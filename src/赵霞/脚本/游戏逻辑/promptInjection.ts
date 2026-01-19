@@ -31,10 +31,7 @@ import {
   applyInterruptionResult,
   type InterruptionCheckResult,
 } from './boundaryInterruption';
-import {
-  detectDangerousContent,
-  shouldSkipDangerousContentDetection,
-} from './dangerousContentDetection';
+import { detectDangerousContent, shouldSkipDangerousContentDetection } from './dangerousContentDetection';
 import {
   calculateScene5Completion as calculateScene5CompletionNew,
   generateScene5EntryReplacement as generateScene5EntryReplacementNew,

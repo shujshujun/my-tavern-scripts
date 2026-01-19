@@ -666,7 +666,9 @@ $(async () => {
         const maxAllowed = Math.min(100, oldAffection + PURE_LOVE_DAILY_LIMIT);
         if (newAffection > maxAllowed) {
           _.set(new_variables, 'stat_data.赵霞状态.纯爱好感度', maxAllowed);
-          console.warn(`[MVU监听] 纯爱好感度增幅过大：${oldAffection} → ${newAffection}，限制为 ${maxAllowed}（每天上限${PURE_LOVE_DAILY_LIMIT}）`);
+          console.warn(
+            `[MVU监听] 纯爱好感度增幅过大：${oldAffection} → ${newAffection}，限制为 ${maxAllowed}（每天上限${PURE_LOVE_DAILY_LIMIT}）`,
+          );
         }
       } else if (newAffection < oldAffection) {
         // 不允许降低纯爱好感度
@@ -681,7 +683,9 @@ $(async () => {
         const maxAllowed = Math.min(100, oldIntimacy + PURE_LOVE_DAILY_LIMIT);
         if (newIntimacy > maxAllowed) {
           _.set(new_variables, 'stat_data.赵霞状态.纯爱亲密度', maxAllowed);
-          console.warn(`[MVU监听] 纯爱亲密度增幅过大：${oldIntimacy} → ${newIntimacy}，限制为 ${maxAllowed}（每天上限${PURE_LOVE_DAILY_LIMIT}）`);
+          console.warn(
+            `[MVU监听] 纯爱亲密度增幅过大：${oldIntimacy} → ${newIntimacy}，限制为 ${maxAllowed}（每天上限${PURE_LOVE_DAILY_LIMIT}）`,
+          );
         }
       } else if (newIntimacy < oldIntimacy) {
         // 不允许降低纯爱亲密度

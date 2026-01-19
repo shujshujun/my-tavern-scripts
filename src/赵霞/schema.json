@@ -776,6 +776,8 @@
     "现实数据": {
       "default": {
         "丈夫怀疑度": 0,
+        "今日怀疑度降低": 0,
+        "上次降低日期": 0,
         "丈夫当前位置": "客厅"
       },
       "type": "object",
@@ -785,6 +787,16 @@
           "type": "number",
           "minimum": 0,
           "maximum": 100
+        },
+        "今日怀疑度降低": {
+          "default": 0,
+          "type": "number",
+          "minimum": 0,
+          "maximum": 10
+        },
+        "上次降低日期": {
+          "default": 0,
+          "type": "number"
         },
         "丈夫当前位置": {
           "default": "客厅",
