@@ -623,6 +623,40 @@ $(async () => {
             }
           }
         }
+
+        // BUG-011 修复：验证AI写入的丈夫心理活动，防止思维链泄露
+        const newThought = newData.现实数据?.丈夫心理活动;
+        const oldThought = oldData.现实数据?.丈夫心理活动;
+        if (newThought && newThought !== oldThought) {
+          // 检测是否包含AI思维链特征
+          const invalidPatterns = [
+            /<think>/i,
+            /<core_memory>/i,
+            /<!--.*-->/,
+            /Variable check:/i,
+            /Key constraint:/i,
+            /So we are in/i,
+            /WAIT:/i,
+            /writing antThinking/i,
+          ];
+          const hasInvalidContent = invalidPatterns.some(p => p.test(newThought));
+          const isTooLong = newThought.length > 500;
+          const chineseChars = (newThought.match(/[\u4e00-\u9fa5]/g) || []).length;
+          const chineseRatio = chineseChars / newThought.length;
+          const lowChineseRatio = chineseRatio < 0.3 && newThought.length > 50;
+
+          if (hasInvalidContent || isTooLong || lowChineseRatio) {
+            // 回滚到旧值或清空
+            _.set(new_variables, 'stat_data.现实数据.丈夫心理活动', oldThought ?? '');
+            console.warn(
+              `[MVU监听] BUG-011修复：检测到AI写入异常的丈夫心理活动（可能是思维链），已回滚`,
+              `\n  长度: ${newThought.length}`,
+              `\n  中文比例: ${(chineseRatio * 100).toFixed(1)}%`,
+              `\n  包含无效标记: ${hasInvalidContent}`,
+            );
+          }
+        }
+
         return;
       }
 
@@ -738,33 +772,16 @@ $(async () => {
         `[游戏逻辑] processGameLogic 进入: message_id=${message_id}, swipe_id=${swipeId}, eventType=${eventType}`,
       );
 
-      // BUG-010 修复：初始化后的第一条消息仍需推进时间
-      // 原问题：跳过第一条消息导致时间卡在8点不推进
-      // 修复：第一条消息只执行时间推进，跳过其他复杂处理（梦境检测、危险检测等）
+      // BUG-010 修复（二次修正）：移除第一条消息的特殊处理
+      // 原修复：第一条消息只执行时间推进然后 return，跳过其他逻辑
+      // 问题：如果第一条消息包含安眠药关键词，promptInjection 设置的梦境状态不会被保存
+      //       因为数据保存在 processGameLogic 的末尾，但第一条消息提前 return 了
+      // 新修复：不再特殊处理第一条消息，让它走完整流程
+      //        这样 promptInjection 设置的状态会被正确保存
       if (eventType === 'MESSAGE_RECEIVED' && isFirstMessageAfterInit) {
         isFirstMessageAfterInit = false;
-        console.info(`[游戏逻辑] 初始化后的第一条消息: ${message_id}，仅执行时间推进`);
-
-        // 读取变量并推进时间
-        const firstMsgVars = Mvu.getMvuData({ type: 'message', message_id: message_id });
-        const firstMsgStatData = _.get(firstMsgVars, 'stat_data');
-        if (firstMsgStatData) {
-          try {
-            const firstMsgData = Schema.parse(firstMsgStatData);
-            const timeBeforeAdvance = firstMsgData.世界.时间;
-            TimeSystem.advance(firstMsgData, 1);
-            TimeSystem.validateAndFixTimeConsistency(firstMsgData);
-            const timeAfterAdvance = firstMsgData.世界.时间;
-            console.info(`[游戏逻辑] 第一条消息时间推进: ${timeBeforeAdvance} → ${timeAfterAdvance}`);
-
-            // 保存时间推进后的数据
-            _.set(firstMsgVars, 'stat_data', firstMsgData);
-            Mvu.replaceMvuData(firstMsgVars, { type: 'message', message_id: message_id });
-          } catch (err) {
-            console.error('[游戏逻辑] 第一条消息时间推进失败:', err);
-          }
-        }
-        return;
+        console.info(`[游戏逻辑] 初始化后的第一条消息: ${message_id}，执行完整处理流程`);
+        // 不再 return，继续执行下面的完整流程
       }
 
       // 去重逻辑 + ROLL时重置梦境选择状态

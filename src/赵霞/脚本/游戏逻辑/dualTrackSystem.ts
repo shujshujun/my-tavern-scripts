@@ -15,6 +15,103 @@ import type { Schema as SchemaType } from '../../schema';
 // ============================================
 
 /**
+ * 清理文本中的AI思维链和内部标记
+ * BUG-011 修复：过滤掉可能混入苦主视角的AI内部内容
+ * @param text 原始文本
+ * @returns 清理后的文本
+ */
+function cleanThinkingContent(text: string): string {
+  let cleaned = text;
+
+  // 移除 <think> 标签及其内容
+  cleaned = cleaned.replace(/<think>[\s\S]*?<\/think>/gi, '');
+
+  // 移除 <core_memory> 标签及其内容
+  cleaned = cleaned.replace(/<core_memory>[\s\S]*?<\/core_memory>/gi, '');
+
+  // 移除 <!-- ... --> HTML注释（包括 writing antThinking 等）
+  cleaned = cleaned.replace(/<!--[\s\S]*?-->/g, '');
+
+  // 移除可能的法语/英语思考内容标记
+  cleaned = cleaned.replace(/\[thinking\][\s\S]*?\[\/thinking\]/gi, '');
+
+  // 移除 WAIT: 或 UPDATE: 等内部指令
+  cleaned = cleaned.replace(/(?:^|\n)\s*(?:WAIT|UPDATE|IMPORTANT|NOTE|TODO):\s*[^\n]*/gi, '');
+
+  // 移除以 - 开头的连续列表项（可能是AI的分析列表）
+  // 但保留正常的短列表（少于3项）
+  const listMatches = cleaned.match(/(?:^|\n)\s*-\s+[^\n]+/g);
+  if (listMatches && listMatches.length > 5) {
+    // 超过5个列表项，可能是AI的分析内容，移除
+    cleaned = cleaned.replace(/(?:^|\n)\s*-\s+[^\n]+/g, '');
+  }
+
+  // 移除变量检查相关内容
+  cleaned = cleaned.replace(/Variable check:[\s\S]*?(?=\n\n|\n[^\n-]|$)/gi, '');
+  cleaned = cleaned.replace(/Update Variable check:[\s\S]*?(?=\n\n|\n[^\n-]|$)/gi, '');
+
+  // 移除 So we are in 等分析性语句
+  cleaned = cleaned.replace(/So we are in[\s\S]*?(?=\n\n|$)/gi, '');
+
+  // 移除 Key constraint 等提示
+  cleaned = cleaned.replace(/Key constraint:[\s\S]*?(?=\n\n|$)/gi, '');
+
+  // 移除多余的空白行
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+
+  return cleaned.trim();
+}
+
+/**
+ * 验证内容是否像是合法的苦主视角（而非AI思维链）
+ * @param text 待验证文本
+ * @returns 是否合法
+ */
+function isValidHusbandThought(text: string): boolean {
+  // 如果太长（超过500字符），可能是思维链
+  if (text.length > 500) {
+    console.warn(`[苦主视角] 内容过长(${text.length}字符)，可能是AI思维链，拒绝使用`);
+    return false;
+  }
+
+  // 如果包含明显的AI内部标记，拒绝
+  const invalidPatterns = [
+    /<think>/i,
+    /<core_memory>/i,
+    /<!--.*-->/,
+    /\[thinking\]/i,
+    /Variable check:/i,
+    /Key constraint:/i,
+    /So we are in/i,
+    /WAIT:/i,
+    /writing antThinking/i,
+    /Let me/i, // AI自我指令
+    /I should/i, // AI自我指令
+    /I need to/i, // AI自我指令
+  ];
+
+  for (const pattern of invalidPatterns) {
+    if (pattern.test(text)) {
+      console.warn(`[苦主视角] 检测到AI内部标记，拒绝使用: ${pattern}`);
+      return false;
+    }
+  }
+
+  // 如果中英文/法语混杂过多，可能是AI思考
+  const chineseChars = (text.match(/[\u4e00-\u9fa5]/g) || []).length;
+  const totalChars = text.length;
+  const chineseRatio = chineseChars / totalChars;
+
+  // 正常的苦主视角应该主要是中文（至少50%）
+  if (chineseRatio < 0.3 && totalChars > 50) {
+    console.warn(`[苦主视角] 中文比例过低(${(chineseRatio * 100).toFixed(1)}%)，可能是AI思维链，拒绝使用`);
+    return false;
+  }
+
+  return true;
+}
+
+/**
  * 从AI回复中解析苦主视角（丈夫心理活动）
  * @param aiText AI的回复文本
  * @returns 解析出的心理活动文本，如果没有则返回null
@@ -22,8 +119,18 @@ import type { Schema as SchemaType } from '../../schema';
 export function parseHusbandThought(aiText: string): string | null {
   const match = aiText.match(/<HusbandThought>([\s\S]*?)<\/HusbandThought>/i);
   if (match && match[1]) {
-    const thought = match[1].trim();
+    let thought = match[1].trim();
+
+    // BUG-011 修复：清理可能混入的AI思维链内容
+    thought = cleanThinkingContent(thought);
+
     if (thought.length > 0) {
+      // 验证内容是否合法
+      if (!isValidHusbandThought(thought)) {
+        console.warn(`[苦主视角] 内容未通过验证，返回null`);
+        return null;
+      }
+
       console.info(`[苦主视角] 解析到AI生成的心理活动: ${thought}`);
       return thought;
     }
