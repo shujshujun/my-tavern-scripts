@@ -3793,7 +3793,9 @@ export function generateFullInjection(
         }
         // Bug #15 修复：ROLL 时不推进数据，index.ts 已经处理了回滚
         shouldProgressScene5Step = false;
-        console.info(`[Prompt注入] ROLL 检测：使用当前步骤 ${completion.currentStep}/12 生成 prompt（index.ts 已回滚）`);
+        console.info(
+          `[Prompt注入] ROLL 检测：使用当前步骤 ${completion.currentStep}/12 生成 prompt（index.ts 已回滚）`,
+        );
       } else {
         // 正常操作：使用当前数据生成 prompt，并推进数据
         shouldProgressScene5Step = true;
@@ -4751,15 +4753,17 @@ export function initPromptInjection(): void {
               }
 
               // 初始化/更新场景5数据
-              const existingScene5Data = currentData.梦境数据.场景5 as {
-                已进入?: boolean;
-                进入时间?: string;
-                进入次数?: number;
-                当前步骤?: number;
-                完成度?: number;
-                步骤进度记录?: number[];
-                已完成步骤?: boolean;
-              } | undefined;
+              const existingScene5Data = currentData.梦境数据.场景5 as
+                | {
+                    已进入?: boolean;
+                    进入时间?: string;
+                    进入次数?: number;
+                    当前步骤?: number;
+                    完成度?: number;
+                    步骤进度记录?: number[];
+                    已完成步骤?: boolean;
+                  }
+                | undefined;
 
               if (!currentData.梦境数据.场景5) {
                 (currentData.梦境数据 as any).场景5 = {};
@@ -4802,14 +4806,16 @@ export function initPromptInjection(): void {
               const completion = calculateScene5CompletionNew(currentData);
               if (completion.isComplete && !currentData.梦境数据.已完成场景.includes(5)) {
                 currentData.梦境数据.已完成场景.push(5);
-                console.info(`[Prompt注入] 场景5完成（完成度: ${completion.completionPercent}%，步骤: ${completion.currentStep}/12）`);
+                console.info(
+                  `[Prompt注入] 场景5完成（完成度: ${completion.completionPercent}%，步骤: ${completion.currentStep}/12）`,
+                );
               }
 
               console.info(
                 `[Prompt注入] 退出场景5（20:00），` +
-                `完成度: ${completion.completionPercent}%，` +
-                `步骤: ${completion.currentStep}/12，` +
-                `状态: ${completion.isComplete ? '已完成(≥80%)' : '未完成(<80%)'}`
+                  `完成度: ${completion.completionPercent}%，` +
+                  `步骤: ${completion.currentStep}/12，` +
+                  `状态: ${completion.isComplete ? '已完成(≥80%)' : '未完成(<80%)'}`,
               );
 
               // Bug #21 扩展：记录场景5退出的楼层ID，用于支持 ROLL
@@ -4851,7 +4857,7 @@ export function initPromptInjection(): void {
                       {
                         okButton: false,
                         cancelButton: false,
-                      }
+                      },
                     );
                     loadingPopup.show();
                     console.info('[记忆摘要] 场景5：显示结算弹窗');
