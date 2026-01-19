@@ -51,21 +51,58 @@ export interface InterruptionResult {
  * @param userInput 玩家输入
  * @returns 检测结果
  */
-export function detectDangerousContent(userInput: string): InterruptionResult {
+/**
+ * 检测危险内容（带怀疑度参数，用于概率计算）
+ * @param userInput 玩家输入
+ * @param currentSuspicion 当前怀疑度（用于严重危险的概率判定）
+ * @returns 检测结果
+ */
+export function detectDangerousContent(userInput: string, currentSuspicion: number = 0): InterruptionResult {
   const normalizedInput = userInput.toLowerCase();
 
-  // 检测严重危险（最高优先级）→ 触发BAD END
+  // 检测严重危险（最高优先级）
+  // Bug #005 修复：不直接触发BAD END，而是基于怀疑度概率触发
   for (const [category, keywords] of Object.entries(DANGEROUS_KEYWORDS.严重)) {
     const matchedKeywords = keywords.filter(kw => normalizedInput.includes(kw));
     if (matchedKeywords.length > 0) {
       console.warn(`[危险检测] ⚠️ 严重危险！匹配到 ${category} 关键词: ${matchedKeywords.join(', ')}`);
-      return {
-        shouldInterrupt: true,
-        severity: '严重',
-        category,
-        action: 'TRIGGER_BAD_END',
-        message: generateBadEndingText(category),
-      };
+
+      // 概率判定：怀疑度>=50时开始有概率触发坏结局
+      // 公式：(怀疑度-50) × 2% = 50→0%, 75→50%, 100→100%
+      // 设计意图：玩家可以通过与苏文互动降低怀疑度，所以门槛可以低一些
+      let badEndProbability = 0;
+      if (currentSuspicion >= 100) {
+        badEndProbability = 1.0;
+      } else if (currentSuspicion >= 50) {
+        badEndProbability = (currentSuspicion - 50) * 0.02; // 50→0%, 75→50%, 100→100%
+      }
+      const randomRoll = Math.random();
+      const shouldTriggerBadEnd = randomRoll < badEndProbability;
+
+      console.info(
+        `[危险检测] 严重危险概率判定: 怀疑度=${currentSuspicion}, 概率=${(badEndProbability * 100).toFixed(1)}%, ` +
+          `掷骰=${(randomRoll * 100).toFixed(1)}%, 触发坏结局=${shouldTriggerBadEnd}`,
+      );
+
+      if (shouldTriggerBadEnd) {
+        return {
+          shouldInterrupt: true,
+          severity: '严重',
+          category,
+          action: 'TRIGGER_BAD_END',
+          message: generateBadEndingText(category),
+        };
+      } else {
+        // 没触发坏结局：强制修正 + 大幅增加怀疑度
+        return {
+          shouldInterrupt: true,
+          severity: '严重',
+          category,
+          action: 'FORCE_CORRECTION',
+          correctedPrompt: generateSevereWarningPrompt(category),
+          penalties: { 怀疑度: 30 }, // 严重危险：怀疑度+30
+        };
+      }
     }
   }
 
@@ -110,15 +147,71 @@ export function detectDangerousContent(userInput: string): InterruptionResult {
 }
 
 /**
- * 生成坏结局文本
+ * 生成坏结局文本（复用苏文打断系统的模板）
+ * 设计意图：严重危险被发现时，触发苏文撞破的场景
  */
-function generateBadEndingText(category: string): string {
-  const badEndingTexts: Record<string, string> = {
-    暴力行为: '你的暴力行为彻底摧毁了一切。赵霞眼中充满恐惧，她再也不会相信你了...',
-    药物行为: '你的行为被发现了。警察已经在路上，一切都结束了...',
-    极端行为: '你失去了理智，做出了无法挽回的事情。游戏结束。',
+function generateBadEndingText(_category: string): string {
+  // 复用 boundaryInterruption.ts 中的坏结局模板风格
+  return `[坏结局触发]
+
+门突然被推开，苏文站在门口，脸色铁青。
+他看到了你和赵霞之间不正常的距离，看到了她惊恐的表情。
+"你们...在干什么？"
+寂静。
+时间仿佛凝固了。
+一切都结束了。
+
+【BAD END: 发现】
+
+【AI任务】
+- 描写苏文发现真相后的反应
+- 赵霞的恐惧和无助
+- {{user}}的处境已经无法挽回
+- 这个家庭彻底破碎了`;
+}
+
+/**
+ * 生成严重警告的修正Prompt（Bug #005：严重危险未触发坏结局时使用）
+ */
+function generateSevereWarningPrompt(category: string): string {
+  const warningTemplates: Record<string, string> = {
+    暴力行为: `[系统修正 - 严重警告]
+玩家试图做出暴力行为，但被阻止了。请生成以下内容：
+1. {{user}}的手停在半空中，内心的理智在最后一刻拉住了他
+2. 他看到赵霞眼中的恐惧，突然意识到自己差点做出无法挽回的事
+3. 赵霞后退了几步，声音颤抖："你...你想干什么？"
+4. 气氛变得极度紧张，赵霞对{{user}}产生了严重的戒备
+
+【警告：怀疑度大幅增加，继续类似行为将直接触发坏结局】
+请基于以上要点生成剧情，不要提及"系统修正"。`,
+
+    药物行为: `[系统修正 - 严重警告]
+玩家的企图被察觉了。请生成以下内容：
+1. 赵霞注意到了{{user}}的异常举动
+2. 她的表情变得警觉，下意识地远离了桌上的饮料
+3. "你...刚才在做什么？"她的声音带着怀疑
+4. 气氛变得紧张，她开始对{{user}}产生严重的不信任
+
+【警告：怀疑度大幅增加，继续类似行为将直接触发坏结局】
+请基于以上要点生成剧情，不要提及"系统修正"。`,
+
+    极端行为: `[系统修正 - 严重警告]
+玩家的极端想法被打断了。请生成以下内容：
+1. {{user}}的理智在最后关头占了上风
+2. 他意识到自己的想法有多么疯狂
+3. 深呼吸，努力让自己冷静下来
+4. 但这一瞬间的失控已经被赵霞察觉，她的眼神中多了几分恐惧
+
+【警告：怀疑度大幅增加，继续类似行为将直接触发坏结局】
+请基于以上要点生成剧情，不要提及"系统修正"。`,
   };
-  return badEndingTexts[category] || '你的行为触发了最坏的结局...';
+
+  return (
+    warningTemplates[category] ||
+    `[系统修正 - 严重警告]
+玩家的危险行为被阻止了。请生成{{user}}在最后关头恢复理智的场景。
+【警告：怀疑度大幅增加，继续类似行为将直接触发坏结局】`
+  );
 }
 
 /**

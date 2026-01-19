@@ -1430,10 +1430,11 @@ export function calculateSuspicionIncrease(data: SchemaType, userInputText: stri
   // 设计意图：玩家主动在苏文面前做亲密动作会增加怀疑度
   // 这是玩家的主观行为，无论哪种模式都应该受到约束
   // Bug #14 修复：仅检测玩家输入，不检测AI回复
+  // Bug #005 修复：降低惩罚值，原来+5/+10/+20太高，改为+3/+5/+10
   if (userInputText) {
     const 亲密等级 = detectIntimacyLevel(userInputText);
     if (亲密等级 >= 1) {
-      const 亲密增加 = [0, 5, 10, 20][亲密等级];
+      const 亲密增加 = [0, 3, 5, 10][亲密等级]; // Bug #005: 降低惩罚值
       result.详细.亲密行为 = 亲密增加;
       result.增加值 += 亲密增加;
       const 模式标注 = 真相模式 ? '' : '（纯爱模式）';
@@ -1488,6 +1489,162 @@ export function updateSuspicionLevel(data: SchemaType, userInputText: string = '
     }
 
     return 新怀疑度;
+  }
+
+  return data.现实数据.丈夫怀疑度;
+}
+
+// ============================================
+// 怀疑度降低系统（Bug #005 新增）
+// ============================================
+
+/**
+ * 与苏文相处/聊天的关键词
+ * 检测玩家是否在与苏文进行正常互动
+ */
+const HUSBAND_INTERACTION_KEYWORDS = [
+  // 直接称呼
+  '苏文',
+  '老公',
+  '丈夫',
+  // 聊天/相处
+  '聊天',
+  '说话',
+  '交谈',
+  '陪伴',
+  '一起',
+  '陪他',
+  '陪苏文',
+  // 家庭互动
+  '吃饭',
+  '看电视',
+  '散步',
+  '做饭',
+  '家务',
+  // 关心
+  '关心',
+  '问候',
+  '怎么样',
+  '辛苦了',
+  '累不累',
+];
+
+/**
+ * 检测玩家是否在与苏文进行正常互动
+ * @param userInput 玩家输入
+ * @returns 是否检测到与苏文的正常互动
+ */
+export function detectHusbandInteraction(userInput: string): boolean {
+  return HUSBAND_INTERACTION_KEYWORDS.some(kw => userInput.includes(kw));
+}
+
+/**
+ * 怀疑度降低结果
+ */
+export interface SuspicionDecreaseResult {
+  降低值: number;
+  原因: string;
+  今日累计降低: number;
+  已达上限: boolean;
+}
+
+/**
+ * 计算并应用怀疑度降低
+ *
+ * Bug #005 新增：与苏文正常相处/聊天时可降低怀疑度
+ * - 每次互动降低 3 点
+ * - 每天最多降低 10 点
+ * - 跨天自动重置计数
+ *
+ * @param data 游戏数据
+ * @param userInput 玩家输入
+ * @returns 降低结果
+ */
+export function calculateSuspicionDecrease(data: SchemaType, userInput: string): SuspicionDecreaseResult {
+  const result: SuspicionDecreaseResult = {
+    降低值: 0,
+    原因: '',
+    今日累计降低: data.现实数据.今日怀疑度降低 ?? 0,
+    已达上限: false,
+  };
+
+  // 前置条件：苏文在家
+  const 苏文在家 = data.现实数据.丈夫当前位置 !== '外出';
+  if (!苏文在家) {
+    return result;
+  }
+
+  // 前置条件：怀疑度 > 0
+  if (data.现实数据.丈夫怀疑度 <= 0) {
+    return result;
+  }
+
+  // 检测是否与苏文互动
+  if (!detectHusbandInteraction(userInput)) {
+    return result;
+  }
+
+  // 检测跨天重置
+  const 当前天数 = data.世界.当前天数;
+  const 上次降低日期 = data.现实数据.上次降低日期 ?? 0;
+  if (当前天数 !== 上次降低日期) {
+    // 跨天了，重置今日降低计数
+    data.现实数据.今日怀疑度降低 = 0;
+    data.现实数据.上次降低日期 = 当前天数;
+    result.今日累计降低 = 0;
+  }
+
+  // 检查是否已达今日上限（10点）
+  const 每日上限 = 10;
+  const 今日已降低 = data.现实数据.今日怀疑度降低 ?? 0;
+  if (今日已降低 >= 每日上限) {
+    result.已达上限 = true;
+    result.原因 = '今日怀疑度降低已达上限（10点）';
+    return result;
+  }
+
+  // 计算本次可降低值（每次互动降低3点，但不超过今日剩余额度）
+  const 每次降低 = 3;
+  const 剩余额度 = 每日上限 - 今日已降低;
+  const 实际降低 = Math.min(每次降低, 剩余额度, data.现实数据.丈夫怀疑度);
+
+  if (实际降低 > 0) {
+    result.降低值 = 实际降低;
+    result.原因 = '与苏文正常相处';
+    result.今日累计降低 = 今日已降低 + 实际降低;
+  }
+
+  return result;
+}
+
+/**
+ * 更新丈夫怀疑度（降低）
+ *
+ * @param data 游戏数据
+ * @param userInput 玩家输入
+ * @returns 更新后的怀疑度
+ */
+export function applySuspicionDecrease(data: SchemaType, userInput: string): number {
+  const result = calculateSuspicionDecrease(data, userInput);
+
+  if (result.降低值 > 0) {
+    const 旧怀疑度 = data.现实数据.丈夫怀疑度;
+    const 新怀疑度 = Math.max(0, 旧怀疑度 - result.降低值);
+
+    data.现实数据.丈夫怀疑度 = 新怀疑度;
+    data.现实数据.今日怀疑度降低 = result.今日累计降低;
+
+    console.info(
+      `[丈夫怀疑度] ${旧怀疑度} → ${新怀疑度} (-${result.降低值})`,
+      `\n  原因: ${result.原因}`,
+      `\n  今日累计降低: ${result.今日累计降低}/10`,
+    );
+
+    return 新怀疑度;
+  }
+
+  if (result.已达上限) {
+    console.info(`[丈夫怀疑度] ${result.原因}`);
   }
 
   return data.现实数据.丈夫怀疑度;

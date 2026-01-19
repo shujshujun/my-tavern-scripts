@@ -514,9 +514,9 @@ export function checkBoundaryInterruption(data: SchemaType, userInput: string): 
     丈夫位置: ${data.现实数据.丈夫当前位置}`);
   }
 
-  // 计算疑心惩罚（真相模式下惩罚减半）
-  const isTruthMode = data.世界.已进入过梦境 === true;
-  const suspicionPenalty = calculateSuspicionPenalty(maxRealmGap, 可打断, isTruthMode);
+  // Bug #005 修复：移除境界打断中的怀疑度惩罚，避免与怀疑值更新系统重复
+  // 怀疑度增加统一由 appearanceSystem.ts 中的 updateSuspicionLevel 处理
+  // 境界打断只负责：1. 生成打断/拒绝场景 2. 触发BAD END（极端情况）
 
   // 根据跨越程度决定严重性
   let severity: '无' | '轻微' | '中等' | '严重';
@@ -524,17 +524,15 @@ export function checkBoundaryInterruption(data: SchemaType, userInput: string): 
   let correctionPrompt: string | undefined;
   const penalties: InterruptionCheckResult['penalties'] = {};
 
-  // 超阶段行为始终增加疑心（无论是否被打断）
-  penalties.怀疑度增加 = suspicionPenalty;
-
   // 判断第一个违规部位是否是嘴巴程度违规
   const firstViolatedPart = violatedParts[0];
   const isFirstPartMouthIntensity = firstViolatedPart === '嘴巴' && mouthIntensityViolation;
 
   if (maxRealmGap >= 3) {
     severity = '严重';
-    // 跨3个境界以上：可能触发BAD END（怀疑度达到100时）
-    if (怀疑度 + suspicionPenalty >= 100) {
+    // Bug #005 修复：BAD END 判定改为检查当前怀疑度是否已经>=100
+    // 不再在这里累加怀疑度，由 updateSuspicionLevel 统一处理
+    if (怀疑度 >= 100) {
       triggerBadEnd = true;
       correctionPrompt = generateBadEndPrompt('extreme_violation');
     } else if (wasInterrupted) {
@@ -1013,9 +1011,11 @@ export function applyInterruptionResult(data: SchemaType, result: InterruptionCh
     console.error(`[境界打断] 丈夫怀疑度达到100，触发发现结局！`);
   }
 
-  if (data.梦境数据.记忆混乱度 >= 100) {
+  // Bug #001 修复：精神崩溃只在场景5中触发，场景1-4的混乱度增加只是给玩家紧张感
+  const isInScene5 = data.梦境数据.场景5?.已进入 === true && data.世界.游戏阶段 === '梦境';
+  if (data.梦境数据.记忆混乱度 >= 100 && isInScene5) {
     data.结局数据.当前结局 = '坏结局';
     data.世界.循环状态 = '结局判定';
-    console.error(`[境界打断] 记忆混乱度达到100，触发精神崩溃结局！`);
+    console.error(`[境界打断] 记忆混乱度达到100且在场景5中，触发精神崩溃结局！`);
   }
 }

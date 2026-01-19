@@ -354,8 +354,10 @@ export function checkBadEnding(data: SchemaType): BadEndingCheckResult {
   // 检测精神崩溃结局（混乱度 >= 100）
   // 注意：这是备用检测，主要的混乱结局逻辑在 confusionEndingSystem.ts 中
   // confusionEndingSystem 有更完整的场景5越轨行为检测和警告系统
-  if (data.梦境数据.记忆混乱度 >= 100) {
-    console.info('[坏结局系统] 混乱度达到100，触发精神崩溃结局');
+  // Bug #001 修复：精神崩溃只在场景5中触发，场景1-4的混乱度增加只是给玩家紧张感
+  const isInScene5 = data.梦境数据.场景5?.已进入 === true && data.世界.游戏阶段 === '梦境';
+  if (data.梦境数据.记忆混乱度 >= 100 && isInScene5) {
+    console.info('[坏结局系统] 混乱度达到100且在场景5中，触发精神崩溃结局');
     return {
       triggered: true,
       type: '精神崩溃',

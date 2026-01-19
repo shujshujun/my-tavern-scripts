@@ -32,6 +32,10 @@ import {
   type InterruptionCheckResult,
 } from './boundaryInterruption';
 import {
+  detectDangerousContent,
+  shouldSkipDangerousContentDetection,
+} from './dangerousContentDetection';
+import {
   calculateScene5Completion as calculateScene5CompletionNew,
   generateScene5EntryReplacement as generateScene5EntryReplacementNew,
   generateScene5ForceExitReplacement as generateScene5ForceExitReplacementNew,
@@ -3530,14 +3534,105 @@ export function generateFullInjection(
     };
   }
 
-  // 0.5 境界打断检测（日常阶段，玩家行为超出当前境界允许范围）
-  // 只在日常阶段且有玩家输入时检测
-  // Bug #23 修复：添加梦境退出豁免期，避免退出后立即触发惩罚
+  // 0.4 危险内容检测（Bug #005 修复：统一到AI生成前检测）
+  // 添加梦境退出豁免期检查
   const isDreamExitMessage = data.世界.上一轮梦境已退出 !== undefined;
   if (isDreamExitMessage) {
-    console.info(`[Prompt注入] 梦境退出豁免期：跳过境界打断检测（上一轮刚退出梦境）`);
+    console.info(`[Prompt注入] 梦境退出豁免期：跳过危险内容和境界打断检测（上一轮刚退出梦境）`);
   }
 
+  if (userInput && !isDreamExitMessage && !shouldSkipDangerousContentDetection(data)) {
+    // Bug #005 修复：传入当前怀疑度，用于严重危险的概率判定
+    const currentSuspicion = data.现实数据.丈夫怀疑度;
+    const dangerResult = detectDangerousContent(userInput, currentSuspicion);
+
+    // 严重危险：触发BAD END
+    if (dangerResult.action === 'TRIGGER_BAD_END') {
+      console.error(`[Prompt注入] ⚠️ 危险内容检测触发坏档: ${dangerResult.category}`);
+      data.结局数据.当前结局 = '坏结局';
+      data.世界.循环状态 = '结局判定';
+
+      return {
+        systemPrompt: null,
+        replaceUserMessage: dangerResult.message || '你的行为触发了最坏的结局...',
+        prefill: null,
+        shouldEnterDream: false,
+        shouldExitDream: false,
+        shouldEnterScene5: false,
+        shouldExitScene5: false,
+        shouldProgressScene5Step: false,
+        shouldTriggerWrongRoute: false,
+        wrongRoutePart: null,
+        shouldInterrupt: true,
+        interruptionResult: null,
+        shouldTriggerBadEnding: true,
+        badEndingType: '坏结局',
+        shouldTriggerNormalEnding: false,
+        normalEndingType: '未触发',
+        shouldActivateTrueEnding: false,
+        shouldProgressTrueEnding: false,
+        trueEndingComplete: false,
+        shouldActivatePerfectEnding: false,
+        shouldProgressPerfectEnding: false,
+        perfectEndingComplete: false,
+        shouldActivateFalseEnding: false,
+        shouldProgressFalseEnding: false,
+        falseEndingComplete: false,
+        shouldActivateAfterStory: false,
+        shouldProgressAfterStory: false,
+        afterStoryComplete: false,
+        isInFreeMode: false,
+      };
+    }
+
+    // 中等危险：强制修正输入
+    if (dangerResult.action === 'FORCE_CORRECTION' && dangerResult.correctedPrompt) {
+      console.warn(`[Prompt注入] 危险内容已修正: ${dangerResult.category}`);
+      // 应用怀疑度惩罚（梦境中转为混乱度）
+      if (dangerResult.penalties?.怀疑度) {
+        if (data.世界.游戏阶段 === '梦境') {
+          data.梦境数据.记忆混乱度 = Math.min(100, data.梦境数据.记忆混乱度 + dangerResult.penalties.怀疑度);
+          console.info(`[Prompt注入] 梦境中危险行为惩罚：混乱度+${dangerResult.penalties.怀疑度}`);
+        } else {
+          data.现实数据.丈夫怀疑度 = Math.min(100, data.现实数据.丈夫怀疑度 + dangerResult.penalties.怀疑度);
+          console.info(`[Prompt注入] 危险行为惩罚：怀疑度+${dangerResult.penalties.怀疑度}`);
+        }
+      }
+      replaceUserMessage = dangerResult.correctedPrompt;
+    }
+
+    // 轻微危险：仅警告，继续正常流程
+    if (dangerResult.action === 'WARNING_ONLY') {
+      console.info(`[Prompt注入] 轻微危险警告: ${dangerResult.category}`);
+      // 轻微惩罚
+      if (dangerResult.penalties?.警觉度) {
+        if (data.世界.已进入过梦境) {
+          data.梦境数据.记忆混乱度 = Math.min(100, data.梦境数据.记忆混乱度 + 5);
+        } else {
+          data.现实数据.丈夫怀疑度 = Math.min(100, data.现实数据.丈夫怀疑度 + 5);
+        }
+      }
+    }
+  }
+
+  // 0.45 时间跳跃描述检测（BUG-006）
+  // 检测玩家输入中的时间跳跃描述（如"几个小时后"、"第二天"等）
+  // 如果检测到，注入提醒到系统提示中，让AI知道不要错误地描绘其他时间的内容
+  if (userInput) {
+    const timeJumpResult = TimeSystem.detectTimeJumpDescription(userInput, data.世界.时间);
+    if (timeJumpResult.detected && timeJumpResult.reminderPrompt) {
+      console.info(`[Prompt注入] 检测到时间跳跃描述: "${timeJumpResult.matchedKeyword}"，注入提醒`);
+      // 将提醒追加到系统提示中（不替换用户消息，只是提醒AI）
+      if (systemPrompt) {
+        systemPrompt = systemPrompt + '\n\n' + timeJumpResult.reminderPrompt;
+      } else {
+        systemPrompt = timeJumpResult.reminderPrompt;
+      }
+    }
+  }
+
+  // 0.5 境界打断检测（日常阶段，玩家行为超出当前境界允许范围）
+  // 只在日常阶段且有玩家输入时检测
   if (data.世界.游戏阶段 === '日常' && userInput && !isDreamExitMessage) {
     const boundaryResult = checkBoundaryInterruption(data, userInput);
 
@@ -4568,37 +4663,26 @@ export function initPromptInjection(): void {
           }
         }
 
-        // 处理境界打断事件（应用惩罚）
+        // Bug #005 修复：境界打断不再单独应用怀疑度惩罚
+        // 怀疑度增加统一由 index.ts 中的 updateSuspicionLevel 处理
+        // 境界打断只负责生成打断/拒绝场景
         if (shouldInterrupt && interruptionResult) {
-          try {
-            const currentVars = Mvu.getMvuData({ type: 'message', message_id: -1 });
-            const currentData = Schema.parse(_.get(currentVars, 'stat_data'));
-
-            // 应用打断惩罚（怀疑度增加等）
-            applyInterruptionResult(currentData, interruptionResult);
-
-            _.set(currentVars, 'stat_data', currentData);
-            Mvu.replaceMvuData(currentVars, { type: 'message', message_id: -1 });
-            console.info(`[Prompt注入] 境界打断惩罚已应用：怀疑度+${interruptionResult.penalties?.怀疑度增加 ?? 0}`);
-          } catch (interruptErr) {
-            console.error('[Prompt注入] 境界打断惩罚应用失败:', interruptErr);
-          }
-        }
-
-        // 处理超阶段行为（未触发打断但有惩罚）
-        if (!shouldInterrupt && interruptionResult && interruptionResult.penalties?.怀疑度增加) {
-          try {
-            const currentVars = Mvu.getMvuData({ type: 'message', message_id: -1 });
-            const currentData = Schema.parse(_.get(currentVars, 'stat_data'));
-
-            // 应用惩罚（苏文外出时的更高惩罚）
-            applyInterruptionResult(currentData, interruptionResult);
-
-            _.set(currentVars, 'stat_data', currentData);
-            Mvu.replaceMvuData(currentVars, { type: 'message', message_id: -1 });
-            console.info(`[Prompt注入] 超阶段行为惩罚已应用：怀疑度+${interruptionResult.penalties.怀疑度增加}`);
-          } catch (penaltyErr) {
-            console.error('[Prompt注入] 超阶段行为惩罚应用失败:', penaltyErr);
+          console.info(
+            `[Prompt注入] 境界打断已触发：${interruptionResult.severity}，` +
+              `违规部位：[${interruptionResult.violatedParts.join(', ')}]`,
+          );
+          // 如果触发了 BAD END，应用结局状态
+          if (interruptionResult.triggerBadEnd) {
+            try {
+              const currentVars = Mvu.getMvuData({ type: 'message', message_id: -1 });
+              const currentData = Schema.parse(_.get(currentVars, 'stat_data'));
+              applyInterruptionResult(currentData, interruptionResult);
+              _.set(currentVars, 'stat_data', currentData);
+              Mvu.replaceMvuData(currentVars, { type: 'message', message_id: -1 });
+              console.info(`[Prompt注入] 境界打断触发坏结局`);
+            } catch (interruptErr) {
+              console.error('[Prompt注入] 境界打断坏结局应用失败:', interruptErr);
+            }
           }
         }
 

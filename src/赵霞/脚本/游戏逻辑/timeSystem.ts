@@ -351,4 +351,70 @@ export class TimeSystem {
     console.info(`[时间系统] ✅ 时间已正确推进: ${beforeTime} → ${afterTime} (楼层 ${messageId})`);
     return { shouldWarn: false };
   }
+
+  /**
+   * 检测用户输入是否包含时间跳跃描述
+   * BUG-006：玩家可能输入"几个小时后"、"第二天"等时间描述，AI可能会错误地描绘其他时间的内容
+   *
+   * 设计说明：
+   * - 检测玩家输入中是否包含时间跳跃描述词
+   * - 如果检测到，返回提醒内容，用于注入到AI提示中
+   * - 提醒AI不要错误地描绘其他时间的内容，要根据当前的游戏时间
+   *
+   * @param userInput 用户输入
+   * @param currentTime 当前游戏时间（格式："Day X, HH:00"）
+   * @returns 检测结果
+   */
+  static detectTimeJumpDescription(
+    userInput: string,
+    currentTime: string,
+  ): {
+    detected: boolean;
+    matchedKeyword?: string;
+    reminderPrompt?: string;
+  } {
+    // 时间跳跃描述关键词库
+    const TIME_JUMP_KEYWORDS = {
+      // 小时相关
+      小时后: ['小时后', '个小时后', '几小时后', '几个小时后', '一小时后', '两小时后', '三小时后', '数小时后'],
+      // 天相关
+      天后: ['天后', '几天后', '一天后', '两天后', '三天后', '数天后', '第二天', '第三天', '明天', '后天'],
+      // 分钟相关（虽然游戏时间以小时为单位，但玩家可能这样写）
+      分钟后: ['分钟后', '几分钟后', '半小时后', '一会儿后', '过了一会'],
+      // 其他时间跳跃表达
+      时间流逝: ['过了很久', '时间流逝', '不知过了多久', '等到', '直到', '到了晚上', '到了早上', '到了中午'],
+    };
+
+    const normalizedInput = userInput.toLowerCase();
+
+    // 遍历所有分类检测
+    for (const [category, keywords] of Object.entries(TIME_JUMP_KEYWORDS)) {
+      for (const keyword of keywords) {
+        if (normalizedInput.includes(keyword)) {
+          console.info(`[时间系统] 检测到时间跳跃描述: "${keyword}" (分类: ${category})`);
+
+          // 生成提醒Prompt
+          const reminderPrompt = `【系统提醒 - 时间一致性】
+玩家输入中包含时间跳跃描述（"${keyword}"），但游戏时间无法跳跃。
+当前游戏时间：${currentTime}
+
+请注意：
+1. 不要描绘"${keyword}"的场景，游戏时间不会因为玩家描述而跳跃
+2. 继续在当前时间（${currentTime}）的背景下描绘场景
+3. 如果玩家想要跳过时间，可以委婉地告知时间的流逝需要通过正常的游戏进程
+4. 时间只会在每次对话后自动推进1小时，不能被玩家的描述跳过
+
+请基于当前时间继续生成内容，不要提及"系统提醒"。`;
+
+          return {
+            detected: true,
+            matchedKeyword: keyword,
+            reminderPrompt,
+          };
+        }
+      }
+    }
+
+    return { detected: false };
+  }
 }

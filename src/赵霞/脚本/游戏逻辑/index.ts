@@ -24,10 +24,11 @@ import {
   getStyleGuidance,
   updateTruthModeValues,
   updateSuspicionLevel,
+  applySuspicionDecrease,
   updateZhaoxiaLocation,
   updateZhaoxiaThoughtAfterDream,
 } from './appearanceSystem';
-import { processUserInput } from './dangerousContentDetection';
+// Bug #005 修复：危险内容检测已移至 promptInjection.ts
 import {
   updateBodyPartProgress,
   getBodyPartSummary,
@@ -590,14 +591,35 @@ $(async () => {
             console.info('[MVU监听] 梦境阶段（场景1-4）：只允许AI修改肉体部位');
           }
 
-          // 回滚不允许修改的部位
+          // Bug #003 修复：梦境阶段也需要限制每次修改幅度（每晚上限20%）
+          // 问题：之前只检查部位是否允许，没有限制幅度，导致AI可以一次性把部位进度从0%改到100%
           const allParts = ['嘴巴', '胸部', '下体', '后穴', '精神'] as const;
           for (const part of allParts) {
             const oldValue = oldData.赵霞状态?.部位进度?.[part] ?? 0;
             const newValue = newData.赵霞状态?.部位进度?.[part] ?? 0;
-            if (oldValue !== newValue && !allowedParts.includes(part)) {
+
+            if (oldValue === newValue) continue;
+
+            // 不允许修改的部位：完全回滚
+            if (!allowedParts.includes(part)) {
               _.set(new_variables, `stat_data.赵霞状态.部位进度.${part}`, oldValue);
               console.info(`[MVU监听] 梦境阶段：回滚AI对${part}的非法修改 ${newValue} → ${oldValue}（当前场景不允许）`);
+              continue;
+            }
+
+            // 允许修改的部位：限制幅度（每晚上限20%）
+            if (newValue > oldValue) {
+              const maxAllowed = Math.min(100, oldValue + DAILY_DEVELOPMENT_LIMIT);
+              if (newValue > maxAllowed) {
+                _.set(new_variables, `stat_data.赵霞状态.部位进度.${part}`, maxAllowed);
+                console.warn(
+                  `[MVU监听] 梦境阶段：${part}进度增幅过大 ${oldValue} → ${newValue}，限制为 ${maxAllowed}（每晚上限${DAILY_DEVELOPMENT_LIMIT}%）`,
+                );
+              }
+            } else if (newValue < oldValue) {
+              // 不允许降低部位进度（防止AI回滚数值）
+              _.set(new_variables, `stat_data.赵霞状态.部位进度.${part}`, oldValue);
+              console.warn(`[MVU监听] 梦境阶段：不允许降低${part}进度 ${oldValue} → ${newValue}，已回滚`);
             }
           }
         }
@@ -631,6 +653,40 @@ $(async () => {
           _.set(new_variables, `stat_data.赵霞状态.部位进度.${part}`, WRONG_ROUTE_RESET_VALUE);
           console.warn(`[MVU监听] 纯爱模式错误路线触发：${part} 达到 100%，重置为 ${WRONG_ROUTE_RESET_VALUE}%`);
         }
+      }
+
+      // Bug #004 修复：纯爱模式下限制纯爱好感度和纯爱亲密度的增幅
+      // 设计：最快第4天才能达到100，每天最大增幅25
+      const PURE_LOVE_DAILY_LIMIT = 25;
+
+      // 纯爱好感度增幅限制
+      const oldAffection = oldData.赵霞状态?.纯爱好感度 ?? 5;
+      const newAffection = newData.赵霞状态?.纯爱好感度 ?? 5;
+      if (newAffection > oldAffection) {
+        const maxAllowed = Math.min(100, oldAffection + PURE_LOVE_DAILY_LIMIT);
+        if (newAffection > maxAllowed) {
+          _.set(new_variables, 'stat_data.赵霞状态.纯爱好感度', maxAllowed);
+          console.warn(`[MVU监听] 纯爱好感度增幅过大：${oldAffection} → ${newAffection}，限制为 ${maxAllowed}（每天上限${PURE_LOVE_DAILY_LIMIT}）`);
+        }
+      } else if (newAffection < oldAffection) {
+        // 不允许降低纯爱好感度
+        _.set(new_variables, 'stat_data.赵霞状态.纯爱好感度', oldAffection);
+        console.warn(`[MVU监听] 不允许降低纯爱好感度：${oldAffection} → ${newAffection}，已回滚`);
+      }
+
+      // 纯爱亲密度增幅限制
+      const oldIntimacy = oldData.赵霞状态?.纯爱亲密度 ?? 0;
+      const newIntimacy = newData.赵霞状态?.纯爱亲密度 ?? 0;
+      if (newIntimacy > oldIntimacy) {
+        const maxAllowed = Math.min(100, oldIntimacy + PURE_LOVE_DAILY_LIMIT);
+        if (newIntimacy > maxAllowed) {
+          _.set(new_variables, 'stat_data.赵霞状态.纯爱亲密度', maxAllowed);
+          console.warn(`[MVU监听] 纯爱亲密度增幅过大：${oldIntimacy} → ${newIntimacy}，限制为 ${maxAllowed}（每天上限${PURE_LOVE_DAILY_LIMIT}）`);
+        }
+      } else if (newIntimacy < oldIntimacy) {
+        // 不允许降低纯爱亲密度
+        _.set(new_variables, 'stat_data.赵霞状态.纯爱亲密度', oldIntimacy);
+        console.warn(`[MVU监听] 不允许降低纯爱亲密度：${oldIntimacy} → ${newIntimacy}，已回滚`);
       }
 
       // 广播错误路线事件
@@ -887,31 +943,8 @@ $(async () => {
         data.世界.上一轮梦境已退出 = undefined; // 清除标记
       }
 
-      // 1. 危险内容检测（最高优先级）
-      const dangerResult = processUserInput(data, userText);
-      if (dangerResult.triggerBadEnd) {
-        console.error(`[游戏逻辑] ⚠️ 触发坏档: ${dangerResult.badEndType}`);
-        // 广播坏结局事件
-        broadcastGameEvent({
-          type: 'BAD_END_TRIGGERED',
-          data: {
-            reason: dangerResult.badEndType,
-            message: '你的行为触发了最坏的结局...',
-          },
-        });
-      }
-
-      // 如果有修正后的Prompt，广播给前端（用于注入AI请求）
-      if (dangerResult.modifiedInput) {
-        console.warn(`[游戏逻辑] 危险内容已修正，注入修正Prompt`);
-        broadcastGameEvent({
-          type: 'PROMPT_CORRECTION',
-          data: {
-            originalInput: userText,
-            correctedPrompt: dangerResult.modifiedInput,
-          },
-        });
-      }
+      // Bug #005 修复：危险内容检测已移至 promptInjection.ts（AI生成前执行）
+      // 这样可以在 AI 生成前替换用户输入，而不是在生成后才处理
 
       // 1. 检测时间跳过请求（始终禁止跳过，显示MVU提示）
       const timeSkipResult = TimeSystem.processTimeSkipRequest(data, userText);
@@ -1194,8 +1227,18 @@ $(async () => {
       // Bug #14 修复：传入玩家输入（userText）而非AI回复（aiText）
       // 原因：AI回复可能包含梦境回忆等不应触发怀疑的内容
       // Bug #XX 修复：Day 5+ 豁免怀疑度更新（结局日不再触发怀疑度系统）
-      const shouldSkipSuspicion = data.世界.当前天数 >= 5;
+      // Bug #002 修复：添加梦境退出豁免期，避免退出后立即触发怀疑度增加
+      // 原因：玩家从梦境醒来的第一轮，AI描写过渡场景时不应触发怀疑度系统
+      const isDreamExitMessage = data.世界.上一轮梦境已退出 !== undefined;
+      if (isDreamExitMessage) {
+        console.info(`[游戏逻辑] 梦境退出豁免期：跳过怀疑度更新（上一轮刚退出梦境）`);
+      }
+      const shouldSkipSuspicion = data.世界.当前天数 >= 5 || isDreamExitMessage;
       if (data.世界.游戏阶段 === '日常' && data.世界.已进入过梦境 && !shouldSkipSuspicion) {
+        // Bug #005 修复：先尝试降低怀疑度（与苏文相处），再计算增加
+        // 这样玩家可以通过与苏文互动来抵消部分怀疑度增加
+        applySuspicionDecrease(data, userText);
+
         const newSuspicion = updateSuspicionLevel(data, userText);
 
         // Bug #24 修复：怀疑度达到100时立即触发坏结局，不等到结局判定时间
