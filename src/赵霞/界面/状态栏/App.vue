@@ -4274,6 +4274,24 @@ section.dream-thought {
     font-size: 0.8em;
   }
 
+  // 服装网格改为2列
+  .outfit-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 4px;
+  }
+
+  .outfit-item {
+    padding: 4px 6px;
+
+    .outfit-label {
+      font-size: 0.65em;
+    }
+
+    .outfit-value {
+      font-size: 0.7em;
+    }
+  }
+
   // 关系状态网格改为单列
   .stats-grid {
     grid-template-columns: 1fr;

@@ -395,6 +395,40 @@ export function validateAndRestoreData(data: SchemaType, snapshot?: DataSnapshot
 
   if (result.detected) {
     console.warn(`[数据保护] 共检测到 ${result.tamperedFields.length} 个字段被篡改，已全部还原`);
+
+    // BUG-007/008/009 修复：时间字段联动回滚
+    // 如果任一时间字段被篡改并回滚，确保所有时间字段一致
+    const timeFields = ['世界.当前天数', '世界.当前小时', '世界.时间'];
+    const timeFieldTampered = result.tamperedFields.some(f => timeFields.includes(f.path));
+
+    if (timeFieldTampered) {
+      // 使用快照中的时间数据，确保三者一致
+      const snapshotDay = targetSnapshot.data['世界.当前天数'] as number;
+      const snapshotHour = targetSnapshot.data['世界.当前小时'] as number;
+      const snapshotTime = targetSnapshot.data['世界.时间'] as string;
+
+      // 验证快照数据一致性
+      const expectedTime = `Day ${snapshotDay}, ${snapshotHour.toString().padStart(2, '0')}:00`;
+
+      if (snapshotTime !== expectedTime) {
+        // 快照本身不一致，以 当前天数 和 当前小时 为准
+        console.warn(
+          `[数据保护] 时间联动修复：快照不一致，以数值为准`,
+          `\n  天数: ${snapshotDay}, 小时: ${snapshotHour}`,
+          `\n  快照时间: ${snapshotTime} → 修正为: ${expectedTime}`,
+        );
+        setNestedValue(dataObj, '世界.时间', expectedTime);
+      }
+
+      // 确保当前数据与快照一致
+      setNestedValue(dataObj, '世界.当前天数', snapshotDay);
+      setNestedValue(dataObj, '世界.当前小时', snapshotHour);
+      setNestedValue(dataObj, '世界.时间', snapshotTime !== expectedTime ? expectedTime : snapshotTime);
+
+      console.info(
+        `[数据保护] 时间联动回滚完成：Day ${snapshotDay}, ${snapshotHour}:00`,
+      );
+    }
   } else {
     console.info('[数据保护] 数据完整性验证通过');
   }

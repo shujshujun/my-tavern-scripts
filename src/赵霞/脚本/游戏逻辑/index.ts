@@ -738,10 +738,32 @@ $(async () => {
         `[游戏逻辑] processGameLogic 进入: message_id=${message_id}, swipe_id=${swipeId}, eventType=${eventType}`,
       );
 
-      // 跳过初始化后的第一条消息
+      // BUG-010 修复：初始化后的第一条消息仍需推进时间
+      // 原问题：跳过第一条消息导致时间卡在8点不推进
+      // 修复：第一条消息只执行时间推进，跳过其他复杂处理（梦境检测、危险检测等）
       if (eventType === 'MESSAGE_RECEIVED' && isFirstMessageAfterInit) {
         isFirstMessageAfterInit = false;
-        console.info(`[游戏逻辑] 跳过初始化后的第一条消息: ${message_id}`);
+        console.info(`[游戏逻辑] 初始化后的第一条消息: ${message_id}，仅执行时间推进`);
+
+        // 读取变量并推进时间
+        const firstMsgVars = Mvu.getMvuData({ type: 'message', message_id: message_id });
+        const firstMsgStatData = _.get(firstMsgVars, 'stat_data');
+        if (firstMsgStatData) {
+          try {
+            const firstMsgData = Schema.parse(firstMsgStatData);
+            const timeBeforeAdvance = firstMsgData.世界.时间;
+            TimeSystem.advance(firstMsgData, 1);
+            TimeSystem.validateAndFixTimeConsistency(firstMsgData);
+            const timeAfterAdvance = firstMsgData.世界.时间;
+            console.info(`[游戏逻辑] 第一条消息时间推进: ${timeBeforeAdvance} → ${timeAfterAdvance}`);
+
+            // 保存时间推进后的数据
+            _.set(firstMsgVars, 'stat_data', firstMsgData);
+            Mvu.replaceMvuData(firstMsgVars, { type: 'message', message_id: message_id });
+          } catch (err) {
+            console.error('[游戏逻辑] 第一条消息时间推进失败:', err);
+          }
+        }
         return;
       }
 
@@ -1052,6 +1074,9 @@ $(async () => {
         const timeBeforeAdvance = data.世界.时间; // 记录推进前的时间
         TimeSystem.advance(data, 1);
         const timeAfterAdvance = data.世界.时间; // 记录推进后的时间
+
+        // BUG-007/008/009 修复：推进后验证时间一致性
+        TimeSystem.validateAndFixTimeConsistency(data);
 
         // 时间推进检测：在脚本处理后检测时间是否正确推进
         // 只对最新楼层进行检测，避免查看历史楼层时误报

@@ -115,9 +115,89 @@ export class TimeSystem {
    * @param hour 小时 (0-23)
    * @returns 格式化字符串 "Day 1, 08:00"
    */
-  private static formatTime(day: number, hour: number): string {
+  static formatTime(day: number, hour: number): string {
     const hourStr = hour.toString().padStart(2, '0');
     return `Day ${day}, ${hourStr}:00`;
+  }
+
+  /**
+   * 上次时间推进的时间戳（用于防抖）
+   */
+  private static lastAdvanceTimestamp: number = 0;
+
+  /**
+   * 防抖间隔（毫秒）- 两次推进间隔小于此值则跳过
+   */
+  private static readonly DEBOUNCE_INTERVAL = 500;
+
+  /**
+   * 检查是否应该跳过本次时间推进（防抖机制）
+   * BUG-007/008/009 修复：防止短时间内多次推进导致时间跳跃
+   * @returns 是否应该跳过
+   */
+  static shouldSkipAdvance(): boolean {
+    const now = Date.now();
+    const elapsed = now - this.lastAdvanceTimestamp;
+
+    if (elapsed < this.DEBOUNCE_INTERVAL && this.lastAdvanceTimestamp > 0) {
+      console.warn(`[时间系统] 防抖：距上次推进仅 ${elapsed}ms，跳过本次推进`);
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * 更新上次推进时间戳
+   */
+  static updateAdvanceTimestamp(): void {
+    this.lastAdvanceTimestamp = Date.now();
+  }
+
+  /**
+   * 验证并修复时间一致性
+   * BUG-007/008/009 修复：确保 当前天数、当前小时、时间字符串 三者一致
+   * @param data 游戏数据
+   * @returns 是否进行了修复
+   */
+  static validateAndFixTimeConsistency(data: SchemaType): boolean {
+    const expectedTime = this.formatTime(data.世界.当前天数, data.世界.当前小时);
+
+    if (data.世界.时间 !== expectedTime) {
+      console.error(
+        `[时间系统] ⚠️ 时间不一致！`,
+        `\n  当前天数: ${data.世界.当前天数}`,
+        `\n  当前小时: ${data.世界.当前小时}`,
+        `\n  时间字符串: ${data.世界.时间}`,
+        `\n  期望字符串: ${expectedTime}`,
+        `\n  正在修复...`,
+      );
+
+      // 以 当前天数 和 当前小时 为准，修复时间字符串
+      data.世界.时间 = expectedTime;
+      data.世界.状态栏需要刷新 = true;
+
+      console.info(`[时间系统] ✅ 时间已修复: ${data.世界.时间}`);
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * 从时间字符串解析天数和小时
+   * @param timeStr 时间字符串，如 "Day 1, 08:00"
+   * @returns 解析结果，失败返回 null
+   */
+  static parseTimeString(timeStr: string): { day: number; hour: number } | null {
+    const match = timeStr.match(/Day\s+(\d+),\s*(\d{1,2}):00/);
+    if (match) {
+      return {
+        day: parseInt(match[1], 10),
+        hour: parseInt(match[2], 10),
+      };
+    }
+    return null;
   }
 
   /**
