@@ -3934,7 +3934,9 @@ export function generateFullInjection(
         systemPrompt = dreamSceneGuidance;
       }
       const completedScenes = data.梦境数据.已完成场景 || [];
-      console.info(`[Prompt注入] 梦境场景描写指南已注入（当前场景: ${currentDreamSceneNumber}，已完成场景: [${completedScenes.join(', ')}]）`);
+      console.info(
+        `[Prompt注入] 梦境场景描写指南已注入（当前场景: ${currentDreamSceneNumber}，已完成场景: [${completedScenes.join(', ')}]）`,
+      );
     }
   }
 
