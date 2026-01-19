@@ -760,6 +760,7 @@ $(async () => {
 
   eventOn(Mvu.events.VARIABLE_INITIALIZED, () => {
     isFirstMessageAfterInit = true;
+    console.info(`[首条消息调试] VARIABLE_INITIALIZED 触发，isFirstMessageAfterInit 设为 true`);
   });
 
   async function processGameLogic(message_id: number, eventType: string) {
@@ -780,7 +781,9 @@ $(async () => {
       //        这样 promptInjection 设置的状态会被正确保存
       if (eventType === 'MESSAGE_RECEIVED' && isFirstMessageAfterInit) {
         isFirstMessageAfterInit = false;
-        console.info(`[游戏逻辑] 初始化后的第一条消息: ${message_id}，执行完整处理流程`);
+        console.info(`[首条消息调试] ========== 初始化后的第一条消息 ==========`);
+        console.info(`[首条消息调试] message_id=${message_id}, eventType=${eventType}`);
+        console.info(`[首条消息调试] isFirstMessageAfterInit 已重置为 false`);
         // 不再 return，继续执行下面的完整流程
       }
 
@@ -1087,10 +1090,14 @@ $(async () => {
       // 原因：Bug #26 修复后 MESSAGE_RECEIVED 和 GENERATION_ENDED 都会处理，
       // 如果两个事件都推进时间，会导致时间跳两次（如 8→9→10）
       // ROLL (MESSAGE_SWIPED) 时也不推进时间，保持当前楼层的时间
+      console.info(`[首条消息调试] 时间推进检查: eventType=${eventType}, targetMessageId=${targetMessageId}`);
+      console.info(`[首条消息调试] 当前时间（推进前）: ${data.世界.时间}, 天数=${data.世界.当前天数}, 小时=${data.世界.当前小时}`);
       if (eventType === 'MESSAGE_RECEIVED') {
         const timeBeforeAdvance = data.世界.时间; // 记录推进前的时间
+        console.info(`[首条消息调试] 准备执行 TimeSystem.advance(), timeBeforeAdvance=${timeBeforeAdvance}`);
         TimeSystem.advance(data, 1);
         const timeAfterAdvance = data.世界.时间; // 记录推进后的时间
+        console.info(`[首条消息调试] TimeSystem.advance() 执行完成, timeAfterAdvance=${timeAfterAdvance}`);
 
         // BUG-007/008/009 修复：推进后验证时间一致性
         TimeSystem.validateAndFixTimeConsistency(data);
@@ -1112,6 +1119,7 @@ $(async () => {
       } else {
         console.info('[游戏逻辑] GENERATION_ENDED: 跳过时间推进，已在 MESSAGE_RECEIVED 中处理');
       }
+      console.info(`[首条消息调试] 当前时间（推进后）: ${data.世界.时间}, 天数=${data.世界.当前天数}, 小时=${data.世界.当前小时}`);
 
       // 1.5. 时间推进后检查场景5退出（20:00强制结束）
       // Bug #13 修复后的流程：
@@ -1499,11 +1507,14 @@ $(async () => {
 
       // 验证并写入
       const validatedData = Schema.parse(data);
+      console.info(`[首条消息调试] 准备保存数据到楼层 ${targetMessageId}`);
+      console.info(`[首条消息调试] 保存前时间: ${validatedData.世界.时间}, 天数=${validatedData.世界.当前天数}, 小时=${validatedData.世界.当前小时}`);
 
       // CRITICAL: 深拷贝 currentVars，避免修改引用影响其他楼层
       const newVars = JSON.parse(JSON.stringify(currentVars));
       _.set(newVars, 'stat_data', validatedData);
       await Mvu.replaceMvuData(newVars, { type: 'message', message_id: targetMessageId });
+      console.info(`[首条消息调试] Mvu.replaceMvuData 执行完成`);
 
       console.info(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
       console.info(`[游戏逻辑] 数据已写入楼层 ${targetMessageId}`);

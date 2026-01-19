@@ -111,55 +111,10 @@ import {
 } from './afterStorySystem';
 
 // ============================================
-// Bug #13 修复：模型类型检测
-// 不同模型（Claude vs Gemini）对提示词位置的注意力不同
-// Claude：头部和尾部注意力均匀
-// Gemini：尾部注意力更高，头部容易被忽略
+// Bug #13 修复：统一使用尾部注入
+// 所有模型都使用 chat.push() 将 systemPrompt 放在尾部
+// 这样对 Gemini 和 Claude 都能获得较高的注意力
 // ============================================
-
-/** 模型类型 */
-type ModelType = 'claude' | 'gemini' | 'openai' | 'unknown';
-
-/** 当前检测到的模型类型（缓存） */
-let cachedModelType: ModelType = 'unknown';
-
-/**
- * 检测当前使用的模型类型
- * 通过酒馆的 mainApi 属性判断
- */
-function detectModelType(): ModelType {
-  try {
-    // 获取酒馆的 mainApi（API 类型标识）
-    const mainApi = SillyTavern.mainApi;
-    if (typeof mainApi === 'string') {
-      const apiLower = mainApi.toLowerCase();
-      // 根据 API 类型判断模型
-      if (apiLower.includes('claude') || apiLower.includes('anthropic')) {
-        cachedModelType = 'claude';
-      } else if (apiLower.includes('google') || apiLower.includes('gemini') || apiLower.includes('makersuite')) {
-        cachedModelType = 'gemini';
-      } else if (apiLower.includes('openai') || apiLower.includes('gpt')) {
-        cachedModelType = 'openai';
-      } else {
-        cachedModelType = 'unknown';
-      }
-    }
-    return cachedModelType;
-  } catch (err) {
-    console.warn('[Prompt注入] 模型检测失败:', err);
-    return 'unknown';
-  }
-}
-
-/**
- * 判断当前模型是否需要将关键信息放在尾部
- * Gemini 系列模型对尾部内容注意力更高
- */
-function shouldInjectAtTail(): boolean {
-  const modelType = detectModelType();
-  // Gemini 需要在尾部注入，Claude/OpenAI/其他在头部注入
-  return modelType === 'gemini';
-}
 
 // ============================================
 // Bug #39 修复：结局描写指南常量定义
@@ -554,11 +509,14 @@ function getDreamSceneGuidance(data: SchemaType): string | null {
   // 1. 始终显示系统概述
   parts.push(DREAM_SYSTEM_OVERVIEW);
 
-  // 2. 场景5始终显示（特殊触发方式）
-  parts.push(DREAM_SCENE_DETAILS[5]);
-
-  // 3. 根据完成状态显示场景1-4
+  // 2. 根据完成状态显示场景1-5的AI描写指南
   const completedScenes = data.梦境数据.已完成场景 || [];
+
+  // 场景5：未完成时显示（特殊触发方式，通过安眠药关键词）
+  // 修复：场景5完成后不再显示其AI引导，避免进入场景4时混淆AI
+  if (!completedScenes.includes(5)) {
+    parts.push(DREAM_SCENE_DETAILS[5]);
+  }
 
   // 场景1：未完成时显示
   if (!completedScenes.includes(1)) {
@@ -863,7 +821,7 @@ function calculateScene1InitValues(data: SchemaType): {
   } else if (亲密度 >= 20) {
     relationshipStage = '破冰';
   } else {
-    relationshipStage = '陌生';
+    relationshipStage = '疏离';
   }
 
   // 生成转化描述（用于AI提示）
@@ -1170,7 +1128,7 @@ function getRealmConstraintReminder(realm: number, 已进入梦境: boolean): st
     // Bug #34 修复：使用 textMapping.ts 定义的纯爱模式境界名称
     switch (realm) {
       case 1:
-        return '⚠️ 关系阶段：陌生，赵霞对超出母子关系的亲密行为会困惑或回避';
+        return '⚠️ 关系阶段：疏离，赵霞对超出母子关系的亲密行为会困惑或回避';
       case 2:
         return '⚠️ 关系阶段：破冰，赵霞会保持适当分寸，过度亲密会让她不自在';
       case 3:
@@ -1786,13 +1744,20 @@ function getHusbandStatusDescription(data: SchemaType): string {
  * @param data 游戏数据
  * @param overridePhase 可选：覆盖游戏阶段（用于即将进入梦境但状态尚未更新的情况）
  */
-function generatePhaseAwareStatePrompt(data: SchemaType, overridePhase?: string): string {
+function generatePhaseAwareStatePrompt(
+  data: SchemaType,
+  overridePhase?: string,
+  overrideScene5?: boolean,
+): string {
   // Bug #8 修复：允许覆盖阶段，解决场景5/梦境入口时状态同步问题
   // 当检测到梦境入口关键词但状态尚未更新时，使用覆盖值
   const 阶段 = overridePhase ?? data.世界.游戏阶段;
 
   if (阶段 === '梦境') {
-    return generateDreamPhasePrompt(data);
+    // Bug #13 修复：传递场景5覆盖标志
+    // 当玩家发送"安眠药，入梦"时，场景5.已进入 尚未设置为 true
+    // 但 shouldEnterScene5 已经检测到关键词，需要覆盖场景编号
+    return generateDreamPhasePrompt(data, overrideScene5);
   } else {
     return generateDailyPhasePrompt(data);
   }
@@ -1884,7 +1849,7 @@ ${realmConstraint}${husbandThoughtConstraint ? '\n' + husbandThoughtConstraint :
  * 整合D9剧情引导 + 梦境专用状态
  * 不包含现实世界信息（苏文位置、现实时间氛围等）
  */
-function generateDreamPhasePrompt(data: SchemaType): string {
+function generateDreamPhasePrompt(data: SchemaType, overrideScene5?: boolean): string {
   const hour = data.世界.当前小时;
   // 使用入口天数计算场景，防止跨天后场景编号错误（Bug #6）
   const day = data.世界._梦境入口天数 ?? data.世界.当前天数;
@@ -1892,11 +1857,23 @@ function generateDreamPhasePrompt(data: SchemaType): string {
   // 获取当前场景编号
   let sceneNum = Math.min(day, 4);
 
-  // 检查是否在场景5
+  // 调试：输出场景判断信息
   const scene5Data = data.梦境数据.场景5 as { 已进入?: boolean } | undefined;
-  if (scene5Data?.已进入) {
+  console.info(`[generateDreamPhasePrompt调试] overrideScene5=${overrideScene5}, 场景5.已进入=${scene5Data?.已进入}, day=${day}, 初始sceneNum=${sceneNum}`);
+
+  // Bug #13 修复：优先使用覆盖标志判断场景5
+  // 当玩家发送"安眠药，入梦"时，场景5.已进入 尚未设置为 true
+  // 但 shouldEnterScene5 已经检测到关键词，需要覆盖场景编号
+  if (overrideScene5) {
     sceneNum = 5;
+    console.info('[Prompt注入] Bug #13 修复：使用覆盖标志强制设置为场景5');
+  } else if (scene5Data?.已进入) {
+    // 检查是否在场景5（已经进入的情况）
+    sceneNum = 5;
+    console.info('[generateDreamPhasePrompt调试] 通过场景5.已进入判断为场景5');
   }
+
+  console.info(`[generateDreamPhasePrompt调试] 最终sceneNum=${sceneNum}`);
 
   // 获取场景配置
   const sceneConfig = DREAM_SCENE_THEMES[sceneNum];
@@ -3899,8 +3876,9 @@ export function generateFullInjection(
   // D9剧情引导已整合到梦境阶段的状态Prompt中
   // Bug #8 修复：当即将进入梦境时，覆盖阶段为'梦境'
   // 这解决了AI看到错误游戏阶段（如"序章"而非"梦境"）的问题
+  // Bug #13 修复：传递 shouldEnterScene5 标志，解决场景5入口时显示场景1信息的问题
   const phaseOverride = shouldEnterScene5 || shouldEnterDream ? '梦境' : undefined;
-  const consistencyPrompt = generatePhaseAwareStatePrompt(data, phaseOverride);
+  const consistencyPrompt = generatePhaseAwareStatePrompt(data, phaseOverride, shouldEnterScene5);
   console.info(
     `[Prompt注入] 阶段感知状态已注入，当前阶段: ${data.世界.游戏阶段}${phaseOverride ? ` (覆盖为: ${phaseOverride})` : ''}`,
   );
@@ -5164,58 +5142,23 @@ export function initPromptInjection(): void {
         // 修复范围：不仅是进入梦境时，还包括已经在梦境中的情况
         const isCurrentlyInDream = data.世界.游戏阶段 === '梦境';
         const shouldFixDreamPhase = shouldEnterDream || shouldEnterScene5 || isCurrentlyInDream;
-        console.info(
-          `[Bug9调试] shouldEnterDream=${shouldEnterDream}, shouldEnterScene5=${shouldEnterScene5}, isCurrentlyInDream=${isCurrentlyInDream}, shouldFix=${shouldFixDreamPhase}`,
-        );
         if (shouldFixDreamPhase) {
-          console.info(`[Bug9调试] 进入修复逻辑，chat长度: ${chat.length}`);
-          let foundStatusVariable = false;
           for (const msg of chat) {
             if (typeof msg.content === 'string') {
               if (msg.content.includes('<status_current_variable>')) {
-                foundStatusVariable = true;
                 const before = msg.content.match(/游戏阶段:\s*(日常|序章)/g);
-                console.info(`[Bug9调试] 找到<status_current_variable>，替换前匹配: ${JSON.stringify(before)}`);
                 if (before && before.length > 0) {
                   msg.content = msg.content.replace(/游戏阶段:\s*(日常|序章)/g, '游戏阶段: 梦境');
                   console.info('[Prompt注入] Bug #9 修复：已将 <status_current_variable> 中的游戏阶段替换为梦境');
-                } else {
-                  console.info('[Bug9调试] <status_current_variable>中没有需要替换的旧游戏阶段值');
                 }
               }
             }
           }
-          if (!foundStatusVariable) {
-            console.info('[Bug9调试] 未找到包含<status_current_variable>的消息');
-          }
-        } else {
-          console.info('[Bug9调试] 不在梦境中且不满足进入梦境条件，跳过修复');
         }
 
-        // Bug #13 修复：根据模型类型选择注入位置
-        // Claude/OpenAI：头部注入（第一条 user 消息之前）
-        // Gemini：尾部注入（最后一条消息之后）
+        // 统一使用尾部注入
         if (systemPrompt) {
-          const injectAtTail = shouldInjectAtTail();
-          const modelType = detectModelType();
-
-          if (injectAtTail) {
-            // Gemini 模式：插入到尾部（高注意力区域）
-            chat.push({ role: 'system', content: systemPrompt });
-            console.info(`[Prompt注入] Gemini模式：系统提示插入到尾部（位置：${chat.length - 1}）`);
-          } else {
-            // Claude/OpenAI/其他模式：插入到第一条 user 消息之前（头部）
-            let firstUserIndex = -1;
-            for (let i = 0; i < chat.length; i++) {
-              if (chat[i].role === 'user') {
-                firstUserIndex = i;
-                break;
-              }
-            }
-            const insertIndex = firstUserIndex === -1 ? chat.length : firstUserIndex;
-            chat.splice(insertIndex, 0, { role: 'system', content: systemPrompt });
-            console.info(`[Prompt注入] ${modelType}模式：系统提示插入到头部（位置：${insertIndex}）`);
-          }
+          chat.push({ role: 'system', content: systemPrompt });
         }
 
         // 添加 prefill

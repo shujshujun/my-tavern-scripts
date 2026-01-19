@@ -44,7 +44,7 @@ export type TidinessLevel = (typeof TIDINESS_LEVELS)[number];
  */
 export const PURE_LOVE_APPEARANCE_CONFIG = {
   1: {
-    境界名: '初识',
+    境界名: '疏离',
     允许互动: ['日常对话', '陪伴交流'],
     约束: {
       暴露程度范围: ['保守', '正常'] as ExposureLevel[],
@@ -68,7 +68,7 @@ export const PURE_LOVE_APPEARANCE_CONFIG = {
     },
   },
   2: {
-    境界名: '好友',
+    境界名: '破冰',
     允许互动: ['日常对话', '陪伴交流', '友好互动'],
     约束: {
       暴露程度范围: ['保守', '正常'] as ExposureLevel[],
@@ -92,7 +92,7 @@ export const PURE_LOVE_APPEARANCE_CONFIG = {
     },
   },
   3: {
-    境界名: '暧昧',
+    境界名: '信任',
     允许互动: ['日常对话', '陪伴交流', '友好互动', '轻微暧昧'],
     约束: {
       暴露程度范围: ['保守', '正常'] as ExposureLevel[],
@@ -116,7 +116,7 @@ export const PURE_LOVE_APPEARANCE_CONFIG = {
     },
   },
   4: {
-    境界名: '热恋',
+    境界名: '依恋',
     允许互动: ['日常对话', '陪伴交流', '友好互动', '暧昧互动', '亲密接触'],
     约束: {
       暴露程度范围: ['正常', '清凉'] as ExposureLevel[],
@@ -140,7 +140,7 @@ export const PURE_LOVE_APPEARANCE_CONFIG = {
     },
   },
   5: {
-    境界名: '真爱',
+    境界名: '羁绊',
     允许互动: ['日常对话', '陪伴交流', '所有友好互动', '亲密互动'],
     约束: {
       暴露程度范围: ['正常', '清凉'] as ExposureLevel[],

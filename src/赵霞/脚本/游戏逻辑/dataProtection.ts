@@ -729,7 +729,7 @@ export function getPureLoveRelationshipStage(affection: number, intimacy: number
   if (effectiveValue >= 60) return 4; // 依恋
   if (effectiveValue >= 40) return 3; // 信任
   if (effectiveValue >= 20) return 2; // 破冰
-  return 1; // 陌生
+  return 1; // 疏离
 }
 
 /**
@@ -737,13 +737,13 @@ export function getPureLoveRelationshipStage(affection: number, intimacy: number
  */
 export function getPureLoveRelationshipName(stage: number): string {
   const names: Record<number, string> = {
-    1: '陌生',
+    1: '疏离',
     2: '破冰',
     3: '信任',
     4: '依恋',
     5: '羁绊',
   };
-  return names[stage] ?? '陌生';
+  return names[stage] ?? '疏离';
 }
 
 /**

@@ -1147,13 +1147,13 @@ const pureLoveStage = computed(() => {
   if (effectiveValue >= 60) return 4; // 依恋
   if (effectiveValue >= 40) return 3; // 信任
   if (effectiveValue >= 20) return 2; // 破冰
-  return 1; // 陌生
+  return 1; // 疏离
 });
 
 // 纯爱模式关系阶段名称
 const pureLoveRealmName = computed(() => {
-  const names = ['陌生', '破冰', '信任', '依恋', '羁绊'];
-  return names[pureLoveStage.value - 1] ?? '陌生';
+  const names = ['疏离', '破冰', '信任', '依恋', '羁绊'];
+  return names[pureLoveStage.value - 1] ?? '疏离';
 });
 
 // 纯爱模式关系阶段提示
@@ -1203,7 +1203,7 @@ const relationshipText = computed(() => {
 
 // 境界名称 - 纯爱模式伪装成母子关系修复游戏
 const realmNames = {
-  pure: ['陌生', '破冰', '信任', '依恋', '羁绊'],
+  pure: ['疏离', '破冰', '信任', '依恋', '羁绊'],
   truth: ['初染', '迷途', '溺深', '归虚', '焚誓'],
 };
 
