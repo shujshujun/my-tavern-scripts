@@ -1744,11 +1744,7 @@ function getHusbandStatusDescription(data: SchemaType): string {
  * @param data 游戏数据
  * @param overridePhase 可选：覆盖游戏阶段（用于即将进入梦境但状态尚未更新的情况）
  */
-function generatePhaseAwareStatePrompt(
-  data: SchemaType,
-  overridePhase?: string,
-  overrideScene5?: boolean,
-): string {
+function generatePhaseAwareStatePrompt(data: SchemaType, overridePhase?: string, overrideScene5?: boolean): string {
   // Bug #8 修复：允许覆盖阶段，解决场景5/梦境入口时状态同步问题
   // 当检测到梦境入口关键词但状态尚未更新时，使用覆盖值
   const 阶段 = overridePhase ?? data.世界.游戏阶段;
@@ -1859,7 +1855,9 @@ function generateDreamPhasePrompt(data: SchemaType, overrideScene5?: boolean): s
 
   // 调试：输出场景判断信息
   const scene5Data = data.梦境数据.场景5 as { 已进入?: boolean } | undefined;
-  console.info(`[generateDreamPhasePrompt调试] overrideScene5=${overrideScene5}, 场景5.已进入=${scene5Data?.已进入}, day=${day}, 初始sceneNum=${sceneNum}`);
+  console.info(
+    `[generateDreamPhasePrompt调试] overrideScene5=${overrideScene5}, 场景5.已进入=${scene5Data?.已进入}, day=${day}, 初始sceneNum=${sceneNum}`,
+  );
 
   // Bug #13 修复：优先使用覆盖标志判断场景5
   // 当玩家发送"安眠药，入梦"时，场景5.已进入 尚未设置为 true
