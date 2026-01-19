@@ -483,11 +483,20 @@ const DREAM_AI_GUIDELINES = `【AI描写指南】
 
 /**
  * 获取梦境场景描写指南
- * 根据场景完成状态动态返回需要的场景信息
+ * 只在梦境阶段调用，只注入当前场景的AI描写指南
+ *
+ * Bug #41 修复（2026-01-20）：
+ * - 原问题：当玩家在场景5中时，场景1-4未完成，它们的AI描写指南也会被注入，造成AI困惑
+ * - 修复：只注入当前正在进行的场景指南，不注入其他未完成场景的指南
+ *
+ * 注意：此函数只在梦境阶段或即将进入梦境时被调用（由调用处 isInDreamOrEntering 判断）
+ * 日常阶段不需要梦境场景的AI描写指南
+ *
  * @param data 游戏数据
+ * @param currentScene 当前正在进行的梦境场景编号（1-5）
  * @returns 梦境场景描写指南字符串，如果未进入过梦境则返回 null
  */
-function getDreamSceneGuidance(data: SchemaType): string | null {
+function getDreamSceneGuidance(data: SchemaType, currentScene: number): string | null {
   // 未进入过梦境，不显示任何内容
   if (!data.世界.已进入过梦境) {
     return null;
@@ -504,41 +513,25 @@ function getDreamSceneGuidance(data: SchemaType): string | null {
     return null;
   }
 
+  // 验证场景编号有效性
+  if (currentScene < 1 || currentScene > 5) {
+    console.warn(`[getDreamSceneGuidance] 无效的场景编号: ${currentScene}`);
+    return null;
+  }
+
   const parts: string[] = [];
 
   // 1. 始终显示系统概述
   parts.push(DREAM_SYSTEM_OVERVIEW);
 
-  // 2. 根据完成状态显示场景1-5的AI描写指南
+  // 2. Bug #41 修复：只注入当前场景的AI描写指南
   const completedScenes = data.梦境数据.已完成场景 || [];
-
-  // 场景5：未完成时显示（特殊触发方式，通过安眠药关键词）
-  // 修复：场景5完成后不再显示其AI引导，避免进入场景4时混淆AI
-  if (!completedScenes.includes(5)) {
-    parts.push(DREAM_SCENE_DETAILS[5]);
+  if (!completedScenes.includes(currentScene) && DREAM_SCENE_DETAILS[currentScene]) {
+    parts.push(DREAM_SCENE_DETAILS[currentScene]);
+    console.info(`[getDreamSceneGuidance] 注入场景${currentScene}的AI描写指南`);
   }
 
-  // 场景1：未完成时显示
-  if (!completedScenes.includes(1)) {
-    parts.push(DREAM_SCENE_DETAILS[1]);
-  }
-
-  // 场景2：场景1完成 且 场景2未完成时显示
-  if (completedScenes.includes(1) && !completedScenes.includes(2)) {
-    parts.push(DREAM_SCENE_DETAILS[2]);
-  }
-
-  // 场景3：场景2完成 且 场景3未完成时显示
-  if (completedScenes.includes(2) && !completedScenes.includes(3)) {
-    parts.push(DREAM_SCENE_DETAILS[3]);
-  }
-
-  // 场景4：场景3完成 且 场景4未完成时显示
-  if (completedScenes.includes(3) && !completedScenes.includes(4)) {
-    parts.push(DREAM_SCENE_DETAILS[4]);
-  }
-
-  // 4. 始终显示AI描写指南
+  // 3. 始终显示AI描写指南
   parts.push(DREAM_AI_GUIDELINES);
 
   return parts.join('\n\n---\n\n');
@@ -3921,8 +3914,19 @@ export function generateFullInjection(
   // 原因：日常阶段不需要梦境场景的AI引导内容，会造成混淆
   const isInDreamOrEntering = data.世界.游戏阶段 === '梦境' || shouldEnterDream || shouldEnterScene5;
   let currentDreamSceneNumber: number | undefined; // 记录当前正在进行的梦境场景编号
+
+  // Bug #41 修复：先获取当前场景编号，再调用 getDreamSceneGuidance
+  // 这样可以只注入当前场景的AI描写指南，避免注入其他未完成场景的指南造成AI困惑
   if (isInDreamOrEntering) {
-    const dreamSceneGuidance = getDreamSceneGuidance(data);
+    // 获取当前正在进行的场景编号
+    if (shouldEnterScene5) {
+      currentDreamSceneNumber = 5;
+    } else {
+      currentDreamSceneNumber = getCurrentDreamScene(data);
+    }
+
+    // Bug #41 修复：传入当前场景编号，只注入当前场景的AI描写指南
+    const dreamSceneGuidance = getDreamSceneGuidance(data, currentDreamSceneNumber);
     if (dreamSceneGuidance) {
       if (systemPrompt) {
         systemPrompt = `${dreamSceneGuidance}\n\n---\n\n${systemPrompt}`;
@@ -3930,14 +3934,7 @@ export function generateFullInjection(
         systemPrompt = dreamSceneGuidance;
       }
       const completedScenes = data.梦境数据.已完成场景 || [];
-      console.info(`[Prompt注入] 梦境场景描写指南已注入（已完成场景: [${completedScenes.join(', ')}]）`);
-    }
-
-    // 获取当前正在进行的场景编号（用于排除历史背景）
-    if (shouldEnterScene5) {
-      currentDreamSceneNumber = 5;
-    } else {
-      currentDreamSceneNumber = getCurrentDreamScene(data);
+      console.info(`[Prompt注入] 梦境场景描写指南已注入（当前场景: ${currentDreamSceneNumber}，已完成场景: [${completedScenes.join(', ')}]）`);
     }
   }
 
