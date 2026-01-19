@@ -1002,7 +1002,10 @@ $(async () => {
         }
       }
 
-      // 1.4. 检测场景5进入（基于用户输入关键词）
+      // 1.4. 场景5进入逻辑已移至 promptInjection.ts
+      // 2026-01-20 修复：场景5进入逻辑现在在 promptInjection.ts 的 CHAT_COMPLETION_PROMPT_READY 事件中执行
+      // 这样可以确保状态栏在首条消息时就显示梦境模式（与场景1-4一致）
+      // 此处仅保留日志，不再重复执行进入逻辑
       const SLEEPING_PILL_KEYWORDS = ['安眠药', '吃药', '服药', '催眠药'];
       const wantEnterScene5 =
         SLEEPING_PILL_KEYWORDS.some(kw => userText.includes(kw)) &&
@@ -1010,80 +1013,8 @@ $(async () => {
         data.世界.当前小时 >= 8 &&
         data.世界.当前小时 < 20;
 
-      // 防逃避机制：如果混乱结局已标记且到达触发时间，阻止进入梦境
-      const canEnterScene5ForConfusion = canEnterDreamForConfusion(data);
-      if (wantEnterScene5 && !canEnterScene5ForConfusion) {
-        console.warn('[游戏逻辑] 混乱结局待触发，阻止进入场景5');
-        // 不进入梦境，让混乱结局在结局判定中触发
-      }
-
-      const shouldEnterScene5 = wantEnterScene5 && canEnterScene5ForConfusion;
-
-      if (shouldEnterScene5) {
-        console.info('[游戏逻辑] 检测到场景5进入关键词，切换到梦境阶段');
-        data.世界.游戏阶段 = '梦境';
-        data.世界.状态栏需要刷新 = true;
-        data.世界._梦境入口消息ID = targetMessageId;
-        data.世界._梦境入口天数 = data.世界.当前天数; // 锁定进入时的天数（场景5固定）
-        data.世界.梦境选择已锁定 = false;
-        updateSnapshotValue('世界.游戏阶段', '梦境'); // 同步更新快照
-
-        if (!data.世界.已进入过梦境) {
-          data.世界.已进入过梦境 = true;
-        }
-
-        // 初始化场景5数据
-        const existingScene5Data = data.梦境数据.场景5 as
-          | { 已进入?: boolean; 进入时间?: string; 进入次数?: number }
-          | undefined;
-        if (!data.梦境数据.场景5) {
-          (data.梦境数据 as any).场景5 = {};
-        }
-
-        const scene5Data = data.梦境数据.场景5 as any;
-        const newEntryCount = (existingScene5Data?.进入次数 ?? 0) + 1;
-        scene5Data.已进入 = true;
-        scene5Data.进入时间 = data.世界.时间;
-        scene5Data.进入次数 = newEntryCount;
-
-        // Bug #13 修复：保存进入前的混乱度和混乱标记（用于试探性进入回滚）
-        // 每次进入都保存，因为玩家可能多次试探性进入
-        scene5Data.进入前混乱度 = data.梦境数据.记忆混乱度;
-        scene5Data.进入前混乱标记 = JSON.parse(JSON.stringify(data.梦境数据.混乱结局));
-        console.info(
-          `[游戏逻辑] 场景5进入前状态已保存：混乱度=${data.梦境数据.记忆混乱度}，混乱标记=${data.梦境数据.混乱结局.已标记}`,
-        );
-
-        // 首次进入时初始化12步系统数据
-        // Bug #13 修复：移除 lockScene5EntryCoherence()，改为完成时再锁定
-        if (newEntryCount === 1) {
-          scene5Data.当前步骤 = 0;
-          scene5Data.完成度 = 0;
-          scene5Data.步骤进度记录 = [];
-          scene5Data.已完成步骤 = false;
-          // 不再在此处锁定连贯性，改为完成时锁定
-          console.info(`[游戏逻辑] 场景5首次进入，初始化12步剧情系统（连贯性将在完成时锁定）`);
-        }
-
-        // 设置进入场景5时的混乱度（固定为80）
-        setConfusionOnDreamEntry(data, 5);
-        // Bug #31 修复：混乱度修改后同步更新快照，防止被 validateAndRestoreData 误还原
-        updateSnapshotValue('梦境数据.记忆混乱度', data.梦境数据.记忆混乱度);
-        console.info(
-          `[游戏逻辑] 进入场景5，第${newEntryCount}次，楼层ID=${targetMessageId}，混乱度=${data.梦境数据.记忆混乱度}`,
-        );
-
-        // ROLL 支持：记录场景5入口的楼层ID
-        // 当用户 ROLL 入口消息时，游戏阶段已经是"梦境"，promptInjection 的正常检测会失败
-        // 记录 AI 回复的楼层（targetMessageId + 1），用于在 PROMPT_READY 中检测 ROLL
-        // 注意：这里 targetMessageId 是用户消息楼层，AI 回复楼层是 targetMessageId + 1
-        const scene5AiReplyFloor = targetMessageId + 1;
-        data.世界._梦境入口记录 = {
-          楼层ID: scene5AiReplyFloor,
-          场景编号: 5,
-          类型: '场景5',
-        };
-        console.info(`[游戏逻辑] 记录场景5入口: 楼层 ${scene5AiReplyFloor} (AI回复)`);
+      if (wantEnterScene5) {
+        console.info('[游戏逻辑] 检测到场景5关键词，但进入逻辑已在 promptInjection.ts 中处理');
       }
 
       // Bug #27 修复：时间推进只在 MESSAGE_RECEIVED 事件中执行

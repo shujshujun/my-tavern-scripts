@@ -2740,19 +2740,27 @@ function isRollOperationBySwipeId(data: SchemaType, currentMessageId: number): b
   const lastMessageId = lastRecord.楼层ID;
   const lastSwipeId = lastRecord.swipe_id;
 
-  // 如果楼层ID相同
+  // 2026-01-20 修复：使用 AI 回复楼层（用户消息+1）来获取 swipe_id
+  // 原因：swipe_id 是 AI 回复消息的属性，用户消息没有 swipe_id
+  // ROLL 操作是重新生成 AI 回复，所以应该比较 AI 回复楼层的 swipe_id
+  const aiReplyFloor = currentMessageId + 1;
+
+  // 如果用户消息楼层ID相同（说明是同一轮对话）
   if (lastMessageId === currentMessageId) {
-    const currentSwipeId = getSwipeId(currentMessageId);
-    // swipe_id 不同说明是 ROLL
+    // 获取 AI 回复楼层的 swipe_id
+    const currentSwipeId = getSwipeId(aiReplyFloor);
+    // swipe_id 不同说明是 ROLL（AI 回复被重新生成）
     if (currentSwipeId !== lastSwipeId) {
       console.info(
-        `[Prompt注入] 检测到 ROLL 操作: 楼层 ${currentMessageId}, ` +
+        `[Prompt注入] 检测到 ROLL 操作: 用户楼层 ${currentMessageId}, AI楼层 ${aiReplyFloor}, ` +
           `swipe_id: ${lastSwipeId} → ${currentSwipeId}，跳过步骤推进`,
       );
       return true;
     }
     // swipe_id 相同，说明是重复触发（可能是 dryRun 后的真实请求），也跳过
-    console.info(`[Prompt注入] 检测到重复触发: 楼层 ${currentMessageId}, swipe_id=${currentSwipeId}，跳过步骤推进`);
+    console.info(
+      `[Prompt注入] 检测到重复触发: 用户楼层 ${currentMessageId}, AI楼层 ${aiReplyFloor}, swipe_id=${currentSwipeId}，跳过步骤推进`,
+    );
     return true;
   }
 
@@ -3001,16 +3009,22 @@ function isEndingEntryRoll(
   return null;
 }
 
-// 保留旧的标志系统接口以兼容 index.ts（但实际不再使用）
+// Bug #15 修复（二次修正）：重新启用 rollOperationFlag 标志
+// 原因：swipe_id 检测方案在 CHAT_COMPLETION_PROMPT_READY 时刻不可靠
+//       因为 AI 回复楼层可能尚未创建（首次生成）或正在被重建（ROLL）
+// 正确方案：由 index.ts 的 MESSAGE_SWIPED 事件设置标志，在此处检查
 let isRollOperation = false;
 export function setRollOperationFlag(value: boolean): void {
   isRollOperation = value;
-  // 不再输出日志，因为这个标志不再被使用
+  console.info(`[Prompt注入] ROLL 标志已${value ? '设置' : '清除'}`);
 }
 function checkIsRollOperation(): boolean {
   return isRollOperation;
 }
 function resetRollOperationFlag(): void {
+  if (isRollOperation) {
+    console.info(`[Prompt注入] ROLL 标志已重置`);
+  }
   isRollOperation = false;
 }
 
@@ -3761,28 +3775,25 @@ export function generateFullInjection(
     const completion = calculateScene5CompletionNew(data);
     // 如果还没完成12步，每次玩家输入都推进一步
     if (!completion.isStepsComplete && completion.currentStep < 12) {
-      // Bug #11 修复（第三版）：在 prompt 构建前检测 ROLL
-      // 如果是 ROLL 操作，使用回退的步骤值来生成 prompt，且不推进数据
-      const currentMessageId = getLastMessageId();
-      const isRoll = isRollOperationBySwipeId(data, currentMessageId);
+      // Bug #15 修复（二次修正）：使用标志检测 ROLL
+      // 原 swipe_id 方案问题：在 PROMPT_READY 时刻 AI 楼层可能不存在
+      // 新方案：由 index.ts 的 MESSAGE_SWIPED 事件设置标志
+      const isRoll = checkIsRollOperation();
 
       if (isRoll && completion.currentStep > 0) {
         // 是 ROLL 操作：
         // 1. 创建临时数据，步骤回退 1，用于生成 prompt
         // 2. 不设置 shouldProgressScene5Step，避免数据推进
-        const tempData = JSON.parse(JSON.stringify(data)) as SchemaType;
-        if (tempData.梦境数据.场景5) {
-          tempData.梦境数据.场景5.当前步骤 = completion.currentStep - 1;
-        }
-        const replacement = generateScene5StepReplacement(tempData, userInput);
+        // 注意：index.ts MESSAGE_SWIPED 已经回滚了步骤数据，这里 completion.currentStep 已经是回滚后的值
+        // 所以不需要再次回退
+        const replacement = generateScene5StepReplacement(data, userInput);
         replaceUserMessage = replacement.userMessage;
         if (replacement.prefill) {
           prefill = replacement.prefill;
         }
-        // 不设置 shouldProgressScene5Step = true，这样后面不会推进数据
-        // 但需要更新 swipe_id 记录，所以仍然标记为需要处理
-        shouldProgressScene5Step = true; // 设为 true 以便后续更新 swipe_id 记录
-        console.info(`[Prompt注入] ROLL 检测：使用回退步骤 ${completion.currentStep}/12 生成 prompt（重新生成同一步）`);
+        // Bug #15 修复：ROLL 时不推进数据，index.ts 已经处理了回滚
+        shouldProgressScene5Step = false;
+        console.info(`[Prompt注入] ROLL 检测：使用当前步骤 ${completion.currentStep}/12 生成 prompt（index.ts 已回滚）`);
       } else {
         // 正常操作：使用当前数据生成 prompt，并推进数据
         shouldProgressScene5Step = true;
@@ -4716,17 +4727,9 @@ export function initPromptInjection(): void {
           // 不修改游戏状态，玩家消息已被替换，AI会描写警告场景
         }
 
-        // 场景5状态变更由游戏逻辑系统处理，此处仅用于日志
-        // 数据修改已移至 index.ts 的 processGameLogic 函数中
-        if (shouldEnterScene5) {
-          console.info('[Prompt注入] 检测到场景5进入关键词（数据修改由游戏逻辑系统处理）');
-        }
-        if (shouldExitScene5) {
-          console.info('[Prompt注入] 检测到场景5退出条件（数据修改由游戏逻辑系统处理）');
-        }
-
-        // 以下代码已注释（原场景5数据修改逻辑，已废弃）
-        /*
+        // 场景5状态变更（进入/退出）
+        // 2026-01-20 修复：恢复在 promptInjection 中立即写入数据，与场景1-4保持一致
+        // 原因：之前移至 index.ts 导致首条消息时状态栏不显示梦境模式
         if (shouldEnterScene5 || shouldExitScene5) {
           try {
             const currentVars = Mvu.getMvuData({ type: 'message', message_id: -1 });
@@ -4903,10 +4906,11 @@ export function initPromptInjection(): void {
             console.error('[Prompt注入] 场景5状态更新失败:', stateErr);
           }
         }
-        */
 
         // 处理场景5步骤推进状态更新
-        // Bug #11 修复（第二版）：使用 swipe_id 检测 ROLL 操作
+        // Bug #15 修复（二次修正）：使用 rollOperationFlag 标志检测 ROLL 操作
+        // 原 swipe_id 方案问题：在 PROMPT_READY 时刻 AI 楼层可能不存在，无法获取正确的 swipe_id
+        // 新方案：由 index.ts 的 MESSAGE_SWIPED 事件设置标志，在此处检查
         if (shouldProgressScene5Step) {
           try {
             const currentVars = Mvu.getMvuData({ type: 'message', message_id: -1 });
@@ -4915,22 +4919,11 @@ export function initPromptInjection(): void {
             // 获取当前最新楼层ID
             const currentMessageId = getLastMessageId();
 
-            // Bug #11 修复：检测是否是 ROLL 操作（通过 swipe_id 比较）
-            if (isRollOperationBySwipeId(currentData, currentMessageId)) {
+            // Bug #15 修复：使用标志检测 ROLL 操作（由 index.ts MESSAGE_SWIPED 设置）
+            if (checkIsRollOperation()) {
               // 是 ROLL 操作，跳过步骤推进
-              // 但需要更新上次推进记录中的 swipe_id（因为这是新的 swipe）
-              if (!currentData.梦境数据.场景5) {
-                (currentData.梦境数据 as any).场景5 = {};
-              }
-              const scene5Data = currentData.梦境数据.场景5 as any;
-              const newSwipeId = getSwipeId(currentMessageId);
-              scene5Data.上次推进记录 = {
-                楼层ID: currentMessageId,
-                swipe_id: newSwipeId,
-              };
-              _.set(currentVars, 'stat_data', currentData);
-              Mvu.replaceMvuData(currentVars, { type: 'message', message_id: -1 });
-              console.info(`[Prompt注入] ROLL 操作，更新 swipe_id 记录: ${newSwipeId}`);
+              // index.ts 已经在 MESSAGE_SWIPED 中回滚了步骤，这里只需跳过
+              console.info(`[Prompt注入] 检测到 ROLL 标志，跳过场景5步骤推进（楼层: ${currentMessageId}）`);
             } else {
               // 不是 ROLL 操作，正常推进步骤
 
@@ -4971,12 +4964,8 @@ export function initPromptInjection(): void {
               scene5Data.完成度 = newCompletion;
               scene5Data.步骤进度记录 = stepProgressRecord;
 
-              // Bug #11 修复：记录本次推进的楼层ID和swipe_id
-              const currentSwipeId = getSwipeId(currentMessageId);
-              scene5Data.上次推进记录 = {
-                楼层ID: currentMessageId,
-                swipe_id: currentSwipeId,
-              };
+              // Bug #15 修复（二次修正）：移除 swipe_id 记录，改用标志检测
+              // 原因：PROMPT_READY 时刻无法可靠获取 AI 楼层的 swipe_id
 
               // 检查是否完成12步
               if (nextStep >= 12) {
@@ -4989,7 +4978,7 @@ export function initPromptInjection(): void {
               console.info(
                 `[Prompt注入] 场景5步骤推进: ${currentStep} → ${nextStep}，` +
                   `契合度: ${matchLevel}，进度+${progressGain}%，` +
-                  `完成度: ${newCompletion}%，楼层: ${currentMessageId}, swipe: ${currentSwipeId}`,
+                  `完成度: ${newCompletion}%，楼层: ${currentMessageId}`,
               );
             }
           } catch (stateErr) {
