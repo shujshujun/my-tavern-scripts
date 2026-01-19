@@ -425,9 +425,7 @@ export function validateAndRestoreData(data: SchemaType, snapshot?: DataSnapshot
       setNestedValue(dataObj, '世界.当前小时', snapshotHour);
       setNestedValue(dataObj, '世界.时间', snapshotTime !== expectedTime ? expectedTime : snapshotTime);
 
-      console.info(
-        `[数据保护] 时间联动回滚完成：Day ${snapshotDay}, ${snapshotHour}:00`,
-      );
+      console.info(`[数据保护] 时间联动回滚完成：Day ${snapshotDay}, ${snapshotHour}:00`);
     }
   } else {
     console.info('[数据保护] 数据完整性验证通过');
