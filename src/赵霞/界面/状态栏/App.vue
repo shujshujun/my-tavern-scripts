@@ -12,13 +12,17 @@
   </div>
 
   <!-- 数据加载完成后显示正常界面 -->
-  <div v-else class="mystic-container" :class="{
-    'truth-mode': isTruthMode && !showAfterStoryMode && !isNormalEndingLocked,
-    'dream-mode': isDreamPhase && !showAfterStoryMode && !isNormalEndingLocked,
-    'romance-mode': !isTruthMode && !isDreamPhase && !showAfterStoryMode && !isNormalEndingLocked,
-    'after-story-mode': showAfterStoryMode,
-    'normal-ending-mode': isNormalEndingLocked
-  }">
+  <div
+    v-else
+    class="mystic-container"
+    :class="{
+      'truth-mode': isTruthMode && !showAfterStoryMode && !isNormalEndingLocked,
+      'dream-mode': isDreamPhase && !showAfterStoryMode && !isNormalEndingLocked,
+      'romance-mode': !isTruthMode && !isDreamPhase && !showAfterStoryMode && !isNormalEndingLocked,
+      'after-story-mode': showAfterStoryMode,
+      'normal-ending-mode': isNormalEndingLocked,
+    }"
+  >
     <!-- 背景纹理层 -->
     <div class="bg-pattern"></div>
 
@@ -38,13 +42,9 @@
               {{ worldData.时间 }}
             </span>
             <span class="divider">|</span>
-            <span class="info-item">
-              循环轮数 #{{ worldData.当前循环轮数 || 1 }}
-            </span>
+            <span class="info-item"> 循环轮数 #{{ worldData.当前循环轮数 || 1 }} </span>
           </div>
-          <span class="phase-tag phase-ending">
-            时间循环
-          </span>
+          <span class="phase-tag phase-ending"> 时间循环 </span>
         </header>
 
         <!-- 结局信息 -->
@@ -97,16 +97,16 @@
               {{ endingTypeName }}
             </span>
           </div>
-          <span class="phase-tag phase-after-story">
-            后日谈
-          </span>
+          <span class="phase-tag phase-after-story"> 后日谈 </span>
         </header>
 
         <!-- 赵霞状态 -->
         <section class="character-section">
           <div class="location-row">
             <span class="location-icon">📍</span>
-            <span class="location-text">赵霞正在<span class="highlight">{{ zhaoxiaData.当前位置 }}</span></span>
+            <span class="location-text"
+              >赵霞正在<span class="highlight">{{ zhaoxiaData.当前位置 }}</span></span
+            >
           </div>
           <div class="thought-bubble">
             <span class="thought-icon">💭</span>
@@ -157,9 +157,7 @@
               {{ currentSceneTitle }}
             </span>
           </div>
-          <span class="phase-tag phase-dream">
-            {{ dreamMemoryAge }}岁记忆
-          </span>
+          <span class="phase-tag phase-dream"> {{ dreamMemoryAge }}岁记忆 </span>
         </header>
 
         <!-- 梦境状态区域（心理活动） -->
@@ -178,9 +176,7 @@
             <span class="title-text">本次目标</span>
             <span class="decor-line"></span>
           </div>
-          <div class="objective-text">
-            🎯 {{ dreamObjective }}
-          </div>
+          <div class="objective-text">🎯 {{ dreamObjective }}</div>
         </section>
 
         <!-- 记忆背景故事 -->
@@ -240,7 +236,7 @@
             <!-- 右列：认知开发 -->
             <div class="stats-column">
               <div class="body-grid-container">
-                <div class="body-grid" :class="{ 'dimmed': showSelectionOverlay }">
+                <div class="body-grid" :class="{ dimmed: showSelectionOverlay }">
                   <div v-for="part in bodyParts" :key="part.key" class="body-item">
                     <span class="part-name">{{ part.name }}</span>
                     <div class="mini-progress">
@@ -270,11 +266,7 @@
                       <span class="selection-part-name">{{ part.name }}</span>
                     </div>
                   </div>
-                  <button
-                    class="confirm-button"
-                    :disabled="selectedParts.length === 0"
-                    @click="confirmSelection"
-                  >
+                  <button class="confirm-button" :disabled="selectedParts.length === 0" @click="confirmSelection">
                     确认 ({{ selectedParts.length }})
                   </button>
                 </div>
@@ -292,7 +284,7 @@
             <span class="stability-time">🕐 {{ hoursUntilWakeUp }}h后醒来</span>
           </div>
           <div class="stability-progress-track">
-            <div class="stability-progress-bar" :style="{ width: (100 - memoryCollapseProgress) + '%' }"></div>
+            <div class="stability-progress-bar" :style="{ width: 100 - memoryCollapseProgress + '%' }"></div>
           </div>
         </section>
         <!-- 场景5：暗示进度条 -->
@@ -304,7 +296,10 @@
             <span class="stability-time">完成度 {{ scene5Data.完成度 || 0 }}%</span>
           </div>
           <div class="stability-progress-track">
-            <div class="stability-progress-bar suggestion" :style="{ width: ((scene5Data.当前步骤 || 0) / 12 * 100) + '%' }"></div>
+            <div
+              class="stability-progress-bar suggestion"
+              :style="{ width: ((scene5Data.当前步骤 || 0) / 12) * 100 + '%' }"
+            ></div>
           </div>
         </section>
       </template>
@@ -323,9 +318,7 @@
             </span>
             <span class="divider">|</span>
             <template v-if="shouldShowRealDate">
-              <span class="info-item">
-                {{ endingTypeName || '结局' }} · 结局中
-              </span>
+              <span class="info-item"> {{ endingTypeName || '结局' }} · 结局中 </span>
             </template>
             <template v-else>
               <span class="info-item countdown" :class="{ urgent: hoursUntilReset <= 24 }">
@@ -343,7 +336,9 @@
         <section class="character-section">
           <div class="location-row">
             <span class="location-icon">📍</span>
-            <span class="location-text">赵霞正在<span class="highlight">{{ zhaoxiaData.当前位置 }}</span></span>
+            <span class="location-text"
+              >赵霞正在<span class="highlight">{{ zhaoxiaData.当前位置 }}</span></span
+            >
           </div>
           <div class="thought-bubble">
             <span class="thought-icon">💭</span>
@@ -436,7 +431,10 @@
                   <span class="num">{{ husbandAffection }}</span>
                 </div>
                 <div class="progress-track">
-                  <div class="progress-bar husband" :style="{ width: Math.max(0, (husbandAffection + 50) / 1.5) + '%' }"></div>
+                  <div
+                    class="progress-bar husband"
+                    :style="{ width: Math.max(0, (husbandAffection + 50) / 1.5) + '%' }"
+                  ></div>
                 </div>
               </div>
 
@@ -503,7 +501,9 @@
         <section class="character-section">
           <div class="location-row">
             <span class="location-icon">📍</span>
-            <span class="location-text">赵霞正在<span class="highlight">{{ zhaoxiaData.当前位置 }}</span></span>
+            <span class="location-text"
+              >赵霞正在<span class="highlight">{{ zhaoxiaData.当前位置 }}</span></span
+            >
           </div>
           <div class="thought-bubble">
             <span class="thought-icon">💭</span>
@@ -589,7 +589,10 @@
                   <span class="num">{{ zhaoxiaData.对丈夫依存度 }}</span>
                 </div>
                 <div class="progress-track">
-                  <div class="progress-bar husband" :style="{ width: Math.max(0, (zhaoxiaData.对丈夫依存度 + 50) / 1.5) + '%' }"></div>
+                  <div
+                    class="progress-bar husband"
+                    :style="{ width: Math.max(0, (zhaoxiaData.对丈夫依存度 + 50) / 1.5) + '%' }"
+                  ></div>
                 </div>
               </div>
 
@@ -628,10 +631,13 @@
                     </div>
                   </template>
                   <template v-else>
-                    <div class="body-item dream-countdown-item" :class="{
-                      'dream-open': isDreamWindowOpen && !isDreamBlocked,
-                      'dream-blocked': isDreamBlocked
-                    }">
+                    <div
+                      class="body-item dream-countdown-item"
+                      :class="{
+                        'dream-open': isDreamWindowOpen && !isDreamBlocked,
+                        'dream-blocked': isDreamBlocked,
+                      }"
+                    >
                       <span class="part-name">🌙 梦境入口</span>
                       <div class="countdown-display">
                         <template v-if="isDreamBlocked">
@@ -670,11 +676,14 @@
                   <div
                     v-for="status in sceneStatuses"
                     :key="status.scene"
-                    :class="['scene-item', {
-                      'completed': status.completed,
-                      'correct': status.correct,
-                      'missed': !status.completed
-                    }]"
+                    :class="[
+                      'scene-item',
+                      {
+                        completed: status.completed,
+                        correct: status.correct,
+                        missed: !status.completed,
+                      },
+                    ]"
                   >
                     <span class="scene-checkbox">
                       <template v-if="status.correct">✓</template>
@@ -795,50 +804,59 @@ const isDataLoaded = computed(() => {
 const selectedParts = ref<string[]>([]);
 
 // 数据访问
-const worldData = computed(() => store.data?.世界 ?? {
-  当前天数: 1,
-  当前小时: 8,
-  时间: 'Day 1, 08:00',
-  已进入过梦境: false,
-  游戏阶段: '序章',
-  循环状态: '进行中',
-  当前循环轮数: 1,
-  _梦境入口消息ID: undefined as number | undefined,
-  _梦境入口天数: undefined as number | undefined,
-  梦境选择已锁定: false,
-});
+const worldData = computed(
+  () =>
+    store.data?.世界 ?? {
+      当前天数: 1,
+      当前小时: 8,
+      时间: 'Day 1, 08:00',
+      已进入过梦境: false,
+      游戏阶段: '序章',
+      循环状态: '进行中',
+      当前循环轮数: 1,
+      _梦境入口消息ID: undefined as number | undefined,
+      _梦境入口天数: undefined as number | undefined,
+      梦境选择已锁定: false,
+    },
+);
 
-const zhaoxiaData = computed(() => store.data?.赵霞状态 ?? {
-  依存度: 0,
-  道德底线: 80,
-  对丈夫依存度: 60,
-  当前境界: 1,
-  部位进度: { 嘴巴: 0, 胸部: 0, 下体: 0, 后穴: 0, 精神: 0 },
-  当前位置: '客厅',
-  服装: {
-    上衣: '米色真丝连衣裙上衣部分',
-    下装: '米色真丝连衣裙裙摆',
-    内衣: '白色蕾丝内衣',
-    内裤: '白色蕾丝内裤',
-    袜子: '肉色丝袜',
-    鞋子: '米色平底鞋',
-  },
-  妆容: '淡妆',
-  配件: '婚戒',
-  改造: [] as string[],
-  纯爱好感度: 5,
-  纯爱亲密度: 0,
-  心理活动: '今天天气不错，该准备午餐了...',
-});
+const zhaoxiaData = computed(
+  () =>
+    store.data?.赵霞状态 ?? {
+      依存度: 0,
+      道德底线: 80,
+      对丈夫依存度: 60,
+      当前境界: 1,
+      部位进度: { 嘴巴: 0, 胸部: 0, 下体: 0, 后穴: 0, 精神: 0 },
+      当前位置: '客厅',
+      服装: {
+        上衣: '米色真丝连衣裙上衣部分',
+        下装: '米色真丝连衣裙裙摆',
+        内衣: '白色蕾丝内衣',
+        内裤: '白色蕾丝内裤',
+        袜子: '肉色丝袜',
+        鞋子: '米色平底鞋',
+      },
+      妆容: '淡妆',
+      配件: '婚戒',
+      改造: [] as string[],
+      纯爱好感度: 5,
+      纯爱亲密度: 0,
+      心理活动: '今天天气不错，该准备午餐了...',
+    },
+);
 
-const dreamData = computed(() => store.data?.梦境数据 ?? {
-  已完成场景: [],
-  正确重构场景: [],
-  记忆混乱度: 0,
-  当前记忆年龄: undefined as number | undefined,
-  梦境心理活动: undefined as string | undefined,
-  此次梦境目标: undefined as string | undefined,
-});
+const dreamData = computed(
+  () =>
+    store.data?.梦境数据 ?? {
+      已完成场景: [],
+      正确重构场景: [],
+      记忆混乱度: 0,
+      当前记忆年龄: undefined as number | undefined,
+      梦境心理活动: undefined as string | undefined,
+      此次梦境目标: undefined as string | undefined,
+    },
+);
 
 // ============================================
 // 梦境模式专用计算属性
@@ -932,7 +950,7 @@ const memoryCollapseProgress = computed(() => {
       hoursFromStart = currentHour - 22;
     } else if (currentHour < 10) {
       // 00:00-09:59: 经过 2-12 小时
-      hoursFromStart = (24 - 22) + currentHour; // 2 + currentHour
+      hoursFromStart = 24 - 22 + currentHour; // 2 + currentHour
     } else {
       // 10:00+ 已经崩塌
       hoursFromStart = 12;
@@ -961,7 +979,7 @@ const hoursUntilWakeUp = computed(() => {
     // 场景1-4：计算到10:00的剩余时间
     if (currentHour >= 22) {
       // 22:00-23:59 -> 距离10:00还有 (24-currentHour) + 10 小时
-      return (24 - currentHour) + 10;
+      return 24 - currentHour + 10;
     } else if (currentHour < 10) {
       // 00:00-09:59 -> 距离10:00还有 10 - currentHour 小时
       return 10 - currentHour;
@@ -1019,11 +1037,11 @@ const memoryBackstory = computed(() => {
 // 获取部位图标
 function getBodyPartIcon(partKey: string): string {
   const icons: Record<string, string> = {
-    '嘴巴': '👄',
-    '胸部': '💗',
-    '下体': '🌸',
-    '后穴': '🍑',
-    '精神': '🧠',
+    嘴巴: '👄',
+    胸部: '💗',
+    下体: '🌸',
+    后穴: '🍑',
+    精神: '🧠',
   };
   return icons[partKey] ?? '⭕';
 }
@@ -1037,11 +1055,14 @@ function getBodyPartLevel(value: number): number {
   return 0;
 }
 
-const realData = computed(() => store.data?.现实数据 ?? {
-  丈夫怀疑度: 0,
-  丈夫当前位置: '外出',
-  丈夫心理活动: undefined as string | undefined,
-});
+const realData = computed(
+  () =>
+    store.data?.现实数据 ?? {
+      丈夫怀疑度: 0,
+      丈夫当前位置: '外出',
+      丈夫心理活动: undefined as string | undefined,
+    },
+);
 
 // 是否真相模式
 const isTruthMode = computed(() => worldData.value.已进入过梦境);
@@ -1085,12 +1106,12 @@ const hoursUntilReset = computed(() => {
 const outfitDisplay = computed(() => {
   const outfit = zhaoxiaData.value.服装;
   return {
-    '上衣': outfit?.上衣 ?? '未知',
-    '下装': outfit?.下装 ?? '未知',
-    '内衣': outfit?.内衣 ?? '未知',
-    '内裤': outfit?.内裤 ?? '未知',
-    '袜子': outfit?.袜子 ?? '未知',
-    '鞋子': outfit?.鞋子 ?? '未知',
+    上衣: outfit?.上衣 ?? '未知',
+    下装: outfit?.下装 ?? '未知',
+    内衣: outfit?.内衣 ?? '未知',
+    内裤: outfit?.内裤 ?? '未知',
+    袜子: outfit?.袜子 ?? '未知',
+    鞋子: outfit?.鞋子 ?? '未知',
   };
 });
 
@@ -1137,13 +1158,7 @@ const pureLoveRealmName = computed(() => {
 
 // 纯爱模式关系阶段提示
 const pureLoveRealmHint = computed(() => {
-  const hints = [
-    '需要更多日常交流',
-    '关系正在升温',
-    '她开始信任你',
-    '你们的关系很特别',
-    '心意相通',
-  ];
+  const hints = ['需要更多日常交流', '关系正在升温', '她开始信任你', '你们的关系很特别', '心意相通'];
   return hints[pureLoveStage.value - 1] ?? '';
 });
 
@@ -1200,13 +1215,7 @@ const realmName = computed(() => {
 // 境界提示
 const realmHint = computed(() => {
   const realm = zhaoxiaData.value.当前境界;
-  const hints = [
-    '需要更多日常交流',
-    '关系正在升温',
-    '她开始信任你',
-    '你们的关系很特别',
-    '心意相通',
-  ];
+  const hints = ['需要更多日常交流', '关系正在升温', '她开始信任你', '你们的关系很特别', '心意相通'];
   return hints[realm - 1] ?? '';
 });
 
@@ -1225,10 +1234,10 @@ const truthRealmHint = computed(() => {
 
 // 阶段名称
 const phaseNames: Record<string, string> = {
-  '序章': '序章',
-  '日常': '日常',
-  '梦境': '梦境中',
-  '结局': '结局',
+  序章: '序章',
+  日常: '日常',
+  梦境: '梦境中',
+  结局: '结局',
 };
 const phaseName = computed(() => phaseNames[worldData.value.游戏阶段] ?? worldData.value.游戏阶段);
 
@@ -1303,11 +1312,11 @@ const husbandPerspective = computed(() => {
 const husbandIcon = computed(() => {
   const pos = realData.value.丈夫当前位置;
   const icons: Record<string, string> = {
-    '客厅': '🛋️',
-    '卧室': '🛏️',
-    '书房': '📚',
-    '厨房': '🍳',
-    '外出': '🚗',
+    客厅: '🛋️',
+    卧室: '🛏️',
+    书房: '📚',
+    厨房: '🍳',
+    外出: '🚗',
   };
   return icons[pos] ?? '👤';
 });
@@ -1315,11 +1324,11 @@ const husbandIcon = computed(() => {
 const husbandStatusText = computed(() => {
   const pos = realData.value.丈夫当前位置;
   const texts: Record<string, string> = {
-    '客厅': '苏文在客厅',
-    '卧室': '苏文在卧室',
-    '书房': '苏文在书房',
-    '厨房': '苏文在厨房',
-    '外出': '苏文不在家',
+    客厅: '苏文在客厅',
+    卧室: '苏文在卧室',
+    书房: '苏文在书房',
+    厨房: '苏文在厨房',
+    外出: '苏文不在家',
   };
   return texts[pos] ?? `苏文: ${pos}`;
 });
@@ -1345,17 +1354,20 @@ const riskText = computed(() => {
 // ============================================
 
 // 结局数据
-const endingData = computed(() => store.data?.结局数据 ?? {
-  当前结局: '未触发' as '未触发' | '真好结局' | '完美真爱结局' | '假好结局' | '坏结局' | '普通结局' | '纯爱结局',
-  后日谈已解锁: false,
-  是完美记忆路线: false,
-  后日谈: {
-    已触发: false,
-    当前轮数: 0,
-    已完成: false,
-    自由模式: false,
-  },
-});
+const endingData = computed(
+  () =>
+    store.data?.结局数据 ?? {
+      当前结局: '未触发' as '未触发' | '真好结局' | '完美真爱结局' | '假好结局' | '坏结局' | '普通结局' | '纯爱结局',
+      后日谈已解锁: false,
+      是完美记忆路线: false,
+      后日谈: {
+        已触发: false,
+        当前轮数: 0,
+        已完成: false,
+        自由模式: false,
+      },
+    },
+);
 
 // 是否显示结局结算区域（Day 5 且 10:00 以后，在真相模式下，但不在自由模式）
 const showEndingSettlement = computed(() => {
@@ -1385,12 +1397,12 @@ const sceneStatuses = computed(() => {
 const triggeredEndingName = computed(() => {
   const ending = endingData.value.当前结局;
   const endingNames: Record<string, string> = {
-    '未触发': '',
-    '完美真爱结局': '命中注定',
-    '真好结局': '禁忌之爱',
-    '假好结局': '秘密关系',
-    '坏结局': '失败结局',
-    '普通结局': '时间循环',
+    未触发: '',
+    完美真爱结局: '命中注定',
+    真好结局: '禁忌之爱',
+    假好结局: '秘密关系',
+    坏结局: '失败结局',
+    普通结局: '时间循环',
   };
   return endingNames[ending] ?? ending;
 });
@@ -1419,11 +1431,11 @@ const endingPredictionText = computed(() => {
   // 如果已触发结局，直接显示结局名称
   if (ending !== '未触发') {
     const endingNames: Record<string, string> = {
-      '完美真爱结局': '💕 命中注定',
-      '真好结局': '🌸 禁忌之爱',
-      '假好结局': '🎭 秘密关系',
-      '坏结局': '💔 失败结局',
-      '普通结局': '🔄 时间循环',
+      完美真爱结局: '💕 命中注定',
+      真好结局: '🌸 禁忌之爱',
+      假好结局: '🎭 秘密关系',
+      坏结局: '💔 失败结局',
+      普通结局: '🔄 时间循环',
     };
     return endingNames[ending] ?? ending;
   }
@@ -1539,9 +1551,7 @@ const shouldShowRealDate = computed(() => {
   if (day > 5) return true;
   // 或者好结局已触发且在后日谈/自由模式
   const ending = endingData.value.当前结局;
-  const isGoodEnding = ending === '完美真爱结局' ||
-                       ending === '真好结局' ||
-                       ending === '假好结局';
+  const isGoodEnding = ending === '完美真爱结局' || ending === '真好结局' || ending === '假好结局';
   const isInAfterStoryOrFreeMode = isInAfterStory.value || isInFreeMode.value;
   return isGoodEnding && isInAfterStoryOrFreeMode;
 });
@@ -1550,9 +1560,9 @@ const shouldShowRealDate = computed(() => {
 const endingTypeName = computed(() => {
   const ending = endingData.value.当前结局;
   const names: Record<string, string> = {
-    '完美真爱结局': '命中注定',
-    '真好结局': '禁忌之爱',
-    '假好结局': '秘密关系',
+    完美真爱结局: '命中注定',
+    真好结局: '禁忌之爱',
+    假好结局: '秘密关系',
   };
   return names[ending] ?? ending;
 });
@@ -1707,7 +1717,9 @@ function confirmSelection() {
     store.data!.赵霞状态.依存度 = initialDependence;
     store.data!.赵霞状态.道德底线 = initialMorality;
 
-    console.info(`[梦境初始化] 好感度=${好感度}, 亲密度=${亲密度} → 依存度=${initialDependence}, 道德底线=${initialMorality}`);
+    console.info(
+      `[梦境初始化] 好感度=${好感度}, 亲密度=${亲密度} → 依存度=${initialDependence}, 道德底线=${initialMorality}`,
+    );
   }
 
   console.info(`[梦境选择] 场景${currentSceneNumber.value} 选择部位: ${selectedParts.value.join(', ')}`);
@@ -1715,12 +1727,15 @@ function confirmSelection() {
 
 // 监听梦境锁定状态变化，用于支持ROLL
 // 当脚本重置锁定状态时（ROLL操作），清空本地选择
-watch(() => worldData.value.梦境选择已锁定, (locked) => {
-  if (!locked) {
-    // 锁定被重置（可能是ROLL操作），清空本地选择状态
-    selectedParts.value = [];
-  }
-});
+watch(
+  () => worldData.value.梦境选择已锁定,
+  locked => {
+    if (!locked) {
+      // 锁定被重置（可能是ROLL操作），清空本地选择状态
+      selectedParts.value = [];
+    }
+  },
+);
 </script>
 
 <style lang="scss" scoped>
@@ -1776,8 +1791,13 @@ $font-sans: 'Microsoft YaHei', 'Roboto', sans-serif;
 
 // Bug #18 修复：加载动画
 @keyframes pulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 // ========== 背景纹理 ==========
@@ -1789,6 +1809,7 @@ $font-sans: 'Microsoft YaHei', 'Roboto', sans-serif;
   height: 100%;
   background-image:
     // 默认背景
+
     radial-gradient(ellipse at 20% 0%, rgba($c-purple, 0.1), transparent 50%),
     radial-gradient(ellipse at 80% 100%, rgba($c-purple, 0.08), transparent 50%),
     radial-gradient(circle at 50% 50%, rgba($c-gold, 0.03), transparent 60%),
@@ -2020,8 +2041,13 @@ $font-sans: 'Microsoft YaHei', 'Roboto', sans-serif;
 }
 
 @keyframes pulse-urgent {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 
 .divider {
@@ -2091,8 +2117,13 @@ $font-sans: 'Microsoft YaHei', 'Roboto', sans-serif;
 }
 
 @keyframes glow-dream {
-  0%, 100% { box-shadow: 0 0 4px rgba($c-purple, 0.3); }
-  50% { box-shadow: 0 0 10px rgba($c-purple, 0.5); }
+  0%,
+  100% {
+    box-shadow: 0 0 4px rgba($c-purple, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 10px rgba($c-purple, 0.5);
+  }
 }
 
 // ========== 恋爱模式专用样式（浅粉色主题） ==========
@@ -2557,8 +2588,13 @@ $font-sans: 'Microsoft YaHei', 'Roboto', sans-serif;
 }
 
 @keyframes pulse-danger {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 
 // ========== 真相模式：主状态区域 ==========
@@ -2928,8 +2964,13 @@ $font-sans: 'Microsoft YaHei', 'Roboto', sans-serif;
 }
 
 @keyframes glow-hint {
-  0%, 100% { box-shadow: 0 0 0 rgba($c-purple, 0); }
-  50% { box-shadow: 0 0 12px rgba($c-purple, 0.25); }
+  0%,
+  100% {
+    box-shadow: 0 0 0 rgba($c-purple, 0);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba($c-purple, 0.25);
+  }
 }
 
 .hint-icon {
@@ -3126,8 +3167,13 @@ $font-sans: 'Microsoft YaHei', 'Roboto', sans-serif;
 }
 
 @keyframes pulse-current {
-  0%, 100% { box-shadow: 0 0 6px rgba($c-purple, 0.4); }
-  50% { box-shadow: 0 0 14px rgba($c-purple, 0.7); }
+  0%,
+  100% {
+    box-shadow: 0 0 6px rgba($c-purple, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 14px rgba($c-purple, 0.7);
+  }
 }
 
 // 梦境模式进度条颜色
@@ -3199,8 +3245,13 @@ $font-sans: 'Microsoft YaHei', 'Roboto', sans-serif;
 }
 
 @keyframes stability-glow {
-  0%, 100% { box-shadow: 0 0 6px rgba($c-purple, 0.4); }
-  50% { box-shadow: 0 0 12px rgba($c-purple, 0.7); }
+  0%,
+  100% {
+    box-shadow: 0 0 6px rgba($c-purple, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba($c-purple, 0.7);
+  }
 }
 
 .dream-mode .mini-bar {
@@ -3292,8 +3343,13 @@ $font-sans: 'Microsoft YaHei', 'Roboto', sans-serif;
 }
 
 @keyframes glow-special {
-  0%, 100% { text-shadow: 0 0 4px rgba(#f1c40f, 0.3); }
-  50% { text-shadow: 0 0 10px rgba(#f1c40f, 0.6); }
+  0%,
+  100% {
+    text-shadow: 0 0 4px rgba(#f1c40f, 0.3);
+  }
+  50% {
+    text-shadow: 0 0 10px rgba(#f1c40f, 0.6);
+  }
 }
 
 // 场景5的场景点特殊样式
@@ -3916,8 +3972,13 @@ section.dream-thought {
 }
 
 @keyframes buffer-pulse {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 // 部位选择遮罩层（新版）
@@ -4160,8 +4221,13 @@ section.dream-thought {
 }
 
 @keyframes threat-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
 }
 
 // ========== 响应式适配（手机端） ==========
@@ -4969,16 +5035,16 @@ section.dream-thought {
 
       // 正确重构（绿色打勾）
       &.correct {
-        background: rgba(#4CAF50, 0.1);
-        border-left: 2px solid #4CAF50;
+        background: rgba(#4caf50, 0.1);
+        border-left: 2px solid #4caf50;
 
         .scene-checkbox {
-          color: #4CAF50;
-          background: rgba(#4CAF50, 0.15);
+          color: #4caf50;
+          background: rgba(#4caf50, 0.15);
         }
 
         .scene-name {
-          color: #4CAF50;
+          color: #4caf50;
         }
       }
 
@@ -5180,7 +5246,8 @@ section.dream-thought {
 }
 
 @keyframes gentle-glow {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 6px rgba($c-gold, 0.2);
   }
   50% {

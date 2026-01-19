@@ -412,8 +412,5 @@ export function applyBadEndingState(data: SchemaType, type: BadEndingType): void
  * @returns 是否处于坏结局锁定状态
  */
 export function isInBadEndingLock(data: SchemaType): boolean {
-  return (
-    data.结局数据.当前结局 === '坏结局' &&
-    data.世界.循环状态 === '结局判定'
-  );
+  return data.结局数据.当前结局 === '坏结局' && data.世界.循环状态 === '结局判定';
 }

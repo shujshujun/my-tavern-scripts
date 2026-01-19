@@ -316,8 +316,7 @@ export function shouldTriggerAfterStory(data: SchemaType): boolean {
  * 检测是否在后日谈进行中
  */
 export function isInAfterStory(data: SchemaType): boolean {
-  return data.结局数据.后日谈?.已触发 === true &&
-         data.结局数据.后日谈?.已完成 !== true;
+  return data.结局数据.后日谈?.已触发 === true && data.结局数据.后日谈?.已完成 !== true;
 }
 
 /**
@@ -333,9 +332,7 @@ export function isInFreeMode(data: SchemaType): boolean {
 export function shouldShowRealDate(data: SchemaType): boolean {
   const ending = data.结局数据.当前结局;
   // 任何非"未触发"的好结局都显示真实日期
-  return ending === '完美真爱结局' ||
-         ending === '真好结局' ||
-         ending === '假好结局';
+  return ending === '完美真爱结局' || ending === '真好结局' || ending === '假好结局';
 }
 
 /**
@@ -526,7 +523,13 @@ const FREE_MODE_SETTINGS = {
 - 会时不时"恰好"出现，眼神中带着审视
 - 可能突然回家拿东西、打电话确认位置
 - 打断系统持续运作，随时可能被发现`,
-    suggestedScenes: ['趁苏文上班偷情', '差点被发现的惊险', '视频通话时的羞辱', '苏文在隔壁时的紧张感', '背德感中的沉沦'],
+    suggestedScenes: [
+      '趁苏文上班偷情',
+      '差点被发现的惊险',
+      '视频通话时的羞辱',
+      '苏文在隔壁时的紧张感',
+      '背德感中的沉沦',
+    ],
     tone: '刺激但危险，随时可能崩盘',
   },
 };
@@ -587,9 +590,7 @@ ${settings.tone}
 export function generateAfterStoryComplete(data: SchemaType): string {
   const type = getAfterStoryType(data);
 
-  const typeTitle = type === '完美真爱' ? '完美真爱结局'
-                  : type === '真好结局' ? '真好结局'
-                  : '假好结局';
+  const typeTitle = type === '完美真爱' ? '完美真爱结局' : type === '真好结局' ? '真好结局' : '假好结局';
 
   return `
 
@@ -603,9 +604,13 @@ ${typeTitle}的后日谈已结束。
 没有时间限制，没有结局判定。
 这个世界，只属于你们。
 
-${type === '完美真爱' ? '苏文已经接受了一切，成为了这个家庭的"苦主"。' :
-  type === '真好结局' ? '苏文还在医院，这里是你们的二人世界。' :
-  '苏文还在怀疑，但这份刺激让一切更加诱人。'}
+${
+  type === '完美真爱'
+    ? '苏文已经接受了一切，成为了这个家庭的"苦主"。'
+    : type === '真好结局'
+      ? '苏文还在医院，这里是你们的二人世界。'
+      : '苏文还在怀疑，但这份刺激让一切更加诱人。'
+}
 
 🔓 自由模式已解锁
 

@@ -52,11 +52,29 @@ const MOUTH_INTENSITY_KEYWORDS = {
   轻度: ['轻吻', '吻了一下', '嘴唇', '亲了亲', '亲一下', '轻轻一吻', '蜻蜓点水', '浅吻'],
   // 深度关键词（需要境界2+）
   深度: [
-    '舌吻', '深吻', '热吻', '湿吻', '长吻',
-    '舌头', '舌尖', '纠缠', '交缠', '缠绕',
-    '舔', '吮', '吸吮', '啃咬', '撬开',
-    '唾液', '口腔', '口水', '深入',
-    '法式', '激烈', '疯狂', '贪婪',
+    '舌吻',
+    '深吻',
+    '热吻',
+    '湿吻',
+    '长吻',
+    '舌头',
+    '舌尖',
+    '纠缠',
+    '交缠',
+    '缠绕',
+    '舔',
+    '吮',
+    '吸吮',
+    '啃咬',
+    '撬开',
+    '唾液',
+    '口腔',
+    '口水',
+    '深入',
+    '法式',
+    '激烈',
+    '疯狂',
+    '贪婪',
   ],
 };
 
@@ -68,20 +86,20 @@ const MOUTH_INTENSITY_KEYWORDS = {
 export function detectMouthIntensity(userInput: string): 'none' | 'light' | 'deep' {
   // 先检查是否有嘴巴相关行为
   const mouthKeywords = BODY_PART_DETECTION_KEYWORDS['嘴巴'];
-  const hasMouthAction = mouthKeywords.some((kw) => userInput.includes(kw));
+  const hasMouthAction = mouthKeywords.some(kw => userInput.includes(kw));
 
   if (!hasMouthAction) {
     return 'none';
   }
 
   // 检查是否有深度关键词
-  const hasDeepAction = MOUTH_INTENSITY_KEYWORDS.深度.some((kw) => userInput.includes(kw));
+  const hasDeepAction = MOUTH_INTENSITY_KEYWORDS.深度.some(kw => userInput.includes(kw));
   if (hasDeepAction) {
     return 'deep';
   }
 
   // 检查是否有轻度关键词（明确的轻度行为）
-  const hasLightAction = MOUTH_INTENSITY_KEYWORDS.轻度.some((kw) => userInput.includes(kw));
+  const hasLightAction = MOUTH_INTENSITY_KEYWORDS.轻度.some(kw => userInput.includes(kw));
   if (hasLightAction) {
     return 'light';
   }
@@ -98,7 +116,7 @@ export function detectMouthIntensity(userInput: string): 'none' | 'light' | 'dee
  */
 export function checkMouthIntensityViolation(
   userInput: string,
-  currentRealm: number
+  currentRealm: number,
 ): { violated: boolean; intensity: 'none' | 'light' | 'deep'; message?: string } {
   const intensity = detectMouthIntensity(userInput);
 
@@ -157,17 +175,37 @@ const BODY_PART_DETECTION_KEYWORDS: Record<string, string[]> = {
  */
 const HUMILIATION_KEYWORDS = [
   // 直接羞辱类
-  '羞辱', '嘲笑', '讽刺', '贬低', '侮辱',
+  '羞辱',
+  '嘲笑',
+  '讽刺',
+  '贬低',
+  '侮辱',
   // 比较类
-  '比不上', '不如你', '没你', '比他', '比苏文',
+  '比不上',
+  '不如你',
+  '没你',
+  '比他',
+  '比苏文',
   // 替代类
-  '取代', '替代', '真正的', '才是',
+  '取代',
+  '替代',
+  '真正的',
+  '才是',
   // 当面类
-  '当着他的面', '让他看', '在他面前', '给他看',
+  '当着他的面',
+  '让他看',
+  '在他面前',
+  '给他看',
   // 否定丈夫类
-  '废物', '没用', '不行', '满足不了',
+  '废物',
+  '没用',
+  '不行',
+  '满足不了',
   // 宣示主权类
-  '属于你', '是你的', '只要你', '不要他',
+  '属于你',
+  '是你的',
+  '只要你',
+  '不要他',
 ];
 
 /**
@@ -176,7 +214,7 @@ const HUMILIATION_KEYWORDS = [
  * @returns 是否检测到羞辱行为
  */
 export function detectHumiliationBehavior(userInput: string): boolean {
-  return HUMILIATION_KEYWORDS.some((kw) => userInput.includes(kw));
+  return HUMILIATION_KEYWORDS.some(kw => userInput.includes(kw));
 }
 
 /**
@@ -188,7 +226,7 @@ export function detectHumiliationBehavior(userInput: string): boolean {
  */
 export function checkHumiliationAllowed(
   userInput: string,
-  currentRealm: number
+  currentRealm: number,
 ): { allowed: boolean; detected: boolean } {
   const detected = detectHumiliationBehavior(userInput);
 
@@ -231,7 +269,7 @@ export function detectBodyParts(userInput: string): string[] {
   const detectedParts: string[] = [];
 
   for (const [part, keywords] of Object.entries(BODY_PART_DETECTION_KEYWORDS)) {
-    const hasMatch = keywords.some((kw) => userInput.includes(kw));
+    const hasMatch = keywords.some(kw => userInput.includes(kw));
     if (hasMatch) {
       detectedParts.push(part);
     }
@@ -275,9 +313,7 @@ export function canHusbandInterrupt(data: SchemaType): boolean {
  * @param husbandSuspicion 丈夫怀疑度（0-100）
  * @returns 打断概率 (0-1)
  */
-export function calculateInterruptionProbability(
-  husbandSuspicion: number
-): number {
+export function calculateInterruptionProbability(husbandSuspicion: number): number {
   // 打断概率 = 怀疑度 × 0.5% = 怀疑度 × 0.005
   return Math.min(1.0, husbandSuspicion * 0.005);
 }
@@ -295,7 +331,11 @@ export function calculateInterruptionProbability(
  * @param isTruthMode 是否为真相模式（已进入过梦境）
  * @returns 疑心增加值
  */
-export function calculateSuspicionPenalty(realmGap: number, canInterrupt: boolean, isTruthMode: boolean = false): number {
+export function calculateSuspicionPenalty(
+  realmGap: number,
+  canInterrupt: boolean,
+  isTruthMode: boolean = false,
+): number {
   if (realmGap <= 0) return 0;
 
   let basePenalty: number;
@@ -370,7 +410,7 @@ export function checkBoundaryInterruption(data: SchemaType, userInput: string): 
   const detectedParts = detectBodyParts(userInput);
 
   // 找出违规的部位（超出当前境界允许的部位）
-  const violatedParts = detectedParts.filter((part) => !allowedParts.includes(part));
+  const violatedParts = detectedParts.filter(part => !allowedParts.includes(part));
 
   // ========== 嘴巴程度检测 ==========
   // 即使嘴巴部位被允许，也要检查行为程度是否超标
@@ -854,7 +894,11 @@ function randomChoice<T>(arr: T[]): T {
 /**
  * 生成打断修正Prompt（苏文在家打断时）
  */
-function generateInterruptionPrompt(severity: 'moderate' | 'severe', bodyPart: string, isMouthIntensityViolation: boolean = false): string {
+function generateInterruptionPrompt(
+  severity: 'moderate' | 'severe',
+  bodyPart: string,
+  isMouthIntensityViolation: boolean = false,
+): string {
   // 嘴巴程度违规使用专用模板
   if (isMouthIntensityViolation && bodyPart === '嘴巴') {
     const template = randomChoice(MOUTH_INTENSITY_VIOLATION_TEMPLATES);
@@ -874,7 +918,11 @@ function generateInterruptionPrompt(severity: 'moderate' | 'severe', bodyPart: s
  * 生成拒绝提示Prompt（超阶段行为但未被打断时）
  * 无论苏文是否在家，超阶段行为赵霞都会拒绝
  */
-function generateRefusalPrompt(bodyPart: string, husbandCanInterrupt: boolean, isMouthIntensityViolation: boolean = false): string {
+function generateRefusalPrompt(
+  bodyPart: string,
+  husbandCanInterrupt: boolean,
+  isMouthIntensityViolation: boolean = false,
+): string {
   // 嘴巴程度违规使用专用模板
   if (isMouthIntensityViolation && bodyPart === '嘴巴') {
     const template = randomChoice(MOUTH_INTENSITY_VIOLATION_TEMPLATES);
@@ -937,10 +985,7 @@ export function applyInterruptionResult(data: SchemaType, result: InterruptionCh
   // 应用惩罚
   if (result.penalties) {
     if (result.penalties.怀疑度增加) {
-      data.现实数据.丈夫怀疑度 = Math.min(
-        100,
-        data.现实数据.丈夫怀疑度 + result.penalties.怀疑度增加
-      );
+      data.现实数据.丈夫怀疑度 = Math.min(100, data.现实数据.丈夫怀疑度 + result.penalties.怀疑度增加);
       console.info(`[境界打断] 丈夫怀疑度 +${result.penalties.怀疑度增加}`);
     }
     if (result.penalties.混乱度增加) {

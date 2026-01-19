@@ -219,12 +219,12 @@ export const SCENE5_STEPS: Scene5Step[] = [
 
 export interface MemoryCoherenceInfo {
   level: 0 | 1 | 2 | 3;
-  hasScene1: boolean;  // 初恋记忆
-  hasScene2: boolean;  // 等待记忆
-  hasScene3: boolean;  // 逃离记忆
-  hasScene4: boolean;  // 放纵记忆（不计入连贯性，但影响剧情）
+  hasScene1: boolean; // 初恋记忆
+  hasScene2: boolean; // 等待记忆
+  hasScene3: boolean; // 逃离记忆
+  hasScene4: boolean; // 放纵记忆（不计入连贯性，但影响剧情）
   description: string;
-  aiHint: string;      // 给AI的提示，描述赵霞应该有的反应
+  aiHint: string; // 给AI的提示，描述赵霞应该有的反应
 }
 
 /**
@@ -521,10 +521,7 @@ export function analyzePlayerIntent(userInput: string): IntentAnalysis {
  * 计算玩家意图与步骤最佳匹配的契合度
  * @returns 'high' | 'low'
  */
-export function calculateMatchLevel(
-  intent: IntentAnalysis,
-  step: Scene5Step
-): 'high' | 'low' {
+export function calculateMatchLevel(intent: IntentAnalysis, step: Scene5Step): 'high' | 'low' {
   const best = step.bestMatch;
   let matchCount = 0;
   let totalRequired = 0;
@@ -569,13 +566,15 @@ export interface Scene5CompletionInfo {
  * 计算场景5的完成度（基于步骤）
  */
 export function calculateScene5Completion(data: SchemaType): Scene5CompletionInfo {
-  const scene5Data = data.梦境数据.场景5 as {
-    进入次数?: number;
-    当前步骤?: number;
-    已完成步骤?: boolean;
-    完成度?: number;
-    步骤进度记录?: number[];
-  } | undefined;
+  const scene5Data = data.梦境数据.场景5 as
+    | {
+        进入次数?: number;
+        当前步骤?: number;
+        已完成步骤?: boolean;
+        完成度?: number;
+        步骤进度记录?: number[];
+      }
+    | undefined;
 
   const entryCount = scene5Data?.进入次数 ?? 0;
   const currentStep = scene5Data?.当前步骤 ?? 0;
@@ -688,10 +687,7 @@ export function getBodyInfluenceForScene5(data: SchemaType): BodyInfluenceInfo {
 /**
  * 生成场景5当前步骤的AI引导
  */
-export function generateScene5StepPrompt(
-  data: SchemaType,
-  intent: IntentAnalysis
-): string {
+export function generateScene5StepPrompt(data: SchemaType, intent: IntentAnalysis): string {
   const completion = calculateScene5Completion(data);
   const currentStep = completion.currentStep;
   const remainingSteps = getRemainingSteps(data);
@@ -722,9 +718,8 @@ export function generateScene5StepPrompt(
 
   // 生成意图分析结果
   const intentSummary = `玩家态度：${intent.态度}，行为：${intent.行为}，目标：${intent.目标}`;
-  const matchNote = matchLevel === 'high'
-    ? '✅ 高契合度 - 玩家行为与剧情需求匹配'
-    : '⚠️ 低契合度 - 按玩家意图推进，但赵霞反应稍弱';
+  const matchNote =
+    matchLevel === 'high' ? '✅ 高契合度 - 玩家行为与剧情需求匹配' : '⚠️ 低契合度 - 按玩家意图推进，但赵霞反应稍弱';
 
   return `[场景5 - 步骤${nextStep}/12：${stepConfig.title}]
 
@@ -772,10 +767,7 @@ ${stepConfig.aiTask}
  * - 20:00 游戏阶段切换为日常
  * - 所以玩家实际可用时间到19:00为止
  */
-function generateFreePlayPrompt(
-  data: SchemaType,
-  bodyInfluence: BodyInfluenceInfo
-): string {
+function generateFreePlayPrompt(data: SchemaType, bodyInfluence: BodyInfluenceInfo): string {
   const completion = calculateScene5Completion(data);
   const currentHour = data.世界.当前小时;
   // 19:00触发退出描写，所以剩余时间基于19:00计算
@@ -858,10 +850,12 @@ function generatePreviousSceneSummaries(data: SchemaType): string {
   // 只读取场景1-3（场景4时间线在场景5之后，不计入）
   for (let i = 1; i <= 3; i++) {
     const sceneKey = `场景${i}` as keyof typeof data.梦境数据;
-    const sceneData = data.梦境数据[sceneKey] as {
-      已进入?: boolean;
-      剧情摘要?: string;
-    } | undefined;
+    const sceneData = data.梦境数据[sceneKey] as
+      | {
+          已进入?: boolean;
+          剧情摘要?: string;
+        }
+      | undefined;
 
     const sceneInfo = SCENE_INFO[i];
     const isCorrect = data.梦境数据.正确重构场景.includes(i);
@@ -950,17 +944,21 @@ export function generateScene5EntryReplacement(data: SchemaType): {
 ${coherenceText}
 ${previousSummaries}
 
-${isFirstEntry ? `【首次进入 - 12步线性剧情】
+${
+  isFirstEntry
+    ? `【首次进入 - 12步线性剧情】
 本次将按照12步线性剧情推进：
 1-2步：初入阶段 - 建立存在感
 3-5步：动摇阶段 - 质疑婚姻
 6-8步：深入阶段 - 情感突破
 9-11步：沦陷阶段 - 背叛选择
-12步：完成阶段 - 戒指归属` :
-isStepsComplete ? `【后续进入 - 自由发挥】
-12步剧情已完成，本次进入AI可自由发挥，延续剧情氛围。` :
-`【继续进入 - 从步骤${completion.currentStep + 1}继续】
-上次进行到步骤${completion.currentStep}，本次从步骤${completion.currentStep + 1}继续。`}
+12步：完成阶段 - 戒指归属`
+    : isStepsComplete
+      ? `【后续进入 - 自由发挥】
+12步剧情已完成，本次进入AI可自由发挥，延续剧情氛围。`
+      : `【继续进入 - 从步骤${completion.currentStep + 1}继续】
+上次进行到步骤${completion.currentStep}，本次从步骤${completion.currentStep + 1}继续。`
+}
 ${bodyInfluenceText}
 
 【AI任务】
@@ -1098,11 +1096,12 @@ ${completion.canTriggerSpecialEnding ? '- 🎯 可触发特殊结局行为' : ''
 - 不要让赵霞完全记住记忆中发生的事
 - 不要提及"完成度"等元游戏术语`;
 
-  const prefill = completion.completionPercent >= 80
-    ? `安眠药的效果逐渐消退，但那段关于结婚日的"新记忆"已经深深植入......
+  const prefill =
+    completion.completionPercent >= 80
+      ? `安眠药的效果逐渐消退，但那段关于结婚日的"新记忆"已经深深植入......
 
 赵霞缓缓睁开眼睛，眼神中带着一丝恍惚。她下意识地看向左手的结婚戒指，`
-    : `安眠药的效果逐渐消退，那段关于结婚日的记忆开始变得模糊......
+      : `安眠药的效果逐渐消退，那段关于结婚日的记忆开始变得模糊......
 
 赵霞缓缓睁开眼睛，`;
 
@@ -1114,7 +1113,7 @@ ${completion.canTriggerSpecialEnding ? '- 🎯 可触发特殊结局行为' : ''
  */
 export function generateScene5StepReplacement(
   data: SchemaType,
-  userInput: string
+  userInput: string,
 ): {
   userMessage: string;
   prefill: string;
@@ -1141,7 +1140,7 @@ ${stepPrompt}`;
  */
 export function generateScene5FreePlayReplacement(
   data: SchemaType,
-  userInput: string
+  userInput: string,
 ): {
   userMessage: string;
   prefill: string;

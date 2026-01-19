@@ -67,11 +67,32 @@ export interface InterruptionCheckResult {
 const SEXUAL_BEHAVIOR_KEYWORDS = {
   // 直接触发（单独出现就算性行为）
   直接: [
-    '插', '进入', '操', '干', '肏', '交合', '贯穿', '抽插',
-    '口交', '深喉', '吞精', '乳交', '胸推',
-    '插入', '抽送', '顶入', '捅入', '刺入',
-    '射', '射精', '中出', '内射', '颜射',
-    '肉棒插', '阳具插', '性器插',
+    '插',
+    '进入',
+    '操',
+    '干',
+    '肏',
+    '交合',
+    '贯穿',
+    '抽插',
+    '口交',
+    '深喉',
+    '吞精',
+    '乳交',
+    '胸推',
+    '插入',
+    '抽送',
+    '顶入',
+    '捅入',
+    '刺入',
+    '射',
+    '射精',
+    '中出',
+    '内射',
+    '颜射',
+    '肉棒插',
+    '阳具插',
+    '性器插',
   ],
 
   // 组合触发（需要动作+部位同时出现）
@@ -86,10 +107,25 @@ const SEXUAL_BEHAVIOR_KEYWORDS = {
  * 在步骤3-5期间检测
  */
 const INTERRUPTION_KEYWORDS = [
-  '拉走', '带走', '阻止', '抢走', '打断', '中止', '停下',
-  '拉她走', '带她走', '抢她', '阻止婚礼', '破坏婚礼',
-  '别嫁', '不要嫁', '跟我走', '跟我离开',
-  '强行', '抢婚', '抢新娘',
+  '拉走',
+  '带走',
+  '阻止',
+  '抢走',
+  '打断',
+  '中止',
+  '停下',
+  '拉她走',
+  '带她走',
+  '抢她',
+  '阻止婚礼',
+  '破坏婚礼',
+  '别嫁',
+  '不要嫁',
+  '跟我走',
+  '跟我离开',
+  '强行',
+  '抢婚',
+  '抢新娘',
 ];
 
 // =============================================
@@ -394,10 +430,7 @@ export function getViolationIncrement(data: SchemaType): number {
  * @param userInput 玩家输入
  * @returns 检测结果
  */
-export function checkSexualBehaviorInScene5(
-  data: SchemaType,
-  userInput: string
-): SexualBehaviorCheckResult {
+export function checkSexualBehaviorInScene5(data: SchemaType, userInput: string): SexualBehaviorCheckResult {
   const detected = detectSexualBehavior(userInput);
   const isPerfect = isPerfectMemoryRoute(data);
   const increment = getViolationIncrement(data);
@@ -436,9 +469,9 @@ export function checkSexualBehaviorInScene5(
 
   console.info(
     `[混乱结局] 场景5性行为检测：` +
-    `路线=${isPerfect ? '完美' : '非完美'}，` +
-    `混乱度 ${currentConfusion} → ${newConfusion} (+${increment})，` +
-    `次数=${newCount}`
+      `路线=${isPerfect ? '完美' : '非完美'}，` +
+      `混乱度 ${currentConfusion} → ${newConfusion} (+${increment})，` +
+      `次数=${newCount}`,
   );
 
   // 判断是否达到100触发精神崩溃
@@ -488,10 +521,7 @@ export function checkSexualBehaviorInScene5(
  * @param userInput 玩家输入
  * @returns 检测结果
  */
-export function checkWeddingInterruptionInScene5(
-  data: SchemaType,
-  userInput: string
-): InterruptionCheckResult {
+export function checkWeddingInterruptionInScene5(data: SchemaType, userInput: string): InterruptionCheckResult {
   // 检查是否在步骤3-5
   const currentStep = data.梦境数据.场景5?.当前步骤 ?? 0;
   if (currentStep < 3 || currentStep > 5) {
@@ -503,10 +533,7 @@ export function checkWeddingInterruptionInScene5(
     // 打断仪式直接将混乱度设为100
     const oldConfusion = data.梦境数据.记忆混乱度;
     data.梦境数据.记忆混乱度 = 100;
-    console.info(
-      `[混乱结局] 步骤${currentStep}检测到婚礼打断，` +
-      `混乱度 ${oldConfusion} → 100，直接标记混乱结局`
-    );
+    console.info(`[混乱结局] 步骤${currentStep}检测到婚礼打断，` + `混乱度 ${oldConfusion} → 100，直接标记混乱结局`);
   }
 
   return {
@@ -529,10 +556,7 @@ export function checkWeddingInterruptionInScene5(
  * @param data 游戏数据
  * @param reason 触发原因
  */
-export function markConfusionEnding(
-  data: SchemaType,
-  reason: '性行为' | '打断仪式'
-): void {
+export function markConfusionEnding(data: SchemaType, reason: '性行为' | '打断仪式'): void {
   // 确保混乱结局数据存在
   if (!data.梦境数据.混乱结局) {
     data.梦境数据.混乱结局 = {
@@ -576,10 +600,7 @@ export function markConfusionEnding(
  * @param forceFirstTrigger 强制使用首次触发模板（用于刚刚触发的情况）
  * @returns 检测结果
  */
-export function checkConfusionEnding(
-  data: SchemaType,
-  forceFirstTrigger = false
-): ConfusionEndingCheckResult {
+export function checkConfusionEnding(data: SchemaType, forceFirstTrigger = false): ConfusionEndingCheckResult {
   const confusion = data.梦境数据.混乱结局;
 
   // 检查是否已触发（锁定状态）
@@ -699,7 +720,7 @@ export function getConfusionForeshadowing(_data: SchemaType): string | null {
  */
 export function checkScene5Violations(
   data: SchemaType,
-  userInput: string
+  userInput: string,
 ): {
   shouldMarkConfusion: boolean;
   shouldWarn: boolean;

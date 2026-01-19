@@ -412,7 +412,8 @@ export const FALSE_ENDING_PHASES: FalseEndingPhase[] = [
     // Bug #15 修复：玩家引导机制
     expectedActions: ['继续', '不停', '动', '操', '顶', '插', '快', '用力'],
     hintThreshold: 2,
-    progressHint: '赵霞正在和苏文视频通话，但你还在她体内...她紧张地看了你一眼，但没有让你退出来。这是一个绝佳的机会，继续你的动作吧。',
+    progressHint:
+      '赵霞正在和苏文视频通话，但你还在她体内...她紧张地看了你一眼，但没有让你退出来。这是一个绝佳的机会，继续你的动作吧。',
   },
 
   // === 阶段7：罪恶快感 ===
@@ -460,7 +461,8 @@ export const FALSE_ENDING_PHASES: FalseEndingPhase[] = [
     // Bug #15 修复：玩家引导机制
     expectedActions: ['继续', '不停', '做', '进入', '亲', '吻', '抱', '更多'],
     hintThreshold: 2,
-    progressHint: '赵霞的眼泪滑落，但她没有推开你。她的身体在微微颤抖，等待着你的下一步行动...她说"不要"，但身体却在靠近。',
+    progressHint:
+      '赵霞的眼泪滑落，但她没有推开你。她的身体在微微颤抖，等待着你的下一步行动...她说"不要"，但身体却在靠近。',
   },
 
   // === 阶段8：匿名照片 ===
@@ -717,9 +719,7 @@ export function isFalseEndingFreeTime(data: SchemaType): boolean {
  * 获取当前时间段的引导类型
  * 2026-01-17 新增：用于决定注入什么类型的引导
  */
-export function getFalseEndingGuidanceType(
-  data: SchemaType
-): 'preheat' | 'dinner' | 'free' | 'main' | null {
+export function getFalseEndingGuidanceType(data: SchemaType): 'preheat' | 'dinner' | 'free' | 'main' | null {
   const day = data.世界.当前天数;
   const hour = data.世界.当前小时;
 
@@ -796,7 +796,7 @@ export function detectCompletedAnchors(aiResponse: string, phase: number): strin
  */
 export function canEnterNextFalsePhase(
   state: FalseEndingState,
-  currentHour: number
+  currentHour: number,
 ): { blocked: boolean; reason?: string; waitHours?: number } {
   const nextPhase = state.currentPhase + 1;
   if (nextPhase >= FALSE_ENDING_PHASES.length) {
@@ -844,7 +844,7 @@ export function shouldAdvancePhase(state: FalseEndingState, currentHour?: number
   // Bug #19: 超过最大轮数时强制推进（但仍受时间锁定约束）
   if (phaseConfig.maxTurns && state.turnsInPhase >= phaseConfig.maxTurns) {
     console.info(
-      `[假好结局] 阶段${state.currentPhase}(${phaseConfig.name}) 达到最大轮数${phaseConfig.maxTurns}，强制推进`
+      `[假好结局] 阶段${state.currentPhase}(${phaseConfig.name}) 达到最大轮数${phaseConfig.maxTurns}，强制推进`,
     );
     return true;
   }
@@ -853,9 +853,7 @@ export function shouldAdvancePhase(state: FalseEndingState, currentHour?: number
   if (state.turnsInPhase < phaseConfig.minTurns) return false;
 
   // 条件2：所有锚点事件都已完成
-  const allAnchorsComplete = phaseConfig.anchorEvents.every((anchor) =>
-    state.completedAnchors.includes(anchor)
-  );
+  const allAnchorsComplete = phaseConfig.anchorEvents.every(anchor => state.completedAnchors.includes(anchor));
 
   return allAnchorsComplete;
 }
@@ -903,7 +901,7 @@ export function hasExpectedAction(userInput: string, phase: number): boolean {
   }
 
   const input = userInput.toLowerCase();
-  return phaseConfig.expectedActions.some((action) => input.includes(action.toLowerCase()));
+  return phaseConfig.expectedActions.some(action => input.includes(action.toLowerCase()));
 }
 
 /**
@@ -939,7 +937,7 @@ export function checkProgressHint(state: FalseEndingState, userInput: string): s
  */
 export function updateProgressTracking(
   state: FalseEndingState,
-  userInput: string
+  userInput: string,
 ): { updatedState: FalseEndingState; hint: string | null } {
   const hasProgress = hasExpectedAction(userInput, state.currentPhase);
 
@@ -972,7 +970,7 @@ export function processTurnEnd(
   state: FalseEndingState,
   aiResponse: string,
   userInput?: string,
-  currentHour?: number
+  currentHour?: number,
 ): {
   newState: FalseEndingState;
   phaseAdvanced: boolean;
@@ -1057,9 +1055,7 @@ export function generateFalseEndingPrompt(state: FalseEndingState, userInput: st
   } else {
     const remainingTurns = phaseConfig.maxTurns - state.turnsInPhase;
     turnsWarning =
-      remainingTurns <= 2
-        ? `⚠️ 剩余${remainingTurns}轮后将自动推进到下一阶段`
-        : `剩余约${remainingTurns}轮`;
+      remainingTurns <= 2 ? `⚠️ 剩余${remainingTurns}轮后将自动推进到下一阶段` : `剩余约${remainingTurns}轮`;
   }
 
   // Bug #40 修复：时间锁定时不显示紧迫感提示
@@ -1084,7 +1080,7 @@ export function generateFalseEndingPrompt(state: FalseEndingState, userInput: st
 - 阶段：${state.currentPhase + 1}/${FALSE_ENDING_PHASES.length} - ${phaseConfig.title}
 - 本阶段轮数：${state.turnsInPhase}（${turnsWarning}）
 - 已完成锚点：[${state.completedAnchors.join(', ')}]
-- 待完成锚点：[${phaseConfig.anchorEvents.filter((a) => !state.completedAnchors.includes(a)).join(', ')}]${timeBlockWarning}${urgencyHint}`;
+- 待完成锚点：[${phaseConfig.anchorEvents.filter(a => !state.completedAnchors.includes(a)).join(', ')}]${timeBlockWarning}${urgencyHint}`;
 
   // Bug #15 修复：检查是否需要玩家引导提示
   const progressHint = checkProgressHint(state, userInput);
@@ -1114,12 +1110,12 @@ function isInputOnTrack(input: string, phase: number): boolean {
   const phaseConfig = FALSE_ENDING_PHASES[phase];
   if (!phaseConfig) return true;
 
-  const allKeywords = phaseConfig.anchorEvents.flatMap((anchor) => {
+  const allKeywords = phaseConfig.anchorEvents.flatMap(anchor => {
     const kws = ANCHOR_KEYWORDS[anchor];
     return kws ? kws.filter((k): k is string => typeof k === 'string') : [];
   });
 
-  return allKeywords.some((kw) => input.includes(kw));
+  return allKeywords.some(kw => input.includes(kw));
 }
 
 /**
@@ -1309,7 +1305,7 @@ export function generatePhaseTransitionHint(fromPhase: number, toPhase: number):
 export function generateFalseEndingTimeBasedPrompt(
   data: SchemaType,
   state: FalseEndingState,
-  userInput: string
+  userInput: string,
 ): string | null {
   const guidanceType = getFalseEndingGuidanceType(data);
   const currentHour = data.世界.当前小时;

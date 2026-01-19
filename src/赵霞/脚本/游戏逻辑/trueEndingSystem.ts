@@ -432,8 +432,8 @@ export function shouldActivateTrueEnding(data: SchemaType): boolean {
   const completedScenes = data.梦境数据.已完成场景;
   const correctScenes = data.梦境数据.正确重构场景;
 
-  const allCompleted = [1, 2, 3, 4, 5].every((s) => completedScenes.includes(s));
-  const allCorrect = [1, 2, 3, 4, 5].every((s) => correctScenes.includes(s));
+  const allCompleted = [1, 2, 3, 4, 5].every(s => completedScenes.includes(s));
+  const allCorrect = [1, 2, 3, 4, 5].every(s => correctScenes.includes(s));
 
   return allCompleted && allCorrect;
 }
@@ -614,7 +614,7 @@ export function detectCompletedAnchors(aiResponse: string, phase: number): strin
 
   for (const anchor of phaseConfig.anchorEvents) {
     const keywords = ANCHOR_KEYWORDS[anchor] || [];
-    const isCompleted = keywords.some((kw) => {
+    const isCompleted = keywords.some(kw => {
       // 支持简单的正则匹配
       if (kw.includes('.*')) {
         const regex = new RegExp(kw, 'i');
@@ -657,7 +657,7 @@ export function shouldAdvancePhase(state: TrueEndingState, currentHour?: number)
   // Bug #19 修复：超过最大轮数时强制推进（但仍受时间锁定约束）
   if (phaseConfig.maxTurns && state.turnsInPhase >= phaseConfig.maxTurns) {
     console.info(
-      `[真好结局] 阶段${state.currentPhase}(${phaseConfig.name}) 达到最大轮数${phaseConfig.maxTurns}，强制推进`
+      `[真好结局] 阶段${state.currentPhase}(${phaseConfig.name}) 达到最大轮数${phaseConfig.maxTurns}，强制推进`,
     );
     return true;
   }
@@ -668,9 +668,7 @@ export function shouldAdvancePhase(state: TrueEndingState, currentHour?: number)
   }
 
   // 检查锚点事件是否全部完成
-  const allAnchorsComplete = phaseConfig.anchorEvents.every((anchor) =>
-    state.completedAnchors.includes(anchor)
-  );
+  const allAnchorsComplete = phaseConfig.anchorEvents.every(anchor => state.completedAnchors.includes(anchor));
 
   return allAnchorsComplete;
 }
@@ -681,7 +679,7 @@ export function shouldAdvancePhase(state: TrueEndingState, currentHour?: number)
  */
 export function canEnterNextPhase(
   state: TrueEndingState,
-  currentHour: number
+  currentHour: number,
 ): { blocked: boolean; reason?: string; waitHours?: number } {
   const nextPhase = state.currentPhase + 1;
   if (nextPhase >= TRUE_ENDING_PHASES.length) {
@@ -753,7 +751,7 @@ export function hasExpectedAction(userInput: string, phase: number): boolean {
   }
 
   const input = userInput.toLowerCase();
-  return phaseConfig.expectedActions.some((action) => input.includes(action.toLowerCase()));
+  return phaseConfig.expectedActions.some(action => input.includes(action.toLowerCase()));
 }
 
 /**
@@ -789,7 +787,7 @@ export function checkProgressHint(state: TrueEndingState, userInput: string): st
  */
 export function updateProgressTracking(
   state: TrueEndingState,
-  userInput: string
+  userInput: string,
 ): { updatedState: TrueEndingState; hint: string | null } {
   const hasProgress = hasExpectedAction(userInput, state.currentPhase);
 
@@ -822,7 +820,7 @@ export function processTurnEnd(
   state: TrueEndingState,
   aiResponse: string,
   userInput?: string,
-  currentHour?: number // Bug #19：当前小时，用于时间锁定检查
+  currentHour?: number, // Bug #19：当前小时，用于时间锁定检查
 ): {
   newState: TrueEndingState;
   phaseAdvanced: boolean;
@@ -858,9 +856,7 @@ export function processTurnEnd(
 
     if (canEnter.blocked) {
       // 时间锁定，不推进但返回锁定信息
-      console.info(
-        `[真好结局] 阶段${newState.currentPhase} 可以推进，但下一阶段时间锁定：${canEnter.reason}`
-      );
+      console.info(`[真好结局] 阶段${newState.currentPhase} 可以推进，但下一阶段时间锁定：${canEnter.reason}`);
       return {
         newState,
         phaseAdvanced: false,
@@ -888,15 +884,13 @@ export function processTurnEnd(
 export function generateTrueEndingPrompt(
   state: TrueEndingState,
   userInput: string,
-  currentHour?: number // Bug #19：当前小时
+  currentHour?: number, // Bug #19：当前小时
 ): string {
   const phaseConfig = TRUE_ENDING_PHASES[state.currentPhase];
   if (!phaseConfig) return '';
 
   // 计算剩余锚点
-  const remainingAnchors = phaseConfig.anchorEvents.filter(
-    (a) => !state.completedAnchors.includes(a)
-  );
+  const remainingAnchors = phaseConfig.anchorEvents.filter(a => !state.completedAnchors.includes(a));
 
   // Bug #40 修复：检查下一阶段时间锁定
   const hour = currentHour ?? 12;
@@ -911,9 +905,7 @@ export function generateTrueEndingPrompt(
   } else {
     const remainingTurns = phaseConfig.maxTurns - state.turnsInPhase;
     turnsWarning =
-      remainingTurns <= 2
-        ? `⚠️ 剩余${remainingTurns}轮后将自动推进到下一阶段`
-        : `剩余约${remainingTurns}轮`;
+      remainingTurns <= 2 ? `⚠️ 剩余${remainingTurns}轮后将自动推进到下一阶段` : `剩余约${remainingTurns}轮`;
   }
 
   // Bug #40 修复：时间锁定的详细提示
@@ -987,7 +979,8 @@ export function generateTrueEndingEntryReplacement(data?: SchemaType): {
   const isPerfect = data ? isPerfectTrueEnding(data) : false;
   const endingTitle = isPerfect ? '完美真爱结局「命中注定」' : '真好结局「禁忌之爱」';
 
-  const perfectMemoryNote = isPerfect ? `
+  const perfectMemoryNote = isPerfect
+    ? `
 
 【完美记忆路线】
 玩家在进入场景5之前，按顺序完成了场景1-2-3。
@@ -1000,7 +993,8 @@ export function generateTrueEndingEntryReplacement(data?: SchemaType): {
 【AI特别指引】
 完美记忆路线的赵霞不是"被改造"的，而是"从一开始就在等待"的。
 她的选择是发自内心的，不是被催眠的。
-描写她时，要体现出"终于等到你"的感动，而不是"我被你改变了"的迷茫。` : '';
+描写她时，要体现出"终于等到你"的感动，而不是"我被你改变了"的迷茫。`
+    : '';
 
   const userMessage = `[系统指令 - ${endingTitle}开始]
 
@@ -1272,11 +1266,7 @@ export function generateRoomTriggerPrompt(state: TrueEndingState, isPerfect: boo
  * 根据当前时间生成对应的引导Prompt
  * 2026-01-17 新增：整合所有时间段的引导
  */
-export function generateTimeBasedPrompt(
-  data: SchemaType,
-  state: TrueEndingState,
-  userInput: string
-): string | null {
+export function generateTimeBasedPrompt(data: SchemaType, state: TrueEndingState, userInput: string): string | null {
   const guidanceType = getGuidanceType(data);
 
   if (!guidanceType) {

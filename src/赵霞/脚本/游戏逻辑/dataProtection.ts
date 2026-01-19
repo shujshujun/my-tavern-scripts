@@ -220,10 +220,7 @@ export interface TamperDetectionResult {
  * @param snapshot 之前保存的快照（可选，默认使用当前快照）
  * @returns 检测结果
  */
-export function validateAndRestoreData(
-  data: SchemaType,
-  snapshot?: DataSnapshot
-): TamperDetectionResult {
+export function validateAndRestoreData(data: SchemaType, snapshot?: DataSnapshot): TamperDetectionResult {
   const targetSnapshot = snapshot || currentSnapshot;
 
   if (!targetSnapshot) {
@@ -259,10 +256,7 @@ export function validateAndRestoreData(
     const currentValue = getNestedValue(dataObj, path);
 
     // 梦境豁免：如果在梦境中，部位进度和当晚进度记录允许修改
-    if (isInDream && (
-      path.startsWith('赵霞状态.部位进度.') ||
-      path.startsWith('梦境数据.当晚进度记录.')
-    )) {
+    if (isInDream && (path.startsWith('赵霞状态.部位进度.') || path.startsWith('梦境数据.当晚进度记录.'))) {
       console.info(`[数据保护] 梦境豁免: ${path} (${JSON.stringify(originalValue)} → ${JSON.stringify(currentValue)})`);
       continue; // 跳过检测，允许修改
     }
@@ -271,7 +265,9 @@ export function validateAndRestoreData(
     // 设计意图：脚本需要在这些时间段把游戏阶段从"日常"切换到"梦境"
     if (path === '世界.游戏阶段' && (isDreamEntryWindow || isScene5Window)) {
       if (!deepEqual(originalValue, currentValue)) {
-        console.info(`[数据保护] 时间窗口豁免: ${path} (${JSON.stringify(originalValue)} → ${JSON.stringify(currentValue)})`);
+        console.info(
+          `[数据保护] 时间窗口豁免: ${path} (${JSON.stringify(originalValue)} → ${JSON.stringify(currentValue)})`,
+        );
       }
       continue; // 跳过检测，允许修改
     }
@@ -280,14 +276,14 @@ export function validateAndRestoreData(
     // 允许 "结局判定" → "已破解" 的合法转换（结局完成时由脚本触发）
     if (path === '世界.循环状态') {
       const validTransitions = [
-        { from: '进行中', to: '结局判定' },     // TimeSystem.advance() 触发
-        { from: '结局判定', to: '已破解' },     // checkEnding() 或结局系统完成时触发
+        { from: '进行中', to: '结局判定' }, // TimeSystem.advance() 触发
+        { from: '结局判定', to: '已破解' }, // checkEnding() 或结局系统完成时触发
       ];
-      const isValidTransition = validTransitions.some(
-        t => originalValue === t.from && currentValue === t.to
-      );
+      const isValidTransition = validTransitions.some(t => originalValue === t.from && currentValue === t.to);
       if (isValidTransition) {
-        console.info(`[数据保护] 结局状态转换豁免: ${path} (${JSON.stringify(originalValue)} → ${JSON.stringify(currentValue)})`);
+        console.info(
+          `[数据保护] 结局状态转换豁免: ${path} (${JSON.stringify(originalValue)} → ${JSON.stringify(currentValue)})`,
+        );
         continue; // 跳过检测，允许修改
       }
     }
@@ -299,7 +295,9 @@ export function validateAndRestoreData(
       // 只允许从 "未触发" 变为其他结局类型，不允许反向变化
       const validEndingTypes = ['坏结局', '普通结局', '真好结局', '假好结局', '完美真爱结局'];
       if (originalValue === '未触发' && validEndingTypes.includes(currentValue as string)) {
-        console.info(`[数据保护] 结局触发豁免: ${path} (${JSON.stringify(originalValue)} → ${JSON.stringify(currentValue)})`);
+        console.info(
+          `[数据保护] 结局触发豁免: ${path} (${JSON.stringify(originalValue)} → ${JSON.stringify(currentValue)})`,
+        );
         continue; // 跳过检测，允许修改
       }
     }
@@ -333,22 +331,22 @@ export function validateAndRestoreData(
       // 检测异常重置：原值有效（>默认值）且新值变为默认值或接近默认值
       // Bug #23 增强：增加对"大幅下降"的检测（如依存度从45降到2）
       // Bug #24 修复：丈夫怀疑度增加到100是正常的（触发坏结局），不应该被阻止
-      const isAbnormalReset = originalNum > 10 && (
-        currentNum === 0 ||
-        currentNum === 1 ||
-        // 道德底线异常重置到100（= 100 - 0），但丈夫怀疑度增加到100是正常的
-        (currentNum === 100 && path === '赵霞状态.道德底线') ||
-        (path === '赵霞状态.道德底线' && currentNum > originalNum + 30) || // 道德底线异常上升超过30
-        (path === '赵霞状态.依存度' && originalNum - currentNum > 15) || // 依存度异常下降超过15
-        (path === '赵霞状态.当前境界' && originalNum - currentNum >= 2) // 境界异常下降超过2级
-      );
+      const isAbnormalReset =
+        originalNum > 10 &&
+        (currentNum === 0 ||
+          currentNum === 1 ||
+          // 道德底线异常重置到100（= 100 - 0），但丈夫怀疑度增加到100是正常的
+          (currentNum === 100 && path === '赵霞状态.道德底线') ||
+          (path === '赵霞状态.道德底线' && currentNum > originalNum + 30) || // 道德底线异常上升超过30
+          (path === '赵霞状态.依存度' && originalNum - currentNum > 15) || // 依存度异常下降超过15
+          (path === '赵霞状态.当前境界' && originalNum - currentNum >= 2)); // 境界异常下降超过2级
 
       if (isAbnormalReset) {
         console.warn(
           `[数据保护] 检测到异常重置，阻止修改: ${path}`,
           `\n  原值: ${originalValue}`,
           `\n  异常新值: ${currentValue}`,
-          `\n  原因: 可能是数据继承问题导致的核心数值被重置`
+          `\n  原因: 可能是数据继承问题导致的核心数值被重置`,
         );
         // 还原为原值
         setNestedValue(dataObj, path, originalValue);
@@ -364,7 +362,9 @@ export function validateAndRestoreData(
       }
 
       if (!deepEqual(originalValue, currentValue)) {
-        console.info(`[数据保护] 真相模式豁免: ${path} (${JSON.stringify(originalValue)} → ${JSON.stringify(currentValue)})`);
+        console.info(
+          `[数据保护] 真相模式豁免: ${path} (${JSON.stringify(originalValue)} → ${JSON.stringify(currentValue)})`,
+        );
       }
       continue; // 正常豁免，允许脚本计算更新
     }
@@ -388,15 +388,13 @@ export function validateAndRestoreData(
         `\n  保护级别: ${level}`,
         `\n  原始值: ${JSON.stringify(originalValue)}`,
         `\n  篡改值: ${JSON.stringify(currentValue)}`,
-        `\n  已还原`
+        `\n  已还原`,
       );
     }
   }
 
   if (result.detected) {
-    console.warn(
-      `[数据保护] 共检测到 ${result.tamperedFields.length} 个字段被篡改，已全部还原`
-    );
+    console.warn(`[数据保护] 共检测到 ${result.tamperedFields.length} 个字段被篡改，已全部还原`);
   } else {
     console.info('[数据保护] 数据完整性验证通过');
   }
@@ -427,7 +425,7 @@ function deepEqual(a: unknown, b: unknown): boolean {
 
     if (aKeys.length !== bKeys.length) return false;
 
-    return aKeys.every((key) => deepEqual(aObj[key], bObj[key]));
+    return aKeys.every(key => deepEqual(aObj[key], bObj[key]));
   }
 
   return false;
@@ -479,12 +477,7 @@ export function clearScriptAuthToken(): void {
  * @param token 授权令牌
  * @returns 是否修改成功
  */
-export function authorizedModify(
-  data: SchemaType,
-  path: string,
-  value: unknown,
-  token: string
-): boolean {
+export function authorizedModify(data: SchemaType, path: string, value: unknown, token: string): boolean {
   // 验证令牌
   if (!validateScriptAuthToken(token)) {
     console.error(`[数据保护] 授权失败: 无效的令牌`);
@@ -545,13 +538,13 @@ export function validateNumericChange(
   path: string,
   oldValue: number,
   newValue: number,
-  maxChange: number = 10
+  maxChange: number = 10,
 ): boolean {
   const change = Math.abs(newValue - oldValue);
 
   if (change > maxChange) {
     console.warn(
-      `[数据保护] 可疑变化: ${path} 从 ${oldValue} 变为 ${newValue}（变化量: ${change}，超过阈值: ${maxChange}）`
+      `[数据保护] 可疑变化: ${path} 从 ${oldValue} 变为 ${newValue}（变化量: ${change}，超过阈值: ${maxChange}）`,
     );
     return false;
   }
@@ -662,9 +655,7 @@ export function applyPureLoveAffectionCap(data: SchemaType): boolean {
   const currentAffection = data.赵霞状态.纯爱好感度;
 
   if (currentAffection > cap) {
-    console.info(
-      `[数据保护] 纯爱好感度软上限修正: ${currentAffection} → ${cap} (Day ${currentDay} 上限: ${cap})`
-    );
+    console.info(`[数据保护] 纯爱好感度软上限修正: ${currentAffection} → ${cap} (Day ${currentDay} 上限: ${cap})`);
     data.赵霞状态.纯爱好感度 = cap;
 
     // 更新快照

@@ -42,17 +42,8 @@ import {
   calculateMatchLevel,
   lockScene5EntryCoherence,
 } from './scene5System';
-import {
-  checkBadEnding,
-  applyBadEndingState,
-  isInBadEndingLock,
-  type BadEndingType,
-} from './badEndingSystem';
-import {
-  checkNormalEnding,
-  isInNormalEndingLock,
-  type NormalEndingType,
-} from './normalEndingSystem';
+import { checkBadEnding, applyBadEndingState, isInBadEndingLock, type BadEndingType } from './badEndingSystem';
+import { checkNormalEnding, isInNormalEndingLock, type NormalEndingType } from './normalEndingSystem';
 import {
   shouldActivateTrueEnding,
   isTrueEndingActive,
@@ -665,13 +656,22 @@ function generateDreamHistoryBackground(data: SchemaType, excludeCurrentScene?: 
 // 梦境入口关键词
 // Bug #16 修复：扩展关键词列表
 const DREAM_ENTRY_KEYWORDS = [
-  '梦境', '做梦', '睡觉', '睡了', '入睡', '睡着', '进入梦境', '入梦',
-  '进入了梦境', '进入她的梦境', '进入赵霞的梦境',
+  '梦境',
+  '做梦',
+  '睡觉',
+  '睡了',
+  '入睡',
+  '睡着',
+  '进入梦境',
+  '入梦',
+  '进入了梦境',
+  '进入她的梦境',
+  '进入赵霞的梦境',
 ];
 // 正则表达式模式：匹配 "进入...梦境" 这类变体
 const DREAM_ENTRY_PATTERNS = [
   /进入.*梦境/, // 匹配 "进入了梦境"、"进入她的梦境" 等
-  /入.*梦/,     // 匹配 "入梦"、"入了梦" 等
+  /入.*梦/, // 匹配 "入梦"、"入了梦" 等
 ];
 
 // 安眠药关键词（触发场景5）
@@ -680,16 +680,19 @@ const SLEEPING_PILL_KEYWORDS = ['安眠药', '安眠藥', '助眠药', '吃药',
 // 梦境场景主题配置
 // 场景1-4：常规场景，需要 23:00-01:00 时间窗口 + 关键词触发
 // 场景5：特殊场景（精神），需要安眠药关键词触发，08:00-19:00时间窗口
-const DREAM_SCENE_THEMES: Record<number, {
-  title: string;
-  age: number;
-  setting: string;
-  theme: string;
-  atmosphere: string;
-  bodyPart: string; // 对应的身体部位
-  objective: string; // 玩家目标提示
-  identity: string; // 苏文在该场景的身份
-}> = {
+const DREAM_SCENE_THEMES: Record<
+  number,
+  {
+    title: string;
+    age: number;
+    setting: string;
+    theme: string;
+    atmosphere: string;
+    bodyPart: string; // 对应的身体部位
+    objective: string; // 玩家目标提示
+    identity: string; // 苏文在该场景的身份
+  }
+> = {
   1: {
     title: '初恋的夏日',
     age: 16,
@@ -786,20 +789,17 @@ function calculateScene1InitValues(data: SchemaType): {
 
   // 计算初始依存度
   const rawDependence =
-    好感度 * SCENE1_INIT_CONFIG.dependence.favorWeight +
-    亲密度 * SCENE1_INIT_CONFIG.dependence.intimacyWeight;
+    好感度 * SCENE1_INIT_CONFIG.dependence.favorWeight + 亲密度 * SCENE1_INIT_CONFIG.dependence.intimacyWeight;
   const initialDependence = Math.min(
     SCENE1_INIT_CONFIG.dependence.maxValue,
-    Math.max(SCENE1_INIT_CONFIG.dependence.minValue, Math.floor(rawDependence))
+    Math.max(SCENE1_INIT_CONFIG.dependence.minValue, Math.floor(rawDependence)),
   );
 
   // 计算初始道德底线
-  const rawMorality =
-    SCENE1_INIT_CONFIG.morality.baseValue -
-    亲密度 * SCENE1_INIT_CONFIG.morality.intimacyReduction;
+  const rawMorality = SCENE1_INIT_CONFIG.morality.baseValue - 亲密度 * SCENE1_INIT_CONFIG.morality.intimacyReduction;
   const initialMorality = Math.min(
     SCENE1_INIT_CONFIG.morality.maxValue,
-    Math.max(SCENE1_INIT_CONFIG.morality.minValue, Math.floor(rawMorality))
+    Math.max(SCENE1_INIT_CONFIG.morality.minValue, Math.floor(rawMorality)),
   );
 
   // 确定关系阶段
@@ -820,7 +820,7 @@ function calculateScene1InitValues(data: SchemaType): {
     亲密度,
     initialDependence,
     initialMorality,
-    relationshipStage
+    relationshipStage,
   );
 
   return {
@@ -839,7 +839,7 @@ function generateTransferDescription(
   intimacy: number,
   dependence: number,
   morality: number,
-  stage: string
+  stage: string,
 ): string {
   let description = `【恋爱关系转化】\n`;
   description += `日常阶段累积：好感度${favor}，亲密度${intimacy}（${stage}阶段）\n`;
@@ -926,58 +926,61 @@ function generateBodyPartInfluencePrompt(data: SchemaType): string | null {
   const parts: string[] = [];
 
   // 部位名称映射和行为示例
-  const bodyPartConfig: Record<string, {
-    displayName: string;
-    behaviors: Record<string, string>; // 等级 -> 行为示例
-  }> = {
+  const bodyPartConfig: Record<
+    string,
+    {
+      displayName: string;
+      behaviors: Record<string, string>; // 等级 -> 行为示例
+    }
+  > = {
     嘴巴: {
       displayName: '嘴巴/口腔',
       behaviors: {
-        '未开发': '拒绝任何口腔相关的亲密行为',
-        '初步开发': '可以接受简单的嘴唇接触，但很快会躲开',
-        '明显开发': '愿意进行舌吻，会有些许回应',
-        '深度开发': '主动进行深吻，愿意进行口交',
-        '完全开发': '渴望口腔刺激，愿意深喉，会主动索吻',
+        未开发: '拒绝任何口腔相关的亲密行为',
+        初步开发: '可以接受简单的嘴唇接触，但很快会躲开',
+        明显开发: '愿意进行舌吻，会有些许回应',
+        深度开发: '主动进行深吻，愿意进行口交',
+        完全开发: '渴望口腔刺激，愿意深喉，会主动索吻',
       },
     },
     胸部: {
       displayName: '胸部',
       behaviors: {
-        '未开发': '会遮挡胸部，拒绝触碰',
-        '初步开发': '允许隔着衣服轻触，但会紧张',
-        '明显开发': '允许直接触摸，会有生理反应',
-        '深度开发': '享受胸部爱抚，乳头变得敏感',
-        '完全开发': '胸部极度敏感，轻触就会颤抖，渴望被揉捏',
+        未开发: '会遮挡胸部，拒绝触碰',
+        初步开发: '允许隔着衣服轻触，但会紧张',
+        明显开发: '允许直接触摸，会有生理反应',
+        深度开发: '享受胸部爱抚，乳头变得敏感',
+        完全开发: '胸部极度敏感，轻触就会颤抖，渴望被揉捏',
       },
     },
     下体: {
       displayName: '下体/私处',
       behaviors: {
-        '未开发': '会夹紧双腿，坚决拒绝触碰',
-        '初步开发': '允许隔着衣物轻抚，但很快会制止',
-        '明显开发': '允许直接触摸，会不自觉地湿润',
-        '深度开发': '渴望被触摸，愿意接受手指进入',
-        '完全开发': '极度敏感，轻触就会颤抖呻吟，渴望被插入',
+        未开发: '会夹紧双腿，坚决拒绝触碰',
+        初步开发: '允许隔着衣物轻抚，但很快会制止',
+        明显开发: '允许直接触摸，会不自觉地湿润',
+        深度开发: '渴望被触摸，愿意接受手指进入',
+        完全开发: '极度敏感，轻触就会颤抖呻吟，渴望被插入',
       },
     },
     后穴: {
       displayName: '后穴/臀部',
       behaviors: {
-        '未开发': '坚决拒绝任何后方接触',
-        '初步开发': '允许轻抚臀部，但会紧张',
-        '明显开发': '允许揉捏臀部，开始有感觉',
-        '深度开发': '对后穴刺激有了好奇，不再完全抗拒',
-        '完全开发': '后穴变得敏感，愿意尝试后庭play',
+        未开发: '坚决拒绝任何后方接触',
+        初步开发: '允许轻抚臀部，但会紧张',
+        明显开发: '允许揉捏臀部，开始有感觉',
+        深度开发: '对后穴刺激有了好奇，不再完全抗拒',
+        完全开发: '后穴变得敏感，愿意尝试后庭play',
       },
     },
     精神: {
       displayName: '精神/心理',
       behaviors: {
-        '未开发': '保持正常的母子界限意识',
-        '初步开发': '开始对{{user}}产生异样的感觉',
-        '明显开发': '心理防线开始松动，会主动靠近',
-        '深度开发': '产生强烈的依赖感，渴望被需要',
-        '完全开发': '完全沦陷，将{{user}}视为最重要的人',
+        未开发: '保持正常的母子界限意识',
+        初步开发: '开始对{{user}}产生异样的感觉',
+        明显开发: '心理防线开始松动，会主动靠近',
+        深度开发: '产生强烈的依赖感，渴望被需要',
+        完全开发: '完全沦陷，将{{user}}视为最重要的人',
       },
     },
   };
@@ -1151,7 +1154,10 @@ function getRealmConstraintReminder(realm: number, 已进入梦境: boolean): st
  * D9：获取梦境时间段引导信息
  * 根据当前时间返回剧情阶段和AI引导提示
  */
-function getDreamTimePhaseGuidance(hour: number, sceneNum: number): {
+function getDreamTimePhaseGuidance(
+  hour: number,
+  sceneNum: number,
+): {
   phase: string;
   guidance: string;
   pacing: string;
@@ -1784,10 +1790,12 @@ function generateDailyPhasePrompt(data: SchemaType): string {
       // 境界 >= 2，应该生成苦主视角
       if (苏文在家) {
         // 苏文在家时：描写他亲眼所见的异常
-        husbandThoughtConstraint = '✅【必须】在回复末尾输出 <HusbandThought> 标签，描写苏文亲眼所见的异常（30-50字内心独白）';
+        husbandThoughtConstraint =
+          '✅【必须】在回复末尾输出 <HusbandThought> 标签，描写苏文亲眼所见的异常（30-50字内心独白）';
       } else {
         // 苏文不在家时：描写他在外地时的隐隐不安
-        husbandThoughtConstraint = '✅【必须】在回复末尾输出 <HusbandThought> 标签，描写苏文在外地的隐隐不安、电话中察觉的异样（30-50字内心独白）';
+        husbandThoughtConstraint =
+          '✅【必须】在回复末尾输出 <HusbandThought> 标签，描写苏文在外地的隐隐不安、电话中察觉的异样（30-50字内心独白）';
       }
     }
   }
@@ -1855,9 +1863,9 @@ function generateDreamPhasePrompt(data: SchemaType): string {
   // 修复：22点也应该计算剩余时间，之前 hour >= 23 漏掉了22点
   let hoursRemaining: number;
   if (hour >= 22) {
-    hoursRemaining = (10 + 24 - hour) - 1;  // 22点 → 11小时, 23点 → 10小时
+    hoursRemaining = 10 + 24 - hour - 1; // 22点 → 11小时, 23点 → 10小时
   } else if (hour >= 0 && hour < 10) {
-    hoursRemaining = (10 - hour) - 1;
+    hoursRemaining = 10 - hour - 1;
   } else {
     hoursRemaining = 0;
   }
@@ -2393,7 +2401,10 @@ ${continuityPrompt}
 /**
  * 生成梦境开场的替换内容（场景1-4）
  */
-function generateDreamEntryReplacement(data: SchemaType, sceneNum: number): {
+function generateDreamEntryReplacement(
+  data: SchemaType,
+  sceneNum: number,
+): {
   userMessage: string;
   prefill: string;
 } {
@@ -2491,9 +2502,8 @@ function generateDreamExitReplacement(data: SchemaType): {
     .filter(([_, v]) => v > 0)
     .sort(([, a], [, b]) => b - a);
 
-  const developmentSummary = sortedParts.length > 0
-    ? sortedParts.map(([part, progress]) => `${part}: ${progress}%`).join('、')
-    : '无明显开发';
+  const developmentSummary =
+    sortedParts.length > 0 ? sortedParts.map(([part, progress]) => `${part}: ${progress}%`).join('、') : '无明显开发';
 
   // 判断是否是首次觉醒
   const isFirstAwakening = data.梦境数据.已完成场景.length === 1;
@@ -2540,7 +2550,9 @@ ${developmentSummary}
  * - 20:00强制结束，给玩家缓冲时间进入正常梦境
  */
 function checkScene5Entry(data: SchemaType, userInput: string): boolean {
-  console.info(`[Scene5Entry调试] 游戏阶段: ${data.世界.游戏阶段}, 当前小时: ${data.世界.当前小时}, 用户输入: "${userInput}"`);
+  console.info(
+    `[Scene5Entry调试] 游戏阶段: ${data.世界.游戏阶段}, 当前小时: ${data.世界.当前小时}, 用户输入: "${userInput}"`,
+  );
 
   // 必须在日常阶段或序章阶段（序章也允许触发场景5）
   if (data.世界.游戏阶段 !== '日常' && data.世界.游戏阶段 !== '序章') {
@@ -2595,8 +2607,10 @@ function checkDreamEntry(data: SchemaType, userInput: string): boolean {
 
   // Bug #16 修复：检测关键词和正则模式
   // 原问题："进入了梦境" 无法匹配 "进入梦境"
-  return DREAM_ENTRY_KEYWORDS.some(kw => userInput.includes(kw)) ||
-         DREAM_ENTRY_PATTERNS.some(pattern => pattern.test(userInput));
+  return (
+    DREAM_ENTRY_KEYWORDS.some(kw => userInput.includes(kw)) ||
+    DREAM_ENTRY_PATTERNS.some(pattern => pattern.test(userInput))
+  );
 }
 
 /**
@@ -2713,14 +2727,12 @@ function isRollOperationBySwipeId(data: SchemaType, currentMessageId: number): b
     if (currentSwipeId !== lastSwipeId) {
       console.info(
         `[Prompt注入] 检测到 ROLL 操作: 楼层 ${currentMessageId}, ` +
-          `swipe_id: ${lastSwipeId} → ${currentSwipeId}，跳过步骤推进`
+          `swipe_id: ${lastSwipeId} → ${currentSwipeId}，跳过步骤推进`,
       );
       return true;
     }
     // swipe_id 相同，说明是重复触发（可能是 dryRun 后的真实请求），也跳过
-    console.info(
-      `[Prompt注入] 检测到重复触发: 楼层 ${currentMessageId}, swipe_id=${currentSwipeId}，跳过步骤推进`
-    );
+    console.info(`[Prompt注入] 检测到重复触发: 楼层 ${currentMessageId}, swipe_id=${currentSwipeId}，跳过步骤推进`);
     return true;
   }
 
@@ -2763,13 +2775,13 @@ function isAfterStoryRollOperation(data: SchemaType, currentMessageId: number): 
     if (currentSwipeId !== lastSwipeId) {
       console.info(
         `[Prompt注入] 检测到后日谈 ROLL 操作: 楼层 ${currentMessageId}, ` +
-          `swipe_id: ${lastSwipeId} → ${currentSwipeId}，跳过轮数推进`
+          `swipe_id: ${lastSwipeId} → ${currentSwipeId}，跳过轮数推进`,
       );
       return true;
     }
     // swipe_id 相同，说明是重复触发（可能是 dryRun 后的真实请求），也跳过
     console.info(
-      `[Prompt注入] 检测到后日谈重复触发: 楼层 ${currentMessageId}, swipe_id=${currentSwipeId}，跳过轮数推进`
+      `[Prompt注入] 检测到后日谈重复触发: 楼层 ${currentMessageId}, swipe_id=${currentSwipeId}，跳过轮数推进`,
     );
     return true;
   }
@@ -2834,7 +2846,7 @@ function isDreamExitRoll(data: SchemaType, currentMessageId: number): number | n
     if (data.世界.游戏阶段 === '日常') {
       console.info(
         `[Prompt注入] 检测到梦境退出 ROLL 操作: ` +
-          `场景${sceneNum ?? '未知'}，楼层匹配 ${aiReplyFloor}，当前阶段=日常`
+          `场景${sceneNum ?? '未知'}，楼层匹配 ${aiReplyFloor}，当前阶段=日常`,
       );
       return sceneNum ?? null;
     } else {
@@ -2867,7 +2879,7 @@ function isDreamExitRoll(data: SchemaType, currentMessageId: number): number | n
  */
 function isDreamEntryRoll(
   data: SchemaType,
-  currentMessageId: number
+  currentMessageId: number,
 ): { sceneNum: number; type: '普通梦境' | '场景5' } | null {
   const entryRecord = data.世界._梦境入口记录;
 
@@ -2901,7 +2913,7 @@ function isDreamEntryRoll(
     if (data.世界.游戏阶段 === '梦境') {
       console.info(
         `[Prompt注入] 检测到梦境入口 ROLL 操作: ` +
-          `场景${sceneNum ?? '未知'}，类型=${entryType ?? '未知'}，楼层匹配 ${aiReplyFloor}`
+          `场景${sceneNum ?? '未知'}，类型=${entryType ?? '未知'}，楼层匹配 ${aiReplyFloor}`,
       );
       return {
         sceneNum: sceneNum ?? 1,
@@ -2936,7 +2948,7 @@ function isDreamEntryRoll(
  */
 function isEndingEntryRoll(
   data: SchemaType,
-  currentMessageId: number
+  currentMessageId: number,
 ): '真好结局' | '完美真爱结局' | '假好结局' | null {
   const entryRecord = data.结局数据._结局入口记录;
 
@@ -2961,9 +2973,7 @@ function isEndingEntryRoll(
     const isFalseEndingRoll = endingType === '假好结局' && isFalseEndingActive(data);
 
     if (isTrueEndingRoll || isPerfectEndingRoll || isFalseEndingRoll) {
-      console.info(
-        `[Prompt注入] 检测到结局入口 ROLL 操作: ${endingType}，楼层匹配 ${aiReplyFloor}`
-      );
+      console.info(`[Prompt注入] 检测到结局入口 ROLL 操作: ${endingType}，楼层匹配 ${aiReplyFloor}`);
       return endingType;
     }
   }
@@ -3013,7 +3023,7 @@ function checkPureLoveWrongRoute(data: SchemaType): string | null {
  */
 function generatePureLoveWrongRouteReplacement(
   _data: SchemaType,
-  triggeredPart: string
+  triggeredPart: string,
 ): { userMessage: string; prefill: string } {
   // 根据不同部位生成不同的警告场景
   const wrongRouteScenes: Record<string, { scenario: string; reaction: string }> = {
@@ -3113,7 +3123,7 @@ function checkScene5ForceExit(data: SchemaType): boolean {
  */
 export function generateFullInjection(
   data: SchemaType,
-  userInput: string
+  userInput: string,
 ): {
   systemPrompt: string | null;
   replaceUserMessage: string | null;
@@ -3286,7 +3296,9 @@ export function generateFullInjection(
       const predictedConfusion = currentConfusion + increment;
 
       if (predictedConfusion >= 100) {
-        console.warn(`[Prompt注入] 场景5违规：混乱度将达到${predictedConfusion}（当前${currentConfusion}+${increment}），直接触发混乱结局并锁死游戏`);
+        console.warn(
+          `[Prompt注入] 场景5违规：混乱度将达到${predictedConfusion}（当前${currentConfusion}+${increment}），直接触发混乱结局并锁死游戏`,
+        );
 
         // 设置混乱度为100并触发混乱结局
         data.梦境数据.记忆混乱度 = 100;
@@ -3341,7 +3353,9 @@ export function generateFullInjection(
     const predictedSuspicion = data.现实数据.丈夫怀疑度 + suspicionResult.增加值;
 
     if (predictedSuspicion >= 100 && data.结局数据.当前结局 === '未触发') {
-      console.warn(`[Prompt注入] 预检测：怀疑度将达到${predictedSuspicion}（当前${data.现实数据.丈夫怀疑度}+${suspicionResult.增加值}），立即触发坏结局`);
+      console.warn(
+        `[Prompt注入] 预检测：怀疑度将达到${predictedSuspicion}（当前${data.现实数据.丈夫怀疑度}+${suspicionResult.增加值}），立即触发坏结局`,
+      );
 
       // 调用 checkBadEnding 获取结局模板（会返回首次触发模板）
       // Bug #XX 修复：直接设置怀疑度为100并保持，确保坏结局状态被锁定
@@ -3537,8 +3551,8 @@ export function generateFullInjection(
         replaceUserMessage = boundaryResult.correctionPrompt;
         console.info(
           `[Prompt注入] 触发境界打断：${boundaryResult.severity}，` +
-          `违规部位：[${boundaryResult.violatedParts.join(', ')}]，` +
-          `跨越境界：${boundaryResult.realmGap}`
+            `违规部位：[${boundaryResult.violatedParts.join(', ')}]，` +
+            `跨越境界：${boundaryResult.realmGap}`,
         );
         // 打断事件触发后，跳过其他场景检测，直接返回
         return {
@@ -3578,8 +3592,8 @@ export function generateFullInjection(
       if (boundaryResult.correctionPrompt && !boundaryResult.wasInterrupted) {
         console.info(
           `[Prompt注入] 超阶段行为未打断：${boundaryResult.severity}，` +
-          `违规部位：[${boundaryResult.violatedParts.join(', ')}]，` +
-          `将注入拒绝引导提示`
+            `违规部位：[${boundaryResult.violatedParts.join(', ')}]，` +
+            `将注入拒绝引导提示`,
         );
         // 将拒绝提示作为系统提示注入，引导AI描写赵霞的拒绝
         systemPrompt = boundaryResult.correctionPrompt;
@@ -3676,7 +3690,9 @@ export function generateFullInjection(
       if (replacement.prefill) {
         prefill = replacement.prefill;
       }
-      console.info(`[Prompt注入] 场景5自由发挥阶段：完成度=${completion.completionPercent}%，剩余时间=${19 - data.世界.当前小时}小时（19:00退出）`);
+      console.info(
+        `[Prompt注入] 场景5自由发挥阶段：完成度=${completion.completionPercent}%，剩余时间=${19 - data.世界.当前小时}小时（19:00退出）`,
+      );
     }
   }
 
@@ -3740,9 +3756,11 @@ export function generateFullInjection(
   // D9剧情引导已整合到梦境阶段的状态Prompt中
   // Bug #8 修复：当即将进入梦境时，覆盖阶段为'梦境'
   // 这解决了AI看到错误游戏阶段（如"序章"而非"梦境"）的问题
-  const phaseOverride = (shouldEnterScene5 || shouldEnterDream) ? '梦境' : undefined;
+  const phaseOverride = shouldEnterScene5 || shouldEnterDream ? '梦境' : undefined;
   const consistencyPrompt = generatePhaseAwareStatePrompt(data, phaseOverride);
-  console.info(`[Prompt注入] 阶段感知状态已注入，当前阶段: ${data.世界.游戏阶段}${phaseOverride ? ` (覆盖为: ${phaseOverride})` : ''}`);
+  console.info(
+    `[Prompt注入] 阶段感知状态已注入，当前阶段: ${data.世界.游戏阶段}${phaseOverride ? ` (覆盖为: ${phaseOverride})` : ''}`,
+  );
 
   if (systemPrompt) {
     systemPrompt = `${systemPrompt}\n\n---\n\n${consistencyPrompt}`;
@@ -3873,7 +3891,9 @@ export function generateFullInjection(
         } else {
           systemPrompt = perfectEndingPrompt;
         }
-        console.info(`[Prompt注入] 完美真爱结局进行中：阶段${state.currentPhase}（${state.currentPhase <= 11 ? ['序幕', '长谈', '决定', '准备', '蒙眼', '揭幕', '新娘', '司仪', '告白', '誓言', '戒指', '完成'][state.currentPhase] : '未知'}），轮数${state.turnsInPhase}`);
+        console.info(
+          `[Prompt注入] 完美真爱结局进行中：阶段${state.currentPhase}（${state.currentPhase <= 11 ? ['序幕', '长谈', '决定', '准备', '蒙眼', '揭幕', '新娘', '司仪', '告白', '誓言', '戒指', '完成'][state.currentPhase] : '未知'}），轮数${state.turnsInPhase}`,
+        );
       }
     }
   }
@@ -3925,14 +3945,16 @@ export function generateFullInjection(
       } else {
         shouldProgressTrueEnding = true;
         // 生成当前时段的AI引导Prompt
-        const trueEndingPrompt = generateTimeBasedPrompt(data, state, userInput) ||
-                                  generateTrueEndingPrompt(state, userInput);
+        const trueEndingPrompt =
+          generateTimeBasedPrompt(data, state, userInput) || generateTrueEndingPrompt(state, userInput);
         if (systemPrompt) {
           systemPrompt = `${systemPrompt}\n\n---\n\n${trueEndingPrompt}`;
         } else {
           systemPrompt = trueEndingPrompt;
         }
-        console.info(`[Prompt注入] 真好结局进行中：阶段${state.currentPhase}，轮数${state.turnsInPhase}，引导类型${guidanceType}`);
+        console.info(
+          `[Prompt注入] 真好结局进行中：阶段${state.currentPhase}，轮数${state.turnsInPhase}，引导类型${guidanceType}`,
+        );
       }
     }
   }
@@ -4557,9 +4579,7 @@ export function initPromptInjection(): void {
 
             _.set(currentVars, 'stat_data', currentData);
             Mvu.replaceMvuData(currentVars, { type: 'message', message_id: -1 });
-            console.info(
-              `[Prompt注入] 境界打断惩罚已应用：怀疑度+${interruptionResult.penalties?.怀疑度增加 ?? 0}`
-            );
+            console.info(`[Prompt注入] 境界打断惩罚已应用：怀疑度+${interruptionResult.penalties?.怀疑度增加 ?? 0}`);
           } catch (interruptErr) {
             console.error('[Prompt注入] 境界打断惩罚应用失败:', interruptErr);
           }
@@ -4576,9 +4596,7 @@ export function initPromptInjection(): void {
 
             _.set(currentVars, 'stat_data', currentData);
             Mvu.replaceMvuData(currentVars, { type: 'message', message_id: -1 });
-            console.info(
-              `[Prompt注入] 超阶段行为惩罚已应用：怀疑度+${interruptionResult.penalties.怀疑度增加}`
-            );
+            console.info(`[Prompt注入] 超阶段行为惩罚已应用：怀疑度+${interruptionResult.penalties.怀疑度增加}`);
           } catch (penaltyErr) {
             console.error('[Prompt注入] 超阶段行为惩罚应用失败:', penaltyErr);
           }
@@ -4591,7 +4609,7 @@ export function initPromptInjection(): void {
           // 不修改游戏状态，玩家消息已被替换，AI会描写警告场景
         }
 
-         // 场景5状态变更由游戏逻辑系统处理，此处仅用于日志
+        // 场景5状态变更由游戏逻辑系统处理，此处仅用于日志
         // 数据修改已移至 index.ts 的 processGameLogic 函数中
         if (shouldEnterScene5) {
           console.info('[Prompt注入] 检测到场景5进入关键词（数据修改由游戏逻辑系统处理）');
@@ -4829,9 +4847,7 @@ export function initPromptInjection(): void {
               // 分析玩家意图并计算契合度
               const intent = analyzePlayerIntent(userInput);
               const stepConfig = SCENE5_STEPS[currentStep]; // 当前要执行的步骤配置
-              const matchLevel = stepConfig
-                ? calculateMatchLevel(intent, stepConfig)
-                : 'low';
+              const matchLevel = stepConfig ? calculateMatchLevel(intent, stepConfig) : 'low';
 
               // 计算进度增量：高契合+10%，低契合+5%
               const progressGain = matchLevel === 'high' ? 10 : 5;
@@ -4841,10 +4857,7 @@ export function initPromptInjection(): void {
               stepProgressRecord.push(progressGain);
 
               // 计算新的完成度（上限100%）
-              const newCompletion = Math.min(
-                (scene5Data.完成度 ?? 0) + progressGain,
-                100
-              );
+              const newCompletion = Math.min((scene5Data.完成度 ?? 0) + progressGain, 100);
 
               // 更新场景5数据
               scene5Data.当前步骤 = nextStep;
@@ -4868,8 +4881,8 @@ export function initPromptInjection(): void {
 
               console.info(
                 `[Prompt注入] 场景5步骤推进: ${currentStep} → ${nextStep}，` +
-                `契合度: ${matchLevel}，进度+${progressGain}%，` +
-                `完成度: ${newCompletion}%，楼层: ${currentMessageId}, swipe: ${currentSwipeId}`
+                  `契合度: ${matchLevel}，进度+${progressGain}%，` +
+                  `完成度: ${newCompletion}%，楼层: ${currentMessageId}, swipe: ${currentSwipeId}`,
               );
             }
           } catch (stateErr) {
@@ -4912,7 +4925,7 @@ export function initPromptInjection(): void {
                 currentData.赵霞状态.依存度 = initValues.initialDependence;
                 currentData.赵霞状态.道德底线 = initValues.initialMorality;
                 console.info(
-                  `[Prompt注入] 场景1初始化：好感度${currentData.赵霞状态.纯爱好感度}+亲密度${currentData.赵霞状态.纯爱亲密度} → 依存度${initValues.initialDependence}，道德底线${initValues.initialMorality}（${initValues.relationshipStage}阶段）`
+                  `[Prompt注入] 场景1初始化：好感度${currentData.赵霞状态.纯爱好感度}+亲密度${currentData.赵霞状态.纯爱亲密度} → 依存度${initValues.initialDependence}，道德底线${initValues.initialMorality}（${initValues.relationshipStage}阶段）`,
                 );
               }
 
@@ -4961,7 +4974,7 @@ export function initPromptInjection(): void {
                 // 梦境通常持续约10轮对话，估算入口楼层
                 const estimatedEntryId = Math.max(0, currentFloor - 10);
                 console.warn(
-                  `[Prompt注入] Bug #19 修复：_梦境入口消息ID 丢失，估算入口楼层为 ${estimatedEntryId}（当前楼层 ${currentFloor}）`
+                  `[Prompt注入] Bug #19 修复：_梦境入口消息ID 丢失，估算入口楼层为 ${estimatedEntryId}（当前楼层 ${currentFloor}）`,
                 );
                 dreamEntryId = estimatedEntryId;
               }
@@ -4974,7 +4987,9 @@ export function initPromptInjection(): void {
                   dreamEntryId,
                   dreamExitId, // Bug #25：添加退出楼层ID
                 };
-                console.info(`[Prompt注入] 梦境退出检测，场景${sceneNum}已标记上一轮退出（入口ID: ${dreamEntryId}，退出ID: ${dreamExitId}），摘要将在下一轮生成`);
+                console.info(
+                  `[Prompt注入] 梦境退出检测，场景${sceneNum}已标记上一轮退出（入口ID: ${dreamEntryId}，退出ID: ${dreamExitId}），摘要将在下一轮生成`,
+                );
               } else {
                 console.warn(`[Prompt注入] 梦境退出但找不到楼层ID，无法设置退出标记`);
               }
@@ -4990,7 +5005,9 @@ export function initPromptInjection(): void {
             setTimeout(() => {
               // 注意：脚本中使用 getLastMessageId()，getCurrentMessageId() 只能在前端界面中使用
               const currentMessageId = getLastMessageId();
-              console.info(`[Prompt注入] 广播 IFRAME_DATA_REFRESH 事件 (${shouldEnterDream ? '进入梦境' : '退出梦境'})`);
+              console.info(
+                `[Prompt注入] 广播 IFRAME_DATA_REFRESH 事件 (${shouldEnterDream ? '进入梦境' : '退出梦境'})`,
+              );
               eventEmit('IFRAME_DATA_REFRESH', {
                 reason: shouldEnterDream ? 'DREAM_ENTERED' : 'DREAM_EXITED',
                 message_id: currentMessageId,
@@ -5015,7 +5032,9 @@ export function initPromptInjection(): void {
         // 修复范围：不仅是进入梦境时，还包括已经在梦境中的情况
         const isCurrentlyInDream = data.世界.游戏阶段 === '梦境';
         const shouldFixDreamPhase = shouldEnterDream || shouldEnterScene5 || isCurrentlyInDream;
-        console.info(`[Bug9调试] shouldEnterDream=${shouldEnterDream}, shouldEnterScene5=${shouldEnterScene5}, isCurrentlyInDream=${isCurrentlyInDream}, shouldFix=${shouldFixDreamPhase}`);
+        console.info(
+          `[Bug9调试] shouldEnterDream=${shouldEnterDream}, shouldEnterScene5=${shouldEnterScene5}, isCurrentlyInDream=${isCurrentlyInDream}, shouldFix=${shouldFixDreamPhase}`,
+        );
         if (shouldFixDreamPhase) {
           console.info(`[Bug9调试] 进入修复逻辑，chat长度: ${chat.length}`);
           let foundStatusVariable = false;
@@ -5026,10 +5045,7 @@ export function initPromptInjection(): void {
                 const before = msg.content.match(/游戏阶段:\s*(日常|序章)/g);
                 console.info(`[Bug9调试] 找到<status_current_variable>，替换前匹配: ${JSON.stringify(before)}`);
                 if (before && before.length > 0) {
-                  msg.content = msg.content.replace(
-                    /游戏阶段:\s*(日常|序章)/g,
-                    '游戏阶段: 梦境'
-                  );
+                  msg.content = msg.content.replace(/游戏阶段:\s*(日常|序章)/g, '游戏阶段: 梦境');
                   console.info('[Prompt注入] Bug #9 修复：已将 <status_current_variable> 中的游戏阶段替换为梦境');
                 } else {
                   console.info('[Bug9调试] <status_current_variable>中没有需要替换的旧游戏阶段值');
@@ -5078,7 +5094,7 @@ export function initPromptInjection(): void {
         // Bug #11 修复：即使出错也要重置标志，防止影响后续请求
         resetRollOperationFlag();
       }
-    }
+    },
   );
 
   console.info('[Prompt注入] 初始化完成');

@@ -18,7 +18,15 @@
 import { Schema, type Schema as SchemaType } from '../../schema';
 import { TimeSystem } from './timeSystem';
 import { validateAndFixState, checkRealmChange } from './stateValidation';
-import { updateHusbandLocation, getRealmTitle, getStyleGuidance, updateTruthModeValues, updateSuspicionLevel, updateZhaoxiaLocation, updateZhaoxiaThoughtAfterDream } from './appearanceSystem';
+import {
+  updateHusbandLocation,
+  getRealmTitle,
+  getStyleGuidance,
+  updateTruthModeValues,
+  updateSuspicionLevel,
+  updateZhaoxiaLocation,
+  updateZhaoxiaThoughtAfterDream,
+} from './appearanceSystem';
 import { processUserInput } from './dangerousContentDetection';
 import {
   updateBodyPartProgress,
@@ -31,18 +39,9 @@ import {
   validateAndProcessAIReport,
 } from './dreamKeywordDetection';
 // 境界打断系统已移至 promptInjection.ts 中处理（系统A：事件触发系统）
-import {
-  parseHusbandThought,
-  shouldGenerateHusbandThought,
-  getCurrentRouteType,
-} from './dualTrackSystem';
+import { parseHusbandThought, shouldGenerateHusbandThought, getCurrentRouteType } from './dualTrackSystem';
 import { initPromptInjection, setRollOperationFlag } from './promptInjection';
-import {
-  isTrueEndingActive,
-  getTrueEndingState,
-  updateTrueEndingState,
-  processTurnEnd,
-} from './trueEndingSystem';
+import { isTrueEndingActive, getTrueEndingState, updateTrueEndingState, processTurnEnd } from './trueEndingSystem';
 import {
   isPerfectEndingActive,
   getPerfectEndingState,
@@ -62,10 +61,7 @@ import {
   initDataProtection,
   updateSnapshotValue,
 } from './dataProtection';
-import {
-  shouldTriggerNormalEnding,
-  applyNormalEndingState,
-} from './normalEndingSystem';
+import { shouldTriggerNormalEnding, applyNormalEndingState } from './normalEndingSystem';
 import {
   calculateScene5Completion as calculateScene5CompletionNew,
   getScene5LockedCoherence,
@@ -173,9 +169,13 @@ function checkEnding(data: SchemaType): boolean {
 
   // 真好结局/完美真爱结局：完成所有5个场景且全部正确
   const 已完成场景 = new Set(data.梦境数据.已完成场景);
-  const 全部完成 = 已完成场景.size === 5 &&
-    已完成场景.has(1) && 已完成场景.has(2) && 已完成场景.has(3) &&
-    已完成场景.has(4) && 已完成场景.has(5);
+  const 全部完成 =
+    已完成场景.size === 5 &&
+    已完成场景.has(1) &&
+    已完成场景.has(2) &&
+    已完成场景.has(3) &&
+    已完成场景.has(4) &&
+    已完成场景.has(5);
 
   if (全部完成 && 正确场景数 === 5) {
     // 检查是否为完美真爱结局（记忆连贯性=3）
@@ -231,7 +231,11 @@ function checkEnding(data: SchemaType): boolean {
  * @param userText 用户输入文本
  * @param targetMessageId 目标消息ID（用于设置梦境楼层ID）
  */
-function checkDreamEvents(data: SchemaType, userText: string, targetMessageId?: number): {
+function checkDreamEvents(
+  data: SchemaType,
+  userText: string,
+  targetMessageId?: number,
+): {
   dreamWindowOpen: boolean;
   dreamEnded: boolean;
   firstAwakening: boolean;
@@ -339,7 +343,7 @@ function checkDreamEvents(data: SchemaType, userText: string, targetMessageId?: 
       // 这不是精确的，但至少可以获取到一些梦境对话内容用于生成摘要
       const estimatedEntryId = Math.max(0, targetMessageId - 10);
       console.warn(
-        `[checkDreamEvents] Bug #19 修复：_梦境入口消息ID 丢失，估算入口楼层为 ${estimatedEntryId}（当前楼层 ${targetMessageId}）`
+        `[checkDreamEvents] Bug #19 修复：_梦境入口消息ID 丢失，估算入口楼层为 ${estimatedEntryId}（当前楼层 ${targetMessageId}）`,
       );
       dreamEntryId = estimatedEntryId;
     }
@@ -352,7 +356,9 @@ function checkDreamEvents(data: SchemaType, userText: string, targetMessageId?: 
         dreamEntryId,
         dreamExitId, // Bug #25：添加退出楼层ID
       };
-      console.info(`[checkDreamEvents] 场景${currentScene}梦境退出，已标记上一轮退出（入口ID: ${dreamEntryId}，退出ID: ${dreamExitId}），摘要将在下一轮生成`);
+      console.info(
+        `[checkDreamEvents] 场景${currentScene}梦境退出，已标记上一轮退出（入口ID: ${dreamEntryId}，退出ID: ${dreamExitId}），摘要将在下一轮生成`,
+      );
     } else {
       console.warn(`[checkDreamEvents] 梦境退出但找不到楼层ID，无法设置退出标记`);
     }
@@ -415,17 +421,25 @@ function checkDreamEvents(data: SchemaType, userText: string, targetMessageId?: 
   // 1. 添加更多变体关键词
   // 2. 添加正则表达式匹配模式（处理"进入.*梦境"这类模式）
   const dreamEntryKeywords = [
-    '进入梦境', '进入了梦境', '进入她的梦境', '进入赵霞的梦境',
-    '入梦', '睡着', '闭上眼睛', '做梦', '睡了', '入睡',
+    '进入梦境',
+    '进入了梦境',
+    '进入她的梦境',
+    '进入赵霞的梦境',
+    '入梦',
+    '睡着',
+    '闭上眼睛',
+    '做梦',
+    '睡了',
+    '入睡',
     '梦境', // 单独的"梦境"关键词，配合时间窗口检测
   ];
   // 正则表达式模式：匹配 "进入...梦境" 这类变体
   const dreamEntryPatterns = [
     /进入.*梦境/, // 匹配 "进入了梦境"、"进入她的梦境" 等
-    /入.*梦/,     // 匹配 "入梦"、"入了梦" 等
+    /入.*梦/, // 匹配 "入梦"、"入了梦" 等
   ];
-  const wantToEnterDream = dreamEntryKeywords.some((kw) => userText.includes(kw)) ||
-                           dreamEntryPatterns.some((pattern) => pattern.test(userText));
+  const wantToEnterDream =
+    dreamEntryKeywords.some(kw => userText.includes(kw)) || dreamEntryPatterns.some(pattern => pattern.test(userText));
 
   // 🐛 DEBUG: 打印梦境入口检测详情
   const isDreamWindow = TimeSystem.isDreamWindowOpen(data);
@@ -443,7 +457,8 @@ function checkDreamEvents(data: SchemaType, userText: string, targetMessageId?: 
   //
   // 防逃避机制：如果混乱结局已标记且到达触发时间，阻止进入普通梦境
   const canEnterForConfusion = canEnterDreamForConfusion(data);
-  const shouldEnterDream = wantToEnterDream && isDreamWindow && (isDaily || data.世界.游戏阶段 === '梦境') && canEnterForConfusion;
+  const shouldEnterDream =
+    wantToEnterDream && isDreamWindow && (isDaily || data.世界.游戏阶段 === '梦境') && canEnterForConfusion;
 
   if (wantToEnterDream && isDreamWindow && !canEnterForConfusion) {
     console.warn('[checkDreamEvents] 混乱结局待触发，阻止进入普通梦境（场景1-4）');
@@ -471,7 +486,9 @@ function checkDreamEvents(data: SchemaType, userText: string, targetMessageId?: 
       setConfusionOnDreamEntry(data, currentScene);
       // Bug #31 修复：混乱度修改后同步更新快照，防止被 validateAndRestoreData 误还原
       updateSnapshotValue('梦境数据.记忆混乱度', data.梦境数据.记忆混乱度);
-      console.info(`[梦境入口] 进入梦境场景${currentScene}，楼层ID=${targetMessageId}，混乱度=${data.梦境数据.记忆混乱度}`);
+      console.info(
+        `[梦境入口] 进入梦境场景${currentScene}，楼层ID=${targetMessageId}，混乱度=${data.梦境数据.记忆混乱度}`,
+      );
 
       // ROLL 支持：记录普通梦境入口的楼层ID
       // 当用户 ROLL 入口消息时，游戏阶段已经是"梦境"，promptInjection 的正常检测会失败
@@ -657,7 +674,9 @@ $(async () => {
       // Bug #26 修复：将 eventType 加入 messageKey，避免 MESSAGE_RECEIVED 和 GENERATION_ENDED 互相跳过
       // 原因：摘要生成需要在 GENERATION_ENDED 后执行，但之前两个事件使用相同的 key 导致第二个被跳过
       const messageKey = `${message_id}:${swipeId}:${eventType}`;
-      console.info(`[游戏逻辑] processGameLogic 进入: message_id=${message_id}, swipe_id=${swipeId}, eventType=${eventType}`);
+      console.info(
+        `[游戏逻辑] processGameLogic 进入: message_id=${message_id}, swipe_id=${swipeId}, eventType=${eventType}`,
+      );
 
       // 跳过初始化后的第一条消息
       if (eventType === 'MESSAGE_RECEIVED' && isFirstMessageAfterInit) {
@@ -715,7 +734,7 @@ $(async () => {
 
               console.info(
                 `[游戏逻辑] ROLL 操作，场景5步骤回滚: ${currentStep} → ${newStep}, ` +
-                `完成度: ${currentCompletion}% → ${newCompletion}% (-${lastProgressIncrement}%)`
+                  `完成度: ${currentCompletion}% → ${newCompletion}% (-${lastProgressIncrement}%)`,
               );
             } else {
               // 如果已经是步骤0，只重置选择状态
@@ -748,7 +767,7 @@ $(async () => {
           if (currentSwipeId !== summaryRecord.swipe_id) {
             console.info(
               `[游戏逻辑] 检测到摘要生成 ROLL 操作: 楼层 ${message_id}, ` +
-              `swipe_id: ${summaryRecord.swipe_id} → ${currentSwipeId}，恢复待生成摘要标记`
+                `swipe_id: ${summaryRecord.swipe_id} → ${currentSwipeId}，恢复待生成摘要标记`,
             );
 
             // 恢复"待生成摘要"标记
@@ -770,7 +789,9 @@ $(async () => {
             }
 
             await Mvu.replaceMvuData(rollVarsForSummary, { type: 'message', message_id: message_id });
-            console.info(`[游戏逻辑] 摘要 ROLL 处理完成，场景${summaryRecord.场景编号}的摘要将在下次 GENERATION_ENDED 时重新生成`);
+            console.info(
+              `[游戏逻辑] 摘要 ROLL 处理完成，场景${summaryRecord.场景编号}的摘要将在下次 GENERATION_ENDED 时重新生成`,
+            );
           }
         }
       } else {
@@ -846,7 +867,7 @@ $(async () => {
             exitInfo = prevStatData.世界.上一轮梦境已退出;
             console.info(
               `[游戏逻辑] Bug #19 修复：从上一楼层(${targetMessageId - 1})恢复退出标记，` +
-              `场景${exitInfo.sceneNum}，楼层ID: ${exitInfo.dreamEntryId}`
+                `场景${exitInfo.sceneNum}，楼层ID: ${exitInfo.dreamEntryId}`,
             );
           }
         } catch (err) {
@@ -856,7 +877,7 @@ $(async () => {
 
       if (exitInfo) {
         console.info(
-          `[游戏逻辑] 检测到上一轮场景${exitInfo.sceneNum}退出，本轮开始生成摘要（入口ID: ${exitInfo.dreamEntryId}，退出ID: ${exitInfo.dreamExitId ?? '未知'}）`
+          `[游戏逻辑] 检测到上一轮场景${exitInfo.sceneNum}退出，本轮开始生成摘要（入口ID: ${exitInfo.dreamEntryId}，退出ID: ${exitInfo.dreamExitId ?? '未知'}）`,
         );
         data.世界.待生成摘要 = {
           sceneNum: exitInfo.sceneNum,
@@ -907,7 +928,8 @@ $(async () => {
       const wantEnterScene5 =
         SLEEPING_PILL_KEYWORDS.some(kw => userText.includes(kw)) &&
         (data.世界.游戏阶段 === '日常' || data.世界.游戏阶段 === '序章') &&
-        data.世界.当前小时 >= 8 && data.世界.当前小时 < 20;
+        data.世界.当前小时 >= 8 &&
+        data.世界.当前小时 < 20;
 
       // 防逃避机制：如果混乱结局已标记且到达触发时间，阻止进入梦境
       const canEnterScene5ForConfusion = canEnterDreamForConfusion(data);
@@ -932,7 +954,9 @@ $(async () => {
         }
 
         // 初始化场景5数据
-        const existingScene5Data = data.梦境数据.场景5 as { 已进入?: boolean; 进入时间?: string; 进入次数?: number } | undefined;
+        const existingScene5Data = data.梦境数据.场景5 as
+          | { 已进入?: boolean; 进入时间?: string; 进入次数?: number }
+          | undefined;
         if (!data.梦境数据.场景5) {
           (data.梦境数据 as any).场景5 = {};
         }
@@ -947,7 +971,9 @@ $(async () => {
         // 每次进入都保存，因为玩家可能多次试探性进入
         scene5Data.进入前混乱度 = data.梦境数据.记忆混乱度;
         scene5Data.进入前混乱标记 = JSON.parse(JSON.stringify(data.梦境数据.混乱结局));
-        console.info(`[游戏逻辑] 场景5进入前状态已保存：混乱度=${data.梦境数据.记忆混乱度}，混乱标记=${data.梦境数据.混乱结局.已标记}`);
+        console.info(
+          `[游戏逻辑] 场景5进入前状态已保存：混乱度=${data.梦境数据.记忆混乱度}，混乱标记=${data.梦境数据.混乱结局.已标记}`,
+        );
 
         // 首次进入时初始化12步系统数据
         // Bug #13 修复：移除 lockScene5EntryCoherence()，改为完成时再锁定
@@ -964,7 +990,9 @@ $(async () => {
         setConfusionOnDreamEntry(data, 5);
         // Bug #31 修复：混乱度修改后同步更新快照，防止被 validateAndRestoreData 误还原
         updateSnapshotValue('梦境数据.记忆混乱度', data.梦境数据.记忆混乱度);
-        console.info(`[游戏逻辑] 进入场景5，第${newEntryCount}次，楼层ID=${targetMessageId}，混乱度=${data.梦境数据.记忆混乱度}`);
+        console.info(
+          `[游戏逻辑] 进入场景5，第${newEntryCount}次，楼层ID=${targetMessageId}，混乱度=${data.梦境数据.记忆混乱度}`,
+        );
 
         // ROLL 支持：记录场景5入口的楼层ID
         // 当用户 ROLL 入口消息时，游戏阶段已经是"梦境"，promptInjection 的正常检测会失败
@@ -994,7 +1022,7 @@ $(async () => {
           const timeCheck = TimeSystem.checkTimeAdvancementAfterScript(
             timeBeforeAdvance,
             timeAfterAdvance,
-            targetMessageId
+            targetMessageId,
           );
           if (timeCheck.shouldWarn && timeCheck.message) {
             toastr.warning(timeCheck.message, '时间系统', { timeOut: 6000 });
@@ -1054,7 +1082,9 @@ $(async () => {
               data.梦境数据.混乱结局 = JSON.parse(JSON.stringify(scene5.进入前混乱标记));
               console.info(`[游戏逻辑] 试探性进入：回滚混乱标记 ${wasMarked} → ${scene5.进入前混乱标记.已标记}`);
             }
-            console.info(`[游戏逻辑] 场景5试探性进入（完成度${completion.completionPercent}%<100%），已回滚状态，连贯性未锁定`);
+            console.info(
+              `[游戏逻辑] 场景5试探性进入（完成度${completion.completionPercent}%<100%），已回滚状态，连贯性未锁定`,
+            );
           }
 
           // 重置场景5的"已进入"标记，允许下次重新进入
@@ -1064,9 +1094,9 @@ $(async () => {
 
           console.info(
             `[游戏逻辑] 退出场景5（20:00），` +
-            `完成度: ${completion.completionPercent}%，` +
-            `步骤: ${completion.currentStep}/12，` +
-            `状态: ${completion.completionPercent >= 100 ? '正式完成(100%)' : '试探性进入(<100%)'}`
+              `完成度: ${completion.completionPercent}%，` +
+              `步骤: ${completion.currentStep}/12，` +
+              `状态: ${completion.completionPercent >= 100 ? '正式完成(100%)' : '试探性进入(<100%)'}`,
           );
 
           // 设置"上一轮退出"标记，摘要将在下一轮对话时生成
@@ -1078,7 +1108,7 @@ $(async () => {
             // 场景5在白天进行，持续约12步，估算约10-15轮对话
             const estimatedEntryId = Math.max(0, targetMessageId - 12);
             console.warn(
-              `[游戏逻辑] Bug #19 修复：场景5 _梦境入口消息ID 丢失，估算入口楼层为 ${estimatedEntryId}（当前楼层 ${targetMessageId}）`
+              `[游戏逻辑] Bug #19 修复：场景5 _梦境入口消息ID 丢失，估算入口楼层为 ${estimatedEntryId}（当前楼层 ${targetMessageId}）`,
             );
             scene5DreamEntryId = estimatedEntryId;
           }
@@ -1091,7 +1121,9 @@ $(async () => {
               dreamEntryId: scene5DreamEntryId,
               dreamExitId: scene5DreamExitId, // Bug #25：添加退出楼层ID
             };
-            console.info(`[游戏逻辑] 场景5退出，已标记上一轮退出（入口ID: ${scene5DreamEntryId}，退出ID: ${scene5DreamExitId}），摘要将在下一轮生成`);
+            console.info(
+              `[游戏逻辑] 场景5退出，已标记上一轮退出（入口ID: ${scene5DreamEntryId}，退出ID: ${scene5DreamExitId}），摘要将在下一轮生成`,
+            );
           } else {
             console.warn(`[游戏逻辑] 场景5退出但找不到楼层ID，无法设置退出标记`);
           }
@@ -1119,7 +1151,7 @@ $(async () => {
             `  境界名: ${境界名}\n` +
             `  模式: ${已进入过梦境 ? '真相模式' : '纯爱模式'}\n` +
             `  风格: ${风格信息.整体风格}\n` +
-            `  气质: ${风格信息.气质关键词.join('、')}`
+            `  气质: ${风格信息.气质关键词.join('、')}`,
         );
       }
 
@@ -1201,9 +1233,7 @@ $(async () => {
             // 原因：targetMessageId 可能是用户消息楼层，而不是 AI 回复楼层
             // aiText 来自 getChatMessages(-1)，所以应该用最后一条消息的 ID
             const aiMessageId = getLastMessageId();
-            await setChatMessages([
-              { message_id: aiMessageId, message: cleanedAiText }
-            ], { refresh: 'affected' });
+            await setChatMessages([{ message_id: aiMessageId, message: cleanedAiText }], { refresh: 'affected' });
             console.info(`[游戏逻辑] 已从AI文本中移除内部标记（HusbandThought/BODY_PROGRESS），楼层=${aiMessageId}`);
           } catch (err) {
             console.warn('[游戏逻辑] 移除内部标记失败:', err);
@@ -1252,17 +1282,15 @@ $(async () => {
           // 如果被时间锁定，不推进阶段，只更新锚点和轮数
           if (result.timeBlocked) {
             console.info(
-              `[游戏逻辑] 真好结局阶段${finalState.currentPhase}已完成条件，但时间锁定：${result.timeBlocked.reason}`
+              `[游戏逻辑] 真好结局阶段${finalState.currentPhase}已完成条件，但时间锁定：${result.timeBlocked.reason}`,
             );
             console.info(
               `[游戏逻辑] 真好结局锚点更新: 阶段${finalState.currentPhase}, ` +
-              `锚点[${finalState.completedAnchors.join(', ')}]`
+                `锚点[${finalState.completedAnchors.join(', ')}]`,
             );
           } else if (result.phaseAdvanced) {
             // processTurnEnd 已经推进了阶段
-            console.info(
-              `[游戏逻辑] 真好结局阶段推进: ${state.currentPhase} → ${finalState.currentPhase}`
-            );
+            console.info(`[游戏逻辑] 真好结局阶段推进: ${state.currentPhase} → ${finalState.currentPhase}`);
 
             // 检查是否完成全部阶段
             if (finalState.isComplete) {
@@ -1273,7 +1301,7 @@ $(async () => {
           } else {
             console.info(
               `[游戏逻辑] 真好结局锚点更新: 阶段${finalState.currentPhase}, ` +
-              `锚点[${finalState.completedAnchors.join(', ')}]`
+                `锚点[${finalState.completedAnchors.join(', ')}]`,
             );
           }
 
@@ -1297,17 +1325,15 @@ $(async () => {
           // 如果被时间锁定，不推进阶段，只更新锚点和轮数
           if (result.timeBlocked) {
             console.info(
-              `[游戏逻辑] 假好结局阶段${finalState.currentPhase}已完成条件，但时间锁定：${result.timeBlocked.reason}`
+              `[游戏逻辑] 假好结局阶段${finalState.currentPhase}已完成条件，但时间锁定：${result.timeBlocked.reason}`,
             );
             console.info(
               `[游戏逻辑] 假好结局锚点更新: 阶段${finalState.currentPhase}, ` +
-              `锚点[${finalState.completedAnchors.join(', ')}]`
+                `锚点[${finalState.completedAnchors.join(', ')}]`,
             );
           } else if (result.phaseAdvanced) {
             // processTurnEnd 已经推进了阶段
-            console.info(
-              `[游戏逻辑] 假好结局阶段推进: ${state.currentPhase} → ${finalState.currentPhase}`
-            );
+            console.info(`[游戏逻辑] 假好结局阶段推进: ${state.currentPhase} → ${finalState.currentPhase}`);
 
             // 检查是否完成全部阶段
             if (finalState.isComplete) {
@@ -1316,7 +1342,7 @@ $(async () => {
           } else {
             console.info(
               `[游戏逻辑] 假好结局锚点更新: 阶段${finalState.currentPhase}, ` +
-              `锚点[${finalState.completedAnchors.join(', ')}]`
+                `锚点[${finalState.completedAnchors.join(', ')}]`,
             );
           }
 
@@ -1340,17 +1366,15 @@ $(async () => {
           // 如果被时间锁定，不推进阶段，只更新锚点和轮数
           if (result.timeBlocked) {
             console.info(
-              `[游戏逻辑] 完美真爱结局阶段${finalState.currentPhase}已完成条件，但时间锁定：${result.timeBlocked.reason}`
+              `[游戏逻辑] 完美真爱结局阶段${finalState.currentPhase}已完成条件，但时间锁定：${result.timeBlocked.reason}`,
             );
             console.info(
               `[游戏逻辑] 完美真爱结局锚点更新: 阶段${finalState.currentPhase}, ` +
-              `锚点[${finalState.completedAnchors.join(', ')}]`
+                `锚点[${finalState.completedAnchors.join(', ')}]`,
             );
           } else if (result.phaseAdvanced) {
             // processPerfectTurnEnd 已经推进了阶段
-            console.info(
-              `[游戏逻辑] 完美真爱结局阶段推进: ${state.currentPhase} → ${finalState.currentPhase}`
-            );
+            console.info(`[游戏逻辑] 完美真爱结局阶段推进: ${state.currentPhase} → ${finalState.currentPhase}`);
 
             // 检查是否完成全部阶段（12个阶段，0-11）
             if (finalState.isComplete) {
@@ -1361,7 +1385,7 @@ $(async () => {
           } else {
             console.info(
               `[游戏逻辑] 完美真爱结局锚点更新: 阶段${finalState.currentPhase}, ` +
-              `锚点[${finalState.completedAnchors.join(', ')}]`
+                `锚点[${finalState.completedAnchors.join(', ')}]`,
             );
           }
 
@@ -1413,15 +1437,13 @@ $(async () => {
       if (validatedData.世界.待生成摘要 && eventType === 'GENERATION_ENDED') {
         const summaryInfo = validatedData.世界.待生成摘要;
         console.info(
-          `[游戏逻辑] 检测到待生成摘要标记，场景${summaryInfo.sceneNum}，入口: ${summaryInfo.dreamEntryId}，退出: ${summaryInfo.dreamExitId ?? '未知'}`
+          `[游戏逻辑] 检测到待生成摘要标记，场景${summaryInfo.sceneNum}，入口: ${summaryInfo.dreamEntryId}，退出: ${summaryInfo.dreamExitId ?? '未知'}`,
         );
 
         try {
           // 获取梦境期间的玩家输入（Bug #25 修复：传递退出楼层ID，限制收集范围）
           const chatHistory = await getDreamSessionMessages(summaryInfo.dreamEntryId, summaryInfo.dreamExitId);
-          console.info(
-            `[游戏逻辑] 获取到玩家行为记录: ${chatHistory.length}字符`
-          );
+          console.info(`[游戏逻辑] 获取到玩家行为记录: ${chatHistory.length}字符`);
 
           // 生成摘要（直接使用玩家输入，不再调用 API）
           const summary = await generateMemorySummary(validatedData, summaryInfo.sceneNum, chatHistory);
@@ -1451,7 +1473,7 @@ $(async () => {
             退出楼层ID: summaryInfo.dreamExitId,
           };
           console.info(
-            `[游戏逻辑] 记录摘要生成: 楼层${targetMessageId}, swipe_id=${summarySwipeId}, 场景${summaryInfo.sceneNum}`
+            `[游戏逻辑] 记录摘要生成: 楼层${targetMessageId}, swipe_id=${summarySwipeId}, 场景${summaryInfo.sceneNum}`,
           );
 
           // 写入数据
@@ -1482,14 +1504,13 @@ $(async () => {
       } else {
         console.info(`[游戏逻辑] ✅ ${eventType} 处理完成`);
       }
-
     } catch (err) {
       console.error('[游戏逻辑] 执行错误:', err);
     }
   }
 
   // 监听新消息接收事件
-  eventOn(tavern_events.MESSAGE_RECEIVED, (message_id) => {
+  eventOn(tavern_events.MESSAGE_RECEIVED, message_id => {
     const id = Number(message_id);
     console.info(`[游戏逻辑] 收到 MESSAGE_RECEIVED 事件，message_id=${id}`);
     setTimeout(() => {
@@ -1498,7 +1519,7 @@ $(async () => {
   });
 
   // 监听消息ROLL事件
-  eventOn(tavern_events.MESSAGE_SWIPED, (message_id) => {
+  eventOn(tavern_events.MESSAGE_SWIPED, message_id => {
     const id = Number(message_id);
     console.info(`[游戏逻辑] 收到 MESSAGE_SWIPED 事件，message_id=${id}`);
     setTimeout(() => {
@@ -1512,7 +1533,7 @@ $(async () => {
   });
 
   // 监听消息删除事件
-  eventOn(tavern_events.MESSAGE_DELETED, (message_id) => {
+  eventOn(tavern_events.MESSAGE_DELETED, message_id => {
     const id = Number(message_id);
     console.info(`[游戏逻辑] 收到 MESSAGE_DELETED 事件，message_id=${id}`);
 
@@ -1533,7 +1554,7 @@ $(async () => {
   });
 
   // 监听生成结束事件
-  eventOn(tavern_events.GENERATION_ENDED, (message_id) => {
+  eventOn(tavern_events.GENERATION_ENDED, message_id => {
     console.info(`[游戏逻辑] 收到 GENERATION_ENDED 事件，原始 message_id=${message_id}`);
     setTimeout(() => {
       try {

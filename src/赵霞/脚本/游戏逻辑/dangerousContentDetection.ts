@@ -56,7 +56,7 @@ export function detectDangerousContent(userInput: string): InterruptionResult {
 
   // 检测严重危险（最高优先级）→ 触发BAD END
   for (const [category, keywords] of Object.entries(DANGEROUS_KEYWORDS.严重)) {
-    const matchedKeywords = keywords.filter((kw) => normalizedInput.includes(kw));
+    const matchedKeywords = keywords.filter(kw => normalizedInput.includes(kw));
     if (matchedKeywords.length > 0) {
       console.warn(`[危险检测] ⚠️ 严重危险！匹配到 ${category} 关键词: ${matchedKeywords.join(', ')}`);
       return {
@@ -71,7 +71,7 @@ export function detectDangerousContent(userInput: string): InterruptionResult {
 
   // 检测中等危险 → 强制修正
   for (const [category, keywords] of Object.entries(DANGEROUS_KEYWORDS.中等)) {
-    const matchedKeywords = keywords.filter((kw) => normalizedInput.includes(kw));
+    const matchedKeywords = keywords.filter(kw => normalizedInput.includes(kw));
     if (matchedKeywords.length > 0) {
       console.warn(`[危险检测] ⚠️ 中等危险！匹配到 ${category} 关键词: ${matchedKeywords.join(', ')}`);
       return {
@@ -87,7 +87,7 @@ export function detectDangerousContent(userInput: string): InterruptionResult {
 
   // 检测轻微危险 → 仅警告
   for (const [category, keywords] of Object.entries(DANGEROUS_KEYWORDS.轻微)) {
-    const matchedKeywords = keywords.filter((kw) => normalizedInput.includes(kw));
+    const matchedKeywords = keywords.filter(kw => normalizedInput.includes(kw));
     if (matchedKeywords.length > 0) {
       console.info(`[危险检测] ℹ️ 轻微危险！匹配到 ${category} 关键词: ${matchedKeywords.join(', ')}`);
       return {
@@ -144,8 +144,11 @@ function generateCorrectionPrompt(_originalInput: string, category: string): str
 请基于以上要点生成剧情，不要提及"系统修正"。`,
   };
 
-  return correctionTemplates[category] || `[系统修正]
-玩家的行为需要被修正。请生成一个合理的剧情转折，让{{user}}停止当前行为。`;
+  return (
+    correctionTemplates[category] ||
+    `[系统修正]
+玩家的行为需要被修正。请生成一个合理的剧情转折，让{{user}}停止当前行为。`
+  );
 }
 
 /**
@@ -175,7 +178,7 @@ export function shouldSkipDangerousContentDetection(data: SchemaType): boolean {
  */
 export function processUserInput(
   data: SchemaType,
-  userInput: string
+  userInput: string,
 ): {
   allowContinue: boolean;
   modifiedInput?: string;

@@ -102,9 +102,7 @@ function truncateAndPad(text: string, maxLen: number): string {
  */
 export function renderMainStatus(data: SchemaType): string {
   // 后日谈/自由模式时使用真实日期，否则使用游戏时间
-  const 时间显示 = shouldShowRealDate(data)
-    ? generateDateDisplay(data)
-    : TimeSystem.getCurrentTime(data);
+  const 时间显示 = shouldShowRealDate(data) ? generateDateDisplay(data) : TimeSystem.getCurrentTime(data);
 
   const 依存度显示名 = getDisplayText('依存度', data) ?? '依存度';
   const 道德显示名 = getDisplayText('道德底线', data) ?? '道德底线';

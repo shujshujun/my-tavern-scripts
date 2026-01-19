@@ -109,11 +109,7 @@ export const 系统提示映射 = {
 /**
  * 获取系统提示文本
  */
-export function getSystemHint(
-  type: keyof typeof 系统提示映射,
-  data: SchemaType,
-  ...args: unknown[]
-): string {
+export function getSystemHint(type: keyof typeof 系统提示映射, data: SchemaType, ...args: unknown[]): string {
   const 当前模式 = data.世界.已进入过梦境 ? '真相' : '纯爱';
   const hintFn = 系统提示映射[type][当前模式] as (...args: unknown[]) => string;
   return hintFn(...args);

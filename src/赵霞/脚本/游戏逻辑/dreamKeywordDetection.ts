@@ -73,7 +73,7 @@ const BODY_PART_KEYWORDS = {
     '嘴唇',
     '初吻',
     // Bug #37 新增：俚语和网络用语
-    '嗦',     // "嗦嗦"、"帮我嗦"等
+    '嗦', // "嗦嗦"、"帮我嗦"等
     '吸吮',
     '舔舐',
     '含着',
@@ -260,42 +260,115 @@ const BODY_PART_KEYWORDS = {
 const INTERACTION_INTENT_KEYWORDS = {
   // 距离接近类
   距离: [
-    '靠近', '接近', '走近', '凑近', '贴近', '挨近',
-    '走向', '走过去', '来到', '上前', '迎上',
-    '面对', '对着', '看着她', '注视',
+    '靠近',
+    '接近',
+    '走近',
+    '凑近',
+    '贴近',
+    '挨近',
+    '走向',
+    '走过去',
+    '来到',
+    '上前',
+    '迎上',
+    '面对',
+    '对着',
+    '看着她',
+    '注视',
   ],
 
   // 物理接触类
   接触: [
-    '抱', '拥抱', '搂', '揽', '拉', '牵', '握', '拽',
-    '碰', '触', '摸', '抚', '蹭', '贴',
-    '伸手', '伸出手', '双手', '手指',
-    '身体', '靠在', '依偎', '倚靠',
+    '抱',
+    '拥抱',
+    '搂',
+    '揽',
+    '拉',
+    '牵',
+    '握',
+    '拽',
+    '碰',
+    '触',
+    '摸',
+    '抚',
+    '蹭',
+    '贴',
+    '伸手',
+    '伸出手',
+    '双手',
+    '手指',
+    '身体',
+    '靠在',
+    '依偎',
+    '倚靠',
   ],
 
   // 情感互动类
   情感: [
-    '温柔', '轻轻', '柔声', '低语', '耳边',
-    '安慰', '哄', '逗', '撩', '调戏',
-    '表白', '告白', '说爱', '喜欢你',
-    '看着眼睛', '对视', '眼神',
+    '温柔',
+    '轻轻',
+    '柔声',
+    '低语',
+    '耳边',
+    '安慰',
+    '哄',
+    '逗',
+    '撩',
+    '调戏',
+    '表白',
+    '告白',
+    '说爱',
+    '喜欢你',
+    '看着眼睛',
+    '对视',
+    '眼神',
   ],
 
   // 主动行为类
   主动: [
-    '主动', '开始', '继续', '不停', '更加',
-    '用力', '加深', '深入', '进一步',
-    '脱', '解开', '褪下', '掀起', '撩起',
-    '带她', '引导', '让她',
+    '主动',
+    '开始',
+    '继续',
+    '不停',
+    '更加',
+    '用力',
+    '加深',
+    '深入',
+    '进一步',
+    '脱',
+    '解开',
+    '褪下',
+    '掀起',
+    '撩起',
+    '带她',
+    '引导',
+    '让她',
   ],
 
   // Bug #37 新增：命令/请求类 - 让对方做某事
   命令: [
-    '帮我', '给我', '让你', '要你', '帮你',
-    '跪下', '趴下', '躺下', '站起', '转身',
-    '张开', '分开', '抬起', '放下',
-    '过来', '来吧', '好好', '乖乖',
-    '没问题', '同意', '答应', '愿意',
+    '帮我',
+    '给我',
+    '让你',
+    '要你',
+    '帮你',
+    '跪下',
+    '趴下',
+    '躺下',
+    '站起',
+    '转身',
+    '张开',
+    '分开',
+    '抬起',
+    '放下',
+    '过来',
+    '来吧',
+    '好好',
+    '乖乖',
+    '没问题',
+    '同意',
+    '答应',
+    '愿意',
   ],
 };
 
@@ -341,10 +414,7 @@ export function hasInteractionIntent(userInput: string): boolean {
  * @param aiResponse AI回复
  * @returns 验证后的进度增量
  */
-export function validateAndProcessAIReport(
-  userInput: string,
-  aiResponse: string
-): BodyPartProgress {
+export function validateAndProcessAIReport(userInput: string, aiResponse: string): BodyPartProgress {
   // 1. 先用脚本检测玩家输入
   const scriptDetected = detectBodyPartProgress(userInput);
   const hasScriptProgress = Object.values(scriptDetected).some(v => v > 0);
@@ -442,14 +512,16 @@ export function detectBodyPartProgress(userInput: string): BodyPartProgress {
   console.info(`[梦境开发] 检测玩家输入: "${inputPreview}"`);
 
   for (const [part, keywords] of Object.entries(BODY_PART_KEYWORDS)) {
-    const matchedKeywords = keywords.filter((kw) => userInput.includes(kw));
+    const matchedKeywords = keywords.filter(kw => userInput.includes(kw));
     const matchCount = matchedKeywords.length;
     if (matchCount > 0) {
       // 每个关键词+2%，单次上限5%
       const increment = Math.min(SINGLE_DETECTION_MAX, matchCount * PROGRESS_PER_KEYWORD);
       result[part as keyof BodyPartProgress] = increment;
       // 显示匹配到的具体关键词
-      console.info(`[梦境开发] 检测到 ${part} 关键词 ${matchCount} 个: [${matchedKeywords.join(', ')}]，进度+${increment}%`);
+      console.info(
+        `[梦境开发] 检测到 ${part} 关键词 ${matchCount} 个: [${matchedKeywords.join(', ')}]，进度+${increment}%`,
+      );
     }
   }
 
@@ -522,7 +594,9 @@ export function getAllowedBodyParts(data: SchemaType): (keyof BodyPartProgress)[
   }
 
   // 未知场景：记录日志但仍允许开发（容错）
-  console.warn(`[梦境开发] 无法确定当前场景（_梦境入口天数=${data.世界._梦境入口天数}，当前天数=${data.世界.当前天数}），允许所有肉体部位`);
+  console.warn(
+    `[梦境开发] 无法确定当前场景（_梦境入口天数=${data.世界._梦境入口天数}，当前天数=${data.世界.当前天数}），允许所有肉体部位`,
+  );
   return ['嘴巴', '胸部', '下体', '后穴'];
 }
 
@@ -591,7 +665,7 @@ export function updateBodyPartProgress(data: SchemaType, progressIncrement: Body
       console.info(
         `[梦境开发] 场景${currentScene} ${part}: +${actualIncrement}%` +
           (actualIncrement < progressIncrement[part] ? `（原始+${progressIncrement[part]}%，受当晚上限限制）` : '') +
-          `，当晚累计: ${data.梦境数据.当晚进度记录[part]}/${NIGHTLY_PROGRESS_CAP}%`
+          `，当晚累计: ${data.梦境数据.当晚进度记录[part]}/${NIGHTLY_PROGRESS_CAP}%`,
       );
 
       if (oldLevel.level !== newLevel.level) {
@@ -607,7 +681,7 @@ export function updateBodyPartProgress(data: SchemaType, progressIncrement: Body
   if (blockedParts.length > 0) {
     console.info(
       `[梦境开发] 场景限制：场景${currentScene}不允许开发 ${blockedParts.join('、')}` +
-        `（允许部位: ${allowedParts.join('、')}）`
+        `（允许部位: ${allowedParts.join('、')}）`,
     );
   }
 }
@@ -618,7 +692,7 @@ export function updateBodyPartProgress(data: SchemaType, progressIncrement: Body
  * @returns 部位状态摘要
  */
 export function getBodyPartSummary(
-  data: SchemaType
+  data: SchemaType,
 ): Record<string, { progress: number; level: string; name: string }> {
   const summary: Record<string, { progress: number; level: string; name: string }> = {};
   const parts: (keyof BodyPartProgress)[] = ['嘴巴', '胸部', '下体', '后穴', '精神'];
@@ -670,7 +744,7 @@ export function checkCorrectSelection(sceneNumber: number, selectedParts: string
   // 如果去重前后数量不同，记录日志
   if (uniqueSelectedParts.length !== selectedParts.length) {
     console.warn(
-      `[梦境判定] 检测到重复部位，已自动去重: [${selectedParts.join(', ')}] → [${uniqueSelectedParts.join(', ')}]`
+      `[梦境判定] 检测到重复部位，已自动去重: [${selectedParts.join(', ')}] → [${uniqueSelectedParts.join(', ')}]`,
     );
   }
 
@@ -685,7 +759,7 @@ export function checkCorrectSelection(sceneNumber: number, selectedParts: string
 
   console.info(
     `[梦境判定] 场景${sceneNumber}: 玩家选择=[${uniqueSelectedParts.join(', ')}], ` +
-    `正确答案=[${correctAnswers.join(', ')}], 结果=${isCorrect ? '✅正确' : '❌错误'}`
+      `正确答案=[${correctAnswers.join(', ')}], 结果=${isCorrect ? '✅正确' : '❌错误'}`,
   );
   return isCorrect;
 }
@@ -736,7 +810,7 @@ export function processSceneCompletion(data: SchemaType, sceneNumber: number): v
 
   // 记录结局倾向
   console.info(
-    `[梦境判定] 当前状态: 正确场景=${data.梦境数据.正确重构场景.length}/5, 混乱度=${data.梦境数据.记忆混乱度}`
+    `[梦境判定] 当前状态: 正确场景=${data.梦境数据.正确重构场景.length}/5, 混乱度=${data.梦境数据.记忆混乱度}`,
   );
 }
 
@@ -798,7 +872,7 @@ export function parseAIBodyProgressSuggestion(aiResponse: string): BodyPartProgr
  */
 export function mergeBodyPartProgress(
   scriptDetected: BodyPartProgress,
-  aiSuggested: BodyPartProgress
+  aiSuggested: BodyPartProgress,
 ): BodyPartProgress {
   const result: BodyPartProgress = { 嘴巴: 0, 胸部: 0, 下体: 0, 后穴: 0, 精神: 0 };
   const parts: (keyof BodyPartProgress)[] = ['嘴巴', '胸部', '下体', '后穴', '精神'];
@@ -834,7 +908,7 @@ export function generateMemoryContinuityPrompt(data: SchemaType, currentScene: n
 - 她对来访者感到陌生和困惑`;
   }
 
-  const completedScenes = data.梦境数据.已完成场景.filter((s) => s < currentScene);
+  const completedScenes = data.梦境数据.已完成场景.filter(s => s < currentScene);
   if (completedScenes.length === 0) {
     return `【记忆连续性】
 - 这是赵霞的第${currentScene}个记忆场景
@@ -843,7 +917,7 @@ export function generateMemoryContinuityPrompt(data: SchemaType, currentScene: n
 
   // 生成前置记忆摘要
   const memorySummary = completedScenes
-    .map((sceneNum) => {
+    .map(sceneNum => {
       const isCorrect = data.梦境数据.正确重构场景.includes(sceneNum);
       return `  - 场景${sceneNum}: ${isCorrect ? '她记得与你的愉快互动' : '她有些困惑的记忆'}`;
     })
@@ -904,11 +978,46 @@ function extractEmotionalReaction(aiOutput: string): string {
 
   // 情感关键词列表
   const emotionKeywords = [
-    '心跳', '脸红', '颤抖', '呼吸', '紧张', '害羞', '期待', '渴望',
-    '眼眶', '泪水', '哽咽', '激动', '震惊', '愣住', '僵住', '发抖',
-    '心中', '内心', '感觉', '感受', '意识到', '明白', '想起', '记得',
-    '熟悉', '陌生', '困惑', '迷茫', '依恋', '依赖', '信任', '安心',
-    '幸福', '满足', '温暖', '甜蜜', '羞耻', '罪恶感', '背德', '沦陷'
+    '心跳',
+    '脸红',
+    '颤抖',
+    '呼吸',
+    '紧张',
+    '害羞',
+    '期待',
+    '渴望',
+    '眼眶',
+    '泪水',
+    '哽咽',
+    '激动',
+    '震惊',
+    '愣住',
+    '僵住',
+    '发抖',
+    '心中',
+    '内心',
+    '感觉',
+    '感受',
+    '意识到',
+    '明白',
+    '想起',
+    '记得',
+    '熟悉',
+    '陌生',
+    '困惑',
+    '迷茫',
+    '依恋',
+    '依赖',
+    '信任',
+    '安心',
+    '幸福',
+    '满足',
+    '温暖',
+    '甜蜜',
+    '羞耻',
+    '罪恶感',
+    '背德',
+    '沦陷',
   ];
 
   // 找到包含情感关键词的句子
@@ -944,7 +1053,7 @@ function extractEmotionalReaction(aiOutput: string): string {
  */
 export async function getDreamSessionMessages(
   dreamEntryMessageId: number | undefined,
-  dreamExitMessageId?: number | undefined
+  dreamExitMessageId?: number | undefined,
 ): Promise<string> {
   if (!dreamEntryMessageId) {
     console.warn('[记忆摘要] 未找到梦境入口楼层ID');
@@ -1000,7 +1109,9 @@ export async function getDreamSessionMessages(
 
     const playerCount = dreamMessages.filter(m => m.is_user).length;
     const aiCount = aiMessages.length;
-    console.info(`[记忆摘要] 收集到 ${playerCount} 条玩家输入，${aiCount} 条AI输出（楼层 ${entryIndex} ~ ${endIndex - 1}）`);
+    console.info(
+      `[记忆摘要] 收集到 ${playerCount} 条玩家输入，${aiCount} 条AI输出（楼层 ${entryIndex} ~ ${endIndex - 1}）`,
+    );
 
     // 组合摘要：玩家行为 + AI情感反应
     let result = playerMessages;
@@ -1041,11 +1152,7 @@ export async function getDreamSessionMessages(
  * @param chatHistory 本次梦境的对话历史（包含玩家行为+AI情感反应）
  * @returns 摘要文本
  */
-export async function generateMemorySummary(
-  _data: SchemaType,
-  sceneNum: number,
-  chatHistory: string
-): Promise<string> {
+export async function generateMemorySummary(_data: SchemaType, sceneNum: number, chatHistory: string): Promise<string> {
   const sceneInfo = DREAM_SCENE_INFO[sceneNum] || { title: `场景${sceneNum}`, age: 0, theme: '未知' };
 
   // 检查内容是否有效
@@ -1094,7 +1201,7 @@ export function generateEnhancedMemoryContinuityPrompt(data: SchemaType, current
 
   // 场景1-3不受场景5影响（都在结婚之前）
   // 场景4需要检查场景5是否已完成（结婚当天 -> 婚后28岁）
-  const completedScenes = data.梦境数据.已完成场景.filter((s) => s < currentScene);
+  const completedScenes = data.梦境数据.已完成场景.filter(s => s < currentScene);
 
   // 特殊处理：场景4需要包含场景5的记忆（如果已完成）
   const hasScene5Memory = currentScene === 4 && data.梦境数据.已完成场景.includes(5);
@@ -1111,10 +1218,12 @@ export function generateEnhancedMemoryContinuityPrompt(data: SchemaType, current
 
   for (let i = 1; i < currentScene; i++) {
     const sceneKey = `场景${i}` as keyof typeof data.梦境数据;
-    const sceneData = data.梦境数据[sceneKey] as {
-      已进入?: boolean;
-      剧情摘要?: string;
-    } | undefined;
+    const sceneData = data.梦境数据[sceneKey] as
+      | {
+          已进入?: boolean;
+          剧情摘要?: string;
+        }
+      | undefined;
 
     const sceneInfo = DREAM_SCENE_INFO[i] || { title: `场景${i}`, age: 0 };
     const isCorrect = data.梦境数据.正确重构场景.includes(i);
@@ -1136,11 +1245,13 @@ ${isCorrect ? '那是一段美好的回忆，虽然细节有些模糊，但感�
   // 场景4特殊处理：插入场景5（结婚当天）的记忆
   // 时间线顺序：场景3(23岁) -> 场景5(结婚当天) -> 场景4(28岁婚后)
   if (hasScene5Memory) {
-    const scene5Data = data.梦境数据.场景5 as {
-      已进入?: boolean;
-      上次剧情摘要?: string;
-      完成度?: number;
-    } | undefined;
+    const scene5Data = data.梦境数据.场景5 as
+      | {
+          已进入?: boolean;
+          上次剧情摘要?: string;
+          完成度?: number;
+        }
+      | undefined;
 
     const scene5Info = DREAM_SCENE_INFO[5];
     const scene5Completion = scene5Data?.完成度 ?? 0;

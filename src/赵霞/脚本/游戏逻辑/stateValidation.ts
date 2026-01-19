@@ -90,22 +90,14 @@ export function validateAndFixState(data: SchemaType): {
     changes.push(`境界: ${旧境界} → ${正确境界}（依存度：${data.赵霞状态.依存度}）`);
     fixed = true;
 
-    console.info(
-      `[状态验证] 境界自动更新: ${getRealmNamePure(旧境界)} → ${getRealmNamePure(正确境界)}`
-    );
+    console.info(`[状态验证] 境界自动更新: ${getRealmNamePure(旧境界)} → ${getRealmNamePure(正确境界)}`);
   }
 
   // ============================================
   // 3. 部位进度范围检查 + 场景限制
   // ============================================
 
-  const 部位列表: Array<'嘴巴' | '胸部' | '下体' | '后穴' | '精神'> = [
-    '嘴巴',
-    '胸部',
-    '下体',
-    '后穴',
-    '精神',
-  ];
+  const 部位列表: Array<'嘴巴' | '胸部' | '下体' | '后穴' | '精神'> = ['嘴巴', '胸部', '下体', '后穴', '精神'];
 
   // 判断当前模式和场景
   const 是纯爱模式 = !data.世界.已进入过梦境;
@@ -181,8 +173,7 @@ export function validateAndFixState(data: SchemaType): {
 
   // Bug #18 修复：结局判定/已破解状态下允许天数超过5（用于显示真实日期）
   // 只有在"进行中"状态下才限制天数在1-5范围内
-  const isEndingPhase =
-    data.世界.循环状态 === '结局判定' || data.世界.循环状态 === '已破解';
+  const isEndingPhase = data.世界.循环状态 === '结局判定' || data.世界.循环状态 === '已破解';
   const maxDay = isEndingPhase ? 99 : 5; // 结局阶段允许更大的天数
   data.世界.当前天数 = clamp(data.世界.当前天数, 1, maxDay);
   data.世界.当前小时 = clamp(data.世界.当前小时, 0, 23);
@@ -199,7 +190,7 @@ export function validateAndFixState(data: SchemaType): {
   // 输出日志
   if (fixed) {
     console.info('[状态验证] 检测到不一致数据，已自动修正:');
-    changes.forEach((change) => console.info(`  - ${change}`));
+    changes.forEach(change => console.info(`  - ${change}`));
   }
 
   return { fixed, changes };
@@ -233,7 +224,7 @@ export function checkRealmChange(data: SchemaType): {
     console.info(
       `[境界检测] ✅ 境界变化: ${oldRealm} → ${currentRealm}\n` +
         `  纯爱模式: ${getRealmNamePure(oldRealm)} → ${getRealmNamePure(currentRealm)}\n` +
-        `  真相模式: ${getRealmNameTruth(oldRealm)} → ${getRealmNameTruth(currentRealm)}`
+        `  真相模式: ${getRealmNameTruth(oldRealm)} → ${getRealmNameTruth(currentRealm)}`,
     );
 
     return { changed: true, oldRealm, newRealm: currentRealm };

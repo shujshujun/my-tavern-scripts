@@ -452,7 +452,7 @@ export type BodyPartName = (typeof ALL_BODY_PARTS)[number];
  * @returns 依存度（0-100）
  */
 export function calculateDependencyFromBodyProgress(部位进度: Record<BodyPartName, number>): number {
-  const values = ALL_BODY_PARTS.map((part) => 部位进度[part] || 0);
+  const values = ALL_BODY_PARTS.map(part => 部位进度[part] || 0);
   const average = values.reduce((sum, v) => sum + v, 0) / values.length;
   return Math.round(average);
 }
@@ -534,7 +534,7 @@ export function updateTruthModeValues(data: {
       `\n  部位进度: ${JSON.stringify(部位进度)}`,
       `\n  当前依存度: ${当前依存度}`,
       `\n  当前道德底线: ${当前道德底线}`,
-      `\n  当前境界: ${当前境界}`
+      `\n  当前境界: ${当前境界}`,
     );
     return; // 跳过更新，保留当前值
   }
@@ -552,7 +552,7 @@ export function updateTruthModeValues(data: {
       `\n  当前依存度: ${当前依存度} → 计算值: ${新依存度}`,
       `\n  部位进度: ${JSON.stringify(部位进度)}`,
       `\n  部位进度总和: ${部位进度总和}`,
-      `\n  原因: 可能是数据未正确继承，阻止更新以保护数据`
+      `\n  原因: 可能是数据未正确继承，阻止更新以保护数据`,
     );
     return; // 跳过更新，保留当前值
   }
@@ -677,7 +677,7 @@ export const BODY_PART_BEHAVIOR_MAP: Record<BodyPartName, Record<string, string>
 export function getBodyPartStatus(
   部位: BodyPartName,
   进度: number,
-  已解锁: boolean
+  已解锁: boolean,
 ): {
   部位名: string;
   进度: number;
@@ -835,7 +835,11 @@ export function generateDetailedInteractionPrompt(data: {
 /**
  * 获取当前服装描述（兼容旧API）
  */
-export function getCurrentClothing(realm: number, _时段: '日常' | '睡衣' | '内衣', 已进入过梦境: boolean = false): string {
+export function getCurrentClothing(
+  realm: number,
+  _时段: '日常' | '睡衣' | '内衣',
+  已进入过梦境: boolean = false,
+): string {
   const defaultAppearance = getDefaultAppearance(realm, 已进入过梦境);
   return defaultAppearance.服装描述;
 }
@@ -843,7 +847,11 @@ export function getCurrentClothing(realm: number, _时段: '日常' | '睡衣' |
 /**
  * 获取当前妆容描述（兼容旧API）
  */
-export function getCurrentMakeup(realm: number, _场合: '日常' | '出门' | '私密', 已进入过梦境: boolean = false): string {
+export function getCurrentMakeup(
+  realm: number,
+  _场合: '日常' | '出门' | '私密',
+  已进入过梦境: boolean = false,
+): string {
   const defaultAppearance = getDefaultAppearance(realm, 已进入过梦境);
   return defaultAppearance.妆容描述;
 }
@@ -945,7 +953,7 @@ export function generateAppearanceConstraintPrompt(data: SchemaType): string {
 export function isActionAllowed(
   行为类型: string,
   当前境界: number,
-  已进入过梦境: boolean = false
+  已进入过梦境: boolean = false,
 ): {
   allowed: boolean;
   reason?: string;
@@ -970,10 +978,10 @@ export function isActionAllowed(
 
   // 检查具体行为
   const 允许 = realmConfig.允许互动.some(
-    (允许的行为) =>
+    允许的行为 =>
       允许的行为 === 行为类型 ||
       允许的行为 === '所有互动' ||
-      (允许的行为.includes(行为类型.substring(0, 2)) && 行为类型.length > 2)
+      (允许的行为.includes(行为类型.substring(0, 2)) && 行为类型.length > 2),
   );
 
   if (允许) {
@@ -1014,9 +1022,7 @@ export function updateHusbandLocation(data: SchemaType): void {
   if (data.现实数据.丈夫当前位置 !== 新位置) {
     const 旧位置 = data.现实数据.丈夫当前位置;
     data.现实数据.丈夫当前位置 = 新位置;
-    console.info(
-      `[父亲位置] 更新: ${旧位置} → ${新位置}（当前时间：${data.世界.当前小时}:00）`
-    );
+    console.info(`[父亲位置] 更新: ${旧位置} → ${新位置}（当前时间：${data.世界.当前小时}:00）`);
   }
 }
 
@@ -1069,9 +1075,7 @@ export function updateZhaoxiaLocation(data: SchemaType): void {
   if (data.赵霞状态.当前位置 !== 新位置) {
     const 旧位置 = data.赵霞状态.当前位置;
     data.赵霞状态.当前位置 = 新位置;
-    console.info(
-      `[赵霞位置] 更新: ${旧位置} → ${新位置}（当前时间：${data.世界.当前小时}:00）`
-    );
+    console.info(`[赵霞位置] 更新: ${旧位置} → ${新位置}（当前时间：${data.世界.当前小时}:00）`);
   }
 }
 
@@ -1109,7 +1113,7 @@ export function updateZhaoxiaThoughtAfterDream(data: SchemaType): void {
   console.info(
     `[赵霞心理] 梦境退出后更新心理活动`,
     `\n  旧: ${旧心理活动.substring(0, 30)}...`,
-    `\n  新: ${新心理活动.substring(0, 30)}...`
+    `\n  新: ${新心理活动.substring(0, 30)}...`,
   );
 }
 
@@ -1123,22 +1127,55 @@ export function updateZhaoxiaThoughtAfterDream(data: SchemaType): void {
  */
 const EXPOSURE_CLOTHING_KEYWORDS = {
   清凉: [
-    '短裙', '迷你裙', '超短裙', '热裤', '短裤',
-    '吊带', '背心', 'V领', '低胸', '露肩',
-    '露背', '透视', '薄纱', '紧身', '贴身',
-    '丝袜', '蕾丝', '网袜', '渔网',
+    '短裙',
+    '迷你裙',
+    '超短裙',
+    '热裤',
+    '短裤',
+    '吊带',
+    '背心',
+    'V领',
+    '低胸',
+    '露肩',
+    '露背',
+    '透视',
+    '薄纱',
+    '紧身',
+    '贴身',
+    '丝袜',
+    '蕾丝',
+    '网袜',
+    '渔网',
   ],
   暴露: [
-    '情趣', '内衣外穿', '比基尼', '胸衣',
-    '镂空', '开叉', '高开叉', '超低腰',
-    '真空', '不穿内衣', '没穿内衣',
-    '睡裙', '吊带睡裙', '丝绸睡衣',
+    '情趣',
+    '内衣外穿',
+    '比基尼',
+    '胸衣',
+    '镂空',
+    '开叉',
+    '高开叉',
+    '超低腰',
+    '真空',
+    '不穿内衣',
+    '没穿内衣',
+    '睡裙',
+    '吊带睡裙',
+    '丝绸睡衣',
   ],
   极度暴露: [
-    '全裸', '裸体', '一丝不挂', '只穿围裙',
-    '情趣内衣', '性感内衣', '开裆',
-    '无底', '三点式', '丁字裤',
-    '乳贴', '身体彩绘',
+    '全裸',
+    '裸体',
+    '一丝不挂',
+    '只穿围裙',
+    '情趣内衣',
+    '性感内衣',
+    '开裆',
+    '无底',
+    '三点式',
+    '丁字裤',
+    '乳贴',
+    '身体彩绘',
   ],
 };
 
@@ -1146,16 +1183,8 @@ const EXPOSURE_CLOTHING_KEYWORDS = {
  * 浓妆关键词库
  */
 const HEAVY_MAKEUP_KEYWORDS = {
-  浓妆: [
-    '浓妆', '大红唇', '红唇', '艳丽妆容',
-    '烈焰红唇', '性感妆', '夜店妆',
-    '烟熏妆', '眼线加深', '假睫毛',
-  ],
-  艳妆: [
-    '艳妆', '媚妆', '色情妆', '浓艳',
-    '红唇艳丽', '眼影浓重', '腮红明显',
-    '妖艳', '妩媚', '风尘',
-  ],
+  浓妆: ['浓妆', '大红唇', '红唇', '艳丽妆容', '烈焰红唇', '性感妆', '夜店妆', '烟熏妆', '眼线加深', '假睫毛'],
+  艳妆: ['艳妆', '媚妆', '色情妆', '浓艳', '红唇艳丽', '眼影浓重', '腮红明显', '妖艳', '妩媚', '风尘'],
 };
 
 /**
@@ -1163,23 +1192,40 @@ const HEAVY_MAKEUP_KEYWORDS = {
  * 用于检测正文中是否包含与主角的亲密行为
  */
 const INTIMATE_BEHAVIOR_KEYWORDS = {
-  轻度: [
-    '牵手', '握手', '拥抱', '搂抱',
-    '依偎', '靠在', '挽着', '挽手',
-    '亲昵', '暧昧眼神', '眉目传情',
-  ],
+  轻度: ['牵手', '握手', '拥抱', '搂抱', '依偎', '靠在', '挽着', '挽手', '亲昵', '暧昧眼神', '眉目传情'],
   中度: [
-    '亲吻', '亲嘴', '接吻', '吻',
-    '贴脸', '耳鬓厮磨', '亲密接触',
-    '抚摸', '触碰', '爱抚',
-    '坐在腿上', '坐大腿', '骑坐',
+    '亲吻',
+    '亲嘴',
+    '接吻',
+    '吻',
+    '贴脸',
+    '耳鬓厮磨',
+    '亲密接触',
+    '抚摸',
+    '触碰',
+    '爱抚',
+    '坐在腿上',
+    '坐大腿',
+    '骑坐',
   ],
   重度: [
-    '深吻', '舌吻', '热吻',
-    '揉', '捏', '掐', '摸胸', '揉胸',
-    '脱衣', '解开', '褪下',
-    '呻吟', '喘息', '娇喘',
-    '进入', '插入', '抽插',
+    '深吻',
+    '舌吻',
+    '热吻',
+    '揉',
+    '捏',
+    '掐',
+    '摸胸',
+    '揉胸',
+    '脱衣',
+    '解开',
+    '褪下',
+    '呻吟',
+    '喘息',
+    '娇喘',
+    '进入',
+    '插入',
+    '抽插',
   ],
 };
 
@@ -1187,10 +1233,22 @@ const INTIMATE_BEHAVIOR_KEYWORDS = {
  * 境界外显关键词（境界4+的行为特征）
  */
 const REALM_MANIFESTATION_KEYWORDS = [
-  '渴望', '主动', '索求', '勾引',
-  '媚眼', '抛媚眼', '挑逗', '撩拨',
-  '撒娇', '讨好', '献媚', '谄媚',
-  '依赖', '离不开', '想你', '需要你',
+  '渴望',
+  '主动',
+  '索求',
+  '勾引',
+  '媚眼',
+  '抛媚眼',
+  '挑逗',
+  '撩拨',
+  '撒娇',
+  '讨好',
+  '献媚',
+  '谄媚',
+  '依赖',
+  '离不开',
+  '想你',
+  '需要你',
 ];
 
 /**
@@ -1316,10 +1374,7 @@ export interface SuspicionIncreaseResult {
  * @param userInputText 玩家输入文本（用于检测亲密行为）
  * @returns 怀疑度增加结果
  */
-export function calculateSuspicionIncrease(
-  data: SchemaType,
-  userInputText: string = ''
-): SuspicionIncreaseResult {
+export function calculateSuspicionIncrease(data: SchemaType, userInputText: string = ''): SuspicionIncreaseResult {
   const result: SuspicionIncreaseResult = {
     增加值: 0,
     原因: [],
@@ -1393,7 +1448,7 @@ export function calculateSuspicionIncrease(
       `\n  原因: ${result.原因.join(', ')}`,
       `\n  苏文位置: ${data.现实数据.丈夫当前位置}`,
       `\n  当前境界: ${data.赵霞状态.当前境界}`,
-      `\n  当前依存度: ${data.赵霞状态.依存度}`
+      `\n  当前依存度: ${data.赵霞状态.依存度}`,
     );
   }
 
@@ -1409,10 +1464,7 @@ export function calculateSuspicionIncrease(
  * @param userInputText 玩家输入文本（用于检测亲密行为）
  * @returns 更新后的怀疑度
  */
-export function updateSuspicionLevel(
-  data: SchemaType,
-  userInputText: string = ''
-): number {
+export function updateSuspicionLevel(data: SchemaType, userInputText: string = ''): number {
   const result = calculateSuspicionIncrease(data, userInputText);
 
   if (result.增加值 > 0) {
@@ -1423,7 +1475,7 @@ export function updateSuspicionLevel(
 
     console.info(
       `[丈夫怀疑度] ${旧怀疑度} → ${新怀疑度} (+${result.增加值})`,
-      `\n  详细: 服装${result.详细.服装暴露} + 妆容${result.详细.妆容浓度} + 亲密${result.详细.亲密行为} + 境界${result.详细.境界外显}`
+      `\n  详细: 服装${result.详细.服装暴露} + 妆容${result.详细.妆容浓度} + 亲密${result.详细.亲密行为} + 境界${result.详细.境界外显}`,
     );
 
     // 检测是否触发坏结局

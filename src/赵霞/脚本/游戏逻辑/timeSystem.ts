@@ -95,7 +95,7 @@ export class TimeSystem {
   private static calculateRawTime(
     currentDay: number,
     currentHour: number,
-    hours: number
+    hours: number,
   ): { day: number; hour: number } {
     let totalHours = currentHour + hours;
     let day = currentDay;
@@ -259,7 +259,7 @@ export class TimeSystem {
    */
   static processTimeSkipRequest(
     data: SchemaType,
-    userInput: string
+    userInput: string,
   ): {
     processed: boolean;
     blocked: boolean;
@@ -328,7 +328,7 @@ export class TimeSystem {
   static checkTimeAdvancementAfterScript(
     beforeTime: string,
     afterTime: string,
-    messageId: number
+    messageId: number,
   ): {
     shouldWarn: boolean;
     message?: string;

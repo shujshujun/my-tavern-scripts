@@ -179,10 +179,7 @@ export function getStatusBarIcon(routeType: RouteType): string {
  * @param stage 阶段编号 (1-5)
  * @param routeType 路线类型
  */
-export function getRealmDescription(
-  stage: number,
-  routeType: RouteType
-): { 状态描述: string; 外观描述: string } {
+export function getRealmDescription(stage: number, routeType: RouteType): { 状态描述: string; 外观描述: string } {
   const index = Math.max(0, Math.min(stage - 1, 4));
   return REALM_DESCRIPTIONS[routeType][index];
 }

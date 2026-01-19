@@ -321,10 +321,7 @@ export function applyNormalEndingState(data: SchemaType): void {
  */
 export function isInNormalEndingLock(data: SchemaType): boolean {
   const ending = data.结局数据.当前结局;
-  return (
-    (ending === '普通结局' || ending === '纯爱结局') &&
-    data.世界.循环状态 === '结局判定'
-  );
+  return (ending === '普通结局' || ending === '纯爱结局') && data.世界.循环状态 === '结局判定';
 }
 
 /**

@@ -588,7 +588,8 @@ export const PERFECT_ENDING_PHASES: PerfectEndingPhase[] = [
     // Bug #15 修复：玩家引导机制
     expectedActions: ['爱', '喜欢', '永远', '一辈子', '誓言', '承诺', '愿意', '属于', '在一起'],
     hintThreshold: 2,
-    progressHint: '赵霞期待地看着你，等待着你的誓言。苏文轻声提醒："新郎，请向新娘说出你的心意...比如你对她的爱，你的承诺。"',
+    progressHint:
+      '赵霞期待地看着你，等待着你的誓言。苏文轻声提醒："新郎，请向新娘说出你的心意...比如你对她的爱，你的承诺。"',
   },
 
   // === 阶段10：戒指 ===
@@ -647,7 +648,8 @@ export const PERFECT_ENDING_PHASES: PerfectEndingPhase[] = [
     // Bug #15 修复：玩家引导机制
     expectedActions: ['戴', '戒指', '套', '接受', '愿意', '手指', '伸手'],
     hintThreshold: 2,
-    progressHint: '赵霞举起戒指盒，里面是一枚银色的戒指。她轻声问："愿意让我为你戴上吗？"她的眼神充满期待，等待你伸出手...',
+    progressHint:
+      '赵霞举起戒指盒，里面是一枚银色的戒指。她轻声问："愿意让我为你戴上吗？"她的眼神充满期待，等待你伸出手...',
   },
 
   // === 阶段11：完成 ===
@@ -707,7 +709,8 @@ export const PERFECT_ENDING_PHASES: PerfectEndingPhase[] = [
     // Bug #15 修复：最终阶段的引导机制
     expectedActions: ['吻', '亲', '接吻', '嘴唇', '靠近', '低头', '抬头'],
     hintThreshold: 2,
-    progressHint: '赵霞闭上眼睛，微微仰起头，等待着...苏文轻声说："请新人接吻。"她的睫毛微微颤抖，樱唇轻启，等待着你低下头...',
+    progressHint:
+      '赵霞闭上眼睛，微微仰起头，等待着...苏文轻声说："请新人接吻。"她的睫毛微微颤抖，樱唇轻启，等待着你低下头...',
   },
 ];
 
@@ -782,8 +785,8 @@ export function shouldActivatePerfectEnding(data: SchemaType): boolean {
   const completedScenes = data.梦境数据.已完成场景;
   const correctScenes = data.梦境数据.正确重构场景;
 
-  const allCompleted = [1, 2, 3, 4, 5].every((s) => completedScenes.includes(s));
-  const allCorrect = [1, 2, 3, 4, 5].every((s) => correctScenes.includes(s));
+  const allCompleted = [1, 2, 3, 4, 5].every(s => completedScenes.includes(s));
+  const allCorrect = [1, 2, 3, 4, 5].every(s => correctScenes.includes(s));
 
   if (!allCompleted || !allCorrect) {
     return false;
@@ -908,7 +911,7 @@ export function detectPerfectAnchors(aiResponse: string, phase: number): string[
 
   for (const anchor of phaseConfig.anchorEvents) {
     const keywords = PERFECT_ANCHOR_KEYWORDS[anchor] || [];
-    const isCompleted = keywords.some((kw) => {
+    const isCompleted = keywords.some(kw => {
       // 支持简单的正则匹配
       if (kw.includes('.*')) {
         const regex = new RegExp(kw, 'i');
@@ -985,7 +988,7 @@ export function checkProgressHint(state: PerfectEndingState, userInput: string):
  */
 export function updateProgressTracking(
   state: PerfectEndingState,
-  userInput: string
+  userInput: string,
 ): {
   updatedState: PerfectEndingState;
   hint: string | null;
@@ -1029,7 +1032,7 @@ export function updateProgressTracking(
  */
 export function canEnterNextPerfectPhase(
   state: PerfectEndingState,
-  currentHour: number
+  currentHour: number,
 ): { blocked: boolean; reason?: string; waitHours?: number } {
   const nextPhase = state.currentPhase + 1;
   if (nextPhase >= PERFECT_ENDING_PHASES.length) {
@@ -1076,7 +1079,7 @@ export function shouldAdvancePerfectPhase(state: PerfectEndingState, currentHour
   // Bug #19: 超过最大轮数时强制推进（但仍受时间锁定约束）
   if (phaseConfig.maxTurns && state.turnsInPhase >= phaseConfig.maxTurns) {
     console.info(
-      `[完美真爱结局] 阶段${state.currentPhase}(${phaseConfig.name}) 达到最大轮数${phaseConfig.maxTurns}，强制推进`
+      `[完美真爱结局] 阶段${state.currentPhase}(${phaseConfig.name}) 达到最大轮数${phaseConfig.maxTurns}，强制推进`,
     );
     return true;
   }
@@ -1087,9 +1090,7 @@ export function shouldAdvancePerfectPhase(state: PerfectEndingState, currentHour
   }
 
   // 检查锚点事件是否全部完成
-  const allAnchorsComplete = phaseConfig.anchorEvents.every((anchor) =>
-    state.completedAnchors.includes(anchor)
-  );
+  const allAnchorsComplete = phaseConfig.anchorEvents.every(anchor => state.completedAnchors.includes(anchor));
 
   return allAnchorsComplete;
 }
@@ -1127,7 +1128,7 @@ export function processPerfectTurnEnd(
   state: PerfectEndingState,
   aiResponse: string,
   userInput?: string,
-  currentHour?: number
+  currentHour?: number,
 ): {
   newState: PerfectEndingState;
   phaseAdvanced: boolean;
@@ -1188,14 +1189,16 @@ export function processPerfectTurnEnd(
  * @param userInput 玩家输入（用于检测期望动作）
  * @param currentHour 当前小时（用于时间锁定提示）
  */
-export function generatePerfectEndingPrompt(state: PerfectEndingState, userInput: string, currentHour?: number): string {
+export function generatePerfectEndingPrompt(
+  state: PerfectEndingState,
+  userInput: string,
+  currentHour?: number,
+): string {
   const phaseConfig = PERFECT_ENDING_PHASES[state.currentPhase];
   if (!phaseConfig) return '';
 
   // 计算剩余锚点
-  const remainingAnchors = phaseConfig.anchorEvents.filter(
-    (a) => !state.completedAnchors.includes(a)
-  );
+  const remainingAnchors = phaseConfig.anchorEvents.filter(a => !state.completedAnchors.includes(a));
 
   // Bug #40 修复：检查下一阶段时间锁定
   const hour = currentHour ?? 12;
@@ -1209,9 +1212,7 @@ export function generatePerfectEndingPrompt(state: PerfectEndingState, userInput
   } else {
     const remainingTurns = phaseConfig.maxTurns - state.turnsInPhase;
     turnsWarning =
-      remainingTurns <= 2
-        ? `⚠️ 剩余${remainingTurns}轮后将自动推进到下一阶段`
-        : `剩余约${remainingTurns}轮`;
+      remainingTurns <= 2 ? `⚠️ 剩余${remainingTurns}轮后将自动推进到下一阶段` : `剩余约${remainingTurns}轮`;
   }
 
   // Bug #40 修复：时间锁定时不显示紧迫感提示
