@@ -1,0 +1,171 @@
+---
+变量输出格式:
+  rule:
+    - you must output the update analysis and the actual update commands at once in the end of the next reply
+    - the update commands works like the **JSON Patch (RFC 6902)** standard, must be a valid JSON array containing operation objects, but supports the following operations instead:
+      - replace: replace the value of existing paths
+      - delta: update the value of existing number paths by a delta value
+      - insert: insert new items into an object or array
+      - remove
+    - don't update field names starts with backtick_underscore as they are readonly
+    - AI does NOT handle time system - script automatically advances time each turn
+    - AI does NOT handle stage transitions - script manages game phases
+    - AI should update character states based on interactions:
+      - 依存度: increase when 赵霞 enjoys user's attention or help
+      - 道德底线: decrease when 赵霞 accepts inappropriate behavior
+      - 对丈夫依存度: may decrease as 依存度 increases
+      - 记忆混乱度: increase on wrong memory reconstruction in dreams
+      - 丈夫怀疑度: increase when 苏文 notices suspicious behavior
+    - 【双模式部位进度规则】:
+      - 纯爱模式（已进入过梦境=false）：AI根据玩家输入内容检测部位相关关键词/场景来更新部位进度
+      - 真相模式（已进入过梦境=true）：【禁止修改】部位进度由脚本自动管理，AI不得修改
+      - 纯爱模式下：每个关键词+2，单次上限+5，每回合合并上限+8
+      - 【每晚上限】每个部位每晚最多+20，超出由脚本自动截断
+      - 【错误路线】部位达到100%时，脚本自动重置为50%，AI描写警告场景（游戏继续）【待完善】
+      - 关键词参见：变量更新规则.yaml 中的 AI部位判定规则
+  format: |
+    <UpdateVariable>
+    <Analysis>(IN ENGLISH, no more than 100 words)
+    - analyze 赵霞's emotional/psychological changes based on interactions
+    - analyze 依存度/道德底线 changes
+    - analyze 部位进度 if in 纯爱模式 and intimate contact occurred
+    - analyze 丈夫怀疑度 if 苏文 is present
+    - analyze 记忆混乱度 if in dream
+    </Analysis>
+    <JSONPatch>
+    [
+      { "op": "delta", "path": "/赵霞状态/依存度", "value": 3 },
+      { "op": "delta", "path": "/赵霞状态/道德底线", "value": -2 },
+      { "op": "delta", "path": "/赵霞状态/部位进度/嘴巴", "value": 5 },
+      { "op": "delta", "path": "/现实数据/丈夫怀疑度", "value": 5 },
+      ...
+    ]
+    </JSONPatch>
+    </UpdateVariable>
+
+  特殊场景示例:
+    日常互动（依存度提升）: |
+      { "op": "delta", "path": "/赵霞状态/依存度", "value": 3 }
+      { "op": "delta", "path": "/赵霞状态/道德底线", "value": -1 }
+
+    纯爱模式_亲吻互动（嘴巴进度提升）: |
+      { "op": "delta", "path": "/赵霞状态/依存度", "value": 5 }
+      { "op": "delta", "path": "/赵霞状态/道德底线", "value": -3 }
+      { "op": "delta", "path": "/赵霞状态/部位进度/嘴巴", "value": 10 }
+
+    纯爱模式_拥抱互动（胸部进度提升）: |
+      { "op": "delta", "path": "/赵霞状态/依存度", "value": 4 }
+      { "op": "delta", "path": "/赵霞状态/道德底线", "value": -2 }
+      { "op": "delta", "path": "/赵霞状态/部位进度/胸部", "value": 5 }
+
+    纯爱模式_心理操控（精神进度提升）: |
+      { "op": "delta", "path": "/赵霞状态/依存度", "value": 8 }
+      { "op": "delta", "path": "/赵霞状态/部位进度/精神", "value": 15 }
+
+    被丈夫发现（怀疑度提升）: |
+      { "op": "delta", "path": "/现实数据/丈夫怀疑度", "value": 15 }
+
+    丈夫打断事件: |
+      { "op": "delta", "path": "/现实数据/丈夫怀疑度", "value": 20 }
+      { "op": "delta", "path": "/赵霞状态/道德底线", "value": 5 }
+
+    对丈夫依存度下降: |
+      { "op": "delta", "path": "/赵霞状态/对丈夫依存度", "value": -3 }
+
+  # ============================================
+  # 阶段专属输出规则（日常 vs 梦境）
+  # ============================================
+  阶段专属规则:
+    梦境阶段:
+      说明: 当 游戏阶段=梦境 时，AI只能更新梦境相关字段
+      禁止输出:
+        - 🚫【绝对禁止】<HusbandThought> 标签及内容（这是日常阶段专属！梦境中苏文没有"现实视角"）
+        - 【禁止】更新 /现实数据/* 的任何字段
+        - 【禁止】更新 /赵霞状态/心理活动（梦境中不使用此字段）
+        - 【禁止】更新 /赵霞状态/当前位置（梦境中位置由场景设定）
+        - 【禁止】更新 /赵霞状态/服装/*（梦境中服装由场景设定）
+        - 【禁止】更新 /赵霞状态/妆容
+        - 【禁止】更新 /赵霞状态/配件
+      允许更新:
+        - /梦境数据/* 的所有字段
+        - /赵霞状态/依存度
+        - /赵霞状态/道德底线
+        - /赵霞状态/对丈夫依存度
+        - /赵霞状态/部位进度/*
+      梦境专属字段:
+        - /梦境数据/梦境心理活动: 赵霞在梦境中的第一人称心理独白（体现记忆中那个年龄的想法）
+        - /梦境数据/记忆混乱度: 梦境中选择错误导致记忆混乱
+      示例: |
+        <UpdateVariable>
+        <Analysis>
+        - 赵霞 in dream accepted intimate contact, 依存度+5
+        - 道德底线 decreased as she accepted forbidden behavior, -3
+        - 记忆混乱度 unchanged as player choice was correct
+        </Analysis>
+        <JSONPatch>
+        [
+          { "op": "delta", "path": "/赵霞状态/依存度", "value": 5 },
+          { "op": "delta", "path": "/赵霞状态/道德底线", "value": -3 },
+          { "op": "delta", "path": "/赵霞状态/部位进度/嘴巴", "value": 10 },
+          { "op": "replace", "path": "/梦境数据/梦境心理活动", "value": "他的吻...让我感到莫名的熟悉和安心..." }
+        ]
+        </JSONPatch>
+        </UpdateVariable>
+
+    日常阶段:
+      说明: 当 游戏阶段=日常 时，AI按正常规则输出
+      苦主视角生成规则:
+        触发条件:
+          - 真相模式（已进入过梦境=true）
+          - 当前境界 ≥ 2
+          - 游戏阶段 = 日常 或 自由模式（假好结局）
+        说明: |-
+          苦主视角在真相模式的日常阶段和假好结局的自由模式中显示。
+          【2026-01-18优化】无论苏文是否在家都输出，体现他虽不在场却在远方感受到妻子的变化。
+        生成要求:
+          - 以苏文第一人称视角描写内心独白
+          - 内容基于：当前剧情、赵霞的状态变化、怀疑度、服装妆容
+          - 体现苏文作为丈夫逐渐察觉异常的心理过程
+          - 苏文在家时：描写他亲眼所见的异常
+          - 苏文不在家时：描写他在外地时的隐隐不安、电话中的异样、心中的疑虑
+          - 长度：30-50字
+          - 语气：困惑、怀疑、痛苦、绝望（随境界递进）
+        境界参考:
+          境界2: 隐约察觉异常，但自我安慰
+          境界3: 开始怀疑，注意到妻子的变化
+          境界4: 痛苦挣扎，确信有问题但不敢面对
+          境界5: 绝望接受，感觉失去一切
+        输出格式: |
+          在回复末尾，UpdateVariable之前，添加：
+          <HusbandThought>
+          苏文的内心独白（30-50字）
+          </HusbandThought>
+        示例:
+          境界2_在家: |
+            <HusbandThought>
+            她最近笑得很多...但好像不是对着我笑。我是不是想太多了？
+            </HusbandThought>
+          境界2_不在家: |
+            <HusbandThought>
+            刚才打电话给她，她好像心不在焉...是在忙什么吗？
+            </HusbandThought>
+          境界3_在家: |
+            <HusbandThought>
+            她今天又换了新衣服，还化了妆...是要出门吗？还是...为了谁？
+            </HusbandThought>
+          境界3_不在家: |
+            <HusbandThought>
+            她说一切都好，但语气里有什么不对劲...我是不是该提前回去看看？
+            </HusbandThought>
+          境界4_在家: |
+            <HusbandThought>
+            我已经不敢直视她的眼睛了。那里面...好像只剩下他的影子。
+            </HusbandThought>
+          境界4_不在家: |
+            <HusbandThought>
+            她的微信回复越来越少，语音里藏着笑意...那笑不是给我的。
+            </HusbandThought>
+          境界5: |
+            <HusbandThought>
+            一切都结束了。她...已经不再是我的妻子了。
+            </HusbandThought>
