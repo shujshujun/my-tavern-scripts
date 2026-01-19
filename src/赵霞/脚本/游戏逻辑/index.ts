@@ -1091,9 +1091,7 @@ $(async () => {
       // 如果两个事件都推进时间，会导致时间跳两次（如 8→9→10）
       // ROLL (MESSAGE_SWIPED) 时也不推进时间，保持当前楼层的时间
       console.info(`[首条消息调试] 时间推进检查: eventType=${eventType}, targetMessageId=${targetMessageId}`);
-      console.info(
-        `[首条消息调试] 当前时间（推进前）: ${data.世界.时间}, 天数=${data.世界.当前天数}, 小时=${data.世界.当前小时}`,
-      );
+      console.info(`[首条消息调试] 当前时间（推进前）: ${data.世界.时间}, 天数=${data.世界.当前天数}, 小时=${data.世界.当前小时}`);
       if (eventType === 'MESSAGE_RECEIVED') {
         const timeBeforeAdvance = data.世界.时间; // 记录推进前的时间
         console.info(`[首条消息调试] 准备执行 TimeSystem.advance(), timeBeforeAdvance=${timeBeforeAdvance}`);
@@ -1121,9 +1119,7 @@ $(async () => {
       } else {
         console.info('[游戏逻辑] GENERATION_ENDED: 跳过时间推进，已在 MESSAGE_RECEIVED 中处理');
       }
-      console.info(
-        `[首条消息调试] 当前时间（推进后）: ${data.世界.时间}, 天数=${data.世界.当前天数}, 小时=${data.世界.当前小时}`,
-      );
+      console.info(`[首条消息调试] 当前时间（推进后）: ${data.世界.时间}, 天数=${data.世界.当前天数}, 小时=${data.世界.当前小时}`);
 
       // 1.5. 时间推进后检查场景5退出（20:00强制结束）
       // Bug #13 修复后的流程：
@@ -1512,9 +1508,7 @@ $(async () => {
       // 验证并写入
       const validatedData = Schema.parse(data);
       console.info(`[首条消息调试] 准备保存数据到楼层 ${targetMessageId}`);
-      console.info(
-        `[首条消息调试] 保存前时间: ${validatedData.世界.时间}, 天数=${validatedData.世界.当前天数}, 小时=${validatedData.世界.当前小时}`,
-      );
+      console.info(`[首条消息调试] 保存前时间: ${validatedData.世界.时间}, 天数=${validatedData.世界.当前天数}, 小时=${validatedData.世界.当前小时}`);
 
       // CRITICAL: 深拷贝 currentVars，避免修改引用影响其他楼层
       const newVars = JSON.parse(JSON.stringify(currentVars));
