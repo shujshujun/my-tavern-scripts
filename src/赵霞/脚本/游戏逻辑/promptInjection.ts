@@ -111,6 +111,57 @@ import {
 } from './afterStorySystem';
 
 // ============================================
+// Bug #13 修复：模型类型检测
+// 不同模型（Claude vs Gemini）对提示词位置的注意力不同
+// Claude：头部和尾部注意力均匀
+// Gemini：尾部注意力更高，头部容易被忽略
+// ============================================
+
+/** 模型类型 */
+type ModelType = 'claude' | 'gemini' | 'openai' | 'unknown';
+
+/** 当前检测到的模型类型（缓存） */
+let cachedModelType: ModelType = 'unknown';
+
+/**
+ * 检测当前使用的模型类型
+ * 通过酒馆的 mainApi 属性判断
+ */
+function detectModelType(): ModelType {
+  try {
+    // 获取酒馆的 mainApi（API 类型标识）
+    const mainApi = SillyTavern.mainApi;
+    if (typeof mainApi === 'string') {
+      const apiLower = mainApi.toLowerCase();
+      // 根据 API 类型判断模型
+      if (apiLower.includes('claude') || apiLower.includes('anthropic')) {
+        cachedModelType = 'claude';
+      } else if (apiLower.includes('google') || apiLower.includes('gemini') || apiLower.includes('makersuite')) {
+        cachedModelType = 'gemini';
+      } else if (apiLower.includes('openai') || apiLower.includes('gpt')) {
+        cachedModelType = 'openai';
+      } else {
+        cachedModelType = 'unknown';
+      }
+    }
+    return cachedModelType;
+  } catch (err) {
+    console.warn('[Prompt注入] 模型检测失败:', err);
+    return 'unknown';
+  }
+}
+
+/**
+ * 判断当前模型是否需要将关键信息放在尾部
+ * Gemini 系列模型对尾部内容注意力更高
+ */
+function shouldInjectAtTail(): boolean {
+  const modelType = detectModelType();
+  // Gemini 需要在尾部注入，Claude/OpenAI/其他在头部注入
+  return modelType === 'gemini';
+}
+
+// ============================================
 // Bug #39 修复：结局描写指南常量定义
 // 由于变量列表设置了"不可激活其他条目"，世界书中的结局条目无法通过正则激活
 // 因此需要通过脚本直接注入这些描写指南
@@ -5141,18 +5192,30 @@ export function initPromptInjection(): void {
           console.info('[Bug9调试] 不在梦境中且不满足进入梦境条件，跳过修复');
         }
 
-        // 插入系统提示（在第一条 user 消息之前）
+        // Bug #13 修复：根据模型类型选择注入位置
+        // Claude/OpenAI：头部注入（第一条 user 消息之前）
+        // Gemini：尾部注入（最后一条消息之后）
         if (systemPrompt) {
-          let firstUserIndex = -1;
-          for (let i = 0; i < chat.length; i++) {
-            if (chat[i].role === 'user') {
-              firstUserIndex = i;
-              break;
+          const injectAtTail = shouldInjectAtTail();
+          const modelType = detectModelType();
+
+          if (injectAtTail) {
+            // Gemini 模式：插入到尾部（高注意力区域）
+            chat.push({ role: 'system', content: systemPrompt });
+            console.info(`[Prompt注入] Gemini模式：系统提示插入到尾部（位置：${chat.length - 1}）`);
+          } else {
+            // Claude/OpenAI/其他模式：插入到第一条 user 消息之前（头部）
+            let firstUserIndex = -1;
+            for (let i = 0; i < chat.length; i++) {
+              if (chat[i].role === 'user') {
+                firstUserIndex = i;
+                break;
+              }
             }
+            const insertIndex = firstUserIndex === -1 ? chat.length : firstUserIndex;
+            chat.splice(insertIndex, 0, { role: 'system', content: systemPrompt });
+            console.info(`[Prompt注入] ${modelType}模式：系统提示插入到头部（位置：${insertIndex}）`);
           }
-          const insertIndex = firstUserIndex === -1 ? chat.length : firstUserIndex;
-          chat.splice(insertIndex, 0, { role: 'system', content: systemPrompt });
-          console.info(`[Prompt注入] 已插入系统提示（位置：${insertIndex}）`);
         }
 
         // 添加 prefill
