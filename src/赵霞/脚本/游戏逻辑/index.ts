@@ -41,7 +41,7 @@ import {
 } from './dreamKeywordDetection';
 // 境界打断系统已移至 promptInjection.ts 中处理（系统A：事件触发系统）
 import { parseHusbandThought, shouldGenerateHusbandThought, getCurrentRouteType } from './dualTrackSystem';
-import { initPromptInjection, setRollOperationFlag } from './promptInjection';
+import { initPromptInjection, setRollOperationFlag, resetLastProcessedMessageId } from './promptInjection';
 import { isTrueEndingActive, getTrueEndingState, updateTrueEndingState, processTurnEnd } from './trueEndingSystem';
 import {
   isPerfectEndingActive,
@@ -622,6 +622,31 @@ $(async () => {
               console.warn(`[MVU监听] 梦境阶段：不允许降低${part}进度 ${oldValue} → ${newValue}，已回滚`);
             }
           }
+
+          // Bug #15 修复（六次修正）：保护场景5核心字段，防止AI篡改
+          // 原因：AI在回复时可能会修改场景5的步骤/完成度等字段，
+          //       导致脚本控制的步骤推进逻辑失效
+          // 解决：在VARIABLE_UPDATE_ENDED中回滚AI对这些字段的任何修改
+          if (isInScene5) {
+            const oldScene5 = oldData.梦境数据?.场景5;
+            const newScene5 = newData.梦境数据?.场景5;
+
+            // 保护的字段列表（这些只能由脚本修改）
+            const protectedFields = ['当前步骤', '完成度', '步骤进度记录', '已完成步骤', '进入次数'] as const;
+
+            for (const field of protectedFields) {
+              const oldValue = oldScene5?.[field];
+              const newValue = newScene5?.[field];
+
+              // 如果值发生了变化，回滚到旧值
+              if (JSON.stringify(oldValue) !== JSON.stringify(newValue)) {
+                _.set(new_variables, `stat_data.梦境数据.场景5.${field}`, oldValue);
+                console.warn(
+                  `[MVU监听] 场景5字段保护：回滚AI对"${field}"的修改 ${JSON.stringify(newValue)} → ${JSON.stringify(oldValue)}`,
+                );
+              }
+            }
+          }
         }
 
         // BUG-011 修复：验证AI写入的丈夫心理活动，防止思维链泄露
@@ -815,6 +840,8 @@ $(async () => {
             // Bug #11 修复：设置 ROLL 标志，防止 promptInjection 再次推进步骤
             // 这个标志会在 CHAT_COMPLETION_PROMPT_READY 处理完成后自动重置
             setRollOperationFlag(true);
+            // Bug #15 修复（四次修正）：重置上次处理的楼层ID记录，允许 ROLL 后重新处理
+            resetLastProcessedMessageId();
 
             if (currentStep > 0 && stepProgressRecord.length > 0) {
               // 回滚一步：减少当前步骤，移除最后一次的进度增量

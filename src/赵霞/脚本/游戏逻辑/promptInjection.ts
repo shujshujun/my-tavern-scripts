@@ -3037,6 +3037,33 @@ function resetRollOperationFlag(): void {
   isRollOperation = false;
 }
 
+// Bug #15 修复（四次修正）：检测重试操作，避免重复推进步骤
+// 原因：使用带思维链的模型时，第一次请求可能失败，酒馆会自动重试
+//       第一次 PROMPT_READY 时已经初始化了场景5（当前步骤=0），
+//       第二次 PROMPT_READY 时检测到已在场景5中，会错误地推进步骤（0→1）
+// 方案：记录上次处理的楼层ID，如果是同一楼层的重复请求则跳过步骤推进
+let lastProcessedMessageIdForScene5Step: number | null = null;
+
+function checkIsRetryOperation(currentMessageId: number): boolean {
+  if (lastProcessedMessageIdForScene5Step === currentMessageId) {
+    console.info(
+      `[Prompt注入] 检测到重试操作：楼层 ${currentMessageId} 已处理过，跳过步骤推进`,
+    );
+    return true;
+  }
+  return false;
+}
+
+function recordProcessedMessageId(messageId: number): void {
+  lastProcessedMessageIdForScene5Step = messageId;
+}
+
+// 当 MESSAGE_SWIPED 触发时重置记录，允许 ROLL 后重新处理
+export function resetLastProcessedMessageId(): void {
+  lastProcessedMessageIdForScene5Step = null;
+  console.info(`[Prompt注入] 已重置上次处理的楼层ID记录`);
+}
+
 /**
  * 检测纯爱模式错误路线条件
  * 纯爱模式下，如果任何部位开发达到100%，触发错误路线（重置到50%）
@@ -3759,6 +3786,13 @@ export function generateFullInjection(
   }
 
   // 2.5 检测场景5中途步骤推进（已在场景5中，且未完成12步）
+  // 诊断日志：输出当前数据中的步骤值和关键状态
+  const debugScene5Data = data.梦境数据.场景5 as { 当前步骤?: number; 已进入?: boolean; 进入次数?: number } | undefined;
+  const debugMessageId = getLastMessageId();
+  console.info(
+    `[Prompt注入诊断] 楼层=${debugMessageId}, isInScene5=${isInScene5(data)}, shouldEnterScene5=${shouldEnterScene5}, ` +
+    `已进入=${debugScene5Data?.已进入}, 进入次数=${debugScene5Data?.进入次数}, data中当前步骤=${debugScene5Data?.当前步骤}`,
+  );
   if (!shouldExitScene5 && !shouldEnterScene5 && isInScene5(data)) {
     // 2.5.1 场景5违规行为检测（性行为/打断婚礼）
     // 在步骤推进前检测，如果检测到违规需要标记混乱结局或发出警告
@@ -4785,9 +4819,20 @@ export function initPromptInjection(): void {
                 // 锁定进入场景5时的记忆连贯性等级（基于已完成的场景1-2-3）
                 lockScene5EntryCoherence(currentData);
                 console.info('[Prompt注入] 场景5首次进入，初始化12步剧情系统，记忆连贯性已锁定');
+                console.info(
+                  `[Prompt注入] 场景5入口初始化完成：当前步骤=${newScene5Data.当前步骤}, 完成度=${newScene5Data.完成度}`,
+                );
               }
 
-              console.info(`[Prompt注入] 进入场景5，第${newEntryCount}次`);
+              const entryMessageId = getLastMessageId();
+              console.info(`[Prompt注入] 进入场景5，第${newEntryCount}次，当前步骤=${newScene5Data.当前步骤}，楼层=${entryMessageId}`);
+
+              // Bug #15 修复（五次修正）：入口时也记录楼层ID
+              // 原因：使用带思维链的模型时，第一次 PROMPT_READY 触发入口初始化（步骤=0），
+              //       但如果模型重试，第二次 PROMPT_READY 时会检测到已在场景5中，
+              //       并触发步骤推进（0→1）。
+              // 解决：在入口初始化完成后也记录楼层ID，这样重试时步骤推进会被跳过
+              recordProcessedMessageId(entryMessageId);
             }
 
             if (shouldExitScene5) {
@@ -4911,13 +4956,15 @@ export function initPromptInjection(): void {
         //       而 MESSAGE_SWIPED 事件可能已经在之前触发并回滚了步骤。
         //       只有在这里重新读取数据，才能正确检测到 ROLL 后的状态。
         // 新方案：由 index.ts 的 MESSAGE_SWIPED 事件设置 rollOperationFlag 标志，在此处检查
+        // 获取当前最新楼层ID（在检查之前获取，用于重试检测）
+        const currentMessageId = getLastMessageId();
+        console.info(
+          `[Prompt注入] 场景5步骤推进检查: shouldProgressScene5Step=${shouldProgressScene5Step}, shouldEnterScene5=${shouldEnterScene5}, 楼层=${currentMessageId}`,
+        );
         if (shouldProgressScene5Step) {
           try {
             const currentVars = Mvu.getMvuData({ type: 'message', message_id: -1 });
             const currentData = Schema.parse(_.get(currentVars, 'stat_data'));
-
-            // 获取当前最新楼层ID
-            const currentMessageId = getLastMessageId();
 
             // Bug #15 修复（三次修正）：使用标志检测 ROLL 操作（由 index.ts MESSAGE_SWIPED 设置）
             // 这是 ROLL 检测的唯一位置，确保使用最新读取的数据进行判断
@@ -4925,6 +4972,11 @@ export function initPromptInjection(): void {
               // 是 ROLL 操作，跳过步骤推进
               // index.ts 已经在 MESSAGE_SWIPED 中回滚了步骤，这里只需跳过
               console.info(`[Prompt注入] 检测到 ROLL 标志，跳过场景5步骤推进（楼层: ${currentMessageId}）`);
+            } else if (checkIsRetryOperation(currentMessageId)) {
+              // Bug #15 修复（四次修正）：是重试操作，跳过步骤推进
+              // 原因：使用带思维链的模型时，第一次请求失败后酒馆会重试
+              //       第一次已经处理过该楼层（可能初始化了场景5），重试时不应再次推进
+              console.info(`[Prompt注入] 检测到重试操作，跳过场景5步骤推进（楼层: ${currentMessageId}）`);
             } else {
               // 不是 ROLL 操作，正常推进步骤
 
@@ -4939,7 +4991,15 @@ export function initPromptInjection(): void {
                 步骤进度记录?: number[];
                 已完成步骤?: boolean;
                 上次推进记录?: { 楼层ID: number; swipe_id: number };
+                已进入?: boolean;
+                进入次数?: number;
               };
+
+              // 诊断：输出当前最新数据中的步骤和入口状态
+              console.info(
+                `[Prompt注入诊断-步骤推进前] 楼层=${currentMessageId}, 最新数据: ` +
+                `已进入=${scene5Data.已进入}, 进入次数=${scene5Data.进入次数}, 当前步骤=${scene5Data.当前步骤}`,
+              );
 
               // 获取当前步骤（0-based，即将变成的步骤是 currentStep + 1）
               const currentStep = scene5Data.当前步骤 ?? 0;
@@ -4975,6 +5035,9 @@ export function initPromptInjection(): void {
 
               _.set(currentVars, 'stat_data', currentData);
               Mvu.replaceMvuData(currentVars, { type: 'message', message_id: -1 });
+
+              // Bug #15 修复（四次修正）：记录已处理的楼层ID，防止重试时重复推进
+              recordProcessedMessageId(currentMessageId);
 
               console.info(
                 `[Prompt注入] 场景5步骤推进: ${currentStep} → ${nextStep}，` +
