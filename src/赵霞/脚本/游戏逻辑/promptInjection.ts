@@ -3046,9 +3046,7 @@ let lastProcessedMessageIdForScene5Step: number | null = null;
 
 function checkIsRetryOperation(currentMessageId: number): boolean {
   if (lastProcessedMessageIdForScene5Step === currentMessageId) {
-    console.info(
-      `[Prompt注入] 检测到重试操作：楼层 ${currentMessageId} 已处理过，跳过步骤推进`,
-    );
+    console.info(`[Prompt注入] 检测到重试操作：楼层 ${currentMessageId} 已处理过，跳过步骤推进`);
     return true;
   }
   return false;
@@ -3791,7 +3789,7 @@ export function generateFullInjection(
   const debugMessageId = getLastMessageId();
   console.info(
     `[Prompt注入诊断] 楼层=${debugMessageId}, isInScene5=${isInScene5(data)}, shouldEnterScene5=${shouldEnterScene5}, ` +
-    `已进入=${debugScene5Data?.已进入}, 进入次数=${debugScene5Data?.进入次数}, data中当前步骤=${debugScene5Data?.当前步骤}`,
+      `已进入=${debugScene5Data?.已进入}, 进入次数=${debugScene5Data?.进入次数}, data中当前步骤=${debugScene5Data?.当前步骤}`,
   );
   if (!shouldExitScene5 && !shouldEnterScene5 && isInScene5(data)) {
     // 2.5.1 场景5违规行为检测（性行为/打断婚礼）
@@ -4825,7 +4823,9 @@ export function initPromptInjection(): void {
               }
 
               const entryMessageId = getLastMessageId();
-              console.info(`[Prompt注入] 进入场景5，第${newEntryCount}次，当前步骤=${newScene5Data.当前步骤}，楼层=${entryMessageId}`);
+              console.info(
+                `[Prompt注入] 进入场景5，第${newEntryCount}次，当前步骤=${newScene5Data.当前步骤}，楼层=${entryMessageId}`,
+              );
 
               // Bug #15 修复（五次修正）：入口时也记录楼层ID
               // 原因：使用带思维链的模型时，第一次 PROMPT_READY 触发入口初始化（步骤=0），
@@ -4998,7 +4998,7 @@ export function initPromptInjection(): void {
               // 诊断：输出当前最新数据中的步骤和入口状态
               console.info(
                 `[Prompt注入诊断-步骤推进前] 楼层=${currentMessageId}, 最新数据: ` +
-                `已进入=${scene5Data.已进入}, 进入次数=${scene5Data.进入次数}, 当前步骤=${scene5Data.当前步骤}`,
+                  `已进入=${scene5Data.已进入}, 进入次数=${scene5Data.进入次数}, 当前步骤=${scene5Data.当前步骤}`,
               );
 
               // 获取当前步骤（0-based，即将变成的步骤是 currentStep + 1）
