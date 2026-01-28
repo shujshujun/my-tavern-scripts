@@ -555,7 +555,11 @@ function parse_configuration(entry: Entry): (_env: any, argv: any) => webpack.Co
       };
       return callback(
         null,
+<<<<<<< HEAD
         'module-import ' + (cdn[request as keyof typeof cdn] ?? `https://fastly.jsdelivr.net/npm/${request}/+esm`),
+=======
+        'module-import ' + (cdn[request as keyof typeof cdn] ?? `https://testingcf.jsdelivr.net/npm/${request}/+esm`),
+>>>>>>> d1ab9562bec19f593c4f8c6eab9057a58f1ef66f
       );
     },
   });
