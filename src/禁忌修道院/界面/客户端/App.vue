@@ -165,6 +165,9 @@
           </div>
           <!-- 顶视图(手绘SVG线稿占位;找到美术图后整块替换) -->
           <svg v-if="!显示寝居" class="map-svg" viewBox="0 0 420 300">
+            <defs>
+              <clipPath id="occ-clip"><circle r="10" /></clipPath>
+            </defs>
             <!-- 回廊连线(装饰) -->
             <g class="map-deco">
               <line x1="124" y1="51" x2="138" y2="51" />
@@ -188,20 +191,15 @@
             <g v-for="房 in 平面图" :key="房.id" class="map-room" @click="点图房(房.id)">
               <rect v-for="(块, i) in 房.块" :key="i" :x="块[0]" :y="块[1]" :width="块[2]" :height="块[3]" />
               <text :x="房.标[0]" :y="房.标[1]" class="map-label">{{ 房.名 }}</text>
-              <g v-for="(名, i) in 图房在场表[房.id] ?? []" :key="名">
-                <circle
-                  :cx="房.点[0] + i * 17 - ((图房在场表[房.id]?.length ?? 1) - 1) * 8.5"
-                  :cy="房.点[1]"
-                  r="7.5"
-                  class="map-occ"
-                />
-                <text
-                  :x="房.点[0] + i * 17 - ((图房在场表[房.id]?.length ?? 1) - 1) * 8.5"
-                  :y="房.点[1] + 3.2"
-                  class="map-occ-t"
-                >
-                  {{ 名[0] }}
-                </text>
+              <!-- 在场者:版画头像+全名(名字置于头像下方) -->
+              <g
+                v-for="(占, i) in 图房在场表[房.id] ?? []"
+                :key="占.职位"
+                :transform="`translate(${房.点[0] + i * 27 - ((图房在场表[房.id]?.length ?? 1) - 1) * 13.5} ${房.点[1]})`"
+              >
+                <circle r="10.5" class="map-occ" />
+                <image :href="地图头像[占.职位]" x="-10" y="-10" width="20" height="20" clip-path="url(#occ-clip)" />
+                <text y="17.5" class="map-occ-t">{{ 占.名 }}</text>
               </g>
             </g>
           </svg>
@@ -574,12 +572,22 @@ const 平面图: 图房[] = [
 ];
 
 /** 图上某房的在场者显示名(寝居=各寝室里的人合并) */
-const 图房在场表 = computed<Record<string, string[]>>(() => {
-  const 表: Record<string, string[]> = {};
-  for (const 房 of 房间列表.value) 表[房.id] = 房.在场名;
-  表['寝居'] = 寝居列表.value.filter(室 => 室.在房).map(室 => 修女表[室.职位].显示名);
+type 图房占位 = { 职位: 修女职位; 名: string };
+
+const 图房在场表 = computed<Record<string, 图房占位[]>>(() => {
+  const 表: Record<string, 图房占位[]> = {};
+  for (const 房 of 房间列表.value) 表[房.id] = 房.在场.map(职位 => ({ 职位, 名: 修女表[职位].显示名 }));
+  表['寝居'] = 寝居列表.value.filter(室 => 室.在房).map(室 => ({ 职位: 室.职位, 名: 修女表[室.职位].显示名 }));
   return 表;
 });
+
+// 地图用头像:SVG <image> 里没有 currentColor 的继承上下文,烤死成金色(与 --gold 同值)
+const 地图头像 = Object.fromEntries(
+  Object.entries(修女头像).map(([职位, svg]) => [
+    职位,
+    'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg.replace(/currentColor/g, '#c9a94e')),
+  ]),
+) as Record<修女职位, string>;
 
 function 点图房(id: string) {
   if (id === '寝居') {
@@ -674,7 +682,7 @@ const 可登场 = computed(() =>
 const 房间列表 = computed(() =>
   房间表.map(房 => ({
     ...房,
-    在场名: 房内修女(房.id, 末楼号.value, 可登场.value).map(职位 => 修女表[职位].显示名),
+    在场: 房内修女(房.id, 末楼号.value, 可登场.value),
   })),
 );
 
@@ -883,17 +891,57 @@ const 当前幕 = computed(() => {
 });
 
 /**
- * 玩家预设兼容:先按玩家自己酒馆里的正则(全局/预设/角色卡,显示向)跑一遍——
+ * 玩家预设兼容:按玩家自己酒馆里的正则(仅全局+预设,显示向)跑一遍——
  * 各家破限预设的输出包装标记(思维链变体/状态块/注释)由它们自带的清理正则负责,
- * 本卡的 清洗() 只兜底通用残渣。深度按楼层距离算,尊重正则自身的深度范围设置。
+ * 本卡的 清洗() 只兜底通用残渣。深度按楼层距离算,尊重正则自身的深度范围。
+ *
+ * 刻意不用 formatAsTavernRegexedString:它会连本卡的角色卡正则一起应用,
+ * 而"客户端界面(吞正文)"/"[不显示]玩家楼层"是给酒馆聊天区用的——在书页里跑
+ * 会把 0 楼替换成加载块代码、把玩家楼吞成空白(xdy0.12 启程上山变代码的事故)。
  */
-function 过酒馆正则(文本: string, 来源: 'ai_output' | 'user_input', 深度?: number): string {
+type 玩家正则项 = { re: RegExp; 替换: string; 用户: boolean; ai: boolean; min: number | null; max: number | null };
+let 玩家正则表: 玩家正则项[] = [];
+
+function 刷新玩家正则() {
   try {
-    return formatAsTavernRegexedString(文本, 来源, 'display', 深度 === undefined ? undefined : { depth: 深度 });
+    const 原 = [...getTavernRegexes({ type: 'global' }), ...getTavernRegexes({ type: 'preset', name: 'in_use' })];
+    玩家正则表 = 原
+      .filter(r => r.enabled && r.destination?.display && (r.source?.ai_output || r.source?.user_input))
+      .map(r => {
+        try {
+          const m = r.find_regex.match(/^\/([\s\S]+)\/([a-z]*)$/);
+          const re = m ? new RegExp(m[1], m[2]) : new RegExp(_.escapeRegExp(r.find_regex), 'g');
+          return {
+            re,
+            替换: r.replace_string ?? '',
+            用户: !!r.source.user_input,
+            ai: !!r.source.ai_output,
+            min: r.min_depth,
+            max: r.max_depth,
+          };
+        } catch {
+          return null; // 单条编译失败(酒馆方言语法等)跳过,不拖垮整表
+        }
+      })
+      .filter(Boolean) as 玩家正则项[];
   } catch (e) {
-    console.warn('[禁忌修道院客户端] 应用酒馆正则失败(按原文显示):', e);
-    return 文本;
+    玩家正则表 = [];
+    console.warn('[禁忌修道院客户端] 读取玩家正则失败(退回本卡清洗):', e);
   }
+}
+
+function 过酒馆正则(文本: string, 来源: 'ai_output' | 'user_input', 深度: number): string {
+  for (const 项 of 玩家正则表) {
+    if (来源 === 'ai_output' ? !项.ai : !项.用户) continue;
+    if (项.min !== null && 深度 < 项.min) continue;
+    if (项.max !== null && 深度 > 项.max) continue;
+    try {
+      文本 = 文本.replace(项.re, 项.替换.replace(/\{\{match\}\}/gi, '$&'));
+    } catch {
+      /* 单条应用失败跳过 */
+    }
+  }
+  return 文本;
 }
 
 function 清洗(原文: string): string {
@@ -924,6 +972,7 @@ async function 滚到底() {
 
 async function 取卷轴() {
   try {
+    刷新玩家正则(); // 玩家可能随时换预设/开关正则,每次重编译(几十条量级,开销可忽略)
     const 末楼 = getLastMessageId();
     末楼号.value = 末楼; // 位置推算种子:每回合+2 → 修女们换了地方
     const 消息组 = (await getChatMessages(`0-${末楼}`)) ?? [];
@@ -2049,7 +2098,7 @@ onMounted(() => {
 .cloister {
   position: relative;
   box-sizing: border-box;
-  width: min(94%, 480px);
+  width: min(96%, 640px);
   max-height: 88%;
   overflow-y: auto;
   padding: 34px 14px 14px;
@@ -2072,11 +2121,11 @@ onMounted(() => {
   margin-bottom: 6px;
 }
 
-/* 顶视图 SVG(手绘线稿占位) */
+/* 顶视图 SVG(手绘线稿占位;随面板铺满,高度上限交给面板的 max-height) */
 .map-svg {
   display: block;
   width: 100%;
-  max-height: 260px;
+  max-height: 64vh;
   margin: 0 auto;
 }
 
@@ -2134,7 +2183,7 @@ onMounted(() => {
 }
 
 .map-occ {
-  fill: rgba(201, 169, 78, 0.16);
+  fill: #14100a;
   stroke: var(--gold);
   stroke-width: 0.8;
   filter: drop-shadow(0 0 4px rgba(201, 169, 78, 0.5));
@@ -2142,8 +2191,12 @@ onMounted(() => {
 
 .map-occ-t {
   fill: var(--gold-bright);
-  font-size: 8.5px;
+  font-size: 7px;
+  letter-spacing: 0.05em;
   text-anchor: middle;
+  paint-order: stroke;
+  stroke: rgba(5, 4, 2, 0.85); /* 名字压在线稿上时的描边保底 */
+  stroke-width: 2px;
   pointer-events: none;
 }
 
