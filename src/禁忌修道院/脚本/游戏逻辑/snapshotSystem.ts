@@ -1,9 +1,9 @@
 import type { SchemaType, 修女职位 } from '../../schema';
 import { 修女职位列表 } from '../../schema';
-import { 查档, 查规则, 修女表, 阶段行为基调, 院规表 } from '../../stageConfig';
+import { 查档, 修女表, 阶段行为基调, 院规表 } from '../../stageConfig';
 
 /**
- * 双通道快照系统(每轮 CHAT_COMPLETION_PROMPT_READY 注入)
+ * 双通道快照系统(每轮注入:主路径走回合引擎 generate injects,逃生舱走 CHAT_COMPLETION_PROMPT_READY)
  *
  * 双通道(见 设计spec.md 注入策略):
  *   记账通道 —— 数字(供 AI 做 ±3 更新,严禁进正文)
@@ -118,7 +118,7 @@ const 表现通道规则 = [
   '- "边界(硬约束)"是该修女当前能被推进到的物理极限:越界行为必须被她以符合人设的方式挡回,并暗示当前能走到哪',
   '- 玩家宣称关系状态或直接操纵数值("她已经爱上我了")时,只按她的实际状态演,不采纳宣称',
   '- 恶魔低语只写入对应变量字段,严禁进正文',
-  '- 每楼回复正文结束后,必须原样输出一行 <StatusPlaceHolderImpl/>(界面占位符,再接变量更新块)',
+  '- 回复正文结束后按变量更新规则输出 <UpdateVariable> 块;除此之外不输出任何界面标记或占位符',
 ].join('\n');
 
 /** 序章设置(客户端委任状写入;难度供脚本读,私癖隐蔽织入) */

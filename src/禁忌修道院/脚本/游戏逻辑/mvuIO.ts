@@ -21,7 +21,7 @@ export function 脚本写入(raw: object, data?: SchemaType) {
   if (data) _.set(raw, 'stat_data', data);
   脚本写入中 = true;
   try {
-    Mvu.replaceMvuData(raw, { type: 'message', message_id: -1 });
+    Mvu.replaceMvuData(raw as Mvu.MvuData, { type: 'message', message_id: -1 });
   } finally {
     脚本写入中 = false;
   }

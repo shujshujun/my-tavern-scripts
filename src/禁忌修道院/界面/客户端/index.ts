@@ -23,7 +23,9 @@ window.addEventListener('unhandledrejection', ev => 显示致命错误(ev.reason
 $(async () => {
   try {
     await waitGlobalInitialized('Mvu');
-    await waitUntil(() => _.has(getVariables({ type: 'message' }), 'stat_data'), { timeout: 15000 }).catch(() => {
+    await waitUntil(() => _.has(getVariables({ type: 'message', message_id: -1 }), 'stat_data'), {
+      timeout: 15000,
+    }).catch(() => {
       console.warn('[禁忌修道院客户端] 等待 stat_data 超时,以默认值挂载');
     });
     const app = createApp(App);

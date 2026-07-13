@@ -3,21 +3,22 @@
     <!-- 错误护栏:任何运行时异常显示在此,不再整屏空白 -->
     <div v-if="错误信息" class="err">⚠ 界面异常:{{ 错误信息 }}</div>
 
-    <!-- ═══════════ 剧情卷轴(全部历史吸进书页,可滚动;酒馆侧只显示最新楼) ═══════════ -->
-    <section v-if="是最新楼 && 卷轴.length" ref="卷轴容器" class="story">
+    <!-- ═══════════ 剧情卷轴(固定0楼:全部历史+流式正文都写进书页;楼层只是数据库) ═══════════ -->
+    <section v-if="卷轴.length || 发送中" ref="卷轴容器" class="story">
       <div v-for="(条, i) in 卷轴" :key="i" class="story-entry">
         <p v-if="条.谁 === '玩家'" class="story-player">✠ {{ 条.文本[0] }}</p>
         <template v-else>
           <p v-for="(段, j) in 条.文本" :key="j">{{ 段 }}</p>
         </template>
       </div>
+      <div v-if="发送中" class="story-entry">
+        <p v-for="(段, j) in 流式段" :key="'流' + j">{{ 段 }}</p>
+        <p class="scribing">✒ 修道院的记事员正在书写……</p>
+      </div>
     </section>
 
-    <!-- ═══════════ 旧楼渲染空(被主页面CSS隐藏,双保险) ═══════════ -->
-    <template v-if="!是最新楼"></template>
-
     <!-- ═══════════ 数据未就绪 ═══════════ -->
-    <template v-else-if="!就绪">
+    <template v-if="!就绪">
       <div class="agenda-hint">……羊皮纸尚在展开(等待存档数据)……</div>
     </template>
 
@@ -140,8 +141,8 @@
       </footer>
     </template>
 
-    <!-- ═══════════ 游戏内输入(最新楼,会议中隐藏;玩家不碰酒馆输入框) ═══════════ -->
-    <div v-if="是最新楼 && 就绪 && data.会议.状态 !== '会议中'" class="quill">
+    <!-- ═══════════ 游戏内输入(会议中隐藏;玩家不碰酒馆输入框) ═══════════ -->
+    <div v-if="就绪 && data.会议.状态 !== '会议中'" class="quill">
       <textarea
         v-model="输入文本"
         rows="2"
@@ -168,29 +169,22 @@ const data = computed(() => store.data);
 /** 数据就绪守卫:store 兜底为 {} 时不裸渲染(defineMvuDataStore 变量缺失的回退路径) */
 const 就绪 = computed(() => Boolean(data.value?.修女 && data.value?.会议 && data.value?.院规));
 
-/** 面板与输入只在最新楼激活;旧楼只留书页(可回看,省性能) */
-const 是最新楼 = getCurrentMessageId() === getLastMessageId();
-
-// ── 游戏内输入(玩家不碰酒馆输入框;玩家楼层由正则隐藏) ──
+// ── 游戏内输入(固定0楼:行动发给脚本回合引擎,不建可见楼层,不碰酒馆输入框) ──
 
 const 输入文本 = ref('');
 const 发送中 = ref(false);
+const 流式段 = ref<string[]>([]);
 
-async function 发送() {
+function 发送() {
   const 文本 = 输入文本.value.trim();
   if (!文本 || 发送中.value) return;
   发送中.value = true;
-  try {
-    // 管道符会截断 slash 命令,替换为全角
-    await triggerSlash(`/send ${文本.replace(/\|/g, '｜')}`);
-    输入文本.value = '';
-    await triggerSlash('/trigger');
-  } catch (e) {
-    console.error('[禁忌修道院客户端] 发送失败:', e);
-    错误信息.value = '发送失败:' + String(e);
-  } finally {
-    发送中.value = false;
-  }
+  流式段.value = [];
+  // 乐观渲染:玩家行动先上卷轴,回合完成后由楼层数据重建
+  卷轴.value.push({ 谁: '玩家', 文本: [文本.replace(/\n+/g, ' ')] });
+  输入文本.value = '';
+  void 滚到底();
+  eventEmit('禁忌修道院:玩家行动', { 文本 });
 }
 
 /** 错误护栏:渲染异常不再整屏空白,显示横幅供定位 */
@@ -226,8 +220,18 @@ function 清洗(原文: string): string {
     .replace(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/g, '')
     .replace(/<StatusPlaceHolderImpl\/>/g, '')
     .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+    .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '')
+    // 流式过程中的未闭合块也要吞掉,否则半截思维链/变量块会闪现在书页上
+    .replace(/<thinking>[\s\S]*$/i, '')
+    .replace(/<reasoning>[\s\S]*$/i, '')
+    .replace(/<UpdateVariable>[\s\S]*$/, '')
     .replace(/【主页】/g, '')
     .trim();
+}
+
+async function 滚到底() {
+  await nextTick();
+  if (卷轴容器.value) 卷轴容器.value.scrollTop = 卷轴容器.value.scrollHeight;
 }
 
 async function 取卷轴() {
@@ -251,8 +255,7 @@ async function 取卷轴() {
       }
     }
     卷轴.value = 条目;
-    await nextTick();
-    if (卷轴容器.value) 卷轴容器.value.scrollTop = 卷轴容器.value.scrollHeight;
+    await 滚到底();
   } catch (e) {
     console.error('[禁忌修道院客户端] 取卷轴失败:', e);
   }
@@ -334,11 +337,34 @@ function 晋阶(职位: 修女职位) {
 }
 
 onMounted(() => {
-  if (是最新楼) void 取卷轴();
+  void 取卷轴();
   // 结果已出(演出楼/回看):从 chat 变量恢复
   会议结果.value = (_.get(getVariables({ type: 'chat' }), '_会议.结果') ?? null) as 会议结果类型 | null;
   eventOn('禁忌修道院:投票结果', (结果: 会议结果类型) => {
     会议结果.value = 结果;
+  });
+
+  // ── 回合引擎事件(固定0楼:脚本 generate 生成,这里只管演) ──
+  eventOn('禁忌修道院:流式', (文本: string) => {
+    const 净文 = 清洗(文本);
+    流式段.value = 净文 ? 净文.split(/\n+/).map(s => s.trim()).filter(Boolean) : [];
+    void 滚到底();
+  });
+  eventOn('禁忌修道院:回合完成', () => {
+    发送中.value = false;
+    流式段.value = [];
+    void 取卷轴();
+    try {
+      (store as unknown as { pull?: () => void }).pull?.();
+    } catch {
+      /* store 未带 pull 时靠 500ms 轮询兜底 */
+    }
+  });
+  eventOn('禁忌修道院:回合失败', (原因: string) => {
+    发送中.value = false;
+    流式段.value = [];
+    错误信息.value = '回合失败:' + 原因;
+    void 取卷轴(); // 乐观上卷轴的玩家行动按真实楼层重建(失败=行动未落库)
   });
 });
 </script>
@@ -516,6 +542,20 @@ onMounted(() => {
 
 .story-entry:last-child p:last-child {
   margin-bottom: 0;
+}
+
+.scribing {
+  text-indent: 0 !important;
+  font-size: 0.82em;
+  font-style: italic;
+  color: var(--ink-faded);
+  animation: scribe-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes scribe-pulse {
+  50% {
+    opacity: 0.35;
+  }
 }
 
 .story-player {

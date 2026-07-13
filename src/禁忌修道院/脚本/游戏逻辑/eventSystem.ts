@@ -1,6 +1,6 @@
 import type { 修女职位 } from '../../schema';
 import { 修女职位列表 } from '../../schema';
-import { 查档, 查规则, 晋阶堕落门槛, 修女表, 阶段标题列表, 专线表 } from '../../stageConfig';
+import { 晋阶堕落门槛, 修女表, 阶段标题列表, 专线表 } from '../../stageConfig';
 import { 读取, 脚本写入 } from './mvuIO';
 
 /**
