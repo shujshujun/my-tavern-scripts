@@ -232,15 +232,19 @@
           <div class="scroll-body">
             <div class="rule-list">
               <div v-for="项 in 道具表" :key="项.id" class="rule-card ware">
-                <div class="rule-head">
-                  <span class="agenda-weight" :data-w="项.类 === '会议' ? '重' : '轻'">{{ 项.类 }}</span>
-                  <b>{{ 项.名称 }}</b>
-                  <span class="ware-price">✟ {{ 项.价 }}</span>
+                <!-- eslint-disable-next-line vue/no-v-html -- 自家仓库内联SVG,非用户输入 -->
+                <div v-if="道具图标[项.id]" class="ware-icon" v-html="道具图标[项.id]"></div>
+                <div class="ware-body">
+                  <div class="rule-head">
+                    <span class="agenda-weight" :data-w="项.类 === '会议' ? '重' : '轻'">{{ 项.类 }}</span>
+                    <b>{{ 项.名称 }}</b>
+                    <span class="ware-price">✟ {{ 项.价 }}</span>
+                  </div>
+                  <div class="rule-text">{{ 项.说明 }}</div>
+                  <button class="reroll-btn ware-buy" :disabled="!可购买(项)" @click="买(项.id)">
+                    {{ 购买标签(项) }}
+                  </button>
                 </div>
-                <div class="rule-text">{{ 项.说明 }}</div>
-                <button class="reroll-btn ware-buy" :disabled="!可购买(项)" @click="买(项.id)">
-                  {{ 购买标签(项) }}
-                </button>
               </div>
             </div>
           </div>
@@ -398,6 +402,22 @@ import {
   type 道具定义,
 } from '../../stageConfig';
 import { useDataStore } from './store';
+// 黑市道具图标(game-icons.net, CC BY 3.0;下载后重着色为暗金,raw 内联进包,不依赖网络/版本号)
+import 图丝绸念珠 from './资源/道具/丝绸念珠.svg?raw';
+import 图安神香 from './资源/道具/安神香.svg?raw';
+import 图蜜酒 from './资源/道具/蜜酒.svg?raw';
+import 图账目复核 from './资源/道具/账目复核.svg?raw';
+import 图非常召集 from './资源/道具/非常召集.svg?raw';
+import 图香脂膏 from './资源/道具/香脂膏.svg?raw';
+
+const 道具图标: Record<string, string> = {
+  蜜酒: 图蜜酒,
+  安神香: 图安神香,
+  丝绸念珠: 图丝绸念珠,
+  香脂膏: 图香脂膏,
+  非常召集: 图非常召集,
+  账目复核: 图账目复核,
+};
 
 const store = useDataStore();
 const data = computed(() => store.data);
@@ -1875,6 +1895,34 @@ onMounted(() => {
 
 .market-owned {
   font-size: 0.9em;
+}
+
+.rule-card.ware {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ware-icon {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  padding: 4px;
+  border: 1px solid var(--line-soft);
+  background: rgba(0, 0, 0, 0.3);
+  filter: drop-shadow(0 0 6px rgba(201, 169, 78, 0.25));
+}
+
+.ware-icon :deep(svg),
+.ware-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.ware-body {
+  flex: 1;
+  min-width: 0;
 }
 
 .ware-price {
