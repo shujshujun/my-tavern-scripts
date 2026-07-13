@@ -45,10 +45,12 @@ import {
 function 注入全屏样式() {
   try {
     if ($('#xdy-fullscreen-style').length === 0) {
+      // 只锁输入框与发送键;左侧 ☰ 选项、扩展按钮、QR 栏保留(重置游戏等功能都在那里)
       $('head').append(
         '<style id="xdy-fullscreen-style">' +
           '#chat .mes[mesid]:not([mesid="0"]){display:none !important;}' +
-          '#send_form{display:none !important;}' +
+          '#send_textarea{display:none !important;}' +
+          '#rightSendForm{display:none !important;}' +
           '</style>',
       );
     }

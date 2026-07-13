@@ -20,6 +20,27 @@ function 显示致命错误(err: unknown, 来源: string) {
 window.addEventListener('error', ev => 显示致命错误(ev.error ?? ev.message, 'window'));
 window.addEventListener('unhandledrejection', ev => 显示致命错误(ev.reason, 'promise'));
 
+/**
+ * 固定游戏画幅:iframe 高度跟随内容,所以由客户端读酒馆窗口高度、把画幅定死成 px,
+ * 面板开合再也不会把框架抻长缩短。留出顶部标题栏与底部按钮条的空间。
+ */
+function 设定画幅() {
+  try {
+    const 父高 = window.parent?.innerHeight ?? 800;
+    const 高 = Math.max(460, Math.round(父高 - 150));
+    document.documentElement.style.setProperty('--frame-h', `${高}px`);
+  } catch {
+    document.documentElement.style.setProperty('--frame-h', '620px');
+  }
+}
+设定画幅();
+window.addEventListener('resize', 设定画幅);
+try {
+  window.parent?.addEventListener?.('resize', 设定画幅);
+} catch {
+  /* 跨域时退回 iframe 自身 resize */
+}
+
 $(async () => {
   try {
     await waitGlobalInitialized('Mvu');

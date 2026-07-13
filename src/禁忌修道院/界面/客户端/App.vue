@@ -1,244 +1,269 @@
 <template>
   <div class="codex">
-    <!-- 错误护栏:任何运行时异常显示在此,不再整屏空白 -->
-    <div v-if="错误信息" class="err">⚠ 界面异常:{{ 错误信息 }}</div>
+    <div class="page">
+      <!-- 错误护栏:任何运行时异常显示在此,不再整屏空白 -->
+      <div v-if="错误信息" class="err">⚠ 界面异常:{{ 错误信息 }}</div>
 
-    <!-- ═══════════ 剧情卷轴(固定0楼:全部历史+流式正文都写进书页;楼层只是数据库) ═══════════ -->
-    <section v-if="卷轴.length || 发送中" ref="卷轴容器" class="story">
-      <div v-for="(条, i) in 卷轴" :key="i" class="story-entry">
-        <p v-if="条.谁 === '玩家'" class="story-player">✠ {{ 条.文本[0] }}</p>
-        <template v-else>
-          <p v-for="(段, j) in 条.文本" :key="j">{{ 段 }}</p>
-          <p v-if="条.可回档 && !发送中" class="candle-row">
-            <button
-              class="candle"
-              :class="{ armed: 待回档楼 === 条.楼 }"
-              :title="待回档楼 === 条.楼 ? '再点一次确认' : '时之烛台:回到这一页刚写完的时刻'"
-              @click.stop="点烛(条.楼)"
-            >
-              {{ 待回档楼 === 条.楼 ? '⚠ 再点一次,烧掉这页之后的一切' : '🕯' }}
-            </button>
-          </p>
-        </template>
-      </div>
-      <div v-if="发送中" class="story-entry">
-        <p v-for="(段, j) in 流式段" :key="'流' + j">{{ 段 }}</p>
-        <p class="scribing">✒ 修道院的记事员正在书写……</p>
-      </div>
-    </section>
+      <!-- ═══════════ 数据未就绪 ═══════════ -->
+      <template v-if="!就绪">
+        <div class="agenda-hint">……羊皮纸尚在展开(等待存档数据)……</div>
+      </template>
 
-    <!-- ═══════════ 数据未就绪 ═══════════ -->
-    <template v-if="!就绪">
-      <div class="agenda-hint">……羊皮纸尚在展开(等待存档数据)……</div>
-    </template>
+      <!-- ═══════════ 会议场景(整幅牧师会礼堂) ═══════════ -->
+      <template v-else-if="data.会议.状态 === '会议中'">
+        <header class="codex-header">✦ 牧师会礼堂 · 修女会议 ✦</header>
 
-    <!-- ═══════════ 会议场景(整屏牧师会礼堂) ═══════════ -->
-    <template v-else-if="data.会议.状态 === '会议中'">
-      <header class="codex-header">
-        <span class="rubric">✦</span> 牧师会礼堂 · 修女会议 <span class="rubric">✦</span>
-      </header>
+        <div class="meeting-body">
+          <!-- 选议程 -->
+          <div v-if="!会议结果" class="agenda">
+            <p class="agenda-hint">院规刻于石墙。神父可就其中一条,提出修订。</p>
+            <label v-for="项 in 可提案" :key="项.规则.id" class="agenda-item" :class="{ chosen: 选中 === 项.规则.id }">
+              <input v-model="选中" type="radio" :value="项.规则.id" />
+              <span class="agenda-weight" :data-w="项.规则.权重">{{ 项.规则.权重 }}</span>
+              <span class="agenda-name">《{{ 项.规则.名称 }}》</span>
+              <span class="agenda-next">→ 「{{ 项.下一档.名称 }}」</span>
+              <span class="seats">
+                <i v-for="s in 席位预测(项.规则.id)" :key="s.名" class="seat" :data-s="s.态" :title="s.名">{{
+                  s.态 === 'fog' ? '?' : s.名[0]
+                }}</i>
+              </span>
+            </label>
+            <button class="rite-btn" :disabled="!选中" @click="提交议案">开始投票</button>
+          </div>
 
-      <!-- 选议程 -->
-      <div v-if="!会议结果" class="agenda">
-        <p class="agenda-hint">院规刻于石墙。神父可就其中一条,提出修订。</p>
-        <label v-for="项 in 可提案" :key="项.规则.id" class="agenda-item" :class="{ chosen: 选中 === 项.规则.id }">
-          <input v-model="选中" type="radio" :value="项.规则.id" />
-          <span class="agenda-weight" :data-w="项.规则.权重">{{ 项.规则.权重 }}</span>
-          <span class="agenda-name">《{{ 项.规则.名称 }}》</span>
-          <span class="agenda-next">→ 「{{ 项.下一档.名称 }}」</span>
-          <span class="seats">
-            <i
-              v-for="s in 席位预测(项.规则.id)"
-              :key="s.名"
-              class="seat"
-              :data-s="s.态"
-              :title="s.名"
-            >{{ s.态 === 'fog' ? '?' : s.名[0] }}</i>
-          </span>
-        </label>
-        <button class="rite-btn" :disabled="!选中" @click="提交议案">开始投票</button>
-      </div>
-
-      <!-- 结果翻牌 -->
-      <div v-else class="verdict">
-        <div v-if="会议结果.类型 === '院长抢案'" class="verdict-banner seized">
-          院长抢案 —— {{ 会议结果.紧缩动作 }}
+          <!-- 结果翻牌 -->
+          <div v-else class="verdict">
+            <div v-if="会议结果.类型 === '院长抢案'" class="verdict-banner seized">
+              院长抢案 —— {{ 会议结果.紧缩动作 }}
+            </div>
+            <div v-else class="verdict-banner" :class="会议结果.通过 ? 'passed' : 'rejected'">
+              《{{ 议程名 }}》「{{ 档名 }}」 —— {{ 会议结果.通过 ? '通过' : '否决' }}
+            </div>
+            <div v-if="显示票面" class="vote-grid">
+              <div
+                v-for="(t, i) in 显示票面.票"
+                :key="t.职位"
+                class="vote-card vote-reveal"
+                :data-v="t.投票"
+                :style="{ animationDelay: i * 0.35 + 's' }"
+              >
+                <div class="vote-name">{{ t.显示名 }}</div>
+                <div class="vote-stance">{{ t.投票 }}</div>
+              </div>
+            </div>
+            <p v-if="会议结果.类型 === '院长抢案'" class="agenda-hint">(神父的原案票面不足,未及宣读即被主持权压下)</p>
+            <button class="rite-btn" @click="离开">离开会议厅</button>
+          </div>
         </div>
-        <div v-else class="verdict-banner" :class="会议结果.通过 ? 'passed' : 'rejected'">
-          《{{ 议程名 }}》「{{ 档名 }}」 —— {{ 会议结果.通过 ? '通过' : '否决' }}
-        </div>
-        <div v-if="显示票面" class="vote-grid">
-          <div
-            v-for="(t, i) in 显示票面.票"
-            :key="t.职位"
-            class="vote-card vote-reveal"
-            :data-v="t.投票"
-            :style="{ animationDelay: i * 0.35 + 's' }"
+      </template>
+
+      <!-- ═══════════ 日常场景 ═══════════ -->
+      <template v-else>
+        <header class="codex-header">✠ 圣维罗妮卡修道院 ✠</header>
+
+        <div class="meta-row">
+          <span title="奉献金">✟ {{ data.奉献金 }}</span>
+          <span
+            class="watch-eye"
+            :class="{ hot: data.警戒度 >= 75 }"
+            :style="{ opacity: 0.4 + data.警戒度 / 160 }"
+            :title="'警戒度 ' + data.警戒度 + ':走廊阴影里,纠察的眼睛'"
+            >👁 {{ data.警戒度 }}</span
           >
-            <div class="vote-name">{{ t.显示名 }}</div>
-            <div class="vote-stance">{{ t.投票 }}</div>
-          </div>
-        </div>
-        <p v-if="会议结果.类型 === '院长抢案'" class="agenda-hint">
-          (神父的原案票面不足,未及宣读即被主持权压下)
-        </p>
-        <button class="rite-btn" @click="离开">离开会议厅</button>
-      </div>
-    </template>
-
-    <!-- ═══════════ 日常场景 ═══════════ -->
-    <template v-else>
-      <header class="codex-header">
-        <span class="rubric">✠</span> 圣维罗妮卡修道院 <span class="rubric">✠</span>
-      </header>
-
-      <div class="meta-row">
-        <span title="奉献金">✟ {{ data.奉献金 }}</span>
-        <span
-          class="watch-eye"
-          :class="{ hot: data.警戒度 >= 75 }"
-          :style="{ opacity: 0.4 + data.警戒度 / 160 }"
-          :title="'警戒度 ' + data.警戒度 + ':走廊阴影里,纠察的眼睛'"
-          >👁 {{ data.警戒度 }}</span
-        >
-        <span title="激进度(累计触发总部视察)">♰ {{ data.激进度 }}</span>
-        <span class="countdown" :class="{ urgent: data.会议.倒计时 <= 3 }" title="距下次修女会议">
-          🕯 {{ data.会议.倒计时 }}
-        </span>
-        <button class="codex-toggle" :class="{ active: 显示法典 }" @click="显示法典 = !显示法典">☨ 法典</button>
-      </div>
-
-      <!-- 头像行:在场点亮(焦点金边/背景半亮/离场暗;隐藏角色=剪影) -->
-      <div class="avatar-row">
-        <div
-          v-for="项 in 头像列表"
-          :key="项.职位"
-          class="avatar"
-          :class="[项.态, { veiled: 项.剪影 }]"
-          :title="项.剪影 ? '尚未知晓的存在' : 项.显示名"
-          @click="!项.剪影 && (选中职位 = 项.职位)"
-        >
-          <span class="avatar-glyph">{{ 项.剪影 ? '?' : 项.显示名[0] }}</span>
-          <span v-if="!项.剪影" class="avatar-name">{{ 项.显示名 }}</span>
-        </div>
-      </div>
-
-      <div v-if="显示法典" class="rule-list">
-        <div v-for="项 in 法典列表" :key="项.规则.id" class="rule-card">
-          <div class="rule-head">
-            <span class="agenda-weight" :data-w="项.规则.权重">{{ 项.规则.权重 }}</span>
-            <b>《{{ 项.规则.名称 }}》</b>
-            <span v-if="项.当前档" class="rule-current">「{{ 项.当前档.名称 }}」</span>
-          </div>
-          <div class="rule-text">
-            <div v-if="项.当前档" class="palimpsest">{{ 项.规则.原规 }}</div>
-            <div>{{ 项.当前档 ? 项.当前档.条文 : 项.规则.原规 }}</div>
-          </div>
-          <div v-if="项.下一档" class="rule-next">
-            <span>可修订 →「{{ 项.下一档.名称 }}」</span>
-            <span class="seats">
-              <i
-                v-for="s in 项.席位"
-                :key="s.名"
-                class="seat"
-                :data-s="s.态"
-                :title="s.名 + ':' + (s.态 === 'fog' ? '未知' : s.态 === 'yes' ? '赞成' : s.态 === 'no' ? '反对' : '弃权')"
-              >{{ s.态 === 'fog' ? '?' : s.名[0] }}</i>
-            </span>
-          </div>
-          <div v-else class="rule-next exhausted">已修订至极限</div>
-        </div>
-      </div>
-
-      <!-- 恶魔低语:页缘血字批注,可听从(填入输入框)或划掉 -->
-      <footer v-if="data.恶魔低语 && 已划掉低语 !== data.恶魔低语" class="whisper">
-        <span class="imp">🜏</span> {{ data.恶魔低语 }}
-        <span class="whisper-acts">
-          <button class="whisper-act obey" title="把低语抄进羽笔,亲手写下它" @click="听从低语">听从</button>
-          <button class="whisper-act" title="划掉这行批注" @click="已划掉低语 = data.恶魔低语">划掉</button>
-        </span>
-      </footer>
-    </template>
-
-    <!-- ═══════════ 档案卡(点头像弹出;情报雾逐项揭开) ═══════════ -->
-    <div v-if="选中档案" class="dossier-mask" @click.self="选中职位 = null">
-      <div class="dossier">
-        <button class="dossier-close" @click="选中职位 = null">✕</button>
-        <div class="dossier-head">
-          <span class="dossier-name">{{ 选中档案.显示名 }}</span>
-          <span class="dossier-role">{{ 选中档案.职位 }}嬷嬷</span>
-          <span class="dossier-stage">「{{ 选中档案.修女.阶段标题 }}」</span>
+          <span title="激进度(累计触发总部视察)">♰ {{ data.激进度 }}</span>
+          <span class="countdown" :class="{ urgent: data.会议.倒计时 <= 3 }" title="距下次修女会议">
+            🕯 {{ data.会议.倒计时 }}
+          </span>
+          <span class="meta-btns">
+            <button class="codex-toggle" @click="显示法典 = true">☨ 法典</button>
+            <button class="codex-toggle" title="完整编年史与时之烛台" @click="显示史册 = true">🕮 史册</button>
+          </span>
         </div>
 
-        <div class="dossier-axes">
-          <div v-for="轴 in 选中档案.三轴" :key="轴.名" class="dossier-axis">
-            <span class="axis-label">{{ 轴.名 }}</span>
-            <div class="axis">
-              <i class="bar" :class="轴.类" :style="{ width: 轴.值 + '%' }" />
-            </div>
-            <span class="axis-num">{{ 轴.值 }}</span>
-            <span class="axis-delta" :class="{ up: 轴.变化 > 0, down: 轴.变化 < 0 }">
-              {{ 轴.变化 > 0 ? '↑' + 轴.变化 : 轴.变化 < 0 ? '↓' + -轴.变化 : '' }}
-            </span>
+        <!-- 头像行:在场点亮(焦点金边/背景半亮/离场暗;隐藏角色=剪影) -->
+        <div class="avatar-row">
+          <div
+            v-for="项 in 头像列表"
+            :key="项.职位"
+            class="avatar"
+            :class="[项.态, { veiled: 项.剪影 }]"
+            :title="项.剪影 ? '尚未知晓的存在' : 项.显示名"
+            @click="!项.剪影 && (选中职位 = 项.职位)"
+          >
+            <span class="avatar-glyph">{{ 项.剪影 ? '?' : 项.显示名[0] }}</span>
+            <span v-if="!项.剪影" class="avatar-name">{{ 项.显示名 }}</span>
           </div>
         </div>
 
-        <!-- 三轴走势(每楼存档=一个采样点;看得见"她是从哪一夜开始崩的") -->
-        <svg v-if="选中曲线" class="dossier-trend" viewBox="0 0 100 28" preserveAspectRatio="none">
-          <polyline :points="选中曲线.支持" class="trend-support" />
-          <polyline :points="选中曲线.堕落" class="trend-sin" />
-          <polyline :points="选中曲线.信仰" class="trend-faith" />
-        </svg>
+        <!-- 正文书页:只演当前幕(完整历史与时之烛台在史册卷轴里) -->
+        <section ref="卷轴容器" class="story">
+          <div v-for="(条, i) in 当前幕" :key="i" class="story-entry">
+            <p v-if="条.谁 === '玩家'" class="story-player">✠ {{ 条.文本[0] }}</p>
+            <template v-else>
+              <p v-for="(段, j) in 条.文本" :key="j" class="narr">{{ 段 }}</p>
+            </template>
+          </div>
+          <div v-if="发送中" class="story-entry">
+            <p v-for="(段, j) in 流式段" :key="'流' + j" class="narr">{{ 段 }}</p>
+            <p class="scribing">✒ 修道院的记事员正在书写……</p>
+          </div>
+        </section>
 
-        <p class="dossier-sense">{{ 选中档案.感知 }}</p>
-        <p class="dossier-line"><b>情绪</b> {{ 选中档案.修女.当前情绪 }}</p>
+        <!-- 恶魔低语:页缘血字批注,可听从(填入输入框)或划掉 -->
+        <footer v-if="data.恶魔低语 && 已划掉低语 !== data.恶魔低语" class="whisper">
+          <span class="imp">🜏</span> {{ data.恶魔低语 }}
+          <span class="whisper-acts">
+            <button class="whisper-act obey" title="把低语抄进羽笔,亲手写下它" @click="听从低语">听从</button>
+            <button class="whisper-act" title="划掉这行批注" @click="已划掉低语 = data.恶魔低语">划掉</button>
+          </span>
+        </footer>
+      </template>
 
-        <template v-if="选中档案.修女.情报可见">
-          <p v-if="选中档案.修女.当前心理想法" class="dossier-line">
-            <b>心声</b> {{ 选中档案.修女.当前心理想法 }}
-          </p>
-          <p class="dossier-line"><b>着装</b> {{ 选中档案.着装 }}</p>
-          <div class="dossier-milestones">
-            <div class="dossier-line-title"><b>{{ 选中档案.专线.线名 }}</b></div>
-            <div
-              v-for="碑 in 选中档案.专线.里程碑"
-              :key="碑.id"
-              class="milestone"
-              :class="{ done: !!选中档案.修女.专线进度[碑.id] }"
-            >
-              {{ 选中档案.修女.专线进度[碑.id] ? '✦' : '·' }} {{ 碑.标题 }}
+      <!-- ═══════════ 法典(羊皮大卷轴) ═══════════ -->
+      <div v-if="显示法典" class="scroll-mask" @click.self="显示法典 = false">
+        <div class="scroll">
+          <button class="scroll-close" @click="显示法典 = false">✕</button>
+          <div class="scroll-title">☨ 院 规 法 典 ☨</div>
+          <div class="scroll-body">
+            <div class="rule-list">
+              <div v-for="项 in 法典列表" :key="项.规则.id" class="rule-card">
+                <div class="rule-head">
+                  <span class="agenda-weight" :data-w="项.规则.权重">{{ 项.规则.权重 }}</span>
+                  <b>《{{ 项.规则.名称 }}》</b>
+                  <span v-if="项.当前档" class="rule-current">「{{ 项.当前档.名称 }}」</span>
+                </div>
+                <div class="rule-text">
+                  <div v-if="项.当前档" class="palimpsest">{{ 项.规则.原规 }}</div>
+                  <div>{{ 项.当前档 ? 项.当前档.条文 : 项.规则.原规 }}</div>
+                </div>
+                <div v-if="项.下一档" class="rule-next">
+                  <span>可修订 →「{{ 项.下一档.名称 }}」</span>
+                  <span class="seats">
+                    <i
+                      v-for="s in 项.席位"
+                      :key="s.名"
+                      class="seat"
+                      :data-s="s.态"
+                      :title="
+                        s.名 +
+                        ':' +
+                        (s.态 === 'fog' ? '未知' : s.态 === 'yes' ? '赞成' : s.态 === 'no' ? '反对' : '弃权')
+                      "
+                      >{{ s.态 === 'fog' ? '?' : s.名[0] }}</i
+                    >
+                  </span>
+                </div>
+                <div v-else class="rule-next exhausted">已修订至极限</div>
+              </div>
             </div>
           </div>
-        </template>
-        <p v-else class="dossier-sealed">🕯 她的内里仍覆着蜡封——推进她的专线,揭开情报。</p>
+        </div>
+      </div>
 
-        <button v-if="可晋阶(选中档案.职位)" class="ascend-btn" @click="晋阶(选中档案.职位)">
-          ✦ 跨过界线
+      <!-- ═══════════ 史册(完整编年卷轴 + 时之烛台) ═══════════ -->
+      <div v-if="显示史册" class="scroll-mask" @click.self="显示史册 = false">
+        <div class="scroll">
+          <button class="scroll-close" @click="显示史册 = false">✕</button>
+          <div class="scroll-title">🕮 修 道 院 史 册</div>
+          <div class="scroll-body chronicle">
+            <div v-for="(条, i) in 卷轴" :key="i" class="story-entry">
+              <p v-if="条.谁 === '玩家'" class="story-player">✠ {{ 条.文本[0] }}</p>
+              <template v-else>
+                <p v-for="(段, j) in 条.文本" :key="j" class="narr">{{ 段 }}</p>
+                <p v-if="条.可回档 && !发送中" class="candle-row">
+                  <button
+                    class="candle"
+                    :class="{ armed: 待回档楼 === 条.楼 }"
+                    :title="待回档楼 === 条.楼 ? '再点一次确认' : '时之烛台:回到这一页刚写完的时刻'"
+                    @click.stop="点烛(条.楼)"
+                  >
+                    {{ 待回档楼 === 条.楼 ? '⚠ 再点一次,烧掉这页之后的一切' : '🕯' }}
+                  </button>
+                </p>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════════ 档案卡(点头像弹出;情报雾逐项揭开) ═══════════ -->
+      <div v-if="选中档案" class="scroll-mask" @click.self="选中职位 = null">
+        <div class="scroll dossier">
+          <button class="scroll-close" @click="选中职位 = null">✕</button>
+          <div class="dossier-head">
+            <span class="dossier-name">{{ 选中档案.显示名 }}</span>
+            <span class="dossier-role">{{ 选中档案.职位 }}嬷嬷</span>
+            <span class="dossier-stage">「{{ 选中档案.修女.阶段标题 }}」</span>
+          </div>
+
+          <div class="dossier-axes">
+            <div v-for="轴 in 选中档案.三轴" :key="轴.名" class="dossier-axis">
+              <span class="axis-label">{{ 轴.名 }}</span>
+              <div class="axis">
+                <i class="bar" :class="轴.类" :style="{ width: 轴.值 + '%' }" />
+              </div>
+              <span class="axis-num">{{ 轴.值 }}</span>
+              <span class="axis-delta" :class="{ up: 轴.变化 > 0, down: 轴.变化 < 0 }">
+                {{ 轴.变化 > 0 ? '↑' + 轴.变化 : 轴.变化 < 0 ? '↓' + -轴.变化 : '' }}
+              </span>
+            </div>
+          </div>
+
+          <!-- 三轴走势(每楼存档=一个采样点;看得见"她是从哪一夜开始崩的") -->
+          <svg v-if="选中曲线" class="dossier-trend" viewBox="0 0 100 28" preserveAspectRatio="none">
+            <polyline :points="选中曲线.支持" class="trend-support" />
+            <polyline :points="选中曲线.堕落" class="trend-sin" />
+            <polyline :points="选中曲线.信仰" class="trend-faith" />
+          </svg>
+
+          <p class="dossier-sense">{{ 选中档案.感知 }}</p>
+          <p class="dossier-line"><b>情绪</b> {{ 选中档案.修女.当前情绪 }}</p>
+
+          <template v-if="选中档案.修女.情报可见">
+            <p v-if="选中档案.修女.当前心理想法" class="dossier-line"><b>心声</b> {{ 选中档案.修女.当前心理想法 }}</p>
+            <p class="dossier-line"><b>着装</b> {{ 选中档案.着装 }}</p>
+            <div class="dossier-milestones">
+              <div class="dossier-line-title">
+                <b>{{ 选中档案.专线.线名 }}</b>
+              </div>
+              <div
+                v-for="碑 in 选中档案.专线.里程碑"
+                :key="碑.id"
+                class="milestone"
+                :class="{ done: !!选中档案.修女.专线进度[碑.id] }"
+              >
+                {{ 选中档案.修女.专线进度[碑.id] ? '✦' : '·' }} {{ 碑.标题 }}
+              </div>
+            </div>
+          </template>
+          <p v-else class="dossier-sealed">🕯 她的内里仍覆着蜡封——推进她的专线,揭开情报。</p>
+
+          <button v-if="可晋阶(选中档案.职位)" class="ascend-btn" @click="晋阶(选中档案.职位)">✦ 跨过界线</button>
+        </div>
+      </div>
+
+      <!-- ═══════════ 行动建议(AI 每轮给 2-3 条,点了直接发送;想自由发挥就打字) ═══════════ -->
+      <div v-if="就绪 && !发送中 && 行动选项.length && data.会议.状态 !== '会议中'" class="option-row">
+        <button v-for="(项, i) in 行动选项" :key="i" class="option-chip" @click="发出(项)">✦ {{ 项 }}</button>
+      </div>
+
+      <!-- ═══════════ 游戏内输入(会议中隐藏;玩家不碰酒馆输入框) ═══════════ -->
+      <div v-if="就绪 && data.会议.状态 !== '会议中'" class="quill">
+        <textarea
+          v-model="输入文本"
+          rows="2"
+          placeholder="神父的言行……(Enter 发送,Shift+Enter 换行)"
+          @keydown.enter.exact.prevent="发送"
+        ></textarea>
+        <button class="rite-btn quill-btn" :disabled="发送中 || !输入文本.trim()" @click="发送">
+          {{ 发送中 ? '…' : '行动' }}
         </button>
       </div>
-    </div>
-
-    <!-- ═══════════ 行动建议(AI 每轮给 2-3 条,点了直接发送;想自由发挥就打字) ═══════════ -->
-    <div v-if="就绪 && !发送中 && 行动选项.length && data.会议.状态 !== '会议中'" class="option-row">
-      <button v-for="(项, i) in 行动选项" :key="i" class="option-chip" @click="发出(项)">✦ {{ 项 }}</button>
-    </div>
-
-    <!-- ═══════════ 游戏内输入(会议中隐藏;玩家不碰酒馆输入框) ═══════════ -->
-    <div v-if="就绪 && data.会议.状态 !== '会议中'" class="quill">
-      <textarea
-        v-model="输入文本"
-        rows="2"
-        placeholder="神父的言行……(Enter 发送,Shift+Enter 换行)"
-        @keydown.enter.exact.prevent="发送"
-      ></textarea>
-      <button class="rite-btn quill-btn" :disabled="发送中 || !输入文本.trim()" @click="发送">
-        {{ 发送中 ? '…' : '行动' }}
-      </button>
-    </div>
-    <div v-if="就绪 && 可重掷 && !发送中 && data.会议.状态 !== '会议中'" class="reroll-row">
-      <button class="reroll-btn" title="撕掉这一页重写:回滚本回合的一切,用同样的行动重新演一遍" @click="重掷">
-        ↻ 重写此页
-      </button>
+      <div v-if="就绪 && 可重掷 && !发送中 && data.会议.状态 !== '会议中'" class="reroll-row">
+        <button class="reroll-btn" title="撕掉这一页重写:回滚本回合的一切,用同样的行动重新演一遍" @click="重掷">
+          ↻ 重写此页
+        </button>
+      </div>
     </div>
   </div>
 </template>
@@ -368,9 +393,7 @@ const 选中档案 = computed(() => {
       { 名: '信仰', 类: 'faith', 值: 修女.信仰值, 变化: 变化('信仰', 修女.信仰值) },
     ],
     感知: 感知语(修女),
-    着装: [服.头纱, 服.上装, 服.下装, 服.袜足, 服.鞋, 服.配饰, 服.特殊装饰]
-      .filter(x => x && x !== '无')
-      .join('、'),
+    着装: [服.头纱, 服.上装, 服.下装, 服.袜足, 服.鞋, 服.配饰, 服.特殊装饰].filter(x => x && x !== '无').join('、'),
     专线: 专线表[职位],
   };
 });
@@ -388,21 +411,33 @@ interface 卷轴条 {
 
 const 卷轴 = ref<卷轴条[]>([]);
 const 卷轴容器 = ref<HTMLElement | null>(null);
+const 显示史册 = ref(false);
+
+/** 正文书页只演当前幕:从最后一条玩家行动起(开场时=整卷开场白);完整历史在史册 */
+const 当前幕 = computed(() => {
+  const 列表 = 卷轴.value;
+  if (!列表.length) return [];
+  let 起 = 列表.length - 1;
+  while (起 > 0 && 列表[起].谁 !== '玩家') 起 -= 1;
+  return 列表[起].谁 === '玩家' ? 列表.slice(起) : 列表;
+});
 
 function 清洗(原文: string): string {
-  return 原文
-    .replace(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/g, '')
-    .replace(/<StatusPlaceHolderImpl\/>/g, '')
-    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
-    .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '')
-    .replace(/<行动选项>[\s\S]*?<\/行动选项>/g, '')
-    // 流式过程中的未闭合块也要吞掉,否则半截思维链/变量块会闪现在书页上
-    .replace(/<thinking>[\s\S]*$/i, '')
-    .replace(/<reasoning>[\s\S]*$/i, '')
-    .replace(/<UpdateVariable>[\s\S]*$/, '')
-    .replace(/<行动选项>[\s\S]*$/, '')
-    .replace(/【主页】/g, '')
-    .trim();
+  return (
+    原文
+      .replace(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/g, '')
+      .replace(/<StatusPlaceHolderImpl\/>/g, '')
+      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+      .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '')
+      .replace(/<行动选项>[\s\S]*?<\/行动选项>/g, '')
+      // 流式过程中的未闭合块也要吞掉,否则半截思维链/变量块会闪现在书页上
+      .replace(/<thinking>[\s\S]*$/i, '')
+      .replace(/<reasoning>[\s\S]*$/i, '')
+      .replace(/<UpdateVariable>[\s\S]*$/, '')
+      .replace(/<行动选项>[\s\S]*$/, '')
+      .replace(/【主页】/g, '')
+      .trim()
+  );
 }
 
 async function 滚到底() {
@@ -423,7 +458,7 @@ async function 取卷轴() {
         for (const 职位 of 修女职位列表) {
           const 修 = _.get(修女档, 职位);
           if (!修) continue;
-          (历史[职位] ??= { 支持: [], 堕落: [], 信仰: [] });
+          历史[职位] ??= { 支持: [], 堕落: [], 信仰: [] };
           历史[职位].支持.push(Number(修.支持度) || 0);
           历史[职位].堕落.push(Number(修.堕落度) || 0);
           历史[职位].信仰.push(Number(修.信仰值) ?? 100);
@@ -485,6 +520,7 @@ function 点烛(楼: number | undefined) {
     return;
   }
   待回档楼.value = null;
+  显示史册.value = false;
   发送中.value = true;
   流式段.value = [];
   eventEmit('禁忌修道院:回档', { 楼层: 楼 });
@@ -504,13 +540,7 @@ function 席位预测(规则id: string): { 名: string; 态: 席位态 }[] {
     const 修 = data.value.修女[职位];
     const 名 = 修女表[职位].显示名;
     if (!修.情报可见) return { 名, 态: 'fog' as const };
-    const 票 = 计算单票(
-      职位,
-      { 支持度: 修.支持度, 堕落度: 修.堕落度 },
-      规则id,
-      目标档,
-      职位 === '纠察' && 把柄弃权,
-    );
+    const 票 = 计算单票(职位, { 支持度: 修.支持度, 堕落度: 修.堕落度 }, 规则id, 目标档, 职位 === '纠察' && 把柄弃权);
     return { 名, 态: (票.投票 === '赞成' ? 'yes' : 票.投票 === '反对' ? 'no' : 'abstain') as 席位态 };
   });
 }
@@ -533,15 +563,11 @@ const 选中 = ref('');
 const 会议结果 = ref<会议结果类型 | null>(null);
 
 const 可提案 = computed(() =>
-  院规表
-    .map(规则 => ({ 规则, 下一档: 规则.档位[(data.value.院规[规则.id] ?? 0)] }))
-    .filter(项 => 项.下一档),
+  院规表.map(规则 => ({ 规则, 下一档: 规则.档位[data.value.院规[规则.id] ?? 0] })).filter(项 => 项.下一档),
 );
 
 const 议程名 = computed(() => (会议结果.value ? 查规则(会议结果.value.议程规则id)?.名称 : ''));
-const 档名 = computed(() =>
-  会议结果.value ? 查档(会议结果.value.议程规则id, 会议结果.value.议程档)?.名称 : '',
-);
+const 档名 = computed(() => (会议结果.value ? 查档(会议结果.value.议程规则id, 会议结果.value.议程档)?.名称 : ''));
 const 显示票面 = computed(() => 会议结果.value?.票面 ?? 会议结果.value?.玩家原案);
 
 function 提交议案() {
@@ -574,7 +600,12 @@ onMounted(() => {
   // ── 回合引擎事件(固定0楼:脚本 generate 生成,这里只管演) ──
   eventOn('禁忌修道院:流式', (文本: string) => {
     const 净文 = 清洗(文本);
-    流式段.value = 净文 ? 净文.split(/\n+/).map(s => s.trim()).filter(Boolean) : [];
+    流式段.value = 净文
+      ? 净文
+          .split(/\n+/)
+          .map(s => s.trim())
+          .filter(Boolean)
+      : [];
     void 滚到底();
   });
   eventOn('禁忌修道院:回合完成', () => {
@@ -604,12 +635,43 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* ═══════════ 画框:深色橡木 + 鎏金压线(固定画幅,内部各区自行滚动) ═══════════ */
+
 .codex {
-  background: var(--parchment);
-  border: 2px solid var(--gilt);
-  border-radius: 4px;
-  padding: 10px 12px;
-  box-shadow: inset 0 0 24px rgba(58, 47, 35, 0.15);
+  box-sizing: border-box;
+  height: var(--frame-h, 620px);
+  padding: 9px;
+  background:
+    radial-gradient(ellipse at 20% 0%, rgba(120, 84, 40, 0.35), transparent 55%),
+    linear-gradient(160deg, #3a2712, #241708 55%, #140b04);
+  border: 2px solid #0a0603;
+  border-radius: 6px;
+  box-shadow:
+    0 10px 34px rgba(0, 0, 0, 0.65),
+    inset 0 0 0 1px rgba(212, 175, 55, 0.4),
+    inset 0 0 0 4px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 5px rgba(212, 175, 55, 0.18);
+}
+
+/* 羊皮书页:纤维纹理 + 四周焦褐晕影 */
+.page {
+  position: relative;
+  box-sizing: border-box;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 8px 12px 10px;
+  border: 1px solid #7a5c1c;
+  border-radius: 3px;
+  background:
+    radial-gradient(ellipse at 30% 18%, rgba(255, 250, 235, 0.45), transparent 55%),
+    radial-gradient(ellipse at 78% 88%, rgba(120, 90, 40, 0.2), transparent 55%),
+    repeating-linear-gradient(93deg, rgba(120, 95, 55, 0.05) 0 2px, transparent 2px 5px),
+    repeating-linear-gradient(1deg, rgba(120, 95, 55, 0.045) 0 1px, transparent 1px 4px), var(--parchment);
+  box-shadow:
+    inset 0 0 64px rgba(90, 65, 30, 0.4),
+    inset 0 0 8px rgba(90, 65, 30, 0.35);
 }
 
 .err {
@@ -623,23 +685,269 @@ onMounted(() => {
   font-size: 0.75em;
 }
 
-/* ── 行动建议 ── */
+/* ═══════════ 顶区:碑铭题头 / 圣物计数 / 圣徒像头像 ═══════════ */
+
+.codex-header {
+  flex: none;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.95em;
+  letter-spacing: 0.4em;
+  text-indent: 0.4em;
+  color: var(--gilt-bright, #d4af37);
+  background: linear-gradient(180deg, #43301576, #24170888);
+  border: 1px solid #7a5c1c;
+  border-radius: 3px;
+  padding: 6px 0 5px;
+  margin: 0 0 7px;
+  text-shadow:
+    0 1px 0 #000,
+    0 0 10px rgba(212, 175, 55, 0.35);
+}
+
+.meta-row {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 14px;
+  justify-content: center;
+  font-size: 0.85em;
+  color: var(--ink-faded);
+  background: linear-gradient(180deg, rgba(58, 39, 18, 0.14), rgba(58, 39, 18, 0.03));
+  border: 1px solid rgba(122, 92, 28, 0.55);
+  border-radius: 3px;
+  padding: 3px 8px;
+  margin-bottom: 7px;
+}
+
+.meta-btns {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.codex-toggle {
+  padding: 1px 10px;
+  font-family: inherit;
+  font-size: 1em;
+  color: var(--parchment);
+  background: linear-gradient(180deg, #6e552a, #4a3617);
+  border: 1px solid #2e2008;
+  border-radius: 3px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 235, 180, 0.35),
+    0 1px 2px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+
+.codex-toggle:hover {
+  background: linear-gradient(180deg, #83672f, #5a431c);
+}
+
+/* ── 头像行:圣徒像小圆章 ── */
+
+.avatar-row {
+  flex: none;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  margin-bottom: 8px;
+}
+
+.avatar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.avatar-glyph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 1.05em;
+  color: var(--ink);
+  background: radial-gradient(circle at 35% 28%, #f6ecd6, var(--parchment-dark) 62%, #b99d68);
+  border: 2px solid #7a5c1c;
+  box-shadow:
+    0 2px 4px rgba(0, 0, 0, 0.45),
+    inset 0 0 0 2px rgba(212, 175, 55, 0.5),
+    inset 0 1px 2px rgba(255, 255, 255, 0.55);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  transition: all 0.4s ease;
+}
+
+.avatar-name {
+  font-size: 0.66em;
+  color: var(--ink-faded);
+}
+
+.avatar.focus .avatar-glyph {
+  border-color: var(--gilt-bright);
+  box-shadow:
+    0 0 10px var(--gilt-bright),
+    inset 0 0 0 2px rgba(212, 175, 55, 0.8),
+    inset 0 1px 2px rgba(255, 255, 255, 0.6);
+}
+
+.avatar.focus .avatar-name {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.avatar.ambient .avatar-glyph {
+  border-color: var(--gilt);
+}
+
+.avatar.away {
+  opacity: 0.42;
+}
+
+.avatar.veiled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.avatar.veiled .avatar-glyph {
+  color: var(--parchment);
+  background: radial-gradient(circle at 40% 30%, #3a2c1a, #191007 70%);
+  border-style: dashed;
+}
+
+/* ═══════════ 正文书页(唯一滚动区;首字母泥金) ═══════════ */
+
+.story {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 10px 14px;
+  border: 1px solid rgba(122, 92, 28, 0.5);
+  border-radius: 3px;
+  background: linear-gradient(180deg, rgba(201, 162, 39, 0.07) 0%, transparent 42px), rgba(255, 250, 238, 0.25);
+  font-size: 0.95em;
+  line-height: 1.9;
+  color: var(--ink);
+  box-shadow: inset 0 0 24px rgba(90, 65, 30, 0.14);
+}
+
+.story p {
+  margin: 0 0 0.9em;
+  text-indent: 2em;
+}
+
+.story-entry:last-child p:last-child {
+  margin-bottom: 0;
+}
+
+/* 泥金首字母(illuminated versal):每段叙事的第一段 */
+.story-entry .narr:first-child::first-letter,
+.chronicle .story-entry .narr:first-child::first-letter {
+  float: left;
+  font-size: 2.5em;
+  line-height: 0.92;
+  padding: 3px 6px 0 0;
+  font-weight: 700;
+  color: var(--rubric);
+  text-shadow:
+    0 0 1px rgba(140, 47, 27, 0.6),
+    1px 1px 0 rgba(212, 175, 55, 0.5);
+}
+
+.story-entry .narr:first-child {
+  text-indent: 0;
+}
+
+.story-player {
+  text-indent: 0 !important;
+  font-size: 0.9em;
+  font-style: italic;
+  color: var(--sin);
+  border-left: 2px solid var(--gilt);
+  padding-left: 8px;
+  margin: 0.4em 0 0.9em !important;
+}
+
+.scribing {
+  text-indent: 0 !important;
+  font-size: 0.82em;
+  font-style: italic;
+  color: var(--ink-faded);
+  animation: scribe-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes scribe-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* ═══════════ 底区:低语 / 行动建议 / 羽笔(钉死在画幅底部,不随正文滚动) ═══════════ */
+
+.whisper {
+  flex: none;
+  margin-top: 6px;
+  padding-top: 5px;
+  border-top: 1px dashed var(--gilt);
+  font-size: 0.8em;
+  font-style: italic;
+  color: var(--sin);
+}
+
+.whisper-acts {
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+.whisper-act {
+  padding: 0 8px;
+  margin-left: 4px;
+  font-family: inherit;
+  font-size: 0.9em;
+  font-style: normal;
+  color: var(--ink-faded);
+  background: transparent;
+  border: 1px dashed var(--ink-faded);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.whisper-act.obey {
+  color: var(--sin);
+  border-color: var(--sin);
+}
+
+.whisper-act:hover {
+  color: var(--parchment);
+  background: var(--sin);
+}
 
 .option-row {
+  flex: none;
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-  margin-top: 8px;
+  margin-top: 7px;
 }
 
 .option-chip {
-  padding: 3px 10px;
+  padding: 3px 11px;
   font-family: inherit;
   font-size: 0.8em;
   color: var(--ink);
-  background: var(--parchment-dark);
-  border: 1px solid var(--gilt);
+  background: linear-gradient(180deg, #efe3c8, var(--parchment-dark));
+  border: 1px solid #7a5c1c;
   border-radius: 12px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    0 1px 2px rgba(0, 0, 0, 0.25);
   cursor: pointer;
   text-align: left;
 }
@@ -649,13 +957,12 @@ onMounted(() => {
   background: var(--rubric);
 }
 
-/* ── 游戏内输入 ── */
-
 .quill {
+  flex: none;
   display: flex;
   gap: 6px;
-  margin-top: 10px;
-  padding-top: 8px;
+  margin-top: 7px;
+  padding-top: 7px;
   border-top: 1px solid var(--gilt);
 }
 
@@ -666,11 +973,13 @@ onMounted(() => {
   font-size: 0.88em;
   line-height: 1.5;
   color: var(--ink);
-  background: var(--parchment-dark);
-  border: 1px solid var(--gilt);
+  background:
+    repeating-linear-gradient(92deg, rgba(120, 95, 55, 0.05) 0 2px, transparent 2px 6px), var(--parchment-dark);
+  border: 1px solid #7a5c1c;
   border-radius: 3px;
+  box-shadow: inset 0 1px 4px rgba(90, 65, 30, 0.35);
   padding: 6px 9px;
-  resize: vertical;
+  resize: none;
 }
 
 .quill-btn {
@@ -681,6 +990,7 @@ onMounted(() => {
 }
 
 .reroll-row {
+  flex: none;
   text-align: right;
   margin-top: 4px;
 }
@@ -701,6 +1011,121 @@ onMounted(() => {
   border-style: solid;
 }
 
+/* ═══════════ 羊皮大卷轴弹窗(法典/史册/档案卡共用;上下卷杆+展卷动画) ═══════════ */
+
+.scroll-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(12, 7, 2, 0.66);
+}
+
+.scroll {
+  position: relative;
+  box-sizing: border-box;
+  width: 94%;
+  height: 90%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 22px 16px 20px;
+  border: 1px solid #7a5c1c;
+  border-radius: 6px;
+  background:
+    radial-gradient(ellipse at 28% 15%, rgba(255, 250, 235, 0.5), transparent 55%),
+    radial-gradient(ellipse at 80% 90%, rgba(120, 90, 40, 0.22), transparent 55%),
+    repeating-linear-gradient(93deg, rgba(120, 95, 55, 0.05) 0 2px, transparent 2px 5px), var(--parchment);
+  box-shadow:
+    0 14px 46px rgba(0, 0, 0, 0.75),
+    inset 0 0 60px rgba(90, 65, 30, 0.38);
+  animation: unroll 0.45s cubic-bezier(0.2, 0.85, 0.3, 1.04);
+  transform-origin: top center;
+}
+
+/* 上下木质卷杆 */
+.scroll::before,
+.scroll::after {
+  content: '';
+  position: absolute;
+  left: -7px;
+  right: -7px;
+  height: 16px;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #8a6a34, #5d431c 45%, #2e2008);
+  box-shadow:
+    0 3px 7px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 235, 180, 0.4);
+}
+
+.scroll::before {
+  top: -8px;
+}
+
+.scroll::after {
+  bottom: -8px;
+}
+
+@keyframes unroll {
+  from {
+    transform: scaleY(0.08);
+    opacity: 0.3;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+.scroll-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 1;
+  border: 1px solid #7a5c1c;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  background: var(--parchment-dark);
+  color: var(--ink-faded);
+  font-size: 0.85em;
+  cursor: pointer;
+}
+
+.scroll-title {
+  flex: none;
+  text-align: center;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  text-indent: 0.3em;
+  color: var(--rubric);
+  border-bottom: 2px double var(--gilt);
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+  text-shadow: 1px 1px 0 rgba(212, 175, 55, 0.4);
+}
+
+.scroll-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px 8px;
+}
+
+.chronicle {
+  font-size: 0.92em;
+  line-height: 1.85;
+  color: var(--ink);
+}
+
+.chronicle p {
+  margin: 0 0 0.85em;
+  text-indent: 2em;
+}
+
 /* ── 时之烛台 ── */
 
 .candle-row {
@@ -718,7 +1143,7 @@ onMounted(() => {
   border: none;
   border-radius: 3px;
   cursor: pointer;
-  opacity: 0.45;
+  opacity: 0.5;
 }
 
 .candle:hover {
@@ -732,159 +1157,22 @@ onMounted(() => {
   border: 1px solid var(--gilt-bright);
 }
 
-.codex-header {
-  text-align: center;
-  font-weight: 700;
-  letter-spacing: 0.15em;
-  color: var(--ink);
-  border-bottom: 1px solid var(--gilt);
-  padding-bottom: 6px;
-  margin-bottom: 8px;
-}
+/* ═══════════ 档案卡(窄卷轴) ═══════════ */
 
-.rubric {
-  color: var(--rubric);
-}
-
-.meta-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-  justify-content: center;
-  font-size: 0.85em;
-  color: var(--ink-faded);
-  margin-bottom: 10px;
-}
-
-/* ── 头像行(在场点亮) ── */
-
-.codex-toggle {
-  padding: 0 10px;
-  font-family: inherit;
-  font-size: 1em;
-  color: var(--ink-faded);
-  background: transparent;
-  border: 1px solid var(--gilt);
-  border-radius: 3px;
-  cursor: pointer;
-}
-
-.codex-toggle.active {
-  color: var(--parchment);
-  background: var(--gilt);
-}
-
-.avatar-row {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 8px 10px;
-  margin-bottom: 10px;
-}
-
-.avatar {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.avatar-glyph {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  font-weight: 700;
-  font-size: 1.05em;
-  color: var(--ink);
-  background: var(--parchment-dark);
-  border: 2px solid var(--ink-faded);
-  transition: all 0.4s ease;
-}
-
-.avatar-name {
-  font-size: 0.68em;
-  color: var(--ink-faded);
-}
-
-/* 焦点:金边亮起 */
-.avatar.focus .avatar-glyph {
-  border-color: var(--gilt-bright);
-  box-shadow: 0 0 8px var(--gilt-bright);
-  background: var(--parchment);
-}
-
-.avatar.focus .avatar-name {
-  color: var(--ink);
-  font-weight: 700;
-}
-
-/* 背景:半亮 */
-.avatar.ambient .avatar-glyph {
-  border-color: var(--gilt);
-}
-
-/* 离场:压暗 */
-.avatar.away {
-  opacity: 0.45;
-}
-
-/* 隐藏角色:剪影 */
-.avatar.veiled {
-  cursor: default;
-  opacity: 0.5;
-}
-
-.avatar.veiled .avatar-glyph {
-  color: var(--parchment);
-  background: var(--shadow, #1a1208);
-  border-style: dashed;
-}
-
-/* ── 档案卡 ── */
-
-.dossier-mask {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(20, 14, 6, 0.55);
-}
-
-.dossier {
-  position: relative;
-  width: min(92vw, 420px);
-  max-height: 84vh;
+.scroll.dossier {
+  width: min(92%, 460px);
+  height: auto;
+  max-height: 88%;
   overflow-y: auto;
-  padding: 14px 16px;
-  background: var(--parchment);
-  border: 2px solid var(--gilt);
-  border-radius: 4px;
-  box-shadow: 0 6px 30px rgba(0, 0, 0, 0.5);
-}
-
-.dossier-close {
-  position: absolute;
-  top: 6px;
-  right: 8px;
-  border: none;
-  background: transparent;
-  color: var(--ink-faded);
-  font-size: 1em;
-  cursor: pointer;
+  display: block;
+  padding: 20px 18px;
 }
 
 .dossier-head {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  border-bottom: 1px solid var(--gilt);
+  border-bottom: 2px double var(--gilt);
   padding-bottom: 6px;
   margin-bottom: 8px;
 }
@@ -901,6 +1189,7 @@ onMounted(() => {
 
 .dossier-stage {
   margin-left: auto;
+  margin-right: 22px;
   font-size: 0.85em;
   color: var(--rubric);
   font-weight: 700;
@@ -934,6 +1223,49 @@ onMounted(() => {
   text-align: right;
   color: var(--ink-faded);
   font-variant-numeric: tabular-nums;
+}
+
+.axis-delta {
+  width: 2.2em;
+  font-size: 0.9em;
+  color: var(--ink-faded);
+}
+
+.axis-delta.up {
+  color: var(--sin);
+  font-weight: 700;
+}
+
+.axis-delta.down {
+  color: #4a6b8a;
+  font-weight: 700;
+}
+
+.dossier-trend {
+  width: 100%;
+  height: 44px;
+  margin: 2px 0 8px;
+  background: rgba(255, 250, 238, 0.4);
+  border: 1px solid rgba(122, 92, 28, 0.55);
+  border-radius: 3px;
+}
+
+.dossier-trend polyline {
+  fill: none;
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+}
+
+.trend-support {
+  stroke: var(--gilt-bright);
+}
+
+.trend-sin {
+  stroke: var(--sin);
+}
+
+.trend-faith {
+  stroke: #4a6b8a;
 }
 
 .dossier-sense {
@@ -978,9 +1310,11 @@ onMounted(() => {
   padding: 6px 8px;
 }
 
+/* ═══════════ 三轴条 ═══════════ */
+
 .axis {
   height: 4px;
-  background: rgba(58, 47, 35, 0.15);
+  background: rgba(58, 47, 35, 0.16);
   border-radius: 2px;
   overflow: hidden;
 }
@@ -1003,44 +1337,7 @@ onMounted(() => {
   background: #4a6b8a;
 }
 
-.whisper {
-  margin-top: 10px;
-  padding-top: 6px;
-  border-top: 1px dashed var(--gilt);
-  font-size: 0.8em;
-  font-style: italic;
-  color: var(--sin);
-}
-
-.whisper-acts {
-  margin-left: 8px;
-  white-space: nowrap;
-}
-
-.whisper-act {
-  padding: 0 8px;
-  margin-left: 4px;
-  font-family: inherit;
-  font-size: 0.9em;
-  font-style: normal;
-  color: var(--ink-faded);
-  background: transparent;
-  border: 1px dashed var(--ink-faded);
-  border-radius: 3px;
-  cursor: pointer;
-}
-
-.whisper-act.obey {
-  color: var(--sin);
-  border-color: var(--sin);
-}
-
-.whisper-act:hover {
-  color: var(--parchment);
-  background: var(--sin);
-}
-
-/* ── 氛围:纠察之眼 / 会议蜡烛 ── */
+/* ═══════════ 氛围:纠察之眼 / 会议蜡烛 ═══════════ */
 
 .watch-eye.hot {
   color: var(--sin);
@@ -1065,103 +1362,7 @@ onMounted(() => {
   }
 }
 
-/* ── 三轴走势 sparkline ── */
-
-.dossier-trend {
-  width: 100%;
-  height: 42px;
-  margin: 2px 0 8px;
-  background: var(--parchment-dark);
-  border: 1px solid var(--gilt);
-  border-radius: 3px;
-}
-
-.dossier-trend polyline {
-  fill: none;
-  stroke-width: 1.2;
-  vector-effect: non-scaling-stroke;
-}
-
-.trend-support {
-  stroke: var(--gilt-bright);
-}
-
-.trend-sin {
-  stroke: var(--sin);
-}
-
-.trend-faith {
-  stroke: #4a6b8a;
-}
-
-.axis-delta {
-  width: 2.2em;
-  font-size: 0.9em;
-  color: var(--ink-faded);
-}
-
-.axis-delta.up {
-  color: var(--sin);
-  font-weight: 700;
-}
-
-.axis-delta.down {
-  color: #4a6b8a;
-  font-weight: 700;
-}
-
-/* ── 正文窗(书页) ── */
-
-.story {
-  padding: 12px 14px 14px;
-  margin-bottom: 10px;
-  border: 1px solid var(--gilt);
-  border-radius: 3px;
-  background:
-    linear-gradient(180deg, rgba(201, 162, 39, 0.06) 0%, transparent 40px),
-    var(--parchment);
-  font-size: 0.95em;
-  line-height: 1.85;
-  color: var(--ink);
-  max-height: 62vh;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
-.story p {
-  margin: 0 0 0.9em;
-  text-indent: 2em;
-}
-
-.story-entry:last-child p:last-child {
-  margin-bottom: 0;
-}
-
-.scribing {
-  text-indent: 0 !important;
-  font-size: 0.82em;
-  font-style: italic;
-  color: var(--ink-faded);
-  animation: scribe-pulse 1.6s ease-in-out infinite;
-}
-
-@keyframes scribe-pulse {
-  50% {
-    opacity: 0.35;
-  }
-}
-
-.story-player {
-  text-indent: 0 !important;
-  font-size: 0.9em;
-  font-style: italic;
-  color: var(--sin);
-  border-left: 2px solid var(--gilt);
-  padding-left: 8px;
-  margin: 0.4em 0 0.9em !important;
-}
-
-/* ── 法典 ── */
+/* ═══════════ 法典 ═══════════ */
 
 .rule-list {
   display: flex;
@@ -1170,11 +1371,13 @@ onMounted(() => {
 }
 
 .rule-card {
-  background: var(--parchment-dark);
-  border: 1px solid var(--gilt);
+  background: rgba(255, 250, 238, 0.35);
+  border: 1px solid rgba(122, 92, 28, 0.55);
+  border-left: 3px solid var(--gilt);
   border-radius: 3px;
-  padding: 6px 8px;
-  font-size: 0.82em;
+  padding: 7px 9px;
+  font-size: 0.84em;
+  box-shadow: 0 1px 3px rgba(90, 65, 30, 0.18);
 }
 
 .rule-head {
@@ -1252,14 +1455,14 @@ onMounted(() => {
 }
 
 .ascend-btn {
-  margin-top: 4px;
+  margin-top: 6px;
   width: 100%;
-  padding: 2px 0;
+  padding: 3px 0;
   font-family: inherit;
-  font-size: 0.75em;
+  font-size: 0.78em;
   font-weight: 700;
   color: var(--parchment);
-  background: var(--sin);
+  background: linear-gradient(180deg, #6d2749, var(--sin));
   border: 1px solid var(--gilt-bright);
   border-radius: 3px;
   cursor: pointer;
@@ -1268,7 +1471,7 @@ onMounted(() => {
 
 @keyframes ascend-glow {
   50% {
-    box-shadow: 0 0 6px var(--gilt-bright);
+    box-shadow: 0 0 8px var(--gilt-bright);
   }
 }
 
@@ -1276,7 +1479,15 @@ onMounted(() => {
   font-style: normal;
 }
 
-/* ── 会议 ── */
+/* ═══════════ 会议 ═══════════ */
+
+.meeting-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px 2px 6px;
+}
 
 .agenda-hint {
   font-size: 0.8em;
@@ -1289,17 +1500,19 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 8px;
-  margin-bottom: 4px;
-  border: 1px solid var(--gilt);
+  padding: 6px 9px;
+  margin-bottom: 5px;
+  border: 1px solid #7a5c1c;
   border-radius: 3px;
-  background: var(--parchment-dark);
+  background: rgba(255, 250, 238, 0.35);
+  box-shadow: 0 1px 3px rgba(90, 65, 30, 0.18);
   cursor: pointer;
   font-size: 0.85em;
 }
 
 .agenda-item.chosen {
   outline: 2px solid var(--rubric);
+  background: rgba(212, 175, 55, 0.14);
 }
 
 .agenda-item input {
@@ -1330,18 +1543,26 @@ onMounted(() => {
   color: var(--ink-faded);
 }
 
+/* 火漆印章按钮 */
 .rite-btn {
   display: block;
   margin: 10px auto 2px;
-  padding: 6px 22px;
+  padding: 6px 24px;
   font-family: inherit;
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.12em;
   color: var(--parchment);
-  background: var(--rubric);
+  background: radial-gradient(circle at 40% 32%, #a8402a, var(--rubric) 65%, #5c150b);
   border: 1px solid var(--gilt);
-  border-radius: 3px;
+  border-radius: 4px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 220, 190, 0.35),
+    0 2px 5px rgba(0, 0, 0, 0.45);
   cursor: pointer;
+}
+
+.rite-btn:hover:not(:disabled) {
+  filter: brightness(1.12);
 }
 
 .rite-btn:disabled {
@@ -1356,21 +1577,22 @@ onMounted(() => {
   margin-bottom: 8px;
   border-radius: 3px;
   border: 1px solid var(--gilt);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.25);
 }
 
 .verdict-banner.passed {
   color: var(--parchment);
-  background: var(--gilt);
+  background: linear-gradient(180deg, #b5942f, var(--gilt));
 }
 
 .verdict-banner.rejected {
   color: var(--parchment);
-  background: var(--ink-faded);
+  background: linear-gradient(180deg, #7d6c53, var(--ink-faded));
 }
 
 .verdict-banner.seized {
   color: var(--parchment);
-  background: var(--sin);
+  background: linear-gradient(180deg, #6d2749, var(--sin));
 }
 
 .vote-grid {
@@ -1388,9 +1610,10 @@ onMounted(() => {
 .vote-card {
   text-align: center;
   padding: 6px 4px;
-  border: 1px solid var(--gilt);
+  border: 1px solid #7a5c1c;
   border-radius: 3px;
-  background: var(--parchment-dark);
+  background: rgba(255, 250, 238, 0.4);
+  box-shadow: 0 1px 3px rgba(90, 65, 30, 0.2);
 }
 
 /* 逐席翻牌:蜡封依次揭开 */
