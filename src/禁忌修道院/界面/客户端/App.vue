@@ -1,46 +1,12 @@
 <template>
   <div class="codex">
-    <!-- ═══════════ 序章:总部委任状(首屏配置,一次性) ═══════════ -->
-    <template v-if="!已配置">
-      <header class="codex-header">
-        <span class="rubric">✠</span> 总会调令 <span class="rubric">✠</span>
-      </header>
-      <div class="writ">
-        <p>
-          兹委派新晋司铎前往圣维罗妮卡修道院,暂代已故安德肋神父之职:主持圣事,听取告解,列席修女会议,牧养该院,俟总会另行任命。
-        </p>
-        <p class="writ-sub">——启程之前,请阁下过目以下两项。</p>
-      </div>
-
-      <div class="writ-section">
-        <div class="writ-label">此行的凶险(难度)</div>
-        <label
-          v-for="(档, key) in 难度预设表"
-          :key="key"
-          class="agenda-item"
-          :class="{ chosen: 难度选择 === key }"
-        >
-          <input v-model="难度选择" type="radio" :value="key" />
-          <span class="agenda-name">{{ 档.名称 }}</span>
-          <span class="agenda-next">会议间隔 {{ 档.会议间隔[0] }}-{{ 档.会议间隔[1] }} 楼 · 视察阈值 {{ 档.视察激进度阈值 }}</span>
-        </label>
-      </div>
-
-      <div class="writ-section">
-        <div class="writ-label">神父不为人知的癖好(选填,叙事中隐蔽体现,永不点破)</div>
-        <textarea
-          v-model="私癖输入"
-          class="writ-input"
-          rows="2"
-          placeholder="例:偏爱看她们攥紧念珠强自镇定的样子……(留空亦可)"
-        ></textarea>
-      </div>
-
-      <button class="rite-btn" @click="启程">签署,启程上山</button>
-    </template>
+    <!-- ═══════════ 正文窗(书页:楼层文本吸进客户端,全屏游戏感) ═══════════ -->
+    <section v-if="正文段落.length" class="story">
+      <p v-for="(段, i) in 正文段落" :key="i">{{ 段 }}</p>
+    </section>
 
     <!-- ═══════════ 会议场景(整屏牧师会礼堂) ═══════════ -->
-    <template v-else-if="data.会议.状态 === '会议中'">
+    <template v-if="data.会议.状态 === '会议中'">
       <header class="codex-header">
         <span class="rubric">✦</span> 牧师会礼堂 · 修女会议 <span class="rubric">✦</span>
       </header>
@@ -166,7 +132,7 @@
 import type { 修女职位 } from '../../schema';
 import type { 会议结果 as 会议结果类型 } from '../../脚本/游戏逻辑/meetingSystem';
 import { 常规投票人, 计算单票 } from '../../脚本/游戏逻辑/voteEngine';
-import { 查档, 查规则, 晋阶堕落门槛, 修女表, 修女职位列表, 难度预设表, 院规表 } from '../../stageConfig';
+import { 查档, 查规则, 晋阶堕落门槛, 修女表, 修女职位列表, 院规表 } from '../../stageConfig';
 import { useDataStore } from './store';
 
 const store = useDataStore();
@@ -179,19 +145,26 @@ const 名册 = computed(() =>
     .filter(nun => !nun.隐藏 || data.value.修女[nun.职位].情报可见),
 );
 
-// ── 序章:总部委任状(配置存 chat 变量 _设置,一次性) ──
+// ── 正文窗:楼层文本吸进客户端(全屏游戏感;显示正则吞掉原始楼层文本) ──
 
-const 已配置 = ref(true); // 挂载时校准,默认 true 防闪屏
-const 难度选择 = ref('忏悔者');
-const 私癖输入 = ref('');
+const 正文段落 = ref<string[]>([]);
 
-function 启程() {
-  insertOrAssignVariables(
-    { _设置: { 难度: 难度选择.value, 私癖: 私癖输入.value.trim() } },
-    { type: 'chat' },
-  );
-  eventEmit('禁忌修道院:序章完成');
-  已配置.value = true;
+async function 取正文() {
+  try {
+    const 消息组 = await getChatMessages(getCurrentMessageId());
+    const 原文 = 消息组?.[0]?.message ?? '';
+    const 净文 = 原文
+      .replace(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/g, '')
+      .replace(/<StatusPlaceHolderImpl\/>/g, '')
+      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+      .trim();
+    正文段落.value = 净文
+      .split(/\n+/)
+      .map(s => s.trim())
+      .filter(Boolean);
+  } catch (e) {
+    console.error('[禁忌修道院客户端] 取正文失败:', e);
+  }
 }
 
 // ── 法典面板(投票预测+情报雾) ──
@@ -270,11 +243,9 @@ function 晋阶(职位: 修女职位) {
 }
 
 onMounted(() => {
-  const chatVars = getVariables({ type: 'chat' });
-  // 序章:仅最新楼且未配置时展示委任状(旧楼 iframe 不弹)
-  已配置.value = _.has(chatVars, '_设置') || getCurrentMessageId() !== getLastMessageId();
+  void 取正文();
   // 结果已出(演出楼/回看):从 chat 变量恢复
-  会议结果.value = (_.get(chatVars, '_会议.结果') ?? null) as 会议结果类型 | null;
+  会议结果.value = (_.get(getVariables({ type: 'chat' }), '_会议.结果') ?? null) as 会议结果类型 | null;
   eventOn('禁忌修道院:投票结果', (结果: 会议结果类型) => {
     会议结果.value = 结果;
   });
@@ -387,43 +358,34 @@ onMounted(() => {
   color: var(--sin);
 }
 
-/* ── 序章委任状 ── */
+/* ── 正文窗(书页) ── */
 
-.writ {
-  font-size: 0.88em;
-  line-height: 1.7;
-  color: var(--ink);
-  padding: 4px 6px;
-}
-
-.writ-sub {
-  color: var(--ink-faded);
-  text-align: right;
-  font-size: 0.9em;
-}
-
-.writ-section {
-  margin: 8px 0;
-}
-
-.writ-label {
-  font-size: 0.8em;
-  font-weight: 700;
-  color: var(--rubric);
-  margin-bottom: 4px;
-}
-
-.writ-input {
-  width: 100%;
-  box-sizing: border-box;
-  font-family: inherit;
-  font-size: 0.85em;
-  color: var(--ink);
-  background: var(--parchment-dark);
+.story {
+  padding: 12px 14px 14px;
+  margin-bottom: 10px;
   border: 1px solid var(--gilt);
   border-radius: 3px;
-  padding: 5px 8px;
-  resize: vertical;
+  background:
+    linear-gradient(180deg, rgba(201, 162, 39, 0.06) 0%, transparent 40px),
+    var(--parchment);
+  font-size: 0.95em;
+  line-height: 1.85;
+  color: var(--ink);
+}
+
+.story p {
+  margin: 0 0 0.9em;
+  text-indent: 2em;
+}
+
+.story p:last-child {
+  margin-bottom: 0;
+}
+
+.story p:first-child::first-letter {
+  font-size: 1.6em;
+  color: var(--rubric);
+  font-weight: 700;
 }
 
 /* ── 面板页签与法典 ── */
