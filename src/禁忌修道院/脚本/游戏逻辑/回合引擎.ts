@@ -242,3 +242,36 @@ export async function 重掷回合(): Promise<void> {
   }
   await 执行回合(记录.行动);
 }
+
+/**
+ * 时之烛台回档:烧掉指定楼层之后的一切书页。
+ *   变量随楼回滚(每楼自带 stat_data 快照);回合类 chat 变量(会议票值/首夜/主动事件/
+ *   晋阶排队/重掷记录)一律清空——它们排队于被烧掉的时间线,保守清掉最安全,
+ *   玩家可重新触发(晋阶按钮还在,会议倒计时在 stat_data 里随楼恢复)。
+ */
+export async function 回档至(楼层: number): Promise<void> {
+  if (进行中) return;
+  const 末楼 = getLastMessageId();
+  if (!Number.isInteger(楼层) || 楼层 < 0 || 楼层 >= 末楼) {
+    eventEmit('禁忌修道院:回合失败', '没有可烧掉的书页');
+    return;
+  }
+  进行中 = true;
+  try {
+    await deleteChatMessages(_.range(楼层 + 1, 末楼 + 1), { refresh: 'none' });
+    await updateVariablesWith(
+      vars => {
+        for (const 键 of [...回合变量键, '_上次回合']) _.set(vars, 键, null);
+        return vars;
+      },
+      { type: 'chat' },
+    );
+    console.info(`[禁忌修道院] 回档至 ${楼层} 楼,之后的书页已烧毁`);
+    eventEmit('禁忌修道院:回合完成');
+  } catch (e) {
+    console.error('[禁忌修道院] 回档失败:', e);
+    eventEmit('禁忌修道院:回合失败', e instanceof Error ? e.message : String(e));
+  } finally {
+    进行中 = false;
+  }
+}

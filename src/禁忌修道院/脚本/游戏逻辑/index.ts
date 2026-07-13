@@ -7,7 +7,16 @@ import { 会议间隔, 离开会议厅, 开始投票 } from './meetingSystem';
 import { 请求晋阶, 达成里程碑 } from './eventSystem';
 import { 读取, 脚本写入, 脚本写入中 } from './mvuIO';
 import { 检测焦点 } from './snapshotSystem';
-import { 执行回合, 重掷回合, 回合结算, 回合进行中, 选事件指令, 组快照注入, type 事件类型 } from './回合引擎';
+import {
+  执行回合,
+  重掷回合,
+  回档至,
+  回合结算,
+  回合进行中,
+  选事件指令,
+  组快照注入,
+  type 事件类型,
+} from './回合引擎';
 
 /**
  * 禁忌修道院(重置版) - 游戏逻辑脚本
@@ -113,6 +122,12 @@ function 挂载监听() {
   eventClearEvent('禁忌修道院:重掷');
   eventOn('禁忌修道院:重掷', () => {
     void 重掷回合();
+  });
+
+  // 时之烛台回档:烧掉指定楼层之后的书页(原生删楼回档的替代)
+  eventClearEvent('禁忌修道院:回档');
+  eventOn('禁忌修道院:回档', (payload: { 楼层: number }) => {
+    void 回档至(payload.楼层);
   });
 
   // ============================================

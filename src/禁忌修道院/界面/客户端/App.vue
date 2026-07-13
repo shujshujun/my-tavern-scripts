@@ -9,6 +9,16 @@
         <p v-if="条.谁 === '玩家'" class="story-player">✠ {{ 条.文本[0] }}</p>
         <template v-else>
           <p v-for="(段, j) in 条.文本" :key="j">{{ 段 }}</p>
+          <p v-if="条.可回档 && !发送中" class="candle-row">
+            <button
+              class="candle"
+              :class="{ armed: 待回档楼 === 条.楼 }"
+              :title="待回档楼 === 条.楼 ? '再点一次确认' : '时之烛台:回到这一页刚写完的时刻'"
+              @click.stop="点烛(条.楼)"
+            >
+              {{ 待回档楼 === 条.楼 ? '⚠ 再点一次,烧掉这页之后的一切' : '🕯' }}
+            </button>
+          </p>
         </template>
       </div>
       <div v-if="发送中" class="story-entry">
@@ -230,6 +240,10 @@ const 名册 = computed(() =>
 interface 卷轴条 {
   谁: '玩家' | '叙事';
   文本: string[];
+  /** 该条对应的楼层号(时之烛台回档锚点) */
+  楼?: number;
+  /** 可作为回档目标(AI 楼、非末楼、当时不在会议中) */
+  可回档?: boolean;
 }
 
 const 卷轴 = ref<卷轴条[]>([]);
@@ -256,7 +270,8 @@ async function 滚到底() {
 
 async function 取卷轴() {
   try {
-    const 消息组 = (await getChatMessages(`0-${getLastMessageId()}`)) ?? [];
+    const 末楼 = getLastMessageId();
+    const 消息组 = (await getChatMessages(`0-${末楼}`)) ?? [];
     const 条目: 卷轴条[] = [];
     for (const 消息 of 消息组) {
       const 净文 = 清洗(消息.message ?? '');
@@ -265,20 +280,41 @@ async function 取卷轴() {
       if (是玩家) {
         条目.push({ 谁: '玩家', 文本: [净文.replace(/\n+/g, ' ')] });
       } else {
+        // 蜡烛只插在"当时是日常"的 AI 楼上(回档进半场会议会踩坏票值快照)
+        const 当时日常 = _.get(消息.data, 'stat_data.会议.状态', '日常') === '日常';
         条目.push({
           谁: '叙事',
           文本: 净文
             .split(/\n+/)
             .map(s => s.trim())
             .filter(Boolean),
+          楼: 消息.message_id,
+          可回档: 消息.message_id < 末楼 && 当时日常,
         });
       }
     }
     卷轴.value = 条目;
+    待回档楼.value = null;
     await 滚到底();
   } catch (e) {
     console.error('[禁忌修道院客户端] 取卷轴失败:', e);
   }
+}
+
+// ── 时之烛台(两段式确认,烧掉该楼之后的一切) ──
+
+const 待回档楼 = ref<number | null>(null);
+
+function 点烛(楼: number | undefined) {
+  if (楼 === undefined || 发送中.value) return;
+  if (待回档楼.value !== 楼) {
+    待回档楼.value = 楼; // 第一次点:武装,等确认
+    return;
+  }
+  待回档楼.value = null;
+  发送中.value = true;
+  流式段.value = [];
+  eventEmit('禁忌修道院:回档', { 楼层: 楼 });
 }
 
 // ── 法典面板(投票预测+情报雾) ──
@@ -462,6 +498,37 @@ onMounted(() => {
 .reroll-btn:hover {
   color: var(--rubric);
   border-style: solid;
+}
+
+/* ── 时之烛台 ── */
+
+.candle-row {
+  text-indent: 0 !important;
+  text-align: right;
+  margin: -0.4em 0 0.6em !important;
+}
+
+.candle {
+  padding: 0 6px;
+  font-family: inherit;
+  font-size: 0.72em;
+  color: var(--ink-faded);
+  background: transparent;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  opacity: 0.45;
+}
+
+.candle:hover {
+  opacity: 1;
+}
+
+.candle.armed {
+  opacity: 1;
+  color: var(--parchment);
+  background: var(--sin);
+  border: 1px solid var(--gilt-bright);
 }
 
 .codex-header {
