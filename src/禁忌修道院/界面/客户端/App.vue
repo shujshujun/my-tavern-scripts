@@ -784,6 +784,13 @@ const 显示寝居 = ref(false);
 const 显示地图 = ref(false);
 /** 位置推算种子=末楼号(取卷轴时更新;每回合+2 → 她们走动了) */
 const 末楼号 = ref(0);
+/** 进房那一刻的末楼号(随 _场景 持久) */
+const 进房末楼 = ref(0);
+/**
+ * 位置种子:在房间里=进房时的楼号(冻结,玩家在房内期间全院不重洗——否则身边的修女
+ * 每回合被"传送"走,AI 只能圆成"她起身要走"的必定离场事故);回廊上=实时末楼(她们走动了)
+ */
+const 位置种子 = computed(() => (当前房间.value ? 进房末楼.value : 末楼号.value));
 
 const 可登场 = computed(() =>
   修女职位列表.filter(职位 => !修女表[职位].隐藏 || (data.value?.修女?.[职位]?.情报可见 ?? false)),
@@ -792,7 +799,7 @@ const 可登场 = computed(() =>
 const 房间列表 = computed(() =>
   房间表.map(房 => ({
     ...房,
-    在场: 房内修女(房.id, 末楼号.value, 可登场.value),
+    在场: 房内修女(房.id, 位置种子.value, 可登场.value),
   })),
 );
 
@@ -803,7 +810,7 @@ const 寝居列表 = computed(() =>
       职位,
       名称: `${修女表[职位].显示名}的寝室`,
       上锁: (data.value?.修女?.[职位]?.支持度 ?? 0) < 寝室支持度门槛,
-      在房: 推算位置(职位, 末楼号.value) === `寝室:${职位}`,
+      在房: 推算位置(职位, 位置种子.value) === `寝室:${职位}`,
       首字: 修女表[职位].显示名[0],
     })),
 );
@@ -817,24 +824,29 @@ const 当前房间名 = computed(() => {
 
 const 房内名单 = computed(() =>
   当前房间.value
-    ? 房内修女(当前房间.value, 末楼号.value, 可登场.value)
+    ? 房内修女(当前房间.value, 位置种子.value, 可登场.value)
         .map(职位 => 修女表[职位].显示名)
         .join('、')
     : '',
 );
 
 function 写场景(房间id: string | null, 破锁 = false) {
-  insertOrAssignVariables({ _场景: 房间id ? { 房间id, 破锁 } : null }, { type: 'chat' });
+  insertOrAssignVariables({ _场景: 房间id ? { 房间id, 破锁, 进房末楼: 进房末楼.value } : null }, { type: 'chat' });
 }
 
 function 进入(房间id: string, 破锁 = false) {
+  try {
+    进房末楼.value = getLastMessageId(); // 冻结位置种子(脚本快照与界面共用,随 _场景 持久)
+  } catch {
+    进房末楼.value = 末楼号.value;
+  }
   当前房间.value = 房间id;
   显示寝居.value = false;
   显示地图.value = false;
   写场景(房间id, 破锁);
   if (破锁) eventEmit('禁忌修道院:破锁'); // 警戒代价在脚本侧
   // 头像即时点亮(回合结束后脚本会按位置系统重算)
-  在场.value = { 焦点: 房内修女(房间id, 末楼号.value, 可登场.value), 背景: [] };
+  在场.value = { 焦点: 房内修女(房间id, 位置种子.value, 可登场.value), 背景: [] };
 }
 
 function 离开房间() {
@@ -1315,9 +1327,14 @@ onMounted(() => {
   刷新可重掷();
   刷新在场();
   刷新行动选项();
-  // 恢复场景(刷新页面/重开酒馆后仍在原房间)
-  const 场景 = _.get(getVariables({ type: 'chat' }), '_场景') as { 房间id?: string } | null;
+  // 恢复场景(刷新页面/重开酒馆后仍在原房间,位置种子一并恢复)
+  const 场景 = _.get(getVariables({ type: 'chat' }), '_场景') as { 房间id?: string; 进房末楼?: number } | null;
   当前房间.value = 场景?.房间id ?? null;
+  try {
+    进房末楼.value = 场景?.进房末楼 ?? getLastMessageId(); // 旧存档无此字段:退回当前末楼(至少从现在起冻结)
+  } catch {
+    进房末楼.value = 0;
+  }
 
   // 真全屏状态同步(按钮/Esc/系统手势退出都走这里;webkit 前缀给 Safari)
   for (const 事件名 of ['fullscreenchange', 'webkitfullscreenchange']) {

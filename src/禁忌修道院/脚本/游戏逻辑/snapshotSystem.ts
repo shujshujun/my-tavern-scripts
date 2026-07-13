@@ -87,8 +87,12 @@ export function 编译院规快照(data: SchemaType): string {
 // ============================================
 
 /** 玩家当前场景(客户端地图写入 chat 变量;走动零成本纯 UI,不产生楼层) */
-export function 读场景(): { 房间id?: string; 破锁?: boolean } {
-  return (_.get(getVariables({ type: 'chat' }), '_场景') ?? {}) as { 房间id?: string; 破锁?: boolean };
+export function 读场景(): { 房间id?: string; 破锁?: boolean; 进房末楼?: number } {
+  return (_.get(getVariables({ type: 'chat' }), '_场景') ?? {}) as {
+    房间id?: string;
+    破锁?: boolean;
+    进房末楼?: number;
+  };
 }
 
 /** 场景显示名+氛围('寝室:职位' 特判) */
@@ -121,9 +125,11 @@ export function 检测焦点(
     职位 => !修女表[职位].隐藏 || data.修女[职位].情报可见 || data.视察.状态 === '进行中',
   );
 
-  const { 房间id } = 读场景();
+  const { 房间id, 进房末楼 } = 读场景();
   if (房间id) {
-    const 在房 = 房内修女(房间id, getLastMessageId(), 可登场);
+    // 位置种子冻结在进房那一刻:玩家在房内期间全院不重洗——否则楼号每回合+2,
+    // 身边的修女下一轮就被"传送"走,AI 只能圆成"她起身要走"(必定离场事故)
+    const 在房 = 房内修女(房间id, 进房末楼 ?? getLastMessageId(), 可登场);
     return { 焦点: 在房.slice(0, 3), 背景: [] };
   }
 
