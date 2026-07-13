@@ -131,24 +131,48 @@
         <div class="cloister-hint">
           {{ 显示寝居 ? '寝居回廊——每一扇门后,是她全部的私人世界' : '你走在回廊上。烛光明灭,该去叩谁的门?' }}
         </div>
-        <div v-if="!显示寝居" class="room-grid">
-          <button v-for="房 in 房间列表" :key="房.id" class="room-plate" @click="进入(房.id)">
-            <span class="room-icon">{{ 房.图标 }}</span>
-            <span class="room-name">{{ 房.名称 }}</span>
-            <span class="room-occupants">
-              <i v-for="名 in 房.在场名" :key="名" class="occ" :title="名">{{ 名[0] }}</i>
-            </span>
-          </button>
-          <button class="room-plate" @click="显示寝居 = true">
-            <span class="room-icon">🚪</span>
-            <span class="room-name">寝居回廊</span>
-            <span class="room-occupants">
-              <i v-for="室 in 寝居列表.filter(x => x.在房)" :key="室.职位" class="occ" :title="室.名称">{{
-                室.首字
-              }}</i>
-            </span>
-          </button>
-        </div>
+        <!-- 顶视图(手绘SVG线稿占位;找到美术图后整块替换) -->
+        <svg v-if="!显示寝居" class="map-svg" viewBox="0 0 420 300">
+          <!-- 回廊连线(装饰) -->
+          <g class="map-deco">
+            <line x1="124" y1="51" x2="138" y2="51" />
+            <line x1="124" y1="119" x2="160" y2="160" />
+            <line x1="124" y1="187" x2="160" y2="187" />
+            <line x1="124" y1="255" x2="160" y2="236" />
+            <line x1="282" y1="67" x2="288" y2="43" />
+            <line x1="296" y1="119" x2="260" y2="160" />
+            <line x1="296" y1="187" x2="260" y2="187" />
+            <line x1="296" y1="255" x2="260" y2="236" />
+            <line x1="210" y1="114" x2="210" y2="140" />
+            <!-- 庭院十字小径 -->
+            <line x1="160" y1="188" x2="260" y2="188" class="thin" />
+            <line x1="210" y1="140" x2="210" y2="236" class="thin" />
+            <!-- 大门 -->
+            <path d="M198 236 v18 h24 v-18" fill="none" />
+          </g>
+          <text x="210" y="16" class="map-cross">✟</text>
+          <text x="210" y="290" class="map-gate">— 山 门 —</text>
+
+          <g v-for="房 in 平面图" :key="房.id" class="map-room" @click="点图房(房.id)">
+            <rect v-for="(块, i) in 房.块" :key="i" :x="块[0]" :y="块[1]" :width="块[2]" :height="块[3]" />
+            <text :x="房.标[0]" :y="房.标[1]" class="map-label">{{ 房.名 }}</text>
+            <g v-for="(名, i) in 图房在场表[房.id] ?? []" :key="名">
+              <circle
+                :cx="房.点[0] + i * 17 - ((图房在场表[房.id]?.length ?? 1) - 1) * 8.5"
+                :cy="房.点[1]"
+                r="7.5"
+                class="map-occ"
+              />
+              <text
+                :x="房.点[0] + i * 17 - ((图房在场表[房.id]?.length ?? 1) - 1) * 8.5"
+                :y="房.点[1] + 3.2"
+                class="map-occ-t"
+              >
+                {{ 名[0] }}
+              </text>
+            </g>
+          </g>
+        </svg>
         <div v-else class="room-grid">
           <button
             v-for="室 in 寝居列表"
@@ -418,6 +442,57 @@ const 道具图标: Record<string, string> = {
   非常召集: 图非常召集,
   账目复核: 图账目复核,
 };
+
+/**
+ * 修道院顶视图(手绘 SVG 线稿占位;用户找到美术图后整块替换)
+ * 布局:十字形礼拜堂居上,回廊围庭院居中,左右两翼房间,寝居回廊在右下。
+ * 块=[x,y,w,h](一房可多块拼形状);标=房名锚点;点=在场者圆点锚点。
+ */
+interface 图房 {
+  id: string;
+  名: string;
+  块: [number, number, number, number][];
+  标: [number, number];
+  点: [number, number];
+}
+
+const 平面图: 图房[] = [
+  {
+    id: '礼拜堂',
+    名: '礼拜堂',
+    块: [
+      [160, 22, 100, 92],
+      [138, 48, 144, 38],
+    ],
+    标: [210, 74],
+    点: [210, 98],
+  },
+  { id: '忏悔室', 名: '忏悔室', 块: [[288, 22, 58, 42]], 标: [317, 40], 点: [317, 54] },
+  { id: '院长室', 名: '院长室', 块: [[24, 22, 100, 58]], 标: [74, 46], 点: [74, 64] },
+  { id: '账房', 名: '账房', 块: [[24, 90, 100, 58]], 标: [74, 114], 点: [74, 132] },
+  { id: '药房', 名: '药房', 块: [[24, 158, 100, 58]], 标: [74, 182], 点: [74, 200] },
+  { id: '缮写室', 名: '缮写室', 块: [[24, 226, 100, 58]], 标: [74, 250], 点: [74, 268] },
+  { id: '庭院', 名: '庭院', 块: [[160, 140, 100, 96]], 标: [210, 184], 点: [210, 206] },
+  { id: '厨房', 名: '厨房', 块: [[296, 90, 100, 58]], 标: [346, 114], 点: [346, 132] },
+  { id: '洗衣房', 名: '洗衣房', 块: [[296, 158, 100, 58]], 标: [346, 182], 点: [346, 200] },
+  { id: '寝居', 名: '寝居回廊', 块: [[296, 226, 100, 58]], 标: [346, 250], 点: [346, 268] },
+];
+
+/** 图上某房的在场者显示名(寝居=各寝室里的人合并) */
+const 图房在场表 = computed<Record<string, string[]>>(() => {
+  const 表: Record<string, string[]> = {};
+  for (const 房 of 房间列表.value) 表[房.id] = 房.在场名;
+  表['寝居'] = 寝居列表.value.filter(室 => 室.在房).map(室 => 修女表[室.职位].显示名);
+  return 表;
+});
+
+function 点图房(id: string) {
+  if (id === '寝居') {
+    显示寝居.value = true;
+    return;
+  }
+  进入(id);
+}
 
 const store = useDataStore();
 const data = computed(() => store.data);
@@ -1744,6 +1819,81 @@ onMounted(() => {
   font-style: italic;
   color: var(--bone-faded);
   margin-bottom: 6px;
+}
+
+/* 顶视图 SVG(手绘线稿占位) */
+.map-svg {
+  display: block;
+  width: 100%;
+  max-height: 260px;
+  margin: 0 auto;
+}
+
+.map-deco line,
+.map-deco path {
+  stroke: var(--line-soft);
+  stroke-width: 1.5;
+}
+
+.map-deco .thin {
+  stroke-width: 0.8;
+  stroke-dasharray: 3 4;
+}
+
+.map-cross {
+  fill: var(--gold-bright);
+  font-size: 13px;
+  text-anchor: middle;
+}
+
+.map-gate {
+  fill: var(--bone-faded);
+  font-size: 9px;
+  letter-spacing: 0.4em;
+  text-anchor: middle;
+}
+
+.map-room {
+  cursor: pointer;
+}
+
+.map-room rect {
+  fill: rgba(201, 169, 78, 0.045);
+  stroke: var(--line);
+  stroke-width: 1;
+  transition: all 0.25s ease;
+}
+
+.map-room:hover rect {
+  fill: rgba(201, 169, 78, 0.13);
+  stroke: var(--gold);
+  filter: drop-shadow(0 0 6px rgba(201, 169, 78, 0.45));
+}
+
+.map-label {
+  fill: var(--bone);
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-anchor: middle;
+  pointer-events: none;
+}
+
+.map-room:hover .map-label {
+  fill: var(--gold-bright);
+}
+
+.map-occ {
+  fill: rgba(201, 169, 78, 0.16);
+  stroke: var(--gold);
+  stroke-width: 0.8;
+  filter: drop-shadow(0 0 4px rgba(201, 169, 78, 0.5));
+}
+
+.map-occ-t {
+  fill: var(--gold-bright);
+  font-size: 8.5px;
+  text-anchor: middle;
+  pointer-events: none;
 }
 
 .room-grid {
