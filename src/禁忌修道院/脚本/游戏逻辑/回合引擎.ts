@@ -48,8 +48,23 @@ function 读上次回合(): 上次回合记录 | undefined {
 let 本回合生成id = '';
 eventClearEvent(iframe_events.STREAM_TOKEN_RECEIVED_FULLY);
 eventOn(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, (文本: string, generation_id: string) => {
-  if (进行中 && generation_id === 本回合生成id) eventEmit('禁忌修道院:流式', 文本);
+  if (!进行中) return;
+  // 有 id 且不匹配才过滤(挡第三方插件的 generate);id 缺失=旧版助手不透传,放行以免全程无流式
+  if (generation_id && generation_id !== 本回合生成id) return;
+  eventEmit('禁忌修道院:流式', 文本);
 });
+
+// ── 取消本回合("打断这一笔"):停掉生成,作废的回合不落书页 ──
+let 已取消 = false;
+export function 取消本回合() {
+  if (!进行中 || !本回合生成id) return;
+  已取消 = true;
+  try {
+    if (!stopGenerationById(本回合生成id)) stopAllGeneration();
+  } catch (e) {
+    console.error('[禁忌修道院] 停止生成失败:', e);
+  }
+}
 
 /** 事件指令优先级:会议数据卡 > 晋阶正戏 > 新规首夜 > 圣器(黑市解锁) > 修女主动事件(互斥,一楼一事) */
 export function 选事件指令(): { 文本: string; 类型: 事件类型 } | null {
@@ -195,10 +210,15 @@ export async function 执行回合(行动: string): Promise<void> {
       injects.push({ role: 'system', content: 事件.文本, position: 'in_chat', depth: 0, should_scan: false });
     }
 
+    已取消 = false;
     本回合生成id = `xdy-${回合前末楼}-${_.random(1e9)}`;
     const 原文 = String(
       await generate({ user_input: 行动, should_stream: true, injects, generation_id: 本回合生成id }),
     );
+    if (已取消) {
+      eventEmit('禁忌修道院:回合失败', '已取消——这一笔没有落纸');
+      return;
+    }
 
     // 楼层由 createChatMessages 静默创建,不经酒馆生成管道 → MVU 不会自动解析,手动 parse + 安检
     const 旧 = Mvu.getMvuData({ type: 'message', message_id: -1 });
@@ -231,10 +251,15 @@ export async function 执行回合(行动: string): Promise<void> {
 
     eventEmit('禁忌修道院:回合完成');
   } catch (e) {
-    console.error('[禁忌修道院] 回合执行失败:', e);
-    eventEmit('禁忌修道院:回合失败', e instanceof Error ? e.message : String(e));
+    if (已取消) {
+      eventEmit('禁忌修道院:回合失败', '已取消——这一笔没有落纸');
+    } else {
+      console.error('[禁忌修道院] 回合执行失败:', e);
+      eventEmit('禁忌修道院:回合失败', e instanceof Error ? e.message : String(e));
+    }
   } finally {
     进行中 = false;
+    本回合生成id = ''; // 防回档等无生成的回合被"取消"误伤
   }
 }
 
