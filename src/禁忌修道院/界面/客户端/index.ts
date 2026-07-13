@@ -13,7 +13,8 @@ function 显示致命错误(err: unknown, 来源: string) {
       'background:#7a1a1a;color:#ffe9e0;padding:6px 8px;margin:4px;border-radius:3px;font-size:12px;white-space:pre-wrap;word-break:break-all;';
     document.body.prepend(d);
   }
-  const 详情 = err instanceof Error ? `${err.message}\n${(err.stack ?? '').split('\n').slice(1, 3).join('\n')}` : String(err);
+  const 详情 =
+    err instanceof Error ? `${err.message}\n${(err.stack ?? '').split('\n').slice(1, 3).join('\n')}` : String(err);
   d.textContent = `⚠︎ [${来源}] ${详情}`;
 }
 
@@ -25,6 +26,11 @@ window.addEventListener('unhandledrejection', ev => 显示致命错误(ev.reason
  * 面板开合再也不会把框架抻长缩短。留出顶部标题栏与底部按钮条的空间。
  */
 function 设定画幅() {
+  // 沉浸全屏(诡秘剧场式):iframe 被脚本钉成 100vw×100vh,画幅直接吃满自身视口
+  if (document.documentElement.classList.contains('xdy-full')) {
+    document.documentElement.style.setProperty('--frame-h', '100vh');
+    return;
+  }
   try {
     const 父高 = window.parent?.innerHeight ?? 800;
     const 高 = Math.max(460, Math.round(父高 - 150));

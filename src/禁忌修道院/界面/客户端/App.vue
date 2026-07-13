@@ -75,6 +75,13 @@
             <GI :i="图烛台" /> {{ data.会议.倒计时 }}
           </span>
           <span class="meta-btns">
+            <button
+              class="codex-toggle"
+              :title="全屏中 ? '退出全屏,回到酒馆页面内' : '沉浸全屏:铺满整个窗口(手机/PC 通用)'"
+              @click="切换全屏"
+            >
+              <GI :i="全屏中 ? 图收拢 : 图展开" />
+            </button>
             <button class="codex-toggle" @click="显示法典 = true">☨ 法典</button>
             <button class="codex-toggle" title="完整编年史与时之烛台" @click="显示史册 = true">
               <GI :i="图史册" /> 史册
@@ -509,6 +516,8 @@ import 图离开 from './资源/界面/离开.svg?raw';
 import 图天平 from './资源/界面/天平.svg?raw';
 import 图羽笔 from './资源/界面/羽笔.svg?raw';
 import 图地图 from './资源/界面/地图.svg?raw';
+import 图展开 from './资源/界面/展开.svg?raw';
+import 图收拢 from './资源/界面/收拢.svg?raw';
 
 // 修女头像(DiceBear Lorelei 线稿, Lisa Wischofsky 原作, CC0;线条重着色 currentColor 吃状态色,
 // 脸底改暖黑成版画质感;raw 内联零网络依赖。占位性质:变体按人设速配,后期整套重绘直接换文件)
@@ -660,6 +669,27 @@ const 行动选项 = ref<string[]>([]);
 function 刷新行动选项() {
   const v = _.get(getVariables({ type: 'chat' }), '_行动选项');
   行动选项.value = Array.isArray(v) ? (v as string[]).filter(x => typeof x === 'string' && x.trim()) : [];
+}
+
+// ── 沉浸全屏(诡秘剧场式):脚本把 0 楼 iframe 钉成 100vw×100vh,这里只管开关与画幅 ──
+
+const 全屏中 = ref(false);
+
+function 切换全屏() {
+  全屏中.value = !全屏中.value;
+  document.documentElement.classList.toggle('xdy-full', 全屏中.value);
+  eventEmit('禁忌修道院:全屏', 全屏中.value);
+  if (全屏中.value) {
+    document.documentElement.style.setProperty('--frame-h', '100vh');
+  } else {
+    // 与 index.ts 设定画幅 同一公式(顶部标题栏+底部按钮条留白)
+    try {
+      const 父高 = window.parent?.innerHeight ?? 800;
+      document.documentElement.style.setProperty('--frame-h', `${Math.max(460, Math.round(父高 - 150))}px`);
+    } catch {
+      document.documentElement.style.setProperty('--frame-h', '620px');
+    }
+  }
 }
 
 // ── 恶魔低语:神父心底的恶念/剧情腹黑旁注(非行动指引);划掉=本条隐去,下条低语再现 ──
@@ -2677,6 +2707,42 @@ onMounted(() => {
 /* text-shadow 照不亮 SVG,警戒之眼的红光用 drop-shadow 补 */
 .watch-eye.hot .gi {
   filter: drop-shadow(0 0 6px var(--rubric));
+}
+
+/* ── 窄屏(手机)适配:缩留白与元件,信息密度让位于可点性 ── */
+@media (max-width: 500px) {
+  .codex {
+    padding: 4px;
+  }
+
+  .page {
+    padding: 6px 6px 8px;
+  }
+
+  .meta-row {
+    gap: 6px;
+    font-size: 0.82em;
+  }
+
+  .avatar-glyph {
+    width: 34px;
+    height: 34px;
+  }
+
+  .story {
+    padding: 10px 10px;
+    font-size: 0.92em;
+    line-height: 1.85;
+  }
+
+  .cloister {
+    width: 96%;
+    padding: 30px 8px 10px;
+  }
+
+  .room-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 /* ── 会议 ── */

@@ -8,16 +8,7 @@ import { 调警戒, 请求晋阶, 达成里程碑 } from './eventSystem';
 import { 读取, 脚本写入, 脚本写入中 } from './mvuIO';
 import { 购买 } from './商店系统';
 import { 检测焦点 } from './snapshotSystem';
-import {
-  执行回合,
-  重掷回合,
-  回档至,
-  回合结算,
-  回合进行中,
-  选事件指令,
-  组快照注入,
-  type 事件类型,
-} from './回合引擎';
+import { 执行回合, 重掷回合, 回档至, 回合结算, 回合进行中, 选事件指令, 组快照注入, type 事件类型 } from './回合引擎';
 
 /**
  * 禁忌修道院(重置版) - 游戏逻辑脚本
@@ -70,6 +61,27 @@ function 注入全屏样式() {
     }
   } catch (e) {
     console.error('[禁忌修道院] 注入全屏样式失败:', e);
+  }
+}
+
+/**
+ * 沉浸全屏(诡秘剧场式):把 0 楼客户端 iframe 钉成 100vw×100vh 盖满整个酒馆窗口。
+ * 手机=吃满屏幕,PC=网页内全屏;✠ 逃生舱按钮 z-index 更高,始终可点。
+ */
+function 切换沉浸全屏(开: boolean) {
+  try {
+    $('#xdy-immersive-style').remove();
+    if (开) {
+      $('head').append(
+        '<style id="xdy-immersive-style">' +
+          '#chat .mes[mesid="0"] iframe{position:fixed !important;inset:0 !important;' +
+          'width:100vw !important;height:100vh !important;max-height:none !important;' +
+          'z-index:2999 !important;background:#050402 !important;border:0 !important;margin:0 !important;}' +
+          '</style>',
+      );
+    }
+  } catch (e) {
+    console.error('[禁忌修道院] 切换沉浸全屏失败:', e);
   }
 }
 
@@ -131,6 +143,12 @@ function 挂载监听() {
   eventClearEvent('禁忌修道院:回档');
   eventOn('禁忌修道院:回档', (payload: { 楼层: number }) => {
     void 回档至(payload.楼层);
+  });
+
+  // 沉浸全屏开关(客户端按钮;样式注在酒馆主页面)
+  eventClearEvent('禁忌修道院:全屏');
+  eventOn('禁忌修道院:全屏', (开: boolean) => {
+    切换沉浸全屏(!!开);
   });
 
   // ============================================
@@ -207,19 +225,19 @@ function 挂载监听() {
   });
 
   // 黑市购买(圣器事件解锁后;校验在脚本侧)
-eventClearEvent('禁忌修道院:购买');
-eventOn('禁忌修道院:购买', (payload: { id: string }) => {
-  购买(payload.id);
-});
+  eventClearEvent('禁忌修道院:购买');
+  eventOn('禁忌修道院:购买', (payload: { id: string }) => {
+    购买(payload.id);
+  });
 
-// 破锁闯入(客户端连击门锁;场景标记由客户端写,这里只收警戒代价)
-eventClearEvent('禁忌修道院:破锁');
-eventOn('禁忌修道院:破锁', () => {
-  调警戒(8);
-  console.info('[禁忌修道院] 破锁闯入,警戒+8');
-});
+  // 破锁闯入(客户端连击门锁;场景标记由客户端写,这里只收警戒代价)
+  eventClearEvent('禁忌修道院:破锁');
+  eventOn('禁忌修道院:破锁', () => {
+    调警戒(8);
+    console.info('[禁忌修道院] 破锁闯入,警戒+8');
+  });
 
-eventClearEvent('禁忌修道院:晋阶');
+  eventClearEvent('禁忌修道院:晋阶');
   eventOn('禁忌修道院:晋阶', (payload: { 职位: Parameters<typeof 请求晋阶>[0] }) => {
     请求晋阶(payload.职位);
   });
