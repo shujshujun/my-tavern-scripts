@@ -153,6 +153,11 @@
         {{ 发送中 ? '…' : '行动' }}
       </button>
     </div>
+    <div v-if="就绪 && 可重掷 && !发送中 && data.会议.状态 !== '会议中'" class="reroll-row">
+      <button class="reroll-btn" title="撕掉这一页重写:回滚本回合的一切,用同样的行动重新演一遍" @click="重掷">
+        ↻ 重写此页
+      </button>
+    </div>
   </div>
 </template>
 
@@ -174,6 +179,21 @@ const 就绪 = computed(() => Boolean(data.value?.修女 && data.value?.会议 &
 const 输入文本 = ref('');
 const 发送中 = ref(false);
 const 流式段 = ref<string[]>([]);
+const 可重掷 = ref(false);
+
+function 刷新可重掷() {
+  可重掷.value = Boolean(_.get(getVariables({ type: 'chat' }), '_上次回合'));
+}
+
+function 重掷() {
+  if (发送中.value) return;
+  发送中.value = true;
+  流式段.value = [];
+  // 乐观:撕掉最后一段叙事(玩家行动行保留,重演的是同一句)
+  if (卷轴.value.at(-1)?.谁 === '叙事') 卷轴.value.pop();
+  void 滚到底();
+  eventEmit('禁忌修道院:重掷');
+}
 
 function 发送() {
   const 文本 = 输入文本.value.trim();
@@ -354,6 +374,7 @@ onMounted(() => {
     发送中.value = false;
     流式段.value = [];
     void 取卷轴();
+    刷新可重掷();
     try {
       (store as unknown as { pull?: () => void }).pull?.();
     } catch {
@@ -365,7 +386,9 @@ onMounted(() => {
     流式段.value = [];
     错误信息.value = '回合失败:' + 原因;
     void 取卷轴(); // 乐观上卷轴的玩家行动按真实楼层重建(失败=行动未落库)
+    刷新可重掷();
   });
+  刷新可重掷();
 });
 </script>
 
@@ -418,6 +441,27 @@ onMounted(() => {
   align-self: stretch;
   padding: 0 18px;
   white-space: nowrap;
+}
+
+.reroll-row {
+  text-align: right;
+  margin-top: 4px;
+}
+
+.reroll-btn {
+  padding: 1px 10px;
+  font-family: inherit;
+  font-size: 0.75em;
+  color: var(--ink-faded);
+  background: transparent;
+  border: 1px dashed var(--gilt);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.reroll-btn:hover {
+  color: var(--rubric);
+  border-style: solid;
 }
 
 .codex-header {

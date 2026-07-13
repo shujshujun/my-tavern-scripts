@@ -7,7 +7,7 @@ import { 会议间隔, 离开会议厅, 开始投票 } from './meetingSystem';
 import { 请求晋阶, 达成里程碑 } from './eventSystem';
 import { 读取, 脚本写入, 脚本写入中 } from './mvuIO';
 import { 检测焦点 } from './snapshotSystem';
-import { 执行回合, 回合结算, 回合进行中, 选事件指令, 组快照注入, type 事件类型 } from './回合引擎';
+import { 执行回合, 重掷回合, 回合结算, 回合进行中, 选事件指令, 组快照注入, type 事件类型 } from './回合引擎';
 
 /**
  * 禁忌修道院(重置版) - 游戏逻辑脚本
@@ -107,6 +107,12 @@ function 挂载监听() {
   eventClearEvent('禁忌修道院:玩家行动');
   eventOn('禁忌修道院:玩家行动', (payload: { 文本: string }) => {
     void 执行回合(payload.文本 ?? '');
+  });
+
+  // 重掷本回合("撕掉这页重写",原生 swipe 被藏后的替代)
+  eventClearEvent('禁忌修道院:重掷');
+  eventOn('禁忌修道院:重掷', () => {
+    void 重掷回合();
   });
 
   // ============================================

@@ -33,6 +33,21 @@ export type 事件类型 = '数据卡' | '晋阶' | '首夜' | '主动';
 let 进行中 = false;
 export const 回合进行中 = () => 进行中;
 
+// ── 重掷支持:回合快照(存 chat 变量,iframe 重载/刷新后仍可重掷) ──
+
+/** 回合内会被写的 chat 变量键(重掷时按快照整值恢复) */
+const 回合变量键 = ['_会议', '_首夜', '_主动事件', '_晋阶'] as const;
+
+type 上次回合记录 = {
+  行动: string;
+  回合前末楼: number;
+  chat快照: Record<string, unknown>;
+};
+
+function 读上次回合(): 上次回合记录 | undefined {
+  return (_.get(getVariables({ type: 'chat' }), '_上次回合') ?? undefined) as 上次回合记录 | undefined;
+}
+
 // 流式转发:generate 的 iframe 事件转成自定义事件,客户端稳定可收
 // (iframe_events 是常量,顶层安全;先清防切聊天 reload 后监听累积)
 eventClearEvent(iframe_events.STREAM_TOKEN_RECEIVED_FULLY);
@@ -144,6 +159,10 @@ export async function 执行回合(行动: string): Promise<void> {
   try {
     eventEmit('禁忌修道院:生成开始');
 
+    // 重掷快照:回合前末楼号 + 回合内会动的 chat 变量整值
+    const 回合前末楼 = getLastMessageId();
+    const chat快照 = _.cloneDeep(_.pick(getVariables({ type: 'chat' }), 回合变量键));
+
     const 对话尾 = 近楼对话(行动);
     const { 快照, 焦点 } = 组快照注入(对话尾);
 
@@ -177,6 +196,12 @@ export async function 执行回合(行动: string): Promise<void> {
     // 结算写在新楼(message_id:-1 已指向它)
     回合结算(焦点, 事件?.类型 ?? null);
 
+    // 落重掷记录(回合成功才落——失败的回合没有楼可删)
+    insertOrAssignVariables(
+      { _上次回合: { 行动, 回合前末楼, chat快照 } satisfies 上次回合记录 },
+      { type: 'chat' },
+    );
+
     eventEmit('禁忌修道院:回合完成');
   } catch (e) {
     console.error('[禁忌修道院] 回合执行失败:', e);
@@ -184,4 +209,36 @@ export async function 执行回合(行动: string): Promise<void> {
   } finally {
     进行中 = false;
   }
+}
+
+/**
+ * 重掷本回合("撕掉这页重写"):
+ *   删掉上一回合创建的楼层 —— 每楼自带 stat_data 快照,变量随楼自动回滚(固定 0 楼架构红利);
+ *   chat 变量按回合前快照整值恢复(会议票值/首夜/主动事件/晋阶排队);
+ *   然后用原行动重新执行一回合。
+ */
+export async function 重掷回合(): Promise<void> {
+  if (进行中) return;
+  const 记录 = 读上次回合();
+  const 末楼 = getLastMessageId();
+  if (!记录 || 末楼 <= 记录.回合前末楼) {
+    eventEmit('禁忌修道院:回合失败', '没有可重写的回合');
+    return;
+  }
+  try {
+    await deleteChatMessages(_.range(记录.回合前末楼 + 1, 末楼 + 1), { refresh: 'none' });
+    // updateVariablesWith + _.set 整值替换(insertOrAssign 对对象是深合并,会残留回合内新增的键)
+    await updateVariablesWith(
+      vars => {
+        for (const 键 of 回合变量键) _.set(vars, 键, (记录.chat快照 as Record<string, unknown>)[键] ?? null);
+        return vars;
+      },
+      { type: 'chat' },
+    );
+  } catch (e) {
+    console.error('[禁忌修道院] 重掷回滚失败:', e);
+    eventEmit('禁忌修道院:回合失败', e instanceof Error ? e.message : String(e));
+    return;
+  }
+  await 执行回合(记录.行动);
 }
