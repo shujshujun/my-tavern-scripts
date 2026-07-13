@@ -1,6 +1,6 @@
 import type { 修女职位 } from '../../schema';
 import { 修女职位列表 } from '../../schema';
-import { 晋阶堕落门槛, 修女表, 修女已现身, 阶段标题列表, 专线表 } from '../../stageConfig';
+import { 房间奖励, 晋阶堕落门槛, 修女表, 修女已现身, 阶段标题列表, 专线表 } from '../../stageConfig';
 import { 读取, 脚本写入 } from './mvuIO';
 
 /**
@@ -173,6 +173,37 @@ export function 达成里程碑(职位: 修女职位, 里程碑id: string) {
 
   脚本写入(raw, data);
   console.info(`[禁忌修道院] 里程碑达成:${修女表[职位].显示名}·${碑.标题}`);
+}
+
+// ============================================
+// 房间零钱拾取(客户端地图金币 eventEmit;金额由脚本按同一颗种子复算,不信客户端)
+// ============================================
+
+export function 拾取房间奖励(房间id: string) {
+  const 场景 = _.get(getVariables({ type: 'chat' }), '_场景') as { 房间id?: string; 进房末楼?: number } | undefined;
+  if (!场景?.房间id || 场景.房间id !== 房间id) return; // 只能捡自己所在房间的
+  const 种子 = 场景.进房末楼 ?? getLastMessageId();
+  const 金额 = 房间奖励(房间id, 种子);
+  if (金额 <= 0) return;
+
+  const 键 = `${种子}:${房间id}`;
+  const 已拾 = (_.get(getVariables({ type: 'chat' }), '_拾取') ?? {}) as Record<string, boolean>;
+  if (已拾[键]) return;
+  // 整值替换并只保留当前种子的记录(旧种子的零钱已随全院重掷消失,记录无限膨胀没意义)
+  const 新表 = _.pickBy(已拾, (_值, k) => k.startsWith(`${种子}:`));
+  新表[键] = true;
+  void updateVariablesWith(
+    vars => {
+      _.set(vars, '_拾取', 新表);
+      return vars;
+    },
+    { type: 'chat' },
+  );
+
+  const { raw, data } = 读取();
+  data.奉献金 += 金额;
+  脚本写入(raw, data);
+  console.info(`[禁忌修道院] 拾取零钱:${房间id} +${金额}`);
 }
 
 // ============================================

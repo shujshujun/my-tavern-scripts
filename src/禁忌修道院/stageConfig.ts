@@ -879,3 +879,14 @@ export function 推算位置(职位: 修女职位, 楼号: number): string {
 export function 房内修女(房间id: string, 楼号: number, 可登场: readonly 修女职位[]): 修女职位[] {
   return 可登场.filter(职位 => 推算位置(职位, 楼号) === 房间id);
 }
+
+/**
+ * 房间零钱(纯函数,与位置系统同一颗种子):约 30% 的房间掉落 2-6 奉献金——
+ * 修女们遗落的什一税、蜡烛钱、私房钱。每过一回合(楼号+2)全院重掷;
+ * 拾取记录存 chat 变量 _拾取(键=`种子:房间id`),同种子内不可重复捡。
+ */
+export function 房间奖励(房间id: string, 楼号: number): number {
+  const r = 种子随机(`钱#${房间id}#${楼号}`);
+  if (r >= 0.3) return 0;
+  return 2 + Math.floor((r / 0.3) * 5); // 2-6
+}

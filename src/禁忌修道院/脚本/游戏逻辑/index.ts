@@ -4,7 +4,7 @@ import { reloadOnChatChange } from '@/util/script';
 import { Schema } from '../../schema';
 import { 安检裁剪 } from './安检机';
 import { 会议间隔, 离开会议厅, 开始投票 } from './meetingSystem';
-import { 调警戒, 请求晋阶, 达成里程碑 } from './eventSystem';
+import { 调警戒, 请求晋阶, 拾取房间奖励, 达成里程碑 } from './eventSystem';
 import { 读取, 脚本写入, 脚本写入中 } from './mvuIO';
 import { 购买 } from './商店系统';
 import { 检测焦点 } from './snapshotSystem';
@@ -251,6 +251,12 @@ function 挂载监听() {
   eventOn('禁忌修道院:破锁', () => {
     调警戒(8);
     console.info('[禁忌修道院] 破锁闯入,警戒+8');
+  });
+
+  // 房间零钱拾取(地图金币;金额按种子复算,不信客户端)
+  eventClearEvent('禁忌修道院:拾取');
+  eventOn('禁忌修道院:拾取', (payload: { 房间id: string }) => {
+    拾取房间奖励(payload.房间id ?? '');
   });
 
   eventClearEvent('禁忌修道院:晋阶');

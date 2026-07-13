@@ -216,6 +216,17 @@
                 <image :href="地图头像[占.职位]" x="-10" y="-10" width="20" height="20" clip-path="url(#occ-clip)" />
                 <text y="17.5" class="map-occ-t">{{ 占.名 }}</text>
               </g>
+              <!-- 遗落的零钱(点击拾取;人不在房时点击=先走进去) -->
+              <g
+                v-if="房奖励表[房.id]"
+                class="map-loot"
+                :transform="`translate(${房.块[0][0] + 房.块[0][2] - 10} ${房.块[0][1] + 10})`"
+                @click.stop="拾取(房.id)"
+              >
+                <title>遗落的零钱 +{{ 房奖励表[房.id] }}(进房后点击拾取)</title>
+                <circle r="6.5" />
+                <text y="3">✟</text>
+              </g>
             </g>
           </svg>
           <div v-else class="room-grid">
@@ -532,6 +543,7 @@ import {
   房间表,
   房内修女,
   推算位置,
+  房间奖励,
   寝室支持度门槛,
   晋阶堕落门槛,
   修女表,
@@ -664,6 +676,36 @@ function 点图房(id: string) {
     return;
   }
   进入(id);
+  // 房里有遗落的零钱:地图不收,捡完金币才关(空房间也因此值得一进)
+  if (房奖励表.value[id]) 显示地图.value = true;
+}
+
+// ── 房间零钱(与位置系统同一颗种子;每回合全院重掷,同种子内不可重复捡) ──
+
+const 已拾取 = ref<Record<string, boolean>>({});
+
+function 刷新拾取() {
+  已拾取.value = (_.get(getVariables({ type: 'chat' }), '_拾取') ?? {}) as Record<string, boolean>;
+}
+
+const 房奖励表 = computed<Record<string, number>>(() => {
+  const 表: Record<string, number> = {};
+  for (const 房 of 房间表) {
+    const 额 = 房间奖励(房.id, 位置种子.value);
+    if (额 > 0 && !已拾取.value[`${位置种子.value}:${房.id}`]) 表[房.id] = 额;
+  }
+  return 表;
+});
+
+function 拾取(房间id: string) {
+  if (!房奖励表.value[房间id]) return;
+  if (当前房间.value !== 房间id) {
+    点图房(房间id); // 人还没进去:先走进房,地图保持,再点金币才捡
+    return;
+  }
+  已拾取.value = { ...已拾取.value, [`${位置种子.value}:${房间id}`]: true }; // 乐观隐藏,脚本记账
+  显示地图.value = false; // 拾取完成,地图这才退场
+  eventEmit('禁忌修道院:拾取', { 房间id });
 }
 
 const store = useDataStore();
@@ -1332,6 +1374,7 @@ onMounted(() => {
     刷新可重掷();
     刷新在场();
     刷新行动选项();
+    刷新拾取();
     try {
       (store as unknown as { pull?: () => void }).pull?.();
     } catch {
@@ -1348,6 +1391,7 @@ onMounted(() => {
   刷新可重掷();
   刷新在场();
   刷新行动选项();
+  刷新拾取();
   // 恢复场景(刷新页面/重开酒馆后仍在原房间,位置种子一并恢复)
   const 场景 = _.get(getVariables({ type: 'chat' }), '_场景') as { 房间id?: string; 进房末楼?: number } | null;
   当前房间.value = 场景?.房间id ?? null;
@@ -2453,6 +2497,32 @@ onMounted(() => {
   paint-order: stroke;
   stroke: rgba(5, 4, 2, 0.85); /* 名字压在线稿上时的描边保底 */
   stroke-width: 2px;
+  pointer-events: none;
+}
+
+/* ── 遗落的零钱(呼吸金光,示意可拾取) ── */
+.map-loot {
+  cursor: pointer;
+}
+
+.map-loot circle {
+  fill: #14100a;
+  stroke: var(--gold-bright);
+  stroke-width: 0.9;
+  animation: loot-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes loot-pulse {
+  50% {
+    stroke: #f4e4b6;
+    fill: #2e2512;
+  }
+}
+
+.map-loot text {
+  fill: var(--gold-bright);
+  font-size: 8px;
+  text-anchor: middle;
   pointer-events: none;
 }
 
