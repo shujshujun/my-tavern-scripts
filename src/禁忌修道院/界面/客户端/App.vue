@@ -671,24 +671,52 @@ function 刷新行动选项() {
   行动选项.value = Array.isArray(v) ? (v as string[]).filter(x => typeof x === 'string' && x.trim()) : [];
 }
 
-// ── 沉浸全屏(诡秘剧场式):脚本把 0 楼 iframe 钉成 100vw×100vh,这里只管开关与画幅 ──
+// ── 沉浸全屏(诡秘剧场同款):iframe 内对自身文档 requestFullscreen ──
+// 之前脚本往酒馆页注 position:fixed 的方案在带 backdrop-filter/transform 祖先的
+// 主题下失效(fixed 相对那个祖先定位),真全屏 API 不受 DOM 层级影响。
+// 脚本侧的钉 iframe 样式保留,只作 iOS Safari 等不支持真全屏时的退路。
 
 const 全屏中 = ref(false);
 
-function 切换全屏() {
-  全屏中.value = !全屏中.value;
-  document.documentElement.classList.toggle('xdy-full', 全屏中.value);
-  eventEmit('禁忌修道院:全屏', 全屏中.value);
-  if (全屏中.value) {
+function 应用画幅(开: boolean) {
+  document.documentElement.classList.toggle('xdy-full', 开);
+  if (开) {
     document.documentElement.style.setProperty('--frame-h', '100vh');
-  } else {
-    // 与 index.ts 设定画幅 同一公式(顶部标题栏+底部按钮条留白)
-    try {
-      const 父高 = window.parent?.innerHeight ?? 800;
-      document.documentElement.style.setProperty('--frame-h', `${Math.max(460, Math.round(父高 - 150))}px`);
-    } catch {
-      document.documentElement.style.setProperty('--frame-h', '620px');
+    return;
+  }
+  // 与 index.ts 设定画幅 同一公式(顶部标题栏+底部按钮条留白)
+  try {
+    const 父高 = window.parent?.innerHeight ?? 800;
+    document.documentElement.style.setProperty('--frame-h', `${Math.max(460, Math.round(父高 - 150))}px`);
+  } catch {
+    document.documentElement.style.setProperty('--frame-h', '620px');
+  }
+}
+
+type 全屏根 = HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void };
+type 全屏文档 = Document & { webkitExitFullscreen?: () => void; webkitFullscreenElement?: Element | null };
+
+async function 切换全屏() {
+  const 根 = document.documentElement as 全屏根;
+  const 文档 = document as 全屏文档;
+  try {
+    if (document.fullscreenElement ?? 文档.webkitFullscreenElement) {
+      if (document.exitFullscreen) await document.exitFullscreen();
+      else 文档.webkitExitFullscreen?.();
+    } else if (根.requestFullscreen) {
+      await 根.requestFullscreen();
+    } else if (根.webkitRequestFullscreen) {
+      await 根.webkitRequestFullscreen();
+    } else {
+      throw new Error('Fullscreen API 不可用');
     }
+    // 状态与画幅统一交给 fullscreenchange 同步(含 Esc 退出)
+  } catch (e) {
+    // 退路:真全屏被拒/不支持 → 脚本侧把 0 楼 iframe 钉成 100vw×100vh
+    console.warn('[禁忌修道院客户端] 真全屏不可用,退回网页内全屏:', e);
+    全屏中.value = !全屏中.value;
+    eventEmit('禁忌修道院:全屏', 全屏中.value);
+    应用画幅(全屏中.value);
   }
 }
 
@@ -1234,6 +1262,15 @@ onMounted(() => {
   // 恢复场景(刷新页面/重开酒馆后仍在原房间)
   const 场景 = _.get(getVariables({ type: 'chat' }), '_场景') as { 房间id?: string } | null;
   当前房间.value = 场景?.房间id ?? null;
+
+  // 真全屏状态同步(按钮/Esc/系统手势退出都走这里;webkit 前缀给 Safari)
+  for (const 事件名 of ['fullscreenchange', 'webkitfullscreenchange']) {
+    document.addEventListener(事件名, () => {
+      const 开 = !!(document.fullscreenElement ?? (document as 全屏文档).webkitFullscreenElement);
+      全屏中.value = 开;
+      应用画幅(开);
+    });
+  }
 });
 </script>
 
