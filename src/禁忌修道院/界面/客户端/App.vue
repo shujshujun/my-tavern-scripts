@@ -108,9 +108,27 @@
         <!-- 正文书页:只演当前幕(完整历史与时之烛台在史册卷轴里) -->
         <section ref="卷轴容器" class="story">
           <div v-for="(条, i) in 当前幕" :key="i" class="story-entry">
-            <p v-if="条.谁 === '玩家'" class="story-player">✠ {{ 条.文本[0] }}</p>
+            <!-- 羽笔改写中:这一页摊开成稿纸 -->
+            <template v-if="条.楼 !== undefined && 条.楼 === 编辑中楼">
+              <textarea v-model="编辑文本" class="edit-area" rows="8"></textarea>
+              <div class="edit-acts">
+                <button class="reroll-btn" :disabled="!编辑文本.trim()" @click="存编辑">落笔</button>
+                <button class="reroll-btn" @click="编辑中楼 = null">作罢</button>
+              </div>
+            </template>
             <template v-else>
-              <p v-for="(段, j) in 条.文本" :key="j" :class="配首字(段, j)">{{ 段 }}</p>
+              <button
+                v-if="条.原文 !== undefined && !发送中"
+                class="entry-edit"
+                title="以羽笔改写这一页(同酒馆的铅笔编辑)"
+                @click="开编辑(条)"
+              >
+                <GI :i="图羽笔" />
+              </button>
+              <p v-if="条.谁 === '玩家'" class="story-player">✠ {{ 条.文本[0] }}</p>
+              <template v-else>
+                <p v-for="(段, j) in 条.文本" :key="j" :class="配首字(段, j)">{{ 段 }}</p>
+              </template>
             </template>
           </div>
           <div v-if="发送中" class="story-entry">
@@ -128,80 +146,93 @@
         </footer>
       </template>
 
-      <!-- ═══════════ 回廊地图(不在房间时;走动零成本,输入框只在房间里出现) ═══════════ -->
-      <div v-if="就绪 && !当前房间 && data.会议.状态 !== '会议中'" class="cloister">
-        <div class="cloister-hint">
-          {{ 显示寝居 ? '寝居回廊——每一扇门后,是她全部的私人世界' : '你走在回廊上。烛光明灭,该去叩谁的门?' }}
-        </div>
-        <!-- 顶视图(手绘SVG线稿占位;找到美术图后整块替换) -->
-        <svg v-if="!显示寝居" class="map-svg" viewBox="0 0 420 300">
-          <!-- 回廊连线(装饰) -->
-          <g class="map-deco">
-            <line x1="124" y1="51" x2="138" y2="51" />
-            <line x1="124" y1="119" x2="160" y2="160" />
-            <line x1="124" y1="187" x2="160" y2="187" />
-            <line x1="124" y1="255" x2="160" y2="236" />
-            <line x1="282" y1="67" x2="288" y2="43" />
-            <line x1="296" y1="119" x2="260" y2="160" />
-            <line x1="296" y1="187" x2="260" y2="187" />
-            <line x1="296" y1="255" x2="260" y2="236" />
-            <line x1="210" y1="114" x2="210" y2="140" />
-            <!-- 庭院十字小径 -->
-            <line x1="160" y1="188" x2="260" y2="188" class="thin" />
-            <line x1="210" y1="140" x2="210" y2="236" class="thin" />
-            <!-- 大门 -->
-            <path d="M198 236 v18 h24 v-18" fill="none" />
-          </g>
-          <text x="210" y="16" class="map-cross">✟</text>
-          <text x="210" y="290" class="map-gate">— 山 门 —</text>
+      <!-- ═══════════ 回廊条(不在房间时;地图收在按钮里,书页不被顶掉) ═══════════ -->
+      <div v-if="就绪 && !当前房间 && data.会议.状态 !== '会议中'" class="scene-bar">
+        <span class="scene-name"><GI :i="图地点" /> 回廊</span>
+        <span class="scene-occ">烛光明灭,该去叩谁的门?</span>
+        <button class="reroll-btn" :disabled="发送中" @click="显示地图 = true"><GI :i="图地图" /> 地图</button>
+      </div>
 
-          <g v-for="房 in 平面图" :key="房.id" class="map-room" @click="点图房(房.id)">
-            <rect v-for="(块, i) in 房.块" :key="i" :x="块[0]" :y="块[1]" :width="块[2]" :height="块[3]" />
-            <text :x="房.标[0]" :y="房.标[1]" class="map-label">{{ 房.名 }}</text>
-            <g v-for="(名, i) in 图房在场表[房.id] ?? []" :key="名">
-              <circle
-                :cx="房.点[0] + i * 17 - ((图房在场表[房.id]?.length ?? 1) - 1) * 8.5"
-                :cy="房.点[1]"
-                r="7.5"
-                class="map-occ"
-              />
-              <text
-                :x="房.点[0] + i * 17 - ((图房在场表[房.id]?.length ?? 1) - 1) * 8.5"
-                :y="房.点[1] + 3.2"
-                class="map-occ-t"
-              >
-                {{ 名[0] }}
-              </text>
+      <!-- ═══════════ 地图(JRPG式:遮罩层浮在书页上方;走动零成本,房内也可直接跨房) ═══════════ -->
+      <div v-if="显示地图 && 就绪 && data.会议.状态 !== '会议中'" class="scroll-mask" @click.self="显示地图 = false">
+        <div class="cloister">
+          <button class="scroll-close" @click="显示地图 = false">✕</button>
+          <div class="cloister-hint">
+            {{ 显示寝居 ? '寝居回廊——每一扇门后,是她全部的私人世界' : '你走在回廊上。烛光明灭,该去叩谁的门?' }}
+          </div>
+          <!-- 顶视图(手绘SVG线稿占位;找到美术图后整块替换) -->
+          <svg v-if="!显示寝居" class="map-svg" viewBox="0 0 420 300">
+            <!-- 回廊连线(装饰) -->
+            <g class="map-deco">
+              <line x1="124" y1="51" x2="138" y2="51" />
+              <line x1="124" y1="119" x2="160" y2="160" />
+              <line x1="124" y1="187" x2="160" y2="187" />
+              <line x1="124" y1="255" x2="160" y2="236" />
+              <line x1="282" y1="67" x2="288" y2="43" />
+              <line x1="296" y1="119" x2="260" y2="160" />
+              <line x1="296" y1="187" x2="260" y2="187" />
+              <line x1="296" y1="255" x2="260" y2="236" />
+              <line x1="210" y1="114" x2="210" y2="140" />
+              <!-- 庭院十字小径 -->
+              <line x1="160" y1="188" x2="260" y2="188" class="thin" />
+              <line x1="210" y1="140" x2="210" y2="236" class="thin" />
+              <!-- 大门 -->
+              <path d="M198 236 v18 h24 v-18" fill="none" />
             </g>
-          </g>
-        </svg>
-        <div v-else class="room-grid">
-          <button
-            v-for="室 in 寝居列表"
-            :key="室.职位"
-            class="room-plate"
-            :class="{ locked: 室.上锁 }"
-            @click="点寝室(室)"
-          >
-            <span class="room-icon"><GI :i="室.上锁 ? 图门锁 : 图房门" /></span>
-            <span class="room-name">{{ 室.名称 }}</span>
-            <span class="room-occupants"
-              ><i v-if="室.在房" class="occ">{{ 室.首字 }}</i></span
+            <text x="210" y="16" class="map-cross">✟</text>
+            <text x="210" y="290" class="map-gate">— 山 门 —</text>
+
+            <g v-for="房 in 平面图" :key="房.id" class="map-room" @click="点图房(房.id)">
+              <rect v-for="(块, i) in 房.块" :key="i" :x="块[0]" :y="块[1]" :width="块[2]" :height="块[3]" />
+              <text :x="房.标[0]" :y="房.标[1]" class="map-label">{{ 房.名 }}</text>
+              <g v-for="(名, i) in 图房在场表[房.id] ?? []" :key="名">
+                <circle
+                  :cx="房.点[0] + i * 17 - ((图房在场表[房.id]?.length ?? 1) - 1) * 8.5"
+                  :cy="房.点[1]"
+                  r="7.5"
+                  class="map-occ"
+                />
+                <text
+                  :x="房.点[0] + i * 17 - ((图房在场表[房.id]?.length ?? 1) - 1) * 8.5"
+                  :y="房.点[1] + 3.2"
+                  class="map-occ-t"
+                >
+                  {{ 名[0] }}
+                </text>
+              </g>
+            </g>
+          </svg>
+          <div v-else class="room-grid">
+            <button
+              v-for="室 in 寝居列表"
+              :key="室.职位"
+              class="room-plate"
+              :class="{ locked: 室.上锁 }"
+              @click="点寝室(室)"
             >
-            <span v-if="破锁目标 === '寝室:' + 室.职位 && 破锁数 > 0" class="lock-progress"> 砸门 {{ 破锁数 }}/6 </span>
-            <span v-else-if="室.上锁" class="lock-hint">门闩着(可强行砸开)</span>
-          </button>
-          <button class="room-plate" @click="显示寝居 = false">
-            <span class="room-icon">↩</span>
-            <span class="room-name">回到回廊</span>
-          </button>
+              <span class="room-icon"><GI :i="室.上锁 ? 图门锁 : 图房门" /></span>
+              <span class="room-name">{{ 室.名称 }}</span>
+              <span class="room-occupants"
+                ><i v-if="室.在房" class="occ">{{ 室.首字 }}</i></span
+              >
+              <span v-if="破锁目标 === '寝室:' + 室.职位 && 破锁数 > 0" class="lock-progress">
+                砸门 {{ 破锁数 }}/6
+              </span>
+              <span v-else-if="室.上锁" class="lock-hint">门闩着(可强行砸开)</span>
+            </button>
+            <button class="room-plate" @click="显示寝居 = false">
+              <span class="room-icon">↩</span>
+              <span class="room-name">回到回廊</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      <!-- ═══════════ 场景条(在房间时;离开=回地图) ═══════════ -->
+      <!-- ═══════════ 场景条(在房间时;地图随时可开,离开=退回回廊) ═══════════ -->
       <div v-if="就绪 && 当前房间 && data.会议.状态 !== '会议中'" class="scene-bar">
         <span class="scene-name"><GI :i="图地点" /> {{ 当前房间名 }}</span>
         <span class="scene-occ">{{ 房内名单 || '此刻无人' }}</span>
+        <button class="reroll-btn" :disabled="发送中" @click="显示地图 = true"><GI :i="图地图" /> 地图</button>
         <button class="reroll-btn" :disabled="发送中" @click="离开房间"><GI :i="图离开" /> 离开</button>
       </div>
 
@@ -475,6 +506,7 @@ import 图地点 from './资源/界面/地点.svg?raw';
 import 图离开 from './资源/界面/离开.svg?raw';
 import 图天平 from './资源/界面/天平.svg?raw';
 import 图羽笔 from './资源/界面/羽笔.svg?raw';
+import 图地图 from './资源/界面/地图.svg?raw';
 
 // 1em 内联图标(自家仓库 SVG,非用户输入;emoji 在手机上是彩色贴图且冷门字形会变豆腐,故全换 SVG)
 const GI: FunctionalComponent<{ i: string }> = props => h('i', { class: 'gi', innerHTML: props.i });
@@ -604,6 +636,8 @@ const 已划掉低语 = ref('');
 
 const 当前房间 = ref<string | null>(null);
 const 显示寝居 = ref(false);
+/** JRPG 式地图:遮罩层浮在正文书页上方,随时可开可关(走动零成本,在房间里也能直接跨房移动) */
+const 显示地图 = ref(false);
 /** 位置推算种子=末楼号(取卷轴时更新;每回合+2 → 她们走动了) */
 const 末楼号 = ref(0);
 
@@ -652,6 +686,7 @@ function 写场景(房间id: string | null, 破锁 = false) {
 function 进入(房间id: string, 破锁 = false) {
   当前房间.value = 房间id;
   显示寝居.value = false;
+  显示地图.value = false;
   写场景(房间id, 破锁);
   if (破锁) eventEmit('禁忌修道院:破锁'); // 警戒代价在脚本侧
   // 头像即时点亮(回合结束后脚本会按位置系统重算)
@@ -661,6 +696,7 @@ function 进入(房间id: string, 破锁 = false) {
 function 离开房间() {
   当前房间.value = null;
   写场景(null);
+  显示地图.value = true; // 走出房门=站上回廊,顺手展开地图选下一处
 }
 
 // 连击破锁:2.5 秒窗口内对着锁死的门敲满 6 下
@@ -798,6 +834,8 @@ interface 卷轴条 {
   楼?: number;
   /** 可作为回档目标(AI 楼、非末楼、当时不在会议中) */
   可回档?: boolean;
+  /** 楼层原始文本(羽笔编辑的底稿;0 楼藏着界面占位符,不开放编辑) */
+  原文?: string;
 }
 
 const 卷轴 = ref<卷轴条[]>([]);
@@ -817,6 +855,20 @@ const 当前幕 = computed(() => {
   while (起 > 0 && 列表[起].谁 !== '玩家') 起 -= 1;
   return 列表[起].谁 === '玩家' ? 列表.slice(起) : 列表;
 });
+
+/**
+ * 玩家预设兼容:先按玩家自己酒馆里的正则(全局/预设/角色卡,显示向)跑一遍——
+ * 各家破限预设的输出包装标记(思维链变体/状态块/注释)由它们自带的清理正则负责,
+ * 本卡的 清洗() 只兜底通用残渣。深度按楼层距离算,尊重正则自身的深度范围设置。
+ */
+function 过酒馆正则(文本: string, 来源: 'ai_output' | 'user_input', 深度?: number): string {
+  try {
+    return formatAsTavernRegexedString(文本, 来源, 'display', 深度 === undefined ? undefined : { depth: 深度 });
+  } catch (e) {
+    console.warn('[禁忌修道院客户端] 应用酒馆正则失败(按原文显示):', e);
+    return 文本;
+  }
+}
 
 function 清洗(原文: string): string {
   return (
@@ -864,11 +916,14 @@ async function 取卷轴() {
           历史[职位].信仰.push(Number(修.信仰值 ?? 100) || 0);
         }
       }
-      const 净文 = 清洗(消息.message ?? '');
-      if (!净文) continue;
       const 是玩家 = 消息.role === 'user';
+      const 原文 = 消息.message ?? '';
+      const 净文 = 清洗(过酒馆正则(原文, 是玩家 ? 'user_input' : 'ai_output', 末楼 - 消息.message_id));
+      if (!净文) continue;
+      // 0 楼藏着 <StatusPlaceHolderImpl/> 等界面标记,整楼写回会砸掉客户端,不开放编辑
+      const 可编辑 = 消息.message_id > 0 ? { 原文 } : {};
       if (是玩家) {
-        条目.push({ 谁: '玩家', 文本: [净文.replace(/\n+/g, ' ')] });
+        条目.push({ 谁: '玩家', 文本: [净文.replace(/\n+/g, ' ')], 楼: 消息.message_id, ...可编辑 });
       } else {
         // 蜡烛只插在"当时是日常"的 AI 楼上(回档进半场会议会踩坏票值快照)
         const 当时日常 = _.get(消息.data, 'stat_data.会议.状态', '日常') === '日常';
@@ -880,6 +935,7 @@ async function 取卷轴() {
             .filter(Boolean),
           楼: 消息.message_id,
           可回档: 消息.message_id < 末楼 && 当时日常,
+          ...可编辑,
         });
       }
     }
@@ -924,6 +980,30 @@ function 点烛(楼: number | undefined) {
   发送中.value = true;
   流式段.value = [];
   eventEmit('禁忌修道院:回档', { 楼层: 楼 });
+}
+
+// ── 羽笔改写(酒馆铅笔的游戏内形态:直接改写楼层原文,楼层变量快照不动) ──
+
+const 编辑中楼 = ref<number | null>(null);
+const 编辑文本 = ref('');
+
+function 开编辑(条: 卷轴条) {
+  if (发送中.value || 条.楼 === undefined || 条.原文 === undefined) return;
+  编辑中楼.value = 条.楼;
+  编辑文本.value = 条.原文;
+}
+
+async function 存编辑() {
+  const 楼 = 编辑中楼.value;
+  const 文 = 编辑文本.value.trim();
+  编辑中楼.value = null;
+  if (楼 === null || !文) return;
+  try {
+    await setChatMessages([{ message_id: 楼, message: 文 }], { refresh: 'none' });
+    await 取卷轴();
+  } catch (e) {
+    错误信息.value = '改写书页失败:' + (e instanceof Error ? e.message : String(e));
+  }
 }
 
 // ── 法典面板(投票预测+情报雾) ──
@@ -1014,7 +1094,7 @@ onMounted(() => {
 
   // ── 回合引擎事件(固定0楼:脚本 generate 生成,这里只管演) ──
   eventOn('禁忌修道院:流式', (文本: string) => {
-    const 净文 = 清洗(文本);
+    const 净文 = 清洗(过酒馆正则(文本, 'ai_output', 0));
     流式段.value = 净文
       ? 净文
           .split(/\n+/)
@@ -1290,8 +1370,58 @@ onMounted(() => {
   text-indent: 2em;
 }
 
+.story-entry {
+  position: relative;
+}
+
 .story-entry:last-child p:last-child {
   margin-bottom: 0;
+}
+
+/* ── 羽笔改写(悬停显笔;移动端常显淡笔) ── */
+.entry-edit {
+  position: absolute;
+  top: -2px;
+  right: 0;
+  padding: 2px 5px;
+  border: none;
+  background: none;
+  color: var(--gold);
+  opacity: 0.22;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.story-entry:hover .entry-edit,
+.entry-edit:focus-visible {
+  opacity: 0.9;
+}
+
+.edit-area {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 140px;
+  padding: 8px 10px;
+  font-family: var(--font-body);
+  font-size: 0.92em;
+  line-height: 1.55;
+  color: var(--bone);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--line-soft);
+  box-shadow: inset 0 1px 6px rgba(0, 0, 0, 0.5);
+  resize: vertical;
+}
+
+.edit-area:focus {
+  outline: none;
+  border-color: var(--gold);
+}
+
+.edit-acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 6px 0 10px;
 }
 
 /* 泥金首字(versal):仅当叙事首段以汉字开头才放大(标记/符号开头不放,防预设残渣被泵金) */
@@ -1858,11 +1988,23 @@ onMounted(() => {
 
 /* ── 回廊地图(魂系门牌) ── */
 
+/* 地图面板(JRPG式:悬在书页上方的羊皮图纸,四周透出正文) */
 .cloister {
-  flex: none;
-  margin-top: 7px;
-  padding-top: 6px;
-  border-top: 1px solid var(--line-soft);
+  position: relative;
+  box-sizing: border-box;
+  width: min(94%, 480px);
+  max-height: 88%;
+  overflow-y: auto;
+  padding: 34px 14px 14px;
+  background:
+    radial-gradient(ellipse 80% 40% at 50% -5%, rgba(201, 169, 78, 0.1), transparent 65%),
+    linear-gradient(175deg, #1b1509, var(--void) 70%);
+  border: 1px solid var(--line);
+  outline: 1px solid rgba(0, 0, 0, 0.9);
+  outline-offset: 2px;
+  box-shadow: 0 16px 60px rgba(0, 0, 0, 0.9);
+  scrollbar-width: thin;
+  scrollbar-color: var(--gold-deep) transparent;
 }
 
 .cloister-hint {
