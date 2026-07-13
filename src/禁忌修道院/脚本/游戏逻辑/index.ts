@@ -4,7 +4,7 @@ import { reloadOnChatChange } from '@/util/script';
 import { Schema } from '../../schema';
 import { 安检裁剪 } from './安检机';
 import { 会议间隔, 离开会议厅, 开始投票 } from './meetingSystem';
-import { 请求晋阶, 达成里程碑 } from './eventSystem';
+import { 调警戒, 请求晋阶, 达成里程碑 } from './eventSystem';
 import { 读取, 脚本写入, 脚本写入中 } from './mvuIO';
 import { 购买 } from './商店系统';
 import { 检测焦点 } from './snapshotSystem';
@@ -210,6 +210,13 @@ function 挂载监听() {
 eventClearEvent('禁忌修道院:购买');
 eventOn('禁忌修道院:购买', (payload: { id: string }) => {
   购买(payload.id);
+});
+
+// 破锁闯入(客户端连击门锁;场景标记由客户端写,这里只收警戒代价)
+eventClearEvent('禁忌修道院:破锁');
+eventOn('禁忌修道院:破锁', () => {
+  调警戒(8);
+  console.info('[禁忌修道院] 破锁闯入,警戒+8');
 });
 
 eventClearEvent('禁忌修道院:晋阶');

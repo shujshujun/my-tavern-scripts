@@ -126,6 +126,59 @@
         </footer>
       </template>
 
+      <!-- ═══════════ 回廊地图(不在房间时;走动零成本,输入框只在房间里出现) ═══════════ -->
+      <div v-if="就绪 && !当前房间 && data.会议.状态 !== '会议中'" class="cloister">
+        <div class="cloister-hint">
+          {{ 显示寝居 ? '寝居回廊——每一扇门后,是她全部的私人世界' : '你走在回廊上。烛光明灭,该去叩谁的门?' }}
+        </div>
+        <div v-if="!显示寝居" class="room-grid">
+          <button v-for="房 in 房间列表" :key="房.id" class="room-plate" @click="进入(房.id)">
+            <span class="room-icon">{{ 房.图标 }}</span>
+            <span class="room-name">{{ 房.名称 }}</span>
+            <span class="room-occupants">
+              <i v-for="名 in 房.在场名" :key="名" class="occ" :title="名">{{ 名[0] }}</i>
+            </span>
+          </button>
+          <button class="room-plate" @click="显示寝居 = true">
+            <span class="room-icon">🚪</span>
+            <span class="room-name">寝居回廊</span>
+            <span class="room-occupants">
+              <i v-for="室 in 寝居列表.filter(x => x.在房)" :key="室.职位" class="occ" :title="室.名称">{{
+                室.首字
+              }}</i>
+            </span>
+          </button>
+        </div>
+        <div v-else class="room-grid">
+          <button
+            v-for="室 in 寝居列表"
+            :key="室.职位"
+            class="room-plate"
+            :class="{ locked: 室.上锁 }"
+            @click="点寝室(室)"
+          >
+            <span class="room-icon">{{ 室.上锁 ? '🔒' : '🚪' }}</span>
+            <span class="room-name">{{ 室.名称 }}</span>
+            <span class="room-occupants"
+              ><i v-if="室.在房" class="occ">{{ 室.首字 }}</i></span
+            >
+            <span v-if="破锁目标 === '寝室:' + 室.职位 && 破锁数 > 0" class="lock-progress"> 砸门 {{ 破锁数 }}/6 </span>
+            <span v-else-if="室.上锁" class="lock-hint">门闩着(可强行砸开)</span>
+          </button>
+          <button class="room-plate" @click="显示寝居 = false">
+            <span class="room-icon">↩</span>
+            <span class="room-name">回到回廊</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- ═══════════ 场景条(在房间时;离开=回地图) ═══════════ -->
+      <div v-if="就绪 && 当前房间 && data.会议.状态 !== '会议中'" class="scene-bar">
+        <span class="scene-name">📍 {{ 当前房间名 }}</span>
+        <span class="scene-occ">{{ 房内名单 || '此刻无人' }}</span>
+        <button class="reroll-btn" :disabled="发送中" @click="离开房间">🚶 离开</button>
+      </div>
+
       <!-- ═══════════ 法典(羊皮大卷轴) ═══════════ -->
       <div v-if="显示法典" class="scroll-mask" @click.self="显示法典 = false">
         <div class="scroll">
@@ -296,12 +349,12 @@
       </div>
 
       <!-- ═══════════ 行动建议(AI 每轮给 2-3 条,点了直接发送;想自由发挥就打字) ═══════════ -->
-      <div v-if="就绪 && !发送中 && 行动选项.length && data.会议.状态 !== '会议中'" class="option-row">
+      <div v-if="就绪 && 当前房间 && !发送中 && 行动选项.length && data.会议.状态 !== '会议中'" class="option-row">
         <button v-for="(项, i) in 行动选项" :key="i" class="option-chip" @click="发出(项)">✦ {{ 项 }}</button>
       </div>
 
       <!-- ═══════════ 游戏内输入(会议中隐藏;玩家不碰酒馆输入框) ═══════════ -->
-      <div v-if="就绪 && data.会议.状态 !== '会议中'" class="quill">
+      <div v-if="就绪 && 当前房间 && data.会议.状态 !== '会议中'" class="quill">
         <textarea
           v-model="输入文本"
           rows="2"
@@ -329,7 +382,21 @@ import { 修女职位列表, type 修女职位 } from '../../schema';
 import type { 会议结果 as 会议结果类型 } from '../../脚本/游戏逻辑/meetingSystem';
 import { 感知语 } from '../../脚本/游戏逻辑/snapshotSystem';
 import { 常规投票人, 计算单票 } from '../../脚本/游戏逻辑/voteEngine';
-import { 查档, 查道具, 查规则, 道具表, 晋阶堕落门槛, 修女表, 院规表, 专线表, type 道具定义 } from '../../stageConfig';
+import {
+  查档,
+  查道具,
+  查规则,
+  道具表,
+  房间表,
+  房内修女,
+  推算位置,
+  寝室支持度门槛,
+  晋阶堕落门槛,
+  修女表,
+  院规表,
+  专线表,
+  type 道具定义,
+} from '../../stageConfig';
 import { useDataStore } from './store';
 
 const store = useDataStore();
@@ -400,6 +467,97 @@ function 刷新行动选项() {
 // ── 恶魔低语:神父心底的恶念/剧情腹黑旁注(非行动指引);划掉=本条隐去,下条低语再现 ──
 
 const 已划掉低语 = ref('');
+
+// ══════════ 修道院地图(走动零成本纯UI;输入框只在房间里出现) ══════════
+
+const 当前房间 = ref<string | null>(null);
+const 显示寝居 = ref(false);
+/** 位置推算种子=末楼号(取卷轴时更新;每回合+2 → 她们走动了) */
+const 末楼号 = ref(0);
+
+const 可登场 = computed(() =>
+  修女职位列表.filter(职位 => !修女表[职位].隐藏 || (data.value?.修女?.[职位]?.情报可见 ?? false)),
+);
+
+const 房间列表 = computed(() =>
+  房间表.map(房 => ({
+    ...房,
+    在场名: 房内修女(房.id, 末楼号.value, 可登场.value).map(职位 => 修女表[职位].显示名),
+  })),
+);
+
+const 寝居列表 = computed(() =>
+  可登场.value
+    .filter(职位 => 职位 !== '巡查')
+    .map(职位 => ({
+      职位,
+      名称: `${修女表[职位].显示名}的寝室`,
+      上锁: (data.value?.修女?.[职位]?.支持度 ?? 0) < 寝室支持度门槛,
+      在房: 推算位置(职位, 末楼号.value) === `寝室:${职位}`,
+      首字: 修女表[职位].显示名[0],
+    })),
+);
+
+const 当前房间名 = computed(() => {
+  const id = 当前房间.value;
+  if (!id) return '';
+  if (id.startsWith('寝室:')) return `${修女表[id.slice(3) as 修女职位]?.显示名 ?? ''}的寝室`;
+  return 房间表.find(r => r.id === id)?.名称 ?? id;
+});
+
+const 房内名单 = computed(() =>
+  当前房间.value
+    ? 房内修女(当前房间.value, 末楼号.value, 可登场.value)
+        .map(职位 => 修女表[职位].显示名)
+        .join('、')
+    : '',
+);
+
+function 写场景(房间id: string | null, 破锁 = false) {
+  insertOrAssignVariables({ _场景: 房间id ? { 房间id, 破锁 } : null }, { type: 'chat' });
+}
+
+function 进入(房间id: string, 破锁 = false) {
+  当前房间.value = 房间id;
+  显示寝居.value = false;
+  写场景(房间id, 破锁);
+  if (破锁) eventEmit('禁忌修道院:破锁'); // 警戒代价在脚本侧
+  // 头像即时点亮(回合结束后脚本会按位置系统重算)
+  在场.value = { 焦点: 房内修女(房间id, 末楼号.value, 可登场.value), 背景: [] };
+}
+
+function 离开房间() {
+  当前房间.value = null;
+  写场景(null);
+}
+
+// 连击破锁:2.5 秒窗口内对着锁死的门敲满 6 下
+const 破锁目标 = ref('');
+const 破锁数 = ref(0);
+let 破锁计时: ReturnType<typeof setTimeout> | undefined;
+
+function 点寝室(室: { 职位: 修女职位; 上锁: boolean }) {
+  const id = `寝室:${室.职位}`;
+  if (!室.上锁) {
+    进入(id);
+    return;
+  }
+  if (破锁目标.value !== id) {
+    破锁目标.value = id;
+    破锁数.value = 0;
+  }
+  破锁数.value += 1;
+  clearTimeout(破锁计时);
+  破锁计时 = setTimeout(() => {
+    破锁数.value = 0;
+    破锁目标.value = '';
+  }, 2500);
+  if (破锁数.value >= 6) {
+    破锁数.value = 0;
+    破锁目标.value = '';
+    进入(id, true);
+  }
+}
 
 /** 错误护栏:渲染异常不再整屏空白,显示横幅供定位 */
 const 错误信息 = ref('');
@@ -557,6 +715,7 @@ async function 滚到底() {
 async function 取卷轴() {
   try {
     const 末楼 = getLastMessageId();
+    末楼号.value = 末楼; // 位置推算种子:每回合+2 → 修女们换了地方
     const 消息组 = (await getChatMessages(`0-${末楼}`)) ?? [];
     const 条目: 卷轴条[] = [];
     const 历史: Record<string, { 支持: number[]; 堕落: number[]; 信仰: number[] }> = {};
@@ -740,6 +899,9 @@ onMounted(() => {
   刷新可重掷();
   刷新在场();
   刷新行动选项();
+  // 恢复场景(刷新页面/重开酒馆后仍在原房间)
+  const 场景 = _.get(getVariables({ type: 'chat' }), '_场景') as { 房间id?: string } | null;
+  当前房间.value = 场景?.房间id ?? null;
 });
 </script>
 
@@ -1545,6 +1707,142 @@ onMounted(() => {
   50% {
     opacity: 0.5;
   }
+}
+
+/* ── 回廊地图(魂系门牌) ── */
+
+.cloister {
+  flex: none;
+  margin-top: 7px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.cloister-hint {
+  text-align: center;
+  font-size: 0.78em;
+  font-style: italic;
+  color: var(--bone-faded);
+  margin-bottom: 6px;
+}
+
+.room-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 5px;
+}
+
+@media (max-width: 640px) {
+  .room-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.room-plate {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 2px 5px;
+  font-family: var(--font-body);
+  color: var(--bone);
+  background: rgba(201, 169, 78, 0.045);
+  border: 1px solid var(--line-soft);
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.room-plate:hover {
+  border-color: var(--gold);
+  box-shadow:
+    0 0 10px rgba(201, 169, 78, 0.3),
+    inset 0 0 8px rgba(201, 169, 78, 0.08);
+}
+
+.room-icon {
+  font-size: 1.15em;
+  color: var(--gold);
+}
+
+.room-name {
+  font-size: 0.72em;
+  letter-spacing: 0.08em;
+}
+
+.room-occupants {
+  display: flex;
+  gap: 2px;
+  min-height: 14px;
+}
+
+.occ {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  font-size: 9px;
+  font-style: normal;
+  color: var(--gold-bright);
+  border: 1px solid var(--gold-deep);
+  background: rgba(201, 169, 78, 0.12);
+  box-shadow: 0 0 5px rgba(201, 169, 78, 0.35);
+}
+
+.room-plate.locked {
+  opacity: 0.75;
+}
+
+.room-plate.locked .room-icon {
+  color: var(--rubric);
+}
+
+.room-plate.locked:hover {
+  border-color: var(--rubric);
+  box-shadow: 0 0 10px rgba(154, 49, 32, 0.3);
+}
+
+.room-plate.locked:active {
+  transform: translateX(1px);
+}
+
+.lock-progress {
+  font-size: 0.66em;
+  color: var(--rubric);
+  font-weight: 700;
+  animation: flame-flicker 0.4s ease-in-out infinite;
+}
+
+.lock-hint {
+  font-size: 0.6em;
+  color: var(--bone-faded);
+}
+
+/* ── 场景条 ── */
+
+.scene-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 7px;
+  padding: 4px 8px;
+  font-size: 0.82em;
+  color: var(--bone);
+  border: 1px solid var(--line-soft);
+  background: linear-gradient(180deg, rgba(201, 169, 78, 0.06), transparent);
+}
+
+.scene-name {
+  color: var(--gold-bright);
+  letter-spacing: 0.08em;
+}
+
+.scene-occ {
+  flex: 1;
+  color: var(--bone-faded);
 }
 
 /* ── 黑市 ── */

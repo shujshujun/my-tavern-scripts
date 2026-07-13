@@ -1,6 +1,6 @@
 import type { SchemaType, 修女职位 } from '../../schema';
 import { 修女职位列表 } from '../../schema';
-import { 查档, 修女表, 阶段行为基调, 院规表 } from '../../stageConfig';
+import { 查档, 房间表, 房内修女, 修女表, 阶段行为基调, 院规表 } from '../../stageConfig';
 import { 编译行囊 } from './商店系统';
 
 /**
@@ -56,9 +56,7 @@ function 警戒感知(警戒度: number): string {
 /** 着装一行编译(仅焦点注入) */
 function 着装一行(修女: SchemaType['修女'][修女职位]): string {
   const 服 = 修女.服装;
-  const 件 = [服.头纱, 服.上装, 服.下装, 服.袜足, 服.鞋, 服.配饰, 服.特殊装饰].filter(
-    x => x && x !== '无',
-  );
+  const 件 = [服.头纱, 服.上装, 服.下装, 服.袜足, 服.鞋, 服.配饰, 服.特殊装饰].filter(x => x && x !== '无');
   const 态 = [
     修女.暴露程度 !== '遮蔽' ? `暴露:${修女.暴露程度}` : '',
     修女.整洁度 !== '整洁' ? 修女.整洁度 : '',
@@ -88,14 +86,47 @@ export function 编译院规快照(data: SchemaType): string {
 // 在场/焦点检测(扫描 prompt 尾部楼层的提及)
 // ============================================
 
-/** 从对话尾部文本检测被提及的修女;末条(玩家最新输入)优先 */
-export function 检测焦点(chat: { role: string; content: string }[], data: SchemaType): {
+/** 玩家当前场景(客户端地图写入 chat 变量;走动零成本纯 UI,不产生楼层) */
+export function 读场景(): { 房间id?: string; 破锁?: boolean } {
+  return (_.get(getVariables({ type: 'chat' }), '_场景') ?? {}) as { 房间id?: string; 破锁?: boolean };
+}
+
+/** 场景显示名+氛围('寝室:职位' 特判) */
+export function 场景描述(房间id: string): { 名称: string; 氛围: string; 私密: boolean } {
+  if (房间id.startsWith('寝室:')) {
+    const 职位 = 房间id.slice(3) as 修女职位;
+    return {
+      名称: `${修女表[职位]?.显示名 ?? 职位}的寝室`,
+      氛围: '窄床、圣像、叠得一丝不苟的被褥——她全部的私人世界',
+      私密: true,
+    };
+  }
+  const 房 = 房间表.find(r => r.id === 房间id);
+  return 房 ? { 名称: 房.名称, 氛围: 房.氛围, 私密: 房.私密 } : { 名称: 房间id, 氛围: '', 私密: false };
+}
+
+/**
+ * 检测焦点:
+ *   地图模式(有 _场景.房间id)→ 在场=位置系统决定,确定性焦点(prompt成本与阵容人数彻底脱钩)
+ *   无场景(✠ 逃生舱原生玩法)→ 退回文本扫描
+ */
+export function 检测焦点(
+  chat: { role: string; content: string }[],
+  data: SchemaType,
+): {
   焦点: 修女职位[];
   背景: 修女职位[];
 } {
   const 可登场 = 修女职位列表.filter(
     职位 => !修女表[职位].隐藏 || data.修女[职位].情报可见 || data.视察.状态 === '进行中',
   );
+
+  const { 房间id } = 读场景();
+  if (房间id) {
+    const 在房 = 房内修女(房间id, getLastMessageId(), 可登场);
+    return { 焦点: 在房.slice(0, 3), 背景: [] };
+  }
+
   const 尾部 = chat.slice(-4).reverse(); // 末条优先
   const 命中: 修女职位[] = [];
   for (const 楼 of 尾部) {
@@ -151,6 +182,19 @@ const 认知隔离规则 = [
 export function 组修道院快照(chat: { role: string; content: string }[], data: SchemaType): string {
   const { 焦点, 背景 } = 检测焦点(chat, data);
   const 行: string[] = ['<修道院快照>'];
+
+  // 当前场景(地图模式:玩家点门牌进入,走动零成本)
+  const 场景 = 读场景();
+  if (场景.房间id) {
+    const { 名称, 氛围, 私密 } = 场景描述(场景.房间id);
+    行.push(`【当前场景】${名称}——${氛围}${私密 ? '(此处私密,不易被撞见)' : '(公共场合,言行可能落进旁人眼里)'}`);
+    if (场景.破锁) {
+      行.push(
+        '【突发】神父砸开了门锁闯进来——房间的主人正被破门而入,按她的人设演出真实反应(惊惧/怒斥/慌乱遮掩),这是严重越界行为,她不会当作无事发生',
+      );
+    }
+    if (!焦点.length) 行.push('(房内此刻无人——她们在修道院的别处)');
+  }
 
   行.push(`【现行院规】`, 编译院规快照(data));
 

@@ -157,6 +157,18 @@ export function 回合结算(本轮焦点: 修女职位[], 已注入事件: 事�
   }
   脚本写入(raw, data);
 
+  // 破锁是一幕性的突发标记:演完这一楼即清除(场景保留,玩家还在房里)
+  const 场景 = _.get(getVariables({ type: 'chat' }), '_场景') as { 破锁?: boolean } | undefined;
+  if (场景?.破锁) {
+    updateVariablesWith(
+      vars => {
+        _.set(vars, '_场景.破锁', false);
+        return vars;
+      },
+      { type: 'chat' },
+    );
+  }
+
   // 冷落检测:排队"她主动来找你"(一次一人,读写在上面写入之后)
   冷落检测();
 }
