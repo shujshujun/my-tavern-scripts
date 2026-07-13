@@ -6,7 +6,7 @@ import { 安检裁剪 } from './安检机';
 import { 会议间隔, 离开会议厅, 开始投票 } from './meetingSystem';
 import { 调警戒, 请求晋阶, 拾取房间奖励, 达成里程碑 } from './eventSystem';
 import { 读取, 脚本写入, 脚本写入中 } from './mvuIO';
-import { 购买 } from './商店系统';
+import { 购买, 请求赠礼 } from './商店系统';
 import { 检测焦点 } from './snapshotSystem';
 import {
   执行回合,
@@ -257,6 +257,17 @@ function 挂载监听() {
   eventClearEvent('禁忌修道院:拾取');
   eventOn('禁忌修道院:拾取', (payload: { 房间id: string }) => {
     拾取房间奖励(payload.房间id ?? '');
+  });
+
+  // 赠礼(行囊面板;校验道具在囊+对方同房,过检后自动跑一回合正戏)
+  eventClearEvent('禁忌修道院:赠礼');
+  eventOn('禁忌修道院:赠礼', (payload: { 道具id: string; 职位: Parameters<typeof 请求晋阶>[0] }) => {
+    const 行动 = 请求赠礼(payload.道具id ?? '', payload.职位);
+    if (!行动) {
+      eventEmit('禁忌修道院:回合失败', '赠礼未成——她不在你身边,或行囊里已没有这件东西');
+      return;
+    }
+    void 执行回合(行动);
   });
 
   eventClearEvent('禁忌修道院:晋阶');

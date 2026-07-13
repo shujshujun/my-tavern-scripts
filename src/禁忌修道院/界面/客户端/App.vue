@@ -99,6 +99,14 @@
             >
               <GI :i="图天平" /> 黑市
             </button>
+            <button
+              v-if="行囊列表.length"
+              class="codex-toggle"
+              title="已购的道具;点道具选人,当面赠出"
+              @click="显示行囊 = true"
+            >
+              <GI :i="图行囊" /> 行囊
+            </button>
           </span>
         </div>
 
@@ -349,6 +357,52 @@
         </div>
       </div>
 
+      <!-- ═══════════ 行囊(已购道具;点道具→点同房修女头像→确定赠送) ═══════════ -->
+      <div v-if="显示行囊" class="scroll-mask" @click.self="关行囊">
+        <div class="scroll dossier">
+          <button class="scroll-close" @click="关行囊">✕</button>
+          <div class="scroll-title"><GI :i="图行囊" /> 神父的行囊</div>
+          <p class="agenda-hint">点选一件,再点她的头像,当面赠出——礼物须当面,先与她同处一室。</p>
+          <div class="rule-list">
+            <div
+              v-for="项 in 行囊列表"
+              :key="项.id"
+              class="rule-card ware gift-card"
+              :class="{ chosen: 赠礼选中 === 项.id }"
+              @click="赠礼选中 = 赠礼选中 === 项.id ? '' : 项.id"
+            >
+              <!-- eslint-disable-next-line vue/no-v-html -- 自家仓库内联SVG,非用户输入 -->
+              <div v-if="道具图标[项.id]" class="ware-icon" v-html="道具图标[项.id]"></div>
+              <div class="ware-body">
+                <div class="rule-head">
+                  <b>{{ 项.名称 }}</b>
+                  <span v-if="项.穿戴" class="agenda-weight" data-w="轻">穿戴</span>
+                </div>
+                <div class="rule-text">{{ 项.说明 }}</div>
+              </div>
+            </div>
+          </div>
+          <template v-if="赠礼选中">
+            <template v-if="赠礼对象列表.length">
+              <div class="gift-targets">
+                <div
+                  v-for="职位 in 赠礼对象列表"
+                  :key="职位"
+                  class="avatar"
+                  :class="{ 'gift-chosen': 赠礼对象 === 职位 }"
+                  @click="赠礼对象 = 赠礼对象 === 职位 ? null : 职位"
+                >
+                  <span class="avatar-glyph"><GI class="avatar-face" :i="修女头像[职位]" /></span>
+                  <span class="avatar-name">{{ 修女表[职位].显示名 }}</span>
+                </div>
+              </div>
+              <button class="rite-btn" :disabled="!赠礼对象 || 发送中" @click="确认赠礼">确定赠送</button>
+            </template>
+            <p v-else class="agenda-hint">此刻房里没有别人——先把她约到同一间房,礼物才送得出手。</p>
+          </template>
+        </div>
+      </div>
+
       <!-- ═══════════ 史册(完整编年卷轴 + 时之烛台) ═══════════ -->
       <div v-if="显示史册" class="scroll-mask" @click.self="显示史册 = false">
         <div class="scroll">
@@ -583,6 +637,7 @@ import 图离开 from './资源/界面/离开.svg?raw';
 import 图天平 from './资源/界面/天平.svg?raw';
 import 图羽笔 from './资源/界面/羽笔.svg?raw';
 import 图地图 from './资源/界面/地图.svg?raw';
+import 图行囊 from './资源/界面/行囊.svg?raw';
 import 图展开 from './资源/界面/展开.svg?raw';
 import 图收拢 from './资源/界面/收拢.svg?raw';
 import 图心镜 from './资源/界面/心镜.svg?raw';
@@ -1007,6 +1062,40 @@ function 购买标签(项: 道具定义): string {
 
 function 买(id: string) {
   eventEmit('禁忌修道院:购买', { id });
+}
+
+// ── 行囊与赠礼(点道具→点同房修女头像→确定;道具消耗,自动跑一回合正戏) ──
+
+const 显示行囊 = ref(false);
+const 赠礼选中 = ref('');
+const 赠礼对象 = ref<修女职位 | null>(null);
+
+/** 行囊里的攻略类道具(会议类买了即用不进囊) */
+const 行囊列表 = computed(() =>
+  (data.value?.商店?.已购 ?? []).map(id => 查道具(id)).filter((d): d is 道具定义 => !!d && d.类 === '攻略'),
+);
+
+/** 可赠对象=与神父同处一室的修女(赠礼是当面的事) */
+const 赠礼对象列表 = computed(() => (当前房间.value ? 房内修女(当前房间.value, 位置种子.value, 可登场.value) : []));
+
+function 关行囊() {
+  显示行囊.value = false;
+  赠礼选中.value = '';
+  赠礼对象.value = null;
+}
+
+function 确认赠礼() {
+  const 道具id = 赠礼选中.value;
+  const 职位 = 赠礼对象.value;
+  if (!道具id || !职位 || 发送中.value) return;
+  const 道具 = 查道具(道具id);
+  发送中.value = true;
+  流式段.value = [];
+  // 乐观:赠礼行动先上卷轴(与 发出() 同款;真实楼层由脚本的 执行回合 创建)
+  卷轴.value.push({ 谁: '玩家', 文本: [`(将「${道具?.名称 ?? 道具id}」赠予${修女表[职位].显示名})`] });
+  void 滚到底();
+  关行囊();
+  eventEmit('禁忌修道院:赠礼', { 道具id, 职位 });
 }
 
 const 选中档案 = computed(() => {
@@ -2400,6 +2489,40 @@ onMounted(() => {
   letter-spacing: 0.12em;
   color: var(--rubric);
   border: 1px solid rgba(154, 49, 32, 0.55);
+}
+
+/* ── 行囊赠礼 ── */
+
+.gift-card {
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.gift-card.chosen {
+  border-color: var(--gold);
+  box-shadow:
+    0 0 12px rgba(201, 169, 78, 0.35),
+    inset 0 0 12px rgba(201, 169, 78, 0.1);
+}
+
+.gift-targets {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 14px;
+  margin: 10px 0;
+}
+
+.gift-targets .avatar.gift-chosen .avatar-glyph {
+  color: var(--gold-bright);
+  border-color: var(--gold);
+  box-shadow:
+    0 0 14px rgba(201, 169, 78, 0.55),
+    inset 0 0 10px rgba(201, 169, 78, 0.25);
+}
+
+.gift-targets .avatar.gift-chosen .avatar-name {
+  color: var(--gold);
 }
 
 /* ── 三轴条 ── */

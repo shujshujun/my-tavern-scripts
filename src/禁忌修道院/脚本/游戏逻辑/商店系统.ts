@@ -1,5 +1,6 @@
-import type { SchemaType } from '../../schema';
-import { 查道具 } from '../../stageConfig';
+import type { SchemaType, 修女职位 } from '../../schema';
+import { 修女职位列表 } from '../../schema';
+import { 查道具, 房内修女, 修女表, 修女已现身 } from '../../stageConfig';
 import { 达成里程碑 } from './eventSystem';
 import { 读取, 脚本写入 } from './mvuIO';
 
@@ -65,4 +66,70 @@ export function 编译行囊(data: SchemaType): string {
   const 行囊 = data.商店.已购.map(查道具).filter(Boolean);
   if (!行囊.length) return '';
   return `【神父的行囊】(剧情中可自然取用):${行囊.map(d => `${d!.名称}(${d!.说明})`).join(';')}`;
+}
+
+// ============================================
+// 赠礼(行囊面板:点道具→点同房修女头像→确定;消耗道具,自动跑一回合正戏)
+// ============================================
+
+interface 赠礼记录 {
+  道具id: string;
+  职位: 修女职位;
+}
+
+function 读赠礼(): 赠礼记录 | undefined {
+  return _.get(getVariables({ type: 'chat' }), '_赠礼') as 赠礼记录 | undefined;
+}
+
+/**
+ * 赠礼入口(index.ts 收客户端事件后调用):校验道具在囊、对方与神父同处一室,
+ * 排队赠礼正戏并返回本回合的玩家行动文本;校验不过返回 null。
+ */
+export function 请求赠礼(道具id: string, 职位: 修女职位): string | null {
+  const 道具 = 查道具(道具id);
+  if (!道具 || 道具.类 !== '攻略') return null;
+  const { data } = 读取();
+  if (!data.商店.已购.includes(道具id)) return null;
+  if (读赠礼()) return null; // 已有赠礼待演
+
+  // 赠礼是当面的事:她必须在神父所在的房间里
+  const 场景 = _.get(getVariables({ type: 'chat' }), '_场景') as { 房间id?: string; 进房末楼?: number } | undefined;
+  if (!场景?.房间id) return null;
+  const 可登场 = 修女职位列表.filter(p => 修女已现身(p, data.修女, data.视察.状态 === '进行中'));
+  const 在房 = 房内修女(场景.房间id, 场景.进房末楼 ?? getLastMessageId(), 可登场);
+  if (!在房.includes(职位)) return null;
+
+  insertOrAssignVariables({ _赠礼: { 道具id, 职位 } satisfies 赠礼记录 }, { type: 'chat' });
+  return `(神父从行囊中取出「${道具.名称}」,当面赠予${修女表[职位].显示名})`;
+}
+
+/** 赠礼正戏指令(零示例:她的反应由处境/阶段/人设决定) */
+export function 取赠礼指令(): string | undefined {
+  const 礼 = 读赠礼();
+  if (!礼) return undefined;
+  const 道具 = 查道具(礼.道具id);
+  if (!道具) return undefined;
+  const 配 = 修女表[礼.职位];
+  return [
+    '<赠礼>',
+    `本楼由玩家发起:神父从行囊中取出「${道具.名称}」,当面赠予${配.显示名}(${礼.职位})。`,
+    `这件东西:${道具.说明}。`,
+    `演出要求:她如何接过(欣然/迟疑/推拒再收下)由她当前的处境、阶段与人设决定;` +
+      (道具.穿戴 ? `这是穿戴之物,演出她如何处置——当场戴上、收进袖中还是藏进枕下;` : '') +
+      `礼物的意味按上面那句说明自然落进这场戏与后续叙事,不点破任何机制。`,
+    '</赠礼>',
+  ].join('\n');
+}
+
+/** 赠礼结算(回合结束调用):道具离囊归她;穿戴类写进她的服装栏 */
+export function 结算赠礼() {
+  const 礼 = 读赠礼();
+  if (!礼) return;
+  const { raw, data } = 读取();
+  data.商店.已购 = data.商店.已购.filter(x => x !== 礼.道具id);
+  const 道具 = 查道具(礼.道具id);
+  if (道具?.穿戴) data.修女[礼.职位].服装[道具.穿戴] = 道具.名称;
+  脚本写入(raw, data);
+  insertOrAssignVariables({ _赠礼: null }, { type: 'chat' });
+  console.info(`[禁忌修道院] 赠礼结算:${道具?.名称 ?? 礼.道具id} → ${修女表[礼.职位].显示名}`);
 }
