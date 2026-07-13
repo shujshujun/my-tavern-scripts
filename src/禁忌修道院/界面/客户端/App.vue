@@ -151,10 +151,10 @@
 </template>
 
 <script setup lang="ts">
-import type { 修女职位 } from '../../schema';
+import { 修女职位列表, type 修女职位 } from '../../schema';
 import type { 会议结果 as 会议结果类型 } from '../../脚本/游戏逻辑/meetingSystem';
 import { 常规投票人, 计算单票 } from '../../脚本/游戏逻辑/voteEngine';
-import { 查档, 查规则, 晋阶堕落门槛, 修女表, 修女职位列表, 院规表 } from '../../stageConfig';
+import { 查档, 查规则, 晋阶堕落门槛, 修女表, 院规表 } from '../../stageConfig';
 import { useDataStore } from './store';
 
 const store = useDataStore();
