@@ -1,5 +1,6 @@
 import { registerMvuSchema } from 'https://testingcf.jsdelivr.net/gh/StageDog/tavern_resource/dist/util/mvu_zod.js';
 
+import { reloadOnChatChange } from '@/util/script';
 import { Schema } from '../../schema';
 import { 安检裁剪 } from './安检机';
 import { 会议间隔, 离开会议厅, 开始投票 } from './meetingSystem';
@@ -20,10 +21,12 @@ import { 执行回合, 回合结算, 回合进行中, 选事件指令, 组快照
  *   VARIABLE_UPDATE_ENDED        → 安检机第二道
  *   MESSAGE_RECEIVED             → 回合结算
  *   两条路径靠 回合进行中() 互斥,不会双结算。
+ *
+ * 启动纪律(云霜凝 2.0.22 踩坑范式,xdy0.06 及以前脚本曾在此翻车):
+ *   模块顶层禁止碰 Mvu/registerMvuSchema —— Mvu 未就绪时整个模块会当场死掉,
+ *   CSS 注入、事件监听全部失效且无任何提示。一切初始化必须等 waitGlobalInitialized('Mvu')。
+ *   全屏 CSS 只在初始化成功后注入:脚本挂了绝不把玩家的酒馆输入框藏起来。
  */
-
-// ── 安检机第一道:挂载 zod schema ──
-registerMvuSchema(Schema);
 
 // ============================================
 // 全屏化:注入酒馆主页面样式(只显示 0 楼——客户端 iframe 常驻其中,永不重建;
@@ -57,116 +60,153 @@ function 注入全屏样式() {
     console.error('[禁忌修道院] 注入全屏样式失败:', e);
   }
 }
-注入全屏样式();
 
 // ============================================
-// 主路径:客户端游戏内输入 → 回合引擎
+// 启动引导:等 Mvu 就绪 → 注册 schema → 注入样式 → 挂全部监听
 // ============================================
 
-eventClearEvent('禁忌修道院:玩家行动');
-eventOn('禁忌修道院:玩家行动', (payload: { 文本: string }) => {
-  void 执行回合(payload.文本 ?? '');
-});
+$(() => {
+  void (async () => {
+    const _top = (window.parent ?? window) as unknown as { toastr?: typeof toastr };
+    try {
+      const 超时 = new Promise<never>((_resolve, reject) =>
+        setTimeout(() => reject(new Error('等待 Mvu 初始化超时(>10s),请检查 MVU 脚本是否启用')), 10000),
+      );
+      await Promise.race([waitGlobalInitialized('Mvu'), 超时]);
 
-// ============================================
-// 逃生舱路径:酒馆原生输入框玩法(✠ 切回后仍可玩)
-// ============================================
+      // ── 安检机第一道:挂载 zod schema ──
+      registerMvuSchema(Schema);
 
-// ── 安检机第二道:VARIABLE_UPDATE_ENDED(MVU 自动解析路径) ──
-eventClearEvent(Mvu.events.VARIABLE_UPDATE_ENDED);
-eventOn(Mvu.events.VARIABLE_UPDATE_ENDED, (新变量: object, 旧变量: object) => {
-  if (脚本写入中 || 回合进行中()) return;
-  try {
-    const newData = Schema.parse(_.get(新变量, 'stat_data') ?? {});
-    const oldData = Schema.parse(_.get(旧变量, 'stat_data') ?? {});
-    if (安检裁剪(newData, oldData)) {
-      _.set(新变量 as object, 'stat_data', newData);
-      脚本写入(新变量 as object);
-      console.info('[禁忌修道院] 安检机第二道:已裁剪/回写越权更新');
+      挂载监听();
+      注入全屏样式();
+      reloadOnChatChange();
+
+      // 加载成功提示(sessionStorage gate:切聊天 reload 不重弹,刷新酒馆页面弹一次)
+      const TOAST_KEY = '禁忌修道院_脚本toast已弹';
+      if (!sessionStorage.getItem(TOAST_KEY)) {
+        _top.toastr?.success?.('游戏逻辑脚本加载正常', '禁忌修道院');
+        sessionStorage.setItem(TOAST_KEY, '1');
+      }
+      console.info('[禁忌修道院] 游戏逻辑脚本已加载(Schema 已注册)');
+    } catch (err) {
+      console.error('[禁忌修道院] 游戏逻辑脚本加载失败:', err);
+      _top.toastr?.error?.(
+        `游戏逻辑脚本加载失败:${(err as Error)?.message ?? String(err)}\n请 F12 查看控制台`,
+        '禁忌修道院',
+        { timeOut: 0, extendedTimeOut: 0 },
+      );
     }
-  } catch (e) {
-    console.error('[禁忌修道院] VARIABLE_UPDATE_ENDED 处理失败:', e);
-  }
+  })();
 });
 
-// ── prompt 注入:快照 + 事件指令 ──
-let 逃生舱事件: 事件类型 | null = null;
-let 逃生舱焦点: ReturnType<typeof 检测焦点>['焦点'] = [];
+function 挂载监听() {
+  // ============================================
+  // 主路径:客户端游戏内输入 → 回合引擎
+  // ============================================
 
-eventClearEvent(tavern_events.CHAT_COMPLETION_PROMPT_READY);
-eventOn(tavern_events.CHAT_COMPLETION_PROMPT_READY, (event_data: { chat: SillyTavern.SendingMessage[] }) => {
-  if (回合进行中()) return; // 主路径的注入走 generate injects,不走酒馆管道
-  try {
-    // 多模态 content 归一成纯文本供焦点扫描
-    const 对话尾 = event_data.chat.map(条 => ({
-      role: 条.role,
-      content:
-        typeof 条.content === 'string'
-          ? 条.content
-          : 条.content.map(块 => ('text' in 块 ? 块.text : '')).join('\n'),
-    }));
-    const { 快照, 焦点 } = 组快照注入(对话尾);
-    逃生舱焦点 = 焦点;
-    event_data.chat.push({ role: 'system', content: 快照 });
+  eventClearEvent('禁忌修道院:玩家行动');
+  eventOn('禁忌修道院:玩家行动', (payload: { 文本: string }) => {
+    void 执行回合(payload.文本 ?? '');
+  });
 
-    const 事件 = 选事件指令();
-    逃生舱事件 = 事件?.类型 ?? null;
-    if (事件) event_data.chat.push({ role: 'system', content: 事件.文本 });
-  } catch (e) {
-    console.error('[禁忌修道院] prompt 注入失败:', e);
-  }
-});
+  // ============================================
+  // 逃生舱路径:酒馆原生输入框玩法(✠ 切回后仍可玩)
+  // ============================================
 
-// ── 回合结算 ──
-eventClearEvent(tavern_events.MESSAGE_RECEIVED);
-eventOn(tavern_events.MESSAGE_RECEIVED, () => {
-  if (回合进行中()) return;
-  try {
-    回合结算(逃生舱焦点, 逃生舱事件);
-    逃生舱事件 = null;
-  } catch (e) {
-    console.error('[禁忌修道院] MESSAGE_RECEIVED 处理失败:', e);
-  }
-});
+  // ── 安检机第二道:VARIABLE_UPDATE_ENDED(MVU 自动解析路径) ──
+  eventClearEvent(Mvu.events.VARIABLE_UPDATE_ENDED);
+  eventOn(Mvu.events.VARIABLE_UPDATE_ENDED, (新变量: object, 旧变量: object) => {
+    if (脚本写入中 || 回合进行中()) return;
+    try {
+      const newData = Schema.parse(_.get(新变量, 'stat_data') ?? {});
+      const oldData = Schema.parse(_.get(旧变量, 'stat_data') ?? {});
+      if (安检裁剪(newData, oldData)) {
+        _.set(新变量 as object, 'stat_data', newData);
+        脚本写入(新变量 as object);
+        console.info('[禁忌修道院] 安检机第二道:已裁剪/回写越权更新');
+      }
+    } catch (e) {
+      console.error('[禁忌修道院] VARIABLE_UPDATE_ENDED 处理失败:', e);
+    }
+  });
 
-// ============================================
-// 客户端 UI 事件
-// ============================================
+  // ── prompt 注入:快照 + 事件指令 ──
+  let 逃生舱事件: 事件类型 | null = null;
+  let 逃生舱焦点: ReturnType<typeof 检测焦点>['焦点'] = [];
 
-eventClearEvent('禁忌修道院:开始投票');
-eventOn('禁忌修道院:开始投票', (payload: { 规则id: string }) => {
-  void 开始投票(payload.规则id);
-});
+  eventClearEvent(tavern_events.CHAT_COMPLETION_PROMPT_READY);
+  eventOn(tavern_events.CHAT_COMPLETION_PROMPT_READY, (event_data: { chat: SillyTavern.SendingMessage[] }) => {
+    if (回合进行中()) return; // 主路径的注入走 generate injects,不走酒馆管道
+    try {
+      // 多模态 content 归一成纯文本供焦点扫描
+      const 对话尾 = event_data.chat.map(条 => ({
+        role: 条.role,
+        content:
+          typeof 条.content === 'string' ? 条.content : 条.content.map(块 => ('text' in 块 ? 块.text : '')).join('\n'),
+      }));
+      const { 快照, 焦点 } = 组快照注入(对话尾);
+      逃生舱焦点 = 焦点;
+      event_data.chat.push({ role: 'system', content: 快照 });
 
-eventClearEvent('禁忌修道院:离开会议厅');
-eventOn('禁忌修道院:离开会议厅', () => {
-  离开会议厅();
-});
+      const 事件 = 选事件指令();
+      逃生舱事件 = 事件?.类型 ?? null;
+      if (事件) event_data.chat.push({ role: 'system', content: 事件.文本 });
+    } catch (e) {
+      console.error('[禁忌修道院] prompt 注入失败:', e);
+    }
+  });
 
-eventClearEvent('禁忌修道院:晋阶');
-eventOn('禁忌修道院:晋阶', (payload: { 职位: Parameters<typeof 请求晋阶>[0] }) => {
-  请求晋阶(payload.职位);
-});
+  // ── 回合结算 ──
+  eventClearEvent(tavern_events.MESSAGE_RECEIVED);
+  eventOn(tavern_events.MESSAGE_RECEIVED, () => {
+    if (回合进行中()) return;
+    try {
+      回合结算(逃生舱焦点, 逃生舱事件);
+      逃生舱事件 = null;
+    } catch (e) {
+      console.error('[禁忌修道院] MESSAGE_RECEIVED 处理失败:', e);
+    }
+  });
 
-// 专线里程碑(先给事件入口,自动判定/按钮后续接;也可控制台手动触发调试)
-eventClearEvent('禁忌修道院:里程碑');
-eventOn('禁忌修道院:里程碑', (payload: { 职位: Parameters<typeof 达成里程碑>[0]; id: string }) => {
-  达成里程碑(payload.职位, payload.id);
-});
+  // ============================================
+  // 客户端 UI 事件
+  // ============================================
 
-// 序章完成:按选定难度重掷首次会议倒计时(委任状界面 eventEmit)
-eventClearEvent('禁忌修道院:序章完成');
-eventOn('禁忌修道院:序章完成', () => {
-  try {
-    const 间隔 = 会议间隔();
-    const { raw, data } = 读取();
-    data.会议.倒计时 = _.random(间隔[0], 间隔[1]);
-    脚本写入(raw, data);
-    console.info('[禁忌修道院] 序章完成,首次会议倒计时', data.会议.倒计时);
-  } catch (e) {
-    console.error('[禁忌修道院] 序章完成处理失败:', e);
-  }
-});
+  eventClearEvent('禁忌修道院:开始投票');
+  eventOn('禁忌修道院:开始投票', (payload: { 规则id: string }) => {
+    void 开始投票(payload.规则id);
+  });
+
+  eventClearEvent('禁忌修道院:离开会议厅');
+  eventOn('禁忌修道院:离开会议厅', () => {
+    离开会议厅();
+  });
+
+  eventClearEvent('禁忌修道院:晋阶');
+  eventOn('禁忌修道院:晋阶', (payload: { 职位: Parameters<typeof 请求晋阶>[0] }) => {
+    请求晋阶(payload.职位);
+  });
+
+  // 专线里程碑(先给事件入口,自动判定/按钮后续接;也可控制台手动触发调试)
+  eventClearEvent('禁忌修道院:里程碑');
+  eventOn('禁忌修道院:里程碑', (payload: { 职位: Parameters<typeof 达成里程碑>[0]; id: string }) => {
+    达成里程碑(payload.职位, payload.id);
+  });
+
+  // 序章完成:按选定难度重掷首次会议倒计时(委任状界面 eventEmit)
+  eventClearEvent('禁忌修道院:序章完成');
+  eventOn('禁忌修道院:序章完成', () => {
+    try {
+      const 间隔 = 会议间隔();
+      const { raw, data } = 读取();
+      data.会议.倒计时 = _.random(间隔[0], 间隔[1]);
+      脚本写入(raw, data);
+      console.info('[禁忌修道院] 序章完成,首次会议倒计时', data.会议.倒计时);
+    } catch (e) {
+      console.error('[禁忌修道院] 序章完成处理失败:', e);
+    }
+  });
+}
 
 // ============================================
 // TODO(后续按 spec 顺序补全)

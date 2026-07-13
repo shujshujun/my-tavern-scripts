@@ -34,6 +34,8 @@ let 进行中 = false;
 export const 回合进行中 = () => 进行中;
 
 // 流式转发:generate 的 iframe 事件转成自定义事件,客户端稳定可收
+// (iframe_events 是常量,顶层安全;先清防切聊天 reload 后监听累积)
+eventClearEvent(iframe_events.STREAM_TOKEN_RECEIVED_FULLY);
 eventOn(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, (文本: string) => {
   if (进行中) eventEmit('禁忌修道院:流式', 文本);
 });
