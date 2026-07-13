@@ -1792,16 +1792,17 @@ onMounted(() => {
   border-color: var(--sin);
 }
 
+/* 行动建议:2×2 网格铺满整行(4 条正好填格;3 条时最后一条独占整行) */
 .option-row {
   flex: none;
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 5px;
   margin-top: 7px;
 }
 
 .option-chip {
-  padding: 3px 12px;
+  padding: 4px 12px;
   font-family: var(--font-body);
   font-size: 0.8em;
   color: var(--bone);
@@ -1810,6 +1811,11 @@ onMounted(() => {
   cursor: pointer;
   text-align: left;
   transition: all 0.25s ease;
+}
+
+/* 奇数条数时,末条横跨两列,不留缺口 */
+.option-chip:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
 }
 
 .option-chip:hover {
