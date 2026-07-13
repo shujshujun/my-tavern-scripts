@@ -1,18 +1,31 @@
-/* 禁忌修道院客户端 - 泥金装饰手抄本(illuminated manuscript)基调 */
+/* 禁忌修道院客户端 - 魂系暗金(艾尔登法环/黑魂纲领:近黑暖底 / 鎏金碑文 / 高对比 / 克制) */
+
+/* 碑文衬线:准圆刻本(标题)+ 宋体刻本(正文)。与装卡同 CDN(jsdelivr),不被墙 */
+@import url('https://testingcf.jsdelivr.net/npm/@fontsource/zcool-xiaowei/index.css');
+@import url('https://testingcf.jsdelivr.net/npm/@fontsource/noto-serif-sc/index.css');
+@import url('https://testingcf.jsdelivr.net/npm/@fontsource/noto-serif-sc/700.css');
 
 :root {
-  /* 羊皮纸与墨 */
-  --parchment: #f0e6d2;
-  --parchment-dark: #e2d3b3;
-  --ink: #3a2f23;
-  --ink-faded: #6f5f4b;
-  /* 泥金与朱砂 */
-  --gilt: #a8842c;
-  --gilt-bright: #c9a227;
-  --rubric: #8c2f1b;
-  /* 阴影与罪 */
-  --shadow: #241c12;
-  --sin: #5a1f3c;
+  /* 暗底(暖近黑,魂系绝不用死黑) */
+  --void: #0c0a06;
+  --void-2: #171208;
+  --panel: rgba(24, 19, 10, 0.72);
+  --panel-lit: rgba(38, 30, 16, 0.85);
+  /* 碑文字(暗底上发光的金与骨白) */
+  --gold: #c9a94e;
+  --gold-bright: #e9d197;
+  --gold-deep: #6e551f;
+  --bone: #cabb98;
+  --bone-faded: #8f815f;
+  /* 血朱砂(极克制,只点睛) */
+  --rubric: #a53a24;
+  --sin: #7a2647;
+  /* 鎏金描边 */
+  --line: rgba(201, 169, 78, 0.42);
+  --line-soft: rgba(201, 169, 78, 0.2);
+  /* 字体 */
+  --font-title: 'ZCOOL XiaoWei', 'STKaiti', 'KaiTi', serif;
+  --font-body: 'Noto Serif SC', 'Source Han Serif SC', 'STSong', serif;
 }
 
 html,
@@ -23,6 +36,6 @@ body {
 }
 
 #app {
-  font-family: 'Noto Serif SC', 'Source Han Serif SC', serif;
-  color: var(--ink);
+  font-family: var(--font-body);
+  color: var(--bone);
 }

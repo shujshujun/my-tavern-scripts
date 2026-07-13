@@ -648,25 +648,27 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* ═══════════ 画框:深色橡木 + 鎏金压线(固定画幅,内部各区自行滚动) ═══════════ */
+/* ═══════════════════════════════════════════════════════════════
+   魂系暗金(艾尔登法环纲领):近黑暖底 / 鎏金细线 / 碑文金字 / 克制留白
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── 画框:黑檀底 + 双重鎏金发丝线(固定画幅,内部各区自行滚动) ── */
 
 .codex {
   box-sizing: border-box;
   height: var(--frame-h, 620px);
-  padding: 9px;
+  padding: 7px;
   background:
-    radial-gradient(ellipse at 20% 0%, rgba(120, 84, 40, 0.35), transparent 55%),
-    linear-gradient(160deg, #3a2712, #241708 55%, #140b04);
-  border: 2px solid #0a0603;
-  border-radius: 6px;
+    radial-gradient(ellipse 90% 60% at 50% -8%, rgba(201, 169, 78, 0.13), transparent 60%),
+    radial-gradient(ellipse 120% 90% at 50% 108%, rgba(0, 0, 0, 0.55), transparent 55%),
+    linear-gradient(175deg, var(--void-2), var(--void) 60%);
+  border: 1px solid var(--line);
   box-shadow:
-    0 10px 34px rgba(0, 0, 0, 0.65),
-    inset 0 0 0 1px rgba(212, 175, 55, 0.4),
-    inset 0 0 0 4px rgba(0, 0, 0, 0.45),
-    inset 0 0 0 5px rgba(212, 175, 55, 0.18);
+    0 12px 40px rgba(0, 0, 0, 0.8),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.9),
+    inset 0 0 90px rgba(0, 0, 0, 0.55);
 }
 
-/* 羊皮书页:纤维纹理 + 四周焦褐晕影 */
 .page {
   position: relative;
   box-sizing: border-box;
@@ -674,97 +676,119 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 8px 12px 10px;
-  border: 1px solid #7a5c1c;
-  border-radius: 3px;
-  background:
-    radial-gradient(ellipse at 30% 18%, rgba(255, 250, 235, 0.45), transparent 55%),
-    radial-gradient(ellipse at 78% 88%, rgba(120, 90, 40, 0.2), transparent 55%),
-    repeating-linear-gradient(93deg, rgba(120, 95, 55, 0.05) 0 2px, transparent 2px 5px),
-    repeating-linear-gradient(1deg, rgba(120, 95, 55, 0.045) 0 1px, transparent 1px 4px), var(--parchment);
-  box-shadow:
-    inset 0 0 64px rgba(90, 65, 30, 0.4),
-    inset 0 0 8px rgba(90, 65, 30, 0.35);
+  padding: 8px 14px 10px;
+  border: 1px solid var(--line-soft);
+  background: transparent;
+}
+
+/* 圣坛微光:顶部一缕金色天光,微微呼吸 */
+.page::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 70% 34% at 50% 0%, rgba(233, 209, 151, 0.09), transparent 70%);
+  animation: altar-breath 7s ease-in-out infinite;
+}
+
+@keyframes altar-breath {
+  50% {
+    opacity: 0.55;
+  }
 }
 
 .err {
   white-space: pre-wrap;
   word-break: break-all;
-  background: #7a1a1a;
+  background: rgba(122, 26, 26, 0.85);
   color: #ffe9e0;
-  border-radius: 3px;
+  border: 1px solid var(--rubric);
   padding: 6px 8px;
   margin-bottom: 8px;
   font-size: 0.75em;
 }
 
-/* ═══════════ 顶区:碑铭题头 / 圣物计数 / 圣徒像头像 ═══════════ */
+/* ── 碑文题头:金字 + 左右细金线(黑魂标题式分隔) ── */
 
 .codex-header {
   flex: none;
-  text-align: center;
-  font-weight: 700;
-  font-size: 0.95em;
-  letter-spacing: 0.4em;
-  text-indent: 0.4em;
-  color: var(--gilt-bright, #d4af37);
-  background: linear-gradient(180deg, #43301576, #24170888);
-  border: 1px solid #7a5c1c;
-  border-radius: 3px;
-  padding: 6px 0 5px;
-  margin: 0 0 7px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-family: var(--font-title);
+  font-weight: 400;
+  font-size: 1.12em;
+  letter-spacing: 0.42em;
+  text-indent: 0.42em;
+  color: var(--gold-bright);
   text-shadow:
-    0 1px 0 #000,
-    0 0 10px rgba(212, 175, 55, 0.35);
+    0 0 14px rgba(201, 169, 78, 0.4),
+    0 1px 2px #000;
+  padding: 5px 0 7px;
+  margin: 0 0 6px;
+  justify-content: center;
 }
+
+.codex-header::before,
+.codex-header::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--line) 45%, var(--line) 55%, transparent);
+}
+
+/* ── 圣物计数条:极简一行,金符号 ── */
 
 .meta-row {
   flex: none;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 14px;
+  gap: 3px 16px;
   justify-content: center;
   font-size: 0.85em;
-  color: var(--ink-faded);
-  background: linear-gradient(180deg, rgba(58, 39, 18, 0.14), rgba(58, 39, 18, 0.03));
-  border: 1px solid rgba(122, 92, 28, 0.55);
-  border-radius: 3px;
-  padding: 3px 8px;
+  color: var(--bone-faded);
+  border-top: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+  padding: 4px 8px;
   margin-bottom: 7px;
+  background: linear-gradient(180deg, rgba(201, 169, 78, 0.05), transparent);
 }
 
 .meta-btns {
   display: inline-flex;
-  gap: 6px;
+  gap: 8px;
 }
 
+/* 魂系按钮:透明底 + 细金框,悬停金光浮起 */
 .codex-toggle {
-  padding: 1px 10px;
-  font-family: inherit;
+  padding: 1px 12px;
+  font-family: var(--font-body);
   font-size: 1em;
-  color: var(--parchment);
-  background: linear-gradient(180deg, #6e552a, #4a3617);
-  border: 1px solid #2e2008;
-  border-radius: 3px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 235, 180, 0.35),
-    0 1px 2px rgba(0, 0, 0, 0.4);
+  color: var(--gold);
+  background: transparent;
+  border: 1px solid var(--line);
   cursor: pointer;
+  transition: all 0.25s ease;
 }
 
 .codex-toggle:hover {
-  background: linear-gradient(180deg, #83672f, #5a431c);
+  color: var(--gold-bright);
+  border-color: var(--gold);
+  box-shadow:
+    0 0 10px rgba(201, 169, 78, 0.35),
+    inset 0 0 8px rgba(201, 169, 78, 0.12);
+  text-shadow: 0 0 8px rgba(233, 209, 151, 0.6);
 }
 
-/* ── 头像行:圣徒像小圆章 ── */
+/* ── 头像行:暗色圣徽章,焦点者燃起金光 ── */
 
 .avatar-row {
   flex: none;
   display: flex;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 6px 10px;
+  gap: 5px 11px;
   margin-bottom: 8px;
 }
 
@@ -772,7 +796,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1px;
+  gap: 2px;
   cursor: pointer;
   user-select: none;
 }
@@ -784,75 +808,80 @@ onMounted(() => {
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  font-weight: 700;
-  font-size: 1.05em;
-  color: var(--ink);
-  background: radial-gradient(circle at 35% 28%, #f6ecd6, var(--parchment-dark) 62%, #b99d68);
-  border: 2px solid #7a5c1c;
+  font-family: var(--font-title);
+  font-size: 1.1em;
+  color: var(--bone);
+  background: radial-gradient(circle at 38% 30%, #2e2512, var(--void-2) 68%);
+  border: 1px solid var(--line);
   box-shadow:
-    0 2px 4px rgba(0, 0, 0, 0.45),
-    inset 0 0 0 2px rgba(212, 175, 55, 0.5),
-    inset 0 1px 2px rgba(255, 255, 255, 0.55);
-  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
-  transition: all 0.4s ease;
+    0 2px 6px rgba(0, 0, 0, 0.6),
+    inset 0 0 10px rgba(0, 0, 0, 0.6);
+  transition: all 0.45s ease;
 }
 
 .avatar-name {
   font-size: 0.66em;
-  color: var(--ink-faded);
+  color: var(--bone-faded);
+  letter-spacing: 0.08em;
+  transition: all 0.45s ease;
 }
 
 .avatar.focus .avatar-glyph {
-  border-color: var(--gilt-bright);
+  color: var(--gold-bright);
+  border-color: var(--gold);
   box-shadow:
-    0 0 10px var(--gilt-bright),
-    inset 0 0 0 2px rgba(212, 175, 55, 0.8),
-    inset 0 1px 2px rgba(255, 255, 255, 0.6);
+    0 0 14px rgba(201, 169, 78, 0.55),
+    inset 0 0 10px rgba(201, 169, 78, 0.25);
+  text-shadow: 0 0 10px rgba(233, 209, 151, 0.8);
 }
 
 .avatar.focus .avatar-name {
-  color: var(--ink);
-  font-weight: 700;
+  color: var(--gold);
 }
 
 .avatar.ambient .avatar-glyph {
-  border-color: var(--gilt);
+  color: var(--gold);
+  border-color: var(--line);
+  box-shadow:
+    0 0 6px rgba(201, 169, 78, 0.22),
+    inset 0 0 10px rgba(0, 0, 0, 0.5);
 }
 
 .avatar.away {
-  opacity: 0.42;
+  opacity: 0.38;
 }
 
 .avatar.veiled {
   cursor: default;
-  opacity: 0.55;
+  opacity: 0.5;
 }
 
 .avatar.veiled .avatar-glyph {
-  color: var(--parchment);
-  background: radial-gradient(circle at 40% 30%, #3a2c1a, #191007 70%);
+  color: var(--bone-faded);
   border-style: dashed;
+  background: radial-gradient(circle at 40% 30%, #1c1509, var(--void) 75%);
 }
 
-/* ═══════════ 正文书页(唯一滚动区;首字母泥金) ═══════════ */
+/* ── 正文:唯一滚动区。骨白碑文,金色泥金首字 ── */
 
 .story {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 10px 14px;
-  border: 1px solid rgba(122, 92, 28, 0.5);
-  border-radius: 3px;
-  background: linear-gradient(180deg, rgba(201, 162, 39, 0.07) 0%, transparent 42px), rgba(255, 250, 238, 0.25);
+  padding: 12px 16px;
   font-size: 0.95em;
-  line-height: 1.9;
-  color: var(--ink);
-  box-shadow: inset 0 0 24px rgba(90, 65, 30, 0.14);
+  line-height: 2;
+  color: var(--bone);
+  background: linear-gradient(180deg, rgba(201, 169, 78, 0.035), transparent 60px);
+  border-top: 1px solid var(--line-soft);
+  border-bottom: 1px solid var(--line-soft);
+  scrollbar-width: thin;
+  scrollbar-color: var(--gold-deep) transparent;
 }
 
 .story p {
-  margin: 0 0 0.9em;
+  margin: 0 0 0.95em;
   text-indent: 2em;
 }
 
@@ -860,18 +889,16 @@ onMounted(() => {
   margin-bottom: 0;
 }
 
-/* 泥金首字母(illuminated versal):每段叙事的第一段 */
+/* 泥金首字(versal):每段叙事的第一段,金字微光 */
 .story-entry .narr:first-child::first-letter,
 .chronicle .story-entry .narr:first-child::first-letter {
   float: left;
+  font-family: var(--font-title);
   font-size: 2.5em;
-  line-height: 0.92;
-  padding: 3px 6px 0 0;
-  font-weight: 700;
-  color: var(--rubric);
-  text-shadow:
-    0 0 1px rgba(140, 47, 27, 0.6),
-    1px 1px 0 rgba(212, 175, 55, 0.5);
+  line-height: 0.95;
+  padding: 3px 7px 0 0;
+  color: var(--gold);
+  text-shadow: 0 0 12px rgba(201, 169, 78, 0.45);
 }
 
 .story-entry .narr:first-child {
@@ -880,38 +907,39 @@ onMounted(() => {
 
 .story-player {
   text-indent: 0 !important;
-  font-size: 0.9em;
+  font-size: 0.88em;
   font-style: italic;
-  color: var(--sin);
-  border-left: 2px solid var(--gilt);
-  padding-left: 8px;
-  margin: 0.4em 0 0.9em !important;
+  color: var(--gold);
+  opacity: 0.85;
+  border-left: 1px solid var(--rubric);
+  padding-left: 10px;
+  margin: 0.5em 0 1em !important;
 }
 
 .scribing {
   text-indent: 0 !important;
   font-size: 0.82em;
   font-style: italic;
-  color: var(--ink-faded);
+  color: var(--bone-faded);
   animation: scribe-pulse 1.6s ease-in-out infinite;
 }
 
 @keyframes scribe-pulse {
   50% {
-    opacity: 0.35;
+    opacity: 0.3;
   }
 }
 
-/* ═══════════ 底区:低语 / 行动建议 / 羽笔(钉死在画幅底部,不随正文滚动) ═══════════ */
+/* ── 底区:低语 / 建议 / 羽笔(钉死画幅底部) ── */
 
 .whisper {
   flex: none;
   margin-top: 6px;
   padding-top: 5px;
-  border-top: 1px dashed var(--gilt);
+  border-top: 1px dashed rgba(122, 38, 71, 0.55);
   font-size: 0.8em;
   font-style: italic;
-  color: var(--sin);
+  color: #b06a8a;
 }
 
 .whisper-acts {
@@ -920,26 +948,27 @@ onMounted(() => {
 }
 
 .whisper-act {
-  padding: 0 8px;
+  padding: 0 9px;
   margin-left: 4px;
-  font-family: inherit;
+  font-family: var(--font-body);
   font-size: 0.9em;
   font-style: normal;
-  color: var(--ink-faded);
+  color: var(--bone-faded);
   background: transparent;
-  border: 1px dashed var(--ink-faded);
-  border-radius: 3px;
+  border: 1px solid rgba(143, 129, 95, 0.4);
   cursor: pointer;
+  transition: all 0.25s ease;
 }
 
 .whisper-act.obey {
-  color: var(--sin);
-  border-color: var(--sin);
+  color: #b06a8a;
+  border-color: rgba(176, 106, 138, 0.6);
 }
 
 .whisper-act:hover {
-  color: var(--parchment);
+  color: #efd4e2;
   background: var(--sin);
+  border-color: var(--sin);
 }
 
 .option-row {
@@ -951,23 +980,22 @@ onMounted(() => {
 }
 
 .option-chip {
-  padding: 3px 11px;
-  font-family: inherit;
+  padding: 3px 12px;
+  font-family: var(--font-body);
   font-size: 0.8em;
-  color: var(--ink);
-  background: linear-gradient(180deg, #efe3c8, var(--parchment-dark));
-  border: 1px solid #7a5c1c;
-  border-radius: 12px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
-    0 1px 2px rgba(0, 0, 0, 0.25);
+  color: var(--bone);
+  background: rgba(201, 169, 78, 0.06);
+  border: 1px solid var(--line-soft);
   cursor: pointer;
   text-align: left;
+  transition: all 0.25s ease;
 }
 
 .option-chip:hover {
-  color: var(--parchment);
-  background: var(--rubric);
+  color: var(--gold-bright);
+  border-color: var(--gold);
+  box-shadow: 0 0 10px rgba(201, 169, 78, 0.3);
+  text-shadow: 0 0 6px rgba(233, 209, 151, 0.5);
 }
 
 .quill {
@@ -976,55 +1004,70 @@ onMounted(() => {
   gap: 6px;
   margin-top: 7px;
   padding-top: 7px;
-  border-top: 1px solid var(--gilt);
+  border-top: 1px solid var(--line-soft);
 }
 
 .quill textarea {
   flex: 1;
   box-sizing: border-box;
-  font-family: inherit;
+  font-family: var(--font-body);
   font-size: 0.88em;
   line-height: 1.5;
-  color: var(--ink);
-  background:
-    repeating-linear-gradient(92deg, rgba(120, 95, 55, 0.05) 0 2px, transparent 2px 6px), var(--parchment-dark);
-  border: 1px solid #7a5c1c;
-  border-radius: 3px;
-  box-shadow: inset 0 1px 4px rgba(90, 65, 30, 0.35);
-  padding: 6px 9px;
+  color: var(--bone);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--line-soft);
+  box-shadow: inset 0 1px 6px rgba(0, 0, 0, 0.5);
+  padding: 6px 10px;
   resize: none;
+  transition: border-color 0.25s ease;
+}
+
+.quill textarea:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow:
+    inset 0 1px 6px rgba(0, 0, 0, 0.5),
+    0 0 10px rgba(201, 169, 78, 0.25);
+}
+
+.quill textarea::placeholder {
+  color: var(--bone-faded);
+  opacity: 0.6;
 }
 
 .quill-btn {
   margin: 0;
   align-self: stretch;
-  padding: 0 18px;
+  padding: 0 20px;
   white-space: nowrap;
 }
 
 .reroll-row {
   flex: none;
-  text-align: right;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
   margin-top: 4px;
 }
 
 .reroll-btn {
   padding: 1px 10px;
-  font-family: inherit;
+  font-family: var(--font-body);
   font-size: 0.75em;
-  color: var(--ink-faded);
+  color: var(--bone-faded);
   background: transparent;
-  border: 1px dashed var(--gilt);
-  border-radius: 3px;
+  border: 1px solid rgba(143, 129, 95, 0.35);
   cursor: pointer;
+  transition: all 0.25s ease;
 }
 
 .reroll-btn:hover {
-  color: var(--rubric);
-  border-style: solid;
+  color: var(--gold);
+  border-color: var(--gold);
+  text-shadow: 0 0 6px rgba(233, 209, 151, 0.5);
 }
 
-/* ═══════════ 羊皮大卷轴弹窗(法典/史册/档案卡共用;上下卷杆+展卷动画) ═══════════ */
+/* ═══════════ 弹窗(法典/史册/档案卡):魂系菜单——暗幕升起,金线画框 ═══════════ */
 
 .scroll-mask {
   position: fixed;
@@ -1033,91 +1076,95 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(12, 7, 2, 0.66);
+  background: rgba(5, 4, 2, 0.78);
+  backdrop-filter: blur(2px);
+  animation: mask-in 0.25s ease;
+}
+
+@keyframes mask-in {
+  from {
+    opacity: 0;
+  }
 }
 
 .scroll {
   position: relative;
   box-sizing: border-box;
   width: 94%;
-  height: 90%;
+  height: 92%;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 22px 16px 20px;
-  border: 1px solid #7a5c1c;
-  border-radius: 6px;
+  padding: 16px 18px;
   background:
-    radial-gradient(ellipse at 28% 15%, rgba(255, 250, 235, 0.5), transparent 55%),
-    radial-gradient(ellipse at 80% 90%, rgba(120, 90, 40, 0.22), transparent 55%),
-    repeating-linear-gradient(93deg, rgba(120, 95, 55, 0.05) 0 2px, transparent 2px 5px), var(--parchment);
+    radial-gradient(ellipse 80% 40% at 50% -5%, rgba(201, 169, 78, 0.1), transparent 65%),
+    linear-gradient(175deg, #1b1509, var(--void) 70%);
+  border: 1px solid var(--line);
+  outline: 1px solid rgba(0, 0, 0, 0.9);
+  outline-offset: 2px;
   box-shadow:
-    0 14px 46px rgba(0, 0, 0, 0.75),
-    inset 0 0 60px rgba(90, 65, 30, 0.38);
-  animation: unroll 0.45s cubic-bezier(0.2, 0.85, 0.3, 1.04);
-  transform-origin: top center;
+    0 16px 60px rgba(0, 0, 0, 0.9),
+    inset 0 0 70px rgba(0, 0, 0, 0.5);
+  animation: menu-rise 0.32s cubic-bezier(0.2, 0.8, 0.3, 1);
 }
 
-/* 上下木质卷杆 */
-.scroll::before,
-.scroll::after {
-  content: '';
-  position: absolute;
-  left: -7px;
-  right: -7px;
-  height: 16px;
-  border-radius: 8px;
-  background: linear-gradient(180deg, #8a6a34, #5d431c 45%, #2e2008);
-  box-shadow:
-    0 3px 7px rgba(0, 0, 0, 0.55),
-    inset 0 1px 0 rgba(255, 235, 180, 0.4);
-}
-
-.scroll::before {
-  top: -8px;
-}
-
-.scroll::after {
-  bottom: -8px;
-}
-
-@keyframes unroll {
+@keyframes menu-rise {
   from {
-    transform: scaleY(0.08);
-    opacity: 0.3;
+    transform: translateY(14px);
+    opacity: 0;
   }
   to {
-    transform: scaleY(1);
+    transform: translateY(0);
     opacity: 1;
   }
 }
 
 .scroll-close {
   position: absolute;
-  top: 10px;
-  right: 12px;
+  top: 8px;
+  right: 10px;
   z-index: 1;
-  border: 1px solid #7a5c1c;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line-soft);
   border-radius: 50%;
-  width: 24px;
-  height: 24px;
-  background: var(--parchment-dark);
-  color: var(--ink-faded);
+  background: transparent;
+  color: var(--bone-faded);
   font-size: 0.85em;
   cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.scroll-close:hover {
+  color: var(--gold-bright);
+  border-color: var(--gold);
 }
 
 .scroll-title {
   flex: none;
-  text-align: center;
-  font-weight: 700;
-  letter-spacing: 0.3em;
-  text-indent: 0.3em;
-  color: var(--rubric);
-  border-bottom: 2px double var(--gilt);
-  padding-bottom: 6px;
-  margin-bottom: 8px;
-  text-shadow: 1px 1px 0 rgba(212, 175, 55, 0.4);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  justify-content: center;
+  font-family: var(--font-title);
+  font-weight: 400;
+  letter-spacing: 0.4em;
+  text-indent: 0.4em;
+  font-size: 1.1em;
+  color: var(--gold-bright);
+  text-shadow:
+    0 0 14px rgba(201, 169, 78, 0.45),
+    0 1px 2px #000;
+  padding-bottom: 8px;
+  margin-bottom: 10px;
+}
+
+.scroll-title::before,
+.scroll-title::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--line) 45%, var(--line) 55%, transparent);
 }
 
 .scroll-body {
@@ -1125,17 +1172,19 @@ onMounted(() => {
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 2px 8px;
+  padding: 2px 10px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--gold-deep) transparent;
 }
 
 .chronicle {
   font-size: 0.92em;
-  line-height: 1.85;
-  color: var(--ink);
+  line-height: 1.95;
+  color: var(--bone);
 }
 
 .chronicle p {
-  margin: 0 0 0.85em;
+  margin: 0 0 0.9em;
   text-indent: 2em;
 }
 
@@ -1149,28 +1198,29 @@ onMounted(() => {
 
 .candle {
   padding: 0 6px;
-  font-family: inherit;
+  font-family: var(--font-body);
   font-size: 0.72em;
-  color: var(--ink-faded);
+  color: var(--bone-faded);
   background: transparent;
   border: none;
-  border-radius: 3px;
   cursor: pointer;
   opacity: 0.5;
+  transition: all 0.25s ease;
 }
 
 .candle:hover {
   opacity: 1;
+  text-shadow: 0 0 8px rgba(233, 209, 151, 0.7);
 }
 
 .candle.armed {
   opacity: 1;
-  color: var(--parchment);
+  color: #efd4e2;
   background: var(--sin);
-  border: 1px solid var(--gilt-bright);
+  border: 1px solid var(--gold);
 }
 
-/* ═══════════ 档案卡(窄卷轴) ═══════════ */
+/* ── 档案卡(窄幅碑铭) ── */
 
 .scroll.dossier {
   width: min(92%, 460px);
@@ -1178,31 +1228,35 @@ onMounted(() => {
   max-height: 88%;
   overflow-y: auto;
   display: block;
-  padding: 20px 18px;
+  padding: 18px 20px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--gold-deep) transparent;
 }
 
 .dossier-head {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  border-bottom: 2px double var(--gilt);
-  padding-bottom: 6px;
-  margin-bottom: 8px;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 7px;
+  margin-bottom: 10px;
 }
 
 .dossier-name {
-  font-weight: 700;
-  font-size: 1.15em;
+  font-family: var(--font-title);
+  font-size: 1.3em;
+  color: var(--gold-bright);
+  text-shadow: 0 0 10px rgba(201, 169, 78, 0.4);
 }
 
 .dossier-role {
   font-size: 0.8em;
-  color: var(--ink-faded);
+  color: var(--bone-faded);
 }
 
 .dossier-stage {
   margin-left: auto;
-  margin-right: 22px;
+  margin-right: 24px;
   font-size: 0.85em;
   color: var(--rubric);
   font-weight: 700;
@@ -1211,8 +1265,8 @@ onMounted(() => {
 .dossier-axes {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-bottom: 8px;
+  gap: 5px;
+  margin-bottom: 9px;
 }
 
 .dossier-axis {
@@ -1228,39 +1282,38 @@ onMounted(() => {
 
 .axis-label {
   width: 2.4em;
-  color: var(--ink-faded);
+  color: var(--bone-faded);
 }
 
 .axis-num {
   width: 2em;
   text-align: right;
-  color: var(--ink-faded);
+  color: var(--bone);
   font-variant-numeric: tabular-nums;
 }
 
 .axis-delta {
   width: 2.2em;
   font-size: 0.9em;
-  color: var(--ink-faded);
+  color: var(--bone-faded);
 }
 
 .axis-delta.up {
-  color: var(--sin);
+  color: var(--rubric);
   font-weight: 700;
 }
 
 .axis-delta.down {
-  color: #4a6b8a;
+  color: #5f7d99;
   font-weight: 700;
 }
 
 .dossier-trend {
   width: 100%;
   height: 44px;
-  margin: 2px 0 8px;
-  background: rgba(255, 250, 238, 0.4);
-  border: 1px solid rgba(122, 92, 28, 0.55);
-  border-radius: 3px;
+  margin: 2px 0 9px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--line-soft);
 }
 
 .dossier-trend polyline {
@@ -1270,65 +1323,65 @@ onMounted(() => {
 }
 
 .trend-support {
-  stroke: var(--gilt-bright);
+  stroke: var(--gold);
 }
 
 .trend-sin {
-  stroke: var(--sin);
+  stroke: var(--rubric);
 }
 
 .trend-faith {
-  stroke: #4a6b8a;
+  stroke: #5f7d99;
 }
 
 .dossier-sense {
   font-size: 0.85em;
   font-style: italic;
-  color: var(--ink);
-  margin: 0 0 6px;
+  color: var(--bone);
+  margin: 0 0 7px;
 }
 
 .dossier-line {
   font-size: 0.82em;
+  color: var(--bone);
   margin: 0 0 4px;
 }
 
 .dossier-line b {
-  color: var(--rubric);
-  margin-right: 4px;
+  color: var(--gold);
+  font-weight: 400;
+  margin-right: 5px;
 }
 
 .dossier-line-title {
   font-size: 0.82em;
-  margin: 6px 0 3px;
+  color: var(--gold);
+  margin: 7px 0 3px;
 }
 
 .milestone {
   font-size: 0.8em;
-  color: var(--ink-faded);
+  color: var(--bone-faded);
   padding-left: 8px;
 }
 
 .milestone.done {
-  color: var(--ink);
-  font-weight: 700;
+  color: var(--gold-bright);
 }
 
 .dossier-sealed {
   font-size: 0.82em;
   font-style: italic;
-  color: var(--ink-faded);
-  border: 1px dashed var(--gilt);
-  border-radius: 3px;
-  padding: 6px 8px;
+  color: var(--bone-faded);
+  border: 1px dashed var(--line-soft);
+  padding: 7px 9px;
 }
 
-/* ═══════════ 三轴条 ═══════════ */
+/* ── 三轴条 ── */
 
 .axis {
-  height: 4px;
-  background: rgba(58, 47, 35, 0.16);
-  border-radius: 2px;
+  height: 3px;
+  background: rgba(201, 169, 78, 0.12);
   overflow: hidden;
 }
 
@@ -1339,64 +1392,69 @@ onMounted(() => {
 }
 
 .bar.support {
-  background: var(--gilt-bright);
+  background: linear-gradient(90deg, var(--gold-deep), var(--gold-bright));
 }
 
 .bar.sin {
-  background: var(--sin);
+  background: linear-gradient(90deg, #5c1c10, var(--rubric));
 }
 
 .bar.faith {
-  background: #4a6b8a;
+  background: linear-gradient(90deg, #2e4457, #6f93b4);
 }
 
-/* ═══════════ 氛围:纠察之眼 / 会议蜡烛 ═══════════ */
+/* ── 氛围:纠察之眼 / 会议蜡烛 ── */
 
 .watch-eye.hot {
-  color: var(--sin);
-  text-shadow: 0 0 6px var(--sin);
+  color: var(--rubric);
+  text-shadow: 0 0 8px var(--rubric);
   animation: eye-throb 1.8s ease-in-out infinite;
 }
 
 @keyframes eye-throb {
   50% {
-    text-shadow: 0 0 12px var(--sin);
+    text-shadow: 0 0 16px var(--rubric);
   }
 }
 
 .countdown.urgent {
-  color: var(--rubric);
+  color: var(--gold-bright);
   animation: flame-flicker 0.9s ease-in-out infinite;
 }
 
 @keyframes flame-flicker {
   50% {
-    opacity: 0.55;
+    opacity: 0.5;
   }
 }
 
-/* ═══════════ 法典 ═══════════ */
+/* ── 法典 ── */
 
 .rule-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
 }
 
 .rule-card {
-  background: rgba(255, 250, 238, 0.35);
-  border: 1px solid rgba(122, 92, 28, 0.55);
-  border-left: 3px solid var(--gilt);
-  border-radius: 3px;
-  padding: 7px 9px;
+  background: rgba(201, 169, 78, 0.045);
+  border: 1px solid var(--line-soft);
+  border-left: 2px solid var(--gold-deep);
+  padding: 8px 11px;
   font-size: 0.84em;
-  box-shadow: 0 1px 3px rgba(90, 65, 30, 0.18);
+  color: var(--bone);
+  transition: border-color 0.25s ease;
+}
+
+.rule-card:hover {
+  border-left-color: var(--gold);
 }
 
 .rule-head {
   display: flex;
   align-items: center;
   gap: 6px;
+  color: var(--gold-bright);
 }
 
 .rule-current {
@@ -1405,14 +1463,14 @@ onMounted(() => {
 }
 
 .rule-text {
-  margin: 3px 0;
-  color: var(--ink);
+  margin: 4px 0;
+  color: var(--bone);
 }
 
-/* palimpsest:被刮去的旧条文,旧字隐约透出 */
+/* palimpsest:被刮去的旧律,灰烬色透出 */
 .palimpsest {
   text-decoration: line-through;
-  color: rgba(58, 47, 35, 0.35);
+  color: rgba(143, 129, 95, 0.55);
   font-size: 0.9em;
 }
 
@@ -1421,13 +1479,12 @@ onMounted(() => {
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  color: var(--ink-faded);
+  color: var(--bone-faded);
   font-size: 0.9em;
 }
 
 .rule-next.exhausted {
-  color: var(--gilt);
-  font-weight: 700;
+  color: var(--gold);
 }
 
 .seats {
@@ -1444,47 +1501,52 @@ onMounted(() => {
   border-radius: 50%;
   font-size: 10px;
   font-style: normal;
-  border: 1px solid var(--ink-faded);
-  color: var(--ink-faded);
+  border: 1px solid var(--bone-faded);
+  color: var(--bone-faded);
   background: transparent;
 }
 
 .seat[data-s='yes'] {
-  background: var(--gilt-bright);
-  border-color: var(--gilt-bright);
-  color: var(--shadow);
+  border-color: var(--gold);
+  color: var(--gold-bright);
+  box-shadow: 0 0 5px rgba(201, 169, 78, 0.4);
 }
 
 .seat[data-s='no'] {
-  background: var(--rubric);
   border-color: var(--rubric);
-  color: var(--parchment);
+  color: var(--rubric);
 }
 
 .seat[data-s='abstain'] {
-  background: var(--ink-faded);
-  border-color: var(--ink-faded);
-  color: var(--parchment);
+  border-color: var(--bone-faded);
+  color: var(--void);
+  background: var(--bone-faded);
 }
 
 .ascend-btn {
-  margin-top: 6px;
+  margin-top: 8px;
   width: 100%;
-  padding: 3px 0;
-  font-family: inherit;
-  font-size: 0.78em;
-  font-weight: 700;
-  color: var(--parchment);
-  background: linear-gradient(180deg, #6d2749, var(--sin));
-  border: 1px solid var(--gilt-bright);
-  border-radius: 3px;
+  padding: 4px 0;
+  font-family: var(--font-title);
+  font-size: 0.85em;
+  letter-spacing: 0.25em;
+  text-indent: 0.25em;
+  color: #e8b4cc;
+  background: linear-gradient(180deg, rgba(122, 38, 71, 0.5), rgba(122, 38, 71, 0.25));
+  border: 1px solid var(--sin);
   cursor: pointer;
-  animation: ascend-glow 2s ease-in-out infinite;
+  animation: ascend-glow 2.2s ease-in-out infinite;
+  transition: all 0.25s ease;
+}
+
+.ascend-btn:hover {
+  color: #ffe6f2;
+  border-color: #b06a8a;
 }
 
 @keyframes ascend-glow {
   50% {
-    box-shadow: 0 0 8px var(--gilt-bright);
+    box-shadow: 0 0 12px rgba(122, 38, 71, 0.8);
   }
 }
 
@@ -1492,7 +1554,7 @@ onMounted(() => {
   font-style: normal;
 }
 
-/* ═══════════ 会议 ═══════════ */
+/* ── 会议 ── */
 
 .meeting-body {
   flex: 1 1 auto;
@@ -1500,32 +1562,41 @@ onMounted(() => {
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 2px 2px 6px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--gold-deep) transparent;
 }
 
 .agenda-hint {
   font-size: 0.8em;
-  color: var(--ink-faded);
+  color: var(--bone-faded);
   text-align: center;
-  margin: 4px 0 8px;
+  margin: 4px 0 9px;
 }
 
 .agenda-item {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 6px 9px;
+  padding: 7px 10px;
   margin-bottom: 5px;
-  border: 1px solid #7a5c1c;
-  border-radius: 3px;
-  background: rgba(255, 250, 238, 0.35);
-  box-shadow: 0 1px 3px rgba(90, 65, 30, 0.18);
+  border: 1px solid var(--line-soft);
+  background: rgba(201, 169, 78, 0.04);
   cursor: pointer;
   font-size: 0.85em;
+  color: var(--bone);
+  transition: all 0.25s ease;
+}
+
+.agenda-item:hover {
+  border-color: var(--line);
 }
 
 .agenda-item.chosen {
-  outline: 2px solid var(--rubric);
-  background: rgba(212, 175, 55, 0.14);
+  border-color: var(--gold);
+  background: rgba(201, 169, 78, 0.1);
+  box-shadow:
+    0 0 12px rgba(201, 169, 78, 0.25),
+    inset 0 0 10px rgba(201, 169, 78, 0.08);
 }
 
 .agenda-item input {
@@ -1534,78 +1605,88 @@ onMounted(() => {
 
 .agenda-weight {
   font-size: 0.75em;
-  padding: 0 4px;
-  border-radius: 2px;
-  color: var(--parchment);
-  background: var(--ink-faded);
+  padding: 0 5px;
+  border: 1px solid var(--bone-faded);
+  color: var(--bone-faded);
 }
 
 .agenda-weight[data-w='中'] {
-  background: var(--gilt);
+  border-color: var(--gold);
+  color: var(--gold);
 }
 
 .agenda-weight[data-w='重'] {
-  background: var(--rubric);
+  border-color: var(--rubric);
+  color: var(--rubric);
 }
 
 .agenda-name {
   font-weight: 700;
+  color: var(--gold-bright);
 }
 
 .agenda-next {
-  color: var(--ink-faded);
+  color: var(--bone-faded);
 }
 
-/* 火漆印章按钮 */
+/* 主仪式按钮:碑金 */
 .rite-btn {
   display: block;
   margin: 10px auto 2px;
-  padding: 6px 24px;
-  font-family: inherit;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  color: var(--parchment);
-  background: radial-gradient(circle at 40% 32%, #a8402a, var(--rubric) 65%, #5c150b);
-  border: 1px solid var(--gilt);
-  border-radius: 4px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 220, 190, 0.35),
-    0 2px 5px rgba(0, 0, 0, 0.45);
+  padding: 6px 26px;
+  font-family: var(--font-title);
+  font-size: 1em;
+  letter-spacing: 0.22em;
+  text-indent: 0.22em;
+  color: var(--gold);
+  background: transparent;
+  border: 1px solid var(--line);
   cursor: pointer;
+  transition: all 0.25s ease;
 }
 
 .rite-btn:hover:not(:disabled) {
-  filter: brightness(1.12);
+  color: var(--gold-bright);
+  border-color: var(--gold);
+  box-shadow:
+    0 0 14px rgba(201, 169, 78, 0.4),
+    inset 0 0 10px rgba(201, 169, 78, 0.12);
+  text-shadow: 0 0 10px rgba(233, 209, 151, 0.7);
 }
 
 .rite-btn:disabled {
-  background: var(--ink-faded);
+  color: var(--bone-faded);
+  border-color: rgba(143, 129, 95, 0.3);
   cursor: not-allowed;
 }
 
 .verdict-banner {
   text-align: center;
-  font-weight: 700;
-  padding: 8px;
-  margin-bottom: 8px;
-  border-radius: 3px;
-  border: 1px solid var(--gilt);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.25);
+  font-family: var(--font-title);
+  font-size: 1.05em;
+  letter-spacing: 0.14em;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  text-shadow: 0 1px 2px #000;
 }
 
 .verdict-banner.passed {
-  color: var(--parchment);
-  background: linear-gradient(180deg, #b5942f, var(--gilt));
+  color: var(--gold-bright);
+  background: linear-gradient(180deg, rgba(201, 169, 78, 0.14), rgba(201, 169, 78, 0.04));
+  text-shadow: 0 0 14px rgba(201, 169, 78, 0.5);
 }
 
 .verdict-banner.rejected {
-  color: var(--parchment);
-  background: linear-gradient(180deg, #7d6c53, var(--ink-faded));
+  color: var(--bone-faded);
+  background: rgba(143, 129, 95, 0.08);
 }
 
 .verdict-banner.seized {
-  color: var(--parchment);
-  background: linear-gradient(180deg, #6d2749, var(--sin));
+  color: #e8b4cc;
+  background: linear-gradient(180deg, rgba(122, 38, 71, 0.35), rgba(122, 38, 71, 0.1));
+  border-color: var(--sin);
 }
 
 .vote-grid {
@@ -1622,47 +1703,51 @@ onMounted(() => {
 
 .vote-card {
   text-align: center;
-  padding: 6px 4px;
-  border: 1px solid #7a5c1c;
-  border-radius: 3px;
-  background: rgba(255, 250, 238, 0.4);
-  box-shadow: 0 1px 3px rgba(90, 65, 30, 0.2);
+  padding: 7px 4px;
+  border: 1px solid var(--line-soft);
+  background: rgba(201, 169, 78, 0.04);
+  color: var(--bone);
 }
 
-/* 逐席翻牌:蜡封依次揭开 */
+/* 逐席揭示:烛光依次燃起 */
 .vote-reveal {
   opacity: 0;
-  animation: seal-flip 0.5s ease-out forwards;
+  animation: seal-flip 0.55s ease-out forwards;
 }
 
 @keyframes seal-flip {
   from {
     opacity: 0;
-    transform: rotateX(80deg);
+    transform: translateY(6px);
+    filter: brightness(2.2);
   }
   to {
     opacity: 1;
-    transform: rotateX(0);
+    transform: translateY(0);
+    filter: brightness(1);
   }
 }
 
 .vote-card[data-v='赞成'] {
-  border-color: var(--gilt-bright);
-  box-shadow: inset 0 0 0 1px var(--gilt-bright);
+  border-color: var(--gold);
+  box-shadow:
+    0 0 10px rgba(201, 169, 78, 0.3),
+    inset 0 0 8px rgba(201, 169, 78, 0.08);
 }
 
 .vote-card[data-v='反对'] {
   border-color: var(--rubric);
-  box-shadow: inset 0 0 0 1px var(--rubric);
+  box-shadow: inset 0 0 8px rgba(154, 49, 32, 0.15);
 }
 
 .vote-name {
   font-weight: 700;
   font-size: 0.85em;
+  color: var(--gold-bright);
 }
 
 .vote-stance {
   font-size: 0.75em;
-  color: var(--ink-faded);
+  color: var(--bone-faded);
 }
 </style>

@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>禁忌修道院 · 主页</title>
     <style>
+      @import url('https://testingcf.jsdelivr.net/npm/@fontsource/zcool-xiaowei/index.css');
+      @import url('https://testingcf.jsdelivr.net/npm/@fontsource/noto-serif-sc/index.css');
+
       :root {
         --bg: #0d0a07;
         --bg2: #171008;
@@ -16,6 +19,7 @@
         --sin: #7a2a4e;
         --ink: #2e2518;
         --font-main: 'Noto Serif SC', 'Source Han Serif SC', serif;
+        --font-title: 'ZCOOL XiaoWei', 'STKaiti', 'KaiTi', serif;
       }
 
       * {
@@ -62,10 +66,14 @@
       h1 {
         margin: 8px 0 2px;
         text-align: center;
-        font-size: 34px;
+        font-family: var(--font-title);
+        font-weight: 400;
+        font-size: 38px;
         letter-spacing: 0.22em;
-        color: var(--parchment);
-        text-shadow: 0 0 22px rgba(201, 162, 39, 0.3);
+        color: #e9d197;
+        text-shadow:
+          0 0 26px rgba(201, 162, 39, 0.5),
+          0 1px 2px #000;
       }
 
       .subtitle {
@@ -163,16 +171,24 @@
         width: 100%;
         margin-top: 26px;
         padding: 13px 0;
-        font-family: inherit;
-        font-size: 16px;
-        font-weight: 700;
+        font-family: var(--font-title);
+        font-size: 17px;
         letter-spacing: 0.35em;
-        color: var(--bg);
-        background: linear-gradient(180deg, var(--gilt) 0%, var(--gilt-dim) 100%);
-        border: none;
-        border-radius: 4px;
+        text-indent: 0.35em;
+        color: var(--gilt);
+        background: rgba(201, 162, 39, 0.06);
+        border: 1px solid rgba(201, 162, 39, 0.45);
         cursor: pointer;
-        box-shadow: 0 0 24px rgba(201, 162, 39, 0.25);
+        transition: all 0.25s ease;
+      }
+
+      .go:hover:not(:disabled) {
+        color: #e9d197;
+        border-color: var(--gilt);
+        box-shadow:
+          0 0 22px rgba(201, 162, 39, 0.4),
+          inset 0 0 12px rgba(201, 162, 39, 0.12);
+        text-shadow: 0 0 12px rgba(233, 209, 151, 0.7);
       }
 
       .go:disabled {
