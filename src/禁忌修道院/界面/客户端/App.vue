@@ -1633,25 +1633,41 @@ onMounted(() => {
   gap: 8px;
 }
 
-/* 魂系按钮:透明底 + 细金框,悬停金光浮起 */
+/* ── 法环式按钮语言(实测法环菜单色阶 #040200→#27170d→#653815→#bd6707→#f9c043):
+   按钮不是浮在纸上的方块,而是融进框架的一段横带——上下发丝线两端渐隐,
+   悬停时中央浮起暗金光带,碑刻衬线金字。 ── */
 .codex-toggle {
-  padding: 1px 12px;
-  font-family: var(--font-body);
-  font-size: 1em;
+  --btn-line: rgba(143, 129, 95, 0.55);
+  padding: 4px 15px;
+  font-family: var(--font-title);
+  font-size: 0.94em;
+  letter-spacing: 0.1em;
   color: var(--gold);
-  background: transparent;
-  border: 1px solid var(--line);
+  border: none;
+  background:
+    linear-gradient(90deg, transparent, var(--btn-line) 22%, var(--btn-line) 78%, transparent) top / 100% 1px no-repeat,
+    linear-gradient(90deg, transparent, var(--btn-line) 22%, var(--btn-line) 78%, transparent) bottom / 100% 1px
+      no-repeat,
+    linear-gradient(90deg, transparent, rgba(39, 23, 13, 0.75) 16%, rgba(39, 23, 13, 0.75) 84%, transparent);
   cursor: pointer;
   transition: all 0.25s ease;
 }
 
 .codex-toggle:hover {
-  color: var(--gold-bright);
-  border-color: var(--gold);
-  box-shadow:
-    0 0 10px rgba(201, 169, 78, 0.35),
-    inset 0 0 8px rgba(201, 169, 78, 0.12);
-  text-shadow: 0 0 8px rgba(233, 209, 151, 0.6);
+  --btn-line: var(--gold);
+  color: #f9c043;
+  background:
+    linear-gradient(90deg, transparent, var(--btn-line) 18%, var(--btn-line) 82%, transparent) top / 100% 1px no-repeat,
+    linear-gradient(90deg, transparent, var(--btn-line) 18%, var(--btn-line) 82%, transparent) bottom / 100% 1px
+      no-repeat,
+    radial-gradient(ellipse 72% 140% at 50% 50%, rgba(189, 103, 7, 0.32), transparent 72%),
+    linear-gradient(90deg, transparent, rgba(39, 23, 13, 0.75) 16%, rgba(39, 23, 13, 0.75) 84%, transparent);
+  text-shadow: 0 0 10px rgba(249, 192, 67, 0.65);
+}
+
+.codex-toggle:active {
+  transform: translateY(1px);
+  text-shadow: 0 0 5px rgba(249, 192, 67, 0.4);
 }
 
 /* ── 头像行:暗色圣徽章,焦点者燃起金光 ── */
@@ -1909,13 +1925,18 @@ onMounted(() => {
   margin-top: 7px;
 }
 
+/* 行动选项:法环对话选项——渐隐底线的暗带,悬停金光浮起并微微前倾 */
 .option-chip {
-  padding: 4px 12px;
+  --btn-line: rgba(143, 129, 95, 0.4);
+  padding: 5px 12px;
   font-family: var(--font-body);
   font-size: 0.8em;
   color: var(--bone);
-  background: rgba(201, 169, 78, 0.06);
-  border: 1px solid var(--line-soft);
+  border: none;
+  background:
+    linear-gradient(90deg, transparent, var(--btn-line) 15%, var(--btn-line) 85%, transparent) bottom / 100% 1px
+      no-repeat,
+    linear-gradient(90deg, rgba(39, 23, 13, 0.55), rgba(39, 23, 13, 0.3) 88%, transparent);
   cursor: pointer;
   text-align: left;
   transition: all 0.25s ease;
@@ -1927,10 +1948,15 @@ onMounted(() => {
 }
 
 .option-chip:hover {
-  color: var(--gold-bright);
-  border-color: var(--gold);
-  box-shadow: 0 0 10px rgba(201, 169, 78, 0.3);
-  text-shadow: 0 0 6px rgba(233, 209, 151, 0.5);
+  --btn-line: var(--gold);
+  color: #f9c043;
+  padding-left: 16px;
+  background:
+    linear-gradient(90deg, transparent, var(--btn-line) 12%, var(--btn-line) 88%, transparent) bottom / 100% 1px
+      no-repeat,
+    radial-gradient(ellipse 80% 160% at 42% 55%, rgba(189, 103, 7, 0.28), transparent 72%),
+    linear-gradient(90deg, rgba(39, 23, 13, 0.55), rgba(39, 23, 13, 0.3) 88%, transparent);
+  text-shadow: 0 0 7px rgba(249, 192, 67, 0.55);
 }
 
 .quill {
@@ -1985,21 +2011,41 @@ onMounted(() => {
   margin-top: 4px;
 }
 
+/* 次级横带按钮(撤回/重写/地图/离开/购买):同一语言,轻一号——只留下缘渐隐发丝线 */
 .reroll-btn {
-  padding: 1px 10px;
+  --btn-line: rgba(143, 129, 95, 0.45);
+  padding: 3px 13px;
   font-family: var(--font-body);
-  font-size: 0.75em;
+  font-size: 0.78em;
+  letter-spacing: 0.05em;
   color: var(--bone-faded);
-  background: transparent;
-  border: 1px solid rgba(143, 129, 95, 0.35);
+  border: none;
+  background:
+    linear-gradient(90deg, transparent, var(--btn-line) 22%, var(--btn-line) 78%, transparent) bottom / 100% 1px
+      no-repeat,
+    linear-gradient(90deg, transparent, rgba(39, 23, 13, 0.6) 18%, rgba(39, 23, 13, 0.6) 82%, transparent);
   cursor: pointer;
   transition: all 0.25s ease;
 }
 
-.reroll-btn:hover {
-  color: var(--gold);
-  border-color: var(--gold);
-  text-shadow: 0 0 6px rgba(233, 209, 151, 0.5);
+.reroll-btn:hover:not(:disabled) {
+  --btn-line: var(--gold);
+  color: #f9c043;
+  background:
+    linear-gradient(90deg, transparent, var(--btn-line) 18%, var(--btn-line) 82%, transparent) bottom / 100% 1px
+      no-repeat,
+    radial-gradient(ellipse 72% 150% at 50% 55%, rgba(189, 103, 7, 0.26), transparent 72%),
+    linear-gradient(90deg, transparent, rgba(39, 23, 13, 0.6) 18%, rgba(39, 23, 13, 0.6) 82%, transparent);
+  text-shadow: 0 0 7px rgba(249, 192, 67, 0.55);
+}
+
+.reroll-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.reroll-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 /* ═══════════ 弹窗(法典/史册/档案卡):魂系菜单——暗幕升起,金线画框 ═══════════ */
@@ -2836,14 +2882,19 @@ onMounted(() => {
 /* ── 黑市 ── */
 
 .codex-toggle.market {
+  --btn-line: rgba(176, 106, 138, 0.45);
   color: #b06a8a;
-  border-color: rgba(176, 106, 138, 0.45);
 }
 
 .codex-toggle.market:hover {
+  --btn-line: #b06a8a;
   color: #e8b4cc;
-  border-color: #b06a8a;
-  box-shadow: 0 0 10px rgba(176, 106, 138, 0.35);
+  background:
+    linear-gradient(90deg, transparent, var(--btn-line) 18%, var(--btn-line) 82%, transparent) top / 100% 1px no-repeat,
+    linear-gradient(90deg, transparent, var(--btn-line) 18%, var(--btn-line) 82%, transparent) bottom / 100% 1px
+      no-repeat,
+    radial-gradient(ellipse 72% 140% at 50% 50%, rgba(176, 106, 138, 0.24), transparent 72%),
+    linear-gradient(90deg, transparent, rgba(39, 17, 25, 0.7) 16%, rgba(39, 17, 25, 0.7) 84%, transparent);
   text-shadow: 0 0 8px rgba(232, 180, 204, 0.6);
 }
 
@@ -3305,34 +3356,84 @@ onMounted(() => {
 }
 
 /* 主仪式按钮:碑金 */
+/* 主仪式按钮(行动/开始投票/确定赠送):正门级横带——菱形饰端+双发丝线+常驻微光 */
 .rite-btn {
+  --btn-line: var(--line);
+  position: relative;
   display: block;
   margin: 10px auto 2px;
-  padding: 6px 26px;
+  padding: 8px 34px;
   font-family: var(--font-title);
   font-size: 1em;
   letter-spacing: 0.22em;
   text-indent: 0.22em;
   color: var(--gold);
-  background: transparent;
-  border: 1px solid var(--line);
+  border: none;
+  background:
+    linear-gradient(90deg, transparent, var(--btn-line) 15%, var(--btn-line) 85%, transparent) top / 100% 1px no-repeat,
+    linear-gradient(90deg, transparent, var(--btn-line) 15%, var(--btn-line) 85%, transparent) bottom / 100% 1px
+      no-repeat,
+    radial-gradient(ellipse 60% 130% at 50% 50%, rgba(101, 56, 21, 0.3), transparent 70%),
+    linear-gradient(90deg, transparent, rgba(39, 23, 13, 0.8) 12%, rgba(39, 23, 13, 0.8) 88%, transparent);
   cursor: pointer;
   transition: all 0.25s ease;
 }
 
+/* 菱形饰端(法环选中条两端的收束记号) */
+.rite-btn::before,
+.rite-btn::after {
+  content: '◆';
+  position: absolute;
+  top: 50%;
+  transform: translateY(-52%) scale(0.6);
+  color: var(--gold);
+  opacity: 0.65;
+  font-size: 0.72em;
+  text-indent: 0;
+  transition: all 0.25s ease;
+  pointer-events: none;
+}
+
+.rite-btn::before {
+  left: 10px;
+}
+
+.rite-btn::after {
+  right: 10px;
+}
+
 .rite-btn:hover:not(:disabled) {
-  color: var(--gold-bright);
-  border-color: var(--gold);
-  box-shadow:
-    0 0 14px rgba(201, 169, 78, 0.4),
-    inset 0 0 10px rgba(201, 169, 78, 0.12);
-  text-shadow: 0 0 10px rgba(233, 209, 151, 0.7);
+  --btn-line: var(--gold);
+  color: #f9c043;
+  background:
+    linear-gradient(90deg, transparent, var(--btn-line) 12%, var(--btn-line) 88%, transparent) top / 100% 1px no-repeat,
+    linear-gradient(90deg, transparent, var(--btn-line) 12%, var(--btn-line) 88%, transparent) bottom / 100% 1px
+      no-repeat,
+    radial-gradient(ellipse 66% 150% at 50% 50%, rgba(189, 103, 7, 0.4), transparent 72%),
+    linear-gradient(90deg, transparent, rgba(39, 23, 13, 0.8) 12%, rgba(39, 23, 13, 0.8) 88%, transparent);
+  text-shadow: 0 0 12px rgba(249, 192, 67, 0.7);
+}
+
+.rite-btn:hover:not(:disabled)::before,
+.rite-btn:hover:not(:disabled)::after {
+  color: #f9c043;
+  opacity: 1;
+  text-shadow: 0 0 8px rgba(249, 192, 67, 0.8);
+}
+
+.rite-btn:active:not(:disabled) {
+  transform: translateY(1px);
 }
 
 .rite-btn:disabled {
   color: var(--bone-faded);
-  border-color: rgba(143, 129, 95, 0.3);
+  opacity: 0.55;
   cursor: not-allowed;
+}
+
+.rite-btn:disabled::before,
+.rite-btn:disabled::after {
+  opacity: 0.25;
 }
 
 .verdict-banner {
