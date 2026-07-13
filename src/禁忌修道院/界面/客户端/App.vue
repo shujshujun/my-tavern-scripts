@@ -23,9 +23,14 @@
               <span class="agenda-name">《{{ 项.规则.名称 }}》</span>
               <span class="agenda-next">→ 「{{ 项.下一档.名称 }}」</span>
               <span class="seats">
-                <i v-for="s in 席位预测(项.规则.id)" :key="s.名" class="seat" :data-s="s.态" :title="s.名">{{
-                  s.态 === 'fog' ? '?' : s.名[0]
-                }}</i>
+                <i
+                  v-for="s in 席位预测(项.规则.id)"
+                  :key="s.名"
+                  class="seat"
+                  :data-s="s.态"
+                  :title="s.态 === 'fog' ? '倾向未知' : s.名"
+                  >{{ s.态 === 'fog' ? '?' : s.名[0] }}</i
+                >
               </span>
             </label>
             <button class="rite-btn" :disabled="!选中" @click="提交议案">开始投票</button>
@@ -285,9 +290,9 @@
                           class="seat"
                           :data-s="s.态"
                           :title="
-                            s.名 +
-                            ':' +
-                            (s.态 === 'fog' ? '未知' : s.态 === 'yes' ? '赞成' : s.态 === 'no' ? '反对' : '弃权')
+                            s.态 === 'fog'
+                              ? '倾向未知'
+                              : s.名 + ':' + (s.态 === 'yes' ? '赞成' : s.态 === 'no' ? '反对' : '弃权')
                           "
                           >{{ s.态 === 'fog' ? '?' : s.名[0] }}</i
                         >
@@ -414,6 +419,11 @@
             <polyline :points="选中曲线.堕落" class="trend-sin" />
             <polyline :points="选中曲线.信仰" class="trend-faith" />
           </svg>
+          <!-- 走势图例(金=支持/红=堕落/蓝=信仰,横轴=时间/书页) -->
+          <div v-if="选中曲线" class="trend-legend">
+            <span class="tl-sup">支持</span><span class="tl-sin">堕落</span><span class="tl-faith">信仰</span>
+            <span class="tl-hint">—— 她的三轴随书页推移的走势</span>
+          </div>
 
           <p class="dossier-sense">{{ 选中档案.感知 }}</p>
 
@@ -475,13 +485,16 @@
         </div>
       </div>
 
-      <!-- ═══════════ 行动建议(AI 每轮给 2-3 条,点了直接发送;想自由发挥就打字) ═══════════ -->
-      <div v-if="就绪 && 当前房间 && !发送中 && 行动选项.length && data.会议.状态 !== '会议中'" class="option-row">
+      <!-- ═══════════ 行动建议(AI 每轮给 4 条,点了直接发送;想自由发挥就打字) ═══════════ -->
+      <div
+        v-if="就绪 && 当前房间 && 房内有人 && !发送中 && 行动选项.length && data.会议.状态 !== '会议中'"
+        class="option-row"
+      >
         <button v-for="(项, i) in 行动选项" :key="i" class="option-chip" @click="发出(项)">✦ {{ 项 }}</button>
       </div>
 
-      <!-- ═══════════ 游戏内输入(会议中隐藏;玩家不碰酒馆输入框) ═══════════ -->
-      <div v-if="就绪 && 当前房间 && data.会议.状态 !== '会议中'" class="quill">
+      <!-- ═══════════ 游戏内输入(会议中/空房隐藏;玩家不碰酒馆输入框) ═══════════ -->
+      <div v-if="就绪 && 当前房间 && 房内有人 && data.会议.状态 !== '会议中'" class="quill">
         <textarea
           v-model="输入文本"
           rows="2"
@@ -522,6 +535,7 @@ import {
   寝室支持度门槛,
   晋阶堕落门槛,
   修女表,
+  修女已现身,
   院规表,
   专线表,
   type 道具定义,
@@ -792,9 +806,16 @@ const 进房末楼 = ref(0);
  */
 const 位置种子 = computed(() => (当前房间.value ? 进房末楼.value : 末楼号.value));
 
-const 可登场 = computed(() =>
-  修女职位列表.filter(职位 => !修女表[职位].隐藏 || (data.value?.修女?.[职位]?.情报可见 ?? false)),
-);
+// 分批引出:开局只有开场白三人(院长/司库/厨娘),上一批攻略到动摇资格才放出下一批(判定在 stageConfig.修女已现身)
+const 可登场 = computed(() => {
+  const 修女档 = data.value?.修女;
+  if (!修女档) return [];
+  const 视察中 = data.value?.视察?.状态 === '进行中';
+  return 修女职位列表.filter(职位 => 修女已现身(职位, 修女档, 视察中));
+});
+
+/** 房内是否有人(无人房间收起输入框与行动建议——没有对手戏,只能离开) */
+const 房内有人 = computed(() => !!房内名单.value);
 
 const 房间列表 = computed(() =>
   房间表.map(房 => ({
@@ -908,7 +929,7 @@ function 刷新在场() {
 const 头像列表 = computed(() =>
   修女职位列表.map(职位 => {
     const 配 = 修女表[职位];
-    const 剪影 = 配.隐藏 && !(data.value?.修女?.[职位]?.情报可见 ?? false);
+    const 剪影 = !可登场.value.includes(职位);
     const 态 = 在场.value.焦点.includes(职位) ? 'focus' : 在场.value.背景.includes(职位) ? 'ambient' : 'away';
     return { 职位, 显示名: 配.显示名, 剪影, 态 };
   }),
@@ -2141,6 +2162,45 @@ onMounted(() => {
 
 .trend-faith {
   stroke: #5f7d99;
+}
+
+/* 走势图例(三色线含义;不然"信仰下面两条线"会被当成显示错误) */
+.trend-legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: -5px 0 8px;
+  font-size: 0.7em;
+  color: var(--bone-faded);
+}
+
+.trend-legend span::before {
+  content: '';
+  display: inline-block;
+  width: 14px;
+  height: 2px;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.tl-sup::before {
+  background: var(--gold);
+}
+
+.tl-sin::before {
+  background: var(--rubric);
+}
+
+.tl-faith::before {
+  background: #5f7d99;
+}
+
+.tl-hint {
+  font-style: italic;
+}
+
+.tl-hint::before {
+  display: none;
 }
 
 .dossier-sense {

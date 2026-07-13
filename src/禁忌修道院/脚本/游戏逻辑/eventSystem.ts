@@ -1,6 +1,6 @@
 import type { 修女职位 } from '../../schema';
 import { 修女职位列表 } from '../../schema';
-import { 晋阶堕落门槛, 修女表, 阶段标题列表, 专线表 } from '../../stageConfig';
+import { 晋阶堕落门槛, 修女表, 修女已现身, 阶段标题列表, 专线表 } from '../../stageConfig';
 import { 读取, 脚本写入 } from './mvuIO';
 
 /**
@@ -44,17 +44,14 @@ export function 冷落检测() {
   if (data.会议.状态 !== '日常') return;
   const 当前楼 = getLastMessageId();
   const 候选 = 修女职位列表
-    .filter(职位 => !修女表[职位].隐藏 || data.修女[职位].情报可见)
+    .filter(职位 => 修女已现身(职位, data.修女))
     .map(职位 => ({ 职位, 距离: 当前楼 - data.修女[职位].上次互动楼层 }))
     .filter(x => x.距离 >= 冷落阈值)
     .sort((a, b) => b.距离 - a.距离);
   if (!候选.length) return;
 
   const 职位 = 候选[0].职位;
-  insertOrAssignVariables(
-    { _主动事件: { 职位, 形式: 掷选(主动事件形式) } satisfies 主动事件 },
-    { type: 'chat' },
-  );
+  insertOrAssignVariables({ _主动事件: { 职位, 形式: 掷选(主动事件形式) } satisfies 主动事件 }, { type: 'chat' });
   console.info(`[禁忌修道院] 冷落计时器:${修女表[职位].显示名} 主动事件已排队`);
 }
 
@@ -81,12 +78,15 @@ export function 清主动事件() {
   insertOrAssignVariables({ _主动事件: null }, { type: 'chat' });
 }
 
-/** 焦点修女互动楼层刷新(每 AI 楼,由 index.ts 传入本轮焦点) */
+/** 焦点修女互动楼层刷新(每 AI 楼,由 index.ts 传入本轮焦点;互动楼数是黑市等门槛的计数源) */
 export function 刷新互动楼层(焦点: 修女职位[]) {
   if (!焦点.length) return;
   const { raw, data } = 读取();
   const 楼 = getLastMessageId();
-  for (const 职位 of 焦点) data.修女[职位].上次互动楼层 = 楼;
+  for (const 职位 of 焦点) {
+    data.修女[职位].上次互动楼层 = 楼;
+    data.修女[职位].互动楼数 += 1;
+  }
   脚本写入(raw, data);
 }
 
@@ -112,10 +112,7 @@ export function 请求晋阶(职位: 修女职位) {
     return console.warn('[禁忌修道院] 堕落度未达标,晋阶被拒');
   }
   if (读晋阶()) return console.warn('[禁忌修道院] 已有晋阶正戏排队');
-  insertOrAssignVariables(
-    { _晋阶: { 职位, 目标阶段: 修女.当前阶段 + 1 } satisfies 晋阶事件 },
-    { type: 'chat' },
-  );
+  insertOrAssignVariables({ _晋阶: { 职位, 目标阶段: 修女.当前阶段 + 1 } satisfies 晋阶事件 }, { type: 'chat' });
   console.info(`[禁忌修道院] ${修女表[职位].显示名} 晋阶正戏已排队`);
 }
 

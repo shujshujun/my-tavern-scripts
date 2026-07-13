@@ -98,6 +98,8 @@ const 修女状态 = z
     // ── 脚本管字段 ──
     情报可见: z.coerce.boolean().catch(false).prefault(false),
     上次互动楼层: nonNegInt(0),
+    /** 与她同场的 AI 楼计数(黑市等"聊够 N 楼"类门槛的数据源) */
+    互动楼数: nonNegInt(0),
   })
   .prefault({});
 
@@ -135,6 +137,7 @@ export const Schema = z.object({
     .object({
       倒计时: nonNegInt(18), // 楼数,15-20 由脚本掷骰重置
       状态: z.enum(['日常', '会议中']).catch('日常').prefault('日常'),
+      已开届数: nonNegInt(0), // 已开完的会议次数(进度记账;视察/后期系统可用)
     })
     .prefault({}),
 

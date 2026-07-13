@@ -176,14 +176,12 @@ export function 离开会议厅() {
     const 间隔 = 会议间隔();
     data.会议.状态 = '日常';
     data.会议.倒计时 = _.random(间隔[0], 间隔[1]);
+    data.会议.已开届数 += 1;
     脚本写入(raw, data);
 
     if (会议.结果?.通过) {
       // 新规首夜:通过当晚自动触发(注入见 index.ts;遵守"event 绝不给示例")
-      insertOrAssignVariables(
-        { _首夜: { 规则id: 会议.结果.议程规则id, 档: 会议.结果.议程档 } },
-        { type: 'chat' },
-      );
+      insertOrAssignVariables({ _首夜: { 规则id: 会议.结果.议程规则id, 档: 会议.结果.议程档 } }, { type: 'chat' });
     }
     写会议变量(undefined);
     console.info('[禁忌修道院] 离开会议厅,倒计时重置为', data.会议.倒计时);
@@ -205,9 +203,7 @@ export function 取待注入数据卡(): string | undefined {
 
 /** 新规首夜指令(零示例:只给要求不给模板,防固定化) */
 export function 取首夜指令(): string | undefined {
-  const 首夜 = _.get(getVariables({ type: 'chat' }), '_首夜') as
-    | { 规则id: string; 档: number }
-    | undefined;
+  const 首夜 = _.get(getVariables({ type: 'chat' }), '_首夜') as { 规则id: string; 档: number } | undefined;
   if (!首夜) return undefined;
   const 规则 = 查规则(首夜.规则id);
   const 档 = 查档(首夜.规则id, 首夜.档);

@@ -133,7 +133,7 @@ function 清洗正文(原文: string): string {
   );
 }
 
-/** 行动选项(AI 隐藏块 → 客户端可点即发的选项;最多 3 条)。
+/** 行动选项(AI 隐藏块 → 客户端可点即发的选项;最多 4 条)。
  *  块固定在消息末尾,模型常忘写/截断闭合标签——闭合缺失就吃到文末,选项不丢 */
 function 提取行动选项(原文: string): string[] {
   const m = 原文.match(/<行动选项>([\s\S]*?)(?:<\/行动选项>|$)/);
@@ -142,7 +142,7 @@ function 提取行动选项(原文: string): string[] {
     .split('\n')
     .map(s => s.replace(/^[-·•*\d.、\s]+/, '').trim())
     .filter(Boolean)
-    .slice(0, 3);
+    .slice(0, 4);
 }
 
 /**

@@ -59,6 +59,10 @@
             "日常",
             "会议中"
           ]
+        },
+        "已开届数": {
+          "default": 0,
+          "type": "number"
         }
       }
     },
@@ -254,6 +258,10 @@
           "type": "boolean"
         },
         "上次互动楼层": {
+          "default": 0,
+          "type": "number"
+        },
+        "互动楼数": {
           "default": 0,
           "type": "number"
         }
