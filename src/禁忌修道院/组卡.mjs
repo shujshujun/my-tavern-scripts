@@ -39,7 +39,7 @@ const 位置映射 = {
 };
 
 let 序号 = 0;
-let 开场白 = '';
+let 开场白 = ''; // → alternate_greetings[0](0楼swipe1);first_mes=【主页】标记
 const entries = [];
 
 for (const 组 of index.条目) {
@@ -105,55 +105,57 @@ for (const 组 of index.条目) {
 
 if (!开场白) throw new Error('未找到 [开场白] 条目');
 
-// ── 界面与脚本产物 ──
+// ── 界面与脚本产物(全内嵌,不依赖网络) ──
 const 客户端HTML = readFileSync(path.join(产物, '界面/客户端/index.html'), 'utf8');
+const 主页HTML = readFileSync(path.join(项目, '界面/主页/主页.html'), 'utf8');
 const 游戏逻辑JS = readFileSync(path.join(产物, '脚本/游戏逻辑/index.js'), 'utf8');
+
+const 正则骨架 = {
+  trimStrings: [],
+  placement: [2],
+  disabled: false,
+  runOnEdit: true,
+  substituteRegex: 0,
+  minDepth: null,
+  maxDepth: null,
+};
 
 const regex_scripts = [
   {
     id: randomUUID(),
-    scriptName: '客户端界面',
-    findRegex: '<StatusPlaceHolderImpl/>',
-    replaceString: '```\n' + 客户端HTML + '\n```',
-    trimStrings: [],
-    placement: [2],
-    disabled: false,
+    scriptName: '[开场]主页',
+    findRegex: '【主页】',
+    replaceString: '```\n' + 主页HTML + '\n```',
     markdownOnly: true,
     promptOnly: false,
-    runOnEdit: true,
-    substituteRegex: 0,
-    minDepth: null,
-    maxDepth: null,
+    ...正则骨架,
+  },
+  {
+    id: randomUUID(),
+    scriptName: '客户端界面(吞正文)',
+    findRegex: String.raw`/^[\s\S]*<StatusPlaceHolderImpl\/>[\s\S]*$/`,
+    replaceString: '```\n' + 客户端HTML + '\n```',
+    markdownOnly: true,
+    promptOnly: false,
+    ...正则骨架,
   },
   {
     id: randomUUID(),
     scriptName: '[不发送]去除变量更新与占位符',
-    findRegex: String.raw`/<UpdateVariable>[\s\S]*?<\/UpdateVariable>|<StatusPlaceHolderImpl\/>/g`,
+    findRegex: String.raw`/<UpdateVariable>[\s\S]*?<\/UpdateVariable>|<StatusPlaceHolderImpl\/>|【主页】/g`,
     replaceString: '',
-    trimStrings: [],
-    placement: [2],
-    disabled: false,
     markdownOnly: false,
     promptOnly: true,
-    runOnEdit: true,
-    substituteRegex: 0,
-    minDepth: null,
-    maxDepth: null,
+    ...正则骨架,
   },
   {
     id: randomUUID(),
     scriptName: '[不显示]隐藏变量更新',
     findRegex: String.raw`/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/g`,
     replaceString: '',
-    trimStrings: [],
-    placement: [2],
-    disabled: false,
     markdownOnly: true,
     promptOnly: false,
-    runOnEdit: true,
-    substituteRegex: 0,
-    minDepth: null,
-    maxDepth: null,
+    ...正则骨架,
   },
 ];
 
@@ -194,21 +196,21 @@ const tavern_helper = {
 
 // ── 卡体 ──
 const 卡名 = '禁忌修道院';
-const 版本 = '0.01';
+const 版本 = '0.02';
 const data = {
   name: 卡名,
   description: '',
   personality: '',
   scenario: '',
-  first_mes: 开场白,
+  first_mes: '【主页】',
   mes_example: '',
-  creator_notes: `禁忌修道院(重置版)v${版本} 内测组包。需酒馆助手(tavern_helper)启用。`,
+  creator_notes: `禁忌修道院(重置版)v${版本} 内测组包。需酒馆助手(tavern_helper)启用。开局:0楼主页签署调令后自动进入到任之日。`,
   system_prompt: '',
   post_history_instructions: '',
   tags: ['禁忌修道院'],
   creator: '',
   character_version: 版本,
-  alternate_greetings: [],
+  alternate_greetings: [开场白],
   group_only_greetings: [],
   extensions: {
     talkativeness: '0.5',
@@ -226,7 +228,7 @@ const 卡 = {
   description: '',
   personality: '',
   scenario: '',
-  first_mes: 开场白,
+  first_mes: '【主页】',
   mes_example: '',
   creatorcomment: data.creator_notes,
   avatar: 'none',
