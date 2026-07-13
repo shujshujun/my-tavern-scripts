@@ -346,20 +346,38 @@
               <div v-if="条.谁 !== '玩家' && (条.楼 ?? 0) > 0" class="leaf-sep">
                 <span>✦ 第 {{ 条.楼 }} 页 ✦</span>
               </div>
-              <p v-if="条.谁 === '玩家'" class="story-player">✠ {{ 条.文本[0] }}</p>
+              <!-- 羽笔改写(与正文同一套;旧书页也能改) -->
+              <template v-if="条.楼 !== undefined && 条.楼 === 编辑中楼">
+                <textarea v-model="编辑文本" class="edit-area" rows="8"></textarea>
+                <div class="edit-acts">
+                  <button class="reroll-btn" :disabled="!编辑文本.trim()" @click="存编辑">落笔</button>
+                  <button class="reroll-btn" @click="编辑中楼 = null">作罢</button>
+                </div>
+              </template>
               <template v-else>
-                <p v-for="(段, j) in 条.文本" :key="j" :class="配首字(段, j)">{{ 段 }}</p>
-                <p v-if="条.可回档 && !发送中" class="candle-row">
-                  <button
-                    class="candle"
-                    :class="{ armed: 待回档楼 === 条.楼 }"
-                    :title="待回档楼 === 条.楼 ? '再点一次确认' : '时之烛台:回到这一页刚写完的时刻'"
-                    @click.stop="点烛(条.楼)"
-                  >
-                    <template v-if="待回档楼 === 条.楼">⚠︎ 再点一次,烧掉这页之后的一切</template>
-                    <GI v-else :i="图烛台" />
-                  </button>
-                </p>
+                <button
+                  v-if="条.原文 !== undefined && !发送中"
+                  class="entry-edit"
+                  title="以羽笔改写这一页(同酒馆的铅笔编辑)"
+                  @click="开编辑(条)"
+                >
+                  <GI :i="图羽笔" />
+                </button>
+                <p v-if="条.谁 === '玩家'" class="story-player">✠ {{ 条.文本[0] }}</p>
+                <template v-else>
+                  <p v-for="(段, j) in 条.文本" :key="j" :class="配首字(段, j)">{{ 段 }}</p>
+                  <p v-if="条.可回档 && !发送中" class="candle-row">
+                    <button
+                      class="candle"
+                      :class="{ armed: 待回档楼 === 条.楼 }"
+                      :title="待回档楼 === 条.楼 ? '再点一次确认' : '时之烛台:回到这一页刚写完的时刻'"
+                      @click.stop="点烛(条.楼)"
+                    >
+                      <template v-if="待回档楼 === 条.楼">⚠︎ 再点一次,烧掉这页之后的一切</template>
+                      <GI v-else :i="图烛台" />
+                    </button>
+                  </p>
+                </template>
               </template>
             </div>
           </div>
@@ -798,6 +816,7 @@ function 离开房间() {
   当前房间.value = null;
   写场景(null);
   显示地图.value = true; // 走出房门=站上回廊,顺手展开地图选下一处
+  在场.value = { 焦点: [], 背景: [] }; // 身边已无人,头像随之熄灭(回合结束脚本会按位置重算)
 }
 
 // 连击破锁:2.5 秒窗口内对着锁死的门敲满 6 下
@@ -1912,15 +1931,23 @@ onMounted(() => {
 }
 
 .candle {
-  padding: 0 6px;
+  padding: 2px 8px;
   font-family: var(--font-body);
-  font-size: 0.72em;
-  color: var(--bone-faded);
+  font-size: 0.8em;
+  color: var(--gold);
   background: transparent;
   border: none;
   cursor: pointer;
-  opacity: 0.5;
+  opacity: 0.7;
   transition: all 0.25s ease;
+}
+
+/* 烛台图标放大一号(0.72em 字号下的 1em 图标肉眼难辨) */
+.candle .gi {
+  width: 1.8em;
+  height: 1.8em;
+  vertical-align: -0.45em;
+  filter: drop-shadow(0 0 4px rgba(201, 169, 78, 0.4));
 }
 
 .candle:hover {

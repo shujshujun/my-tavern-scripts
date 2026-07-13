@@ -113,16 +113,24 @@ export function 组快照注入(对话尾: { role: string; content: string }[]):
 
 /** 楼层落库前的清洗:思维链/界面标记/变量块/行动选项不进楼层文本(prompt 与卷轴双干净) */
 function 清洗正文(原文: string): string {
-  return 原文
-    .replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, '')
-    .replace(/<reason(?:ing)?>[\s\S]*?<\/reason(?:ing)?>/gi, '')
-    .replace(/<!--[\s\S]*?-->/g, '') // 预设泄漏的注释标记(如 Test Inputs Were Rejected)
-    .replace(/^\s*-{2,}>?\s*$/gm, '')
-    .replace(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/g, '')
-    .replace(/<行动选项>[\s\S]*?<\/行动选项>/g, '')
-    .replace(/<StatusPlaceHolderImpl\/>/g, '')
-    .replace(/【主页】/g, '')
-    .trim();
+  return (
+    原文
+      .replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, '')
+      .replace(/<reason(?:ing)?>[\s\S]*?<\/reason(?:ing)?>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '') // 预设泄漏的注释标记(如 Test Inputs Were Rejected)
+      .replace(/^\s*-{2,}>?\s*$/gm, '')
+      .replace(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/g, '')
+      .replace(/<行动选项>[\s\S]*?<\/行动选项>/g, '')
+      // 生成被截断时的未闭合块也吞掉,否则半截标记块会永久留在楼层原文里(羽笔编辑可见)
+      .replace(/<think(?:ing)?>[\s\S]*$/i, '')
+      .replace(/<reason(?:ing)?>[\s\S]*$/i, '')
+      .replace(/<UpdateVariable>[\s\S]*$/, '')
+      .replace(/<行动选项>[\s\S]*$/, '')
+      .replace(/<!--[\s\S]*$/, '')
+      .replace(/<StatusPlaceHolderImpl\/>/g, '')
+      .replace(/【主页】/g, '')
+      .trim()
+  );
 }
 
 /** 行动选项(AI 隐藏块 → 客户端可点即发的选项;最多 3 条) */
