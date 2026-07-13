@@ -117,11 +117,10 @@
           </div>
         </section>
 
-        <!-- 恶魔低语:页缘血字批注,可听从(填入输入框)或划掉 -->
+        <!-- 恶魔低语:神父心底的恶念/对剧情的腹黑旁注(不是行动指引),只可划掉 -->
         <footer v-if="data.恶魔低语 && 已划掉低语 !== data.恶魔低语" class="whisper">
           <span class="imp">🜏</span> {{ data.恶魔低语 }}
           <span class="whisper-acts">
-            <button class="whisper-act obey" title="把低语抄进羽笔,亲手写下它" @click="听从低语">听从</button>
             <button class="whisper-act" title="划掉这行批注" @click="已划掉低语 = data.恶魔低语">划掉</button>
           </span>
         </footer>
@@ -200,6 +199,7 @@
         <div class="scroll">
           <button class="scroll-close" @click="显示史册 = false">✕</button>
           <div class="scroll-title">🕮 修 道 院 史 册</div>
+          <p class="agenda-hint">完整编年史。每页右下角的 🕯 是时之烛台:点两次,烧掉那一页之后的一切,回到当时。</p>
           <div class="scroll-body chronicle">
             <div v-for="(条, i) in 卷轴" :key="i" class="story-entry">
               <div v-if="条.谁 !== '玩家' && (条.楼 ?? 0) > 0" class="leaf-sep">
@@ -397,14 +397,9 @@ function 刷新行动选项() {
   行动选项.value = Array.isArray(v) ? (v as string[]).filter(x => typeof x === 'string' && x.trim()) : [];
 }
 
-// ── 恶魔低语:听从=抄进羽笔(玩家可改再发);划掉=本条隐去,下条低语再现 ──
+// ── 恶魔低语:神父心底的恶念/剧情腹黑旁注(非行动指引);划掉=本条隐去,下条低语再现 ──
 
 const 已划掉低语 = ref('');
-
-function 听从低语() {
-  输入文本.value = data.value.恶魔低语;
-  已划掉低语.value = data.value.恶魔低语;
-}
 
 /** 错误护栏:渲染异常不再整屏空白,显示横幅供定位 */
 const 错误信息 = ref('');
