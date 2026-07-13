@@ -42,6 +42,40 @@ import type { 票值快照 } from './voteEngine';
 // ── 安检机第一道:挂载 zod schema ──
 registerMvuSchema(Schema);
 
+// ============================================
+// 全屏化:注入酒馆主页面样式(伪单楼——聊天区只显示最新楼,历史在客户端卷轴里;
+// 隐藏酒馆原生输入框,输入走游戏内)。右下角 ✠ 按钮可随时切回原生界面(逃生舱)。
+// ============================================
+
+function 注入全屏样式() {
+  try {
+    if ($('#xdy-fullscreen-style').length === 0) {
+      $('head').append(
+        '<style id="xdy-fullscreen-style">' +
+          '#chat .mes:not(:last-child){display:none !important;}' +
+          '#send_form{display:none !important;}' +
+          '</style>',
+      );
+    }
+    if ($('#xdy-ui-toggle').length === 0) {
+      $('body').append(
+        '<div id="xdy-ui-toggle" title="切换酒馆原生界面(逃生舱)" ' +
+          'style="position:fixed;right:10px;bottom:10px;z-index:9999;width:34px;height:34px;' +
+          'border-radius:50%;background:#1a1208;color:#c9a227;border:1px solid #c9a227;' +
+          'display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;user-select:none;">✠</div>',
+      );
+      $('#xdy-ui-toggle').on('click', () => {
+        const 样式 = $('#xdy-fullscreen-style');
+        if (样式.attr('media') === 'not all') 样式.removeAttr('media');
+        else 样式.attr('media', 'not all');
+      });
+    }
+  } catch (e) {
+    console.error('[禁忌修道院] 注入全屏样式失败:', e);
+  }
+}
+注入全屏样式();
+
 const 三轴 = ['支持度', '堕落度', '信仰值'] as const;
 const 单轮封顶 = 3;
 

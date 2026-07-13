@@ -13,3 +13,9 @@ auto-imports.d.ts
 components.d.ts
 
 .claude/
+
+# 参考卡(他人作品,勿入库)
+src/禁忌修道院/《道渊》v5.2.json
+src/禁忌修道院/诡秘剧场1.json
+src/禁忌修道院/云霜凝.json
+dist/禁忌修道院/禁忌修道院.json

@@ -3,12 +3,17 @@
     <!-- 错误护栏:任何运行时异常显示在此,不再整屏空白 -->
     <div v-if="错误信息" class="err">⚠ 界面异常:{{ 错误信息 }}</div>
 
-    <!-- ═══════════ 正文窗(书页:楼层文本吸进客户端,全屏游戏感) ═══════════ -->
-    <section v-if="正文段落.length" class="story">
-      <p v-for="(段, i) in 正文段落" :key="i">{{ 段 }}</p>
+    <!-- ═══════════ 剧情卷轴(全部历史吸进书页,可滚动;酒馆侧只显示最新楼) ═══════════ -->
+    <section v-if="是最新楼 && 卷轴.length" ref="卷轴容器" class="story">
+      <div v-for="(条, i) in 卷轴" :key="i" class="story-entry">
+        <p v-if="条.谁 === '玩家'" class="story-player">✠ {{ 条.文本[0] }}</p>
+        <template v-else>
+          <p v-for="(段, j) in 条.文本" :key="j">{{ 段 }}</p>
+        </template>
+      </div>
     </section>
 
-    <!-- ═══════════ 旧楼只留书页(面板/输入只在最新楼,省性能) ═══════════ -->
+    <!-- ═══════════ 旧楼渲染空(被主页面CSS隐藏,双保险) ═══════════ -->
     <template v-if="!是最新楼"></template>
 
     <!-- ═══════════ 数据未就绪 ═══════════ -->
@@ -206,25 +211,50 @@ const 名册 = computed(() =>
     .filter(nun => !nun.隐藏 || (data.value?.修女?.[nun.职位]?.情报可见 ?? false)),
 );
 
-// ── 正文窗:楼层文本吸进客户端(全屏游戏感;显示正则吞掉原始楼层文本) ──
+// ── 剧情卷轴:全部楼层清洗后吸进书页(伪单楼——酒馆聊天区只显示最新楼) ──
 
-const 正文段落 = ref<string[]>([]);
+interface 卷轴条 {
+  谁: '玩家' | '叙事';
+  文本: string[];
+}
 
-async function 取正文() {
+const 卷轴 = ref<卷轴条[]>([]);
+const 卷轴容器 = ref<HTMLElement | null>(null);
+
+function 清洗(原文: string): string {
+  return 原文
+    .replace(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/g, '')
+    .replace(/<StatusPlaceHolderImpl\/>/g, '')
+    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+    .replace(/【主页】/g, '')
+    .trim();
+}
+
+async function 取卷轴() {
   try {
-    const 消息组 = await getChatMessages(getCurrentMessageId());
-    const 原文 = 消息组?.[0]?.message ?? '';
-    const 净文 = 原文
-      .replace(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/g, '')
-      .replace(/<StatusPlaceHolderImpl\/>/g, '')
-      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
-      .trim();
-    正文段落.value = 净文
-      .split(/\n+/)
-      .map(s => s.trim())
-      .filter(Boolean);
+    const 消息组 = (await getChatMessages(`0-${getLastMessageId()}`)) ?? [];
+    const 条目: 卷轴条[] = [];
+    for (const 消息 of 消息组) {
+      const 净文 = 清洗(消息.message ?? '');
+      if (!净文) continue;
+      const 是玩家 = 消息.role === 'user';
+      if (是玩家) {
+        条目.push({ 谁: '玩家', 文本: [净文.replace(/\n+/g, ' ')] });
+      } else {
+        条目.push({
+          谁: '叙事',
+          文本: 净文
+            .split(/\n+/)
+            .map(s => s.trim())
+            .filter(Boolean),
+        });
+      }
+    }
+    卷轴.value = 条目;
+    await nextTick();
+    if (卷轴容器.value) 卷轴容器.value.scrollTop = 卷轴容器.value.scrollHeight;
   } catch (e) {
-    console.error('[禁忌修道院客户端] 取正文失败:', e);
+    console.error('[禁忌修道院客户端] 取卷轴失败:', e);
   }
 }
 
@@ -304,7 +334,7 @@ function 晋阶(职位: 修女职位) {
 }
 
 onMounted(() => {
-  void 取正文();
+  if (是最新楼) void 取卷轴();
   // 结果已出(演出楼/回看):从 chat 变量恢复
   会议结果.value = (_.get(getVariables({ type: 'chat' }), '_会议.结果') ?? null) as 会议结果类型 | null;
   eventOn('禁忌修道院:投票结果', (结果: 会议结果类型) => {
@@ -474,6 +504,9 @@ onMounted(() => {
   font-size: 0.95em;
   line-height: 1.85;
   color: var(--ink);
+  max-height: 62vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .story p {
@@ -481,14 +514,18 @@ onMounted(() => {
   text-indent: 2em;
 }
 
-.story p:last-child {
+.story-entry:last-child p:last-child {
   margin-bottom: 0;
 }
 
-.story p:first-child::first-letter {
-  font-size: 1.6em;
-  color: var(--rubric);
-  font-weight: 700;
+.story-player {
+  text-indent: 0 !important;
+  font-size: 0.9em;
+  font-style: italic;
+  color: var(--sin);
+  border-left: 2px solid var(--gilt);
+  padding-left: 8px;
+  margin: 0.4em 0 0.9em !important;
 }
 
 /* ── 面板页签与法典 ── */
