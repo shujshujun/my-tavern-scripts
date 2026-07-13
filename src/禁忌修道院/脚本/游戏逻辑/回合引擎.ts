@@ -84,15 +84,17 @@ function 近楼对话(行动?: string): { role: string; content: string }[] {
   return 尾;
 }
 
-/** 快照 + 焦点一次组装(主路径与逃生舱 PROMPT_READY 共用) */
+/** 快照 + 焦点一次组装(主路径与逃生舱 PROMPT_READY 共用);顺手把在场名单落 chat 变量供客户端头像行点亮 */
 export function 组快照注入(对话尾: { role: string; content: string }[]): {
   快照: string;
   焦点: 修女职位[];
 } {
   const { data } = 读取();
+  const { 焦点, 背景 } = 检测焦点(对话尾, data);
+  insertOrAssignVariables({ _在场: { 焦点, 背景 } }, { type: 'chat' });
   return {
     快照: 组修道院快照(对话尾, data),
-    焦点: 检测焦点(对话尾, data).焦点,
+    焦点,
   };
 }
 
@@ -261,7 +263,7 @@ export async function 回档至(楼层: number): Promise<void> {
     await deleteChatMessages(_.range(楼层 + 1, 末楼 + 1), { refresh: 'none' });
     await updateVariablesWith(
       vars => {
-        for (const 键 of [...回合变量键, '_上次回合']) _.set(vars, 键, null);
+        for (const 键 of [...回合变量键, '_上次回合', '_在场']) _.set(vars, 键, null);
         return vars;
       },
       { type: 'chat' },
