@@ -447,17 +447,18 @@
               <p v-if="选中档案.修女.气质描述" class="dossier-line"><b>气质</b> {{ 选中档案.修女.气质描述 }}</p>
             </div>
 
-            <!-- 仪容:着装/妆容 -->
+            <!-- 仪容:着装/妆容(秦璐式双列网格;暴露/失整时红标签) -->
             <div class="dsec">
-              <div class="dsec-title"><GI :i="图明镜" /> 仪 容</div>
-              <p class="dossier-line">
-                <span class="dline-ico"><GI :i="图长袍" /></span>
-                {{ 选中档案.着装 }}<template v-if="选中档案.仪容">({{ 选中档案.仪容 }})</template>
-              </p>
-              <p v-if="选中档案.妆容行" class="dossier-line">
-                <span class="dline-ico"><GI :i="图口红" /></span>
-                {{ 选中档案.妆容行 }}
-              </p>
+              <div class="dsec-title">
+                <GI :i="图明镜" /> 仪 容
+                <span v-for="t in 选中档案.仪容标签" :key="t" class="attire-tag">{{ t }}</span>
+              </div>
+              <div class="attire-grid">
+                <div v-for="a in 选中档案.仪容项" :key="a.标" class="a-cell" :title="a.标 + ':' + a.值">
+                  <small>{{ a.标 }}</small>
+                  <b>{{ a.值 }}</b>
+                </div>
+              </div>
             </div>
 
             <!-- 身体开发:四部位 2×2 -->
@@ -586,8 +587,6 @@ import 图展开 from './资源/界面/展开.svg?raw';
 import 图收拢 from './资源/界面/收拢.svg?raw';
 import 图心镜 from './资源/界面/心镜.svg?raw';
 import 图明镜 from './资源/界面/明镜.svg?raw';
-import 图长袍 from './资源/界面/长袍.svg?raw';
-import 图口红 from './资源/界面/口红.svg?raw';
 import 图焰身 from './资源/界面/焰身.svg?raw';
 import 图路径 from './资源/界面/路径.svg?raw';
 
@@ -1028,15 +1027,33 @@ const 选中档案 = computed(() => {
       { 名: '信仰', 类: 'faith', 值: 修女.信仰值, 变化: 变化('信仰', 修女.信仰值) },
     ],
     感知: 感知语(修女),
-    着装: [服.头纱, 服.上装, 服.下装, 服.内衣上, 服.内衣下, 服.袜足, 服.鞋, 服.配饰, 服.特殊装饰]
-      .filter(x => x && x !== '无')
-      .join('、'),
-    仪容: [修女.暴露程度 !== '遮蔽' ? `暴露:${修女.暴露程度}` : '', 修女.整洁度 !== '整洁' ? 修女.整洁度 : '']
-      .filter(Boolean)
-      .join(' · '),
-    妆容行: [修女.妆容.底妆, 修女.妆容.唇妆, 修女.妆容.眼妆, 修女.妆容.香氛]
-      .filter(x => x && x !== '无' && x !== '素颜')
-      .join('、'),
+    // 仪容网格(秦璐 CharPanel v0.33 排列范式):核心件常显,可选件非"无"才入列
+    仪容项: (() => {
+      const 项: { 标: string; 值: string }[] = [
+        { 标: '头纱', 值: 服.头纱 || '—' },
+        { 标: '上装', 值: 服.上装 || '—' },
+        { 标: '下装', 值: 服.下装 || '—' },
+        { 标: '内衣', 值: 服.内衣上 || '—' },
+        { 标: '内裤', 值: 服.内衣下 || '—' },
+        { 标: '袜足', 值: 服.袜足 || '—' },
+        { 标: '鞋', 值: 服.鞋 || '—' },
+      ];
+      const 可选: [string, string][] = [
+        ['配饰', 服.配饰],
+        ['装饰', 服.特殊装饰],
+        ['底妆', 修女.妆容.底妆 === '素颜' ? '' : 修女.妆容.底妆],
+        ['唇妆', 修女.妆容.唇妆],
+        ['眼妆', 修女.妆容.眼妆],
+        ['香氛', 修女.妆容.香氛],
+      ];
+      for (const [标, 值] of 可选) if (值 && 值 !== '无') 项.push({ 标, 值 });
+      return 项;
+    })(),
+    // 异常状态标签(暴露非遮蔽/整洁度失守时亮红)
+    仪容标签: [
+      修女.暴露程度 !== '遮蔽' ? `暴露:${修女.暴露程度}` : '',
+      修女.整洁度 !== '整洁' ? 修女.整洁度 : '',
+    ].filter(Boolean),
     开发: [
       { 名: '小嘴', 值: 修女.身体开发.小嘴 },
       { 名: '胸部', 值: 修女.身体开发.胸部 },
@@ -2343,6 +2360,46 @@ onMounted(() => {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px 18px;
+}
+
+/* ── 仪容网格(秦璐 CharPanel 排列范式:标签+值双列,长值省略号+title) ── */
+.attire-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 16px;
+}
+
+.a-cell {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  min-width: 0;
+  font-size: 0.8em;
+}
+
+.a-cell small {
+  flex: none;
+  width: 2.6em;
+  font-size: 0.92em;
+  color: var(--gold);
+}
+
+.a-cell b {
+  font-weight: 400;
+  color: var(--bone);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attire-tag {
+  margin-left: 8px;
+  padding: 1px 8px;
+  font-size: 0.7em;
+  font-family: var(--font-body);
+  letter-spacing: 0.12em;
+  color: var(--rubric);
+  border: 1px solid rgba(154, 49, 32, 0.55);
 }
 
 /* ── 三轴条 ── */
