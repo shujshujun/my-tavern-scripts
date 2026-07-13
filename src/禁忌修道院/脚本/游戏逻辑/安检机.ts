@@ -1,26 +1,39 @@
-import type { SchemaType } from '../../schema';
+import type { SchemaType, 修女职位 } from '../../schema';
 import { 修女职位列表 } from '../../schema';
 import { 阶段标题列表 } from '../../stageConfig';
 
 /**
- * 安检机第二道:相对变化量(单轮 ±3)裁剪 + 脚本管字段回写。
+ * 安检机第二道:相对变化量(单轮 ±3)裁剪 + 脚本管字段回写 + 焦点白名单。
  * 第一道(schema.ts zod)负责类型强转/catch 默认/clamp 绝对范围。
  *
  * 两条路径复用:
- *   回合引擎(固定 0 楼主路径)—— Mvu.parseMessage 解析后直接调用
- *   VARIABLE_UPDATE_ENDED(✠ 逃生舱原生玩法)—— MVU 自动解析后调用
+ *   回合引擎(固定 0 楼主路径)—— Mvu.parseMessage 解析后直接调用(带本轮焦点)
+ *   VARIABLE_UPDATE_ENDED(✠ 逃生舱原生玩法)—— MVU 自动解析后调用(带逃生舱焦点)
  */
 
 const 三轴 = ['支持度', '堕落度', '信仰值'] as const;
 const 单轮封顶 = 3;
 
-/** 原地裁剪 newData,返回是否有改动 */
-export function 安检裁剪(newData: SchemaType, oldData: SchemaType): boolean {
+/**
+ * 原地裁剪 newData,返回是否有改动。
+ * @param 焦点 传入时=本轮允许更新的修女白名单:名单外的修女整份状态回写旧值
+ *   (AI 隔空给不在场的修女涨数值——"没去她房间也能聊天加好感"——在此被硬拦)
+ */
+export function 安检裁剪(newData: SchemaType, oldData: SchemaType, 焦点?: readonly 修女职位[]): boolean {
   let changed = false;
 
   for (const 职位 of 修女职位列表) {
     const n = newData.修女[职位];
     const o = oldData.修女[职位];
+
+    // 焦点白名单:不在场者一切字段回写(她根本不在这场戏里)
+    if (焦点 && !焦点.includes(职位)) {
+      if (!_.isEqual(n, o)) {
+        newData.修女[职位] = _.cloneDeep(o);
+        changed = true;
+      }
+      continue;
+    }
 
     // 三轴单轮 ±3 差值裁剪(大额涨幅只走脚本里程碑事件)
     for (const 轴 of 三轴) {
@@ -42,6 +55,10 @@ export function 安检裁剪(newData: SchemaType, oldData: SchemaType): boolean 
     }
     if (n.上次互动楼层 !== o.上次互动楼层) {
       n.上次互动楼层 = o.上次互动楼层;
+      changed = true;
+    }
+    if (n.互动楼数 !== o.互动楼数) {
+      n.互动楼数 = o.互动楼数;
       changed = true;
     }
 

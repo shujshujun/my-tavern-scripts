@@ -688,22 +688,24 @@ function 刷新拾取() {
   已拾取.value = (_.get(getVariables({ type: 'chat' }), '_拾取') ?? {}) as Record<string, boolean>;
 }
 
+// 零钱种子刻意用实时末楼号而非冻结的位置种子:每过一回合全院重掷一批新零钱,
+// 在房间里聊着天,外面也会有新的铜板落下——否则捡过一轮后地图上再无金光(0.16 事故)
 const 房奖励表 = computed<Record<string, number>>(() => {
   const 表: Record<string, number> = {};
   for (const 房 of 房间表) {
-    const 额 = 房间奖励(房.id, 位置种子.value);
-    if (额 > 0 && !已拾取.value[`${位置种子.value}:${房.id}`]) 表[房.id] = 额;
+    const 额 = 房间奖励(房.id, 末楼号.value);
+    if (额 > 0 && !已拾取.value[`${末楼号.value}:${房.id}`]) 表[房.id] = 额;
   }
   return 表;
 });
 
 function 拾取(房间id: string) {
-  if (!房奖励表.value[房间id]) return;
+  if (发送中.value || !房奖励表.value[房间id]) return;
   if (当前房间.value !== 房间id) {
     点图房(房间id); // 人还没进去:先走进房,地图保持,再点金币才捡
     return;
   }
-  已拾取.value = { ...已拾取.value, [`${位置种子.value}:${房间id}`]: true }; // 乐观隐藏,脚本记账
+  已拾取.value = { ...已拾取.value, [`${末楼号.value}:${房间id}`]: true }; // 乐观隐藏,脚本记账
   显示地图.value = false; // 拾取完成,地图这才退场
   eventEmit('禁忌修道院:拾取', { 房间id });
 }

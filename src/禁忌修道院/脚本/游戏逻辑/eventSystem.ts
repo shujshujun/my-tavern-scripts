@@ -180,9 +180,10 @@ export function 达成里程碑(职位: 修女职位, 里程碑id: string) {
 // ============================================
 
 export function 拾取房间奖励(房间id: string) {
-  const 场景 = _.get(getVariables({ type: 'chat' }), '_场景') as { 房间id?: string; 进房末楼?: number } | undefined;
+  const 场景 = _.get(getVariables({ type: 'chat' }), '_场景') as { 房间id?: string } | undefined;
   if (!场景?.房间id || 场景.房间id !== 房间id) return; // 只能捡自己所在房间的
-  const 种子 = 场景.进房末楼 ?? getLastMessageId();
+  // 种子=实时末楼(与客户端 房奖励表 一致):每回合重掷,人在房里外面也落新铜板
+  const 种子 = getLastMessageId();
   const 金额 = 房间奖励(房间id, 种子);
   if (金额 <= 0) return;
 

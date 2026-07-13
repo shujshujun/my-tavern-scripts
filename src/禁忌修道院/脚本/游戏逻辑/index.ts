@@ -178,7 +178,7 @@ function 挂载监听() {
     try {
       const newData = Schema.parse(_.get(新变量, 'stat_data') ?? {});
       const oldData = Schema.parse(_.get(旧变量, 'stat_data') ?? {});
-      if (安检裁剪(newData, oldData)) {
+      if (安检裁剪(newData, oldData, 逃生舱焦点)) {
         _.set(新变量 as object, 'stat_data', newData);
         脚本写入(新变量 as object);
         console.info('[禁忌修道院] 安检机第二道:已裁剪/回写越权更新');

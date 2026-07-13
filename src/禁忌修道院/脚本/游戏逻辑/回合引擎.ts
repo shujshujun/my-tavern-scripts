@@ -234,7 +234,7 @@ export async function 执行回合(行动: string): Promise<void> {
     const 新 = ((await Mvu.parseMessage(原文, 旧)) ?? 旧) as Record<string, unknown>;
     const newStat = Schema.parse(_.get(新, 'stat_data') ?? {});
     const oldStat = Schema.parse(_.get(旧, 'stat_data') ?? {});
-    安检裁剪(newStat, oldStat);
+    安检裁剪(newStat, oldStat, 焦点); // 焦点白名单:不在场的修女数值一律回写(隔空刷好感在此被拦)
     _.set(新, 'stat_data', newStat);
 
     const 正文 = 清洗正文(原文) || '(修道院陷入了短暂的寂静……本轮 AI 未返回正文,可换个说法再试)';
