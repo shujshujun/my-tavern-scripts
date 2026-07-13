@@ -260,6 +260,9 @@
         </button>
       </div>
       <div v-if="就绪 && 可重掷 && !发送中 && data.会议.状态 !== '会议中'" class="reroll-row">
+        <button class="reroll-btn" title="撤回这一页:删掉本回合(你的行动与回应),回到落笔之前重新措辞" @click="撤回">
+          ⌫ 撤回此页
+        </button>
         <button class="reroll-btn" title="撕掉这一页重写:回滚本回合的一切,用同样的行动重新演一遍" @click="重掷">
           ↻ 重写此页
         </button>
@@ -301,6 +304,16 @@ function 重掷() {
   if (卷轴.value.at(-1)?.谁 === '叙事') 卷轴.value.pop();
   void 滚到底();
   eventEmit('禁忌修道院:重掷');
+}
+
+/** 撤回本回合:删掉你的行动与 AI 回应,回到落笔之前(不重演,自己重新措辞) */
+function 撤回() {
+  if (发送中.value) return;
+  const 记录 = _.get(getVariables({ type: 'chat' }), '_上次回合') as { 回合前末楼?: number } | undefined;
+  if (!记录 || typeof 记录.回合前末楼 !== 'number') return;
+  发送中.value = true;
+  流式段.value = [];
+  eventEmit('禁忌修道院:回档', { 楼层: 记录.回合前末楼 });
 }
 
 /** 发出一条行动(输入框与行动建议按钮共用) */
@@ -427,12 +440,12 @@ function 清洗(原文: string): string {
     原文
       .replace(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/g, '')
       .replace(/<StatusPlaceHolderImpl\/>/g, '')
-      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
-      .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '')
+      .replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, '')
+      .replace(/<reason(?:ing)?>[\s\S]*?<\/reason(?:ing)?>/gi, '')
       .replace(/<行动选项>[\s\S]*?<\/行动选项>/g, '')
       // 流式过程中的未闭合块也要吞掉,否则半截思维链/变量块会闪现在书页上
-      .replace(/<thinking>[\s\S]*$/i, '')
-      .replace(/<reasoning>[\s\S]*$/i, '')
+      .replace(/<think(?:ing)?>[\s\S]*$/i, '')
+      .replace(/<reason(?:ing)?>[\s\S]*$/i, '')
       .replace(/<UpdateVariable>[\s\S]*$/, '')
       .replace(/<行动选项>[\s\S]*$/, '')
       .replace(/【主页】/g, '')

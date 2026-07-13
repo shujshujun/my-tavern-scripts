@@ -101,8 +101,8 @@ export function 组快照注入(对话尾: { role: string; content: string }[]):
 /** 楼层落库前的清洗:思维链/界面标记/变量块/行动选项不进楼层文本(prompt 与卷轴双干净) */
 function 清洗正文(原文: string): string {
   return 原文
-    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
-    .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '')
+    .replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, '')
+    .replace(/<reason(?:ing)?>[\s\S]*?<\/reason(?:ing)?>/gi, '')
     .replace(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/g, '')
     .replace(/<行动选项>[\s\S]*?<\/行动选项>/g, '')
     .replace(/<StatusPlaceHolderImpl\/>/g, '')
