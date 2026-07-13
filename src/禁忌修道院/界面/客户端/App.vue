@@ -203,43 +203,57 @@
         <button class="reroll-btn" :disabled="发送中" @click="离开房间">🚶 离开</button>
       </div>
 
-      <!-- ═══════════ 法典(羊皮大卷轴) ═══════════ -->
+      <!-- ═══════════ 法典(羊皮大卷轴;分组+手风琴,撑得住后期几十档) ═══════════ -->
       <div v-if="显示法典" class="scroll-mask" @click.self="显示法典 = false">
         <div class="scroll">
           <button class="scroll-close" @click="显示法典 = false">✕</button>
           <div class="scroll-title">☨ 院 规 法 典 ☨</div>
+          <p class="codex-legend">
+            <span class="lg-dot改" /> 已篡改 <span class="lg-dot满" /> 已到顶 <span class="lg-dot原" /> 原律 ·
+            点条目展开
+          </p>
           <div class="scroll-body">
-            <div class="rule-list">
-              <div v-for="项 in 法典列表" :key="项.规则.id" class="rule-card">
-                <div class="rule-head">
-                  <span class="agenda-weight" :data-w="项.规则.权重">{{ 项.规则.权重 }}</span>
-                  <b>《{{ 项.规则.名称 }}》</b>
-                  <span v-if="项.当前档" class="rule-current">「{{ 项.当前档.名称 }}」</span>
+            <template v-for="组 in 法典分组" :key="组.权重">
+              <div v-if="组.条目.length" class="codex-group">
+                <div class="codex-group-title">
+                  <span class="agenda-weight" :data-w="组.权重">{{ 组.权重 }}</span>
+                  {{ 组.标题 }}
                 </div>
-                <div class="rule-text">
-                  <div v-if="项.当前档" class="palimpsest">{{ 项.规则.原规 }}</div>
-                  <div>{{ 项.当前档 ? 项.当前档.条文 : 项.规则.原规 }}</div>
+                <div v-for="项 in 组.条目" :key="项.规则.id" class="law" :class="{ open: 展开法条 === 项.规则.id }">
+                  <button class="law-head" @click="展开法条 = 展开法条 === 项.规则.id ? '' : 项.规则.id">
+                    <span class="law-state" :class="项.当前档 ? (项.下一档 ? '改' : '满') : '原'" />
+                    <b class="law-name">{{ 项.规则.名称 }}</b>
+                    <span v-if="项.当前档" class="law-tier">「{{ 项.当前档.名称 }}」</span>
+                    <span class="law-arrow">{{ 展开法条 === 项.规则.id ? '▾' : '▸' }}</span>
+                  </button>
+                  <div v-if="展开法条 === 项.规则.id" class="law-body">
+                    <div class="law-text">
+                      <div v-if="项.当前档" class="palimpsest">{{ 项.规则.原规 }}</div>
+                      <div>{{ 项.当前档 ? 项.当前档.条文 : 项.规则.原规 }}</div>
+                    </div>
+                    <div v-if="项.当前档" class="law-effect">{{ 项.当前档.全局效果 }}</div>
+                    <div v-if="项.下一档" class="rule-next">
+                      <span>可修订 →「{{ 项.下一档.名称 }}」</span>
+                      <span class="seats">
+                        <i
+                          v-for="s in 项.席位"
+                          :key="s.名"
+                          class="seat"
+                          :data-s="s.态"
+                          :title="
+                            s.名 +
+                            ':' +
+                            (s.态 === 'fog' ? '未知' : s.态 === 'yes' ? '赞成' : s.态 === 'no' ? '反对' : '弃权')
+                          "
+                          >{{ s.态 === 'fog' ? '?' : s.名[0] }}</i
+                        >
+                      </span>
+                    </div>
+                    <div v-else class="rule-next exhausted">已修订至极限</div>
+                  </div>
                 </div>
-                <div v-if="项.下一档" class="rule-next">
-                  <span>可修订 →「{{ 项.下一档.名称 }}」</span>
-                  <span class="seats">
-                    <i
-                      v-for="s in 项.席位"
-                      :key="s.名"
-                      class="seat"
-                      :data-s="s.态"
-                      :title="
-                        s.名 +
-                        ':' +
-                        (s.态 === 'fog' ? '未知' : s.态 === 'yes' ? '赞成' : s.态 === 'no' ? '反对' : '弃权')
-                      "
-                      >{{ s.态 === 'fog' ? '?' : s.名[0] }}</i
-                    >
-                  </span>
-                </div>
-                <div v-else class="rule-next exhausted">已修订至极限</div>
               </div>
-            </div>
+            </template>
           </div>
         </div>
       </div>
@@ -908,6 +922,8 @@ function 席位预测(规则id: string): { 名: string; 态: 席位态 }[] {
   });
 }
 
+const 展开法条 = ref('');
+
 const 法典列表 = computed(() =>
   院规表.map(规则 => {
     const 档号 = data.value.院规[规则.id] ?? 0;
@@ -919,6 +935,19 @@ const 法典列表 = computed(() =>
     };
   }),
 );
+
+/** 按权重分组(轻/中/重),后期硬核档也归到"重"下,列表撑得住体量 */
+const 法典分组 = computed(() => {
+  const 组定义 = [
+    { 权重: '轻', 标题: '日常戒律' },
+    { 权重: '中', 标题: '风纪与秩序' },
+    { 权重: '重', 标题: '禁忌之律' },
+  ] as const;
+  return 组定义.map(g => ({
+    ...g,
+    条目: 法典列表.value.filter(项 => 项.规则.权重 === g.权重),
+  }));
+});
 
 // ── 会议场景 ──
 
@@ -2090,7 +2119,145 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
-/* ── 法典 ── */
+/* ── 法典(分组 + 手风琴) ── */
+
+.codex-legend {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  justify-content: center;
+  font-size: 0.7em;
+  color: var(--bone-faded);
+  margin: 0 0 8px;
+}
+
+.codex-legend span[class^='lg-dot'] {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin: 0 1px 0 8px;
+}
+
+.lg-dot改 {
+  background: var(--rubric);
+}
+
+.lg-dot满 {
+  background: var(--gold-bright);
+}
+
+.lg-dot原 {
+  border: 1px solid var(--bone-faded);
+}
+
+.codex-group {
+  margin-bottom: 12px;
+}
+
+.codex-group-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-title);
+  font-size: 0.9em;
+  letter-spacing: 0.18em;
+  color: var(--gold);
+  padding-bottom: 4px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.law {
+  border-bottom: 1px solid rgba(201, 169, 78, 0.12);
+}
+
+.law-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 4px;
+  font-family: var(--font-body);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.2s ease;
+}
+
+.law-head:hover {
+  background: rgba(201, 169, 78, 0.06);
+}
+
+.law-state {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.law-state.改 {
+  background: var(--rubric);
+  box-shadow: 0 0 5px rgba(165, 58, 36, 0.6);
+}
+
+.law-state.满 {
+  background: var(--gold-bright);
+  box-shadow: 0 0 5px rgba(233, 209, 151, 0.6);
+}
+
+.law-state.原 {
+  border: 1px solid var(--bone-faded);
+}
+
+.law-name {
+  color: var(--bone);
+  font-size: 0.9em;
+}
+
+.law.open .law-name {
+  color: var(--gold-bright);
+}
+
+.law-tier {
+  color: var(--rubric);
+  font-size: 0.8em;
+}
+
+.law-arrow {
+  margin-left: auto;
+  color: var(--gold);
+  font-size: 0.85em;
+}
+
+.law-body {
+  padding: 2px 4px 12px 20px;
+  font-size: 0.84em;
+  animation: law-open 0.25s ease;
+}
+
+@keyframes law-open {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+.law-text {
+  color: var(--bone);
+  line-height: 1.6;
+}
+
+.law-effect {
+  margin: 6px 0;
+  padding: 6px 9px;
+  font-size: 0.92em;
+  font-style: italic;
+  color: var(--bone-faded);
+  background: rgba(201, 169, 78, 0.05);
+  border-left: 2px solid var(--gold-deep);
+}
 
 .rule-list {
   display: flex;
