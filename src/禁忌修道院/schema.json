@@ -89,6 +89,23 @@
         }
       }
     },
+    "商店": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "解锁": {
+          "default": false,
+          "type": "boolean"
+        },
+        "已购": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "恶魔低语": {
       "type": "string"
     }

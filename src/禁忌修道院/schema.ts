@@ -147,6 +147,14 @@ export const Schema = z.object({
     })
     .prefault({}),
 
+  // 黑市(圣器事件解锁;道具定义见 stageConfig.道具表)
+  商店: z
+    .object({
+      解锁: z.coerce.boolean().catch(false).prefault(false),
+      已购: z.array(z.string()).catch([]).prefault([]),
+    })
+    .prefault({}),
+
   // ── AI 每轮即兴一句,只进客户端页缘,严禁进正文 ──
   恶魔低语: z.string().prefault(''),
 });

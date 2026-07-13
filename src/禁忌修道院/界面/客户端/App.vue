@@ -77,6 +77,14 @@
           <span class="meta-btns">
             <button class="codex-toggle" @click="显示法典 = true">☨ 法典</button>
             <button class="codex-toggle" title="完整编年史与时之烛台" @click="显示史册 = true">🕮 史册</button>
+            <button
+              v-if="data.商店?.解锁"
+              class="codex-toggle market"
+              title="玛尔大的销赃渠道,反过来为神父进货"
+              @click="显示黑市 = true"
+            >
+              ⚖ 黑市
+            </button>
           </span>
         </div>
 
@@ -100,11 +108,11 @@
           <div v-for="(条, i) in 当前幕" :key="i" class="story-entry">
             <p v-if="条.谁 === '玩家'" class="story-player">✠ {{ 条.文本[0] }}</p>
             <template v-else>
-              <p v-for="(段, j) in 条.文本" :key="j" class="narr">{{ 段 }}</p>
+              <p v-for="(段, j) in 条.文本" :key="j" :class="配首字(段, j)">{{ 段 }}</p>
             </template>
           </div>
           <div v-if="发送中" class="story-entry">
-            <p v-for="(段, j) in 流式段" :key="'流' + j" class="narr">{{ 段 }}</p>
+            <p v-for="(段, j) in 流式段" :key="'流' + j" :class="配首字(段, j)">{{ 段 }}</p>
             <p class="scribing">✒ 修道院的记事员正在书写……</p>
           </div>
         </section>
@@ -160,6 +168,33 @@
         </div>
       </div>
 
+      <!-- ═══════════ 黑市(圣器事件解锁) ═══════════ -->
+      <div v-if="显示黑市" class="scroll-mask" @click.self="显示黑市 = false">
+        <div class="scroll">
+          <button class="scroll-close" @click="显示黑市 = false">✕</button>
+          <div class="scroll-title">⚖ 玛尔大的暗账</div>
+          <div class="market-balance">
+            奉献金 <b>✟ {{ data.奉献金 }}</b>
+            <span v-if="行囊名单" class="market-owned">行囊:{{ 行囊名单 }}</span>
+          </div>
+          <div class="scroll-body">
+            <div class="rule-list">
+              <div v-for="项 in 道具表" :key="项.id" class="rule-card ware">
+                <div class="rule-head">
+                  <span class="agenda-weight" :data-w="项.类 === '会议' ? '重' : '轻'">{{ 项.类 }}</span>
+                  <b>{{ 项.名称 }}</b>
+                  <span class="ware-price">✟ {{ 项.价 }}</span>
+                </div>
+                <div class="rule-text">{{ 项.说明 }}</div>
+                <button class="reroll-btn ware-buy" :disabled="!可购买(项)" @click="买(项.id)">
+                  {{ 购买标签(项) }}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- ═══════════ 史册(完整编年卷轴 + 时之烛台) ═══════════ -->
       <div v-if="显示史册" class="scroll-mask" @click.self="显示史册 = false">
         <div class="scroll">
@@ -167,9 +202,12 @@
           <div class="scroll-title">🕮 修 道 院 史 册</div>
           <div class="scroll-body chronicle">
             <div v-for="(条, i) in 卷轴" :key="i" class="story-entry">
+              <div v-if="条.谁 !== '玩家' && (条.楼 ?? 0) > 0" class="leaf-sep">
+                <span>✦ 第 {{ 条.楼 }} 页 ✦</span>
+              </div>
               <p v-if="条.谁 === '玩家'" class="story-player">✠ {{ 条.文本[0] }}</p>
               <template v-else>
-                <p v-for="(段, j) in 条.文本" :key="j" class="narr">{{ 段 }}</p>
+                <p v-for="(段, j) in 条.文本" :key="j" :class="配首字(段, j)">{{ 段 }}</p>
                 <p v-if="条.可回档 && !发送中" class="candle-row">
                   <button
                     class="candle"
@@ -221,7 +259,22 @@
 
           <template v-if="选中档案.修女.情报可见">
             <p v-if="选中档案.修女.当前心理想法" class="dossier-line"><b>心声</b> {{ 选中档案.修女.当前心理想法 }}</p>
-            <p class="dossier-line"><b>着装</b> {{ 选中档案.着装 }}</p>
+            <p v-if="选中档案.修女.气质描述" class="dossier-line"><b>气质</b> {{ 选中档案.修女.气质描述 }}</p>
+            <p class="dossier-line">
+              <b>着装</b> {{ 选中档案.着装 }}<template v-if="选中档案.仪容">({{ 选中档案.仪容 }})</template>
+            </p>
+            <p v-if="选中档案.妆容行" class="dossier-line"><b>妆容</b> {{ 选中档案.妆容行 }}</p>
+
+            <div class="dossier-line-title"><b>身体开发</b></div>
+            <div class="dossier-axes">
+              <div v-for="部位 in 选中档案.开发" :key="部位.名" class="dossier-axis">
+                <span class="axis-label">{{ 部位.名 }}</span>
+                <div class="axis">
+                  <i class="bar dev" :style="{ width: 部位.值 + '%' }" />
+                </div>
+                <span class="axis-num">{{ 部位.值 }}</span>
+              </div>
+            </div>
             <div class="dossier-milestones">
               <div class="dossier-line-title">
                 <b>{{ 选中档案.专线.线名 }}</b>
@@ -276,7 +329,7 @@ import { 修女职位列表, type 修女职位 } from '../../schema';
 import type { 会议结果 as 会议结果类型 } from '../../脚本/游戏逻辑/meetingSystem';
 import { 感知语 } from '../../脚本/游戏逻辑/snapshotSystem';
 import { 常规投票人, 计算单票 } from '../../脚本/游戏逻辑/voteEngine';
-import { 查档, 查规则, 晋阶堕落门槛, 修女表, 院规表, 专线表 } from '../../stageConfig';
+import { 查档, 查道具, 查规则, 道具表, 晋阶堕落门槛, 修女表, 院规表, 专线表, type 道具定义 } from '../../stageConfig';
 import { useDataStore } from './store';
 
 const store = useDataStore();
@@ -387,6 +440,32 @@ const 头像列表 = computed(() =>
 
 const 选中职位 = ref<修女职位 | null>(null);
 const 显示法典 = ref(false);
+const 显示黑市 = ref(false);
+
+// ── 黑市(圣器事件解锁;校验在脚本,这里只做展示与去抖) ──
+
+const 行囊名单 = computed(() =>
+  (data.value?.商店?.已购 ?? [])
+    .map(id => 查道具(id)?.名称)
+    .filter(Boolean)
+    .join('、'),
+);
+
+function 可购买(项: 道具定义): boolean {
+  if ((data.value?.奉献金 ?? 0) < 项.价) return false;
+  if (项.类 === '攻略' && data.value.商店.已购.includes(项.id)) return false;
+  return true;
+}
+
+function 购买标签(项: 道具定义): string {
+  if (项.类 === '攻略' && data.value.商店.已购.includes(项.id)) return '已在行囊';
+  if ((data.value?.奉献金 ?? 0) < 项.价) return '奉献金不足';
+  return '买下';
+}
+
+function 买(id: string) {
+  eventEmit('禁忌修道院:购买', { id });
+}
 
 const 选中档案 = computed(() => {
   if (!选中职位.value || !就绪.value) return null;
@@ -406,7 +485,21 @@ const 选中档案 = computed(() => {
       { 名: '信仰', 类: 'faith', 值: 修女.信仰值, 变化: 变化('信仰', 修女.信仰值) },
     ],
     感知: 感知语(修女),
-    着装: [服.头纱, 服.上装, 服.下装, 服.袜足, 服.鞋, 服.配饰, 服.特殊装饰].filter(x => x && x !== '无').join('、'),
+    着装: [服.头纱, 服.上装, 服.下装, 服.内衣上, 服.内衣下, 服.袜足, 服.鞋, 服.配饰, 服.特殊装饰]
+      .filter(x => x && x !== '无')
+      .join('、'),
+    仪容: [修女.暴露程度 !== '遮蔽' ? `暴露:${修女.暴露程度}` : '', 修女.整洁度 !== '整洁' ? 修女.整洁度 : '']
+      .filter(Boolean)
+      .join(' · '),
+    妆容行: [修女.妆容.底妆, 修女.妆容.唇妆, 修女.妆容.眼妆, 修女.妆容.香氛]
+      .filter(x => x && x !== '无' && x !== '素颜')
+      .join('、'),
+    开发: [
+      { 名: '小嘴', 值: 修女.身体开发.小嘴 },
+      { 名: '胸部', 值: 修女.身体开发.胸部 },
+      { 名: '小屄', 值: 修女.身体开发.小屄 },
+      { 名: '屁穴', 值: 修女.身体开发.屁穴 },
+    ],
     专线: 专线表[职位],
   };
 });
@@ -426,6 +519,11 @@ const 卷轴 = ref<卷轴条[]>([]);
 const 卷轴容器 = ref<HTMLElement | null>(null);
 const 显示史册 = ref(false);
 
+/** 泥金首字只给"以汉字开头的叙事首段"——标记/符号开头不放大(防预设残渣被泵金) */
+function 配首字(段: string, j: number): string {
+  return j === 0 && /^[一-鿿]/.test(段) ? 'narr versal' : 'narr';
+}
+
 /** 正文书页只演当前幕:从最后一条玩家行动起(开场时=整卷开场白);完整历史在史册 */
 const 当前幕 = computed(() => {
   const 列表 = 卷轴.value;
@@ -442,10 +540,13 @@ function 清洗(原文: string): string {
       .replace(/<StatusPlaceHolderImpl\/>/g, '')
       .replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, '')
       .replace(/<reason(?:ing)?>[\s\S]*?<\/reason(?:ing)?>/gi, '')
+      .replace(/<!--[\s\S]*?-->/g, '') // 预设泄漏的注释标记(如 Test Inputs Were Rejected)
+      .replace(/^\s*-{2,}>?\s*$/gm, '')
       .replace(/<行动选项>[\s\S]*?<\/行动选项>/g, '')
       // 流式过程中的未闭合块也要吞掉,否则半截思维链/变量块会闪现在书页上
       .replace(/<think(?:ing)?>[\s\S]*$/i, '')
       .replace(/<reason(?:ing)?>[\s\S]*$/i, '')
+      .replace(/<!--[\s\S]*$/, '')
       .replace(/<UpdateVariable>[\s\S]*$/, '')
       .replace(/<行动选项>[\s\S]*$/, '')
       .replace(/【主页】/g, '')
@@ -889,9 +990,8 @@ onMounted(() => {
   margin-bottom: 0;
 }
 
-/* 泥金首字(versal):每段叙事的第一段,金字微光 */
-.story-entry .narr:first-child::first-letter,
-.chronicle .story-entry .narr:first-child::first-letter {
+/* 泥金首字(versal):仅当叙事首段以汉字开头才放大(标记/符号开头不放,防预设残渣被泵金) */
+.versal::first-letter {
   float: left;
   font-family: var(--font-title);
   font-size: 2.5em;
@@ -901,8 +1001,8 @@ onMounted(() => {
   text-shadow: 0 0 12px rgba(201, 169, 78, 0.45);
 }
 
-.story-entry .narr:first-child {
-  text-indent: 0;
+.versal {
+  text-indent: 0 !important;
 }
 
 .story-player {
@@ -1188,6 +1288,26 @@ onMounted(() => {
   text-indent: 2em;
 }
 
+/* 史册分页:每一页(楼)一条金线页码 */
+.leaf-sep {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 1.1em 0 0.9em;
+  font-size: 0.72em;
+  letter-spacing: 0.25em;
+  color: var(--gold);
+  opacity: 0.8;
+}
+
+.leaf-sep::before,
+.leaf-sep::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--line-soft) 40%, var(--line-soft) 60%, transparent);
+}
+
 /* ── 时之烛台 ── */
 
 .candle-row {
@@ -1403,6 +1523,10 @@ onMounted(() => {
   background: linear-gradient(90deg, #2e4457, #6f93b4);
 }
 
+.bar.dev {
+  background: linear-gradient(90deg, #4a1830, #b0508a);
+}
+
 /* ── 氛围:纠察之眼 / 会议蜡烛 ── */
 
 .watch-eye.hot {
@@ -1426,6 +1550,53 @@ onMounted(() => {
   50% {
     opacity: 0.5;
   }
+}
+
+/* ── 黑市 ── */
+
+.codex-toggle.market {
+  color: #b06a8a;
+  border-color: rgba(176, 106, 138, 0.45);
+}
+
+.codex-toggle.market:hover {
+  color: #e8b4cc;
+  border-color: #b06a8a;
+  box-shadow: 0 0 10px rgba(176, 106, 138, 0.35);
+  text-shadow: 0 0 8px rgba(232, 180, 204, 0.6);
+}
+
+.market-balance {
+  flex: none;
+  text-align: center;
+  font-size: 0.85em;
+  color: var(--bone-faded);
+  margin-bottom: 8px;
+}
+
+.market-balance b {
+  color: var(--gold-bright);
+  font-weight: 400;
+  margin-right: 12px;
+}
+
+.market-owned {
+  font-size: 0.9em;
+}
+
+.ware-price {
+  margin-left: auto;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
+}
+
+.ware-buy {
+  margin-top: 5px;
+}
+
+.ware-buy:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 /* ── 法典 ── */

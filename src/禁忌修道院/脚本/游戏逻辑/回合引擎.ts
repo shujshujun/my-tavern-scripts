@@ -1,16 +1,9 @@
 import type { 修女职位 } from '../../schema';
 import { Schema, 修女职位列表 } from '../../schema';
 import { 安检裁剪 } from './安检机';
-import {
-  取主动事件指令,
-  取晋阶指令,
-  刷新互动楼层,
-  警戒回落,
-  冷落检测,
-  清主动事件,
-  结算晋阶,
-} from './eventSystem';
+import { 取主动事件指令, 取晋阶指令, 刷新互动楼层, 警戒回落, 冷落检测, 清主动事件, 结算晋阶 } from './eventSystem';
 import { 取待注入数据卡, 取首夜指令, 清首夜标记 } from './meetingSystem';
+import { 结算圣器, 取圣器指令 } from './商店系统';
 import { 读取, 脚本写入 } from './mvuIO';
 import { 检测焦点, 组修道院快照 } from './snapshotSystem';
 import type { 票值快照 } from './voteEngine';
@@ -28,7 +21,7 @@ import type { 票值快照 } from './voteEngine';
  *   禁忌修道院:生成开始/流式/回合完成/回合失败 → 客户端(流式渲染+解锁输入)
  */
 
-export type 事件类型 = '数据卡' | '晋阶' | '首夜' | '主动';
+export type 事件类型 = '数据卡' | '晋阶' | '首夜' | '圣器' | '主动';
 
 let 进行中 = false;
 export const 回合进行中 = () => 进行中;
@@ -48,14 +41,17 @@ function 读上次回合(): 上次回合记录 | undefined {
   return (_.get(getVariables({ type: 'chat' }), '_上次回合') ?? undefined) as 上次回合记录 | undefined;
 }
 
-// 流式转发:generate 的 iframe 事件转成自定义事件,客户端稳定可收
+// 流式转发:generate 的 iframe 事件转成自定义事件,客户端稳定可收。
+// 用 generation_id 只认自家生成——数据库/总结类第三方脚本自己也会调 generate,
+// 不过滤的话它们的表格填充内容会被误当正文推给客户端(shujuku 插件冲突根源之一)。
 // (iframe_events 是常量,顶层安全;先清防切聊天 reload 后监听累积)
+let 本回合生成id = '';
 eventClearEvent(iframe_events.STREAM_TOKEN_RECEIVED_FULLY);
-eventOn(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, (文本: string) => {
-  if (进行中) eventEmit('禁忌修道院:流式', 文本);
+eventOn(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, (文本: string, generation_id: string) => {
+  if (进行中 && generation_id === 本回合生成id) eventEmit('禁忌修道院:流式', 文本);
 });
 
-/** 事件指令优先级:会议数据卡 > 晋阶正戏 > 新规首夜 > 修女主动事件(互斥,一楼一事) */
+/** 事件指令优先级:会议数据卡 > 晋阶正戏 > 新规首夜 > 圣器(黑市解锁) > 修女主动事件(互斥,一楼一事) */
 export function 选事件指令(): { 文本: string; 类型: 事件类型 } | null {
   const 数据卡 = 取待注入数据卡();
   if (数据卡) return { 文本: 数据卡, 类型: '数据卡' };
@@ -63,6 +59,8 @@ export function 选事件指令(): { 文本: string; 类型: 事件类型 } | nu
   if (晋阶) return { 文本: 晋阶, 类型: '晋阶' };
   const 首夜 = 取首夜指令();
   if (首夜) return { 文本: 首夜, 类型: '首夜' };
+  const 圣器 = 取圣器指令(读取().data);
+  if (圣器) return { 文本: 圣器, 类型: '圣器' };
   const 主动 = 取主动事件指令();
   if (主动) return { 文本: 主动, 类型: '主动' };
   return null;
@@ -103,6 +101,8 @@ function 清洗正文(原文: string): string {
   return 原文
     .replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, '')
     .replace(/<reason(?:ing)?>[\s\S]*?<\/reason(?:ing)?>/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '') // 预设泄漏的注释标记(如 Test Inputs Were Rejected)
+    .replace(/^\s*-{2,}>?\s*$/gm, '')
     .replace(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/g, '')
     .replace(/<行动选项>[\s\S]*?<\/行动选项>/g, '')
     .replace(/<StatusPlaceHolderImpl\/>/g, '')
@@ -129,6 +129,7 @@ export function 回合结算(本轮焦点: 修女职位[], 已注入事件: 事�
   // 事件结算(与注入一一对应;swipe 不重演为骨架取舍)
   if (已注入事件 === '首夜') 清首夜标记();
   if (已注入事件 === '晋阶') 结算晋阶(); // 阶段+1 + 堕落度+10(大额涨幅)
+  if (已注入事件 === '圣器') 结算圣器(); // 黑市解锁 + 封口钱 + 司库线里程碑
   if (已注入事件 === '主动') 清主动事件();
 
   // 焦点修女互动楼层刷新(冷落计时器的数据源)
@@ -148,15 +149,9 @@ export function 回合结算(本轮焦点: 修女职位[], 已注入事件: 事�
       // 票值快照:会议触发楼立即定格全员支持度/堕落度,投票按快照算,
       // 会议楼内的数值变动不影响本次结果(存 chat 变量,AI 不需要看见 → 不进 stat_data)
       const 快照 = Object.fromEntries(
-        修女职位列表.map(职位 => [
-          职位,
-          { 支持度: data.修女[职位].支持度, 堕落度: data.修女[职位].堕落度 },
-        ]),
+        修女职位列表.map(职位 => [职位, { 支持度: data.修女[职位].支持度, 堕落度: data.修女[职位].堕落度 }]),
       ) as 票值快照;
-      insertOrAssignVariables(
-        { _会议: { 票值快照: 快照, 触发楼层: getLastMessageId() } },
-        { type: 'chat' },
-      );
+      insertOrAssignVariables({ _会议: { 票值快照: 快照, 触发楼层: getLastMessageId() } }, { type: 'chat' });
       console.info('[禁忌修道院] 会议触发,票值快照已定格');
     }
   }
@@ -188,7 +183,10 @@ export async function 执行回合(行动: string): Promise<void> {
       injects.push({ role: 'system', content: 事件.文本, position: 'in_chat', depth: 0, should_scan: false });
     }
 
-    const 原文 = String(await generate({ user_input: 行动, should_stream: true, injects }));
+    本回合生成id = `xdy-${回合前末楼}-${_.random(1e9)}`;
+    const 原文 = String(
+      await generate({ user_input: 行动, should_stream: true, injects, generation_id: 本回合生成id }),
+    );
 
     // 楼层由 createChatMessages 静默创建,不经酒馆生成管道 → MVU 不会自动解析,手动 parse + 安检
     const 旧 = Mvu.getMvuData({ type: 'message', message_id: -1 });

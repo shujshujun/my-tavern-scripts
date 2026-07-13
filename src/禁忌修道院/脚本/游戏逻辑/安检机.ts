@@ -60,7 +60,7 @@ export function 安检裁剪(newData: SchemaType, oldData: SchemaType): boolean 
       changed = true;
     }
   }
-  for (const key of ['会议', '院规', '视察'] as const) {
+  for (const key of ['会议', '院规', '视察', '商店'] as const) {
     if (!_.isEqual(newData[key], oldData[key])) {
       newData[key] = oldData[key] as never;
       changed = true;

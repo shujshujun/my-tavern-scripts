@@ -1,6 +1,7 @@
 import type { SchemaType, 修女职位 } from '../../schema';
 import { 修女职位列表 } from '../../schema';
 import { 查档, 修女表, 阶段行为基调, 院规表 } from '../../stageConfig';
+import { 编译行囊 } from './商店系统';
 
 /**
  * 双通道快照系统(每轮注入:主路径走回合引擎 generate injects,逃生舱走 CHAT_COMPLETION_PROMPT_READY)
@@ -180,6 +181,10 @@ export function 组修道院快照(chat: { role: string; content: string }[], da
   }
 
   行.push(`【院内空气】${警戒感知(data.警戒度)}`);
+
+  // 黑市行囊(圣器事件解锁后;只报持有,消耗走叙事)
+  const 行囊 = 编译行囊(data);
+  if (行囊) 行.push(行囊);
 
   // 神父私癖(序章自填,隐蔽织入,永不点破)
   const { 私癖 } = 读设置();

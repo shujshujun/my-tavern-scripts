@@ -6,6 +6,7 @@ import { 安检裁剪 } from './安检机';
 import { 会议间隔, 离开会议厅, 开始投票 } from './meetingSystem';
 import { 请求晋阶, 达成里程碑 } from './eventSystem';
 import { 读取, 脚本写入, 脚本写入中 } from './mvuIO';
+import { 购买 } from './商店系统';
 import { 检测焦点 } from './snapshotSystem';
 import {
   执行回合,
@@ -205,7 +206,13 @@ function 挂载监听() {
     离开会议厅();
   });
 
-  eventClearEvent('禁忌修道院:晋阶');
+  // 黑市购买(圣器事件解锁后;校验在脚本侧)
+eventClearEvent('禁忌修道院:购买');
+eventOn('禁忌修道院:购买', (payload: { id: string }) => {
+  购买(payload.id);
+});
+
+eventClearEvent('禁忌修道院:晋阶');
   eventOn('禁忌修道院:晋阶', (payload: { 职位: Parameters<typeof 请求晋阶>[0] }) => {
     请求晋阶(payload.职位);
   });
