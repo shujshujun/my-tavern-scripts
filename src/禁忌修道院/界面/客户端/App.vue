@@ -416,30 +416,46 @@
           </svg>
 
           <p class="dossier-sense">{{ 选中档案.感知 }}</p>
-          <p class="dossier-line"><b>情绪</b> {{ 选中档案.修女.当前情绪 }}</p>
 
           <template v-if="选中档案.修女.情报可见">
-            <p v-if="选中档案.修女.当前心理想法" class="dossier-line"><b>心声</b> {{ 选中档案.修女.当前心理想法 }}</p>
-            <p v-if="选中档案.修女.气质描述" class="dossier-line"><b>气质</b> {{ 选中档案.修女.气质描述 }}</p>
-            <p class="dossier-line">
-              <b>着装</b> {{ 选中档案.着装 }}<template v-if="选中档案.仪容">({{ 选中档案.仪容 }})</template>
-            </p>
-            <p v-if="选中档案.妆容行" class="dossier-line"><b>妆容</b> {{ 选中档案.妆容行 }}</p>
+            <!-- 心镜:情绪/心声/气质 -->
+            <div class="dsec">
+              <div class="dsec-title"><GI :i="图心镜" /> 心 镜</div>
+              <p class="dossier-line"><b>情绪</b> {{ 选中档案.修女.当前情绪 }}</p>
+              <p v-if="选中档案.修女.当前心理想法" class="dossier-line"><b>心声</b> {{ 选中档案.修女.当前心理想法 }}</p>
+              <p v-if="选中档案.修女.气质描述" class="dossier-line"><b>气质</b> {{ 选中档案.修女.气质描述 }}</p>
+            </div>
 
-            <div class="dossier-line-title"><b>身体开发</b></div>
-            <div class="dossier-axes">
-              <div v-for="部位 in 选中档案.开发" :key="部位.名" class="dossier-axis">
-                <span class="axis-label">{{ 部位.名 }}</span>
-                <div class="axis">
-                  <i class="bar dev" :style="{ width: 部位.值 + '%' }" />
+            <!-- 仪容:着装/妆容 -->
+            <div class="dsec">
+              <div class="dsec-title"><GI :i="图明镜" /> 仪 容</div>
+              <p class="dossier-line">
+                <span class="dline-ico"><GI :i="图长袍" /></span>
+                {{ 选中档案.着装 }}<template v-if="选中档案.仪容">({{ 选中档案.仪容 }})</template>
+              </p>
+              <p v-if="选中档案.妆容行" class="dossier-line">
+                <span class="dline-ico"><GI :i="图口红" /></span>
+                {{ 选中档案.妆容行 }}
+              </p>
+            </div>
+
+            <!-- 身体开发:四部位 2×2 -->
+            <div class="dsec">
+              <div class="dsec-title"><GI :i="图焰身" /> 身 体 开 发</div>
+              <div class="dev-grid">
+                <div v-for="部位 in 选中档案.开发" :key="部位.名" class="dossier-axis">
+                  <span class="axis-label">{{ 部位.名 }}</span>
+                  <div class="axis">
+                    <i class="bar dev" :style="{ width: 部位.值 + '%' }" />
+                  </div>
+                  <span class="axis-num">{{ 部位.值 }}</span>
                 </div>
-                <span class="axis-num">{{ 部位.值 }}</span>
               </div>
             </div>
-            <div class="dossier-milestones">
-              <div class="dossier-line-title">
-                <b>{{ 选中档案.专线.线名 }}</b>
-              </div>
+
+            <!-- 专线里程碑 -->
+            <div class="dsec">
+              <div class="dsec-title"><GI :i="图路径" /> {{ 选中档案.专线.线名 }}</div>
               <div
                 v-for="碑 in 选中档案.专线.里程碑"
                 :key="碑.id"
@@ -450,7 +466,10 @@
               </div>
             </div>
           </template>
-          <p v-else class="dossier-sealed"><GI :i="图烛台" /> 她的内里仍覆着蜡封——推进她的专线,揭开情报。</p>
+          <template v-else>
+            <p class="dossier-line"><b>情绪</b> {{ 选中档案.修女.当前情绪 }}</p>
+            <p class="dossier-sealed"><GI :i="图烛台" /> 她的内里仍覆着蜡封——推进她的专线,揭开情报。</p>
+          </template>
 
           <button v-if="可晋阶(选中档案.职位)" class="ascend-btn" @click="晋阶(选中档案.职位)">✦ 跨过界线</button>
         </div>
@@ -539,6 +558,12 @@ import 图羽笔 from './资源/界面/羽笔.svg?raw';
 import 图地图 from './资源/界面/地图.svg?raw';
 import 图展开 from './资源/界面/展开.svg?raw';
 import 图收拢 from './资源/界面/收拢.svg?raw';
+import 图心镜 from './资源/界面/心镜.svg?raw';
+import 图明镜 from './资源/界面/明镜.svg?raw';
+import 图长袍 from './资源/界面/长袍.svg?raw';
+import 图口红 from './资源/界面/口红.svg?raw';
+import 图焰身 from './资源/界面/焰身.svg?raw';
+import 图路径 from './资源/界面/路径.svg?raw';
 
 // 修女头像(DiceBear Lorelei 线稿, Lisa Wischofsky 原作, CC0;线条重着色 currentColor 吃状态色,
 // 脸底改暖黑成版画质感;raw 内联零网络依赖。占位性质:变体按人设速配,后期整套重绘直接换文件)
@@ -1965,9 +1990,10 @@ onMounted(() => {
 /* ── 档案卡(窄幅碑铭) ── */
 
 .scroll.dossier {
-  width: min(92%, 460px);
+  width: min(96%, 600px);
   height: auto;
-  max-height: 88%;
+  max-height: 92%;
+  font-size: 1.04em;
   overflow-y: auto;
   display: block;
   padding: 18px 20px;
@@ -1991,8 +2017,8 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 46px;
-  height: 46px;
+  width: 58px;
+  height: 58px;
   overflow: hidden;
   border-radius: 50%;
   color: var(--gold);
@@ -2141,6 +2167,53 @@ onMounted(() => {
   color: var(--bone-faded);
   border: 1px dashed var(--line-soft);
   padding: 7px 9px;
+}
+
+/* ── 档案分区面板(心镜/仪容/身体开发/专线) ── */
+
+.dsec {
+  margin-top: 9px;
+  padding: 9px 11px 8px;
+  border: 1px solid var(--line-soft);
+  background: linear-gradient(180deg, rgba(201, 169, 78, 0.05), rgba(201, 169, 78, 0.015));
+  box-shadow: inset 0 1px 8px rgba(0, 0, 0, 0.35);
+}
+
+.dsec-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 7px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--line-soft);
+  font-family: var(--font-title);
+  font-size: 0.88em;
+  letter-spacing: 0.22em;
+  color: var(--gold-bright);
+}
+
+.dsec-title .gi {
+  width: 1.3em;
+  height: 1.3em;
+  filter: drop-shadow(0 0 4px rgba(201, 169, 78, 0.35));
+}
+
+.dline-ico {
+  color: var(--gold);
+  margin-right: 5px;
+}
+
+.dline-ico .gi {
+  width: 1.2em;
+  height: 1.2em;
+  vertical-align: -0.25em;
+}
+
+/* 身体开发四部位:双列网格 */
+.dev-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 18px;
 }
 
 /* ── 三轴条 ── */
