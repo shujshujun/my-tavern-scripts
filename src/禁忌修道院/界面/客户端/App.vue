@@ -100,7 +100,10 @@
             :title="项.剪影 ? '尚未知晓的存在' : 项.显示名"
             @click="!项.剪影 && (选中职位 = 项.职位)"
           >
-            <span class="avatar-glyph">{{ 项.剪影 ? '?' : 项.显示名[0] }}</span>
+            <span class="avatar-glyph">
+              <template v-if="项.剪影">?</template>
+              <GI v-else class="avatar-face" :i="修女头像[项.职位]" />
+            </span>
             <span v-if="!项.剪影" class="avatar-name">{{ 项.显示名 }}</span>
           </div>
         </div>
@@ -360,6 +363,7 @@
         <div class="scroll dossier">
           <button class="scroll-close" @click="选中职位 = null">✕</button>
           <div class="dossier-head">
+            <span class="dossier-portrait"><GI class="avatar-face" :i="修女头像[选中档案.职位]" /></span>
             <span class="dossier-name">{{ 选中档案.显示名 }}</span>
             <span class="dossier-role">{{ 选中档案.职位 }}嬷嬷</span>
             <span class="dossier-stage">「{{ 选中档案.修女.阶段标题 }}」</span>
@@ -507,6 +511,28 @@ import 图离开 from './资源/界面/离开.svg?raw';
 import 图天平 from './资源/界面/天平.svg?raw';
 import 图羽笔 from './资源/界面/羽笔.svg?raw';
 import 图地图 from './资源/界面/地图.svg?raw';
+
+// 修女头像(DiceBear Lorelei 线稿, Lisa Wischofsky 原作, CC0;线条重着色 currentColor 吃状态色,
+// 脸底改暖黑成版画质感;raw 内联零网络依赖。占位性质:变体按人设速配,后期整套重绘直接换文件)
+import 像特蕾莎 from './资源/头像/特蕾莎.svg?raw';
+import 像玛利亚 from './资源/头像/玛利亚.svg?raw';
+import 像玛尔大 from './资源/头像/玛尔大.svg?raw';
+import 像希尔德加德 from './资源/头像/希尔德加德.svg?raw';
+import 像爱洛伊丝 from './资源/头像/爱洛伊丝.svg?raw';
+import 像罗莎 from './资源/头像/罗莎.svg?raw';
+import 像露西亚 from './资源/头像/露西亚.svg?raw';
+import 像塞拉菲娜 from './资源/头像/塞拉菲娜.svg?raw';
+
+const 修女头像: Record<修女职位, string> = {
+  院长: 像特蕾莎,
+  纠察: 像玛利亚,
+  司库: 像玛尔大,
+  医务: 像希尔德加德,
+  图书: 像爱洛伊丝,
+  厨娘: 像罗莎,
+  见习: 像露西亚,
+  巡查: 像塞拉菲娜,
+};
 
 // 1em 内联图标(自家仓库 SVG,非用户输入;emoji 在手机上是彩色贴图且冷门字形会变豆腐,故全换 SVG)
 const GI: FunctionalComponent<{ i: string }> = props => h('i', { class: 'gi', innerHTML: props.i });
@@ -1292,6 +1318,7 @@ onMounted(() => {
   justify-content: center;
   width: 38px;
   height: 38px;
+  overflow: hidden;
   border-radius: 50%;
   font-family: var(--font-title);
   font-size: 1.1em;
@@ -1302,6 +1329,12 @@ onMounted(() => {
     0 2px 6px rgba(0, 0, 0, 0.6),
     inset 0 0 10px rgba(0, 0, 0, 0.6);
   transition: all 0.45s ease;
+}
+
+/* 版画头像:线条 currentColor(跟随焦点/离场状态色),铺满圆框 */
+.avatar-glyph .avatar-face {
+  width: 100%;
+  height: 100%;
 }
 
 .avatar-name {
@@ -1794,6 +1827,30 @@ onMounted(() => {
   border-bottom: 1px solid var(--line);
   padding-bottom: 7px;
   margin-bottom: 10px;
+}
+
+/* 档案卡肖像(与头像行同一套版画头像,放大一号) */
+.dossier-portrait {
+  flex: none;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  overflow: hidden;
+  border-radius: 50%;
+  color: var(--gold);
+  background: radial-gradient(circle at 38% 30%, #2e2512, var(--void-2) 68%);
+  border: 1px solid var(--line);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.6),
+    inset 0 0 10px rgba(0, 0, 0, 0.6);
+}
+
+.dossier-portrait .avatar-face {
+  width: 100%;
+  height: 100%;
 }
 
 .dossier-name {
