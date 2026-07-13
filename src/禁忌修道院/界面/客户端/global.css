@@ -1,0 +1,28 @@
+/* 禁忌修道院客户端 - 泥金装饰手抄本(illuminated manuscript)基调 */
+
+:root {
+  /* 羊皮纸与墨 */
+  --parchment: #f0e6d2;
+  --parchment-dark: #e2d3b3;
+  --ink: #3a2f23;
+  --ink-faded: #6f5f4b;
+  /* 泥金与朱砂 */
+  --gilt: #a8842c;
+  --gilt-bright: #c9a227;
+  --rubric: #8c2f1b;
+  /* 阴影与罪 */
+  --shadow: #241c12;
+  --sin: #5a1f3c;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+
+#app {
+  font-family: 'Noto Serif SC', 'Source Han Serif SC', serif;
+  color: var(--ink);
+}

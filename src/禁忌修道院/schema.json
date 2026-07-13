@@ -1,0 +1,246 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "修女": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "院长": {
+          "$ref": "#/$defs/__schema0"
+        },
+        "纠察": {
+          "$ref": "#/$defs/__schema0"
+        },
+        "司库": {
+          "$ref": "#/$defs/__schema0"
+        },
+        "医务": {
+          "$ref": "#/$defs/__schema0"
+        },
+        "图书": {
+          "$ref": "#/$defs/__schema0"
+        },
+        "厨娘": {
+          "$ref": "#/$defs/__schema0"
+        },
+        "见习": {
+          "$ref": "#/$defs/__schema0"
+        },
+        "巡查": {
+          "$ref": "#/$defs/__schema0"
+        }
+      }
+    },
+    "奉献金": {
+      "default": 0,
+      "type": "number"
+    },
+    "激进度": {
+      "default": 0,
+      "type": "number"
+    },
+    "警戒度": {
+      "default": 0,
+      "type": "number"
+    },
+    "会议": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "倒计时": {
+          "default": 18,
+          "type": "number"
+        },
+        "状态": {
+          "default": "日常",
+          "type": "string",
+          "enum": [
+            "日常",
+            "会议中"
+          ]
+        }
+      }
+    },
+    "院规": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "default": 0,
+        "type": "number"
+      }
+    },
+    "视察": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "状态": {
+          "default": "未触发",
+          "type": "string",
+          "enum": [
+            "未触发",
+            "预警",
+            "进行中",
+            "已结束"
+          ]
+        }
+      }
+    },
+    "恶魔低语": {
+      "type": "string"
+    }
+  },
+  "$defs": {
+    "__schema0": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "支持度": {
+          "default": 0,
+          "type": "number"
+        },
+        "堕落度": {
+          "default": 0,
+          "type": "number"
+        },
+        "信仰值": {
+          "default": 100,
+          "type": "number"
+        },
+        "当前阶段": {
+          "default": 1,
+          "type": "number"
+        },
+        "阶段标题": {
+          "default": "圣洁",
+          "type": "string"
+        },
+        "身体开发": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "小嘴": {
+              "default": 0,
+              "type": "number"
+            },
+            "胸部": {
+              "default": 0,
+              "type": "number"
+            },
+            "小屄": {
+              "default": 0,
+              "type": "number"
+            },
+            "屁穴": {
+              "default": 0,
+              "type": "number"
+            }
+          }
+        },
+        "当前心理想法": {
+          "type": "string"
+        },
+        "当前情绪": {
+          "default": "平静",
+          "type": "string"
+        },
+        "气质描述": {
+          "type": "string"
+        },
+        "服装": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "头纱": {
+              "default": "黑色头纱",
+              "type": "string"
+            },
+            "上装": {
+              "default": "黑色修女长袍",
+              "type": "string"
+            },
+            "下装": {
+              "default": "及踝长裙",
+              "type": "string"
+            },
+            "内衣上": {
+              "default": "朴素白棉内衣",
+              "type": "string"
+            },
+            "内衣下": {
+              "default": "朴素白棉内裤",
+              "type": "string"
+            },
+            "袜足": {
+              "default": "黑色长袜",
+              "type": "string"
+            },
+            "鞋": {
+              "default": "低跟黑皮鞋",
+              "type": "string"
+            },
+            "配饰": {
+              "default": "木质念珠十字架",
+              "type": "string"
+            },
+            "特殊装饰": {
+              "default": "无",
+              "type": "string"
+            }
+          }
+        },
+        "妆容": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "底妆": {
+              "default": "素颜",
+              "type": "string"
+            },
+            "唇妆": {
+              "default": "无",
+              "type": "string"
+            },
+            "眼妆": {
+              "default": "无",
+              "type": "string"
+            },
+            "香氛": {
+              "default": "无",
+              "type": "string"
+            }
+          }
+        },
+        "暴露程度": {
+          "default": "遮蔽",
+          "type": "string"
+        },
+        "整洁度": {
+          "default": "整洁",
+          "type": "string"
+        },
+        "专线进度": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "情报可见": {
+          "default": false,
+          "type": "boolean"
+        },
+        "上次互动楼层": {
+          "default": 0,
+          "type": "number"
+        }
+      }
+    }
+  }
+}
