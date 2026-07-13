@@ -1,12 +1,20 @@
 <template>
   <div class="codex">
+    <!-- 错误护栏:任何运行时异常显示在此,不再整屏空白 -->
+    <div v-if="错误信息" class="err">⚠ 界面异常:{{ 错误信息 }}</div>
+
     <!-- ═══════════ 正文窗(书页:楼层文本吸进客户端,全屏游戏感) ═══════════ -->
     <section v-if="正文段落.length" class="story">
       <p v-for="(段, i) in 正文段落" :key="i">{{ 段 }}</p>
     </section>
 
+    <!-- ═══════════ 数据未就绪 ═══════════ -->
+    <template v-if="!就绪">
+      <div class="agenda-hint">……羊皮纸尚在展开(等待存档数据)……</div>
+    </template>
+
     <!-- ═══════════ 会议场景(整屏牧师会礼堂) ═══════════ -->
-    <template v-if="data.会议.状态 === '会议中'">
+    <template v-else-if="data.会议.状态 === '会议中'">
       <header class="codex-header">
         <span class="rubric">✦</span> 牧师会礼堂 · 修女会议 <span class="rubric">✦</span>
       </header>
@@ -138,11 +146,25 @@ import { useDataStore } from './store';
 const store = useDataStore();
 const data = computed(() => store.data);
 
+/** 数据就绪守卫:store 兜底为 {} 时不裸渲染(defineMvuDataStore 变量缺失的回退路径) */
+const 就绪 = computed(() => Boolean(data.value?.修女 && data.value?.会议 && data.value?.院规));
+
+/** 错误护栏:渲染异常不再整屏空白,显示横幅供定位 */
+const 错误信息 = ref('');
+onErrorCaptured(err => {
+  错误信息.value = err instanceof Error ? `${err.message}\n${(err.stack ?? '').split('\n')[1] ?? ''}` : String(err);
+  console.error('[禁忌修道院客户端]', err);
+  return false;
+});
+window.addEventListener('unhandledrejection', ev => {
+  if (!错误信息.value) 错误信息.value = String(ev.reason);
+});
+
 /** 名册顺序;巡查修女登场(情报可见)前不显示 */
 const 名册 = computed(() =>
   修女职位列表
     .map(职位 => 修女表[职位])
-    .filter(nun => !nun.隐藏 || data.value.修女[nun.职位].情报可见),
+    .filter(nun => !nun.隐藏 || (data.value?.修女?.[nun.职位]?.情报可见 ?? false)),
 );
 
 // ── 正文窗:楼层文本吸进客户端(全屏游戏感;显示正则吞掉原始楼层文本) ──
@@ -259,6 +281,17 @@ onMounted(() => {
   border-radius: 4px;
   padding: 10px 12px;
   box-shadow: inset 0 0 24px rgba(58, 47, 35, 0.15);
+}
+
+.err {
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: #7a1a1a;
+  color: #ffe9e0;
+  border-radius: 3px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  font-size: 0.75em;
 }
 
 .codex-header {

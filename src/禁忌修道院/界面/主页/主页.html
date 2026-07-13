@@ -259,10 +259,26 @@
             $btn.prop('disabled', false);
             return;
           }
+
+          // 消息变量是 per-swipe 的:先取 swipe0(主页)上 MVU 初始化好的 stat_data,
+          // 切到开场白 swipe 后若目标 swipe 缺档,把存档带过去(云霜凝主页同款处理)
+          const 主页变量 = getVariables({ type: 'message', message_id: 0 });
+          const 存档 = 主页变量 && 主页变量.stat_data ? 主页变量.stat_data : null;
+
           await setChatMessage(messages[0].swipes[1], 0, {
             swipe_id: 1,
             refresh: 'display_and_render_current',
           });
+
+          if (存档) {
+            await updateVariablesWith(
+              function (variables) {
+                if (!variables.stat_data) variables.stat_data = 存档;
+                return variables;
+              },
+              { type: 'message', message_id: 0 },
+            );
+          }
         } catch (e) {
           console.error('[禁忌修道院主页] 启程失败:', e);
           $('#hint').text('启程失败:' + (e && e.message ? e.message : String(e)));
