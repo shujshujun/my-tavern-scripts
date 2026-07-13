@@ -98,15 +98,27 @@ export function 组快照注入(对话尾: { role: string; content: string }[]):
   };
 }
 
-/** 楼层落库前的清洗:思维链/界面标记/变量块不进楼层文本(prompt 与卷轴双干净) */
+/** 楼层落库前的清洗:思维链/界面标记/变量块/行动选项不进楼层文本(prompt 与卷轴双干净) */
 function 清洗正文(原文: string): string {
   return 原文
     .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
     .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '')
     .replace(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/g, '')
+    .replace(/<行动选项>[\s\S]*?<\/行动选项>/g, '')
     .replace(/<StatusPlaceHolderImpl\/>/g, '')
     .replace(/【主页】/g, '')
     .trim();
+}
+
+/** 行动选项(AI 隐藏块 → 客户端可点即发的选项;最多 3 条) */
+function 提取行动选项(原文: string): string[] {
+  const m = 原文.match(/<行动选项>([\s\S]*?)<\/行动选项>/);
+  if (!m) return [];
+  return m[1]
+    .split('\n')
+    .map(s => s.replace(/^[-·•*\d.、\s]+/, '').trim())
+    .filter(Boolean)
+    .slice(0, 3);
 }
 
 /**
@@ -198,9 +210,12 @@ export async function 执行回合(行动: string): Promise<void> {
     // 结算写在新楼(message_id:-1 已指向它)
     回合结算(焦点, 事件?.类型 ?? null);
 
-    // 落重掷记录(回合成功才落——失败的回合没有楼可删)
+    // 落重掷记录(回合成功才落——失败的回合没有楼可删)+ 本轮行动选项
     insertOrAssignVariables(
-      { _上次回合: { 行动, 回合前末楼, chat快照 } satisfies 上次回合记录 },
+      {
+        _上次回合: { 行动, 回合前末楼, chat快照 } satisfies 上次回合记录,
+        _行动选项: 提取行动选项(原文),
+      },
       { type: 'chat' },
     );
 
@@ -263,7 +278,7 @@ export async function 回档至(楼层: number): Promise<void> {
     await deleteChatMessages(_.range(楼层 + 1, 末楼 + 1), { refresh: 'none' });
     await updateVariablesWith(
       vars => {
-        for (const 键 of [...回合变量键, '_上次回合', '_在场']) _.set(vars, 键, null);
+        for (const 键 of [...回合变量键, '_上次回合', '_在场', '_行动选项']) _.set(vars, 键, null);
         return vars;
       },
       { type: 'chat' },

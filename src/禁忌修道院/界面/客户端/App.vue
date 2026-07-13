@@ -68,7 +68,13 @@
           《{{ 议程名 }}》「{{ 档名 }}」 —— {{ 会议结果.通过 ? '通过' : '否决' }}
         </div>
         <div v-if="显示票面" class="vote-grid">
-          <div v-for="t in 显示票面.票" :key="t.职位" class="vote-card" :data-v="t.投票">
+          <div
+            v-for="(t, i) in 显示票面.票"
+            :key="t.职位"
+            class="vote-card vote-reveal"
+            :data-v="t.投票"
+            :style="{ animationDelay: i * 0.35 + 's' }"
+          >
             <div class="vote-name">{{ t.显示名 }}</div>
             <div class="vote-stance">{{ t.投票 }}</div>
           </div>
@@ -87,10 +93,18 @@
       </header>
 
       <div class="meta-row">
-        <span>奉献金 {{ data.奉献金 }}</span>
-        <span>警戒 {{ data.警戒度 }}</span>
-        <span>激进 {{ data.激进度 }}</span>
-        <span>距会议 {{ data.会议.倒计时 }} 楼</span>
+        <span title="奉献金">✟ {{ data.奉献金 }}</span>
+        <span
+          class="watch-eye"
+          :class="{ hot: data.警戒度 >= 75 }"
+          :style="{ opacity: 0.4 + data.警戒度 / 160 }"
+          :title="'警戒度 ' + data.警戒度 + ':走廊阴影里,纠察的眼睛'"
+          >👁 {{ data.警戒度 }}</span
+        >
+        <span title="激进度(累计触发总部视察)">♰ {{ data.激进度 }}</span>
+        <span class="countdown" :class="{ urgent: data.会议.倒计时 <= 3 }" title="距下次修女会议">
+          🕯 {{ data.会议.倒计时 }}
+        </span>
         <button class="codex-toggle" :class="{ active: 显示法典 }" @click="显示法典 = !显示法典">☨ 法典</button>
       </div>
 
@@ -136,8 +150,13 @@
         </div>
       </div>
 
-      <footer v-if="data.恶魔低语" class="whisper">
+      <!-- 恶魔低语:页缘血字批注,可听从(填入输入框)或划掉 -->
+      <footer v-if="data.恶魔低语 && 已划掉低语 !== data.恶魔低语" class="whisper">
         <span class="imp">🜏</span> {{ data.恶魔低语 }}
+        <span class="whisper-acts">
+          <button class="whisper-act obey" title="把低语抄进羽笔,亲手写下它" @click="听从低语">听从</button>
+          <button class="whisper-act" title="划掉这行批注" @click="已划掉低语 = data.恶魔低语">划掉</button>
+        </span>
       </footer>
     </template>
 
@@ -158,8 +177,18 @@
               <i class="bar" :class="轴.类" :style="{ width: 轴.值 + '%' }" />
             </div>
             <span class="axis-num">{{ 轴.值 }}</span>
+            <span class="axis-delta" :class="{ up: 轴.变化 > 0, down: 轴.变化 < 0 }">
+              {{ 轴.变化 > 0 ? '↑' + 轴.变化 : 轴.变化 < 0 ? '↓' + -轴.变化 : '' }}
+            </span>
           </div>
         </div>
+
+        <!-- 三轴走势(每楼存档=一个采样点;看得见"她是从哪一夜开始崩的") -->
+        <svg v-if="选中曲线" class="dossier-trend" viewBox="0 0 100 28" preserveAspectRatio="none">
+          <polyline :points="选中曲线.支持" class="trend-support" />
+          <polyline :points="选中曲线.堕落" class="trend-sin" />
+          <polyline :points="选中曲线.信仰" class="trend-faith" />
+        </svg>
 
         <p class="dossier-sense">{{ 选中档案.感知 }}</p>
         <p class="dossier-line"><b>情绪</b> {{ 选中档案.修女.当前情绪 }}</p>
@@ -187,6 +216,11 @@
           ✦ 跨过界线
         </button>
       </div>
+    </div>
+
+    <!-- ═══════════ 行动建议(AI 每轮给 2-3 条,点了直接发送;想自由发挥就打字) ═══════════ -->
+    <div v-if="就绪 && !发送中 && 行动选项.length && data.会议.状态 !== '会议中'" class="option-row">
+      <button v-for="(项, i) in 行动选项" :key="i" class="option-chip" @click="发出(项)">✦ {{ 项 }}</button>
     </div>
 
     <!-- ═══════════ 游戏内输入(会议中隐藏;玩家不碰酒馆输入框) ═══════════ -->
@@ -244,16 +278,41 @@ function 重掷() {
   eventEmit('禁忌修道院:重掷');
 }
 
-function 发送() {
-  const 文本 = 输入文本.value.trim();
+/** 发出一条行动(输入框与行动建议按钮共用) */
+function 发出(文本: string) {
+  文本 = 文本.trim();
   if (!文本 || 发送中.value) return;
   发送中.value = true;
   流式段.value = [];
   // 乐观渲染:玩家行动先上卷轴,回合完成后由楼层数据重建
   卷轴.value.push({ 谁: '玩家', 文本: [文本.replace(/\n+/g, ' ')] });
-  输入文本.value = '';
   void 滚到底();
   eventEmit('禁忌修道院:玩家行动', { 文本 });
+}
+
+function 发送() {
+  const 文本 = 输入文本.value.trim();
+  if (!文本) return;
+  输入文本.value = '';
+  发出(文本);
+}
+
+// ── 行动建议(脚本每回合从 <行动选项> 块提取,存 chat 变量) ──
+
+const 行动选项 = ref<string[]>([]);
+
+function 刷新行动选项() {
+  const v = _.get(getVariables({ type: 'chat' }), '_行动选项');
+  行动选项.value = Array.isArray(v) ? (v as string[]).filter(x => typeof x === 'string' && x.trim()) : [];
+}
+
+// ── 恶魔低语:听从=抄进羽笔(玩家可改再发);划掉=本条隐去,下条低语再现 ──
+
+const 已划掉低语 = ref('');
+
+function 听从低语() {
+  输入文本.value = data.value.恶魔低语;
+  已划掉低语.value = data.value.恶魔低语;
 }
 
 /** 错误护栏:渲染异常不再整屏空白,显示横幅供定位 */
@@ -296,14 +355,17 @@ const 选中档案 = computed(() => {
   const 职位 = 选中职位.value;
   const 修女 = data.value.修女[职位];
   const 服 = 修女.服装;
+  const 史 = 三轴历史.value[职位];
+  const 变化 = (k: '支持' | '堕落' | '信仰', 当前: number) =>
+    史 && 史[k].length >= 2 ? 当前 - 史[k][史[k].length - 2] : 0;
   return {
     职位,
     显示名: 修女表[职位].显示名,
     修女,
     三轴: [
-      { 名: '支持', 类: 'support', 值: 修女.支持度 },
-      { 名: '堕落', 类: 'sin', 值: 修女.堕落度 },
-      { 名: '信仰', 类: 'faith', 值: 修女.信仰值 },
+      { 名: '支持', 类: 'support', 值: 修女.支持度, 变化: 变化('支持', 修女.支持度) },
+      { 名: '堕落', 类: 'sin', 值: 修女.堕落度, 变化: 变化('堕落', 修女.堕落度) },
+      { 名: '信仰', 类: 'faith', 值: 修女.信仰值, 变化: 变化('信仰', 修女.信仰值) },
     ],
     感知: 感知语(修女),
     着装: [服.头纱, 服.上装, 服.下装, 服.袜足, 服.鞋, 服.配饰, 服.特殊装饰]
@@ -333,10 +395,12 @@ function 清洗(原文: string): string {
     .replace(/<StatusPlaceHolderImpl\/>/g, '')
     .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
     .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '')
+    .replace(/<行动选项>[\s\S]*?<\/行动选项>/g, '')
     // 流式过程中的未闭合块也要吞掉,否则半截思维链/变量块会闪现在书页上
     .replace(/<thinking>[\s\S]*$/i, '')
     .replace(/<reasoning>[\s\S]*$/i, '')
     .replace(/<UpdateVariable>[\s\S]*$/, '')
+    .replace(/<行动选项>[\s\S]*$/, '')
     .replace(/【主页】/g, '')
     .trim();
 }
@@ -351,7 +415,20 @@ async function 取卷轴() {
     const 末楼 = getLastMessageId();
     const 消息组 = (await getChatMessages(`0-${末楼}`)) ?? [];
     const 条目: 卷轴条[] = [];
+    const 历史: Record<string, { 支持: number[]; 堕落: number[]; 信仰: number[] }> = {};
     for (const 消息 of 消息组) {
+      // 三轴历史:每个带存档的楼是一个采样点(固定0楼架构红利——楼层即时间轴)
+      const 修女档 = _.get(消息.data, 'stat_data.修女');
+      if (消息.role !== 'user' && 修女档) {
+        for (const 职位 of 修女职位列表) {
+          const 修 = _.get(修女档, 职位);
+          if (!修) continue;
+          (历史[职位] ??= { 支持: [], 堕落: [], 信仰: [] });
+          历史[职位].支持.push(Number(修.支持度) || 0);
+          历史[职位].堕落.push(Number(修.堕落度) || 0);
+          历史[职位].信仰.push(Number(修.信仰值) ?? 100);
+        }
+      }
       const 净文 = 清洗(消息.message ?? '');
       if (!净文) continue;
       const 是玩家 = 消息.role === 'user';
@@ -372,12 +449,30 @@ async function 取卷轴() {
       }
     }
     卷轴.value = 条目;
+    三轴历史.value = 历史;
     待回档楼.value = null;
     await 滚到底();
   } catch (e) {
     console.error('[禁忌修道院客户端] 取卷轴失败:', e);
   }
 }
+
+// ── 三轴历史曲线(档案卡 sparkline;数据源=各楼层自带的存档快照) ──
+
+const 三轴历史 = ref<Record<string, { 支持: number[]; 堕落: number[]; 信仰: number[] }>>({});
+
+function 折线(序列: number[]): string {
+  if (序列.length < 2) return '';
+  const 步 = 100 / (序列.length - 1);
+  return 序列.map((v, i) => `${(i * 步).toFixed(1)},${(28 - (v / 100) * 26 - 1).toFixed(1)}`).join(' ');
+}
+
+const 选中曲线 = computed(() => {
+  if (!选中职位.value) return null;
+  const 史 = 三轴历史.value[选中职位.value];
+  if (!史 || 史.支持.length < 2) return null;
+  return { 支持: 折线(史.支持), 堕落: 折线(史.堕落), 信仰: 折线(史.信仰) };
+});
 
 // ── 时之烛台(两段式确认,烧掉该楼之后的一切) ──
 
@@ -488,6 +583,7 @@ onMounted(() => {
     void 取卷轴();
     刷新可重掷();
     刷新在场();
+    刷新行动选项();
     try {
       (store as unknown as { pull?: () => void }).pull?.();
     } catch {
@@ -503,6 +599,7 @@ onMounted(() => {
   });
   刷新可重掷();
   刷新在场();
+  刷新行动选项();
 });
 </script>
 
@@ -524,6 +621,32 @@ onMounted(() => {
   padding: 6px 8px;
   margin-bottom: 8px;
   font-size: 0.75em;
+}
+
+/* ── 行动建议 ── */
+
+.option-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.option-chip {
+  padding: 3px 10px;
+  font-family: inherit;
+  font-size: 0.8em;
+  color: var(--ink);
+  background: var(--parchment-dark);
+  border: 1px solid var(--gilt);
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.option-chip:hover {
+  color: var(--parchment);
+  background: var(--rubric);
 }
 
 /* ── 游戏内输入 ── */
@@ -889,6 +1012,104 @@ onMounted(() => {
   color: var(--sin);
 }
 
+.whisper-acts {
+  margin-left: 8px;
+  white-space: nowrap;
+}
+
+.whisper-act {
+  padding: 0 8px;
+  margin-left: 4px;
+  font-family: inherit;
+  font-size: 0.9em;
+  font-style: normal;
+  color: var(--ink-faded);
+  background: transparent;
+  border: 1px dashed var(--ink-faded);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.whisper-act.obey {
+  color: var(--sin);
+  border-color: var(--sin);
+}
+
+.whisper-act:hover {
+  color: var(--parchment);
+  background: var(--sin);
+}
+
+/* ── 氛围:纠察之眼 / 会议蜡烛 ── */
+
+.watch-eye.hot {
+  color: var(--sin);
+  text-shadow: 0 0 6px var(--sin);
+  animation: eye-throb 1.8s ease-in-out infinite;
+}
+
+@keyframes eye-throb {
+  50% {
+    text-shadow: 0 0 12px var(--sin);
+  }
+}
+
+.countdown.urgent {
+  color: var(--rubric);
+  animation: flame-flicker 0.9s ease-in-out infinite;
+}
+
+@keyframes flame-flicker {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* ── 三轴走势 sparkline ── */
+
+.dossier-trend {
+  width: 100%;
+  height: 42px;
+  margin: 2px 0 8px;
+  background: var(--parchment-dark);
+  border: 1px solid var(--gilt);
+  border-radius: 3px;
+}
+
+.dossier-trend polyline {
+  fill: none;
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+}
+
+.trend-support {
+  stroke: var(--gilt-bright);
+}
+
+.trend-sin {
+  stroke: var(--sin);
+}
+
+.trend-faith {
+  stroke: #4a6b8a;
+}
+
+.axis-delta {
+  width: 2.2em;
+  font-size: 0.9em;
+  color: var(--ink-faded);
+}
+
+.axis-delta.up {
+  color: var(--sin);
+  font-weight: 700;
+}
+
+.axis-delta.down {
+  color: #4a6b8a;
+  font-weight: 700;
+}
+
 /* ── 正文窗(书页) ── */
 
 .story {
@@ -1170,6 +1391,23 @@ onMounted(() => {
   border: 1px solid var(--gilt);
   border-radius: 3px;
   background: var(--parchment-dark);
+}
+
+/* 逐席翻牌:蜡封依次揭开 */
+.vote-reveal {
+  opacity: 0;
+  animation: seal-flip 0.5s ease-out forwards;
+}
+
+@keyframes seal-flip {
+  from {
+    opacity: 0;
+    transform: rotateX(80deg);
+  }
+  to {
+    opacity: 1;
+    transform: rotateX(0);
+  }
 }
 
 .vote-card[data-v='赞成'] {
