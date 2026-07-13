@@ -105,14 +105,14 @@ for (const 组 of index.条目) {
 
 if (!开场白) throw new Error('未找到 [开场白] 条目');
 
-// ── 界面与脚本产物(全内嵌,不依赖网络) ──
-const 客户端HTML = readFileSync(path.join(产物, '界面/客户端/index.html'), 'utf8');
-const 主页HTML = readFileSync(path.join(项目, '界面/主页/主页.html'), 'utf8');
-const 游戏逻辑JS = readFileSync(path.join(产物, '脚本/游戏逻辑/index.js'), 'utf8');
+// ── 资源走 jsdelivr(手机友好,秦璐/云霜凝同款;改代码后 bump TAG 并重推) ──
+const TAG = 'xdy0.04';
+const BASE = `https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@${TAG}`;
+
+const 加载块 = url => '```\n<body>\n<script>\n$(\'body\').load(\'' + url + '\')\n</script>\n</body>\n```';
 
 const 正则骨架 = {
   trimStrings: [],
-  placement: [2],
   disabled: false,
   runOnEdit: true,
   substituteRegex: 0,
@@ -125,7 +125,8 @@ const regex_scripts = [
     id: randomUUID(),
     scriptName: '[开场]主页',
     findRegex: '【主页】',
-    replaceString: '```\n' + 主页HTML + '\n```',
+    replaceString: 加载块(`${BASE}/src/禁忌修道院/界面/主页/主页.html`),
+    placement: [2],
     markdownOnly: true,
     promptOnly: false,
     ...正则骨架,
@@ -134,7 +135,18 @@ const regex_scripts = [
     id: randomUUID(),
     scriptName: '客户端界面(吞正文)',
     findRegex: String.raw`/^[\s\S]*<StatusPlaceHolderImpl\/>[\s\S]*$/`,
-    replaceString: '```\n' + 客户端HTML + '\n```',
+    replaceString: 加载块(`${BASE}/dist/禁忌修道院/界面/客户端/index.html`),
+    placement: [2],
+    markdownOnly: true,
+    promptOnly: false,
+    ...正则骨架,
+  },
+  {
+    id: randomUUID(),
+    scriptName: '[不显示]玩家楼层(输入走游戏内)',
+    findRegex: String.raw`/^[\s\S]*$/`,
+    replaceString: '',
+    placement: [1],
     markdownOnly: true,
     promptOnly: false,
     ...正则骨架,
@@ -144,6 +156,7 @@ const regex_scripts = [
     scriptName: '[不发送]去除变量更新与占位符',
     findRegex: String.raw`/<UpdateVariable>[\s\S]*?<\/UpdateVariable>|<StatusPlaceHolderImpl\/>|【主页】/g`,
     replaceString: '',
+    placement: [2],
     markdownOnly: false,
     promptOnly: true,
     ...正则骨架,
@@ -153,6 +166,7 @@ const regex_scripts = [
     scriptName: '[不显示]隐藏变量更新',
     findRegex: String.raw`/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/g`,
     replaceString: '',
+    placement: [2],
     markdownOnly: true,
     promptOnly: false,
     ...正则骨架,
@@ -187,7 +201,7 @@ const tavern_helper = {
       id: randomUUID(),
       info: '构建产物,源码见仓库 src/禁忌修道院/脚本/游戏逻辑',
       button: 脚本按钮(),
-      content: 游戏逻辑JS,
+      content: "import '" + BASE + "/dist/禁忌修道院/脚本/游戏逻辑/index.js';",
       data: {},
     },
   ],
@@ -196,7 +210,7 @@ const tavern_helper = {
 
 // ── 卡体 ──
 const 卡名 = '禁忌修道院';
-const 版本 = '0.02';
+const 版本 = '0.04';
 const data = {
   name: 卡名,
   description: '',

@@ -8,8 +8,11 @@
       <p v-for="(段, i) in 正文段落" :key="i">{{ 段 }}</p>
     </section>
 
+    <!-- ═══════════ 旧楼只留书页(面板/输入只在最新楼,省性能) ═══════════ -->
+    <template v-if="!是最新楼"></template>
+
     <!-- ═══════════ 数据未就绪 ═══════════ -->
-    <template v-if="!就绪">
+    <template v-else-if="!就绪">
       <div class="agenda-hint">……羊皮纸尚在展开(等待存档数据)……</div>
     </template>
 
@@ -132,7 +135,18 @@
       </footer>
     </template>
 
-    <!-- TODO(按 spec 顺序):院规法典面板(投票预测+palimpsest)/商店/忏悔录图鉴/正文窗吸入 -->
+    <!-- ═══════════ 游戏内输入(最新楼,会议中隐藏;玩家不碰酒馆输入框) ═══════════ -->
+    <div v-if="是最新楼 && 就绪 && data.会议.状态 !== '会议中'" class="quill">
+      <textarea
+        v-model="输入文本"
+        rows="2"
+        placeholder="神父的言行……(Enter 发送,Shift+Enter 换行)"
+        @keydown.enter.exact.prevent="发送"
+      ></textarea>
+      <button class="rite-btn quill-btn" :disabled="发送中 || !输入文本.trim()" @click="发送">
+        {{ 发送中 ? '…' : '行动' }}
+      </button>
+    </div>
   </div>
 </template>
 
@@ -148,6 +162,31 @@ const data = computed(() => store.data);
 
 /** 数据就绪守卫:store 兜底为 {} 时不裸渲染(defineMvuDataStore 变量缺失的回退路径) */
 const 就绪 = computed(() => Boolean(data.value?.修女 && data.value?.会议 && data.value?.院规));
+
+/** 面板与输入只在最新楼激活;旧楼只留书页(可回看,省性能) */
+const 是最新楼 = getCurrentMessageId() === getLastMessageId();
+
+// ── 游戏内输入(玩家不碰酒馆输入框;玩家楼层由正则隐藏) ──
+
+const 输入文本 = ref('');
+const 发送中 = ref(false);
+
+async function 发送() {
+  const 文本 = 输入文本.value.trim();
+  if (!文本 || 发送中.value) return;
+  发送中.value = true;
+  try {
+    // 管道符会截断 slash 命令,替换为全角
+    await triggerSlash(`/send ${文本.replace(/\|/g, '｜')}`);
+    输入文本.value = '';
+    await triggerSlash('/trigger');
+  } catch (e) {
+    console.error('[禁忌修道院客户端] 发送失败:', e);
+    错误信息.value = '发送失败:' + String(e);
+  } finally {
+    发送中.value = false;
+  }
+}
 
 /** 错误护栏:渲染异常不再整屏空白,显示横幅供定位 */
 const 错误信息 = ref('');
@@ -292,6 +331,37 @@ onMounted(() => {
   padding: 6px 8px;
   margin-bottom: 8px;
   font-size: 0.75em;
+}
+
+/* ── 游戏内输入 ── */
+
+.quill {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--gilt);
+}
+
+.quill textarea {
+  flex: 1;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 0.88em;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--parchment-dark);
+  border: 1px solid var(--gilt);
+  border-radius: 3px;
+  padding: 6px 9px;
+  resize: vertical;
+}
+
+.quill-btn {
+  margin: 0;
+  align-self: stretch;
+  padding: 0 18px;
+  white-space: nowrap;
 }
 
 .codex-header {
