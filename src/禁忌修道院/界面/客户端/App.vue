@@ -2,7 +2,7 @@
   <div class="codex">
     <div class="page">
       <!-- 错误护栏:任何运行时异常显示在此,不再整屏空白 -->
-      <div v-if="错误信息" class="err">⚠ 界面异常:{{ 错误信息 }}</div>
+      <div v-if="错误信息" class="err">⚠︎ 界面异常:{{ 错误信息 }}</div>
 
       <!-- ═══════════ 数据未就绪 ═══════════ -->
       <template v-if="!就绪">
@@ -68,22 +68,24 @@
             :class="{ hot: data.警戒度 >= 75 }"
             :style="{ opacity: 0.4 + data.警戒度 / 160 }"
             :title="'警戒度 ' + data.警戒度 + ':走廊阴影里,纠察的眼睛'"
-            >👁 {{ data.警戒度 }}</span
+            ><GI :i="图警戒眼" /> {{ data.警戒度 }}</span
           >
           <span title="激进度(累计触发总部视察)">♰ {{ data.激进度 }}</span>
           <span class="countdown" :class="{ urgent: data.会议.倒计时 <= 3 }" title="距下次修女会议">
-            🕯 {{ data.会议.倒计时 }}
+            <GI :i="图烛台" /> {{ data.会议.倒计时 }}
           </span>
           <span class="meta-btns">
             <button class="codex-toggle" @click="显示法典 = true">☨ 法典</button>
-            <button class="codex-toggle" title="完整编年史与时之烛台" @click="显示史册 = true">🕮 史册</button>
+            <button class="codex-toggle" title="完整编年史与时之烛台" @click="显示史册 = true">
+              <GI :i="图史册" /> 史册
+            </button>
             <button
               v-if="data.商店?.解锁"
               class="codex-toggle market"
               title="玛尔大的销赃渠道,反过来为神父进货"
               @click="显示黑市 = true"
             >
-              ⚖ 黑市
+              <GI :i="图天平" /> 黑市
             </button>
           </span>
         </div>
@@ -113,13 +115,13 @@
           </div>
           <div v-if="发送中" class="story-entry">
             <p v-for="(段, j) in 流式段" :key="'流' + j" :class="配首字(段, j)">{{ 段 }}</p>
-            <p class="scribing">✒ 修道院的记事员正在书写……</p>
+            <p class="scribing"><GI :i="图羽笔" /> 修道院的记事员正在书写……</p>
           </div>
         </section>
 
         <!-- 恶魔低语:神父心底的恶念/对剧情的腹黑旁注(不是行动指引),只可划掉 -->
         <footer v-if="data.恶魔低语 && 已划掉低语 !== data.恶魔低语" class="whisper">
-          <span class="imp">🜏</span> {{ data.恶魔低语 }}
+          <span class="imp"><GI :i="图恶魔低语" /></span> {{ data.恶魔低语 }}
           <span class="whisper-acts">
             <button class="whisper-act" title="划掉这行批注" @click="已划掉低语 = data.恶魔低语">划掉</button>
           </span>
@@ -181,7 +183,7 @@
             :class="{ locked: 室.上锁 }"
             @click="点寝室(室)"
           >
-            <span class="room-icon">{{ 室.上锁 ? '🔒' : '🚪' }}</span>
+            <span class="room-icon"><GI :i="室.上锁 ? 图门锁 : 图房门" /></span>
             <span class="room-name">{{ 室.名称 }}</span>
             <span class="room-occupants"
               ><i v-if="室.在房" class="occ">{{ 室.首字 }}</i></span
@@ -198,9 +200,9 @@
 
       <!-- ═══════════ 场景条(在房间时;离开=回地图) ═══════════ -->
       <div v-if="就绪 && 当前房间 && data.会议.状态 !== '会议中'" class="scene-bar">
-        <span class="scene-name">📍 {{ 当前房间名 }}</span>
+        <span class="scene-name"><GI :i="图地点" /> {{ 当前房间名 }}</span>
         <span class="scene-occ">{{ 房内名单 || '此刻无人' }}</span>
-        <button class="reroll-btn" :disabled="发送中" @click="离开房间">🚶 离开</button>
+        <button class="reroll-btn" :disabled="发送中" @click="离开房间"><GI :i="图离开" /> 离开</button>
       </div>
 
       <!-- ═══════════ 法典(羊皮大卷轴;分组+手风琴,撑得住后期几十档) ═══════════ -->
@@ -262,7 +264,7 @@
       <div v-if="显示黑市" class="scroll-mask" @click.self="显示黑市 = false">
         <div class="scroll">
           <button class="scroll-close" @click="显示黑市 = false">✕</button>
-          <div class="scroll-title">⚖ 玛尔大的暗账</div>
+          <div class="scroll-title"><GI :i="图天平" /> 玛尔大的暗账</div>
           <div class="market-balance">
             奉献金 <b>✟ {{ data.奉献金 }}</b>
             <span v-if="行囊名单" class="market-owned">行囊:{{ 行囊名单 }}</span>
@@ -293,8 +295,10 @@
       <div v-if="显示史册" class="scroll-mask" @click.self="显示史册 = false">
         <div class="scroll">
           <button class="scroll-close" @click="显示史册 = false">✕</button>
-          <div class="scroll-title">🕮 修 道 院 史 册</div>
-          <p class="agenda-hint">完整编年史。每页右下角的 🕯 是时之烛台:点两次,烧掉那一页之后的一切,回到当时。</p>
+          <div class="scroll-title"><GI :i="图史册" /> 修 道 院 史 册</div>
+          <p class="agenda-hint">
+            完整编年史。每页右下角的 <GI :i="图烛台" /> 是时之烛台:点两次,烧掉那一页之后的一切,回到当时。
+          </p>
           <div class="scroll-body chronicle">
             <div v-for="(条, i) in 卷轴" :key="i" class="story-entry">
               <div v-if="条.谁 !== '玩家' && (条.楼 ?? 0) > 0" class="leaf-sep">
@@ -310,7 +314,8 @@
                     :title="待回档楼 === 条.楼 ? '再点一次确认' : '时之烛台:回到这一页刚写完的时刻'"
                     @click.stop="点烛(条.楼)"
                   >
-                    {{ 待回档楼 === 条.楼 ? '⚠ 再点一次,烧掉这页之后的一切' : '🕯' }}
+                    <template v-if="待回档楼 === 条.楼">⚠︎ 再点一次,烧掉这页之后的一切</template>
+                    <GI v-else :i="图烛台" />
                   </button>
                 </p>
               </template>
@@ -384,7 +389,7 @@
               </div>
             </div>
           </template>
-          <p v-else class="dossier-sealed">🕯 她的内里仍覆着蜡封——推进她的专线,揭开情报。</p>
+          <p v-else class="dossier-sealed"><GI :i="图烛台" /> 她的内里仍覆着蜡封——推进她的专线,揭开情报。</p>
 
           <button v-if="可晋阶(选中档案.职位)" class="ascend-btn" @click="晋阶(选中档案.职位)">✦ 跨过界线</button>
         </div>
@@ -420,6 +425,8 @@
 </template>
 
 <script setup lang="ts">
+import type { FunctionalComponent } from 'vue';
+
 import { 修女职位列表, type 修女职位 } from '../../schema';
 import type { 会议结果 as 会议结果类型 } from '../../脚本/游戏逻辑/meetingSystem';
 import { 感知语 } from '../../脚本/游戏逻辑/snapshotSystem';
@@ -456,6 +463,22 @@ const 道具图标: Record<string, string> = {
   非常召集: 图非常召集,
   账目复核: 图账目复核,
 };
+
+// 界面图标(game-icons.net, CC BY 3.0;重着色 currentColor 以继承状态色,raw 内联进包,不依赖网络)
+import 图警戒眼 from './资源/界面/警戒眼.svg?raw';
+import 图烛台 from './资源/界面/烛台.svg?raw';
+import 图史册 from './资源/界面/史册.svg?raw';
+import 图恶魔低语 from './资源/界面/恶魔低语.svg?raw';
+import 图门锁 from './资源/界面/门锁.svg?raw';
+import 图房门 from './资源/界面/房门.svg?raw';
+import 图地点 from './资源/界面/地点.svg?raw';
+import 图离开 from './资源/界面/离开.svg?raw';
+import 图天平 from './资源/界面/天平.svg?raw';
+import 图羽笔 from './资源/界面/羽笔.svg?raw';
+
+// 1em 内联图标(自家仓库 SVG,非用户输入;emoji 在手机上是彩色贴图且冷门字形会变豆腐,故全换 SVG)
+const GI: FunctionalComponent<{ i: string }> = props => h('i', { class: 'gi', innerHTML: props.i });
+GI.props = ['i'];
 
 /**
  * 修道院顶视图(手绘 SVG 线稿占位;用户找到美术图后整块替换)
@@ -838,7 +861,7 @@ async function 取卷轴() {
           历史[职位] ??= { 支持: [], 堕落: [], 信仰: [] };
           历史[职位].支持.push(Number(修.支持度) || 0);
           历史[职位].堕落.push(Number(修.堕落度) || 0);
-          历史[职位].信仰.push(Number(修.信仰值) ?? 100);
+          历史[职位].信仰.push(Number(修.信仰值 ?? 100) || 0);
         }
       }
       const 净文 = 清洗(消息.message ?? '');
@@ -2381,6 +2404,27 @@ onMounted(() => {
 
 .imp {
   font-style: normal;
+}
+
+/* ── 内联界面图标(game-icons;fill=currentColor,跟随所在元素文字色) ── */
+.gi {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.12em;
+  font-style: normal;
+}
+
+.gi :deep(svg),
+.gi svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* text-shadow 照不亮 SVG,警戒之眼的红光用 drop-shadow 补 */
+.watch-eye.hot .gi {
+  filter: drop-shadow(0 0 6px var(--rubric));
 }
 
 /* ── 会议 ── */

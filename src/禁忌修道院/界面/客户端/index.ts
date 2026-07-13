@@ -14,7 +14,7 @@ function 显示致命错误(err: unknown, 来源: string) {
     document.body.prepend(d);
   }
   const 详情 = err instanceof Error ? `${err.message}\n${(err.stack ?? '').split('\n').slice(1, 3).join('\n')}` : String(err);
-  d.textContent = `⚠ [${来源}] ${详情}`;
+  d.textContent = `⚠︎ [${来源}] ${详情}`;
 }
 
 window.addEventListener('error', ev => 显示致命错误(ev.error ?? ev.message, 'window'));
