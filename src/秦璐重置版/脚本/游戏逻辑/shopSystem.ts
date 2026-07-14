@@ -1692,12 +1692,14 @@ export function toggleEquip(
   const wearKey = `${charKey}:${name}`;
   const firstWear = !data.系统._已首穿[wearKey];
   if (firstWear) data.系统._已首穿[wearKey] = true;
+  // v0.41 实物感（玩家反馈"道具不该无中生有"）：交付/取用必须有物理画面——
+  // 首穿=新带回来的东西亲手拿出来给她；复穿={{user}}从她的衣柜/妆台把那件东西翻出来
   queueItemEvent(
     data,
     charKey,
     firstWear
-      ? `{{user}}把新买的「${name}」交给她，让她换上（${item.槽位}；他第一次送她这样的东西）——本轮请演绎这次交付与她按当前阶段的反应，此后以服装/妆容细节变量为准持续体现新装扮`
-      : `{{user}}让她换上「${name}」（${item.槽位}）——此后以服装/妆容细节变量为准体现新装扮`,
+      ? `{{user}}把新买回来的「${name}」当面从包装里取出，亲手拿给她，让她换上（${item.槽位}；他第一次送她这样的东西）——本轮先给这个拿出实物、递到她手里的画面，再演绎她按当前阶段的反应，此后以服装/妆容细节变量为准持续体现新装扮`
+      : `{{user}}从她的衣柜或妆台里翻出那件「${name}」（${item.槽位}）递到她手里，让她换上——先给这个取物递物的实物动作一笔，此后以服装/妆容细节变量为准体现新装扮`,
   );
   console.info(`[网店] ${charKey} 装备「${name}」${firstWear ? '（首穿）' : ''}`);
   return { firstWear };
@@ -1773,9 +1775,14 @@ export function buyBodyMod(data: SchemaType, charKey: CharKey, name: string): st
   }
 
   // 改造事件（一次性，购买即唯一，无需额外幂等标记）；
-  // v0.23：加"在{{user}}的安排下"前缀，锚定改造是玩家推动的，不凭空发生
+  // v0.23 加"在{{user}}的安排下"锚定玩家推动；v0.41 升级为陪同施术完整正戏
+  // （玩家反馈"体改不该一笔带过，要演出带她去纹身店做的过程"，参考云霜凝道具事件的物理骨架）
   if (item.首穿) {
-    queueItemEvent(data, charKey, `在{{user}}的安排下，${item.首穿}`);
+    queueItemEvent(
+      data,
+      charKey,
+      `【体改·${name}】本轮必须完整上演：{{user}}亲自带她前往完成这次改造（场所按项目自然选择——纹身店/穿刺工作室/医院，出门的由头与时机贴合当前剧情）。全程实景地演：路上她的心态、店内施术过程她的真实反应、结束后归途上那点说不出口的变化。素材方向（按人设与阶段自然化用，不必照抄）：${item.首穿}。禁止一笔带过或用一句"已完成"转述`,
+    );
   }
   console.info(`[体改] ${charKey} 完成「${name}」-${item.价格} 堕落+${item.堕落度加成 ?? 0} (余${data.系统.货币})`);
   return null;
@@ -2004,9 +2011,21 @@ export function useConsumable(
   } else if (name === '安神药') {
     data[charKey]._越级加成 = 1;
     data[charKey]._越级加成至楼层 = currentFloor + 5;
+    // v0.41 实物感：原为纯静默改字段——药是实物，喂下去要有画面（不点破用意）
+    queueItemEvent(
+      data,
+      charKey,
+      `{{user}}寻了个自然的由头（睡前温水、一碗汤——由当前场景生成），亲手把那片安神药让她服了下去——本轮给取药、递药入口的实物动作一笔，不点破用意；此后几楼她整个人松弛得有些反常`,
+    );
   } else if (name === '头孢酒') {
     data[charKey]._越级加成 = 2;
     data[charKey]._越级加成至楼层 = currentFloor + 3;
+    // v0.41 实物感：同上，斟酒劝饮要有过程
+    queueItemEvent(
+      data,
+      charKey,
+      `{{user}}亲手斟了酒，用一个说得过去的名目劝她喝下——本轮演出取酒、斟酒、她饮下的过程，不点破用意；此后几楼她的意识门槛明显被泡软了`,
+    );
   } else if (name === '精心家宴') {
     // 苏文安抚类：她去执行，弹一楼安抚剧情（方向不定细节，角色无关原则）
     lowerSuspicion(data, charKey, 10);
