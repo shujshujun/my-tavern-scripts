@@ -130,6 +130,7 @@ import {
   buyEquipment,
   buyBodyMod,
   getConsumableCooldownLeft,
+  直写晋阶镜像,
   showTape,
   toggleEquip,
   toggleRecording,
@@ -297,6 +298,7 @@ async function shopAction(item: ShopItem) {
     }
     let err: string | null = null;
     let extra = '';
+    let mirrorAfterWrite = false;
     if (item.分类 === '特别') {
       if (ui.kind === 'buy') {
         err = buyCamera(d);
@@ -315,6 +317,7 @@ async function shopAction(item: ShopItem) {
     } else if (item.分类 === '体改') {
       err = buyBodyMod(d, key, item.名称);
       if (!err) extra = '，改造完成（永久）——下一轮她会有反应';
+      if (!err) mirrorAfterWrite = true; // v0.41：体改的堕落度加成进镜像，重roll不吞晋阶资格
     } else if (ui.kind === 'buy') {
       err = buyEquipment(d, key, item.名称);
     } else {
@@ -327,6 +330,7 @@ async function shopAction(item: ShopItem) {
       return;
     }
     await Mvu.replaceMvuData(vars, { type: 'message', message_id: -1 });
+    if (mirrorAfterWrite) 直写晋阶镜像(d);
     showMsg(`「${item.名称}」操作成功${extra}`, 'success');
   } catch (e) {
     console.error('[秦璐重置版] 网店操作失败', e);

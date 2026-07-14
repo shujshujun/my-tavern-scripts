@@ -1844,6 +1844,36 @@ export function getOutfitStars(data: SchemaType, charKey: CharKey): OutfitStars 
   return { lit, count, full: count === OUTFIT_STAR_SLOTS.length, route };
 }
 
+/** 晋阶/堕落镜像的 chat 变量键（0.38补引入阶段镜像；v0.41 扩展承载堕落度） */
+export const PROMOTE_MIRROR_KEY = '秦璐重置版_晋阶镜像';
+
+/**
+ * 晋阶/堕落镜像直写（v0.41，玩家实测"出售习惯攒够晋阶资格，重roll 后被打回"）：
+ * 当前阶段与堕落度都是单调状态——UI 侧抬升（手动晋阶/变卖·刻印腾位补转/体改）后
+ * 立即取大写进 chat 级镜像。重roll 楼时 MVU 从上一楼重建、内存快照又定格在 UI 操作
+ * 之前，两头都没有这次抬升；下次快照捕获会按镜像取大并回，堕落度不缩水，
+ * "阶段超前钳回"就不会把晋阶资格吞掉。楼层字段保留"回档到镜像前则作废"语义。
+ */
+export function 直写晋阶镜像(data: SchemaType): void {
+  try {
+    const pm = (_.get(getVariables({ type: 'chat' }), PROMOTE_MIRROR_KEY) as any) ?? {};
+    void insertOrAssignVariables(
+      {
+        [PROMOTE_MIRROR_KEY]: {
+          楼层: Math.max(pm.楼层 ?? 0, SillyTavern.chat?.length ?? 0),
+          秦璐: Math.max(pm.秦璐 ?? 1, data.秦璐状态?.当前阶段 ?? 1),
+          苏梦: Math.max(pm.苏梦 ?? 1, data.苏梦状态?.当前阶段 ?? 1),
+          秦璐堕落: Math.max(pm.秦璐堕落 ?? 0, data.秦璐状态?.堕落度 ?? 0),
+          苏梦堕落: Math.max(pm.苏梦堕落 ?? 0, data.苏梦状态?.堕落度 ?? 0),
+        },
+      },
+      { type: 'chat' },
+    );
+  } catch (e) {
+    console.error('[秦璐重置版] 晋阶镜像直写失败', e);
+  }
+}
+
 /**
  * 手动晋阶（v0.37 玩家反馈"阶段自动跃迁太快没感觉"）：堕落度越过下一阶段门槛后，
  * 由玩家在状态栏点击确认晋阶——一次一阶（跨两档点两次，各演一次转变），
