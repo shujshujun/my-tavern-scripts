@@ -9,11 +9,11 @@
         <div class="agenda-hint">……羊皮纸尚在展开(等待存档数据)……</div>
       </template>
 
-      <!-- ═══════════ 会议场景(整幅牧师会礼堂) ═══════════ -->
+      <!-- ═══════════ 会议场景(整幅牧师会礼堂;背景=Granet油画,公有领域) ═══════════ -->
       <template v-else-if="data.会议.状态 === '会议中'">
         <header class="codex-header">✦ 牧师会礼堂 · 修女会议 ✦</header>
 
-        <div class="meeting-body">
+        <div class="meeting-body" :style="{ '--meeting-bg': `url(${会议背景})` }">
           <!-- 选议程 -->
           <div v-if="!会议结果" class="agenda">
             <p class="agenda-hint">院规刻于石墙。神父可就其中一条,提出修订。</p>
@@ -52,6 +52,7 @@
                 :data-v="t.投票"
                 :style="{ animationDelay: i * 0.35 + 's' }"
               >
+                <span class="vote-portrait"><GI class="avatar-face" :i="修女头像[t.职位]" /></span>
                 <div class="vote-name">{{ t.显示名 }}</div>
                 <div class="vote-stance">{{ t.投票 }}</div>
               </div>
@@ -638,6 +639,9 @@ import 图天平 from './资源/界面/天平.svg?raw';
 import 图羽笔 from './资源/界面/羽笔.svg?raw';
 import 图地图 from './资源/界面/地图.svg?raw';
 import 图行囊 from './资源/界面/行囊.svg?raw';
+
+// 会议背景:Granet《嘉布遣会教堂唱诗班》(公有领域油画, Wikimedia Commons;base64 内联零网络)
+import 会议背景 from './资源/背景/礼拜堂集会.jpg?url';
 import 图展开 from './资源/界面/展开.svg?raw';
 import 图收拢 from './资源/界面/收拢.svg?raw';
 import 图心镜 from './资源/界面/心镜.svg?raw';
@@ -3282,12 +3286,27 @@ onMounted(() => {
 
 /* ── 会议 ── */
 
+/* 会议厅:Granet 油画垫底,上下暗纱压住画面让金字可读,金线画框 */
 .meeting-body {
   flex: 1 1 auto;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 2px 2px 6px;
+  padding: 14px 12px 16px;
+  border: 1px solid var(--line);
+  outline: 1px solid rgba(0, 0, 0, 0.9);
+  outline-offset: 2px;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(5, 4, 2, 0.88) 0%,
+      rgba(5, 4, 2, 0.55) 34%,
+      rgba(5, 4, 2, 0.62) 62%,
+      rgba(5, 4, 2, 0.9) 100%
+    ),
+    var(--meeting-bg) center 28% / cover no-repeat,
+    var(--void);
+  box-shadow: inset 0 0 70px rgba(0, 0, 0, 0.75);
   scrollbar-width: thin;
   scrollbar-color: var(--gold-deep) transparent;
 }
@@ -3297,32 +3316,44 @@ onMounted(() => {
   color: var(--bone-faded);
   text-align: center;
   margin: 4px 0 9px;
+  text-shadow: 0 1px 3px #000;
 }
 
+/* 议程条:法环横带(油画上的一列鎏金议案) */
 .agenda-item {
+  --btn-line: rgba(143, 129, 95, 0.45);
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 10px;
-  margin-bottom: 5px;
-  border: 1px solid var(--line-soft);
-  background: rgba(201, 169, 78, 0.04);
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  border: none;
+  background:
+    linear-gradient(90deg, transparent, var(--btn-line) 12%, var(--btn-line) 88%, transparent) bottom / 100% 1px
+      no-repeat,
+    linear-gradient(90deg, transparent, rgba(5, 4, 2, 0.78) 8%, rgba(5, 4, 2, 0.78) 92%, transparent);
   cursor: pointer;
   font-size: 0.85em;
   color: var(--bone);
+  text-shadow: 0 1px 2px #000;
   transition: all 0.25s ease;
 }
 
 .agenda-item:hover {
-  border-color: var(--line);
+  --btn-line: var(--line);
+  color: var(--gold-bright);
 }
 
 .agenda-item.chosen {
-  border-color: var(--gold);
-  background: rgba(201, 169, 78, 0.1);
-  box-shadow:
-    0 0 12px rgba(201, 169, 78, 0.25),
-    inset 0 0 10px rgba(201, 169, 78, 0.08);
+  --btn-line: var(--gold);
+  background:
+    linear-gradient(90deg, transparent, var(--btn-line) 8%, var(--btn-line) 92%, transparent) top / 100% 1px no-repeat,
+    linear-gradient(90deg, transparent, var(--btn-line) 8%, var(--btn-line) 92%, transparent) bottom / 100% 1px
+      no-repeat,
+    radial-gradient(ellipse 76% 150% at 50% 50%, rgba(189, 103, 7, 0.35), transparent 72%),
+    linear-gradient(90deg, transparent, rgba(5, 4, 2, 0.82) 8%, rgba(5, 4, 2, 0.82) 92%, transparent);
+  color: #f9c043;
+  text-shadow: 0 0 8px rgba(249, 192, 67, 0.5);
 }
 
 .agenda-item input {
@@ -3436,16 +3467,40 @@ onMounted(() => {
   opacity: 0.25;
 }
 
+/* 裁决横幅:菱形饰端 + 两端渐隐双线的敕令带 */
 .verdict-banner {
+  position: relative;
   text-align: center;
   font-family: var(--font-title);
   font-size: 1.05em;
   letter-spacing: 0.14em;
-  padding: 10px;
-  margin-bottom: 10px;
-  border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
+  padding: 12px 30px;
+  margin-bottom: 12px;
+  border: none;
+  background:
+    linear-gradient(90deg, transparent, var(--line) 10%, var(--line) 90%, transparent) top / 100% 1px no-repeat,
+    linear-gradient(90deg, transparent, var(--line) 10%, var(--line) 90%, transparent) bottom / 100% 1px no-repeat,
+    linear-gradient(90deg, transparent, rgba(5, 4, 2, 0.8) 8%, rgba(5, 4, 2, 0.8) 92%, transparent);
   text-shadow: 0 1px 2px #000;
+}
+
+.verdict-banner::before,
+.verdict-banner::after {
+  content: '◆';
+  position: absolute;
+  top: 50%;
+  transform: translateY(-52%) scale(0.62);
+  color: var(--gold);
+  opacity: 0.7;
+  font-size: 0.75em;
+}
+
+.verdict-banner::before {
+  left: 9px;
+}
+
+.verdict-banner::after {
+  right: 9px;
 }
 
 .verdict-banner.passed {
@@ -3477,12 +3532,53 @@ onMounted(() => {
   }
 }
 
+/* 投票席牌:版画肖像 + 暗底名牌;赞成燃金/反对渗红/弃权褪色 */
 .vote-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
   text-align: center;
-  padding: 7px 4px;
+  padding: 9px 4px 7px;
   border: 1px solid var(--line-soft);
-  background: rgba(201, 169, 78, 0.04);
+  background: linear-gradient(180deg, rgba(233, 209, 151, 0.06), transparent 40%), rgba(5, 4, 2, 0.72);
   color: var(--bone);
+}
+
+.vote-portrait {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  overflow: hidden;
+  border-radius: 50%;
+  color: var(--gold);
+  background: radial-gradient(circle at 38% 30%, #2e2512, var(--void-2) 68%);
+  border: 1px solid var(--line);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.6),
+    inset 0 0 10px rgba(0, 0, 0, 0.6);
+}
+
+.vote-portrait .avatar-face {
+  width: 100%;
+  height: 100%;
+}
+
+.vote-card[data-v='赞成'] .vote-portrait {
+  color: var(--gold-bright);
+  border-color: var(--gold);
+  box-shadow: 0 0 12px rgba(201, 169, 78, 0.5);
+}
+
+.vote-card[data-v='反对'] .vote-portrait {
+  color: var(--rubric);
+  border-color: var(--rubric);
+}
+
+.vote-card[data-v='弃权'] .vote-portrait {
+  opacity: 0.55;
 }
 
 /* 逐席揭示:烛光依次燃起 */

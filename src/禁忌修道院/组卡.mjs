@@ -218,7 +218,7 @@ const data = {
   scenario: '',
   first_mes: '【主页】',
   mes_example: '',
-  creator_notes: `禁忌修道院(重置版)v${版本} 内测组包。需酒馆助手(tavern_helper)启用。开局:0楼主页签署调令后自动进入到任之日。图标素材来自 game-icons.net(Lorc, Delapouite 等作者,CC BY 3.0);角色头像基于 DiceBear Lorelei(Lisa Wischofsky 原作,CC0 1.0)生成。`,
+  creator_notes: `禁忌修道院(重置版)v${版本} 内测组包。需酒馆助手(tavern_helper)启用。开局:0楼主页签署调令后自动进入到任之日。图标素材来自 game-icons.net(Lorc, Delapouite 等作者,CC BY 3.0);角色头像基于 DiceBear Lorelei(Lisa Wischofsky 原作,CC0 1.0)生成;会议背景为 Granet《嘉布遣会教堂唱诗班》(公有领域, Wikimedia Commons)。`,
   system_prompt: '',
   post_history_instructions: '',
   tags: ['禁忌修道院'],
