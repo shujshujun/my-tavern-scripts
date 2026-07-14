@@ -177,7 +177,7 @@ const INTERRUPT_MIRROR_KEY = '秦璐重置版_打断镜像';
 /** 晋阶镜像（v0.38补）：当前阶段是玩家手点的单调状态，与打断标记同类——毒快照/
  *  楼层重建等任何旧值路径都可能把它盖回去（玩家反馈"晋阶过一两楼被打回"）。
  *  chat 级镜像取大兜底；回档到镜像楼层之前则作废（回档重演语义）。UI 晋阶时同步直写。
- *  v0.41 扩展承载堕落度（键与直写助手统一从 shopSystem 导入） */
+ *  v0.40 扩展承载堕落度（键与直写助手统一从 shopSystem 导入） */
 
 function syncInterruptMirror(): void {
   if (!_protSnapshot?.系统) return;
@@ -193,7 +193,7 @@ function syncInterruptMirror(): void {
     if (pm && pm.楼层 <= floor) {
       snapQin.当前阶段 = Math.max(snapQin.当前阶段 ?? 1, pm.秦璐 ?? 1);
       snapMeng.当前阶段 = Math.max(snapMeng.当前阶段 ?? 1, pm.苏梦 ?? 1);
-      // v0.41：堕落度同为单调状态（变卖/刻印腾位补转、体改都在 UI 侧即时抬升）——
+      // v0.40：堕落度同为单调状态（变卖/刻印腾位补转、体改都在 UI 侧即时抬升）——
       // 重roll 楼 MVU 从上一楼重建、快照定格在操作前，两头都缺这次抬升；不取大恢复，
       // "阶段超前钳回"会按缩水的堕落度把晋阶资格吞掉（玩家实测：可晋"疯狂"重roll后退回"沉溺"）
       snapQin.堕落度 = Math.max(snapQin.堕落度 ?? 0, pm.秦璐堕落 ?? 0);

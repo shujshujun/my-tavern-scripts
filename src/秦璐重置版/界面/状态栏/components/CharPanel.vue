@@ -264,7 +264,7 @@ async function promoteUi() {
       return;
     }
     await Mvu.replaceMvuData(vars, { type: 'message', message_id: -1 });
-    // 晋阶镜像同步直写（v0.38补，v0.41 起含堕落度、逻辑收进 shopSystem 共享助手）：
+    // 晋阶镜像同步直写（v0.38补，v0.40 起含堕落度、逻辑收进 shopSystem 共享助手）：
     // 阶段/堕落度是玩家手点的单调状态，chat 级镜像兜底——即使脚本侧下一次快照捕获
     // 恰好读到坏数据/重roll重建数据，捕获时也会从镜像取大恢复
     直写晋阶镜像(d);
@@ -636,7 +636,7 @@ async function sellHabit(index: number) {
     d.系统.货币 += HABIT_SELL_PRICE;
     backfillMatureThoughts(d, key);
     await Mvu.replaceMvuData(vars, { type: 'message', message_id: -1 });
-    直写晋阶镜像(d); // v0.41：腾位补转抬升的堕落度进镜像，重roll不吞晋阶资格
+    直写晋阶镜像(d); // v0.40：腾位补转抬升的堕落度进镜像，重roll不吞晋阶资格
     showMsg(`变卖习惯 +${HABIT_SELL_PRICE}货币`, 'success');
   } catch (e) {
     console.error('[秦璐重置版] 变卖失败', e);
@@ -671,7 +671,7 @@ async function pinHabit(index: number) {
     d.系统._刻印名额 -= 1;
     backfillMatureThoughts(d, key); // 刻印同样腾出习惯位
     await Mvu.replaceMvuData(vars, { type: 'message', message_id: -1 });
-    直写晋阶镜像(d); // v0.41：腾位补转抬升的堕落度进镜像，重roll不吞晋阶资格
+    直写晋阶镜像(d); // v0.40：腾位补转抬升的堕落度进镜像，重roll不吞晋阶资格
     showMsg(`「${habit.内容}」已刻进她的本能`, 'success');
   } catch (e) {
     console.error('[秦璐重置版] 刻印失败', e);

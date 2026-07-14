@@ -1844,11 +1844,11 @@ export function getOutfitStars(data: SchemaType, charKey: CharKey): OutfitStars 
   return { lit, count, full: count === OUTFIT_STAR_SLOTS.length, route };
 }
 
-/** 晋阶/堕落镜像的 chat 变量键（0.38补引入阶段镜像；v0.41 扩展承载堕落度） */
+/** 晋阶/堕落镜像的 chat 变量键（0.38补引入阶段镜像；v0.40 扩展承载堕落度） */
 export const PROMOTE_MIRROR_KEY = '秦璐重置版_晋阶镜像';
 
 /**
- * 晋阶/堕落镜像直写（v0.41，玩家实测"出售习惯攒够晋阶资格，重roll 后被打回"）：
+ * 晋阶/堕落镜像直写（v0.40，玩家实测"出售习惯攒够晋阶资格，重roll 后被打回"）：
  * 当前阶段与堕落度都是单调状态——UI 侧抬升（手动晋阶/变卖·刻印腾位补转/体改）后
  * 立即取大写进 chat 级镜像。重roll 楼时 MVU 从上一楼重建、内存快照又定格在 UI 操作
  * 之前，两头都没有这次抬升；下次快照捕获会按镜像取大并回，堕落度不缩水，
