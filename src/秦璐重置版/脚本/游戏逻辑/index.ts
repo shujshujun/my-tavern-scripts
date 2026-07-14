@@ -95,6 +95,31 @@ function getLastAiMessage(): string {
 }
 
 /**
+ * 从末楼往前找最近一楼含有效 stat_data 的楼层数据（上限回溯 10 楼）。
+ * v0.40（玩家实测 0.39 上晋阶下一楼仍偶发被打回）：0.38 的"缺失即跳过、保留旧快照"
+ * 在 PROMPT_READY 有残余窗口——MVU 往刚发送的用户楼拷贝变量是**异步**的，与提示词
+ * 构建存在竞态；竞态时读 -1 楼为空，保留的旧快照定格在晋阶/购买/刻印**之前**，
+ * 本轮回滚就把它们连同堕落度一起盖回（堕落度缩水再触发"阶段超前钳回"）。
+ * 而上一楼（含全部 UI 写入）就是真值——走回退拿它：快照恒新鲜，注入也不再丢轮。
+ * 找不到（全新对话等）才返回 undefined，由调用方跳过。
+ */
+function 读最近有效stat(): unknown {
+  const last = (SillyTavern.chat?.length ?? 0) - 1;
+  for (let id = last; id >= 0 && id > last - 10; id--) {
+    try {
+      const raw = _.get(Mvu.getMvuData({ type: 'message', message_id: id }), 'stat_data');
+      if (raw && !_.isEmpty(raw)) {
+        if (id !== last) console.info(`[秦璐重置版] 末楼 stat_data 未就绪，回退取 ${id} 楼数据（末楼 ${last}）`);
+        return raw;
+      }
+    } catch {
+      /* 单楼读取异常继续往前找 */
+    }
+  }
+  return undefined;
+}
+
+/**
  * 捕获硬保护快照（脚本管理字段的当前值）
  * 在 CHAT_COMPLETION_PROMPT_READY 末尾从最新消息数据捕获
  */
@@ -895,14 +920,12 @@ $(() => {
       _isInAiCycle = true;
       try {
         const messageId = getCurrentFloor();
-        const vars = Mvu.getMvuData({ type: 'message', message_id: -1 });
-        // v0.38 毒快照防御（玩家实测"状态栏突然初始化，仅习惯/念头幸存"）：
-        // stat_data 偶发缺失时 parse({}) 会凭空造全默认值数据——被捕获成保护快照后，
-        // 下一轮回滚就把初始数值盖回去（习惯/念头列表回滚从不整体覆盖，恰好幸存）。
-        // 缺失即跳过本轮捕获与注入，沿用上一轮的真快照
-        const rawStat = _.get(vars, 'stat_data');
-        if (!rawStat || _.isEmpty(rawStat)) {
-          console.warn('[秦璐重置版] PROMPT_READY: stat_data 缺失，跳过本轮快照捕获与注入（保留旧快照）');
+        // v0.38 毒快照防御：绝不 parse({}) 造默认值；v0.40 升级：末楼缺失（MVU 异步拷贝
+        // 用户楼的竞态窗口）不再"跳过保留旧快照"，而是往前回退取最近有效楼层——
+        // 快照恒新鲜（含晋阶/购买/刻印等 UI 写入），快照注入也不再丢轮
+        const rawStat = 读最近有效stat();
+        if (!rawStat) {
+          console.warn('[秦璐重置版] PROMPT_READY: 近 10 楼均无 stat_data，跳过本轮快照捕获与注入（保留旧快照）');
           return;
         }
         const data = Schema.parse(rawStat) as SchemaType;
@@ -983,8 +1006,8 @@ $(() => {
             // 它含快照之后的 UI 写入，比内存快照新；此刻 MVU 尚未写回，读到的是重处理前真值。
             // 读不到（缺失/解析失败）才退回内存快照（v0.37补原逻辑）
             try {
-              const 真值 = _.get(Mvu.getMvuData({ type: 'message', message_id: -1 }), 'stat_data');
-              if (真值 && !_.isEmpty(真值)) captureProtectionSnapshot(Schema.parse(真值) as SchemaType);
+              const 真值 = 读最近有效stat();
+              if (真值) captureProtectionSnapshot(Schema.parse(真值) as SchemaType);
             } catch (e) {
               console.warn('[秦璐重置版] 重处理恢复：读当前楼真值失败，退回内存快照', e);
             }
@@ -1184,12 +1207,11 @@ $(() => {
     eventOn(tavern_events.MESSAGE_RECEIVED, async () => {
       try {
         // 刷新保护快照（AI 回复后数据已落地）
-        const messageId = getCurrentFloor();
-        const vars = Mvu.getMvuData({ type: 'message', message_id: -1 });
-        // v0.38 毒快照防御：MESSAGE_RECEIVED 可能先于 MVU 落数据（竞态）——缺失就不刷新，保留旧快照
-        const rawStat = _.get(vars, 'stat_data');
-        if (!rawStat || _.isEmpty(rawStat)) {
-          console.warn('[秦璐重置版] MESSAGE_RECEIVED: stat_data 缺失，跳过快照刷新（保留旧快照）');
+        // v0.38 毒快照防御 + v0.40 回退取楼：MESSAGE_RECEIVED 可能先于 MVU 落数据（竞态），
+        // 末楼缺失时回退到上一有效楼（与 PROMPT_READY 快照等值，无害且不再依赖旧内存快照）
+        const rawStat = 读最近有效stat();
+        if (!rawStat) {
+          console.warn('[秦璐重置版] MESSAGE_RECEIVED: 近 10 楼均无 stat_data，跳过快照刷新（保留旧快照）');
           return;
         }
         const data = Schema.parse(rawStat) as SchemaType;
