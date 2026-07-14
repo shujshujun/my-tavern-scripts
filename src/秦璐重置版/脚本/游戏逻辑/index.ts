@@ -966,8 +966,28 @@ $(() => {
           console.warn('[秦璐重置版] VARIABLE_UPDATE_ENDED: stat_data 缺失，跳过处理');
           return;
         }
+        // v0.39 修根（玩家实测"货币下轮回来 / 刻印下一楼就消失"）：
+        // MVU 对玩家刚发送的用户楼（MESSAGE_SENT）也会跑一遍变量处理并无条件触发本事件——
+        // 用户楼变量本就是 MVU 刚从上一楼（含全部 UI 写入）拷贝的真值，既不该被
+        // v0.37补的"按快照恢复"用定格在上一轮 MESSAGE_RECEIVED 的旧快照盖回
+        // （购买扣款/刻印/晋阶全晚于快照，一发消息就被回滚并顺着传给下一楼；
+        // 0.38"晋阶被打回"的根因同此，镜像是治标），也不该在事件迟到时被当成
+        // AI 楼推进引擎。末楼是用户楼 = MESSAGE_SENT 路径，一律放行
+        {
+          const 末楼 = SillyTavern.chat?.[SillyTavern.chat.length - 1];
+          if (末楼?.is_user) return;
+        }
         if (!_isInAiCycle) {
           if (_protSnapshot) {
+            // 手动"重新处理变量"（末楼=AI楼）：恢复源优先取该楼当前（重建前）的变量——
+            // 它含快照之后的 UI 写入，比内存快照新；此刻 MVU 尚未写回，读到的是重处理前真值。
+            // 读不到（缺失/解析失败）才退回内存快照（v0.37补原逻辑）
+            try {
+              const 真值 = _.get(Mvu.getMvuData({ type: 'message', message_id: -1 }), 'stat_data');
+              if (真值 && !_.isEmpty(真值)) captureProtectionSnapshot(Schema.parse(真值) as SchemaType);
+            } catch (e) {
+              console.warn('[秦璐重置版] 重处理恢复：读当前楼真值失败，退回内存快照', e);
+            }
             const restored = Schema.parse(rawStat) as SchemaType;
             rollbackProtectedFields(restored);
             _.set(新变量, 'stat_data', restored);
