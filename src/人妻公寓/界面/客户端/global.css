@@ -1,50 +1,83 @@
-/* 人妻公寓客户端 - 日式小清新(奶油纸底 × 樱粉 × 天青 × 原木;2026-07-16 用户定调换掉暗色暮调) */
+/* 人妻公寓客户端 - 学マス系流行日系(2026-07-16 用户给样:初星育成前端;
+   语法=暖白渐变底+格纸纹理/玻璃白卡大圆角软影/荧光粉·天蓝·柠黄点色/mono kicker 小标) */
 
 :root {
-  /* 扁平日系(参考图定调:白色圆角框浮在明亮天蓝底上,赛璐璐平涂) */
-  --frame-bg: #63bfe8; /* 画框外的亮蓝底 */
-  --paper-bg: #f6fbfe; /* 页面底:近白的天光 */
-  --paper-card: #ffffff;
-  --cream: #fff9ef; /* 正文阅读区暖白 */
-  --ink: #4a4544;
-  --ink-soft: #8b8582;
-  --ink-faint: #bab3ae;
-  /* 点色(樱粉/天青/叶绿/原木/晒衣白) */
-  --sakura: #f0839f;
-  --sakura-soft: #fbd3dd;
-  --sky: #3ea7d7;
-  --sky-soft: #d8effa;
-  --leaf: #8fc08a;
-  --wood: #d8b48c;
-  --wood-deep: #a97f52;
-  --amber: #f2b64f; /* 窗灯 */
-  /* 描边与投影(扁平风:细描边+浅投影) */
-  --line: rgba(74, 69, 68, 0.22);
-  --line-soft: rgba(74, 69, 68, 0.1);
-  --card-shadow: 0 3px 12px rgba(63, 132, 170, 0.16);
-  --font-body: 'Noto Serif SC', 'Source Han Serif SC', 'STSong', serif;
+  color-scheme: light;
+  /* 墨(近黑紫灰,初星同款) */
+  --ink: #242126;
+  --ink-soft: #5f5b66;
+  --ink-faint: #8b8794;
+  /* 底与卡 */
+  --white: #fffefd;
+  --glass: rgba(255, 255, 255, 0.88);
+  --paper-card: #fffefd;
+  --cream: #fffaf2;
+  /* 点色(初星六色取四,粉为主) */
+  --pink: #ff4f9a;
+  --pink-soft: #ffd7e7;
+  --blue: #26a9f4;
+  --blue-soft: #d9effc;
+  --yellow: #ffca35;
+  --green: #20dfad;
+  --red: #e5533f;
+  --violet: #8c73ff;
+  /* 描边/投影/圆角 */
+  --line: rgba(41, 35, 44, 0.14);
+  --line-soft: rgba(41, 35, 44, 0.08);
+  --shadow: 0 14px 38px rgba(30, 26, 38, 0.18);
+  --card-shadow: 0 4px 16px rgba(30, 26, 38, 0.1);
+  --radius: 14px;
+  --font-body: 'Noto Sans SC', 'Source Han Sans SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
+  --font-prose: 'Noto Serif SC', 'Source Han Serif SC', 'STSong', serif; /* 正文卷轴仍用衬线,小说质感 */
+  --font-mono: 'Fira Code', 'SFMono-Regular', Consolas, monospace;
 
-  /* ── 兼容旧 token(值映射到新调色盘,漏改处不至于穿帮) ── */
-  --dusk: #f6fbfe;
-  --dusk-2: #eaf5fb;
-  --panel: #ffffff;
-  --panel-lit: #fff4f6;
-  --lamp: #d98f3f;
+  /* ── 兼容旧 token(值映射,漏改处不穿帮) ── */
+  --frame-bg: #f2f7ff;
+  --paper-bg: #fffdf9;
+  --sakura: #ff4f9a;
+  --sakura-soft: #ffd7e7;
+  --sky: #26a9f4;
+  --sky-soft: #d9effc;
+  --leaf: #23bf95;
+  --wood: #e6c391;
+  --wood-deep: #b98f58;
+  --amber: #ffca35;
+  --dusk: #fffdf9;
+  --dusk-2: #f2f7ff;
+  --panel: #fffefd;
+  --panel-lit: #fff2f7;
+  --lamp: #e08f2e;
   --lamp-bright: #b06f22;
-  --lamp-deep: #ecd3ae;
-  --paper: #4a4544;
-  --paper-faded: #8b8582;
-  --seal: #e06a60;
-  --verdigris: #4f9482;
+  --lamp-deep: #f4dcae;
+  --paper: #242126;
+  --paper-faded: #5f5b66;
+  --seal: #e5533f;
+  --verdigris: #23bf95;
 }
 
 html,
 body {
   margin: 0;
   padding: 0;
-  background: var(--paper-bg);
   color: var(--ink);
   font-family: var(--font-body);
+  background:
+    radial-gradient(circle at 18% 8%, rgba(255, 79, 154, 0.16), transparent 30%),
+    radial-gradient(circle at 84% 4%, rgba(38, 169, 244, 0.18), transparent 32%),
+    linear-gradient(135deg, #fff7f0 0%, #f2f7ff 48%, #fff6dd 100%);
+}
+
+/* 格纸纹理(初星签名细节:细白网格,向下淡出) */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.4) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.3) 1px, transparent 1px);
+  background-size: 36px 36px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.6), transparent 65%);
 }
 
 #app {

@@ -44,7 +44,7 @@
       },
       "regex_scripts": [
         {
-          "id": "5fb54e38-b75a-4713-b137-e09976d98839",
+          "id": "e7d8b118-3045-42a9-b61f-d92d8953e321",
           "scriptName": "客户端界面(吞正文)",
           "findRegex": "/^[\\s\\S]*<StatusPlaceHolderImpl\\/>[\\s\\S]*$/",
           "replaceString": "```\n<body>\n<script>\n$('body').load('https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.02/dist/人妻公寓/界面/客户端/index.html')\n</script>\n</body>\n```",
@@ -61,7 +61,7 @@
           "maxDepth": null
         },
         {
-          "id": "99d3bb3f-672c-4b77-af2b-9c905aca9c70",
+          "id": "3e4dc36c-0064-4647-969e-3858d4a3d459",
           "scriptName": "[不显示]玩家楼层(输入走游戏内)",
           "findRegex": "/^[\\s\\S]*$/",
           "replaceString": "",
@@ -78,7 +78,7 @@
           "maxDepth": null
         },
         {
-          "id": "67515289-2b0c-406f-8cd8-b8ed00f56c68",
+          "id": "6150450f-5319-43d6-94f8-57d9fd460539",
           "scriptName": "[不发送]去除变量更新与占位符",
           "findRegex": "/<UpdateVariable>[\\s\\S]*?<\\/UpdateVariable>|<StatusPlaceHolderImpl\\/>/g",
           "replaceString": "",
@@ -95,7 +95,7 @@
           "maxDepth": null
         },
         {
-          "id": "9ad61ad7-55c1-49b4-b926-c0a01a57945c",
+          "id": "720ca4c5-96f0-4190-aafb-fd9a50fde7ca",
           "scriptName": "[不显示]隐藏变量更新与协议标签",
           "findRegex": "/<UpdateVariable>[\\s\\S]*?<\\/UpdateVariable>|<options>[\\s\\S]*?<\\/options>|<行为等级>[\\s\\S]*?<\\/行为等级>/g",
           "replaceString": "",
@@ -118,7 +118,7 @@
             "type": "script",
             "enabled": true,
             "name": "MVU",
-            "id": "427f0156-8f2e-49f9-bfd9-f528f0b48ed5",
+            "id": "4be8fc14-d650-478c-adba-c745858c7726",
             "info": "",
             "button": {
               "enabled": true,
@@ -156,7 +156,7 @@
             "type": "script",
             "enabled": true,
             "name": "人妻公寓游戏逻辑",
-            "id": "a8ee962d-5b55-43f3-b1e2-d6d0bc009e7a",
+            "id": "e6cb9f84-1f1f-4fd2-a4e8-0f28f3a64151",
             "info": "构建产物,源码见仓库 src/人妻公寓/脚本/游戏逻辑",
             "button": {
               "enabled": true,
