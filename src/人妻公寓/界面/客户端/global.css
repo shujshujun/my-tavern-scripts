@@ -30,6 +30,7 @@
   --font-body: 'Noto Sans SC', 'Source Han Sans SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
   --font-prose: 'Noto Serif SC', 'Source Han Serif SC', 'STSong', serif; /* 正文卷轴仍用衬线,小说质感 */
   --font-mono: 'Fira Code', 'SFMono-Regular', Consolas, monospace;
+  --font-display: 'DIN Alternate', 'Bahnschrift', 'Arial Rounded MT Bold', var(--font-body); /* 数字展示字体(初星同款) */
 
   /* ── 兼容旧 token(值映射,漏改处不穿帮) ── */
   --frame-bg: #f2f7ff;

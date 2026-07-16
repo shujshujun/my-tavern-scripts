@@ -5,8 +5,8 @@
       <div v-if="错误信息" class="err">⚠︎ 界面异常:{{ 错误信息 }}</div>
 
       <!-- 主题切换(日间亮色/夜间深色;地图插画自带昼夜不受影响) -->
-      <button class="btn mini theme-btn" :title="暗色 ? '切回日间模式' : '切换夜间模式'" @click="切换主题">
-        {{ 暗色 ? '☀' : '🌙' }}
+      <button class="btn mini icon theme-btn" :title="暗色 ? '切回日间模式' : '切换夜间模式'" @click="切换主题">
+        <Ic :n="暗色 ? 'sun' : 'moon'" />
       </button>
 
       <!-- ═══════════ 数据未就绪 ═══════════ -->
@@ -27,27 +27,32 @@
         </div>
       </template>
 
-      <!-- ═══════════ 序章:难度三档卡(开局流程①) ═══════════ -->
+      <!-- ═══════════ 序章开屏(初星 launch-screen 语法:hero 渐变视觉板 + 模式列表) ═══════════ -->
       <template v-else-if="!data.系统._序章完成">
-        <div class="ui-kicker center">WUTONGLI APARTMENT / NEW GAME</div>
-        <header class="masthead">人 妻 公 寓</header>
-        <p class="hint center">父亲把楼交给你之前,先看看他的心情——</p>
-        <div class="diff-row">
+        <div class="launch-visual">
+          <div class="ui-kicker light">WUTONGLI APARTMENT / PRODUCED BY DAD</div>
+          <h1>人妻公寓</h1>
+          <p>十六把钥匙,六户人家,一栋楼的关起门来。<br />父亲的考验,今天开始。</p>
+        </div>
+        <div class="launch-modes">
+          <div class="ui-kicker">SELECT DIFFICULTY / 先看看父亲的心情</div>
           <button
             v-for="档 in 难度卡"
             :key="档.名称"
-            class="diff-card"
+            class="mode-item"
             :class="{ chosen: 选中难度 === 档.名称 }"
             @click="选中难度 = 档.名称"
           >
-            <b class="diff-name">{{ 档.名称 }}</b>
-            <span class="diff-desc">{{ 档.说明 }}</span>
-            <span class="diff-meta">起步资金 ¥{{ 档.起始资金 }}</span>
+            <span class="mode-main">
+              <b>{{ 档.名称 }}</b>
+              <small>{{ 档.说明 }}</small>
+            </span>
+            <span class="mode-meta">¥{{ 档.起始资金 }}</span>
+          </button>
+          <button class="btn rite" :disabled="!选中难度 || 发送中" @click="开始考验">
+            {{ 发送中 ? '电话接通中……' : '接起父亲的电话' }}
           </button>
         </div>
-        <button class="btn rite" :disabled="!选中难度 || 发送中" @click="开始考验">
-          {{ 发送中 ? '电话接通中……' : '接起父亲的电话' }}
-        </button>
         <p class="heartbeat" :class="{ dead: !脚本存活 }">
           {{ 脚本存活 ? '✓ 游戏逻辑脚本心跳正常' : '✗ 未检测到游戏逻辑脚本(请确认脚本已启用)' }}
         </p>
@@ -59,20 +64,28 @@
         <header class="masthead">人 妻 公 寓</header>
 
         <div class="meta-row">
-          <span title="现金">¥ {{ data.现金 }}</span>
-          <span :title="'胜任度 ' + data.胜任度 + ':父亲对你管楼的评价'" :class="{ hot: data.胜任度 <= 40 }"
-            >任 {{ data.胜任度 }}</span
+          <span class="stat" title="现金"><small>现金</small><b>¥{{ data.现金 }}</b></span>
+          <span class="stat" :title="'胜任度:父亲对你管楼的评价'" :class="{ hot: data.胜任度 <= 40 }"
+            ><small>胜任</small><b>{{ data.胜任度 }}</b></span
           >
-          <span :title="'风闻 ' + data.风闻 + ':楼里的闲话'" :class="{ hot: data.风闻 >= 50 }">闻 {{ data.风闻 }}</span>
-          <span :title="'第 ' + 天数 + ' 天'">第{{ 天数 }}天·{{ 时段 }}</span>
+          <span class="stat" :title="'风闻:楼里的闲话'" :class="{ hot: data.风闻 >= 50 }"
+            ><small>风闻</small><b>{{ data.风闻 }}</b></span
+          >
+          <span class="stat" :title="'第 ' + 天数 + ' 天'"
+            ><small>第{{ 天数 }}天</small><b>{{ 时段 }}</b></span
+          >
           <span class="meta-btns">
-            <button class="btn mini" :title="全屏中 ? '退出全屏' : '沉浸全屏'" @click="切换全屏">
-              {{ 全屏中 ? '⇲' : '⇱' }}
+            <button class="btn mini icon" title="网购商城,次日达到管理员室" @click="显示商店 = true">
+              <Ic n="cart" />商店
             </button>
-            <button class="btn mini" title="网购商城,次日达到管理员室" @click="显示商店 = true">商店</button>
-            <button v-if="背包列表.length" class="btn mini" @click="显示背包 = true">背包</button>
-            <button v-if="监控列表.length" class="btn mini" title="你装下的眼睛" @click="显示监控 = true">监控</button>
-            <button class="btn mini" title="完整往事与回档" @click="显示史册 = true">史册</button>
+            <button v-if="背包列表.length" class="btn mini icon" @click="显示背包 = true"><Ic n="bag" />背包</button>
+            <button v-if="监控列表.length" class="btn mini icon" title="你装下的眼睛" @click="显示监控 = true">
+              <Ic n="cctv" />监控
+            </button>
+            <button class="btn mini icon" title="完整往事与回档" @click="显示史册 = true"><Ic n="book" />史册</button>
+            <button class="btn mini icon" :title="全屏中 ? '退出全屏' : '沉浸全屏'" @click="切换全屏">
+              <Ic n="expand" />
+            </button>
           </span>
         </div>
 
@@ -137,8 +150,8 @@
         <div class="scene-bar">
           <span class="scene-name">{{ 当前房间名 || '楼道里' }}</span>
           <span class="scene-occ">{{ 当前房间 ? 房内名单 || '此刻没有别人' : '该去敲谁的门?' }}</span>
-          <button class="btn" :disabled="发送中" @click="显示地图 = true">地图</button>
-          <button v-if="当前房间" class="btn" :disabled="发送中" @click="离开房间">离开</button>
+          <button class="btn icon" :disabled="发送中" @click="显示地图 = true"><Ic n="map" />地图</button>
+          <button v-if="当前房间" class="btn icon" :disabled="发送中" @click="离开房间"><Ic n="exit" />离开</button>
         </div>
 
         <!-- 偷窥余像:"你注意到了什么?"(摄像头渠道,选对收进线索板) -->
@@ -239,7 +252,8 @@
               <p class="rc-mood">{{ 房卡氛围 }}</p>
               <div class="rc-acts">
                 <button v-for="(动作, i) in 房卡动作" :key="i" class="act-btn" :class="动作.类" @click="动作.做()">
-                  {{ 动作.文案 }}
+                  <span class="act-kicker">{{ 动作.kicker }}</span>
+                  <strong>{{ 动作.文案 }}</strong>
                 </button>
                 <span v-if="!房卡动作.length" class="rc-empty">门上贴着招租启事,还没有住户</span>
               </div>
@@ -257,8 +271,13 @@
           <button class="sheet-close" @click="选中门牌 = null">✕</button>
           <div class="dossier-head">
             <span class="avatar-glyph big">{{ 选中档案.妻名[0] }}</span>
-            <span class="dossier-name">{{ 选中档案.妻名 }}</span>
-            <span class="dossier-role">{{ 选中档案.门牌 }} 室</span>
+            <span class="dossier-id">
+              <span class="dossier-name">{{ 选中档案.妻名 }}</span>
+              <span class="hearts" :title="'阶段:' + 选中档案.妻.阶段标题">
+                <i v-for="n in 5" :key="n" :class="{ on: n <= 选中档案.妻.当前阶段 }">♥</i>
+              </span>
+            </span>
+            <span class="dossier-role">ROOM {{ 选中档案.门牌 }}</span>
             <span class="dossier-stage">「{{ 选中档案.妻.阶段标题 }}」</span>
           </div>
 
@@ -478,11 +497,32 @@
 </template>
 
 <script setup lang="ts">
+import type { FunctionalComponent } from 'vue';
+
 import type { SchemaType } from '../../schema';
 import { 户静态表, 查房间, 查裂缝, 查道具, 道具表, 门牌列表, 难度表, type 门牌 } from '../../stageConfig';
 import { 丈夫状态推算, 妻位置推算, 当前天数, 当前时段 } from '../../脚本/游戏逻辑/楼层时钟';
 import { 可晋阶 } from '../../脚本/游戏逻辑/结算系统';
 import { useDataStore } from './store';
+
+// ── 描边线条图标(初星 icon-sprite 语法:24×24 stroke=currentColor;feather 风手写路径) ──
+
+const 图标库: Record<string, string> = {
+  cart: '<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/>',
+  bag: '<path d="M6 7h12l1 14H5L6 7Z"/><path d="M9 7a3 3 0 0 1 6 0"/>',
+  cctv: '<path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2"/>',
+  book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5Z"/>',
+  map: '<path d="m9 18-6 3V6l6-3 6 3 6-3v15l-6 3-6-3Z"/><path d="M9 3v15"/><path d="M15 6v15"/>',
+  expand: '<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
+  exit: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/>',
+  phone: '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>',
+};
+
+const Ic: FunctionalComponent<{ n: string }> = props =>
+  h('svg', { class: 'ic', viewBox: '0 0 24 24', innerHTML: 图标库[props.n] ?? '' });
+Ic.props = ['n'];
 
 const store = useDataStore();
 // defineMvuDataStore 的 Pinia 泛型在 SFC 里推断失败(已知误报,见 ShopPanel 先例),显式标回
@@ -619,6 +659,7 @@ function 敲撬门(房间id: string) {
 }
 
 interface 卡动作 {
+  kicker: string;
   文案: string;
   类?: string;
   做: () => void;
@@ -633,11 +674,12 @@ const 房卡动作 = computed<卡动作[]>(() => {
   if (房?.类型 === '户' && id !== '302') {
     if (!data.value.户[id]) return []; // 招租中,没有可做的事
     if (房内有人在(id)) {
-      动作.push({ 文案: `🚪 过去串门`, 做: () => 进入(id) });
+      动作.push({ kicker: 'VISIT', 文案: '过去串门', 做: () => 进入(id) });
     } else {
-      动作.push({ 文案: '🚪 敲敲门(没人应也站一会儿)', 做: () => 进入(id) });
+      动作.push({ kicker: 'KNOCK', 文案: '敲敲门(没人应也站一会儿)', 做: () => 进入(id) });
       动作.push({
-        文案: 破门目标.value === id && 破门数.value > 0 ? `🔓 撬门中……再点 ${6 - 破门数.value} 下` : '🔓 撬门(连点)',
+        kicker: 'BREAK IN',
+        文案: 破门目标.value === id && 破门数.value > 0 ? `撬门中……再点 ${6 - 破门数.value} 下` : '撬门(连点)',
         类: 'risky',
         做: () => 敲撬门(id),
       });
@@ -646,16 +688,17 @@ const 房卡动作 = computed<卡动作[]>(() => {
   }
 
   if (id === '302') {
-    动作.push({ 文案: '🏠 回家看看', 做: () => 进入(id) });
+    动作.push({ kicker: 'HOME', 文案: '回家看看', 做: () => 进入(id) });
     return 动作;
   }
 
   // 公共区
-  动作.push({ 文案: '👣 走过去', 做: () => 进入(id) });
+  动作.push({ kicker: 'GO', 文案: '走过去', 做: () => 进入(id) });
   if (id === '垃圾房') {
     for (const 袋 of 垃圾袋列表.value) {
       动作.push({
-        文案: `🗑 翻${袋.妻名}家的垃圾袋(${袋.门牌})`,
+        kicker: 'SEARCH',
+        文案: `翻${袋.妻名}家的垃圾袋(${袋.门牌})`,
         类: 'risky',
         做: () => {
           if (当前房间.value !== '垃圾房') 进入('垃圾房', false, true); // 人先走过去,地图和卡都不收
@@ -2974,6 +3017,239 @@ onUnmounted(() => {
   top: 6px;
   right: 8px;
   z-index: 20;
+}
+
+/* ═══ 描边图标(初星 icon-sprite 语法:24×24 线条,吃 currentColor) ═══ */
+
+.ic {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vertical-align: -2px;
+}
+
+.btn.icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ═══ 开屏(初星 launch-screen:hero 三色渐变视觉板 + 模式列表) ═══ */
+
+.launch-visual {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 148px;
+  padding: 18px 20px 16px;
+  margin-bottom: 10px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  color: #fff;
+  background:
+    linear-gradient(180deg, rgba(20, 22, 30, 0.12), rgba(20, 22, 30, 0.65)),
+    linear-gradient(130deg, #ff8ab9, #4ab7ff 46%, #ffd24f);
+}
+
+.launch-visual h1 {
+  margin: 4px 0 6px;
+  font-size: clamp(26px, 7vw, 38px);
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  line-height: 1.05;
+  text-shadow: 0 2px 10px rgba(20, 22, 30, 0.35);
+}
+
+.launch-visual p {
+  margin: 0;
+  font-size: 0.78em;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.ui-kicker.light {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.launch-modes {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 13px;
+  border-radius: 18px;
+  background: var(--glass);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: var(--card-shadow);
+}
+
+.mode-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 12px;
+  font-family: inherit;
+  text-align: left;
+  color: var(--ink);
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+
+.mode-item:hover {
+  transform: translateY(-1px);
+  border-color: rgba(38, 169, 244, 0.55);
+  box-shadow: 0 6px 16px rgba(38, 169, 244, 0.18);
+}
+
+.mode-item.chosen {
+  border-color: rgba(255, 79, 154, 0.65);
+  box-shadow: 0 8px 20px rgba(255, 79, 154, 0.25);
+  background: #fff6f9;
+}
+
+.mode-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.mode-main b {
+  font-size: 0.92em;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.mode-item.chosen .mode-main b {
+  color: var(--pink);
+}
+
+.mode-main small {
+  font-size: 0.72em;
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
+
+.mode-meta {
+  font-family: var(--font-display);
+  font-size: 0.86em;
+  color: var(--blue);
+}
+
+/* ═══ 状态瓦片(初星 status card:小灰标 + 展示字体数值) ═══ */
+
+.stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 2px 10px;
+  border: 1px solid var(--line-soft);
+  background: #fff;
+  border-radius: 999px;
+}
+
+.stat small {
+  font-size: 0.66em;
+  color: var(--ink-faint);
+  font-weight: 700;
+}
+
+.stat b {
+  font-family: var(--font-display);
+  font-size: 0.84em;
+  color: var(--ink);
+}
+
+.stat.hot {
+  border-color: var(--red);
+}
+
+.stat.hot b {
+  color: var(--red);
+}
+
+/* ═══ 动作按钮 kicker 结构(初星 hotspot 语法) ═══ */
+
+.act-btn {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.act-kicker {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.act-btn.risky .act-kicker {
+  color: var(--red);
+  opacity: 0.75;
+}
+
+.act-btn strong {
+  font-weight: 600;
+}
+
+/* ═══ 阶段爱心条(初星 affinity-hearts) ═══ */
+
+.dossier-id {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.hearts {
+  display: inline-flex;
+  gap: 2px;
+  font-size: 0.7em;
+}
+
+.hearts i {
+  font-style: normal;
+  color: rgba(36, 33, 38, 0.16);
+  transition: color 0.3s;
+}
+
+.hearts i.on {
+  color: var(--pink);
+  text-shadow: 0 0 6px rgba(255, 79, 154, 0.4);
+}
+
+/* ═══ 新元素的夜间覆盖 ═══ */
+
+:global(html.rq-dark) .stat,
+:global(html.rq-dark) .mode-item {
+  background: #2c2e40;
+}
+
+:global(html.rq-dark) .mode-item.chosen {
+  background: rgba(255, 79, 154, 0.14);
+}
+
+:global(html.rq-dark) .launch-modes {
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+:global(html.rq-dark) .hearts i {
+  color: rgba(255, 255, 255, 0.14);
+}
+
+:global(html.rq-dark) .hearts i.on {
+  color: var(--pink);
 }
 
 /* ═══ 夜间模式:scoped 里写死的浅色逐条覆盖(token 部分已在 global.css 换) ═══
