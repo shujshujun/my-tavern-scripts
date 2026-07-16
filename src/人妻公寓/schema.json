@@ -1,0 +1,241 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "户": {
+      "default": {},
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "default": {},
+        "type": "object",
+        "properties": {
+          "妻": {
+            "default": {},
+            "type": "object",
+            "properties": {
+              "好感值": {
+                "default": 0,
+                "type": "number"
+              },
+              "堕落值": {
+                "default": 0,
+                "type": "number"
+              },
+              "婚姻值": {
+                "default": 100,
+                "type": "number"
+              },
+              "当前阶段": {
+                "default": 0,
+                "type": "number"
+              },
+              "阶段标题": {
+                "default": "陌生邻里",
+                "type": "string"
+              },
+              "裂缝": {
+                "default": {},
+                "type": "object",
+                "properties": {
+                  "碎片进度": {
+                    "default": 0,
+                    "type": "number"
+                  },
+                  "已确认": {
+                    "default": false,
+                    "type": "boolean"
+                  }
+                }
+              },
+              "当前心理想法": {
+                "type": "string"
+              },
+              "当前情绪": {
+                "default": "平静",
+                "type": "string"
+              },
+              "气质描述": {
+                "type": "string"
+              },
+              "外装": {
+                "type": "string"
+              },
+              "内衣": {
+                "type": "string"
+              },
+              "妆容": {
+                "default": "素颜",
+                "type": "string"
+              },
+              "特殊": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "身体开发": {
+                "default": {},
+                "type": "object",
+                "properties": {
+                  "小嘴": {
+                    "default": 0,
+                    "type": "number"
+                  },
+                  "胸部": {
+                    "default": 0,
+                    "type": "number"
+                  },
+                  "小屄": {
+                    "default": 0,
+                    "type": "number"
+                  },
+                  "屁穴": {
+                    "default": 0,
+                    "type": "number"
+                  }
+                }
+              },
+              "性癖装载": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "曾开发性癖": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "情报可见": {
+                "default": false,
+                "type": "boolean"
+              },
+              "上次互动楼层": {
+                "default": 0,
+                "type": "number"
+              },
+              "_上次结算楼层": {
+                "default": -1,
+                "type": "number"
+              },
+              "_要钱次数": {
+                "default": 0,
+                "type": "number"
+              },
+              "_上次要钱楼层": {
+                "default": -1,
+                "type": "number"
+              }
+            }
+          },
+          "夫": {
+            "default": {},
+            "type": "object",
+            "properties": {
+              "疑心值": {
+                "default": 0,
+                "type": "number"
+              },
+              "信任值": {
+                "default": 0,
+                "type": "number"
+              },
+              "状态": {
+                "type": "string"
+              },
+              "结局轨道": {
+                "type": "string"
+              },
+              "当前心理想法": {
+                "type": "string"
+              },
+              "当前情绪": {
+                "default": "平静",
+                "type": "string"
+              }
+            }
+          },
+          "_入住楼层": {
+            "default": 0,
+            "type": "number"
+          }
+        }
+      }
+    },
+    "现金": {
+      "default": 500,
+      "type": "number"
+    },
+    "胜任度": {
+      "default": 80,
+      "type": "number"
+    },
+    "风闻": {
+      "default": 0,
+      "type": "number"
+    },
+    "背包": {
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "系统": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "_坏结局": {
+          "type": "string"
+        },
+        "_待发送事件": {
+          "type": "string"
+        },
+        "_已注入事件": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "楼层": {
+              "default": -1,
+              "type": "number"
+            },
+            "内容": {
+              "type": "string"
+            }
+          }
+        },
+        "_母亲撞见次数": {
+          "default": 0,
+          "type": "number"
+        },
+        "_系统操作中": {
+          "default": false,
+          "type": "boolean"
+        },
+        "_难度": {
+          "default": "标准",
+          "type": "string"
+        },
+        "_序章完成": {
+          "default": false,
+          "type": "boolean"
+        },
+        "_连续违规": {
+          "default": 0,
+          "type": "number"
+        },
+        "_上次违规楼层": {
+          "default": -1,
+          "type": "number"
+        }
+      }
+    }
+  }
+}

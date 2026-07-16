@@ -1,0 +1,35 @@
+/* 人妻公寓客户端 - 暖调市井(老公寓的黄昏光感;正式视觉语言 P1 定稿) */
+
+:root {
+  /* 暖底(旧楼道的暗木与暮色) */
+  --dusk: #14100c;
+  --dusk-2: #201812;
+  --panel: rgba(32, 24, 18, 0.78);
+  --panel-lit: rgba(46, 34, 24, 0.88);
+  /* 暖光(楼道声控灯的昏黄) */
+  --lamp: #d9a35c;
+  --lamp-bright: #f2cf9a;
+  --lamp-deep: #7a5a2e;
+  --paper: #cfc2a8;
+  --paper-faded: #93866c;
+  /* 点睛(信箱红与门牌铜绿) */
+  --seal: #a54832;
+  --verdigris: #4f7a6a;
+  /* 描边 */
+  --line: rgba(217, 163, 92, 0.4);
+  --line-soft: rgba(217, 163, 92, 0.18);
+  --font-body: 'Noto Serif SC', 'Source Han Serif SC', 'STSong', serif;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--dusk);
+  color: var(--paper);
+  font-family: var(--font-body);
+}
+
+#app {
+  min-height: 100px;
+}
