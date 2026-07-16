@@ -4,6 +4,11 @@
       <!-- 错误护栏:任何运行时异常显示在此,不再整屏空白 -->
       <div v-if="错误信息" class="err">⚠︎ 界面异常:{{ 错误信息 }}</div>
 
+      <!-- 主题切换(日间亮色/夜间深色;地图插画自带昼夜不受影响) -->
+      <button class="btn mini theme-btn" :title="暗色 ? '切回日间模式' : '切换夜间模式'" @click="切换主题">
+        {{ 暗色 ? '☀' : '🌙' }}
+      </button>
+
       <!-- ═══════════ 数据未就绪 ═══════════ -->
       <template v-if="!就绪">
         <div class="hint center">……楼道的声控灯还没亮(等待存档数据)……</div>
@@ -145,12 +150,12 @@
         </div>
 
         <!-- 行动选项(AI 每轮给 4 条,点了直接发送;想自由发挥就打字) -->
-        <div v-if="当前房间 && !发送中 && 行动选项.length" class="option-row">
+        <div v-if="显示选项" class="option-row">
           <button v-for="(项, i) in 行动选项" :key="i" class="option-chip" @click="发出(项)">▸ {{ 项 }}</button>
         </div>
 
         <!-- 游戏内输入(玩家不碰酒馆输入框) -->
-        <div v-if="当前房间" class="quill">
+        <div v-if="可输入" class="quill">
           <textarea
             v-model="输入文本"
             rows="2"
@@ -519,6 +524,7 @@ function 进入(房间id: string, 破门 = false, 保持地图 = false) {
     进房末楼.value = 末楼号.value;
   }
   当前房间.value = 房间id;
+  已破门进入.value = 破门;
   if (!保持地图) 关地图();
   写场景(房间id, 破门);
   记待办(房间id);
@@ -526,9 +532,35 @@ function 进入(房间id: string, 破门 = false, 保持地图 = false) {
 
 function 离开房间() {
   当前房间.value = null;
+  已破门进入.value = false;
   写场景(null);
   显示地图.value = true; // 走出房门=站上楼道,顺手展开地图选下一处
 }
+
+/** 本次进入是否撬门而入(撬进空屋才有事可做;敲门无人应=还站在门外) */
+const 已破门进入 = ref(false);
+
+/**
+ * 输入框门控(2026-07-17 用户反馈:无人的房间不该给输入框):
+ * 户房间没人应门=没有对手戏,输入收起(只能离开或撬门);撬进去了=屋里翻找,输入恢复;
+ * 公共区与 302(你家)不设限——独处也有事可做。
+ */
+const 可输入 = computed(() => {
+  const id = 当前房间.value;
+  if (!id) return false;
+  const 房 = 查房间(id);
+  if (房?.类型 === '户' && id !== '302' && !房内有人在(id)) return 已破门进入.value;
+  return true;
+});
+
+/** 行动选项只在"产出它们的场景"里显示(换了地方=过期建议,收起防误导) */
+const 选项房间 = ref<string | null>(null);
+
+const 显示选项 = computed(() => {
+  if (发送中.value || !行动选项.value.length) return false;
+  if (!当前房间.value) return 选项房间.value === null; // 楼道态:序章引导等
+  return 可输入.value && 选项房间.value === 当前房间.value;
+});
 
 // ── 行动卡片(gal式:点房弹卡,氛围+在场+可做的事;翻垃圾/撬门都收在卡里) ──
 
@@ -1260,6 +1292,25 @@ async function 切换全屏() {
   }
 }
 
+// ── 夜间模式(html.rq-dark 令牌覆盖;localStorage 记住偏好) ──
+
+const 暗色 = ref(false);
+const 主题存储键 = '人妻公寓_夜间模式';
+
+function 应用主题(开: boolean) {
+  暗色.value = 开;
+  document.documentElement.classList.toggle('rq-dark', 开);
+}
+
+function 切换主题() {
+  应用主题(!暗色.value);
+  try {
+    localStorage.setItem(主题存储键, 暗色.value ? '1' : '0');
+  } catch {
+    /* 隐私模式等存不了就不记 */
+  }
+}
+
 // ── 提示 toast ──
 
 const 提示文本 = ref('');
@@ -1309,6 +1360,7 @@ onMounted(() => {
   eventOn('人妻公寓:回合完成', () => {
     发送中.value = false;
     流式段.value = [];
+    选项房间.value = 当前房间.value; // 本轮选项绑定产出场景,换地方即过期
     void 取卷轴();
     刷新可重掷();
     刷新在场();
@@ -1343,12 +1395,25 @@ onMounted(() => {
   });
 
   // 恢复场景(刷新页面/重开酒馆后仍在原房间,位置种子一并恢复)
-  const 场景 = _.get(getVariables({ type: 'chat' }), '_场景') as { 房间id?: string; 进房末楼?: number } | null;
+  const 场景 = _.get(getVariables({ type: 'chat' }), '_场景') as {
+    房间id?: string;
+    破门?: boolean;
+    进房末楼?: number;
+  } | null;
   当前房间.value = 场景?.房间id ?? null;
+  已破门进入.value = !!场景?.破门;
+  选项房间.value = 当前房间.value; // 刷新恢复:existing 选项视为当前场景的
   try {
     进房末楼.value = 场景?.进房末楼 ?? getLastMessageId();
   } catch {
     进房末楼.value = 0;
+  }
+
+  // 恢复主题偏好
+  try {
+    应用主题(localStorage.getItem(主题存储键) === '1');
+  } catch {
+    /* 读不到就保持日间 */
   }
 
   // 真全屏状态同步(按钮/Esc/系统手势退出都走这里)
@@ -2900,5 +2965,71 @@ onUnmounted(() => {
 
 .chronicle {
   padding-right: 4px;
+}
+
+/* ═══ 主题切换按钮(常驻右上角) ═══ */
+
+.theme-btn {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 20;
+}
+
+/* ═══ 夜间模式:scoped 里写死的浅色逐条覆盖(token 部分已在 global.css 换) ═══
+   地图 .galmap 子树刻意不覆盖——立面插画自带昼夜(天色+窗灯) ═══ */
+
+:global(html.rq-dark) .meta-row > span:not(.meta-btns) {
+  background: #2c2e40;
+}
+
+:global(html.rq-dark) .meta-row,
+:global(html.rq-dark) .story,
+:global(html.rq-dark) .diff-card {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+:global(html.rq-dark) .sheet {
+  background: rgba(38, 40, 56, 0.97);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+:global(html.rq-dark) .sheet-close,
+:global(html.rq-dark) .act-btn,
+:global(html.rq-dark) .trend,
+:global(html.rq-dark) .edit-area {
+  background: #2c2e40;
+  color: var(--ink);
+}
+
+:global(html.rq-dark) .toast {
+  background: rgba(38, 40, 56, 0.97);
+}
+
+:global(html.rq-dark) .room-card,
+:global(html.rq-dark) .peep-card {
+  background: rgba(34, 36, 50, 0.94);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+:global(html.rq-dark) .todo-bar,
+:global(html.rq-dark) .clue-card,
+:global(html.rq-dark) .letter {
+  background: rgba(255, 202, 53, 0.1);
+}
+
+:global(html.rq-dark) .err {
+  background: #3a2220;
+  color: #f5c3bb;
+}
+
+:global(html.rq-dark) .avatar-glyph {
+  background: linear-gradient(160deg, rgba(255, 79, 154, 0.3), rgba(255, 79, 154, 0.16));
+  border-color: #3a3d52;
+  color: #ff9ec4;
+}
+
+:global(html.rq-dark) .avatar.focus .avatar-glyph {
+  border-color: var(--pink);
 }
 </style>
