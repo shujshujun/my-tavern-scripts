@@ -4,10 +4,15 @@
       <!-- 错误护栏:任何运行时异常显示在此,不再整屏空白 -->
       <div v-if="错误信息" class="err">⚠︎ 界面异常:{{ 错误信息 }}</div>
 
-      <!-- 主题切换(日间亮色/夜间深色;地图插画自带昼夜不受影响) -->
-      <button class="btn mini icon theme-btn" :title="暗色 ? '切回日间模式' : '切换夜间模式'" @click="切换主题">
-        <Ic :n="暗色 ? 'sun' : 'moon'" />
-      </button>
+      <!-- 右上角:主题切换 + 全屏(meta 类操作,不进游戏功能区) -->
+      <span class="corner-btns">
+        <button class="btn mini icon" :title="暗色 ? '切回日间模式' : '切换夜间模式'" @click="切换主题">
+          <Ic :n="暗色 ? 'sun' : 'moon'" />
+        </button>
+        <button class="btn mini icon" :title="全屏中 ? '退出全屏' : '沉浸全屏'" @click="切换全屏">
+          <Ic n="expand" />
+        </button>
+      </span>
 
       <!-- ═══════════ 数据未就绪 ═══════════ -->
       <template v-if="!就绪">
@@ -22,8 +27,8 @@
         <header class="masthead ending">考 验 失 败</header>
         <div class="ending-body">
           <p class="ending-line">{{ data.系统._坏结局 }}</p>
-          <p class="hint">父亲收回了这栋楼。你可以在史册里回到从前的某一页,重新来过。</p>
-          <button class="btn" @click="显示史册 = true">翻开史册</button>
+          <p class="hint">父亲收回了这栋楼。你可以在往事里回到从前的某一页,重新来过。</p>
+          <button class="btn" @click="显示史册 = true">翻开往事</button>
         </div>
       </template>
 
@@ -63,30 +68,26 @@
         <div class="ui-kicker center">WUTONGLI APARTMENT / MANAGER MODE</div>
         <header class="masthead">人 妻 公 寓</header>
 
-        <div class="meta-row">
-          <span class="stat" title="现金"><small>现金</small><b>¥{{ data.现金 }}</b></span>
-          <span class="stat" :title="'胜任度:父亲对你管楼的评价'" :class="{ hot: data.胜任度 <= 40 }"
-            ><small>胜任</small><b>{{ data.胜任度 }}</b></span
-          >
-          <span class="stat" :title="'风闻:楼里的闲话'" :class="{ hot: data.风闻 >= 50 }"
-            ><small>风闻</small><b>{{ data.风闻 }}</b></span
-          >
-          <span class="stat" :title="'第 ' + 天数 + ' 天'"
-            ><small>第{{ 天数 }}天</small><b>{{ 时段 }}</b></span
-          >
-          <span class="meta-btns">
-            <button class="btn mini icon" title="网购商城,次日达到管理员室" @click="显示商店 = true">
-              <Ic n="cart" />商店
-            </button>
-            <button v-if="背包列表.length" class="btn mini icon" @click="显示背包 = true"><Ic n="bag" />背包</button>
-            <button v-if="监控列表.length" class="btn mini icon" title="你装下的眼睛" @click="显示监控 = true">
-              <Ic n="cctv" />监控
-            </button>
-            <button class="btn mini icon" title="完整往事与回档" @click="显示史册 = true"><Ic n="book" />史册</button>
-            <button class="btn mini icon" :title="全屏中 ? '退出全屏' : '沉浸全屏'" @click="切换全屏">
-              <Ic n="expand" />
-            </button>
-          </span>
+        <!-- HUD:数据专属框架(时间块 + 三轴瓦片,与功能按钮分离;按钮在底部 dock) -->
+        <div class="hud">
+          <div class="hud-time">
+            <div class="ui-kicker">DAY {{ String(天数).padStart(2, '0') }}</div>
+            <b><Ic n="clock" />{{ 时段 }}</b>
+          </div>
+          <div class="hud-stats">
+            <div class="hstat" title="现金">
+              <small>现金</small>
+              <b>¥{{ data.现金 }}</b>
+            </div>
+            <div class="hstat" title="胜任度:父亲对你管楼的评价" :class="{ hot: data.胜任度 <= 40 }">
+              <small>胜任</small>
+              <b>{{ data.胜任度 }}</b>
+            </div>
+            <div class="hstat" title="风闻:楼里的闲话" :class="{ hot: data.风闻 >= 50 }">
+              <small>风闻</small>
+              <b>{{ data.风闻 }}</b>
+            </div>
+          </div>
         </div>
 
         <!-- 头像行:已入住户(焦点亮/在场半亮/离场暗);点开档案 -->
@@ -150,7 +151,6 @@
         <div class="scene-bar">
           <span class="scene-name">{{ 当前房间名 || '楼道里' }}</span>
           <span class="scene-occ">{{ 当前房间 ? 房内名单 || '此刻没有别人' : '该去敲谁的门?' }}</span>
-          <button class="btn icon" :disabled="发送中" @click="显示地图 = true"><Ic n="map" />地图</button>
           <button v-if="当前房间" class="btn icon" :disabled="发送中" @click="离开房间"><Ic n="exit" />离开</button>
         </div>
 
@@ -183,6 +183,25 @@
           <button class="btn" title="撤回本回合(你的行动与回应),重新措辞" @click="撤回">⌫ 撤回</button>
           <button class="btn" title="同样的行动重新演一遍" @click="重掷">↻ 重演</button>
         </div>
+
+        <!-- 功能区:gal 式底部 dock(大图标按钮,与数据 HUD 分离) -->
+        <nav class="dock">
+          <button class="dock-btn primary" :disabled="发送中" @click="显示地图 = true">
+            <Ic n="map" /><span>地图</span>
+          </button>
+          <button class="dock-btn" title="网购商城,次日达到管理员室" @click="显示商店 = true">
+            <Ic n="cart" /><span>商店</span>
+          </button>
+          <button class="dock-btn" :disabled="!背包列表.length" @click="显示背包 = true">
+            <Ic n="bag" /><span>背包</span>
+          </button>
+          <button v-if="监控列表.length" class="dock-btn" title="你装下的眼睛" @click="显示监控 = true">
+            <Ic n="cctv" /><span>监控</span>
+          </button>
+          <button class="dock-btn" title="完整往事与回档" @click="显示史册 = true">
+            <Ic n="book" /><span>往事</span>
+          </button>
+        </nav>
       </template>
 
       <!-- ═══════════ 地图(日式gal移动画面:天空随时段变色+公寓立面插画+点房弹行动卡) ═══════════ -->
@@ -195,7 +214,9 @@
             <i class="cloud c1" />
             <i class="cloud c2" />
             <i class="cloud c3" />
-            <template v-if="时段 === '深夜'"><i class="star s1" /><i class="star s2" /><i class="star s3" /><i class="star s4" /></template>
+            <template v-if="时段 === '深夜' || 时段 === '晚上'"
+              ><i class="star s1" /><i class="star s2" /><i class="star s3" /><i class="star s4"
+            /></template>
           </div>
           <div class="map-banner">
             <div class="ui-kicker">WUTONGLI APARTMENT / FIELD MAP</div>
@@ -240,26 +261,36 @@
             </div>
           </div>
 
-          <!-- 行动卡片(动画弹出:氛围+在场+可做的事;翻垃圾/撬门都在这里) -->
+          <!-- 房间弹窗(gal 式:遮罩层+居中卡;hero 色带头+瓷砖大按钮;翻垃圾/撬门都在这里) -->
           <transition name="card-pop">
-            <div v-if="房卡" :key="房卡" class="room-card" @click.stop>
-              <div class="ui-kicker">{{ 房卡kicker }}</div>
-              <div class="rc-head">
-                <b>{{ 房卡名称 }}</b>
-                <em v-if="房卡在场">{{ 房卡在场 }}</em>
-                <em v-else class="rc-empty">此刻没有人</em>
+            <div v-if="房卡" class="rc-mask" @click.self="房卡 = null">
+              <div :key="房卡" class="room-modal">
+                <button class="sheet-close" @click="房卡 = null">✕</button>
+                <div class="rm-hero" :class="{ pub: !/^\d+$/.test(房卡) }">
+                  <div class="ui-kicker light">{{ 房卡kicker }}</div>
+                  <b>{{ 房卡名称 }}</b>
+                  <em v-if="房卡在场">这里有:{{ 房卡在场 }}</em>
+                  <em v-else>此刻没有人</em>
+                </div>
+                <p class="rc-mood">{{ 房卡氛围 }}</p>
+                <div class="rm-grid">
+                  <button
+                    v-for="(动作, i) in 房卡动作"
+                    :key="i"
+                    class="tile"
+                    :class="动作.类"
+                    @click="动作.做()"
+                  >
+                    <Ic :n="动作.icon" />
+                    <span class="act-kicker">{{ 动作.kicker }}</span>
+                    <strong>{{ 动作.文案 }}</strong>
+                  </button>
+                  <span v-if="!房卡动作.length" class="rc-empty">门上贴着招租启事,还没有住户</span>
+                </div>
+                <transition name="clue-flip">
+                  <div v-if="结果卡" :key="结果卡" class="clue-card">{{ 结果卡 }}</div>
+                </transition>
               </div>
-              <p class="rc-mood">{{ 房卡氛围 }}</p>
-              <div class="rc-acts">
-                <button v-for="(动作, i) in 房卡动作" :key="i" class="act-btn" :class="动作.类" @click="动作.做()">
-                  <span class="act-kicker">{{ 动作.kicker }}</span>
-                  <strong>{{ 动作.文案 }}</strong>
-                </button>
-                <span v-if="!房卡动作.length" class="rc-empty">门上贴着招租启事,还没有住户</span>
-              </div>
-              <transition name="clue-flip">
-                <div v-if="结果卡" :key="结果卡" class="clue-card">{{ 结果卡 }}</div>
-              </transition>
             </div>
           </transition>
         </div>
@@ -289,16 +320,6 @@
             </div>
           </div>
 
-          <svg v-if="选中曲线" class="trend" viewBox="0 0 100 28" preserveAspectRatio="none">
-            <polyline :points="选中曲线.好感" class="trend-fav" />
-            <polyline :points="选中曲线.堕落" class="trend-sin" />
-            <polyline :points="选中曲线.婚姻" class="trend-marr" />
-          </svg>
-          <div v-if="选中曲线" class="trend-legend">
-            <span class="tl-fav">好感</span><span class="tl-sin">堕落</span><span class="tl-marr">婚姻</span>
-            <span class="tl-hint">—— 随楼层推移的走势</span>
-          </div>
-
           <template v-if="选中档案.妻.情报可见">
             <div class="dsec">
               <div class="dsec-title">心 镜</div>
@@ -325,13 +346,35 @@
                 </div>
               </div>
             </div>
-            <div class="dsec">
-              <div class="dsec-title">她 的 家</div>
-              <p class="dline"><b>丈夫</b> {{ 选中档案.夫名 }} —— 此刻{{ 选中档案.夫状态 }}</p>
+            <!-- 丈夫状态栏(解锁后:双轴可见——疑心是风险表,信任是钥匙) -->
+            <div class="dsec husband">
+              <div class="dsec-title">她 的 丈 夫</div>
+              <div class="hb-row">
+                <span class="avatar-glyph hb">{{ 选中档案.夫名[0] }}</span>
+                <span class="hb-main">
+                  <b>{{ 选中档案.夫名 }}</b>
+                  <small>此刻{{ 选中档案.夫状态 }}</small>
+                </span>
+              </div>
+              <div class="axis-row">
+                <span class="axis-label">疑心</span>
+                <div class="axis"><i class="bar sin" :style="{ width: 选中档案.夫.疑心值 + '%' }" /></div>
+                <span class="axis-num">{{ Math.round(选中档案.夫.疑心值) }}</span>
+              </div>
+              <div class="axis-row">
+                <span class="axis-label">信任</span>
+                <div class="axis"><i class="bar marr" :style="{ width: 选中档案.夫.信任值 + '%' }" /></div>
+                <span class="axis-num">{{ Math.round(选中档案.夫.信任值) }}</span>
+              </div>
+              <p v-if="选中档案.夫.当前情绪 && 选中档案.夫.当前情绪 !== '平静'" class="dline">
+                <b>情绪</b> {{ 选中档案.夫.当前情绪 }}
+              </p>
+              <p v-if="选中档案.夫.当前心理想法" class="dline"><b>心里</b> {{ 选中档案.夫.当前心理想法 }}</p>
             </div>
           </template>
           <template v-else>
             <p class="dline"><b>情绪</b> {{ 选中档案.妻.当前情绪 }}</p>
+            <p class="dline"><b>丈夫</b> {{ 选中档案.夫名 }} —— 此刻{{ 选中档案.夫状态 }}</p>
             <p class="dsealed">
               她的日子隔着一扇门——裂缝线索 {{ 选中档案.妻.裂缝.碎片进度 }}/4。看清她的裂缝,才看得见她。
               <template v-if="选中档案.妻.裂缝.碎片进度 >= 4">线索齐了:背包里那封拼起来的东西,读一读。</template>
@@ -518,6 +561,13 @@ const 图标库: Record<string, string> = {
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/>',
   phone: '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>',
+  door: '<rect x="5" y="2" width="14" height="20" rx="1"/><circle cx="15" cy="12" r="1"/>',
+  bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/>',
+  lock: '<rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
+  home: '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M9 22V12h6v10"/>',
+  arrow: '<circle cx="12" cy="12" r="10"/><path d="m12 16 4-4-4-4"/><path d="M8 12h8"/>',
+  trash: '<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="m19 6-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
 };
 
 const Ic: FunctionalComponent<{ n: string }> = props =>
@@ -660,6 +710,7 @@ function 敲撬门(房间id: string) {
 
 interface 卡动作 {
   kicker: string;
+  icon: string;
   文案: string;
   类?: string;
   做: () => void;
@@ -674,12 +725,13 @@ const 房卡动作 = computed<卡动作[]>(() => {
   if (房?.类型 === '户' && id !== '302') {
     if (!data.value.户[id]) return []; // 招租中,没有可做的事
     if (房内有人在(id)) {
-      动作.push({ kicker: 'VISIT', 文案: '过去串门', 做: () => 进入(id) });
+      动作.push({ kicker: 'VISIT', icon: 'door', 文案: '过去串门', 做: () => 进入(id) });
     } else {
-      动作.push({ kicker: 'KNOCK', 文案: '敲敲门(没人应也站一会儿)', 做: () => 进入(id) });
+      动作.push({ kicker: 'KNOCK', icon: 'bell', 文案: '敲敲门', 做: () => 进入(id) });
       动作.push({
         kicker: 'BREAK IN',
-        文案: 破门目标.value === id && 破门数.value > 0 ? `撬门中……再点 ${6 - 破门数.value} 下` : '撬门(连点)',
+        icon: 'lock',
+        文案: 破门目标.value === id && 破门数.value > 0 ? `撬门中…再点 ${6 - 破门数.value} 下` : '撬门(连点)',
         类: 'risky',
         做: () => 敲撬门(id),
       });
@@ -688,17 +740,18 @@ const 房卡动作 = computed<卡动作[]>(() => {
   }
 
   if (id === '302') {
-    动作.push({ kicker: 'HOME', 文案: '回家看看', 做: () => 进入(id) });
+    动作.push({ kicker: 'HOME', icon: 'home', 文案: '回家看看', 做: () => 进入(id) });
     return 动作;
   }
 
   // 公共区
-  动作.push({ kicker: 'GO', 文案: '走过去', 做: () => 进入(id) });
+  动作.push({ kicker: 'GO', icon: 'arrow', 文案: '走过去', 做: () => 进入(id) });
   if (id === '垃圾房') {
     for (const 袋 of 垃圾袋列表.value) {
       动作.push({
         kicker: 'SEARCH',
-        文案: `翻${袋.妻名}家的垃圾袋(${袋.门牌})`,
+        icon: 'trash',
+        文案: `翻${袋.妻名}家的垃圾袋`,
         类: 'risky',
         做: () => {
           if (当前房间.value !== '垃圾房') 进入('垃圾房', false, true); // 人先走过去,地图和卡都不收
@@ -710,14 +763,22 @@ const 房卡动作 = computed<卡动作[]>(() => {
   return 动作;
 });
 
-/** 晚间/深夜有人在家=窗户亮灯(gal地图的生活感;也是"丈夫在不在家"的免费可视化) */
+/** 天暗后有人在家=窗户亮灯(gal地图的生活感;也是"丈夫在不在家"的免费可视化) */
 function 窗灯(房间id: string): boolean {
-  if (时段.value !== '晚' && 时段.value !== '深夜') return false;
+  if (时段.value !== '傍晚' && 时段.value !== '晚上' && 时段.value !== '深夜') return false;
   return 房内有人在(房间id);
 }
 
 const 时段问候 = computed(
-  () => ({ 早: '晨光正好', 午: '日头晃眼', 晚: '暮色四合', 深夜: '整栋楼都睡了' })[时段.value],
+  () =>
+    ({
+      早上: '晨光正好',
+      中午: '日头正高',
+      下午: '午后正长',
+      傍晚: '家家飘出饭菜香',
+      晚上: '楼里亮起灯火',
+      深夜: '整栋楼都睡了',
+    })[时段.value],
 );
 
 // ── 楼内的人:与脚本同一套纯函数推算(永不自相矛盾) ──
@@ -911,13 +972,13 @@ const 选中档案 = computed(() => {
   const m = 选中门牌.value;
   if (!m || !就绪.value || !data.value.户[m]) return null;
   const { 妻, 夫 } = data.value.户[m];
-  void 夫;
   return {
     门牌: m,
     妻名: 户静态表[m].妻名,
     夫名: 户静态表[m].夫名 || '她丈夫',
     夫状态: 丈夫状态推算(m, 位置种子.value),
     妻,
+    夫,
     三轴: [
       { 名: '好感', 类: 'fav', 值: 妻.好感值 },
       { 名: '堕落', 类: 'sin', 值: 妻.堕落值 },
@@ -1191,20 +1252,7 @@ async function 取卷轴() {
     末楼号.value = 末楼;
     const 消息组 = (await getChatMessages(`0-${末楼}`)) ?? [];
     const 条目: 卷轴条[] = [];
-    const 历史: Record<string, { 好感: number[]; 堕落: number[]; 婚姻: number[] }> = {};
     for (const 消息 of 消息组) {
-      // 三轴历史:每个带存档的楼是一个采样点(固定0楼架构红利)
-      const 户档 = _.get(消息.data, 'stat_data.户');
-      if (消息.role !== 'user' && 户档) {
-        for (const m of 门牌列表) {
-          const 妻 = _.get(户档, [m, '妻']);
-          if (!妻) continue;
-          历史[m] ??= { 好感: [], 堕落: [], 婚姻: [] };
-          历史[m].好感.push(Number(妻.好感值) || 0);
-          历史[m].堕落.push(Number(妻.堕落值) || 0);
-          历史[m].婚姻.push(Number(妻.婚姻值 ?? 100) || 0);
-        }
-      }
       const 是玩家 = 消息.role === 'user';
       const 原文 = 消息.message ?? '';
       const 净文 = 清洗(过酒馆正则(原文, 是玩家 ? 'user_input' : 'ai_output', 末楼 - 消息.message_id));
@@ -1227,30 +1275,12 @@ async function 取卷轴() {
       }
     }
     卷轴.value = 条目;
-    三轴历史.value = 历史;
     待回档楼.value = null;
     await 滚到底();
   } catch (e) {
     console.error('[人妻公寓客户端] 取卷轴失败:', e);
   }
 }
-
-// ── 三轴历史曲线(档案卡 sparkline) ──
-
-const 三轴历史 = ref<Record<string, { 好感: number[]; 堕落: number[]; 婚姻: number[] }>>({});
-
-function 折线(序列: number[]): string {
-  if (序列.length < 2) return '';
-  const 步 = 100 / (序列.length - 1);
-  return 序列.map((v, i) => `${(i * 步).toFixed(1)},${(28 - (v / 100) * 26 - 1).toFixed(1)}`).join(' ');
-}
-
-const 选中曲线 = computed(() => {
-  if (!选中门牌.value) return null;
-  const 史 = 三轴历史.value[选中门牌.value];
-  if (!史 || 史.好感.length < 2) return null;
-  return { 好感: 折线(史.好感), 堕落: 折线(史.堕落), 婚姻: 折线(史.婚姻) };
-});
 
 // ── 回档(两段式确认) ──
 
@@ -1594,9 +1624,9 @@ onUnmounted(() => {
 /* ── 按钮:白玻璃胶囊,悬停上浮+辉光;rite=粉色主按钮 ── */
 
 .btn {
-  padding: 4px 14px;
+  padding: 6px 18px;
   font-family: inherit;
-  font-size: 0.86em;
+  font-size: 0.92em;
   font-weight: 600;
   color: var(--ink);
   background: var(--glass);
@@ -2115,23 +2145,33 @@ onUnmounted(() => {
   transition: background 0.6s ease;
 }
 
-/* 时段天色 */
-.sky-早 {
+/* 时段天色(六档:早上/中午/下午/傍晚/晚上/深夜) */
+.sky-早上 {
   background: linear-gradient(180deg, #9dd7ef 0%, #cfeefb 55%, #ffefd8 100%);
 }
 
-.sky-午 {
+.sky-中午 {
   background: linear-gradient(180deg, #4ab7ff 0%, #a8dcf4 60%, #e8f6fd 100%);
 }
 
-.sky-晚 {
+.sky-下午 {
+  background: linear-gradient(180deg, #6fc2e8 0%, #b8e2f2 55%, #ffefc9 100%);
+}
+
+.sky-傍晚 {
   background: linear-gradient(180deg, #7796c9 0%, #ff9d6b 55%, #ffd9a8 100%);
+}
+
+.sky-晚上 {
+  background: linear-gradient(180deg, #2c3a63 0%, #46578c 60%, #6b77a6 100%);
 }
 
 .sky-深夜 {
   background: linear-gradient(180deg, #1f2a4d 0%, #35456f 60%, #4f5b86 100%);
 }
 
+.sky-晚上 .map-banner,
+.sky-晚上 .map-banner .ui-kicker,
 .sky-深夜 .map-banner,
 .sky-深夜 .map-banner .ui-kicker {
   color: #e8ecfa;
@@ -2156,12 +2196,13 @@ onUnmounted(() => {
   box-shadow: 0 0 0 8px rgba(255, 226, 138, 0.3);
 }
 
-.sky-晚 .orb {
+.sky-傍晚 .orb {
   top: 92px;
   background: #ff9d5c;
   box-shadow: 0 0 0 10px rgba(255, 157, 92, 0.3);
 }
 
+.sky-晚上 .orb,
 .sky-深夜 .orb {
   background: transparent;
   box-shadow: inset -9px -4px 0 0 #f4f0d8;
@@ -2188,6 +2229,7 @@ onUnmounted(() => {
   background: inherit;
 }
 
+.sky-晚上 .cloud,
 .sky-深夜 .cloud {
   background: rgba(255, 255, 255, 0.12);
 }
@@ -2398,8 +2440,9 @@ onUnmounted(() => {
   box-shadow: 0 0 9px rgba(255, 202, 53, 0.85);
 }
 
-.sky-深夜 .bunit:not(.lit) .unit-window i,
-.sky-晚 .bunit:not(.lit) .unit-window i {
+.sky-傍晚 .bunit:not(.lit) .unit-window i,
+.sky-晚上 .bunit:not(.lit) .unit-window i,
+.sky-深夜 .bunit:not(.lit) .unit-window i {
   background: #66718c;
 }
 
@@ -2476,102 +2519,137 @@ onUnmounted(() => {
   background: var(--pink-soft);
 }
 
-/* ── 行动卡片(初星热点卡语法:玻璃白卡+kicker+顶部三色渐变杠) ── */
+/* ── 房间弹窗(gal 式:遮罩+居中卡+hero 色带头+瓷砖大按钮) ── */
 
-.room-card {
-  position: relative;
-  z-index: 2;
-  flex: none;
-  margin-top: 10px;
-  background: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.65);
-  border-radius: 16px;
-  padding: 12px 13px 11px;
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(8px);
-}
-
-.room-card::before {
-  content: '';
+.rc-mask {
   position: absolute;
-  top: 0;
-  left: 14px;
-  right: 14px;
-  height: 4px;
-  border-radius: 0 0 4px 4px;
-  background: linear-gradient(130deg, #ff8ab9, #4ab7ff 46%, #ffd24f);
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  padding: 14px;
+  background: rgba(20, 22, 30, 0.45);
+  backdrop-filter: blur(3px);
+  border-radius: 18px;
 }
 
-.rc-head {
+.room-modal {
+  position: relative;
+  width: min(340px, 96%);
+  max-height: 96%;
+  overflow-y: auto;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 18px;
+  padding: 0 0 12px;
+  box-shadow: var(--shadow);
+  scrollbar-width: thin;
+}
+
+.rm-hero {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin: 3px 0 4px;
+  flex-direction: column;
+  gap: 1px;
+  padding: 14px 16px 10px;
+  margin-bottom: 8px;
+  color: #fff;
+  background:
+    linear-gradient(180deg, rgba(20, 22, 30, 0.08), rgba(20, 22, 30, 0.42)),
+    linear-gradient(130deg, #ff8ab9, #4ab7ff 72%);
+  border-radius: 18px 18px 0 0;
 }
 
-.rc-head b {
-  color: var(--ink);
-  font-size: 0.98em;
+.rm-hero.pub {
+  background:
+    linear-gradient(180deg, rgba(20, 22, 30, 0.08), rgba(20, 22, 30, 0.42)),
+    linear-gradient(130deg, #4ab7ff, #7fd8a8 72%);
+}
+
+.rm-hero b {
+  font-size: 1.15em;
   font-weight: 900;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.12em;
+  text-shadow: 0 1px 6px rgba(20, 22, 30, 0.35);
 }
 
-.rc-head em {
+.rm-hero em {
   font-style: normal;
-  font-size: 0.75em;
-  font-weight: 700;
-  color: var(--pink);
+  font-size: 0.74em;
+  color: rgba(255, 255, 255, 0.9);
 }
 
-.rc-head em.rc-empty,
 .rc-empty {
   color: var(--ink-faint);
   font-style: normal;
   font-weight: 400;
-  font-size: 0.75em;
+  font-size: 0.78em;
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 8px 0;
 }
 
 .rc-mood {
   margin: 0 0 8px;
+  padding: 0 16px;
   font-size: 0.78em;
-  line-height: 1.6;
+  line-height: 1.65;
   color: var(--ink-soft);
 }
 
-.rc-acts {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
+.rm-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 0 14px;
 }
 
-.act-btn {
-  text-align: left;
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 12px 8px 10px;
   font-family: inherit;
-  font-size: 0.82em;
-  font-weight: 600;
   color: var(--ink);
+  text-align: center;
   background: #fff;
   border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 12px;
-  padding: 7px 11px;
+  border-radius: 14px;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(30, 26, 38, 0.06);
+  box-shadow: 0 2px 8px rgba(30, 26, 38, 0.08);
   transition: all 0.16s;
 }
 
-.act-btn:hover {
-  border-color: rgba(38, 169, 244, 0.6);
-  box-shadow: 0 6px 16px rgba(38, 169, 244, 0.2);
-  transform: translateY(-1px);
+.tile .ic {
+  width: 22px;
+  height: 22px;
+  color: var(--blue);
+  margin-bottom: 2px;
 }
 
-.act-btn.risky {
-  border-color: rgba(229, 83, 63, 0.35);
+.tile strong {
+  font-size: 0.82em;
+  font-weight: 700;
+  line-height: 1.35;
 }
 
-.act-btn.risky:hover {
+.tile:hover {
+  transform: translateY(-2px);
+  border-color: rgba(38, 169, 244, 0.55);
+  box-shadow: 0 8px 20px rgba(38, 169, 244, 0.22);
+}
+
+.tile.risky .ic {
+  color: var(--red);
+}
+
+.tile.risky:hover {
   border-color: var(--red);
-  box-shadow: 0 6px 16px rgba(229, 83, 63, 0.2);
+  box-shadow: 0 8px 20px rgba(229, 83, 63, 0.22);
+}
+
+.room-modal .clue-card {
+  margin: 8px 14px 0;
 }
 
 /* 弹卡动画(anime pop) */
@@ -2771,55 +2849,35 @@ onUnmounted(() => {
   font-size: 0.9em;
 }
 
-.trend {
-  width: 100%;
-  height: 44px;
-  margin-top: 2px;
-  border: 1px solid var(--line-soft);
-  border-radius: 10px;
-  background: #fff;
-}
-
-.trend polyline {
-  fill: none;
-  stroke-width: 1.4;
-  vector-effect: non-scaling-stroke;
-  stroke-linejoin: round;
-}
-
-.trend-fav {
-  stroke: var(--pink);
-}
-
-.trend-sin {
-  stroke: var(--red);
-}
-
-.trend-marr {
-  stroke: var(--green);
-}
-
-.trend-legend {
+/* 丈夫状态栏(解锁后:双轴=风险表与钥匙) */
+.hb-row {
   display: flex;
-  gap: 10px;
-  font-size: 0.68em;
-  margin: 2px 0 6px;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 5px;
 }
 
-.tl-fav {
-  color: var(--pink);
+.avatar-glyph.hb {
+  width: 30px;
+  height: 30px;
+  font-size: 0.8em;
+  background: linear-gradient(160deg, #d9e9f4, #c2dbee);
+  color: #4a6b8a;
 }
 
-.tl-sin {
-  color: var(--red);
+.hb-main {
+  display: flex;
+  flex-direction: column;
 }
 
-.tl-marr {
-  color: var(--green);
+.hb-main b {
+  font-size: 0.86em;
+  font-weight: 700;
 }
 
-.tl-hint {
-  color: var(--ink-faint);
+.hb-main small {
+  font-size: 0.7em;
+  color: var(--ink-soft);
 }
 
 .dsec {
@@ -3010,13 +3068,160 @@ onUnmounted(() => {
   padding-right: 4px;
 }
 
-/* ═══ 主题切换按钮(常驻右上角) ═══ */
+/* ═══ 右上角 meta 钮(主题/全屏) ═══ */
 
-.theme-btn {
+.corner-btns {
   position: absolute;
   top: 6px;
   right: 8px;
   z-index: 20;
+  display: inline-flex;
+  gap: 6px;
+}
+
+/* ═══ HUD:数据专属框架(时间块+瓦片,与按钮分离) ═══ */
+
+.hud {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  padding: 8px 12px;
+  margin-bottom: 7px;
+  background: var(--glass);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: var(--radius);
+  box-shadow: var(--card-shadow);
+  backdrop-filter: blur(6px);
+}
+
+.hud-time {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0;
+  padding-right: 12px;
+  border-right: 1px dashed var(--line-soft);
+  min-width: 74px;
+}
+
+.hud-time b {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 1.02em;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.hud-time .ic {
+  width: 15px;
+  height: 15px;
+  color: var(--blue);
+}
+
+.hud-stats {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.hstat {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0;
+  padding: 3px 10px;
+  background: #fff;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+}
+
+.hstat small {
+  font-size: 0.64em;
+  color: var(--ink-faint);
+  font-weight: 700;
+}
+
+.hstat b {
+  font-family: var(--font-display);
+  font-size: 0.98em;
+  color: var(--ink);
+  line-height: 1.15;
+}
+
+.hstat.hot {
+  border-color: var(--red);
+}
+
+.hstat.hot b {
+  color: var(--red);
+}
+
+/* ═══ 底部功能 dock(gal 式:大图标+标签,融进背景的悬浮条) ═══ */
+
+.dock {
+  flex: none;
+  display: flex;
+  gap: 6px;
+  padding: 7px 8px;
+  margin-top: 7px;
+  background: var(--glass);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 16px;
+  box-shadow: var(--card-shadow);
+  backdrop-filter: blur(6px);
+}
+
+.dock-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 7px 2px 5px;
+  font-family: inherit;
+  color: var(--ink-soft);
+  background: transparent;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.16s;
+}
+
+.dock-btn .ic {
+  width: 21px;
+  height: 21px;
+}
+
+.dock-btn span {
+  font-size: 0.68em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.dock-btn:hover:not(:disabled) {
+  color: var(--blue);
+  background: rgba(38, 169, 244, 0.1);
+  transform: translateY(-2px);
+}
+
+.dock-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.dock-btn.primary {
+  color: #fff;
+  background: linear-gradient(180deg, #ff6cab, #ff4f9a);
+  box-shadow: 0 4px 14px rgba(255, 79, 154, 0.35);
+}
+
+.dock-btn.primary:hover:not(:disabled) {
+  color: #fff;
+  background: linear-gradient(180deg, #ff5da2, #f04390);
+  transform: translateY(-2px);
 }
 
 /* ═══ 描边图标(初星 icon-sprite 语法:24×24 线条,吃 currentColor) ═══ */
@@ -3149,43 +3354,7 @@ onUnmounted(() => {
 
 /* ═══ 状态瓦片(初星 status card:小灰标 + 展示字体数值) ═══ */
 
-.stat {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 5px;
-  padding: 2px 10px;
-  border: 1px solid var(--line-soft);
-  background: #fff;
-  border-radius: 999px;
-}
-
-.stat small {
-  font-size: 0.66em;
-  color: var(--ink-faint);
-  font-weight: 700;
-}
-
-.stat b {
-  font-family: var(--font-display);
-  font-size: 0.84em;
-  color: var(--ink);
-}
-
-.stat.hot {
-  border-color: var(--red);
-}
-
-.stat.hot b {
-  color: var(--red);
-}
-
-/* ═══ 动作按钮 kicker 结构(初星 hotspot 语法) ═══ */
-
-.act-btn {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
+/* ═══ 动作 kicker(初星 hotspot 语法,瓷砖里的小标) ═══ */
 
 .act-kicker {
   font-family: var(--font-mono);
@@ -3195,13 +3364,9 @@ onUnmounted(() => {
   color: var(--ink-faint);
 }
 
-.act-btn.risky .act-kicker {
+.tile.risky .act-kicker {
   color: var(--red);
   opacity: 0.75;
-}
-
-.act-btn strong {
-  font-weight: 600;
 }
 
 /* ═══ 阶段爱心条(初星 affinity-hearts) ═══ */
@@ -3231,9 +3396,15 @@ onUnmounted(() => {
 
 /* ═══ 新元素的夜间覆盖 ═══ */
 
-:global(html.rq-dark) .stat,
+:global(html.rq-dark) .hstat,
+:global(html.rq-dark) .tile,
 :global(html.rq-dark) .mode-item {
   background: #2c2e40;
+}
+
+:global(html.rq-dark) .hud,
+:global(html.rq-dark) .dock {
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 :global(html.rq-dark) .mode-item.chosen {
@@ -3271,8 +3442,6 @@ onUnmounted(() => {
 }
 
 :global(html.rq-dark) .sheet-close,
-:global(html.rq-dark) .act-btn,
-:global(html.rq-dark) .trend,
 :global(html.rq-dark) .edit-area {
   background: #2c2e40;
   color: var(--ink);
@@ -3282,9 +3451,9 @@ onUnmounted(() => {
   background: rgba(38, 40, 56, 0.97);
 }
 
-:global(html.rq-dark) .room-card,
+:global(html.rq-dark) .room-modal,
 :global(html.rq-dark) .peep-card {
-  background: rgba(34, 36, 50, 0.94);
+  background: rgba(34, 36, 50, 0.96);
   border-color: rgba(255, 255, 255, 0.1);
 }
 

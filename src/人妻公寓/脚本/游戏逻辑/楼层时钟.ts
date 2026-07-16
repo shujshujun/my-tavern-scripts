@@ -14,9 +14,9 @@ import { 户静态表 } from '../../stageConfig';
  *   丈夫作息表/角色位置全挂时段、不挂 AI 的钟——永不自相矛盾。
  */
 
-export const 时段列表: readonly 时段名[] = ['早', '午', '晚', '深夜'];
+export const 时段列表: readonly 时段名[] = ['早上', '中午', '下午', '傍晚', '晚上', '深夜'];
 
-/** 〔调参〕每个时段占几楼(4 档一轮=一天;初值 2 楼/档 → 一天 8 楼) */
+/** 〔调参〕每个时段占几楼(6 档一轮=一天;初值 2 楼/档 → 一天 12 楼) */
 export const 每时段楼数 = 2;
 
 /** 纯函数:楼层 → 时段(无游标可漂移,防护11同理——同楼重roll结果不变) */
@@ -77,20 +77,32 @@ export function 丈夫状态推算(门牌号: 门牌, 楼层: number): 夫状态
 export function 妻位置推算(门牌号: 门牌, 楼层: number): string {
   const 段 = 当前时段(楼层);
   const r = seededRandom(楼层, 门牌号, '妻位置');
-  if (段 === '深夜') return 门牌号; // 深夜都在家
-  if (段 === '早') {
-    if (r < 0.7) return 门牌号;
-    if (r < 0.85) return '天台'; // 晾衣
-    return '垃圾房'; // 扔垃圾
+  switch (段) {
+    case '深夜':
+      return 门牌号; // 深夜都在家
+    case '早上': // 晾衣/扔垃圾的时段
+      if (r < 0.65) return 门牌号;
+      if (r < 0.8) return '天台';
+      if (r < 0.9) return '垃圾房';
+      return '大堂';
+    case '中午': // 买菜/办事
+      if (r < 0.55) return 门牌号;
+      if (r < 0.75) return '外出';
+      if (r < 0.9) return '大堂';
+      return '天台';
+    case '下午': // 一天里最容易不在家的时段
+      if (r < 0.5) return 门牌号;
+      if (r < 0.7) return '外出';
+      if (r < 0.85) return '大堂';
+      return '楼梯间';
+    case '傍晚': // 做饭的黄金时段(丈夫还没到家)
+      if (r < 0.75) return 门牌号;
+      if (r < 0.9) return '垃圾房';
+      return '楼梯间';
+    case '晚上':
+    default:
+      if (r < 0.85) return 门牌号;
+      if (r < 0.95) return '楼梯间';
+      return '天台'; // 乘凉
   }
-  if (段 === '午') {
-    if (r < 0.5) return 门牌号;
-    if (r < 0.7) return '外出'; // 买菜/办事
-    if (r < 0.85) return '大堂';
-    return '天台';
-  }
-  // 晚
-  if (r < 0.8) return 门牌号;
-  if (r < 0.9) return '楼梯间';
-  return '大堂';
 }
