@@ -87,13 +87,20 @@
               <small>现金</small>
               <b>¥{{ data.现金 }}</b>
             </div>
-            <div class="hstat" title="胜任度:父亲对你管楼的评价" :class="{ hot: data.胜任度 <= 40 }">
+            <!-- 胜任/风闻=电池条(格子随值增减,低胜任/高风闻亮红报警) -->
+            <div class="battery" title="胜任度:父亲对你管楼的评价,跌到底=考验失败" :class="{ warn: data.胜任度 <= 40 }">
               <small>胜任</small>
-              <b>{{ data.胜任度 }}</b>
+              <span class="cells">
+                <i v-for="n in 10" :key="n" :class="{ on: n <= Math.round(data.胜任度 / 10) }" />
+              </span>
+              <b>{{ Math.round(data.胜任度) }}</b>
             </div>
-            <div class="hstat" title="风闻:楼里的闲话" :class="{ hot: data.风闻 >= 50 }">
+            <div class="battery risk" title="风闻:楼里的闲话,涨满=东窗事发" :class="{ warn: data.风闻 >= 50 }">
               <small>风闻</small>
-              <b>{{ data.风闻 }}</b>
+              <span class="cells">
+                <i v-for="n in 10" :key="n" :class="{ on: n <= Math.round(data.风闻 / 10) }" />
+              </span>
+              <b>{{ Math.round(data.风闻) }}</b>
             </div>
           </div>
         </div>
@@ -676,12 +683,15 @@ const 可输入 = computed(() => {
 });
 
 /**
- * 幕房间:最近一场戏发生的地方(回合完成时记下)。
- * 正文与行动选项都属于"那个房间的那场戏"——人走了戏就收,回到原房间戏还在(2026-07-17 用户拍板)。
+ * 幕房间:最近一楼(=最近一场戏)发生的地方,回合完成时记下。
+ * 底层是一条线性上下文(全角色融在一起),没有"每个房间各存一份对话"——
+ * 正文永远只显示"当前正在进行的这一场戏";一旦走动(当前房间≠幕房间),
+ * 这场戏就翻篇,正文让位给到场卡;在新地方开口=新的一楼,正文才回来。
+ * 走回旧房间不会"复活"旧对话(线性上下文里它已在更早的楼层),而是当作一次新的到场。
  */
 const 幕房间 = ref<string | null>(null);
 
-/** 人还在戏发生的地方(正文可见;走动后=新场景,正文隐去换到场卡) */
+/** 人还站在最近这场戏发生的地方(正文可见;一走动就=新场景,正文隐去换到场卡) */
 const 在幕中 = computed(() => 当前房间.value === 幕房间.value);
 
 const 显示选项 = computed(() => {
@@ -3298,8 +3308,82 @@ onUnmounted(() => {
 .hud-stats {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: 0.7fr 1fr 1fr;
   gap: 8px;
+}
+
+/* 电池条(胜任=绿→黄→红报警,风闻=反向;格子随值点亮) */
+.battery {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 3px 9px;
+  background: #fff;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+}
+
+.battery small {
+  font-size: 0.64em;
+  color: var(--ink-faint);
+  font-weight: 700;
+}
+
+.battery .cells {
+  display: flex;
+  gap: 1.5px;
+  align-items: center;
+  height: 9px;
+}
+
+.battery .cells i {
+  flex: 1;
+  height: 100%;
+  border-radius: 1.5px;
+  background: rgba(36, 33, 38, 0.1);
+  transition:
+    background 0.35s ease,
+    box-shadow 0.35s ease;
+}
+
+/* 胜任:安全绿 */
+.battery .cells i.on {
+  background: var(--green);
+}
+
+/* 风闻:警示橙红 */
+.battery.risk .cells i.on {
+  background: var(--yellow);
+}
+
+/* 报警态(胜任≤40 / 风闻≥50):亮格转红+末格呼吸 */
+.battery.warn .cells i.on {
+  background: var(--red);
+}
+
+/* 呼吸=最后一格亮着的(下一格不亮或已是末格) */
+.battery.warn .cells i.on:has(+ i:not(.on)),
+.battery.warn .cells i.on:last-of-type {
+  animation: cell-pulse 1s ease-in-out infinite;
+}
+
+@keyframes cell-pulse {
+  50% {
+    box-shadow: 0 0 6px var(--red);
+    opacity: 0.6;
+  }
+}
+
+.battery b {
+  align-self: flex-end;
+  font-family: var(--font-display);
+  font-size: 0.78em;
+  color: var(--ink-soft);
+  line-height: 1;
+}
+
+.battery.warn b {
+  color: var(--red);
 }
 
 .hstat {
@@ -3572,9 +3656,14 @@ onUnmounted(() => {
 /* ═══ 新元素的夜间覆盖 ═══ */
 
 :global(html.rq-dark) .hstat,
+:global(html.rq-dark) .battery,
 :global(html.rq-dark) .tile,
 :global(html.rq-dark) .mode-item {
   background: #2c2e40;
+}
+
+:global(html.rq-dark) .battery .cells i {
+  background: rgba(255, 255, 255, 0.12);
 }
 
 :global(html.rq-dark) .hud,
