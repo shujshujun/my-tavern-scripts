@@ -134,13 +134,6 @@
           <button v-if="当前房间" class="btn" :disabled="发送中" @click="离开房间">离开</button>
         </div>
 
-        <!-- 垃圾房:按户分袋,翻哪户=选择(这栋楼扔掉的秘密都在这里) -->
-        <div v-if="当前房间 === '垃圾房' && !发送中" class="option-row">
-          <button v-for="袋 in 垃圾袋列表" :key="袋.门牌" class="option-chip" @click="翻(袋.门牌)">
-            🗑 翻 {{ 袋.门牌 }} 的垃圾袋({{ 袋.妻名 }}家)
-          </button>
-        </div>
-
         <!-- 偷窥余像:"你注意到了什么?"(摄像头渠道,选对收进线索板) -->
         <div v-if="偷窥待选 && !发送中" class="peep-card">
           <p class="hint">画面看完了。你注意到了什么?</p>
@@ -172,46 +165,80 @@
         </div>
       </template>
 
-      <!-- ═══════════ 地图(公寓立面:一梯两户×3层+公共区;走动零成本纯UI) ═══════════ -->
-      <div v-if="显示地图 && 就绪" class="mask" @click.self="显示地图 = false">
-        <div class="sheet map-sheet">
-          <button class="sheet-close" @click="显示地图 = false">✕</button>
-          <div class="sheet-title">这 栋 楼</div>
-          <p class="hint center">{{ 破门目标 ? `撬门 ${破门数}/6 ——再连点几下` : '点一间房走过去;没人应门的户,连点可以撬开' }}</p>
-          <div class="building">
-            <button class="map-room roof" :class="房态类('天台')" @click="点房('天台')">
-              <span class="room-name">天台</span>
-              <span class="room-occ">{{ 房内首字('天台') }}</span>
-            </button>
-            <div v-for="层 in 楼层组" :key="层.名" class="floor-row">
-              <button
-                v-for="房 in 层.房"
-                :key="房.id"
-                class="map-room unit"
-                :class="[房态类(房.id), { vacant: 房.空置 }]"
-                @click="点房(房.id)"
-              >
-                <span class="room-name">{{ 房.id }}</span>
-                <span v-if="房.空置" class="room-sub">招租中</span>
-                <template v-else>
-                  <span class="room-sub">{{ 房.标签 }}</span>
-                  <span class="room-occ">{{ 房内首字(房.id) }}</span>
-                </template>
+      <!-- ═══════════ 地图(日式gal移动画面:天空随时段变色+公寓立面插画+点房弹行动卡) ═══════════ -->
+      <div v-if="显示地图 && 就绪" class="mask map-mask" @click.self="关地图">
+        <div class="galmap" :class="'sky-' + 时段">
+          <button class="sheet-close" @click="关地图">✕</button>
+          <!-- 天空装饰(纯CSS:日月云星,随时段切换) -->
+          <div class="sky-deco">
+            <i class="orb" />
+            <i class="cloud c1" />
+            <i class="cloud c2" />
+            <i class="cloud c3" />
+            <template v-if="时段 === '深夜'"><i class="star s1" /><i class="star s2" /><i class="star s3" /><i class="star s4" /></template>
+          </div>
+          <div class="map-banner">
+            <b>第 {{ 天数 }} 天</b><em>{{ 时段问候 }}</em>
+          </div>
+
+          <!-- 公寓立面插画 -->
+          <div class="bldg">
+            <div class="roofline">
+              <button class="roof-card" :class="{ here: 当前房间 === '天台' }" @click="点房('天台')">
+                <span class="unit-name">天台</span>
+                <span class="unit-occ">{{ 房内首字('天台') }}</span>
               </button>
             </div>
-            <div class="floor-row ground">
+            <div class="bldg-body">
+              <div v-for="层 in 楼层组" :key="层.名" class="bfloor">
+                <button
+                  v-for="房 in 层.房"
+                  :key="房.id"
+                  class="bunit"
+                  :class="{ here: 当前房间 === 房.id, vacant: 房.空置, lit: 窗灯(房.id) }"
+                  @click="点房(房.id)"
+                >
+                  <span class="unit-window"><i /><i /></span>
+                  <span class="unit-plate">{{ 房.id }}</span>
+                  <span class="unit-sub">{{ 房.空置 ? '招租中' : 房.标签 }}</span>
+                  <span class="unit-occ">{{ 房.空置 ? '' : 房内首字(房.id) }}</span>
+                </button>
+              </div>
+            </div>
+            <div class="bground">
               <button
                 v-for="房 in 底层公共"
                 :key="房.id"
-                class="map-room pub"
-                :class="房态类(房.id)"
+                class="gunit"
+                :class="{ here: 当前房间 === 房.id }"
                 @click="点房(房.id)"
               >
-                <span class="room-name">{{ 房.名称 }}</span>
-                <span class="room-occ">{{ 房内首字(房.id) }}</span>
+                <span class="unit-sub">{{ 房.名称 }}</span>
+                <span class="unit-occ">{{ 房内首字(房.id) }}</span>
               </button>
             </div>
           </div>
+
+          <!-- 行动卡片(动画弹出:氛围+在场+可做的事;翻垃圾/撬门都在这里) -->
+          <transition name="card-pop">
+            <div v-if="房卡" :key="房卡" class="room-card" @click.stop>
+              <div class="rc-head">
+                <b>{{ 房卡名称 }}</b>
+                <em v-if="房卡在场">{{ 房卡在场 }}</em>
+                <em v-else class="rc-empty">此刻没有人</em>
+              </div>
+              <p class="rc-mood">{{ 房卡氛围 }}</p>
+              <div class="rc-acts">
+                <button v-for="(动作, i) in 房卡动作" :key="i" class="act-btn" :class="动作.类" @click="动作.做()">
+                  {{ 动作.文案 }}
+                </button>
+                <span v-if="!房卡动作.length" class="rc-empty">门上贴着招租启事,还没有住户</span>
+              </div>
+              <transition name="clue-flip">
+                <div v-if="结果卡" :key="结果卡" class="clue-card">{{ 结果卡 }}</div>
+              </transition>
+            </div>
+          </transition>
         </div>
       </div>
 
@@ -481,14 +508,14 @@ function 写场景(房间id: string | null, 破门 = false) {
   );
 }
 
-function 进入(房间id: string, 破门 = false) {
+function 进入(房间id: string, 破门 = false, 保持地图 = false) {
   try {
     进房末楼.value = getLastMessageId();
   } catch {
     进房末楼.value = 末楼号.value;
   }
   当前房间.value = 房间id;
-  显示地图.value = false;
+  if (!保持地图) 关地图();
   写场景(房间id, 破门);
   记待办(房间id);
 }
@@ -499,22 +526,40 @@ function 离开房间() {
   显示地图.value = true; // 走出房门=站上楼道,顺手展开地图选下一处
 }
 
-// 连击破门("点的语法":连击空房门=破锁;2.5 秒窗口内敲满 6 下)
+// ── 行动卡片(gal式:点房弹卡,氛围+在场+可做的事;翻垃圾/撬门都收在卡里) ──
+
+const 房卡 = ref<string | null>(null);
+const 结果卡 = ref('');
+
+function 点房(房间id: string) {
+  if (发送中.value) return;
+  结果卡.value = '';
+  房卡.value = 房卡.value === 房间id ? null : 房间id;
+}
+
+function 关地图() {
+  显示地图.value = false;
+  房卡.value = null;
+  结果卡.value = '';
+}
+
+const 房卡名称 = computed(() => (房卡.value ? (查房间(房卡.value)?.名称 ?? 房卡.value) : ''));
+const 房卡氛围 = computed(() => {
+  if (!房卡.value) return '';
+  const 房 = 查房间(房卡.value);
+  if (房?.类型 === '户' && 房卡.value !== '302' && !data.value.户[房卡.value]) {
+    return '窗户蒙着灰,门上贴着一张手写的招租启事。';
+  }
+  return 房?.氛围 ?? '';
+});
+const 房卡在场 = computed(() => (房卡.value ? 房内的人(房卡.value).join('、') : ''));
+
+// 连击破门("点的语法":对没人应的户门连点 6 下=撬开;2.5 秒窗口)
 const 破门目标 = ref('');
 const 破门数 = ref(0);
 let 破门计时: ReturnType<typeof setTimeout> | undefined;
 
-function 点房(房间id: string) {
-  if (发送中.value) return;
-  const 房 = 查房间(房间id);
-  // 未入住的户:门上贴着招租,进不去
-  if (房?.类型 === '户' && 房间id !== '302' && !data.value.户[房间id]) return;
-  // 户门无人在家:单点=走到门口(敲门无人应),连点=撬门
-  const 需破门 = 房?.类型 === '户' && 房间id !== '302' && !房内有人在(房间id);
-  if (!需破门) {
-    进入(房间id);
-    return;
-  }
+function 敲撬门(房间id: string) {
   if (破门目标.value !== 房间id) {
     破门目标.value = 房间id;
     破门数.value = 0;
@@ -529,11 +574,67 @@ function 点房(房间id: string) {
     破门数.value = 0;
     破门目标.value = '';
     进入(房间id, true);
-  } else if (破门数.value === 1) {
-    进入(房间id); // 第一下先走到门口(站门外);后续连点升级成撬门
-    显示地图.value = true; // 地图不收,等连击
   }
 }
+
+interface 卡动作 {
+  文案: string;
+  类?: string;
+  做: () => void;
+}
+
+const 房卡动作 = computed<卡动作[]>(() => {
+  const id = 房卡.value;
+  if (!id) return [];
+  const 房 = 查房间(id);
+  const 动作: 卡动作[] = [];
+
+  if (房?.类型 === '户' && id !== '302') {
+    if (!data.value.户[id]) return []; // 招租中,没有可做的事
+    if (房内有人在(id)) {
+      动作.push({ 文案: `🚪 过去串门`, 做: () => 进入(id) });
+    } else {
+      动作.push({ 文案: '🚪 敲敲门(没人应也站一会儿)', 做: () => 进入(id) });
+      动作.push({
+        文案: 破门目标.value === id && 破门数.value > 0 ? `🔓 撬门中……再点 ${6 - 破门数.value} 下` : '🔓 撬门(连点)',
+        类: 'risky',
+        做: () => 敲撬门(id),
+      });
+    }
+    return 动作;
+  }
+
+  if (id === '302') {
+    动作.push({ 文案: '🏠 回家看看', 做: () => 进入(id) });
+    return 动作;
+  }
+
+  // 公共区
+  动作.push({ 文案: '👣 走过去', 做: () => 进入(id) });
+  if (id === '垃圾房') {
+    for (const 袋 of 垃圾袋列表.value) {
+      动作.push({
+        文案: `🗑 翻${袋.妻名}家的垃圾袋(${袋.门牌})`,
+        类: 'risky',
+        做: () => {
+          if (当前房间.value !== '垃圾房') 进入('垃圾房', false, true); // 人先走过去,地图和卡都不收
+          翻(袋.门牌);
+        },
+      });
+    }
+  }
+  return 动作;
+});
+
+/** 晚间/深夜有人在家=窗户亮灯(gal地图的生活感;也是"丈夫在不在家"的免费可视化) */
+function 窗灯(房间id: string): boolean {
+  if (时段.value !== '晚' && 时段.value !== '深夜') return false;
+  return 房内有人在(房间id);
+}
+
+const 时段问候 = computed(
+  () => ({ 早: '晨光正好', 午: '日头晃眼', 晚: '暮色四合', 深夜: '整栋楼都睡了' })[时段.value],
+);
 
 // ── 楼内的人:与脚本同一套纯函数推算(永不自相矛盾) ──
 
@@ -570,12 +671,12 @@ const 房内名单 = computed(() => (当前房间.value ? 房内的人(当前房
 // ── 地图数据(公寓立面:3F→1F 每层两户,顶=天台,底=公共区) ──
 
 const 楼层组 = computed(() => [
-  { 名: '3F', 房: [房卡('301'), 房卡('302')] },
-  { 名: '2F', 房: [房卡('201'), 房卡('202')] },
-  { 名: '1F', 房: [房卡('101'), 房卡('102')] },
+  { 名: '3F', 房: [户牌('301'), 户牌('302')] },
+  { 名: '2F', 房: [户牌('201'), 户牌('202')] },
+  { 名: '1F', 房: [户牌('101'), 户牌('102')] },
 ]);
 
-function 房卡(m: 门牌) {
+function 户牌(m: 门牌) {
   const 入住 = Boolean(data.value.户[m]);
   return {
     id: m,
@@ -591,10 +692,6 @@ const 底层公共 = [
   { id: '楼梯间', 名称: '楼梯间' },
   { id: '垃圾房', 名称: '垃圾房' },
 ];
-
-function 房态类(房间id: string): string {
-  return 当前房间.value === 房间id ? 'here' : '';
-}
 
 // ── 头像行(脚本每回合把焦点/在场落 chat 变量 _在场) ──
 
@@ -1223,7 +1320,9 @@ onMounted(() => {
     刷新可重掷();
   });
   eventOn('人妻公寓:提示', (消息: string) => {
-    弹提示(消息);
+    // 地图行动卡开着:结果以"线索卡"翻出(动画),不走 toast
+    if (显示地图.value && 房卡.value) 结果卡.value = 消息;
+    else 弹提示(消息);
     // 侦探/商店操作是纯 UI 回合(不产楼):变量与软计数即时刷新
     刷新监控();
     刷新偷窥待选();
@@ -1274,19 +1373,20 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* ═══ 画框:老公寓的黄昏(固定画幅,内部各区自行滚动) ═══ */
+/* ═══════════════════════════════════════════════════════════════
+   日式小清新·扁平赛璐璐(2026-07-16 用户定调,参考图:白色圆角框浮在亮蓝底上)
+   语法:白卡+细描边+浅投影/樱粉与天青点色/圆角胶囊按钮/动画轻快
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── 画框:亮蓝底 + 白色圆角大卡(参考图的白框构图) ── */
 
 .apt {
   box-sizing: border-box;
   height: var(--frame-h, 620px);
-  padding: 6px;
+  padding: 10px;
   background:
-    radial-gradient(ellipse 90% 55% at 50% -6%, rgba(217, 163, 92, 0.12), transparent 60%),
-    linear-gradient(175deg, var(--dusk-2), var(--dusk) 65%);
-  border: 1px solid var(--line);
-  box-shadow:
-    0 10px 36px rgba(0, 0, 0, 0.75),
-    inset 0 0 70px rgba(0, 0, 0, 0.5);
+    radial-gradient(ellipse 120% 60% at 50% -20%, rgba(255, 255, 255, 0.35), transparent 55%),
+    var(--frame-bg);
 }
 
 .page {
@@ -1296,20 +1396,27 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 8px 12px 10px;
-  border: 1px solid var(--line-soft);
+  padding: 10px 14px 12px;
+  background: var(--paper-bg);
+  border-radius: 14px;
+  box-shadow:
+    0 6px 24px rgba(30, 90, 125, 0.25),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.8);
 }
 
 .err {
   white-space: pre-wrap;
   word-break: break-all;
-  background: rgba(122, 26, 26, 0.85);
-  color: #ffe9e0;
+  background: #fdeeec;
+  color: #a4423a;
   border: 1px solid var(--seal);
+  border-radius: 8px;
   padding: 6px 8px;
   margin-bottom: 8px;
   font-size: 0.75em;
 }
+
+/* ── 题头:墨字 + 樱花点 ── */
 
 .masthead {
   flex: none;
@@ -1317,21 +1424,21 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   justify-content: center;
-  font-size: 1.1em;
-  letter-spacing: 0.4em;
-  text-indent: 0.4em;
-  color: var(--lamp-bright);
-  text-shadow: 0 0 12px rgba(217, 163, 92, 0.35);
-  padding: 4px 0 6px;
+  font-size: 1.08em;
+  letter-spacing: 0.38em;
+  text-indent: 0.38em;
+  color: var(--ink);
+  padding: 2px 0 6px;
   margin-bottom: 6px;
 }
 
 .masthead::before,
 .masthead::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--line) 45%, var(--line) 55%, transparent);
+  content: '❀';
+  font-size: 0.7em;
+  color: var(--sakura);
+  letter-spacing: 0;
+  text-indent: 0;
 }
 
 .masthead.ending {
@@ -1340,7 +1447,7 @@ onUnmounted(() => {
 
 .hint {
   font-size: 0.8em;
-  color: var(--paper-faded);
+  color: var(--ink-soft);
   margin: 4px 0;
 }
 
@@ -1351,7 +1458,7 @@ onUnmounted(() => {
 .heartbeat {
   flex: none;
   font-size: 0.72em;
-  color: var(--verdigris);
+  color: var(--leaf);
   text-align: center;
   margin-top: auto;
 }
@@ -1360,33 +1467,31 @@ onUnmounted(() => {
   color: var(--seal);
 }
 
-/* ═══ 按钮语言:楼道声控灯的昏黄横带 ═══ */
+/* ── 按钮语言:白色胶囊 + 细描边,悬停染樱粉 ── */
 
 .btn {
-  --btn-line: rgba(217, 163, 92, 0.4);
   padding: 4px 14px;
   font-family: inherit;
   font-size: 0.88em;
-  letter-spacing: 0.08em;
-  color: var(--lamp);
-  border: none;
-  background:
-    linear-gradient(90deg, transparent, var(--btn-line) 20%, var(--btn-line) 80%, transparent) top / 100% 1px no-repeat,
-    linear-gradient(90deg, transparent, var(--btn-line) 20%, var(--btn-line) 80%, transparent) bottom / 100% 1px
-      no-repeat,
-    linear-gradient(90deg, transparent, rgba(46, 34, 24, 0.8) 15%, rgba(46, 34, 24, 0.8) 85%, transparent);
+  letter-spacing: 0.06em;
+  color: var(--ink);
+  background: var(--paper-card);
+  border: 1.5px solid var(--line);
+  border-radius: 999px;
+  box-shadow: 0 1px 3px rgba(63, 132, 170, 0.12);
   cursor: pointer;
-  transition: all 0.22s ease;
+  transition: all 0.18s ease;
 }
 
 .btn:hover:not(:disabled) {
-  --btn-line: var(--lamp);
-  color: var(--lamp-bright);
-  text-shadow: 0 0 9px rgba(242, 207, 154, 0.55);
+  border-color: var(--sakura);
+  color: var(--sakura);
+  background: #fff7f9;
+  transform: translateY(-1px);
 }
 
 .btn:active:not(:disabled) {
-  transform: translateY(1px);
+  transform: translateY(0);
 }
 
 .btn:disabled {
@@ -1395,19 +1500,27 @@ onUnmounted(() => {
 }
 
 .btn.mini {
-  padding: 2px 8px;
+  padding: 2px 9px;
   font-size: 0.8em;
 }
 
 .btn.rite {
   align-self: center;
-  padding: 6px 26px;
+  padding: 7px 30px;
   font-size: 0.95em;
-  letter-spacing: 0.16em;
-  color: var(--lamp-bright);
+  letter-spacing: 0.18em;
+  color: #fff;
+  background: var(--sakura);
+  border-color: var(--sakura);
+  box-shadow: 0 3px 10px rgba(240, 131, 159, 0.4);
 }
 
-/* ═══ 计数条 ═══ */
+.btn.rite:hover:not(:disabled) {
+  color: #fff;
+  background: #e8688a;
+}
+
+/* ── 计数条:白底信息带 ── */
 
 .meta-row {
   flex: none;
@@ -1417,11 +1530,13 @@ onUnmounted(() => {
   gap: 3px 14px;
   justify-content: center;
   font-size: 0.82em;
-  color: var(--paper-faded);
-  border-top: 1px solid var(--line-soft);
-  border-bottom: 1px solid var(--line-soft);
-  padding: 3px 6px;
-  margin-bottom: 6px;
+  color: var(--ink-soft);
+  background: var(--paper-card);
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  padding: 4px 14px;
+  margin-bottom: 7px;
+  box-shadow: 0 1px 4px rgba(63, 132, 170, 0.08);
 }
 
 .meta-row .hot {
@@ -1433,13 +1548,13 @@ onUnmounted(() => {
   gap: 6px;
 }
 
-/* ═══ 头像行 ═══ */
+/* ── 头像行:粉彩圆徽 ── */
 
 .avatar-row {
   flex: none;
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 10px;
+  gap: 4px 12px;
   justify-content: center;
   margin-bottom: 6px;
 }
@@ -1450,51 +1565,57 @@ onUnmounted(() => {
   align-items: center;
   gap: 1px;
   cursor: pointer;
-  opacity: 0.45;
-  transition: opacity 0.25s;
+  opacity: 0.5;
+  filter: saturate(0.4);
+  transition: all 0.25s;
 }
 
-.avatar.focus {
-  opacity: 1;
-}
-
+.avatar.focus,
 .avatar.ambient {
-  opacity: 0.75;
+  opacity: 1;
+  filter: none;
 }
 
 .avatar-glyph {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
-  border: 1px solid var(--line);
-  background: var(--panel-lit);
-  color: var(--lamp-bright);
+  border: 2px solid #fff;
+  background: linear-gradient(160deg, var(--sakura-soft), #fde8ee);
+  color: #b04a66;
   font-size: 1em;
+  box-shadow: 0 2px 6px rgba(63, 132, 170, 0.18);
 }
 
 .avatar.focus .avatar-glyph {
-  border-color: var(--lamp);
-  box-shadow: 0 0 10px rgba(217, 163, 92, 0.4);
+  border-color: var(--sakura);
+  animation: avatar-bounce 0.4s ease;
+}
+
+@keyframes avatar-bounce {
+  40% {
+    transform: translateY(-3px);
+  }
 }
 
 .avatar-glyph.big {
-  width: 44px;
-  height: 44px;
+  width: 46px;
+  height: 46px;
   font-size: 1.25em;
 }
 
 .avatar-name {
   font-size: 0.68em;
-  color: var(--paper-faded);
+  color: var(--ink-soft);
 }
 
 .avatar.focus .avatar-name {
-  color: var(--lamp);
+  color: var(--sakura);
 }
 
-/* ═══ 待办条 ═══ */
+/* ── 待办条:便签风 ── */
 
 .todo-bar {
   flex: none;
@@ -1503,15 +1624,16 @@ onUnmounted(() => {
   align-items: center;
   gap: 2px 12px;
   font-size: 0.74em;
-  color: var(--paper-faded);
-  border: 1px dashed var(--line-soft);
-  border-radius: 4px;
-  padding: 3px 8px;
+  color: var(--ink-soft);
+  background: #fffbe8;
+  border: 1px dashed var(--wood);
+  border-radius: 8px;
+  padding: 4px 10px;
   margin-bottom: 6px;
 }
 
 .todo-item.done {
-  color: var(--verdigris);
+  color: var(--leaf);
   text-decoration: line-through;
 }
 
@@ -1519,15 +1641,18 @@ onUnmounted(() => {
   margin-left: auto;
 }
 
-/* ═══ 卷轴 ═══ */
+/* ── 卷轴:暖白阅读卡 ── */
 
 .story {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 4px 6px;
+  padding: 8px 12px;
+  background: var(--cream);
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
   scrollbar-width: thin;
-  scrollbar-color: var(--lamp-deep) transparent;
+  scrollbar-color: var(--wood) transparent;
 }
 
 .story-entry {
@@ -1536,23 +1661,23 @@ onUnmounted(() => {
 }
 
 .story-player {
-  color: var(--lamp);
+  color: var(--sky);
   font-size: 0.88em;
   margin: 6px 0;
   padding-left: 8px;
-  border-left: 2px solid var(--line);
+  border-left: 3px solid var(--sky-soft);
 }
 
 .narr {
-  color: var(--paper);
+  color: var(--ink);
   font-size: 0.9em;
-  line-height: 1.75;
+  line-height: 1.8;
   margin: 5px 0;
   text-indent: 2em;
 }
 
 .scribing {
-  color: var(--paper-faded);
+  color: var(--ink-soft);
   font-size: 0.8em;
   display: flex;
   align-items: center;
@@ -1565,7 +1690,7 @@ onUnmounted(() => {
   right: 0;
   background: none;
   border: none;
-  color: var(--paper-faded);
+  color: var(--ink-faint);
   opacity: 0;
   cursor: pointer;
   font-size: 0.85em;
@@ -1573,17 +1698,17 @@ onUnmounted(() => {
 }
 
 .story-entry:hover .entry-edit {
-  opacity: 0.7;
+  opacity: 0.8;
 }
 
 .edit-area {
   width: 100%;
   box-sizing: border-box;
-  background: var(--panel);
-  color: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 6px;
+  background: #fff;
+  color: var(--ink);
+  border: 1.5px solid var(--sky);
+  border-radius: 8px;
+  padding: 6px 8px;
   font-family: inherit;
   font-size: 0.88em;
   line-height: 1.6;
@@ -1604,14 +1729,14 @@ onUnmounted(() => {
 .candle {
   background: none;
   border: none;
-  color: var(--lamp-deep);
+  color: var(--ink-faint);
   cursor: pointer;
-  font-size: 0.85em;
+  font-size: 0.9em;
   transition: color 0.2s;
 }
 
 .candle:hover {
-  color: var(--lamp);
+  color: var(--sky);
 }
 
 .candle.armed {
@@ -1619,7 +1744,7 @@ onUnmounted(() => {
   font-size: 0.78em;
 }
 
-/* ═══ 场景条 / 选项 / 输入 ═══ */
+/* ── 场景条 / 选项 / 输入 ── */
 
 .scene-bar {
   flex: none;
@@ -1627,18 +1752,20 @@ onUnmounted(() => {
   align-items: center;
   gap: 10px;
   font-size: 0.82em;
-  border-top: 1px solid var(--line-soft);
-  padding: 5px 2px 0;
+  padding: 6px 2px 0;
 }
 
 .scene-name {
-  color: var(--lamp);
+  color: var(--ink);
   white-space: nowrap;
+  background: var(--sky-soft);
+  border-radius: 999px;
+  padding: 1px 10px;
 }
 
 .scene-occ {
   flex: 1;
-  color: var(--paper-faded);
+  color: var(--ink-soft);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1648,26 +1775,28 @@ onUnmounted(() => {
   flex: none;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  margin-top: 5px;
+  gap: 4px;
+  margin-top: 6px;
 }
 
 .option-chip {
   text-align: left;
-  background: var(--panel);
-  border: 1px solid var(--line-soft);
-  border-radius: 4px;
-  color: var(--paper);
+  background: var(--paper-card);
+  border: 1.5px solid var(--line-soft);
+  border-radius: 10px;
+  color: var(--ink);
   font-family: inherit;
   font-size: 0.8em;
-  padding: 4px 8px;
+  padding: 5px 10px;
   cursor: pointer;
-  transition: all 0.2s;
+  box-shadow: 0 1px 3px rgba(63, 132, 170, 0.1);
+  transition: all 0.18s;
 }
 
-.option-chip:hover {
-  border-color: var(--lamp);
-  color: var(--lamp-bright);
+.option-chip:hover:not(:disabled) {
+  border-color: var(--sky);
+  color: var(--sky);
+  transform: translateX(2px);
 }
 
 .quill {
@@ -1680,11 +1809,11 @@ onUnmounted(() => {
 .quill textarea {
   flex: 1;
   resize: none;
-  background: var(--panel);
-  color: var(--paper);
-  border: 1px solid var(--line-soft);
-  border-radius: 4px;
-  padding: 5px 8px;
+  background: var(--paper-card);
+  color: var(--ink);
+  border: 1.5px solid var(--line-soft);
+  border-radius: 10px;
+  padding: 6px 10px;
   font-family: inherit;
   font-size: 0.88em;
   line-height: 1.5;
@@ -1692,7 +1821,7 @@ onUnmounted(() => {
 
 .quill textarea:focus {
   outline: none;
-  border-color: var(--lamp);
+  border-color: var(--sky);
 }
 
 .quill-btn {
@@ -1704,19 +1833,21 @@ onUnmounted(() => {
   display: flex;
   gap: 10px;
   justify-content: center;
-  margin-top: 5px;
+  margin-top: 6px;
 }
 
-/* ═══ 遮罩与面板 ═══ */
+/* ── 遮罩与白卡面板 ── */
 
 .mask {
   position: absolute;
   inset: 0;
   z-index: 30;
-  background: rgba(10, 7, 5, 0.72);
+  background: rgba(58, 110, 138, 0.35);
+  backdrop-filter: blur(2px);
   display: grid;
   place-items: center;
   padding: 12px;
+  border-radius: 14px;
 }
 
 .sheet {
@@ -1726,38 +1857,54 @@ onUnmounted(() => {
   max-height: 94%;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(178deg, var(--dusk-2), var(--dusk));
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 12px 14px;
-  box-shadow: 0 14px 42px rgba(0, 0, 0, 0.8);
+  background: var(--paper-card);
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 10px 32px rgba(30, 90, 125, 0.35);
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: var(--lamp-deep) transparent;
+  scrollbar-color: var(--wood) transparent;
 }
 
 .sheet-close {
   position: absolute;
-  top: 6px;
-  right: 8px;
-  background: none;
-  border: none;
-  color: var(--paper-faded);
-  font-size: 1em;
+  top: 8px;
+  right: 10px;
+  z-index: 5;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  border: 1.5px solid var(--line);
+  border-radius: 50%;
+  color: var(--ink-soft);
+  font-size: 0.8em;
   cursor: pointer;
 }
 
 .sheet-close:hover {
-  color: var(--lamp);
+  color: var(--sakura);
+  border-color: var(--sakura);
 }
 
 .sheet-title {
   text-align: center;
-  color: var(--lamp-bright);
+  color: var(--ink);
   letter-spacing: 0.35em;
   text-indent: 0.35em;
   font-size: 1em;
   margin-bottom: 6px;
+}
+
+.sheet-title::after {
+  content: '';
+  display: block;
+  width: 46px;
+  height: 3px;
+  margin: 5px auto 0;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--sakura), var(--sky));
 }
 
 .sheet-body {
@@ -1769,97 +1916,529 @@ onUnmounted(() => {
 .toast {
   position: absolute;
   left: 50%;
-  bottom: 66px;
+  bottom: 70px;
   transform: translateX(-50%);
   z-index: 40;
-  background: var(--panel-lit);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  color: var(--lamp-bright);
+  background: var(--paper-card);
+  border: 1.5px solid var(--sakura-soft);
+  border-radius: 999px;
+  color: var(--ink);
   font-size: 0.82em;
-  padding: 5px 14px;
+  padding: 6px 18px;
   white-space: nowrap;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 4px 14px rgba(30, 90, 125, 0.25);
+  animation: toast-pop 0.25s ease;
 }
 
-/* ═══ 地图:公寓立面 ═══ */
-
-.map-sheet {
-  width: min(420px, 96%);
+@keyframes toast-pop {
+  from {
+    transform: translate(-50%, 8px);
+    opacity: 0;
+  }
 }
 
-.building {
+/* ═══ gal 地图:天空随时段变色 + 公寓立面插画 ═══ */
+
+.map-mask {
+  padding: 8px;
+}
+
+.galmap {
+  position: relative;
+  box-sizing: border-box;
+  width: min(440px, 98%);
+  max-height: 96%;
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  padding: 4px 2px 8px;
+  border-radius: 14px;
+  padding: 12px 14px 14px;
+  overflow: hidden auto;
+  box-shadow: 0 10px 32px rgba(30, 90, 125, 0.4);
+  scrollbar-width: thin;
+  transition: background 0.6s ease;
 }
 
-.floor-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 5px;
+/* 时段天色(扁平色带) */
+.sky-早 {
+  background: linear-gradient(180deg, #9dd7ef 0%, #cfeefb 55%, #fdeedd 100%);
 }
 
-.floor-row.ground {
-  grid-template-columns: repeat(5, 1fr);
+.sky-午 {
+  background: linear-gradient(180deg, #5fb9e6 0%, #a8dcf4 60%, #dff3fc 100%);
 }
 
-.map-room {
+.sky-晚 {
+  background: linear-gradient(180deg, #7796c9 0%, #eba24f 55%, #f7d5a0 100%);
+}
+
+.sky-深夜 {
+  background: linear-gradient(180deg, #232f52 0%, #3a4a77 60%, #56628f 100%);
+}
+
+.sky-深夜 .map-banner {
+  color: #e8ecfa;
+}
+
+/* 天空装饰:日/月/云/星(纯CSS扁平) */
+.sky-deco {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.orb {
+  position: absolute;
+  top: 26px;
+  right: 40px;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #ffe28a;
+  box-shadow: 0 0 0 8px rgba(255, 226, 138, 0.25);
+}
+
+.sky-晚 .orb {
+  top: 90px;
+  background: #ff9d5c;
+  box-shadow: 0 0 0 10px rgba(255, 157, 92, 0.25);
+}
+
+.sky-深夜 .orb {
+  background: transparent;
+  box-shadow: inset -9px -4px 0 0 #f4f0d8;
+  transform: rotate(-20deg);
+}
+
+.cloud {
+  position: absolute;
+  height: 14px;
+  width: 52px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.85);
+  animation: cloud-drift 26s linear infinite;
+}
+
+.cloud::before {
+  content: '';
+  position: absolute;
+  top: -8px;
+  left: 12px;
+  width: 22px;
+  height: 16px;
+  border-radius: 50%;
+  background: inherit;
+}
+
+.sky-深夜 .cloud {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.cloud.c1 {
+  top: 30px;
+  left: 8%;
+}
+
+.cloud.c2 {
+  top: 64px;
+  left: 46%;
+  transform: scale(0.75);
+  animation-duration: 34s;
+}
+
+.cloud.c3 {
+  top: 14px;
+  left: 68%;
+  transform: scale(0.6);
+  animation-duration: 40s;
+}
+
+@keyframes cloud-drift {
+  50% {
+    margin-left: 26px;
+  }
+}
+
+.star {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: #fff;
+  animation: star-wink 2.4s ease-in-out infinite;
+}
+
+.star.s1 {
+  top: 22px;
+  left: 16%;
+}
+
+.star.s2 {
+  top: 48px;
+  left: 32%;
+  animation-delay: 0.7s;
+}
+
+.star.s3 {
+  top: 18px;
+  left: 55%;
+  animation-delay: 1.3s;
+}
+
+.star.s4 {
+  top: 60px;
+  left: 78%;
+  animation-delay: 1.9s;
+}
+
+@keyframes star-wink {
+  50% {
+    opacity: 0.2;
+  }
+}
+
+.map-banner {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  color: var(--ink);
+  padding: 2px 4px 8px;
+}
+
+.map-banner b {
+  font-size: 1em;
+  letter-spacing: 0.12em;
+}
+
+.map-banner em {
+  font-style: normal;
+  font-size: 0.78em;
+  opacity: 0.85;
+}
+
+/* 楼体:白墙 + 木顶 + 窗灯 */
+.bldg {
+  position: relative;
+  z-index: 1;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  margin-top: auto;
+}
+
+.roofline {
+  display: flex;
+  justify-content: center;
+  padding: 0 18px;
+}
+
+.roof-card {
+  width: 60%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1px;
-  background: var(--panel);
-  border: 1px solid var(--line-soft);
-  border-radius: 4px;
-  color: var(--paper);
+  gap: 0;
+  padding: 5px 4px 3px;
   font-family: inherit;
-  padding: 7px 4px;
+  color: var(--ink);
+  background:
+    repeating-linear-gradient(90deg, transparent 0 10px, rgba(74, 69, 68, 0.25) 10px 12px),
+    linear-gradient(180deg, #f2f7f9, #e2edf2);
+  border: 2px solid var(--wood-deep);
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.18s;
 }
 
-.map-room:hover {
-  border-color: var(--lamp);
+.roof-card:hover,
+.roof-card.here {
+  background:
+    repeating-linear-gradient(90deg, transparent 0 10px, rgba(74, 69, 68, 0.25) 10px 12px),
+    linear-gradient(180deg, #fff, #eef6f9);
+  border-color: var(--sakura);
 }
 
-.map-room.here {
-  border-color: var(--lamp);
-  background: var(--panel-lit);
-  box-shadow: inset 0 0 14px rgba(217, 163, 92, 0.14);
+.bldg-body {
+  display: flex;
+  flex-direction: column;
+  border: 2px solid var(--wood-deep);
+  border-radius: 6px 6px 0 0;
+  background: #fdfaf4;
+  overflow: hidden;
 }
 
-.map-room.vacant {
-  opacity: 0.4;
-  cursor: default;
+.bfloor {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 2px solid rgba(169, 127, 82, 0.5);
 }
 
-.map-room.roof {
-  align-self: center;
-  width: 46%;
+.bfloor:last-child {
+  border-bottom: none;
 }
 
-.map-room.pub {
-  padding: 5px 2px;
+.bunit {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding: 7px 4px 5px;
+  font-family: inherit;
+  color: var(--ink);
+  background: #fdfaf4;
+  border: none;
+  border-left: 2px solid rgba(169, 127, 82, 0.35);
+  cursor: pointer;
+  transition: background 0.18s;
 }
 
-.room-name {
-  font-size: 0.82em;
-  color: var(--lamp);
-  letter-spacing: 0.06em;
+.bunit:first-child {
+  border-left: none;
 }
 
-.room-sub {
-  font-size: 0.7em;
-  color: var(--paper-faded);
+.bunit:hover {
+  background: #fff3f6;
 }
 
-.room-occ {
-  min-height: 1em;
+.bunit.here {
+  background: var(--sakura-soft);
+}
+
+.bunit.vacant {
+  color: var(--ink-faint);
+  background: #f4f1ea;
+}
+
+.unit-window {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 3px;
+}
+
+.unit-window i {
+  width: 14px;
+  height: 11px;
+  border-radius: 2px;
+  border: 1.5px solid var(--wood-deep);
+  background: var(--sky-soft);
+  transition: all 0.4s;
+}
+
+.bunit.lit .unit-window i {
+  background: var(--amber);
+  box-shadow: 0 0 8px rgba(242, 182, 79, 0.8);
+}
+
+.sky-深夜 .bunit:not(.lit) .unit-window i,
+.sky-晚 .bunit:not(.lit) .unit-window i {
+  background: #6d7896;
+}
+
+.unit-plate {
   font-size: 0.72em;
-  color: var(--lamp-bright);
-  letter-spacing: 0.2em;
+  color: #fff;
+  background: var(--sky);
+  border-radius: 4px;
+  padding: 0 6px;
+  letter-spacing: 0.08em;
+}
+
+.bunit.vacant .unit-plate {
+  background: var(--ink-faint);
+}
+
+.unit-sub {
+  font-size: 0.72em;
+  margin-top: 2px;
+}
+
+.unit-name {
+  font-size: 0.78em;
+  letter-spacing: 0.1em;
+}
+
+.unit-occ {
+  min-height: 1.1em;
+  font-size: 0.72em;
+  color: var(--sakura);
+  letter-spacing: 0.22em;
+}
+
+/* 底层公共区:木色门脸一条街 */
+.bground {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0;
+  border: 2px solid var(--wood-deep);
+  border-top: 2px solid rgba(169, 127, 82, 0.6);
+  border-radius: 0 0 6px 6px;
+  background: linear-gradient(180deg, #f0e4d0, #e6d5ba);
+  overflow: hidden;
+}
+
+.gunit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 2px 5px;
+  font-family: inherit;
+  color: var(--ink);
+  background: transparent;
+  border: none;
+  border-left: 1.5px solid rgba(169, 127, 82, 0.4);
+  cursor: pointer;
+  transition: background 0.18s;
+}
+
+.gunit:first-child {
+  border-left: none;
+}
+
+.gunit:hover {
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.gunit.here {
+  background: var(--sakura-soft);
+}
+
+/* ── 行动卡片(anime弹卡:氛围+在场+动作) ── */
+
+.room-card {
+  position: relative;
+  z-index: 2;
+  flex: none;
+  margin-top: 10px;
+  background: var(--paper-card);
+  border-radius: 12px;
+  padding: 10px 12px;
+  box-shadow: 0 6px 20px rgba(30, 90, 125, 0.3);
+}
+
+.room-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 12px;
+  right: 12px;
+  height: 4px;
+  border-radius: 0 0 4px 4px;
+  background: linear-gradient(90deg, var(--sakura), var(--sky));
+}
+
+.rc-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 2px 0 4px;
+}
+
+.rc-head b {
+  color: var(--ink);
+  font-size: 0.95em;
+  letter-spacing: 0.08em;
+}
+
+.rc-head em {
+  font-style: normal;
+  font-size: 0.75em;
+  color: var(--sakura);
+}
+
+.rc-head em.rc-empty,
+.rc-empty {
+  color: var(--ink-faint);
+  font-style: normal;
+  font-size: 0.75em;
+}
+
+.rc-mood {
+  margin: 0 0 8px;
+  font-size: 0.78em;
+  line-height: 1.6;
+  color: var(--ink-soft);
+}
+
+.rc-acts {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.act-btn {
+  text-align: left;
+  font-family: inherit;
+  font-size: 0.82em;
+  color: var(--ink);
+  background: #fff;
+  border: 1.5px solid var(--line-soft);
+  border-radius: 10px;
+  padding: 6px 10px;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(63, 132, 170, 0.1);
+  transition: all 0.15s;
+}
+
+.act-btn:hover {
+  border-color: var(--sky);
+  color: var(--sky);
+  transform: translateX(2px);
+}
+
+.act-btn.risky {
+  border-color: rgba(224, 106, 96, 0.4);
+}
+
+.act-btn.risky:hover {
+  border-color: var(--seal);
+  color: var(--seal);
+}
+
+/* 弹卡动画(anime pop) */
+.card-pop-enter-active {
+  animation: card-pop-in 0.28s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.card-pop-leave-active {
+  transition: all 0.15s ease;
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+@keyframes card-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(26px) scale(0.94);
+  }
+}
+
+/* 线索卡:翻出动画 */
+.clue-card {
+  margin-top: 8px;
+  background: #fffbe8;
+  border: 1.5px dashed var(--wood);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 0.8em;
+  line-height: 1.65;
+  color: var(--ink);
+  transform-origin: top center;
+}
+
+.clue-flip-enter-active {
+  animation: clue-flip-in 0.42s cubic-bezier(0.34, 1.3, 0.64, 1);
+}
+
+@keyframes clue-flip-in {
+  from {
+    opacity: 0;
+    transform: perspective(500px) rotateX(-72deg);
+  }
 }
 
 /* ═══ 难度三档卡 ═══ */
@@ -1867,51 +2446,60 @@ onUnmounted(() => {
 .diff-row {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin: 10px 0 14px;
+  gap: 10px;
+  margin: 12px 0 16px;
 }
 
 .diff-card {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  background: var(--panel);
-  border: 1px solid var(--line-soft);
-  border-radius: 6px;
-  color: var(--paper);
+  background: var(--paper-card);
+  border: 2px solid var(--line-soft);
+  border-radius: 14px;
+  color: var(--ink);
   font-family: inherit;
-  padding: 12px 8px;
+  padding: 14px 10px;
   cursor: pointer;
-  transition: all 0.22s;
+  box-shadow: var(--card-shadow);
+  transition: all 0.2s;
 }
 
 .diff-card:hover {
-  border-color: var(--lamp);
+  transform: translateY(-2px);
+  border-color: var(--sky);
 }
 
 .diff-card.chosen {
-  border-color: var(--lamp);
-  background: var(--panel-lit);
-  box-shadow: 0 0 16px rgba(217, 163, 92, 0.18);
+  border-color: var(--sakura);
+  background: #fff7f9;
+  box-shadow: 0 6px 18px rgba(240, 131, 159, 0.3);
+  transform: translateY(-2px);
 }
 
 .diff-name {
-  color: var(--lamp-bright);
+  color: var(--ink);
   font-size: 1em;
   letter-spacing: 0.24em;
   text-indent: 0.24em;
+  text-align: center;
+}
+
+.diff-card.chosen .diff-name {
+  color: var(--sakura);
 }
 
 .diff-desc {
   font-size: 0.74em;
-  color: var(--paper-faded);
+  color: var(--ink-soft);
   line-height: 1.6;
   min-height: 3.2em;
 }
 
 .diff-meta {
   font-size: 0.72em;
-  color: var(--verdigris);
+  color: var(--sky);
+  text-align: center;
 }
 
 /* ═══ 档案卡 ═══ */
@@ -1924,20 +2512,23 @@ onUnmounted(() => {
 }
 
 .dossier-name {
-  color: var(--lamp-bright);
+  color: var(--ink);
   font-size: 1.05em;
   letter-spacing: 0.1em;
 }
 
 .dossier-role {
-  color: var(--paper-faded);
+  color: var(--ink-faint);
   font-size: 0.78em;
 }
 
 .dossier-stage {
   margin-left: auto;
-  color: var(--lamp);
-  font-size: 0.85em;
+  color: #fff;
+  background: var(--sakura);
+  border-radius: 999px;
+  padding: 1px 10px;
+  font-size: 0.78em;
 }
 
 .axes {
@@ -1956,44 +2547,44 @@ onUnmounted(() => {
 
 .axis-label {
   width: 2.6em;
-  color: var(--paper-faded);
+  color: var(--ink-soft);
   text-align: right;
 }
 
 .axis {
   flex: 1;
-  height: 5px;
-  background: rgba(0, 0, 0, 0.5);
-  border: 1px solid var(--line-soft);
-  border-radius: 3px;
+  height: 8px;
+  background: #efece5;
+  border-radius: 999px;
   overflow: hidden;
 }
 
 .bar {
   display: block;
   height: 100%;
+  border-radius: 999px;
   transition: width 0.5s ease;
 }
 
 .bar.fav {
-  background: linear-gradient(90deg, var(--lamp-deep), var(--lamp));
+  background: linear-gradient(90deg, var(--sakura-soft), var(--sakura));
 }
 
 .bar.sin {
-  background: linear-gradient(90deg, #5e2418, var(--seal));
+  background: linear-gradient(90deg, #f3b8ae, var(--seal));
 }
 
 .bar.marr {
-  background: linear-gradient(90deg, #2e4a40, var(--verdigris));
+  background: linear-gradient(90deg, #bfe0d6, var(--verdigris));
 }
 
 .bar.dev {
-  background: linear-gradient(90deg, #5e2418, #b06a4a);
+  background: linear-gradient(90deg, #f8ceb8, #ec9468);
 }
 
 .axis-num {
   width: 2em;
-  color: var(--paper);
+  color: var(--ink);
   text-align: right;
   font-size: 0.94em;
 }
@@ -2003,18 +2594,19 @@ onUnmounted(() => {
   height: 44px;
   margin-top: 2px;
   border: 1px solid var(--line-soft);
-  border-radius: 3px;
-  background: rgba(0, 0, 0, 0.35);
+  border-radius: 8px;
+  background: #fcfaf5;
 }
 
 .trend polyline {
   fill: none;
-  stroke-width: 1;
+  stroke-width: 1.4;
   vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
 }
 
 .trend-fav {
-  stroke: var(--lamp);
+  stroke: var(--sakura);
 }
 
 .trend-sin {
@@ -2033,7 +2625,7 @@ onUnmounted(() => {
 }
 
 .tl-fav {
-  color: var(--lamp);
+  color: var(--sakura);
 }
 
 .tl-sin {
@@ -2045,17 +2637,17 @@ onUnmounted(() => {
 }
 
 .tl-hint {
-  color: var(--paper-faded);
+  color: var(--ink-faint);
 }
 
 .dsec {
-  border-top: 1px solid var(--line-soft);
-  padding: 6px 0 2px;
-  margin-top: 4px;
+  border-top: 1px dashed var(--line-soft);
+  padding: 7px 0 2px;
+  margin-top: 5px;
 }
 
 .dsec-title {
-  color: var(--lamp);
+  color: var(--sky);
   font-size: 0.8em;
   letter-spacing: 0.3em;
   margin-bottom: 4px;
@@ -2063,23 +2655,25 @@ onUnmounted(() => {
 
 .dline {
   font-size: 0.8em;
-  color: var(--paper);
+  color: var(--ink);
   margin: 3px 0;
 }
 
 .dline b {
-  color: var(--paper-faded);
+  color: var(--ink-faint);
   font-weight: normal;
   margin-right: 6px;
 }
 
 .dsealed {
   font-size: 0.78em;
-  color: var(--paper-faded);
-  border: 1px dashed var(--line-soft);
-  border-radius: 4px;
-  padding: 6px 8px;
+  color: var(--ink-soft);
+  background: #f4f8fa;
+  border: 1.5px dashed var(--sky-soft);
+  border-radius: 10px;
+  padding: 7px 10px;
   margin: 6px 0;
+  line-height: 1.6;
 }
 
 .attire-grid,
@@ -2093,17 +2687,22 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   font-size: 0.76em;
-  border-left: 2px solid var(--line-soft);
+  border-left: 3px solid var(--sakura-soft);
+  border-radius: 2px;
   padding-left: 6px;
 }
 
 .a-cell small {
-  color: var(--paper-faded);
+  color: var(--ink-faint);
 }
 
 .a-cell b {
-  color: var(--paper);
+  color: var(--ink);
   font-weight: normal;
+}
+
+.crack-hint {
+  color: var(--sakura);
 }
 
 /* ═══ 背包 / 商店 ═══ */
@@ -2112,7 +2711,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   border-top: 1px dashed var(--line-soft);
-  padding: 5px 0;
+  padding: 6px 0;
   font-size: 0.82em;
 }
 
@@ -2121,17 +2720,18 @@ onUnmounted(() => {
 }
 
 .ware b {
-  color: var(--lamp);
+  color: var(--ink);
   font-weight: normal;
 }
 
 .ware-desc {
-  color: var(--paper-faded);
+  color: var(--ink-soft);
   font-size: 0.92em;
+  line-height: 1.55;
 }
 
 .ware-price {
-  color: var(--verdigris);
+  color: var(--sky);
   font-style: normal;
   margin-left: 8px;
   font-size: 0.9em;
@@ -2141,62 +2741,61 @@ onUnmounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 3px;
+  margin-top: 4px;
 }
 
 .shop-tabs {
   display: flex;
   align-items: center;
   gap: 8px;
-  border-bottom: 1px solid var(--line-soft);
-  padding-bottom: 5px;
+  border-bottom: 1.5px solid var(--line-soft);
+  padding-bottom: 6px;
   margin-bottom: 4px;
 }
 
 .shop-tabs .btn.on {
-  color: var(--lamp-bright);
-  text-shadow: 0 0 8px rgba(242, 207, 154, 0.5);
+  color: #fff;
+  background: var(--sky);
+  border-color: var(--sky);
 }
 
 .shop-cash {
   margin-left: auto;
   font-size: 0.8em;
-  color: var(--verdigris);
+  color: var(--sky);
 }
 
-/* ═══ 偷窥余像 / 读信 / 裂缝 ═══ */
+/* ═══ 偷窥余像 / 读信 ═══ */
 
 .peep-card {
   flex: none;
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 6px 8px;
-  margin-top: 5px;
-  background: var(--panel-lit);
+  gap: 4px;
+  border: 1.5px solid var(--sky-soft);
+  border-radius: 12px;
+  padding: 8px 10px;
+  margin-top: 6px;
+  background: var(--paper-card);
+  box-shadow: var(--card-shadow);
+  animation: card-pop-in 0.28s cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
 .peep-card .hint {
   margin: 0 0 2px;
-  color: var(--lamp);
+  color: var(--sky);
 }
 
 .letter {
-  border: 1px dashed var(--line);
-  border-radius: 4px;
-  padding: 10px 12px;
+  background: #fffbe8;
+  border: 1.5px dashed var(--wood);
+  border-radius: 10px;
+  padding: 12px 14px;
   margin: 4px 0 10px;
-  background: rgba(0, 0, 0, 0.3);
 }
 
 .narr.no-indent {
   text-indent: 0;
-}
-
-.crack-hint {
-  color: var(--lamp);
 }
 
 /* ═══ 坏结局 ═══ */
@@ -2211,7 +2810,7 @@ onUnmounted(() => {
 }
 
 .ending-line {
-  color: var(--paper);
+  color: var(--ink);
   font-size: 0.95em;
   text-align: center;
   max-width: 34em;

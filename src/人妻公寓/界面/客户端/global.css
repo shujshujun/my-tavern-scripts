@@ -1,32 +1,49 @@
-/* 人妻公寓客户端 - 暖调市井(老公寓的黄昏光感;正式视觉语言 P1 定稿) */
+/* 人妻公寓客户端 - 日式小清新(奶油纸底 × 樱粉 × 天青 × 原木;2026-07-16 用户定调换掉暗色暮调) */
 
 :root {
-  /* 暖底(旧楼道的暗木与暮色) */
-  --dusk: #14100c;
-  --dusk-2: #201812;
-  --panel: rgba(32, 24, 18, 0.78);
-  --panel-lit: rgba(46, 34, 24, 0.88);
-  /* 暖光(楼道声控灯的昏黄) */
-  --lamp: #d9a35c;
-  --lamp-bright: #f2cf9a;
-  --lamp-deep: #7a5a2e;
-  --paper: #cfc2a8;
-  --paper-faded: #93866c;
-  /* 点睛(信箱红与门牌铜绿) */
-  --seal: #a54832;
-  --verdigris: #4f7a6a;
-  /* 描边 */
-  --line: rgba(217, 163, 92, 0.4);
-  --line-soft: rgba(217, 163, 92, 0.18);
+  /* 扁平日系(参考图定调:白色圆角框浮在明亮天蓝底上,赛璐璐平涂) */
+  --frame-bg: #63bfe8; /* 画框外的亮蓝底 */
+  --paper-bg: #f6fbfe; /* 页面底:近白的天光 */
+  --paper-card: #ffffff;
+  --cream: #fff9ef; /* 正文阅读区暖白 */
+  --ink: #4a4544;
+  --ink-soft: #8b8582;
+  --ink-faint: #bab3ae;
+  /* 点色(樱粉/天青/叶绿/原木/晒衣白) */
+  --sakura: #f0839f;
+  --sakura-soft: #fbd3dd;
+  --sky: #3ea7d7;
+  --sky-soft: #d8effa;
+  --leaf: #8fc08a;
+  --wood: #d8b48c;
+  --wood-deep: #a97f52;
+  --amber: #f2b64f; /* 窗灯 */
+  /* 描边与投影(扁平风:细描边+浅投影) */
+  --line: rgba(74, 69, 68, 0.22);
+  --line-soft: rgba(74, 69, 68, 0.1);
+  --card-shadow: 0 3px 12px rgba(63, 132, 170, 0.16);
   --font-body: 'Noto Serif SC', 'Source Han Serif SC', 'STSong', serif;
+
+  /* ── 兼容旧 token(值映射到新调色盘,漏改处不至于穿帮) ── */
+  --dusk: #f6fbfe;
+  --dusk-2: #eaf5fb;
+  --panel: #ffffff;
+  --panel-lit: #fff4f6;
+  --lamp: #d98f3f;
+  --lamp-bright: #b06f22;
+  --lamp-deep: #ecd3ae;
+  --paper: #4a4544;
+  --paper-faded: #8b8582;
+  --seal: #e06a60;
+  --verdigris: #4f9482;
 }
 
 html,
 body {
   margin: 0;
   padding: 0;
-  background: var(--dusk);
-  color: var(--paper);
+  background: var(--paper-bg);
+  color: var(--ink);
   font-family: var(--font-body);
 }
 
