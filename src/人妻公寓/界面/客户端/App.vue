@@ -115,7 +115,14 @@
             :title="项.妻名 + '(' + 项.门牌 + ')'"
             @click="选中门牌 = 项.门牌"
           >
-            <span class="avatar-glyph">{{ 项.妻名[0] }}</span>
+            <img
+              v-if="!头像失效[项.妻名]"
+              class="avatar-glyph img"
+              :src="头像图(项.妻名)"
+              :alt="项.妻名"
+              @error="头像失效[项.妻名] = true"
+            />
+            <span v-else class="avatar-glyph">{{ 项.妻名[0] }}</span>
             <span class="avatar-name">{{ 项.妻名 }}</span>
           </div>
         </div>
@@ -129,7 +136,7 @@
         </div>
 
         <!-- 正文卷轴:只演当前幕,且幕跟着房间走——人走了戏就收,回来戏还在(氛围色随位置) -->
-        <section ref="卷轴容器" class="story" :style="场景色">
+        <section ref="卷轴容器" class="story" :style="[场景色, 场景图样式]">
           <!-- 到场卡:走动后的新场景,给地点一个"开场镜头"(旧正文属于旧场景,隐去) -->
           <div v-if="!在幕中 && !发送中" class="arrive">
             <div class="ui-kicker">{{ 当前房间 ? 'ARRIVE / 到场' : 'HALLWAY / 楼道' }}</div>
@@ -324,7 +331,14 @@
         <div class="sheet dossier">
           <button class="sheet-close" @click="选中门牌 = null">✕</button>
           <div class="dossier-head">
-            <span class="avatar-glyph big">{{ 选中档案.妻名[0] }}</span>
+            <img
+              v-if="!头像失效[选中档案.妻名]"
+              class="avatar-glyph big img"
+              :src="头像图(选中档案.妻名)"
+              :alt="选中档案.妻名"
+              @error="头像失效[选中档案.妻名] = true"
+            />
+            <span v-else class="avatar-glyph big">{{ 选中档案.妻名[0] }}</span>
             <span class="dossier-id">
               <span class="dossier-name">{{ 选中档案.妻名 }}</span>
               <span class="hearts" :title="'阶段:' + 选中档案.妻.阶段标题">
@@ -373,7 +387,14 @@
             <div class="dsec husband">
               <div class="dsec-title">她 的 丈 夫</div>
               <div class="hb-row">
-                <span class="avatar-glyph hb">{{ 选中档案.夫名[0] }}</span>
+                <img
+                  v-if="!头像失效['影子']"
+                  class="avatar-glyph hb img"
+                  :src="头像图('影子')"
+                  alt="丈夫"
+                  @error="头像失效['影子'] = true"
+                />
+                <span v-else class="avatar-glyph hb">{{ 选中档案.夫名[0] }}</span>
                 <span class="hb-main">
                   <b>{{ 选中档案.夫名 }}</b>
                   <small>此刻{{ 选中档案.夫状态 }}</small>
@@ -906,6 +927,9 @@ const 场景色 = computed(() => {
   return { '--sc-a': c[0], '--sc-b': c[1] };
 });
 
+/** 正文区背景图(CSS 变量进 .story 的多层 background,垫在氛围色渐变+白纱之下;图挂了渐变就是兜底) */
+const 场景图样式 = computed(() => ({ '--scene-img': `url(${背景图(当前房间.value)})` }));
+
 // ── 地图数据(公寓立面:3F→1F 每层两户,顶=天台,底=公共区) ──
 
 const 楼层组 = computed(() => [
@@ -930,6 +954,22 @@ const 底层公共 = [
   { id: '楼梯间', 名称: '楼梯间' },
   { id: '垃圾房', 名称: '垃圾房' },
 ];
+
+// ── 素材(AI 生成,2026-07-17 入库;素材 TAG 与发布 TAG 解耦——素材没变就不用动这里) ──
+
+const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.08/dist/人妻公寓/素材';
+
+function 头像图(名: string): string {
+  return `${素材基址}/头像/${名}.webp`;
+}
+
+/** 图挂了(断网/边缘缓存未热)回退首字圆徽 */
+const 头像失效 = ref<Record<string, boolean>>({});
+
+function 背景图(房间id: string | null): string {
+  // 楼道没有专属图,借楼梯间的(同一栋楼的筒子间气质)
+  return `${素材基址}/背景/${房间id && 房间色[房间id] ? 房间id : '楼梯间'}.webp`;
+}
 
 // ── 头像行(脚本每回合把焦点/在场落 chat 变量 _在场) ──
 
@@ -1870,6 +1910,13 @@ onUnmounted(() => {
   font-size: 1.2em;
 }
 
+/* 头像图版本(AI 生成素材;加载失败回退首字圆徽) */
+.avatar-glyph.img {
+  object-fit: cover;
+  object-position: top;
+  background: linear-gradient(160deg, #fff4f9, #ffe3ee);
+}
+
 .avatar-name {
   font-size: 0.68em;
   color: var(--ink-soft);
@@ -1913,8 +1960,11 @@ onUnmounted(() => {
   min-height: 0;
   overflow-y: auto;
   padding: 8px 12px;
+  /* 四层:氛围色渐变 > 白纱(保可读) > 地点背景图(素材) > 玻璃底(图挂了的兜底) */
   background:
     linear-gradient(180deg, rgba(var(--sc-a, 165, 175, 195), 0.16), rgba(var(--sc-b, 205, 215, 230), 0.06) 42%, transparent 72%),
+    linear-gradient(rgba(255, 250, 245, 0.78), rgba(255, 250, 245, 0.86)),
+    var(--scene-img, none) center / cover no-repeat,
     var(--glass);
   border: 1px solid rgba(255, 255, 255, 0.6);
   border-radius: var(--radius);
@@ -3698,6 +3748,15 @@ onUnmounted(() => {
 :global(html.rq-dark) .story,
 :global(html.rq-dark) .diff-card {
   border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* 夜间:白纱换深纱,背景图压暗保可读 */
+:global(html.rq-dark) .story {
+  background:
+    linear-gradient(180deg, rgba(var(--sc-a, 165, 175, 195), 0.2), rgba(var(--sc-b, 205, 215, 230), 0.08) 42%, transparent 72%),
+    linear-gradient(rgba(30, 32, 48, 0.82), rgba(30, 32, 48, 0.88)),
+    var(--scene-img, none) center / cover no-repeat,
+    var(--glass);
 }
 
 :global(html.rq-dark) .sheet {
