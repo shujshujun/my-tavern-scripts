@@ -4,6 +4,14 @@
       <!-- 错误护栏:任何运行时异常显示在此,不再整屏空白 -->
       <div v-if="错误信息" class="err">⚠︎ 界面异常:{{ 错误信息 }}</div>
 
+      <!-- 转场横幅(gal 式地点闪卡:走动的即时反馈) -->
+      <transition name="loc-flash">
+        <div v-if="转场" :key="转场" class="loc-banner">
+          <div class="ui-kicker">MOVE</div>
+          <b>{{ 转场 }}</b>
+        </div>
+      </transition>
+
       <!-- 右上角:主题切换 + 全屏(meta 类操作,不进游戏功能区) -->
       <span class="corner-btns">
         <button class="btn mini icon" :title="暗色 ? '切回日间模式' : '切换夜间模式'" @click="切换主题">
@@ -113,9 +121,17 @@
           <button class="btn mini" title="收起待办" @click="划掉待办">✕</button>
         </div>
 
-        <!-- 正文卷轴:只演当前幕(完整历史在史册) -->
-        <section ref="卷轴容器" class="story">
-          <div v-for="(条, i) in 当前幕" :key="i" class="story-entry">
+        <!-- 正文卷轴:只演当前幕,且幕跟着房间走——人走了戏就收,回来戏还在(氛围色随位置) -->
+        <section ref="卷轴容器" class="story" :style="场景色">
+          <!-- 到场卡:走动后的新场景,给地点一个"开场镜头"(旧正文属于旧场景,隐去) -->
+          <div v-if="!在幕中 && !发送中" class="arrive">
+            <div class="ui-kicker">{{ 当前房间 ? 'ARRIVE / 到场' : 'HALLWAY / 楼道' }}</div>
+            <b>{{ 到场标题 }}</b>
+            <p class="arrive-mood">{{ 到场描写 }}</p>
+            <p v-if="当前房间 && 房内名单" class="arrive-who">这里有:{{ 房内名单 }}</p>
+            <p class="hint">{{ 到场提示 }}</p>
+          </div>
+          <div v-for="(条, i) in 在幕中 ? 当前幕 : []" :key="i" class="story-entry">
             <template v-if="条.楼 !== undefined && 条.楼 === 编辑中楼">
               <textarea v-model="编辑文本" class="edit-area" rows="8"></textarea>
               <div class="edit-acts">
@@ -618,13 +634,29 @@ function 进入(房间id: string, 破门 = false, 保持地图 = false) {
   if (!保持地图) 关地图();
   写场景(房间id, 破门);
   记待办(房间id);
+  闪转场(查房间(房间id)?.名称 ?? 房间id);
+  // 头像即时点亮(走到谁身边谁亮;回合结束后脚本按位置系统重算)
+  在场.value = { 焦点: 可见门牌.value.filter(m => 妻位置推算(m, 位置种子.value) === 房间id), 在场: [] };
 }
 
 function 离开房间() {
   当前房间.value = null;
   已破门进入.value = false;
   写场景(null);
+  闪转场('楼道');
+  在场.value = { 焦点: [], 在场: [] }; // 身边已无人,头像随之熄灭
   显示地图.value = true; // 走出房门=站上楼道,顺手展开地图选下一处
+}
+
+// ── 转场横幅(走动的即时反馈) ──
+
+const 转场 = ref('');
+let 转场计时: ReturnType<typeof setTimeout> | undefined;
+
+function 闪转场(名称: string) {
+  转场.value = 名称;
+  clearTimeout(转场计时);
+  转场计时 = setTimeout(() => (转场.value = ''), 1200);
 }
 
 /** 本次进入是否撬门而入(撬进空屋才有事可做;敲门无人应=还站在门外) */
@@ -643,13 +675,19 @@ const 可输入 = computed(() => {
   return true;
 });
 
-/** 行动选项只在"产出它们的场景"里显示(换了地方=过期建议,收起防误导) */
-const 选项房间 = ref<string | null>(null);
+/**
+ * 幕房间:最近一场戏发生的地方(回合完成时记下)。
+ * 正文与行动选项都属于"那个房间的那场戏"——人走了戏就收,回到原房间戏还在(2026-07-17 用户拍板)。
+ */
+const 幕房间 = ref<string | null>(null);
+
+/** 人还在戏发生的地方(正文可见;走动后=新场景,正文隐去换到场卡) */
+const 在幕中 = computed(() => 当前房间.value === 幕房间.value);
 
 const 显示选项 = computed(() => {
   if (发送中.value || !行动选项.value.length) return false;
-  if (!当前房间.value) return 选项房间.value === null; // 楼道态:序章引导等
-  return 可输入.value && 选项房间.value === 当前房间.value;
+  if (!当前房间.value) return 幕房间.value === null; // 楼道态:序章引导等
+  return 可输入.value && 在幕中.value;
 });
 
 // ── 行动卡片(gal式:点房弹卡,氛围+在场+可做的事;翻垃圾/撬门都收在卡里) ──
@@ -812,6 +850,51 @@ function 房内首字(房间id: string): string {
 
 const 当前房间名 = computed(() => (当前房间.value ? (查房间(当前房间.value)?.名称 ?? 当前房间.value) : ''));
 const 房内名单 = computed(() => (当前房间.value ? 房内的人(当前房间.value).join('、') : ''));
+
+// ── 到场卡与氛围色(移动的沉浸反馈:每个地点有自己的"开场镜头"和颜色) ──
+
+const 到场标题 = computed(() => 当前房间名.value || '楼道里');
+
+const 到场描写 = computed(() => {
+  const id = 当前房间.value;
+  if (!id) return '声控灯应了一声亮起来,又在你身后一盏盏熄灭。整栋楼的门都关着,门后各是各的日子。';
+  const 房 = 查房间(id);
+  if (房?.类型 === '户' && id !== '302' && !data.value.户[id]) {
+    return '窗户蒙着灰,门上贴着一张手写的招租启事。';
+  }
+  if (房?.类型 === '户' && id !== '302' && !房内有人在(id)) {
+    return 已破门进入.value ? `${房.氛围}——只是此刻没有人,静得能听见冰箱的嗡嗡声。` : '你敲了敲门。门里没有动静。';
+  }
+  return 房?.氛围 ?? '';
+});
+
+const 到场提示 = computed(() => {
+  const id = 当前房间.value;
+  if (!id) return '打开地图,看看这栋楼此刻亮着的灯。';
+  if (可输入.value) return '在这里做点什么——故事会从这里继续。';
+  return '要么改天再来,要么……对着门连点几下。';
+});
+
+/** 每个地点的氛围色(洗到正文区背景;日夜两态都吃同一组 RGB,只调透明度) */
+const 房间色: Record<string, [string, string]> = {
+  '101': ['255, 150, 110', '255, 205, 130'], // 饭菜香的暖橙
+  '102': ['120, 170, 220', '175, 205, 235'], // 一尘不染的瓷青
+  '201': ['175, 150, 220', '205, 185, 235'],
+  '202': ['245, 165, 195', '250, 200, 215'],
+  '301': ['235, 150, 170', '245, 190, 200'],
+  '302': ['255, 185, 95', '255, 220, 150'], // 你家的灯泡黄
+  大堂: ['145, 185, 205', '190, 215, 225'],
+  信箱区: ['155, 165, 185', '195, 205, 220'],
+  管理员室: ['195, 155, 105', '220, 190, 145'], // 值班桌的木色
+  楼梯间: ['135, 145, 170', '180, 190, 210'],
+  天台: ['110, 190, 235', '175, 220, 245'], // 天的颜色
+  垃圾房: ['145, 165, 125', '185, 195, 160'],
+};
+
+const 场景色 = computed(() => {
+  const c = 房间色[当前房间.value ?? ''] ?? (['165, 175, 195', '205, 215, 230'] as [string, string]);
+  return { '--sc-a': c[0], '--sc-b': c[1] };
+});
 
 // ── 地图数据(公寓立面:3F→1F 每层两户,顶=天台,底=公共区) ──
 
@@ -1433,7 +1516,7 @@ onMounted(() => {
   eventOn('人妻公寓:回合完成', () => {
     发送中.value = false;
     流式段.value = [];
-    选项房间.value = 当前房间.value; // 本轮选项绑定产出场景,换地方即过期
+    幕房间.value = 当前房间.value; // 本轮的戏与选项绑定产出场景,换地方即收
     void 取卷轴();
     刷新可重掷();
     刷新在场();
@@ -1475,7 +1558,7 @@ onMounted(() => {
   } | null;
   当前房间.value = 场景?.房间id ?? null;
   已破门进入.value = !!场景?.破门;
-  选项房间.value = 当前房间.value; // 刷新恢复:existing 选项视为当前场景的
+  幕房间.value = 当前房间.value; // 刷新恢复:已有正文与选项视为当前场景的
   try {
     进房末楼.value = 场景?.进房末楼 ?? getLastMessageId();
   } catch {
@@ -1820,13 +1903,105 @@ onUnmounted(() => {
   min-height: 0;
   overflow-y: auto;
   padding: 8px 12px;
-  background: var(--glass);
+  background:
+    linear-gradient(180deg, rgba(var(--sc-a, 165, 175, 195), 0.16), rgba(var(--sc-b, 205, 215, 230), 0.06) 42%, transparent 72%),
+    var(--glass);
   border: 1px solid rgba(255, 255, 255, 0.6);
   border-radius: var(--radius);
   box-shadow: var(--card-shadow);
   backdrop-filter: blur(6px);
   scrollbar-width: thin;
   scrollbar-color: rgba(38, 169, 244, 0.4) transparent;
+  transition: background 0.5s ease;
+}
+
+/* 到场卡:走动后的"开场镜头" */
+.arrive {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 6px 8px;
+  animation: card-pop-in 0.28s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.arrive b {
+  font-size: 1.08em;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: var(--ink);
+}
+
+.arrive b::after {
+  content: '';
+  display: block;
+  width: 40px;
+  height: 3px;
+  margin-top: 5px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgb(var(--sc-a, 165, 175, 195)), rgb(var(--sc-b, 205, 215, 230)));
+}
+
+.arrive-mood {
+  margin: 4px 0 0;
+  font-family: var(--font-prose);
+  font-size: 0.86em;
+  line-height: 1.8;
+  color: var(--ink-soft);
+}
+
+.arrive-who {
+  margin: 0;
+  font-size: 0.8em;
+  font-weight: 700;
+  color: var(--pink);
+}
+
+/* 转场横幅:gal 式地点閃卡 */
+.loc-banner {
+  position: absolute;
+  top: 30%;
+  left: 50%;
+  z-index: 50;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  padding: 10px 30px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 999px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(6px);
+  pointer-events: none;
+}
+
+.loc-banner b {
+  font-size: 1.1em;
+  font-weight: 900;
+  letter-spacing: 0.3em;
+  text-indent: 0.3em;
+  color: var(--ink);
+}
+
+.loc-flash-enter-active {
+  animation: loc-in 0.3s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.loc-flash-leave-active {
+  transition: all 0.35s ease;
+  opacity: 0;
+  transform: translate(-50%, -8px);
+}
+
+@keyframes loc-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 14px) scale(0.92);
+  }
+  to {
+    transform: translate(-50%, 0) scale(1);
+  }
 }
 
 .story-entry {
@@ -3452,7 +3627,8 @@ onUnmounted(() => {
 }
 
 :global(html.rq-dark) .room-modal,
-:global(html.rq-dark) .peep-card {
+:global(html.rq-dark) .peep-card,
+:global(html.rq-dark) .loc-banner {
   background: rgba(34, 36, 50, 0.96);
   border-color: rgba(255, 255, 255, 0.1);
 }
