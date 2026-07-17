@@ -1,6 +1,6 @@
 import type { SchemaType } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
-import { 户静态表, 门牌列表 } from '../../stageConfig';
+import { 户静态表, 查考古, 门牌列表 } from '../../stageConfig';
 import { 妻位置推算, 当前时段, seededRandom } from './楼层时钟';
 import { 读取, 读最近有效stat, 脚本写入 } from './mvuIO';
 import { 捕获保护快照 } from './守护系统';
@@ -275,11 +275,15 @@ export async function 手机节拍(): Promise<void> {
 // ============================================
 
 const ROOT_ID = 'rq-phone-root';
-const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.16/dist/人妻公寓/素材';
+// ⚠ 与 App.vue 素材基址同步:下次推 tag 必须叫 rq0.19,或推前改此处对齐 tag 名
+const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.19/dist/人妻公寓/素材';
 
-let 当前页: { 名: 'home' | 'chats' | 'chat' | 'moments' | 'call' | 'talk' | 'settings'; 会话?: string } = {
-  名: 'home',
-};
+let 当前页: {
+  名: 'home' | 'chats' | 'chat' | 'moments' | 'profile' | 'call' | 'talk' | 'settings';
+  会话?: string;
+  展开?: number; // profile:考古已加载条数
+  题?: number; // profile:展开中的"哪里不对劲?"动态序
+} = { 名: 'home' };
 let 通话记录: { 谁: string; 文: string }[] = [];
 let 通话上下文: { 分数段: string; 报表: string; 通牒: boolean } | null = null;
 
@@ -320,7 +324,7 @@ const 手机CSS = `
 #${ROOT_ID} .rqp-batt i{display:block;width:100%;height:78%;background:#4cd964;}
 #${ROOT_ID} .rqp-screen{width:100%;height:100%;background:#ededed;border-radius:36px;overflow:hidden;display:flex;flex-direction:column;position:relative;padding-top:34px;}
 /* ── 主屏(柚月 home-screen 同构:壁纸+app-grid+dock) ── */
-#${ROOT_ID} .rqp-home{flex:1;position:relative;overflow:hidden;background:linear-gradient(160deg,#8fb8de 0%,#c3a6d8 45%,#f2c4ae 100%);}
+#${ROOT_ID} .rqp-home{flex:1;position:relative;overflow:hidden;background:url('${素材基址}/界面/手机壁纸.webp') center/cover no-repeat,linear-gradient(160deg,#8fb8de 0%,#c3a6d8 45%,#f2c4ae 100%);}
 #${ROOT_ID} .rqp-home .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3.5%;padding:14% 5% 4%;justify-items:center;}
 #${ROOT_ID} .rqp-home .app{display:flex;flex-direction:column;align-items:center;border:none;background:none;cursor:pointer;position:relative;width:100%;}
 #${ROOT_ID} .rqp-home .app .bg{width:52px;height:52px;border-radius:13px;display:grid;place-items:center;font-size:26px;color:#fff;box-shadow:0 4px 10px rgba(0,0,0,.22);}
@@ -370,6 +374,19 @@ const 手机CSS = `
 #${ROOT_ID} .rqw-stats span{flex:1;display:flex;align-items:center;justify-content:center;gap:4px;font-size:11px;color:#666;}
 #${ROOT_ID} .rqw-cmt{margin-top:6px;background:#f7f7f7;border-radius:4px;padding:6px 8px;font-size:11px;color:#333;line-height:1.5;}
 #${ROOT_ID} .rqw-cmt b{color:#576b95;font-weight:400;}
+#${ROOT_ID} .rqw-img{display:block;width:100%;max-height:170px;object-fit:cover;border-radius:6px;margin:2px 0 6px;}
+/* 个人主页(考古层:头图+历史流+加载更早) */
+#${ROOT_ID} .rqw-hero{background:linear-gradient(160deg,#ffb37a,#ff8200);padding:18px 14px 12px;display:flex;align-items:center;gap:10px;color:#fff;}
+#${ROOT_ID} .rqw-hero .rqp-ava{width:52px;height:52px;border-radius:50%;border:2px solid rgba(255,255,255,.8);font-size:20px;}
+#${ROOT_ID} .rqw-hero b{font-size:15px;display:block;}
+#${ROOT_ID} .rqw-hero i{font-style:normal;font-size:11px;opacity:.85;}
+#${ROOT_ID} .rqw-divider{padding:8px 12px;font-size:11px;color:#999;background:#f5f5f5;}
+#${ROOT_ID} .rqw-post.key-open{box-shadow:inset 0 0 0 1.5px #ff8200;}
+#${ROOT_ID} .rqw-quiz{margin-top:8px;border-top:.5px solid rgba(0,0,0,.06);padding-top:8px;}
+#${ROOT_ID} .rqw-quiz p{font-size:11px;color:#ff8200;font-weight:600;margin-bottom:6px;}
+#${ROOT_ID} .rqw-quiz button{display:block;width:100%;text-align:left;border:1px solid #eee;background:#fafafa;border-radius:5px;padding:6px 9px;font-size:11px;color:#333;cursor:pointer;margin-bottom:5px;font-family:inherit;}
+#${ROOT_ID} .rqw-quiz button:hover{border-color:#ff8200;background:#fff7ef;}
+#${ROOT_ID} .rqw-more{display:block;width:calc(100% - 24px);margin:8px 12px 14px;border:none;border-radius:6px;background:rgba(255,130,0,.1);color:#ff8200;padding:9px;font-size:12px;cursor:pointer;font-family:inherit;}
 #${ROOT_ID} .rqp-call{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:linear-gradient(180deg,#3a3f4b,#22252d);color:#fff;}
 #${ROOT_ID} .rqp-call .rqp-ava{width:84px;height:84px;border-radius:14px;font-size:34px;}
 #${ROOT_ID} .rqp-call b{font-size:18px;}
@@ -640,13 +657,88 @@ function 渲染(): void {
       const 卡 = el(
         'div',
         'rqw-post',
-        `<div class="rqw-head">${头像块(c.谁)}<span class="rqw-meta"><span class="rqw-name">${_.escape(c.谁)}<span class="rqw-tag">同小区</span></span><span class="rqw-time">${时段字(c.楼, 偏移)} · 来自梧桐里</span></span></div>` +
+        `<div class="rqw-head" style="cursor:pointer">${头像块(c.谁)}<span class="rqw-meta"><span class="rqw-name">${_.escape(c.谁)}<span class="rqw-tag">同小区</span></span><span class="rqw-time">${时段字(c.楼, 偏移)} · 来自梧桐里</span></span></div>` +
           `<div class="rqw-text">${正文}</div>` +
           `<div class="rqw-stats"><span>↻ ${转 || '转发'}</span><span>💬 ${评数 || '评论'}</span><span>♡ ${赞}</span></div>` +
           评块,
       );
+      // 点头像/名字进个人主页(考古入口:往下翻,翻它的历史)
+      const 谁门牌 = 门牌列表.find(k => 户静态表[k].妻名 === c.谁);
+      if (谁门牌) {
+        (卡.querySelector('.rqw-head') as HTMLElement).addEventListener('click', () => {
+          当前页 = { 名: 'profile', 会话: 谁门牌, 展开: 6 };
+          渲染();
+        });
+      }
       体.appendChild(卡);
     }
+    屏.appendChild(体);
+    return;
+  }
+
+  if (当前页.名 === 'profile' && 当前页.会话) {
+    // 个人主页=双层广场的考古层(近期流在上,历史静态配置在下;"加载更早"=考古仪式感)
+    const 门牌号 = 当前页.会话 as 门牌;
+    const 配 = 户静态表[门牌号];
+    头(`${配?.妻名 ?? 门牌号}的主页`, () => {
+      当前页 = { 名: 'moments' };
+      渲染();
+    });
+    const 体 = el('div', 'rqp-body rqw-feed');
+    体.appendChild(
+      el('div', 'rqw-hero', `${头像块(配?.妻名 ?? '?')}<span><b>${_.escape(配?.妻名 ?? '')}</b><i>梧桐里7号 · 已关注你 0 天</i></span>`),
+    );
+    // 近期流(现编层)
+    for (const c of 库.圈.filter(x => x.谁 === 配?.妻名 && x.楼 <= 楼)) {
+      体.appendChild(el('div', 'rqw-post', `<div class="rqw-text">${_.escape(c.文)}</div><div class="rqw-time">${时段字(c.楼, 偏移)}</div>`));
+    }
+    体.appendChild(el('div', 'rqw-divider', '—— 更早以前 ——'));
+    // 考古层(静态配置,分页加载)
+    const 史 = 查考古(门牌号);
+    const 展开 = Math.min(当前页.展开 ?? 6, 史.length);
+    史.slice(0, 展开).forEach((条, 序) => {
+      const 开题 = 当前页.题 === 序;
+      const 图块 = 条.图
+        ? `<img class="rqw-img" src="${素材基址}/微博/${条.图}.webp" loading="lazy" onerror="this.remove()"/>`
+        : '';
+      const 卡 = el(
+        'div',
+        `rqw-post${开题 ? ' key-open' : ''}`,
+        `<div class="rqw-text">${_.escape(条.文).replace(/#([^#\s]{1,12})#/g, '<span class="tp">#$1#</span>')}</div>${图块}<div class="rqw-time">${_.escape(条.时间)}</div>`,
+      );
+      if (条.关键) {
+        卡.style.cursor = 'pointer';
+        卡.addEventListener('click', ev => {
+          if ((ev.target as HTMLElement).closest('.rqw-quiz')) return;
+          当前页 = { ...当前页, 题: 开题 ? undefined : 序 };
+          渲染();
+        });
+        if (开题) {
+          const 题区 = el('div', 'rqw-quiz', `<p>哪里不对劲?</p>`);
+          条.关键.选项.forEach((文, i) => {
+            const b = el('button', '', _.escape(文));
+            b.addEventListener('click', () => {
+              当前页 = { ...当前页, 题: undefined };
+              eventEmit('人妻公寓:考古选细节', { 门牌: 门牌号, 序, 选项: i });
+              渲染();
+            });
+            题区.appendChild(b);
+          });
+          卡.appendChild(题区);
+        }
+      }
+      体.appendChild(卡);
+    });
+    const 更 = el('button', 'rqw-more', 展开 < 史.length ? '加载更早的动态…' : '翻到底了');
+    更.addEventListener('click', () => {
+      if (展开 < 史.length) {
+        当前页 = { ...当前页, 展开: 展开 + 6 };
+        渲染();
+      } else {
+        eventEmit('人妻公寓:考古到底', 门牌号);
+      }
+    });
+    体.appendChild(更);
     屏.appendChild(体);
     return;
   }
