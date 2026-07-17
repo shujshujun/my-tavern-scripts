@@ -353,9 +353,7 @@
 
       <!-- ═══════════ 地图(日式gal移动画面:天空随时段变色+公寓立面插画+点房弹行动卡) ═══════════ -->
       <div v-if="显示地图 && 就绪" class="mask map-mask" @click.self="关地图">
-        <div class="galmap" :class="'sky-' + 时段" :style="地图立面样式">
-          <!-- 立面画作打底(时段差分;图挂了露出底下的天色渐变=兜底) -->
-          <i class="map-art" />
+        <div class="galmap" :class="'sky-' + 时段">
           <button class="sheet-close" @click="关地图">✕</button>
           <!-- 天空装饰(纯CSS:日月云星,随时段切换) -->
           <div class="sky-deco">
@@ -372,41 +370,86 @@
             <div class="mb-line"><b>第 {{ 天数 }} 天</b><em>{{ 时段问候 }}</em></div>
           </div>
 
-          <!-- 公寓立面插画 -->
-          <div class="bldg">
-            <div class="roofline">
-              <button class="roof-card" :class="{ here: 当前房间 === '天台' }" @click="点房('天台')">
-                <span class="unit-name">天台</span>
-                <span class="unit-occ">{{ 房内首字('天台') }}</span>
+          <!-- 立面画布(rq0.12 描点地图:徽章钉在画里的门窗上;时段=同一张画调色,点位永不漂) -->
+          <div v-if="用画布地图" class="map-stage">
+            <div class="map-canvas" :class="'tint-' + 时段色调">
+              <img
+                class="map-base"
+                :src="`${素材基址}/地图/立面_傍晚.webp`"
+                alt=""
+                draggable="false"
+                @error="立面失效 = true"
+              />
+              <i class="map-veil" />
+              <button
+                v-for="点 in 地图点位"
+                :key="点.id"
+                class="spot"
+                :class="{ here: 当前房间 === 点.id, vacant: 点.空置, lit: 窗灯(点.id) }"
+                :style="{ left: 点.x + '%', top: 点.y + '%' }"
+                @click="点房(点.id)"
+              >
+                <span class="spot-plate">{{ 点.名 }}</span>
+                <span v-if="点.空置" class="spot-note">招租</span>
+                <span v-else-if="当前房间 === 点.id || 房内的人(点.id).length" class="spot-faces">
+                  <img
+                    v-if="当前房间 === 点.id && !头像失效['主角']"
+                    class="me"
+                    :src="头像图('主角')"
+                    alt="你"
+                    @error="头像失效['主角'] = true"
+                  />
+                  <template v-for="名 in 房内的人(点.id)" :key="名">
+                    <img
+                      v-if="!头像失效[头像名(名)]"
+                      :src="头像图(头像名(名))"
+                      :alt="名"
+                      @error="头像失效[头像名(名)] = true"
+                    />
+                    <b v-else>{{ 名[0] }}</b>
+                  </template>
+                </span>
               </button>
             </div>
-            <div class="bldg-body">
-              <div v-for="层 in 楼层组" :key="层.名" class="bfloor">
-                <button
-                  v-for="房 in 层.房"
-                  :key="房.id"
-                  class="bunit"
-                  :class="{ here: 当前房间 === 房.id, vacant: 房.空置, lit: 窗灯(房.id) }"
-                  @click="点房(房.id)"
-                >
-                  <span class="unit-window"><i /><i /></span>
-                  <span class="unit-plate">{{ 房.id }}</span>
-                  <span class="unit-sub">{{ 房.空置 ? '招租中' : 房.标签 }}</span>
-                  <span class="unit-occ">{{ 房.空置 ? '' : 房内首字(房.id) }}</span>
+          </div>
+
+          <!-- 兜底(省流模式/立面图挂了):原玻璃楼体 -->
+          <div v-else class="map-fallback">
+            <div class="bldg">
+              <div class="roofline">
+                <button class="roof-card" :class="{ here: 当前房间 === '天台' }" @click="点房('天台')">
+                  <span class="unit-name">天台</span>
+                  <span class="unit-occ">{{ 房内首字('天台') }}</span>
                 </button>
               </div>
-            </div>
-            <div class="bground">
-              <button
-                v-for="房 in 底层公共"
-                :key="房.id"
-                class="gunit"
-                :class="{ here: 当前房间 === 房.id }"
-                @click="点房(房.id)"
-              >
-                <span class="unit-sub">{{ 房.名称 }}</span>
-                <span class="unit-occ">{{ 房内首字(房.id) }}</span>
-              </button>
+              <div class="bldg-body">
+                <div v-for="层 in 楼层组" :key="层.名" class="bfloor">
+                  <button
+                    v-for="房 in 层.房"
+                    :key="房.id"
+                    class="bunit"
+                    :class="{ here: 当前房间 === 房.id, vacant: 房.空置, lit: 窗灯(房.id) }"
+                    @click="点房(房.id)"
+                  >
+                    <span class="unit-window"><i /><i /></span>
+                    <span class="unit-plate">{{ 房.id }}</span>
+                    <span class="unit-sub">{{ 房.空置 ? '招租中' : 房.标签 }}</span>
+                    <span class="unit-occ">{{ 房.空置 ? '' : 房内首字(房.id) }}</span>
+                  </button>
+                </div>
+              </div>
+              <div class="bground">
+                <button
+                  v-for="房 in 底层公共"
+                  :key="房.id"
+                  class="gunit"
+                  :class="{ here: 当前房间 === 房.id }"
+                  @click="点房(房.id)"
+                >
+                  <span class="unit-sub">{{ 房.名称 }}</span>
+                  <span class="unit-occ">{{ 房内首字(房.id) }}</span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -828,16 +871,16 @@ function 闪转场(名称: string) {
 const 已破门进入 = ref(false);
 
 /**
- * 输入框门控(2026-07-17 用户反馈:无人的房间不该给输入框):
- * 户房间没人应门=没有对手戏,输入收起(只能离开或撬门);撬进去了=屋里翻找,输入恢复;
- * 公共区与 302(你家)不设限——独处也有事可做。
+ * 输入框门控(2026-07-17 用户反馈:无人的房间不该给输入框,公共区也一样):
+ * 没人=没有对手戏,输入收起——户只能离开或撬门(撬进去=屋里翻找,输入恢复),
+ * 公共区该干的事全在行动卡上(翻垃圾/查信箱);豁免你自己的地盘:302(你家)与管理员室。
  */
 const 可输入 = computed(() => {
   const id = 当前房间.value;
   if (!id) return false;
-  const 房 = 查房间(id);
-  if (房?.类型 === '户' && id !== '302' && !房内有人在(id)) return 已破门进入.value;
-  return true;
+  if (id === '302' || id === '管理员室') return true;
+  if (房内有人在(id)) return true;
+  return 查房间(id)?.类型 === '户' ? 已破门进入.value : false;
 });
 
 /**
@@ -1094,7 +1137,7 @@ const 底层公共 = [
 
 // ── 素材(AI 生成,2026-07-17 入库;素材 TAG 与发布 TAG 解耦——素材没变就不用动这里) ──
 
-const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.10/dist/人妻公寓/素材';
+const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.12/dist/人妻公寓/素材';
 
 function 头像图(名: string): string {
   return `${素材基址}/头像/${名}.webp`;
@@ -1108,11 +1151,51 @@ function 背景图(房间id: string | null): string {
   return `${素材基址}/背景/${房间id && 房间色[房间id] ? 房间id : '楼梯间'}.webp`;
 }
 
-/** 地图立面画作(昼夜三差分,同一栋楼参考图连生保证同楼) */
-const 地图立面样式 = computed(() => {
-  const 档 = 时段.value === '傍晚' ? '傍晚' : 时段.value === '晚上' || 时段.value === '深夜' ? '夜晚' : '白天';
-  return { '--map-img': `url(${素材基址}/地图/立面_${档}.webp)` };
-});
+// ── 描点地图(rq0.12):徽章钉在立面画上;坐标=画布百分比,楼体单图+调色做时段,点位永不漂 ──
+
+const 立面失效 = ref(false);
+
+/** 省流关位图/立面图挂了 → 退回玻璃楼体 */
+const 用画布地图 = computed(() => !省流.value && !立面失效.value);
+
+/** 时段调色档:同一张傍晚底图,白天提亮降饱和、夜里压暗上蓝 */
+const 时段色调 = computed(
+  () => (({ 早上: 'day', 中午: 'day', 下午: 'day', 傍晚: 'dusk', 晚上: 'night', 深夜: 'late' }) as const)[时段.value],
+);
+
+/** 点位坐标:立面_傍晚.webp(rq0.12 四层版)各门窗中心的百分比,已按点位预览校准;不动图不用再标 */
+const 立面点位: readonly { id: string; 名: string; x: number; y: number }[] = [
+  { id: '天台', 名: '天台', x: 50, y: 12.5 },
+  { id: '301', 名: '301', x: 37, y: 26 },
+  { id: '302', 名: '302', x: 63, y: 26 },
+  { id: '201', 名: '201', x: 37, y: 41 },
+  { id: '202', 名: '202', x: 63, y: 41 },
+  { id: '101', 名: '101', x: 37, y: 56 },
+  { id: '102', 名: '102', x: 63, y: 56 },
+  { id: '楼梯间', 名: '楼梯间', x: 79, y: 48 },
+  { id: '管理员室', 名: '管理员室', x: 37, y: 74 },
+  { id: '大堂', 名: '大堂', x: 54, y: 75 },
+  { id: '信箱区', 名: '信箱', x: 71, y: 75 },
+  { id: '垃圾房', 名: '垃圾房', x: 84, y: 80 },
+];
+
+const 地图点位 = computed(() =>
+  立面点位.map(p => {
+    const 户 = /^\d+$/.test(p.id) ? 户牌(p.id as 门牌) : null;
+    return { ...p, 空置: 户?.空置 ?? false };
+  }),
+);
+
+/** 头像文件名:妻/母亲用本名,丈夫们共用柯南式影子 */
+const 夫名集 = new Set(
+  Object.values(户静态表)
+    .map(h => h.夫名)
+    .filter(Boolean),
+);
+
+function 头像名(名: string): string {
+  return 夫名集.has(名) ? '影子' : 名;
+}
 
 // ── 头像行(脚本每回合把焦点/在场落 chat 变量 _在场) ──
 
@@ -2628,22 +2711,17 @@ onUnmounted(() => {
 /* ═══ gal 地图:天空随时段变色 + 公寓立面 + 玻璃热点 ═══ */
 
 .map-mask {
-  padding: 8px;
+  padding: 0;
 }
 
+/* rq0.12 全屏化:地图铺满画幅,立面画布定比呈现,徽章钉在画上 */
 .galmap {
   position: relative;
   box-sizing: border-box;
-  width: min(440px, 98%);
-  max-height: 96%;
-  display: flex;
-  flex-direction: column;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  padding: 12px 14px 14px;
-  overflow: hidden auto;
-  box-shadow: var(--shadow);
-  scrollbar-width: thin;
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  overflow: hidden;
   transition: background 0.6s ease;
 }
 
@@ -2800,14 +2878,16 @@ onUnmounted(() => {
 }
 
 .map-banner {
-  position: relative;
-  z-index: 1;
-  flex: none;
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  right: 56px;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   gap: 1px;
   color: var(--ink);
-  padding: 2px 4px 10px;
+  pointer-events: none;
 }
 
 .map-banner .mb-line {
@@ -3032,7 +3112,6 @@ onUnmounted(() => {
   padding: 14px;
   background: rgba(20, 22, 30, 0.45);
   backdrop-filter: blur(3px);
-  border-radius: 18px;
 }
 
 .room-modal {
@@ -4190,13 +4269,187 @@ onUnmounted(() => {
   text-shadow: 0 0 6px rgba(255, 79, 154, 0.4);
 }
 
-/* ── 地图立面画作打底(rq0.09):画透出来,楼体转磨砂玻璃浮层 ── */
+/* ── 描点地图(rq0.12):立面画布定比呈现 + 徽章热区 + 时段调色 ── */
 
-.map-art {
+.map-stage {
   position: absolute;
   inset: 0;
-  background: var(--map-img, none) center top / cover no-repeat;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  container-type: size;
+}
+
+.map-canvas {
+  position: relative;
+  width: 100%;
+  width: min(100%, calc(100cqh * 0.667));
+  aspect-ratio: 2 / 3;
+}
+
+.map-base {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: filter 0.6s ease;
+  /* 画的天空顶边淡出,融进 CSS 天色渐变(画布比屏幕矮时上方留白不生硬) */
+  mask-image: linear-gradient(to bottom, transparent, #000 8%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 8%);
+}
+
+.map-veil {
+  position: absolute;
+  inset: 0;
   pointer-events: none;
+  transition: background 0.6s ease;
+}
+
+/* 同一张傍晚底图的四档调色:白天提亮去橙,夜里压暗上蓝(楼不换图,点位永不漂) */
+.tint-day .map-base {
+  filter: brightness(1.15) saturate(0.72) hue-rotate(-14deg) contrast(0.97);
+}
+
+.tint-day .map-veil {
+  background: linear-gradient(rgba(160, 205, 255, 0.16), rgba(255, 255, 255, 0));
+}
+
+.tint-night .map-base {
+  filter: brightness(0.6) saturate(0.82) hue-rotate(8deg);
+}
+
+.tint-night .map-veil {
+  background: rgba(22, 30, 68, 0.32);
+  mix-blend-mode: multiply;
+}
+
+.tint-late .map-base {
+  filter: brightness(0.42) saturate(0.68) hue-rotate(14deg);
+}
+
+.tint-late .map-veil {
+  background: rgba(12, 16, 48, 0.46);
+  mix-blend-mode: multiply;
+}
+
+/* 徽章热区:磨砂小门牌钉在画里的门窗上,在场者头像挂在牌下 */
+.spot {
+  position: absolute;
+  z-index: 1;
+  transform: translate(-50%, -50%);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-width: 44px;
+  padding: 4px 8px 5px;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(4px);
+  box-shadow: 0 4px 12px rgba(24, 28, 46, 0.22);
+  cursor: pointer;
+  transition:
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.spot:hover {
+  border-color: rgba(255, 79, 154, 0.6);
+  box-shadow: 0 6px 16px rgba(24, 28, 46, 0.3);
+}
+
+.spot.here {
+  border-color: var(--pink);
+  box-shadow:
+    0 0 0 2px rgba(255, 79, 154, 0.42),
+    0 8px 18px rgba(255, 79, 154, 0.3);
+}
+
+.spot.vacant {
+  opacity: 0.72;
+}
+
+/* 晚间在家=窗户透出暖光(丈夫可视化沿袭窗灯语义) */
+.spot.lit::before {
+  content: '';
+  position: absolute;
+  inset: -16px;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(255, 196, 96, 0.5), transparent);
+  pointer-events: none;
+}
+
+.spot-plate {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.spot-note {
+  font-size: 9px;
+  line-height: 1;
+  color: var(--ink-faint);
+}
+
+.spot-faces {
+  display: inline-flex;
+  align-items: center;
+}
+
+.spot-faces img,
+.spot-faces b {
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  border: 1.5px solid #fff;
+  border-radius: 50%;
+  object-fit: cover;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(20, 24, 40, 0.3);
+}
+
+.spot-faces > * + * {
+  margin-left: -7px;
+}
+
+.spot-faces b {
+  display: inline-grid;
+  place-items: center;
+  font-size: 10px;
+  font-style: normal;
+  color: var(--ink);
+}
+
+.spot-faces img.me,
+.spot-faces b.me {
+  border-color: var(--pink);
+}
+
+/* 兜底容器(省流/图挂):原玻璃楼体贴底呈现 */
+.map-fallback {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 52px 14px 14px;
+  overflow: hidden auto;
+  scrollbar-width: thin;
+}
+
+:global(html.rq-dark) .spot {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(44, 46, 64, 0.72);
+}
+
+:global(html.rq-dark) .spot-plate,
+:global(html.rq-dark) .spot-faces b {
+  color: #e8ecfa;
 }
 
 .bldg-body {
@@ -4327,10 +4580,6 @@ onUnmounted(() => {
 
 :global(html.rq-lite) .title-screen {
   --kv-img: none !important;
-}
-
-:global(html.rq-lite) .map-art {
-  display: none;
 }
 
 /* ── 减少动效:关掉全局过渡与动画 ── */
