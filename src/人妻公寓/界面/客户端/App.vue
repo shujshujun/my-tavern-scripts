@@ -94,7 +94,7 @@
           <div class="set-group row">
             <div>
               <div class="set-label">立绘显示</div>
-              <p class="set-hint">她在场时右下角入画;文字垫板永远压在立绘上面,不遮正文。</p>
+              <p class="set-hint">在场者入画:一人右下,两人左右对望,三人添中位,再多并排;垫板永远压立绘,不遮正文。</p>
             </div>
             <button class="toggle" :class="{ on: 立绘显示 }" @click="((立绘显示 = !立绘显示), 改设置())"><i /></button>
           </div>
@@ -278,17 +278,19 @@
 
         <!-- 正文舞台:背景四层在 wrap 上,立绘钉右下,正文滚动层浮最上(垫板压立绘,gal 层次) -->
         <div class="story-wrap" :style="[场景色, 场景图样式]">
-          <transition name="fade">
+          <TransitionGroup v-if="立绘显示" name="fade">
             <img
-              v-if="立绘显示 && 立绘图"
-              :key="立绘图"
+              v-for="绘 in 立绘列表"
+              :key="绘.src"
               class="portrait"
-              :src="立绘图"
+              :class="绘.位"
+              :style="绘.style"
+              :src="绘.src"
               alt=""
               draggable="false"
-              @error="立绘失效[立绘图] = true"
+              @error="立绘失效[绘.src] = true"
             />
-          </transition>
+          </TransitionGroup>
           <!-- 正文卷轴:只演当前幕,且幕跟着房间走——人走了戏就收,回来戏还在(氛围色随位置) -->
           <section ref="卷轴容器" class="story">
           <!-- 到场卡:走动后的新场景,给地点一个"开场镜头"(旧正文属于旧场景,隐去) -->
@@ -1303,16 +1305,38 @@ function 道具图(id: string): string {
 
 const 道具图失效 = ref<Record<string, boolean>>({});
 
-// ── 立绘(2026-07-17 用户拍板:右下角、垫板压立绘;她在这场戏里才入画,人走戏收) ──
+// ── 立绘(2026-07-17 用户拍板:垫板压立绘,她在这场戏里才入画,人走戏收;
+//    多人站位同日拍板:1人右下,2人加左下对齐,3人加中位,4~6人并排均分) ──
 
 const 立绘失效 = ref<Record<string, boolean>>({});
 
-const 立绘图 = computed(() => {
-  if (!当前房间.value) return '';
-  const m = 可见门牌.value.find(k => 妻位置推算(k, 位置种子.value) === 当前房间.value);
-  if (!m) return '';
-  const src = `${素材基址}/立绘/${户静态表[m].妻名}.webp`;
-  return 立绘失效.value[src] ? '' : src;
+interface 立绘项 {
+  src: string;
+  位: 'pos-right' | 'pos-left' | 'pos-center' | 'pos-row';
+  style?: Record<string, string>;
+}
+
+const 立绘列表 = computed<立绘项[]>(() => {
+  if (!当前房间.value) return [];
+  const 图 = 可见门牌.value
+    .filter(k => 妻位置推算(k, 位置种子.value) === 当前房间.value)
+    .map(m => `${素材基址}/立绘/${户静态表[m].妻名}.webp`)
+    .filter(src => !立绘失效.value[src])
+    .slice(0, 6);
+  const n = 图.length;
+  if (n >= 4) {
+    // 并排均分画幅(数组顺序即绘制顺序,右邻略压左邻,自然的队列层次)
+    return 图.map((src, i) => ({
+      src,
+      位: 'pos-row' as const,
+      style: { left: `${(((i + 0.5) * 100) / n).toFixed(2)}%` },
+    }));
+  }
+  const 位序 = ['pos-right', 'pos-left', 'pos-center'] as const;
+  const 排 = 图.map((src, i) => ({ src, 位: 位序[i] }));
+  // 绘制顺序=中位垫底、左次之、右(主位)最上;z 不能碰——正文层在 z2,立绘全员必须留在 z1 之下
+  const 层 = { 'pos-center': 0, 'pos-left': 1, 'pos-right': 2 } as const;
+  return 排.sort((a, b) => 层[a.位] - 层[b.位]);
 });
 
 function 背景图(房间id: string | null): string {
@@ -1667,6 +1691,8 @@ const 监控列表 = computed<门牌[]>(() => {
 
 function 看监控(门牌号: 门牌) {
   显示监控.value = false;
+  // 2026-07-17 用户拍板:看监控=回302自己屋里看,再跑偷窥AI回合出正文,完成后弹选择。
+  // 移动不在这里做:成败由脚本判(没布设/冷却/她不在家=白跑),成功时脚本写场景+发"监控回合"事件
   eventEmit('人妻公寓:查看摄像头', 门牌号);
 }
 
@@ -2164,6 +2190,10 @@ onMounted(() => {
     // 楼层与过程变量已清,整页重建最干净(幕房间/卷轴/弹窗全归零),回到标题屏
     window.location.reload();
   });
+  eventOn('人妻公寓:监控回合', () => {
+    // 脚本侧已写好 _场景=302 并即将开偷窥回合,这里只同步画面(进入 重写同值场景,幂等)
+    if (当前房间.value !== '302') 进入('302');
+  });
   eventOn('人妻公寓:提示', (消息: string) => {
     // 地图行动卡开着:结果以"线索卡"翻出(动画),不走 toast
     if (显示地图.value && 房卡.value) 结果卡.value = 消息;
@@ -2563,6 +2593,31 @@ onUnmounted(() => {
     drop-shadow(0 8px 20px rgba(20, 24, 40, 0.35));
   mask-image: linear-gradient(to right, transparent, #000 14%);
   -webkit-mask-image: linear-gradient(to right, transparent, #000 14%);
+}
+
+/* 多人站位(2026-07-17 用户拍板):第2人左下与右侧对齐(羽化翻到右缘),第3人居中(双缘羽化),
+   4~6人并排均分(left 由脚本按人数算,统一收身高防打架) */
+.portrait.pos-left {
+  right: auto;
+  left: -10px;
+  mask-image: linear-gradient(to left, transparent, #000 14%);
+  -webkit-mask-image: linear-gradient(to left, transparent, #000 14%);
+}
+
+.portrait.pos-center {
+  right: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+}
+
+.portrait.pos-row {
+  right: auto;
+  height: 68%;
+  transform: translateX(-50%);
+  mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
 }
 
 :global(html.rq-dark) .portrait {

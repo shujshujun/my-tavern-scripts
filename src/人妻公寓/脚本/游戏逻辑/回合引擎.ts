@@ -92,25 +92,31 @@ export function 组快照注入(
 
 /** 楼层落库前的清洗:思维链/变量块/选项块/行为等级标签不进楼层文本(prompt 与卷轴双干净) */
 function 清洗正文(原文: string): string {
-  return (
-    原文
-      .replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, '')
-      .replace(/<reason(?:ing)?>[\s\S]*?<\/reason(?:ing)?>/gi, '')
-      .replace(/<!--[\s\S]*?-->/g, '')
-      .replace(/^\s*-{2,}>?\s*$/gm, '')
-      .replace(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/g, '')
-      .replace(/<options>[\s\S]*?<\/options>/g, '')
-      .replace(/<行为等级>[\s\S]*?<\/行为等级>/g, '')
-      // 生成被截断时的未闭合块也吞掉,否则半截标记块会永久留在楼层原文里
-      .replace(/<think(?:ing)?>[\s\S]*$/i, '')
-      .replace(/<reason(?:ing)?>[\s\S]*$/i, '')
-      .replace(/<UpdateVariable>[\s\S]*$/, '')
-      .replace(/<options>[\s\S]*$/, '')
-      .replace(/<行为等级>[\s\S]*$/, '')
-      .replace(/<!--[\s\S]*$/, '')
-      .replace(/<StatusPlaceHolderImpl\/>/g, '')
-      .trim()
-  );
+  const 闭合清 = 原文
+    .replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, '')
+    .replace(/<reason(?:ing)?>[\s\S]*?<\/reason(?:ing)?>/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/^\s*-{2,}>?\s*$/gm, '')
+    .replace(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/g, '')
+    .replace(/<options>[\s\S]*?<\/options>/g, '')
+    .replace(/<行为等级>[\s\S]*?<\/行为等级>/g, '')
+    .replace(/<StatusPlaceHolderImpl\/>/g, '');
+  const 全清 = 闭合清
+    // 生成被截断时的未闭合块也吞掉,否则半截标记块会永久留在楼层原文里
+    .replace(/<think(?:ing)?>[\s\S]*$/i, '')
+    .replace(/<reason(?:ing)?>[\s\S]*$/i, '')
+    .replace(/<UpdateVariable>[\s\S]*$/, '')
+    .replace(/<options>[\s\S]*$/, '')
+    .replace(/<行为等级>[\s\S]*$/, '')
+    .replace(/<!--[\s\S]*$/, '')
+    .trim();
+  // 吞尾防误杀(2026-07-17 BUG2根因:偷窥回合"无正文却弹选择"):AI 把协议标记漏闭合地写在
+  // 正文开头(如裸 <行为等级>3 打头),吞尾会把整楼吞成空白——宁留半截标记,不吞整场戏
+  if (!全清 && 闭合清.trim()) {
+    console.warn('[人妻公寓] 清洗吞尾把正文吞成了空白,回退只清闭合块(原文开头疑有未闭合协议标记)');
+    return 闭合清.trim();
+  }
+  return 全清;
 }
 
 // 行动选项系统已下线(2026-07-17 用户拍板:序章四条硬编码引导=唯一的选项,点掉即新手引导结束;
