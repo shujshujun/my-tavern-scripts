@@ -5,7 +5,7 @@ import type { SchemaType } from '../../schema';
 import { Schema, 创建户节点 } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
 import { 户静态表, 首批门牌, 阶段标题 } from '../../stageConfig';
-import { 惰性结算户, 结算焦点疑心, 冷落检测, 请求晋阶 } from './结算系统';
+import { 夜访结算, 惰性结算户, 结算焦点疑心, 冷落检测, 请求晋阶 } from './结算系统';
 import { 捕获保护快照, 回滚保护字段, 有保护快照, 镜像直写 } from './守护系统';
 import { 布设摄像头, 查看摄像头, 清偷窥挂起, 读信揭晓, 翻垃圾, 偷窥选细节, type 侦探结果 } from './侦探系统';
 import { 杀时间 } from './楼层时钟';
@@ -454,6 +454,7 @@ function 挂载监听() {
           const 基准堕落 = oldStat?.户[m]?.妻.堕落值;
           结算焦点疑心(节点, m, 节点.妻.堕落值 - (基准堕落 ?? 节点.妻.堕落值));
         }
+        夜访结算(newData, 楼层);
         冷落检测(newData, 楼层);
       }
 

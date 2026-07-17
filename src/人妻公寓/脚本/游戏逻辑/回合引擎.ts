@@ -2,7 +2,7 @@ import type { SchemaType } from '../../schema';
 import { Schema, 创建户节点 } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
 import { 户静态表, 难度表, 首批门牌 } from '../../stageConfig';
-import { 惰性结算户, 结算焦点疑心, 冷落检测 } from './结算系统';
+import { 夜访结算, 惰性结算户, 结算焦点疑心, 冷落检测 } from './结算系统';
 import { PROMOTE_MIRROR_KEY, 捕获保护快照, 回滚保护字段, 清保护快照, 镜像直写 } from './守护系统';
 import { 中断卡文案, 记违规清零, 结算违规代价, 输出稽查, 未遂余波指引 } from './稽查系统';
 import { 读取, 读最近有效stat, 脚本写入 } from './mvuIO';
@@ -142,6 +142,9 @@ function 回合结算(newStat: SchemaType, snapStat: SchemaType, 焦点: 门牌[
     newStat.系统._已注入事件 = { 楼层, 内容: newStat.系统._待发送事件 };
     newStat.系统._待发送事件 = '';
   }
+
+  // 深夜杵在低阶段住户门口的代价(演出层纪律在快照,账面在此)
+  夜访结算(newStat, 楼层);
 
   // 冷落检测:排队"她主动来找你"(一次一人)
   冷落检测(newStat, 楼层);
