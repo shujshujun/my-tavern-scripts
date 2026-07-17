@@ -244,6 +244,14 @@
         "_上次违规楼层": {
           "default": -1,
           "type": "number"
+        },
+        "_时段偏移楼": {
+          "default": 0,
+          "type": "number"
+        },
+        "_上次杀时间楼层": {
+          "default": -1,
+          "type": "number"
         }
       }
     }

@@ -1,8 +1,8 @@
 <template>
   <div class="apt">
     <div class="page">
-      <!-- 错误护栏:任何运行时异常显示在此,不再整屏空白 -->
-      <div v-if="错误信息" class="err">⚠︎ 界面异常:{{ 错误信息 }}</div>
+      <!-- 错误护栏:任何运行时异常显示在此,不再整屏空白(点击即散,不常驻) -->
+      <div v-if="错误信息" class="err" title="点击关闭" @click="错误信息 = ''">⚠︎ 界面异常:{{ 错误信息 }}(点击关闭)</div>
 
       <!-- 转场横幅(gal 式地点闪卡:走动的即时反馈) -->
       <transition name="loc-flash">
@@ -376,10 +376,10 @@
           </button>
         </div>
 
-        <!-- 偷窥余像:"你注意到了什么?"(摄像头渠道,选对收进线索板) -->
-        <div v-if="偷窥待选 && !发送中" class="peep-card">
+        <!-- 偷窥余像:"你注意到了什么?"(摄像头渠道,选对收进线索板;选项走 gal 纸条样式与行动选项同款) -->
+        <div v-if="偷窥待选 && !发送中" class="peep-card" :style="{ '--opt-img': `url(${素材基址}/界面/选项条.webp)` }">
           <p class="hint">画面看完了。你注意到了什么?</p>
-          <button v-for="(项, i) in 偷窥待选.选项" :key="i" class="option-chip" @click="选细节(i)">
+          <button v-for="(项, i) in 偷窥待选.选项" :key="i" class="option-chip gal" @click="选细节(i)">
             {{ 项 }}
           </button>
         </div>
@@ -897,6 +897,7 @@ const 图标库: Record<string, string> = {
   arrow: '<circle cx="12" cy="12" r="10"/><path d="m12 16 4-4-4-4"/><path d="M8 12h8"/>',
   trash: '<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="m19 6-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
   clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  tv: '<rect x="2" y="7" width="20" height="15" rx="2"/><path d="m17 2-5 5-5-5"/>',
 };
 
 /** 线条 SVG 兜底(水彩图标加载失败时用,颜色取墨色定值) */
@@ -936,8 +937,11 @@ let 心跳timer: ReturnType<typeof setInterval> | undefined;
 // ── 楼层时钟 ──
 
 const 末楼号 = ref(0);
-const 时段 = computed(() => 当前时段(末楼号.value));
-const 天数 = computed(() => 当前天数(末楼号.value));
+/** 杀时间偏移(MVU 持久,与脚本同一本账):一切时间读数=真实楼层+偏移 */
+const 偏移楼 = computed(() => data.value?.系统?._时段偏移楼 ?? 0);
+const 钟楼号 = computed(() => 末楼号.value + 偏移楼.value);
+const 时段 = computed(() => 当前时段(钟楼号.value));
+const 天数 = computed(() => 当前天数(钟楼号.value));
 
 // ── 场景与移动(走动零成本纯UI;_场景 与脚本快照共用) ──
 
@@ -945,7 +949,7 @@ const 当前房间 = ref<string | null>(null);
 const 显示地图 = ref(false);
 /** 进房那一刻的末楼号(随 _场景 持久;位置种子在房内期间冻结——否则身边的人被"传送"走) */
 const 进房末楼 = ref(0);
-const 位置种子 = computed(() => (当前房间.value ? 进房末楼.value : 末楼号.value));
+const 位置种子 = computed(() => (当前房间.value ? 进房末楼.value : 末楼号.value) + 偏移楼.value);
 
 function 写场景(房间id: string | null, 破门 = false) {
   insertOrAssignVariables(
@@ -1122,6 +1126,21 @@ function 房间动作(id: string | null): 卡动作[] {
 
   if (id === '302') {
     动作.push({ kicker: 'HOME', icon: 'home', 文案: '回家看看', 做: () => 进入(id) });
+    return 动作;
+  }
+
+  // 管理员室:杀时间(2026-07-17 拍板)——静默快进一个时段,不产楼不耗token;
+  // 冷却=每真实楼层一次,冷却中 tile 直接不出现(极简,不摆灰按钮)
+  if (id === '管理员室') {
+    动作.push({ kicker: 'GO', icon: 'arrow', 文案: '走过去', 做: () => 进入(id) });
+    if ((data.value?.系统?._上次杀时间楼层 ?? -1) < 末楼号.value) {
+      const 消磨 = (方式: string) => {
+        if (当前房间.value !== id) 进入(id, false, true); // 人先走过去,地图和卡都不收
+        eventEmit('人妻公寓:杀时间', 方式);
+      };
+      动作.push({ kicker: 'IDLE', icon: 'moon', 文案: '眯一觉', 做: () => 消磨('休息') });
+      动作.push({ kicker: 'IDLE', icon: 'tv', 文案: '看会儿电视', 做: () => 消磨('看电视') });
+    }
     return 动作;
   }
 
@@ -1391,7 +1410,7 @@ function 选项移动目标(文本: string): string | null {
   if (房) return 房.id;
   const 牌 = 可见门牌.value.find(m => 试(户静态表[m].妻名));
   if (牌) {
-    const 位 = 妻位置推算(牌, 末楼号.value);
+    const 位 = 妻位置推算(牌, 钟楼号.value);
     if (查房间(位)) return 位;
   }
   return null;
@@ -2077,10 +2096,10 @@ function 重置偏好() {
 const 提示文本 = ref('');
 let 提示timer: ReturnType<typeof setTimeout> | undefined;
 
-function 弹提示(文本: string) {
+function 弹提示(文本: string, 时长 = 2600) {
   提示文本.value = 文本;
   clearTimeout(提示timer);
-  提示timer = setTimeout(() => (提示文本.value = ''), 2600);
+  提示timer = setTimeout(() => (提示文本.value = ''), 时长);
 }
 
 // ── 错误护栏 ──
@@ -2135,7 +2154,9 @@ onMounted(() => {
   eventOn('人妻公寓:回合失败', (原因: string) => {
     发送中.value = false;
     流式段.value = [];
-    if (!原因.startsWith('已取消')) 错误信息.value = '回合失败:' + 原因;
+    偷窥待选.value = null; // 偷窥回合没演成,挂起的选择卡一并作废(脚本侧同步清账)
+    // 回合失败=这一轮没发生,是提示不是事故——走可消散 toast,不占常驻错误横幅(2026-07-17 用户反馈)
+    if (!原因.startsWith('已取消')) 弹提示(`回合失败,这一轮没有发生:${原因}`, 6000);
     void 取卷轴();
     刷新可重掷();
   });
@@ -2844,7 +2865,8 @@ onUnmounted(() => {
   transform: translateY(-1px);
 }
 
-:global(html.rq-lite) .option-row {
+:global(html.rq-lite) .option-row,
+:global(html.rq-lite) .peep-card {
   --opt-img: none;
 }
 
