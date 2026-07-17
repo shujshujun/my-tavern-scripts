@@ -625,10 +625,24 @@
             </div>
             <div class="dsec">
               <div class="dsec-title">仪 容</div>
+              <!-- gal 化(2026-07-18 用户反馈排版丑):对得上商店 SKU 的项直接上道具图卡,文字项走软卡行 -->
               <div class="attire-grid">
-                <div v-for="a in 选中档案.仪容项" :key="a.标" class="a-cell">
-                  <small>{{ a.标 }}</small>
-                  <b>{{ a.值 }}</b>
+                <div v-for="a in 选中档案.仪容项" :key="a.标 + a.值" class="a-cell" :class="{ pic: !!a.图id }">
+                  <span v-if="a.图id" class="a-pic">
+                    <img
+                      v-if="!道具图失效[a.图id]"
+                      :src="道具图(a.图id)"
+                      :alt="a.值"
+                      loading="lazy"
+                      draggable="false"
+                      @error="道具图失效[a.图id] = true"
+                    />
+                    <b v-else>{{ a.值[0] }}</b>
+                  </span>
+                  <span class="a-main">
+                    <small>{{ a.标 }}</small>
+                    <b class="a-val">{{ a.值 }}</b>
+                  </span>
                 </div>
               </div>
             </div>
@@ -1645,12 +1659,14 @@ const 选中档案 = computed(() => {
       { 名: '婚姻', 类: 'marr', 值: 妻.婚姻值 },
     ],
     仪容项: (() => {
-      const 项 = [
-        { 标: '外装', 值: 妻.外装 || '—' },
-        { 标: '妆容', 值: 妻.妆容 || '素颜' },
+      // 对得上商店 SKU 的项带 图id(道具图缩略卡);自由描述项纯文字软卡
+      const 配图 = (值: string) => (查道具(值) ? 值 : undefined);
+      const 项: { 标: string; 值: string; 图id?: string }[] = [
+        { 标: '外装', 值: 妻.外装 || '—', 图id: 配图(妻.外装) },
+        { 标: '妆容', 值: 妻.妆容 || '素颜', 图id: 配图(妻.妆容) },
       ];
-      if (妻.内衣) 项.push({ 标: '内衣', 值: 妻.内衣 });
-      for (const 件 of 妻.特殊) 项.push({ 标: '佩着', 值: 件 });
+      if (妻.内衣) 项.push({ 标: '内衣', 值: 妻.内衣, 图id: 配图(妻.内衣) });
+      for (const 件 of 妻.特殊) 项.push({ 标: '佩着', 值: 件, 图id: 配图(件) });
       return 项;
     })(),
     开发: [
@@ -4096,13 +4112,47 @@ onUnmounted(() => {
   gap: 3px 10px;
 }
 
+/* 仪容 gal 化(2026-07-18):软玻璃卡行;带道具图的项升级缩略卡 */
 .a-cell {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 8px;
   font-size: 0.76em;
+  background: var(--glass);
+  border: 1px solid rgba(255, 79, 154, 0.14);
   border-left: 3px solid var(--pink-soft);
-  border-radius: 2px;
-  padding-left: 6px;
+  border-radius: 10px;
+  padding: 5px 8px;
+  box-shadow: 0 2px 6px rgba(30, 26, 38, 0.05);
+}
+
+.a-cell .a-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.a-cell.pic {
+  grid-column: span 1;
+}
+
+.a-cell .a-pic {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid rgba(255, 202, 53, 0.55);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 2px 6px rgba(30, 26, 38, 0.12);
+}
+
+.a-cell .a-pic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .a-cell small {
