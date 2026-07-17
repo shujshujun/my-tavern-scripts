@@ -1629,14 +1629,22 @@ function 布设() {
 }
 
 const 显示监控 = ref(false);
-const 监控列表 = ref<门牌[]>([]);
 
-function 刷新监控() {
-  // 布设名单主账在 stat(与背包同生共死,重掷/撤回同步回滚);旧局 chat 变量 `_摄像头` 只读兼容
+/**
+ * 监控列表改响应式(2026-07-17 用户反馈:装完摄像头按钮不立刻弹):手动刷新的 ref 会在
+ * store 拉回新账之前读到旧数据,之后又无人再刷;computed 跟着 store 走,数据一到位自动弹。
+ * 布设名单主账在 stat(与背包同生共死);旧局 chat 变量 `_摄像头` 只读兼容。
+ */
+const 监控列表 = computed<门牌[]>(() => {
   const 布设 = (data.value?.系统 as { _摄像头布设?: Record<string, boolean> } | undefined)?._摄像头布设 ?? {};
-  const legacy = (_.get(getVariables({ type: 'chat' }), '_摄像头') ?? {}) as Record<string, boolean>;
-  监控列表.value = 门牌列表.filter(m => 布设[m] || legacy[m]);
-}
+  let legacy: Record<string, boolean> = {};
+  try {
+    legacy = (_.get(getVariables({ type: 'chat' }), '_摄像头') ?? {}) as Record<string, boolean>;
+  } catch {
+    /* chat 变量读取失败只影响旧局兼容 */
+  }
+  return 门牌列表.filter(m => 布设[m] || legacy[m]);
+});
 
 function 看监控(门牌号: 门牌) {
   显示监控.value = false;
@@ -2092,7 +2100,6 @@ onMounted(() => {
   刷新在场();
   刷新行动选项();
   刷新待办();
-  刷新监控();
   刷新偷窥待选();
 
   eventOn('人妻公寓:生成开始', () => {
@@ -2118,7 +2125,6 @@ onMounted(() => {
     刷新可重掷();
     刷新在场();
     刷新行动选项();
-    刷新监控();
     刷新偷窥待选();
     try {
       (store as unknown as { pull?: () => void }).pull?.();
@@ -2141,8 +2147,7 @@ onMounted(() => {
     // 地图行动卡开着:结果以"线索卡"翻出(动画),不走 toast
     if (显示地图.value && 房卡.value) 结果卡.value = 消息;
     else 弹提示(消息);
-    // 侦探/商店操作是纯 UI 回合(不产楼):变量与软计数即时刷新
-    刷新监控();
+    // 侦探/商店操作是纯 UI 回合(不产楼):软计数即时刷新,store 拉新(监控列表是 computed 自动跟)
     刷新偷窥待选();
     try {
       (store as unknown as { pull?: () => void }).pull?.();
