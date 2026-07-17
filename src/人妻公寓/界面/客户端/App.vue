@@ -42,7 +42,7 @@
 
       <!-- ═══════════ 序章开屏(初星 launch-screen 语法:hero 渐变视觉板 + 模式列表) ═══════════ -->
       <template v-else-if="!data.系统._序章完成">
-        <div class="launch-visual">
+        <div class="launch-visual" :style="{ '--launch-img': `url(${素材基址}/地图/立面_傍晚.webp)` }">
           <div class="ui-kicker light">WUTONGLI APARTMENT / PRODUCED BY DAD</div>
           <h1>人妻公寓</h1>
           <p>十六把钥匙,六户人家,一栋楼的关起门来。<br />父亲的考验,今天开始。</p>
@@ -236,7 +236,9 @@
 
       <!-- ═══════════ 地图(日式gal移动画面:天空随时段变色+公寓立面插画+点房弹行动卡) ═══════════ -->
       <div v-if="显示地图 && 就绪" class="mask map-mask" @click.self="关地图">
-        <div class="galmap" :class="'sky-' + 时段">
+        <div class="galmap" :class="'sky-' + 时段" :style="地图立面样式">
+          <!-- 立面画作打底(时段差分;图挂了露出底下的天色渐变=兜底) -->
+          <i class="map-art" />
           <button class="sheet-close" @click="关地图">✕</button>
           <!-- 天空装饰(纯CSS:日月云星,随时段切换) -->
           <div class="sky-deco">
@@ -614,8 +616,26 @@ const 图标库: Record<string, string> = {
   clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
 };
 
+/** 线条 SVG 兜底(水彩图标加载失败时用,颜色取墨色定值) */
+function 兜底图标(n: string): string {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#5a5566" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${图标库[n] ?? ''}</svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+// 图标=AI 生成水彩小物(素材/图标/,与背景同画风);onerror 回退线条 SVG
 const Ic: FunctionalComponent<{ n: string }> = props =>
-  h('svg', { class: 'ic', viewBox: '0 0 24 24', innerHTML: 图标库[props.n] ?? '' });
+  h('img', {
+    class: 'ic',
+    src: `${素材基址}/图标/${props.n}.webp`,
+    alt: '',
+    draggable: false,
+    onError: (e: Event) => {
+      const t = e.target as HTMLImageElement;
+      if (t.dataset.fb) return;
+      t.dataset.fb = '1';
+      t.src = 兜底图标(props.n);
+    },
+  });
 Ic.props = ['n'];
 
 const store = useDataStore();
@@ -957,7 +977,7 @@ const 底层公共 = [
 
 // ── 素材(AI 生成,2026-07-17 入库;素材 TAG 与发布 TAG 解耦——素材没变就不用动这里) ──
 
-const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.08/dist/人妻公寓/素材';
+const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.09/dist/人妻公寓/素材';
 
 function 头像图(名: string): string {
   return `${素材基址}/头像/${名}.webp`;
@@ -970,6 +990,12 @@ function 背景图(房间id: string | null): string {
   // 楼道没有专属图,借楼梯间的(同一栋楼的筒子间气质)
   return `${素材基址}/背景/${房间id && 房间色[房间id] ? 房间id : '楼梯间'}.webp`;
 }
+
+/** 地图立面画作(昼夜三差分,同一栋楼参考图连生保证同楼) */
+const 地图立面样式 = computed(() => {
+  const 档 = 时段.value === '傍晚' ? '傍晚' : 时段.value === '晚上' || 时段.value === '深夜' ? '夜晚' : '白天';
+  return { '--map-img': `url(${素材基址}/地图/立面_${档}.webp)` };
+});
 
 // ── 头像行(脚本每回合把焦点/在场落 chat 变量 _在场) ──
 
@@ -1960,10 +1986,10 @@ onUnmounted(() => {
   min-height: 0;
   overflow-y: auto;
   padding: 8px 12px;
-  /* 四层:氛围色渐变 > 白纱(保可读) > 地点背景图(素材) > 玻璃底(图挂了的兜底) */
+  /* 四层:氛围色渐变 > 薄纱(背景放开看,可读性交给正文磨砂垫板) > 地点背景图(素材) > 玻璃底(图挂了的兜底) */
   background:
-    linear-gradient(180deg, rgba(var(--sc-a, 165, 175, 195), 0.16), rgba(var(--sc-b, 205, 215, 230), 0.06) 42%, transparent 72%),
-    linear-gradient(rgba(255, 250, 245, 0.78), rgba(255, 250, 245, 0.86)),
+    linear-gradient(180deg, rgba(var(--sc-a, 165, 175, 195), 0.14), rgba(var(--sc-b, 205, 215, 230), 0.05) 42%, transparent 72%),
+    linear-gradient(rgba(255, 250, 245, 0.32), rgba(255, 250, 245, 0.42)),
     var(--scene-img, none) center / cover no-repeat,
     var(--glass);
   border: 1px solid rgba(255, 255, 255, 0.6);
@@ -2067,6 +2093,11 @@ onUnmounted(() => {
 .story-entry {
   position: relative;
   margin-bottom: 8px;
+  /* 磨砂垫板:背景图放开看,字浮在自己的可读底上(gal 文字框的卷轴版) */
+  background: rgba(255, 252, 247, 0.66);
+  backdrop-filter: blur(3px);
+  border-radius: 10px;
+  padding: 4px 10px;
 }
 
 .story-player {
@@ -2856,8 +2887,8 @@ onUnmounted(() => {
 }
 
 .tile .ic {
-  width: 22px;
-  height: 22px;
+  width: 30px;
+  height: 30px;
   color: var(--blue);
   margin-bottom: 2px;
 }
@@ -3500,8 +3531,8 @@ onUnmounted(() => {
 }
 
 .dock-btn .ic {
-  width: 21px;
-  height: 21px;
+  width: 26px;
+  height: 26px;
 }
 
 .dock-btn span {
@@ -3536,14 +3567,10 @@ onUnmounted(() => {
 /* ═══ 描边图标(初星 icon-sprite 语法:24×24 线条,吃 currentColor) ═══ */
 
 .ic {
-  width: 14px;
-  height: 14px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  vertical-align: -2px;
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  vertical-align: -3px;
 }
 
 .btn.icon {
@@ -3559,7 +3586,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
-  min-height: 148px;
+  min-height: 186px;
   padding: 18px 20px 16px;
   margin-bottom: 10px;
   border-radius: 18px;
@@ -3567,8 +3594,10 @@ onUnmounted(() => {
   box-shadow: var(--shadow);
   overflow: hidden;
   color: #fff;
+  /* 三层:暗角字幕纱 > 立面傍晚画作(开屏KV) > 三色渐变兜底 */
   background:
     linear-gradient(180deg, rgba(20, 22, 30, 0.12), rgba(20, 22, 30, 0.65)),
+    var(--launch-img, none) center 30% / cover no-repeat,
     linear-gradient(130deg, #ff8ab9, #4ab7ff 46%, #ffd24f);
 }
 
@@ -3703,6 +3732,73 @@ onUnmounted(() => {
   text-shadow: 0 0 6px rgba(255, 79, 154, 0.4);
 }
 
+/* ── 地图立面画作打底(rq0.09):画透出来,楼体转磨砂玻璃浮层 ── */
+
+.map-art {
+  position: absolute;
+  inset: 0;
+  background: var(--map-img, none) center top / cover no-repeat;
+  pointer-events: none;
+}
+
+.bldg-body {
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(5px);
+  border-color: rgba(255, 255, 255, 0.8);
+}
+
+.bfloor {
+  border-bottom-color: rgba(255, 255, 255, 0.55);
+}
+
+.bunit {
+  background: rgba(255, 255, 255, 0.3);
+  border-left-color: rgba(255, 255, 255, 0.5);
+}
+
+.bunit:hover {
+  background: rgba(255, 242, 247, 0.72);
+}
+
+.bunit.here {
+  background: rgba(255, 214, 231, 0.78);
+}
+
+.bunit.vacant {
+  background: rgba(238, 238, 242, 0.45);
+}
+
+.roof-card {
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(5px);
+  border-color: rgba(255, 255, 255, 0.85);
+}
+
+.roof-card:hover,
+.roof-card.here {
+  border-color: var(--pink);
+}
+
+.bground {
+  background: rgba(240, 244, 249, 0.5);
+  backdrop-filter: blur(5px);
+  border-color: rgba(255, 255, 255, 0.8);
+  border-top-color: rgba(255, 255, 255, 0.55);
+}
+
+.gunit {
+  background: rgba(255, 255, 255, 0.42);
+  backdrop-filter: blur(4px);
+}
+
+.gunit:hover {
+  background: rgba(255, 242, 247, 0.72);
+}
+
+.gunit.here {
+  background: rgba(255, 214, 231, 0.78);
+}
+
 /* ═══ 新元素的夜间覆盖 ═══ */
 
 :global(html.rq-dark) .hstat,
@@ -3750,13 +3846,17 @@ onUnmounted(() => {
   border-color: rgba(255, 255, 255, 0.08);
 }
 
-/* 夜间:白纱换深纱,背景图压暗保可读 */
+/* 夜间:薄深纱,背景图微压暗;可读性同样交给磨砂垫板 */
 :global(html.rq-dark) .story {
   background:
-    linear-gradient(180deg, rgba(var(--sc-a, 165, 175, 195), 0.2), rgba(var(--sc-b, 205, 215, 230), 0.08) 42%, transparent 72%),
-    linear-gradient(rgba(30, 32, 48, 0.82), rgba(30, 32, 48, 0.88)),
+    linear-gradient(180deg, rgba(var(--sc-a, 165, 175, 195), 0.18), rgba(var(--sc-b, 205, 215, 230), 0.07) 42%, transparent 72%),
+    linear-gradient(rgba(30, 32, 48, 0.42), rgba(30, 32, 48, 0.52)),
     var(--scene-img, none) center / cover no-repeat,
     var(--glass);
+}
+
+:global(html.rq-dark) .story-entry {
+  background: rgba(32, 34, 50, 0.68);
 }
 
 :global(html.rq-dark) .sheet {
