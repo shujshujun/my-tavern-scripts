@@ -107,7 +107,7 @@ for (const 组 of index.条目) {
 if (!开场白) throw new Error('未找到 [开场白] 条目');
 
 // ── 资源走 jsdelivr(手机友好;〔待用户拍板〕首个内测 tag 名,推送后此处生效) ──
-const TAG = 'rq0.09';
+const TAG = 'rq0.10';
 const BASE = `https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@${TAG}`;
 
 const 加载块 = url => '```\n<body>\n<script>\n$(\'body\').load(\'' + url + '\')\n</script>\n</body>\n```';

@@ -12,7 +12,7 @@
         </div>
       </transition>
 
-      <!-- 右上角:主题切换 + 全屏(meta 类操作,不进游戏功能区) -->
+      <!-- 右上角:主题切换 + 全屏 + 设置(meta 类操作,不进游戏功能区) -->
       <span class="corner-btns">
         <button class="btn mini icon" :title="暗色 ? '切回日间模式' : '切换夜间模式'" @click="切换主题">
           <Ic :n="暗色 ? 'sun' : 'moon'" />
@@ -20,7 +20,90 @@
         <button class="btn mini icon" :title="全屏中 ? '退出全屏' : '沉浸全屏'" @click="切换全屏">
           <Ic n="expand" />
         </button>
+        <button class="btn mini icon" title="设置" @click="设置开 = true">
+          <Ic n="ops" />
+        </button>
       </span>
+
+      <!-- ═══════════ 设置弹窗(界面偏好,全走 localStorage) ═══════════ -->
+      <div v-if="设置开" class="mask" @click.self="设置开 = false">
+        <div class="sheet settings">
+          <button class="sheet-close" @click="设置开 = false">✕</button>
+          <div class="ui-kicker">SETTINGS / 界面偏好</div>
+          <h3 class="set-title">看着舒服最要紧</h3>
+
+          <div class="set-group">
+            <div class="set-label">主题</div>
+            <div class="seg">
+              <button
+                v-for="m in (['日间', '夜间', '跟随'] as const)"
+                :key="m"
+                :class="{ on: 主题模式 === m }"
+                @click="((主题模式 = m), 改设置())"
+              >
+                {{ m === '跟随' ? '跟随时段' : m }}
+              </button>
+            </div>
+            <p class="set-hint">「跟随时段」=游戏里入夜,界面也跟着暗下来。</p>
+          </div>
+
+          <div class="set-group">
+            <div class="set-label">正文字号</div>
+            <div class="seg">
+              <button
+                v-for="z in (['小', '中', '大'] as const)"
+                :key="z"
+                :class="{ on: 字号档 === z }"
+                @click="((字号档 = z), 改设置())"
+              >
+                {{ z }}
+              </button>
+            </div>
+          </div>
+
+          <div class="set-group">
+            <div class="set-label">正文垫板浓度<em>{{ Math.round(垫板浓度 * 100) }}%</em></div>
+            <input
+              class="set-range"
+              type="range"
+              min="0.2"
+              max="1"
+              step="0.02"
+              :value="垫板浓度"
+              @input="((垫板浓度 = Number(($event.target as HTMLInputElement).value)), 改设置())"
+            />
+            <p class="set-hint">调低=更看得清背景画,调高=文字底更实。</p>
+          </div>
+
+          <div class="set-group row">
+            <div>
+              <div class="set-label">省流模式</div>
+              <p class="set-hint">关掉背景图与图标,回纯色——省流量。</p>
+            </div>
+            <button class="toggle" :class="{ on: 省流 }" @click="((省流 = !省流), 改设置())"><i /></button>
+          </div>
+
+          <div class="set-group row">
+            <div>
+              <div class="set-label">减少动效</div>
+              <p class="set-hint">关掉转场、弹跳、呼吸等动画。</p>
+            </div>
+            <button class="toggle" :class="{ on: 减动效 }" @click="((减动效 = !减动效), 改设置())"><i /></button>
+          </div>
+
+          <div class="set-group row">
+            <div>
+              <div class="set-label">沉浸全屏</div>
+              <p class="set-hint">把游戏铺满整个屏幕。</p>
+            </div>
+            <button class="toggle" :class="{ on: 全屏中 }" @click="切换全屏"><i /></button>
+          </div>
+
+          <div class="set-danger">
+            <button class="btn ghost" @click="重置偏好">恢复默认外观</button>
+          </div>
+        </div>
+      </div>
 
       <!-- ═══════════ 数据未就绪 ═══════════ -->
       <template v-if="!就绪">
@@ -40,35 +123,60 @@
         </div>
       </template>
 
-      <!-- ═══════════ 序章开屏(初星 launch-screen 语法:hero 渐变视觉板 + 模式列表) ═══════════ -->
+      <!-- ═══════════ 序章标题屏(gal タイトル:全屏立面KV + 纹章logo + 竖排木牌菜单) ═══════════ -->
       <template v-else-if="!data.系统._序章完成">
-        <div class="launch-visual" :style="{ '--launch-img': `url(${素材基址}/地图/立面_傍晚.webp)` }">
-          <div class="ui-kicker light">WUTONGLI APARTMENT / PRODUCED BY DAD</div>
-          <h1>人妻公寓</h1>
-          <p>十六把钥匙,六户人家,一栋楼的关起门来。<br />父亲的考验,今天开始。</p>
+        <div class="title-screen" :style="{ '--kv-img': `url(${素材基址}/地图/立面_傍晚.webp)` }">
+          <div class="title-hero">
+            <img
+              class="title-emblem"
+              :src="`${素材基址}/界面/纹章.webp`"
+              alt=""
+              draggable="false"
+              @error="($event.target as HTMLImageElement).style.display = 'none'"
+            />
+            <div class="ui-kicker light">WUTONGLI APARTMENT / PRODUCED BY DAD</div>
+            <h1>人妻公寓</h1>
+            <p>十六把钥匙,六户人家,一栋楼的关起门来。<br />父亲的考验,今天开始。</p>
+          </div>
+
+          <!-- 菜单:木牌按钮融进画面。难度未选=展开难度选择,已选=显主菜单 -->
+          <div class="title-menu" :style="{ '--plaque': `url(${素材基址}/界面/按钮底.webp)` }">
+            <template v-if="!难度展开">
+              <button class="plaque main" :disabled="发送中" @click="难度展开 = true">
+                <span class="pl-main">开始游戏</span>
+                <span class="pl-sub">START</span>
+              </button>
+              <button class="plaque" @click="设置开 = true">
+                <span class="pl-main">设置</span>
+                <span class="pl-sub">OPTIONS</span>
+              </button>
+            </template>
+            <template v-else>
+              <div class="ui-kicker light center">SELECT DIFFICULTY / 先看看父亲的心情</div>
+              <button
+                v-for="档 in 难度卡"
+                :key="档.名称"
+                class="plaque diff"
+                :class="{ chosen: 选中难度 === 档.名称 }"
+                @click="选中难度 = 档.名称"
+              >
+                <span class="pl-main">{{ 档.名称 }}</span>
+                <span class="pl-note">{{ 档.说明 }}</span>
+                <span class="pl-meta">¥{{ 档.起始资金 }}</span>
+              </button>
+              <div class="title-acts">
+                <button class="btn ghost" :disabled="发送中" @click="难度展开 = false; 选中难度 = ''">返回</button>
+                <button class="btn rite" :disabled="!选中难度 || 发送中" @click="开始考验">
+                  {{ 发送中 ? '电话接通中……' : '接起父亲的电话' }}
+                </button>
+              </div>
+            </template>
+          </div>
+
+          <p class="heartbeat title-beat" :class="{ dead: !脚本存活 }">
+            {{ 脚本存活 ? '✓ 游戏逻辑脚本心跳正常' : '✗ 未检测到游戏逻辑脚本(请确认脚本已启用)' }}
+          </p>
         </div>
-        <div class="launch-modes">
-          <div class="ui-kicker">SELECT DIFFICULTY / 先看看父亲的心情</div>
-          <button
-            v-for="档 in 难度卡"
-            :key="档.名称"
-            class="mode-item"
-            :class="{ chosen: 选中难度 === 档.名称 }"
-            @click="选中难度 = 档.名称"
-          >
-            <span class="mode-main">
-              <b>{{ 档.名称 }}</b>
-              <small>{{ 档.说明 }}</small>
-            </span>
-            <span class="mode-meta">¥{{ 档.起始资金 }}</span>
-          </button>
-          <button class="btn rite" :disabled="!选中难度 || 发送中" @click="开始考验">
-            {{ 发送中 ? '电话接通中……' : '接起父亲的电话' }}
-          </button>
-        </div>
-        <p class="heartbeat" :class="{ dead: !脚本存活 }">
-          {{ 脚本存活 ? '✓ 游戏逻辑脚本心跳正常' : '✗ 未检测到游戏逻辑脚本(请确认脚本已启用)' }}
-        </p>
       </template>
 
       <!-- ═══════════ 日常主界面 ═══════════ -->
@@ -977,7 +1085,7 @@ const 底层公共 = [
 
 // ── 素材(AI 生成,2026-07-17 入库;素材 TAG 与发布 TAG 解耦——素材没变就不用动这里) ──
 
-const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.09/dist/人妻公寓/素材';
+const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.10/dist/人妻公寓/素材';
 
 function 头像图(名: string): string {
   return `${素材基址}/头像/${名}.webp`;
@@ -1080,6 +1188,7 @@ function 刷新行动选项() {
 // ── 序章:难度三档 ──
 
 const 选中难度 = ref('');
+const 难度展开 = ref(false); // 标题屏:false=主菜单(开始游戏/设置),true=难度选择
 const 难度卡 = Object.values(难度表);
 
 function 开始考验() {
@@ -1087,6 +1196,7 @@ function 开始考验() {
   发送中.value = true;
   eventEmit('人妻公寓:开始新游戏', 选中难度.value);
 }
+
 
 // ── 待办软引导(开局流程③:拿钥匙看信箱→101报修→102收租→回管理员室;不硬锁) ──
 
@@ -1536,11 +1646,108 @@ function 应用主题(开: boolean) {
 
 function 切换主题() {
   应用主题(!暗色.value);
+  持久化设置();
+}
+
+// ── 界面偏好设置(全走 localStorage,不碰游戏变量) ──
+
+const 设置开 = ref(false);
+const 设置存储键 = '人妻公寓_界面偏好';
+
+/** 主题三档:日间 / 夜间 / 跟随游戏时段 */
+const 主题模式 = ref<'日间' | '夜间' | '跟随'>('日间');
+/** 正文字号档 */
+const 字号档 = ref<'小' | '中' | '大'>('中');
+/** 正文垫板不透明度(0.2~1.0,越高字越清背景越淡) */
+const 垫板浓度 = ref(0.66);
+/** 省流:关掉全部背景图/立绘/图标,回纯 CSS */
+const 省流 = ref(false);
+/** 减少动效 */
+const 减动效 = ref(false);
+
+const 字号档表: Record<'小' | '中' | '大', string> = { 小: '0.82em', 中: '0.9em', 大: '1.02em' };
+
+/** 主题「跟随」时按游戏时段推日夜(晚上/深夜=暗) */
+const 时段偏暗 = computed(() => 时段.value === '晚上' || 时段.value === '深夜');
+
+/** 派生实际暗色:跟随档看时段,否则看用户选的档 */
+function 结算主题() {
+  const 该暗 = 主题模式.value === '跟随' ? 时段偏暗.value : 主题模式.value === '夜间';
+  应用主题(该暗);
+}
+
+// 「跟随」档下,游戏时段变了自动切日夜
+watch(时段偏暗, () => {
+  if (主题模式.value === '跟随') 结算主题();
+});
+
+/** 把偏好写进根元素的 CSS 变量 + body class(省流/减动效) */
+function 应用界面偏好() {
+  const root = document.documentElement;
+  root.style.setProperty('--prose-size', 字号档表[字号档.value]);
+  root.style.setProperty('--entry-veil', String(垫板浓度.value));
+  root.classList.toggle('rq-lite', 省流.value);
+  root.classList.toggle('rq-still', 减动效.value);
+  结算主题();
+}
+
+function 持久化设置() {
   try {
-    localStorage.setItem(主题存储键, 暗色.value ? '1' : '0');
+    localStorage.setItem(主题存储键, 暗色.value ? '1' : '0'); // 兼容旧键
+    localStorage.setItem(
+      设置存储键,
+      JSON.stringify({
+        主题模式: 主题模式.value,
+        字号档: 字号档.value,
+        垫板浓度: 垫板浓度.value,
+        省流: 省流.value,
+        减动效: 减动效.value,
+      }),
+    );
   } catch {
     /* 隐私模式等存不了就不记 */
   }
+}
+
+/** 任一设置项改动:立即应用 + 存盘 */
+function 改设置() {
+  应用界面偏好();
+  持久化设置();
+}
+
+function 恢复设置() {
+  try {
+    const raw = localStorage.getItem(设置存储键);
+    if (raw) {
+      const s = JSON.parse(raw);
+      if (s.主题模式) 主题模式.value = s.主题模式;
+      else 主题模式.value = localStorage.getItem(主题存储键) === '1' ? '夜间' : '日间'; // 旧键迁移
+      if (s.字号档) 字号档.value = s.字号档;
+      if (typeof s.垫板浓度 === 'number') 垫板浓度.value = s.垫板浓度;
+      省流.value = !!s.省流;
+      减动效.value = !!s.减动效;
+    } else {
+      主题模式.value = localStorage.getItem(主题存储键) === '1' ? '夜间' : '日间';
+    }
+  } catch {
+    /* 读不到就用默认 */
+  }
+  应用界面偏好();
+}
+
+function 重置偏好() {
+  主题模式.value = '日间';
+  字号档.value = '中';
+  垫板浓度.value = 0.66;
+  省流.value = false;
+  减动效.value = false;
+  try {
+    localStorage.removeItem(设置存储键);
+    localStorage.removeItem(主题存储键);
+  } catch {
+    /* ignore */
+  }
+  应用界面偏好();
 }
 
 // ── 提示 toast ──
@@ -1641,12 +1848,8 @@ onMounted(() => {
     进房末楼.value = 0;
   }
 
-  // 恢复主题偏好
-  try {
-    应用主题(localStorage.getItem(主题存储键) === '1');
-  } catch {
-    /* 读不到就保持日间 */
-  }
+  // 恢复界面偏好(主题三档/字号/垫板/省流/减动效)
+  恢复设置();
 
   // 真全屏状态同步(按钮/Esc/系统手势退出都走这里)
   for (const 事件名 of ['fullscreenchange', 'webkitfullscreenchange']) {
@@ -2093,8 +2296,8 @@ onUnmounted(() => {
 .story-entry {
   position: relative;
   margin-bottom: 8px;
-  /* 磨砂垫板:背景图放开看,字浮在自己的可读底上(gal 文字框的卷轴版) */
-  background: rgba(255, 252, 247, 0.66);
+  /* 磨砂垫板:背景图放开看,字浮在自己的可读底上(gal 文字框的卷轴版);浓度由设置滑杆控 */
+  background: rgba(255, 252, 247, var(--entry-veil, 0.66));
   backdrop-filter: blur(3px);
   border-radius: 10px;
   padding: 4px 10px;
@@ -2113,7 +2316,7 @@ onUnmounted(() => {
 .narr {
   font-family: var(--font-prose);
   color: var(--ink);
-  font-size: 0.9em;
+  font-size: var(--prose-size, 0.9em);
   line-height: 1.85;
   margin: 5px 0;
   text-indent: 2em;
@@ -3203,6 +3406,143 @@ onUnmounted(() => {
   color: var(--ink-faint);
 }
 
+/* ═══ 设置弹窗(界面偏好) ═══ */
+
+.sheet.settings {
+  width: min(400px, 94%);
+  max-height: 92%;
+  overflow-y: auto;
+}
+
+.set-title {
+  margin: 2px 0 12px;
+  font-size: 1.05em;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.set-group {
+  padding: 10px 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.set-group.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.set-label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 0.9em;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 7px;
+}
+
+.set-label em {
+  font-style: normal;
+  font-size: 0.82em;
+  color: var(--pink);
+  font-weight: 800;
+}
+
+.set-hint {
+  margin: 6px 0 0;
+  font-size: 0.72em;
+  line-height: 1.5;
+  color: var(--ink-faint);
+}
+
+.set-group.row .set-hint {
+  margin-top: 3px;
+}
+
+/* 分段选择器 */
+.seg {
+  display: flex;
+  gap: 4px;
+  background: var(--pink-soft);
+  padding: 3px;
+  border-radius: 10px;
+}
+
+.seg button {
+  flex: 1;
+  padding: 7px 4px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.82em;
+  font-weight: 700;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: all 0.18s;
+}
+
+.seg button.on {
+  background: #fff;
+  color: var(--pink);
+  box-shadow: 0 2px 8px rgba(255, 79, 154, 0.22);
+}
+
+/* 滑杆 */
+.set-range {
+  width: 100%;
+  accent-color: var(--pink);
+  cursor: pointer;
+}
+
+/* 开关 */
+.toggle {
+  flex: none;
+  width: 46px;
+  height: 27px;
+  border-radius: 14px;
+  border: none;
+  background: rgba(36, 33, 38, 0.18);
+  cursor: pointer;
+  transition: background 0.2s;
+  padding: 0;
+}
+
+.toggle i {
+  display: block;
+  width: 21px;
+  height: 21px;
+  margin: 3px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  transition: transform 0.2s;
+}
+
+.toggle.on {
+  background: var(--pink);
+}
+
+.toggle.on i {
+  transform: translateX(19px);
+}
+
+.set-danger {
+  display: flex;
+  gap: 8px;
+  padding-top: 14px;
+  margin-top: 4px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.btn.ghost {
+  background: transparent;
+  border: 1px solid var(--line-soft);
+  color: var(--ink-soft);
+}
+
 .a-cell b {
   color: var(--ink);
   font-weight: normal;
@@ -3579,115 +3919,188 @@ onUnmounted(() => {
   gap: 4px;
 }
 
-/* ═══ 开屏(初星 launch-screen:hero 三色渐变视觉板 + 模式列表) ═══ */
+/* ═══ 序章标题屏(gal タイトル:全屏立面KV + 纹章 + 竖排木牌菜单) ═══ */
 
-.launch-visual {
+.title-screen {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: var(--shadow);
+  overflow: hidden auto;
+  color: #fff;
+  padding: 22px 18px 14px;
+  /* 立面傍晚 KV 全屏铺满;顶暗底暗保标题与按钮可读;三色渐变兜底 */
+  background:
+    linear-gradient(180deg, rgba(20, 22, 30, 0.35), rgba(20, 22, 30, 0.2) 34%, rgba(20, 22, 30, 0.72)),
+    var(--kv-img, none) center top / cover no-repeat,
+    linear-gradient(150deg, #ff8ab9, #4ab7ff 48%, #ffd24f);
+}
+
+.title-hero {
   flex: none;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
-  min-height: 186px;
-  padding: 18px 20px 16px;
-  margin-bottom: 10px;
-  border-radius: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  box-shadow: var(--shadow);
-  overflow: hidden;
-  color: #fff;
-  /* 三层:暗角字幕纱 > 立面傍晚画作(开屏KV) > 三色渐变兜底 */
-  background:
-    linear-gradient(180deg, rgba(20, 22, 30, 0.12), rgba(20, 22, 30, 0.65)),
-    var(--launch-img, none) center 30% / cover no-repeat,
-    linear-gradient(130deg, #ff8ab9, #4ab7ff 46%, #ffd24f);
+  align-items: center;
+  text-align: center;
 }
 
-.launch-visual h1 {
-  margin: 4px 0 6px;
-  font-size: clamp(26px, 7vw, 38px);
+.title-emblem {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(20, 22, 30, 0.5));
+  margin-bottom: 4px;
+}
+
+.title-hero h1 {
+  margin: 4px 0 8px;
+  font-size: clamp(30px, 8vw, 44px);
   font-weight: 900;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.16em;
   line-height: 1.05;
-  text-shadow: 0 2px 10px rgba(20, 22, 30, 0.35);
+  text-shadow: 0 2px 14px rgba(20, 22, 30, 0.6);
 }
 
-.launch-visual p {
+.title-hero p {
   margin: 0;
-  font-size: 0.78em;
+  font-size: 0.8em;
   line-height: 1.7;
-  color: rgba(255, 255, 255, 0.88);
+  color: rgba(255, 255, 255, 0.9);
+  text-shadow: 0 1px 6px rgba(20, 22, 30, 0.55);
 }
 
 .ui-kicker.light {
-  color: rgba(255, 255, 255, 0.78);
+  color: rgba(255, 255, 255, 0.82);
 }
 
-.launch-modes {
+.ui-kicker.center {
+  text-align: center;
+}
+
+.title-menu {
   flex: none;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px 13px;
-  border-radius: 18px;
-  background: var(--glass);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: var(--card-shadow);
+  gap: 9px;
+  margin-top: auto;
+  padding-top: 20px;
 }
 
-.mode-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 9px 12px;
-  font-family: inherit;
-  text-align: left;
-  color: var(--ink);
-  background: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  border-radius: 14px;
-  cursor: pointer;
-  transition: all 0.18s;
-}
-
-.mode-item:hover {
-  transform: translateY(-1px);
-  border-color: rgba(38, 169, 244, 0.55);
-  box-shadow: 0 6px 16px rgba(38, 169, 244, 0.18);
-}
-
-.mode-item.chosen {
-  border-color: rgba(255, 79, 154, 0.65);
-  box-shadow: 0 8px 20px rgba(255, 79, 154, 0.25);
-  background: #fff6f9;
-}
-
-.mode-main {
-  flex: 1;
+/* 木牌按钮:水彩牌底铺满,文字排在上面(牌底挂了=退回半透明玻璃条) */
+.plaque {
+  position: relative;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  justify-content: center;
   gap: 1px;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 16px;
+  font-family: inherit;
+  color: #4a3f2e;
+  background:
+    var(--plaque, none) center / 100% 100% no-repeat,
+    rgba(255, 250, 242, 0.86);
+  border: none;
+  border-radius: 12px;
+  filter: drop-shadow(0 4px 10px rgba(20, 22, 30, 0.32));
+  cursor: pointer;
+  transition:
+    transform 0.16s,
+    filter 0.16s;
 }
 
-.mode-main b {
-  font-size: 0.92em;
+.plaque:hover:not(:disabled) {
+  transform: translateY(-2px);
+  filter: drop-shadow(0 7px 16px rgba(255, 180, 90, 0.5));
+}
+
+.plaque:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.plaque .pl-main {
+  font-size: 1.02em;
   font-weight: 900;
+  letter-spacing: 0.16em;
+}
+
+.plaque .pl-sub {
+  font-family: var(--font-mono);
+  font-size: 0.6em;
+  letter-spacing: 0.24em;
+  color: #9a8a6a;
+}
+
+.plaque.main .pl-main {
+  color: #b03a6a;
+}
+
+/* 难度木牌:横排(名+说明+金额) */
+.plaque.diff {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  min-height: 58px;
+}
+
+.plaque.diff .pl-main {
+  flex: none;
+  font-size: 0.94em;
   letter-spacing: 0.12em;
 }
 
-.mode-item.chosen .mode-main b {
-  color: var(--pink);
+.plaque.diff .pl-note {
+  flex: 1;
+  font-size: 0.68em;
+  line-height: 1.45;
+  color: #6a5c46;
+  font-weight: 600;
 }
 
-.mode-main small {
-  font-size: 0.72em;
-  color: var(--ink-soft);
-  line-height: 1.5;
-}
-
-.mode-meta {
+.plaque.diff .pl-meta {
+  flex: none;
   font-family: var(--font-display);
-  font-size: 0.86em;
-  color: var(--blue);
+  font-size: 0.9em;
+  color: #b03a6a;
+}
+
+.plaque.diff.chosen {
+  filter: drop-shadow(0 8px 20px rgba(255, 79, 154, 0.6));
+  transform: translateY(-2px);
+}
+
+.plaque.diff.chosen::after {
+  content: '✓';
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  font-size: 0.8em;
+  font-weight: 900;
+  color: #b03a6a;
+}
+
+.title-acts {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.title-acts .btn {
+  flex: 1;
+}
+
+.title-beat {
+  flex: none;
+  text-align: center;
+  margin-top: 12px;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 /* ═══ 状态瓦片(初星 status card:小灰标 + 展示字体数值) ═══ */
@@ -3803,9 +4216,20 @@ onUnmounted(() => {
 
 :global(html.rq-dark) .hstat,
 :global(html.rq-dark) .battery,
-:global(html.rq-dark) .tile,
-:global(html.rq-dark) .mode-item {
+:global(html.rq-dark) .tile {
   background: #2c2e40;
+}
+
+:global(html.rq-dark) .seg {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+:global(html.rq-dark) .seg button.on {
+  background: #3a3d52;
+}
+
+:global(html.rq-dark) .toggle {
+  background: rgba(255, 255, 255, 0.16);
 }
 
 :global(html.rq-dark) .battery .cells i {
@@ -3815,14 +4239,6 @@ onUnmounted(() => {
 :global(html.rq-dark) .hud,
 :global(html.rq-dark) .dock {
   border-color: rgba(255, 255, 255, 0.08);
-}
-
-:global(html.rq-dark) .mode-item.chosen {
-  background: rgba(255, 79, 154, 0.14);
-}
-
-:global(html.rq-dark) .launch-modes {
-  border-color: rgba(255, 255, 255, 0.1);
 }
 
 :global(html.rq-dark) .hearts i {
@@ -3856,7 +4272,28 @@ onUnmounted(() => {
 }
 
 :global(html.rq-dark) .story-entry {
-  background: rgba(32, 34, 50, 0.68);
+  background: rgba(32, 34, 50, calc(var(--entry-veil, 0.66) + 0.02));
+}
+
+/* ── 省流模式:关掉重量级场景位图(背景/立面),回纯 CSS 渐变;头像/图标小,保留 ── */
+:global(html.rq-lite) .story {
+  --scene-img: none !important;
+}
+
+:global(html.rq-lite) .title-screen {
+  --kv-img: none !important;
+}
+
+:global(html.rq-lite) .map-art {
+  display: none;
+}
+
+/* ── 减少动效:关掉全局过渡与动画 ── */
+:global(html.rq-still) *,
+:global(html.rq-still) *::before,
+:global(html.rq-still) *::after {
+  animation-duration: 0.001s !important;
+  transition-duration: 0.001s !important;
 }
 
 :global(html.rq-dark) .sheet {
