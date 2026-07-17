@@ -100,6 +100,15 @@
           </div>
 
           <div class="set-danger">
+            <button
+              v-if="就绪 && data.系统._序章完成"
+              class="btn ghost restart"
+              :class="{ armed: 重开确认 }"
+              :disabled="发送中"
+              @click="点重开"
+            >
+              {{ 重开确认 ? '再点一次,推倒重来(本局进度全部清除)' : '重开一局' }}
+            </button>
             <button class="btn ghost" @click="重置偏好">恢复默认外观</button>
           </div>
         </div>
@@ -1735,6 +1744,26 @@ function 恢复设置() {
   应用界面偏好();
 }
 
+// ── 重开一局(两段式确认;真重置在脚本侧:删楼+清过程变量,完成后 iframe 自刷回标题屏) ──
+
+const 重开确认 = ref(false);
+
+// 弹窗一关就撤销"待确认"武装态,防下次误触
+watch(设置开, 开 => {
+  if (!开) 重开确认.value = false;
+});
+
+function 点重开() {
+  if (!重开确认.value) {
+    重开确认.value = true;
+    return;
+  }
+  重开确认.value = false;
+  设置开.value = false;
+  发送中.value = true; // 清场期间锁输入,收到"已重开"即整页重建
+  eventEmit('人妻公寓:重开一局');
+}
+
 function 重置偏好() {
   主题模式.value = '日间';
   字号档.value = '中';
@@ -1818,6 +1847,10 @@ onMounted(() => {
     if (!原因.startsWith('已取消')) 错误信息.value = '回合失败:' + 原因;
     void 取卷轴();
     刷新可重掷();
+  });
+  eventOn('人妻公寓:已重开', () => {
+    // 楼层与过程变量已清,整页重建最干净(幕房间/卷轴/弹窗全归零),回到标题屏
+    window.location.reload();
   });
   eventOn('人妻公寓:提示', (消息: string) => {
     // 地图行动卡开着:结果以"线索卡"翻出(动画),不走 toast
@@ -3541,6 +3574,18 @@ onUnmounted(() => {
   background: transparent;
   border: 1px solid var(--line-soft);
   color: var(--ink-soft);
+}
+
+/* 重开一局:平时只是淡红描边,点第一下进入武装态才变实红 */
+.btn.ghost.restart {
+  color: #c0574f;
+  border-color: rgba(192, 87, 79, 0.35);
+}
+
+.btn.ghost.restart.armed {
+  color: #fff;
+  background: linear-gradient(180deg, #e0655c, #c0392b);
+  border-color: rgba(192, 57, 43, 0.85);
 }
 
 .a-cell b {

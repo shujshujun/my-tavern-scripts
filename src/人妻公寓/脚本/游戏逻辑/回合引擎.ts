@@ -3,7 +3,7 @@ import { Schema } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
 import { 户静态表, 难度表 } from '../../stageConfig';
 import { 惰性结算户, 结算焦点疑心, 冷落检测 } from './结算系统';
-import { 捕获保护快照, 回滚保护字段 } from './守护系统';
+import { PROMOTE_MIRROR_KEY, 捕获保护快照, 回滚保护字段, 清保护快照 } from './守护系统';
 import { 中断卡文案, 记违规清零, 结算违规代价, 输出稽查, 未遂余波指引 } from './稽查系统';
 import { 读取, 读最近有效stat } from './mvuIO';
 import { 检测焦点, 组公寓快照 } from './snapshotSystem';
@@ -399,6 +399,47 @@ export async function 开始新游戏(难度: string): Promise<boolean> {
     console.error('[人妻公寓] 序章开局失败:', e);
     eventEmit('人妻公寓:回合失败', e instanceof Error ? e.message : String(e));
     return false;
+  } finally {
+    进行中 = false;
+  }
+}
+
+/**
+ * 重开一局(设置弹窗二次确认后调用):删掉 0 楼以上全部楼层,回到标题屏。
+ * 0 楼 stat_data 即出厂态(_序章完成=false,户=首批入住模板),楼层一删自然还原;
+ * chat 级过程变量全清——晋阶镜像必须显式清:镜像直写不校验楼层作废,
+ * 残留旧局镜像会把旧阶段"取大"进新局(防护9 的反向路径)。
+ */
+export async function 重开一局(): Promise<void> {
+  if (进行中) return;
+  进行中 = true;
+  try {
+    const 末楼 = getLastMessageId();
+    if (末楼 >= 1) await deleteChatMessages(_.range(1, 末楼 + 1), { refresh: 'none' });
+    await updateVariablesWith(
+      vars => {
+        for (const 键 of [
+          ...回合变量键,
+          '_上次回合',
+          '_在场',
+          '_行动选项',
+          '_待办',
+          '_侦探',
+          '_摄像头',
+          PROMOTE_MIRROR_KEY,
+        ]) {
+          _.set(vars, 键, null);
+        }
+        return vars;
+      },
+      { type: 'chat' },
+    );
+    清保护快照();
+    console.info('[人妻公寓] 重开一局:楼层与过程变量已清,回到标题屏');
+    eventEmit('人妻公寓:已重开');
+  } catch (e) {
+    console.error('[人妻公寓] 重开一局失败:', e);
+    eventEmit('人妻公寓:回合失败', e instanceof Error ? e.message : String(e));
   } finally {
     进行中 = false;
   }
