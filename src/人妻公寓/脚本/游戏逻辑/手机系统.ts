@@ -7,9 +7,10 @@ import { 捕获保护快照 } from './守护系统';
 import { Schema } from '../../schema';
 
 /**
- * 手机系统(P4:微信一 App)
- * 外观=柚月小手机(yuzuki, github.com/gaigai315/yuzuki-phone)授权砍装:华为全面屏壳/药丸双摄/
- * 状态栏/主屏 app-grid+dock 同构复刻;挂载范式参考玉子手机(yuzi83)。经双授权改造,谨此致谢。
+ * 手机系统(P4:手机开机即微信,2026-07-18 用户拍板——不做主屏与独立App,
+ * 底签 微信/朋友圈/我;动态集成朋友圈混排,点头像进"她的相册"=考古层,API设置藏"我")
+ * 外观=柚月小手机(yuzuki, github.com/gaigai315/yuzuki-phone)授权砍装:华为全面屏壳/
+ * 药丸双摄/状态栏 同构复刻;挂载范式参考玉子手机(yuzi83)。经双授权改造,谨此致谢。
  *
  * 挂载:注入酒馆页面文档(window.parent)——与游戏卡片 iframe 平级的独立手机(用户拍板,
  * 非游戏内浮层);玉子同款防重复加载。游戏界面只有"跳动来电指示/红点",点击唤起本机。
@@ -191,9 +192,9 @@ export async function 手机节拍(): Promise<void> {
       库.节拍[键] = 钟;
       const 妻 = 节点.妻;
       const 文 = await 小生成(
-        '你替一款都市题材游戏生成一条中国已婚女性发的微博。只输出微博文案本身(可含emoji,可含至多一个#话题#),不超过70字,不要引号,不要解释。' +
-          '纪律:内容=日常生活切片(做饭/天气/追剧/小区琐事),这是公开平台,语气比朋友圈更"晒"一点;绝不提及任何秘密、暧昧对象或游戏机制。',
-        `人物:${配.妻名},${配.初始?.气质描述 ?? '一位住在老公寓里的太太'}。当前状态档:${档位标签(妻.当前阶段, 妻.好感值, 妻.堕落值)};时段:${当前时段(钟)}。生成她此刻发的一条微博。`,
+        '你替一款都市题材游戏生成一条中国已婚女性发的微信朋友圈文案。只输出文案本身(可含emoji),不超过60字,不要引号,不要解释。' +
+          '纪律:内容=日常生活切片(做饭/天气/追剧/楼里琐事),按人物状态微调语气;绝不提及任何秘密、暧昧对象或游戏机制。',
+        `人物:${配.妻名},${配.初始?.气质描述 ?? '一位住在老公寓里的太太'}。当前状态档:${档位标签(妻.当前阶段, 妻.好感值, 妻.堕落值)};时段:${当前时段(钟)}。生成她此刻发的一条朋友圈。`,
       );
       if (文) {
         库.圈.unshift({ 楼, 谁: 配.妻名, 文, 评: [] });
@@ -279,11 +280,11 @@ const ROOT_ID = 'rq-phone-root';
 const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.19/dist/人妻公寓/素材';
 
 let 当前页: {
-  名: 'home' | 'chats' | 'chat' | 'moments' | 'profile' | 'call' | 'talk' | 'settings';
+  名: 'chats' | 'chat' | 'moments' | 'profile' | 'call' | 'talk' | 'settings';
   会话?: string;
   展开?: number; // profile:考古已加载条数
   题?: number; // profile:展开中的"哪里不对劲?"动态序
-} = { 名: 'home' };
+} = { 名: 'chats' };
 let 通话记录: { 谁: string; 文: string }[] = [];
 let 通话上下文: { 分数段: string; 报表: string; 通牒: boolean } | null = null;
 
@@ -323,15 +324,16 @@ const 手机CSS = `
 #${ROOT_ID} .rqp-batt::before{content:'';position:absolute;top:-4px;left:50%;transform:translateX(-50%);width:5px;height:2.5px;background:#333;border-radius:1px;}
 #${ROOT_ID} .rqp-batt i{display:block;width:100%;height:78%;background:#4cd964;}
 #${ROOT_ID} .rqp-screen{width:100%;height:100%;background:#ededed;border-radius:36px;overflow:hidden;display:flex;flex-direction:column;position:relative;padding-top:34px;}
-/* ── 主屏(柚月 home-screen 同构:壁纸+app-grid+dock) ── */
-#${ROOT_ID} .rqp-home{flex:1;position:relative;overflow:hidden;background:url('${素材基址}/界面/手机壁纸.webp') center/cover no-repeat,linear-gradient(160deg,#8fb8de 0%,#c3a6d8 45%,#f2c4ae 100%);}
-#${ROOT_ID} .rqp-home .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3.5%;padding:14% 5% 4%;justify-items:center;}
-#${ROOT_ID} .rqp-home .app{display:flex;flex-direction:column;align-items:center;border:none;background:none;cursor:pointer;position:relative;width:100%;}
-#${ROOT_ID} .rqp-home .app .bg{width:52px;height:52px;border-radius:13px;display:grid;place-items:center;font-size:26px;color:#fff;box-shadow:0 4px 10px rgba(0,0,0,.22);}
-#${ROOT_ID} .rqp-home .app span{margin-top:4px;font-size:11px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.5);}
-#${ROOT_ID} .rqp-home .app .dot{position:absolute;top:-3px;right:12%;width:11px;height:11px;border-radius:50%;background:#fa5151;border:1.5px solid #fff;}
-#${ROOT_ID} .rqp-home .dock{position:absolute;bottom:5%;left:50%;transform:translateX(-50%);display:flex;gap:16px;background:rgba(255,255,255,.22);backdrop-filter:blur(8px);border-radius:22px;padding:9px 18px;}
-#${ROOT_ID} .rqp-home .dock .app span{display:none;}
+/* ── 微信底部页签(手机开机即微信,2026-07-18 用户拍板;微信/朋友圈/我 三签) ── */
+#${ROOT_ID} .rqp-tabs{flex:none;display:flex;background:#f7f7f7;border-top:.5px solid #ddd;}
+#${ROOT_ID} .rqp-tabs button{flex:1;border:none;background:none;cursor:pointer;padding:7px 0 9px;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10px;color:#7f7f7f;font-family:inherit;position:relative;}
+#${ROOT_ID} .rqp-tabs button i{font-style:normal;font-size:20px;line-height:1;}
+#${ROOT_ID} .rqp-tabs button.on{color:#07c160;}
+#${ROOT_ID} .rqp-tabs button .dot{position:absolute;top:4px;right:26%;width:9px;height:9px;border-radius:50%;background:#fa5151;}
+/* 朋友圈封面(壁纸作封面图,微信 moments 语法) */
+#${ROOT_ID} .rqm-cover{height:132px;background:url('${素材基址}/界面/手机壁纸.webp') center/cover no-repeat,linear-gradient(160deg,#8fb8de,#c3a6d8);position:relative;margin-bottom:26px;}
+#${ROOT_ID} .rqm-cover b{position:absolute;right:74px;bottom:-10px;color:#fff;font-size:15px;text-shadow:0 1px 4px rgba(0,0,0,.5);}
+#${ROOT_ID} .rqm-cover .rqp-ava{position:absolute;right:12px;bottom:-22px;width:52px;height:52px;border-radius:8px;border:1.5px solid #fff;}
 #${ROOT_ID} .rqp-head{flex:none;background:#ededed;padding:12px 14px 8px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #ddd;}
 #${ROOT_ID} .rqp-head b{font-size:15px;color:#111;flex:1;text-align:center;}
 #${ROOT_ID} .rqp-back{border:none;background:none;font-size:16px;cursor:pointer;color:#111;width:24px;}
@@ -376,7 +378,7 @@ const 手机CSS = `
 #${ROOT_ID} .rqw-cmt b{color:#576b95;font-weight:400;}
 #${ROOT_ID} .rqw-img{display:block;width:100%;max-height:170px;object-fit:cover;border-radius:6px;margin:2px 0 6px;}
 /* 个人主页(考古层:头图+历史流+加载更早) */
-#${ROOT_ID} .rqw-hero{background:linear-gradient(160deg,#ffb37a,#ff8200);padding:18px 14px 12px;display:flex;align-items:center;gap:10px;color:#fff;}
+#${ROOT_ID} .rqw-hero{background:linear-gradient(160deg,#8fa6bd,#5c728c);padding:18px 14px 12px;display:flex;align-items:center;gap:10px;color:#fff;}
 #${ROOT_ID} .rqw-hero .rqp-ava{width:52px;height:52px;border-radius:50%;border:2px solid rgba(255,255,255,.8);font-size:20px;}
 #${ROOT_ID} .rqw-hero b{font-size:15px;display:block;}
 #${ROOT_ID} .rqw-hero i{font-style:normal;font-size:11px;opacity:.85;}
@@ -439,8 +441,8 @@ export function 挂载手机(): void {
   root.querySelector('.rqp-toggle')!.addEventListener('click', () => {
     root.classList.toggle('open');
     if (root.classList.contains('open')) {
-      // 有来电先接来电,否则回主屏
-      当前页 = 有来电() ? { 名: 'call' } : 当前页.名 === 'call' || 当前页.名 === 'talk' ? { 名: 'home' } : 当前页;
+      // 有来电先接来电,否则开机即微信(2026-07-18 用户拍板:不做主屏,手机=微信)
+      当前页 = 有来电() ? { 名: 'call' } : 当前页.名 === 'call' || 当前页.名 === 'talk' ? { 名: 'chats' } : 当前页;
       渲染();
     }
   });
@@ -527,51 +529,38 @@ function 渲染(): void {
     屏.appendChild(h);
   };
 
-  if (当前页.名 === 'home') {
-    // 柚月同构主屏:壁纸+app-grid+dock(我们只有三个 app,格局照旧)
-    const 家 = el('div', 'rqp-home');
-    const 格 = el('div', 'grid');
+  // 微信底部三签(2026-07-18 用户拍板:不做主屏与独立App,手机开机即微信;
+  // 动态集成朋友圈混排,API设置藏"我"页签)
+  const 底栏 = (当前: 'chats' | 'moments' | 'settings') => {
     const 未读 = 库.消息.some(m => m.楼 <= 楼 && m.发 === '对方' && m.楼 > (库.读到[m.会话] ?? -1));
     const 圈新 = 库.圈.some(c => c.楼 <= 楼 && c.楼 > 库.圈读到);
-    const 应用 = (名: string, 底色: string, 图: string, 点: boolean, 去: () => void) => {
-      const a = el('button', 'app', `<span class="bg" style="background:${底色}">${图}</span><span>${名}</span>${点 ? '<span class="dot"></span>' : ''}`);
-      a.addEventListener('click', 去);
-      return a;
+    const 栏 = el('div', 'rqp-tabs');
+    const 签 = (键: 'chats' | 'moments' | 'settings', 名: string, 图: string, 点: boolean, 去: () => void) => {
+      const b = el('button', 当前 === 键 ? 'on' : '', `<i>${图}</i>${名}${点 ? '<span class="dot"></span>' : ''}`);
+      if (当前 !== 键) b.addEventListener('click', 去);
+      栏.appendChild(b);
     };
-    const 去微信 = () => {
+    签('chats', '微信', '💬', 未读 || 有来电(), () => {
       当前页 = 有来电() ? { 名: 'call' } : { 名: 'chats' };
       渲染();
-    };
-    格.appendChild(应用('微信', '#07c160', '💬', 未读 || 有来电(), 去微信));
-    格.appendChild(
-      应用('微博', '#ff8200', '📣', 圈新, () => {
-        当前页 = { 名: 'moments' };
-        const 库2 = 读库();
-        库2.圈读到 = 楼;
-        写库(库2);
-        渲染();
-        刷新红点();
-      }),
-    );
-    格.appendChild(
-      应用('设置', '#8e8e93', '⚙️', false, () => {
-        当前页 = { 名: 'settings' };
-        渲染();
-      }),
-    );
-    家.appendChild(格);
-    const dock = el('div', 'dock');
-    dock.appendChild(应用('微信', '#07c160', '💬', 未读 || 有来电(), 去微信));
-    家.appendChild(dock);
-    屏.appendChild(家);
-    return;
-  }
-
-  if (当前页.名 === 'chats') {
-    头('微信', () => {
-      当前页 = { 名: 'home' };
+    });
+    签('moments', '朋友圈', '🌁', 圈新, () => {
+      当前页 = { 名: 'moments' };
+      const 库2 = 读库();
+      库2.圈读到 = 楼;
+      写库(库2);
+      渲染();
+      刷新红点();
+    });
+    签('settings', '我', '👤', false, () => {
+      当前页 = { 名: 'settings' };
       渲染();
     });
+    屏.appendChild(栏);
+  };
+
+  if (当前页.名 === 'chats') {
+    头('微信');
     const 体 = el('div', 'rqp-body');
     const 友们 = data ? 微信好友(data) : [{ id: '父亲', 名: '爸', 类: '父亲' as const }];
     for (const 友 of 友们) {
@@ -594,6 +583,7 @@ function 渲染(): void {
       体.appendChild(r);
     }
     屏.appendChild(体);
+    底栏('chats');
     return;
   }
 
@@ -638,18 +628,16 @@ function 渲染(): void {
   }
 
   if (当前页.名 === 'moments') {
-    // 动态广场载体=微博(2026-07-18 用户拍板改制,柚月 weibo 样式;逻辑仍我们的近期流)
-    头('微博', () => {
-      当前页 = { 名: 'home' };
-      渲染();
-    });
+    // 动态广场载体=微信朋友圈(2026-07-18 用户二次改拍:独立微博App作废,好友动态混排时间流;
+    // 非好友的动态(入住预告等)照混不较真——用户原话"不要在意这些细节")
+    头('朋友圈');
     const 体 = el('div', 'rqp-body rqw-feed');
+    const 我名 = (SillyTavern as unknown as { name1?: string })?.name1 || '我';
+    体.appendChild(el('div', 'rqm-cover', `<b>${_.escape(我名)}</b>${头像块('主角')}`));
     const 圈们 = 库.圈.filter(c => c.楼 <= 楼);
-    if (!圈们.length) 体.appendChild(el('div', 'rqw-post', '<p class="rqw-text" style="color:#999">刷不出新内容,过会儿再来。</p>'));
+    if (!圈们.length) 体.appendChild(el('div', 'rqw-post', '<p class="rqw-text" style="color:#999">朋友圈还静悄悄的。</p>'));
     for (const c of 圈们) {
-      const 赞 = 1 + Math.floor(seededRandom(c.楼, c.谁, '赞') * 68);
-      const 评数 = Math.floor(seededRandom(c.楼, c.谁, '评数') * 12);
-      const 转 = Math.floor(seededRandom(c.楼, c.谁, '转') * 5);
+      const 赞 = 1 + Math.floor(seededRandom(c.楼, c.谁, '赞') * 9);
       const 正文 = _.escape(c.文).replace(/#([^#\s]{1,12})#/g, '<span class="tp">#$1#</span>');
       const 评块 = c.评.length
         ? `<div class="rqw-cmt">${c.评.map(e => `<b>${_.escape(e.谁)}:</b>${_.escape(e.文)}`).join('<br/>')}</div>`
@@ -657,9 +645,9 @@ function 渲染(): void {
       const 卡 = el(
         'div',
         'rqw-post',
-        `<div class="rqw-head" style="cursor:pointer">${头像块(c.谁)}<span class="rqw-meta"><span class="rqw-name">${_.escape(c.谁)}<span class="rqw-tag">同小区</span></span><span class="rqw-time">${时段字(c.楼, 偏移)} · 来自梧桐里</span></span></div>` +
+        `<div class="rqw-head" style="cursor:pointer">${头像块(c.谁)}<span class="rqw-meta"><span class="rqw-name">${_.escape(c.谁)}</span><span class="rqw-time">${时段字(c.楼, 偏移)}</span></span></div>` +
           `<div class="rqw-text">${正文}</div>` +
-          `<div class="rqw-stats"><span>↻ ${转 || '转发'}</span><span>💬 ${评数 || '评论'}</span><span>♡ ${赞}</span></div>` +
+          `<div class="rqw-stats"><span>♡ ${赞} 位邻居觉得很赞</span></div>` +
           评块,
       );
       // 点头像/名字进个人主页(考古入口:往下翻,翻它的历史)
@@ -673,6 +661,7 @@ function 渲染(): void {
       体.appendChild(卡);
     }
     屏.appendChild(体);
+    底栏('moments');
     return;
   }
 
@@ -680,7 +669,7 @@ function 渲染(): void {
     // 个人主页=双层广场的考古层(近期流在上,历史静态配置在下;"加载更早"=考古仪式感)
     const 门牌号 = 当前页.会话 as 门牌;
     const 配 = 户静态表[门牌号];
-    头(`${配?.妻名 ?? 门牌号}的主页`, () => {
+    头(`${配?.妻名 ?? 门牌号}的相册`, () => {
       当前页 = { 名: 'moments' };
       渲染();
     });
@@ -750,7 +739,7 @@ function 渲染(): void {
     区.innerHTML = `${头像块('父亲')}<b>爸</b><i>邀请你进行语音通话…</i><div class="acts"><button class="no" title="挂断">✕</button><button class="ok" title="接听">✓</button></div>`;
     (区.querySelector('.no') as HTMLButtonElement).addEventListener('click', () => {
       // 挂断=未接红点继续挂着,下一期被覆盖时照扣(经济系统规则)
-      当前页 = { 名: 'home' };
+      当前页 = { 名: 'chats' };
       渲染();
     });
     (区.querySelector('.ok') as HTMLButtonElement).addEventListener('click', () => {
@@ -791,10 +780,7 @@ function 渲染(): void {
   }
 
   if (当前页.名 === 'settings') {
-    头('设置', () => {
-      当前页 = { 名: 'home' };
-      渲染();
-    });
+    头('我');
     const c = 读配置();
     const 区 = el('div', 'rqp-set');
     区.innerHTML = `
@@ -811,10 +797,11 @@ function 渲染(): void {
         model: (区.querySelector('.i-model') as HTMLInputElement).value.trim(),
         频率: (区.querySelector('.i-freq') as HTMLSelectElement).value as 手机配置['频率'],
       });
-      当前页 = { 名: 'home' };
+      当前页 = { 名: 'chats' };
       渲染();
     });
     屏.appendChild(区);
+    底栏('settings');
     return;
   }
 }
@@ -924,7 +911,7 @@ async function 结束通话(): Promise<void> {
   }
   通话上下文 = null;
   通话记录 = [];
-  当前页 = { 名: 'home' };
+  当前页 = { 名: 'chats' };
   渲染();
   刷新红点();
 }
