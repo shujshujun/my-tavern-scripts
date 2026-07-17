@@ -1132,16 +1132,13 @@ function 房间动作(id: string | null): 卡动作[] {
   }
 
   // 管理员室:杀时间(2026-07-17 拍板)——静默快进一个时段,不产楼不耗token;
+  // 瓷砖只在人已经走进屋里才出现(同日用户拍板:菜单归正文框架,地图房卡上只有"走过去");
   // 冷却=每真实楼层一次,冷却中 tile 直接不出现(极简,不摆灰按钮)
   if (id === '管理员室') {
     动作.push({ kicker: 'GO', icon: 'arrow', 文案: '走过去', 做: () => 进入(id) });
-    if ((data.value?.系统?._上次杀时间楼层 ?? -1) < 末楼号.value) {
-      const 消磨 = (方式: string) => {
-        if (当前房间.value !== id) 进入(id, false, true); // 人先走过去,地图和卡都不收
-        eventEmit('人妻公寓:杀时间', 方式);
-      };
-      动作.push({ kicker: 'IDLE', icon: 'moon', 文案: '眯一觉', 做: () => 消磨('休息') });
-      动作.push({ kicker: 'IDLE', icon: 'tv', 文案: '看会儿电视', 做: () => 消磨('看电视') });
+    if (当前房间.value === id && (data.value?.系统?._上次杀时间楼层 ?? -1) < 末楼号.value) {
+      动作.push({ kicker: 'IDLE', icon: 'moon', 文案: '眯一觉', 做: () => eventEmit('人妻公寓:杀时间', '休息') });
+      动作.push({ kicker: 'IDLE', icon: 'tv', 文案: '看会儿电视', 做: () => eventEmit('人妻公寓:杀时间', '看电视') });
     }
     return 动作;
   }
