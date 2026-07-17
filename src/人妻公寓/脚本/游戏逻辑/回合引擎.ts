@@ -100,6 +100,12 @@ function 清洗正文(原文: string): string {
     .replace(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/g, '')
     .replace(/<options>[\s\S]*?<\/options>/g, '')
     .replace(/<行为等级>[\s\S]*?<\/行为等级>/g, '')
+    // 玩家预设夹带的整篇 HTML 组件(2026-07-18 玩家实测:破限预设让模型在正文后附"选项分支"
+    // HTML 文档,原生酒馆渲染成卡,固定0楼界面=裸代码墙,还白吃上下文token)——整体剥除
+    .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*?```/gi, '')
+    .replace(/<!DOCTYPE[\s\S]*?<\/html\s*>/gi, '')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
     .replace(/<StatusPlaceHolderImpl\/>/g, '');
   const 全清 = 闭合清
     // 生成被截断时的未闭合块也吞掉,否则半截标记块会永久留在楼层原文里
@@ -108,6 +114,10 @@ function 清洗正文(原文: string): string {
     .replace(/<UpdateVariable>[\s\S]*$/, '')
     .replace(/<options>[\s\S]*$/, '')
     .replace(/<行为等级>[\s\S]*$/, '')
+    .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*$/i, '')
+    .replace(/<!DOCTYPE[\s\S]*$/i, '')
+    .replace(/<style[^>]*>[\s\S]*$/i, '')
+    .replace(/<script[^>]*>[\s\S]*$/i, '')
     .replace(/<!--[\s\S]*$/, '')
     .trim();
   // 吞尾防误杀(2026-07-17 BUG2根因:偷窥回合"无正文却弹选择"):AI 把协议标记漏闭合地写在

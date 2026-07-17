@@ -1839,7 +1839,12 @@ function 清洗(原文: string, 流式 = false): string {
     .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/^\s*-{2,}>?\s*$/gm, '')
     .replace(/<options>[\s\S]*?<\/options>/g, '')
-    .replace(/<行为等级>[\s\S]*?<\/行为等级>/g, '');
+    .replace(/<行为等级>[\s\S]*?<\/行为等级>/g, '')
+    // 玩家预设夹带的整篇 HTML 组件(2026-07-18 玩家实测,同脚本侧 清洗正文):裸代码墙整体剥除
+    .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*?```/gi, '')
+    .replace(/<!DOCTYPE[\s\S]*?<\/html\s*>/gi, '')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
   const 全清 = 闭合清
     // 未闭合块也吞掉:流式=防半截标记块闪现;完整楼层=防截断残块
     .replace(/<details[^>]*>[\s\S]*$/i, '')
@@ -1849,6 +1854,10 @@ function 清洗(原文: string, 流式 = false): string {
     .replace(/<UpdateVariable>[\s\S]*$/, '')
     .replace(/<options>[\s\S]*$/, '')
     .replace(/<行为等级>[\s\S]*$/, '')
+    .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*$/i, '')
+    .replace(/<!DOCTYPE[\s\S]*$/i, '')
+    .replace(/<style[^>]*>[\s\S]*$/i, '')
+    .replace(/<script[^>]*>[\s\S]*$/i, '')
     .trim();
   // 吞尾防误杀(2026-07-17,与脚本侧 清洗正文 同款):AI 把协议标记漏闭合写在开头时,
   // 吞尾会把整楼显示成空白——完整楼层回退只清闭合块,顺手剥掉裸标记词;流式期间不回退
