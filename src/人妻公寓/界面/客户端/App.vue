@@ -1820,29 +1820,35 @@ function 过酒馆正则(文本: string, 来源: 'ai_output' | 'user_input', 深
   return 文本;
 }
 
-function 清洗(原文: string): string {
-  return (
-    原文
-      .replace(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/g, '')
-      .replace(/<StatusPlaceHolderImpl\/>/g, '')
-      // 预设的摘要/折叠块(<details>)只藏不删:楼层原文保留给 AI 与预设当记忆,显示层吞掉
-      .replace(/<details[^>]*>[\s\S]*?<\/details>/gi, '')
-      .replace(/<details[^>]*>[\s\S]*$/i, '')
-      .replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, '')
-      .replace(/<reason(?:ing)?>[\s\S]*?<\/reason(?:ing)?>/gi, '')
-      .replace(/<!--[\s\S]*?-->/g, '')
-      .replace(/^\s*-{2,}>?\s*$/gm, '')
-      .replace(/<options>[\s\S]*?<\/options>/g, '')
-      .replace(/<行为等级>[\s\S]*?<\/行为等级>/g, '')
-      // 流式过程中的未闭合块也吞掉,防半截标记块闪现
-      .replace(/<think(?:ing)?>[\s\S]*$/i, '')
-      .replace(/<reason(?:ing)?>[\s\S]*$/i, '')
-      .replace(/<!--[\s\S]*$/, '')
-      .replace(/<UpdateVariable>[\s\S]*$/, '')
-      .replace(/<options>[\s\S]*$/, '')
-      .replace(/<行为等级>[\s\S]*$/, '')
-      .trim()
-  );
+function 清洗(原文: string, 流式 = false): string {
+  const 闭合清 = 原文
+    .replace(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/g, '')
+    .replace(/<StatusPlaceHolderImpl\/>/g, '')
+    // 预设的摘要/折叠块(<details>)只藏不删:楼层原文保留给 AI 与预设当记忆,显示层吞掉
+    .replace(/<details[^>]*>[\s\S]*?<\/details>/gi, '')
+    .replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, '')
+    .replace(/<reason(?:ing)?>[\s\S]*?<\/reason(?:ing)?>/gi, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/^\s*-{2,}>?\s*$/gm, '')
+    .replace(/<options>[\s\S]*?<\/options>/g, '')
+    .replace(/<行为等级>[\s\S]*?<\/行为等级>/g, '');
+  const 全清 = 闭合清
+    // 未闭合块也吞掉:流式=防半截标记块闪现;完整楼层=防截断残块
+    .replace(/<details[^>]*>[\s\S]*$/i, '')
+    .replace(/<think(?:ing)?>[\s\S]*$/i, '')
+    .replace(/<reason(?:ing)?>[\s\S]*$/i, '')
+    .replace(/<!--[\s\S]*$/, '')
+    .replace(/<UpdateVariable>[\s\S]*$/, '')
+    .replace(/<options>[\s\S]*$/, '')
+    .replace(/<行为等级>[\s\S]*$/, '')
+    .trim();
+  // 吞尾防误杀(2026-07-17,与脚本侧 清洗正文 同款):AI 把协议标记漏闭合写在开头时,
+  // 吞尾会把整楼显示成空白——完整楼层回退只清闭合块,顺手剥掉裸标记词;流式期间不回退
+  if (!流式 && !全清 && 闭合清.trim()) {
+    console.warn('[人妻公寓客户端] 显示层吞尾把楼层吞成了空白,回退只清闭合块');
+    return 闭合清.replace(/<\/?(?:think(?:ing)?|reason(?:ing)?|UpdateVariable|options|行为等级|details[^>]*)>/gi, '').trim();
+  }
+  return 全清;
 }
 
 async function 滚到底() {
@@ -2150,7 +2156,7 @@ onMounted(() => {
   });
   eventOn('人妻公寓:流式', (文本: string) => {
     // 流式半截文本只走本卡清洗,不过玩家正则(闭合标记未到会整段吞空)
-    const 净文 = 清洗(文本);
+    const 净文 = 清洗(文本, true);
     流式段.value = 净文
       ? 净文
           .split(/\n+/)
