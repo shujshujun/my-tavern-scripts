@@ -1,11 +1,11 @@
 import type { SchemaType } from '../../schema';
-import { Schema } from '../../schema';
+import { Schema, 创建户节点 } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
-import { 户静态表, 难度表 } from '../../stageConfig';
+import { 户静态表, 难度表, 首批门牌 } from '../../stageConfig';
 import { 惰性结算户, 结算焦点疑心, 冷落检测 } from './结算系统';
-import { PROMOTE_MIRROR_KEY, 捕获保护快照, 回滚保护字段, 清保护快照 } from './守护系统';
+import { PROMOTE_MIRROR_KEY, 捕获保护快照, 回滚保护字段, 清保护快照, 镜像直写 } from './守护系统';
 import { 中断卡文案, 记违规清零, 结算违规代价, 输出稽查, 未遂余波指引 } from './稽查系统';
-import { 读取, 读最近有效stat } from './mvuIO';
+import { 读取, 读最近有效stat, 脚本写入 } from './mvuIO';
 import { 检测焦点, 组公寓快照 } from './snapshotSystem';
 
 /**
@@ -410,10 +410,12 @@ export async function 开始新游戏(难度: string): Promise<boolean> {
 }
 
 /**
- * 重开一局(设置弹窗二次确认后调用):删掉 0 楼以上全部楼层,回到标题屏。
- * 0 楼 stat_data 即出厂态(_序章完成=false,户=首批入住模板),楼层一删自然还原;
- * chat 级过程变量全清——晋阶镜像必须显式清:镜像直写不校验楼层作废,
- * 残留旧局镜像会把旧阶段"取大"进新局(防护9 的反向路径)。
+ * 重开一局(设置弹窗二次确认后调用):删掉 0 楼以上全部楼层 + 把 0 楼 stat 重写成出厂态。
+ * 不再假设"0 楼天然纯净"(2026-07-17 双 bug 修复):0 楼的 户 表可能是空的(首批入住是
+ * 过程中某一楼才写进去的),_序章完成 也可能残留 true——只删楼会得到户表空+已完成的残缺态,
+ * 导致地图没人 + 要重开两次才碰巧刷对。改为显式重建:Schema.parse({}) 出厂默认 + 首批入住,
+ * 写回 0 楼(=删楼后的 -1)。chat 过程变量全清,晋阶镜像必须显式清(镜像直写不校验楼层作废,
+ * 残留旧局镜像会把旧阶段"取大"进新局,防护9 反向路径)。
  */
 export async function 重开一局(): Promise<void> {
   if (进行中) return;
@@ -421,6 +423,8 @@ export async function 重开一局(): Promise<void> {
   try {
     const 末楼 = getLastMessageId();
     if (末楼 >= 1) await deleteChatMessages(_.range(1, 末楼 + 1), { refresh: 'none' });
+
+    // 过程变量与镜像先清(镜像清在重建首批入住之前,避免旧镜像并入新出厂态)
     await updateVariablesWith(
       vars => {
         for (const 键 of [
@@ -440,7 +444,18 @@ export async function 重开一局(): Promise<void> {
       { type: 'chat' },
     );
     清保护快照();
-    console.info('[人妻公寓] 重开一局:楼层与过程变量已清,回到标题屏');
+
+    // 0 楼 stat 重写成出厂态:默认值 + 首批入住(与 index.确保首批入住 同一套模板)
+    const 出厂 = Schema.parse({}) as SchemaType;
+    for (const m of 首批门牌) {
+      出厂.户[m] = 创建户节点(0);
+      镜像直写(m, { 入住楼层: 0 });
+    }
+    const 旧raw = Mvu.getMvuData({ type: 'message', message_id: -1 });
+    脚本写入(旧raw, 出厂);
+    捕获保护快照(出厂);
+
+    console.info('[人妻公寓] 重开一局:楼层已删,0楼 stat 重建为出厂态(首批入住已就位)');
     eventEmit('人妻公寓:已重开');
   } catch (e) {
     console.error('[人妻公寓] 重开一局失败:', e);
