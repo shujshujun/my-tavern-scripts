@@ -180,26 +180,38 @@ function 挂载监听() {
   // 侦探与商店(P2):UI 事件 → 纯脚本结算,直写 -1 + 刷新保护快照,提示回 toast
   // ─────────────────────────────────────────────
 
-  /** 侦探/商店结果通用落地:排队事件+落库+刷快照+toast */
+  /** 侦探/商店结果通用落地:排队事件+落库+刷快照+toast。
+   * 静默失败清零(2026-07-17 用户实测"翻垃圾点一下没变化,锁却记上了"):落库炸了必须明着报,
+   * 否则玩家看到的就是"没反应",而周期锁(chat 变量)已在结算函数里写过=白吃一次冷却 */
   function 落地(结果: { 提示: string; 事件?: string; 变动?: boolean; 碎片到手?: boolean }, raw: object, data: SchemaType) {
     if (结果.事件) {
       data.系统._待发送事件 = data.系统._待发送事件 ? `${data.系统._待发送事件}|${结果.事件}` : 结果.事件;
     }
     if (结果.事件 || 结果.变动 || (结果 as 侦探结果).碎片到手) {
-      脚本写入(raw, data);
-      捕获保护快照(data);
+      try {
+        脚本写入(raw, data);
+        捕获保护快照(data);
+      } catch (e) {
+        console.error('[人妻公寓] 结果落库失败:', e, 结果);
+        eventEmit('人妻公寓:提示', `⚠ 结果没记上(请截 F12 控制台给作者):${e instanceof Error ? e.message : String(e)}`);
+        return;
+      }
     }
     eventEmit('人妻公寓:提示', 结果.提示);
   }
 
-  /** 带毒快照守卫的操作壳(近10楼无 stat 一律不动手) */
+  /** 带毒快照守卫的操作壳(近10楼无 stat 一律不动手;失败一律明着报,不再静默) */
   function 安全操作(fn: (raw: object, data: SchemaType) => void) {
     try {
-      if (!读最近有效stat()) return;
+      if (!读最近有效stat()) {
+        eventEmit('人妻公寓:提示', '变量还没就绪,稍等两秒再试。');
+        return;
+      }
       const { raw, data } = 读取();
       fn(raw, data);
     } catch (e) {
       console.error('[人妻公寓] UI 操作失败:', e);
+      eventEmit('人妻公寓:提示', `⚠ 操作没成(请截 F12 控制台给作者):${e instanceof Error ? e.message : String(e)}`);
     }
   }
 
