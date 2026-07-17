@@ -19,7 +19,7 @@ import { 镜像直写 } from './守护系统';
 const 垃圾出货概率 = 0.45;
 const 垃圾软保底次数 = 2; // 连续 N 次空手后下次必出(玩家无感知防非酋)
 const 垃圾同周期锁 = 8; // 同户翻过后隔 N 楼才再判(周期几率刷新,一天=8楼)
-const 偷窥冷却楼数 = 6; // 同户两拍之间隔 N 楼
+const 偷窥冷却楼数 = 3; // 同户两拍之间隔 N 楼(2026-07-17 用户反馈 6 太久,6→3=一个时段)
 
 // ── 软计数(chat 变量) ──
 
@@ -124,25 +124,25 @@ export function 翻垃圾(data: SchemaType, 门牌号: 门牌, 楼层: number): 
 // 摄像头(102 专属;布设→偷窥剧情→"你注意到了什么?"选细节)
 // ============================================
 
-/** 已布设名单存 stat `_摄像头` 吗?——不:布设是玩家单调操作但体量小,走 chat 变量,回档重装无伤 */
-function 读布设(): Record<string, boolean> {
-  return (_.get(getVariables({ type: 'chat' }), '_摄像头') ?? {}) as Record<string, boolean>;
+/**
+ * 已布设名单存 stat `_摄像头布设`(2026-07-17 从 chat 变量迁入):布设的"消耗"(背包扣道具)
+ * 随楼层快照走,布设记录必须同账——重掷/撤回删楼时两者一起回滚,否则道具复活+已装仍在=无限摄像头。
+ * 旧局的 chat 变量 `_摄像头` 只读兼容(在测玩家已装的不作废),新写入只进 stat。
+ */
+export function 已布设(data: SchemaType, 门牌号: string): boolean {
+  if (data.系统._摄像头布设[门牌号]) return true;
+  const legacy = (_.get(getVariables({ type: 'chat' }), '_摄像头') ?? {}) as Record<string, boolean>;
+  return !!legacy[门牌号];
 }
 
-export function 已布设(门牌号: string): boolean {
-  return !!读布设()[门牌号];
-}
-
-/** 布设摄像头(客户端已校验:在该户房内+背包有货;这里做最终校验+消耗) */
+/** 布设摄像头(客户端已校验:在该户房内+背包有货;这里做最终校验+消耗;消耗与布设记录同写 stat=同一本账) */
 export function 布设摄像头(data: SchemaType, 门牌号: 门牌): 侦探结果 {
   if (!data.户[门牌号]) return { 提示: '这户还空着,装了也只能看灰。' };
   const i = data.背包.indexOf('针孔摄像头');
   if (i < 0) return { 提示: '背包里没有摄像头。' };
-  if (已布设(门牌号)) return { 提示: '这里已经装过一个了。' };
+  if (已布设(data, 门牌号)) return { 提示: '这里已经装过一个了。' };
   data.背包.splice(i, 1);
-  void insertOrAssignVariables({ _摄像头: { ...读布设(), [门牌号]: true } }, { type: 'chat' }).catch(
-    (e: unknown) => console.error('[人妻公寓·侦探] 布设写入失败', e),
-  );
+  data.系统._摄像头布设[门牌号] = true;
   return {
     提示: '装好了。烟雾报警器的外壳严丝合缝——从今晚起,这个家没人看着的时候,你看着。',
     碎片到手: true, // 背包变了,需要落库
@@ -159,7 +159,7 @@ export function 查看摄像头(
   楼层: number,
 ): { 事件: string; 拍: number } | 侦探结果 {
   const 节点 = data.户[门牌号];
-  if (!节点 || !已布设(门牌号)) return { 提示: '那边没有你的眼睛。' };
+  if (!节点 || !已布设(data, 门牌号)) return { 提示: '那边没有你的眼睛。' };
   const 配 = 查裂缝(门牌号);
   const c = 读计数();
   const 妻名 = 户静态表[门牌号].妻名;

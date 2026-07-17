@@ -183,6 +183,9 @@ export const Schema = z.object({
       _系统操作中: z.coerce.boolean().catch(false).prefault(false), // 道具使用/模式切换楼跳过轮次推进
       _难度: z.string().prefault('标准'), // 开局三档(轻松/标准/严苛),效果查 stageConfig.难度表
       _序章完成: z.coerce.boolean().catch(false).prefault(false), // 单向语义随楼层快照走(回档到0=重开序章)
+      // 摄像头布设名单(2026-07-17 从 chat 变量迁入:与背包同一本账,重掷/撤回删楼时消耗与布设同生共死,
+      // 否则"背包里的摄像头随楼层复活+chat 侧已装记录还在"=一次购买无限装)
+      _摄像头布设: z.record(z.string(), z.coerce.boolean()).catch({}).prefault({}),
       _连续违规: nonNegInt(0), // 稽查:连续越阶计数(3次→"她开始躲着你"事件)
       _上次违规楼层: floorMark(-1), // 楼层去重旗标(防护12):同楼不重复结算惩罚
     })

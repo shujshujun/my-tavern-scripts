@@ -227,6 +227,16 @@
           "default": false,
           "type": "boolean"
         },
+        "_摄像头布设": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
         "_连续违规": {
           "default": 0,
           "type": "number"

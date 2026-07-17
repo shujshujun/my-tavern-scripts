@@ -62,6 +62,22 @@
           </div>
 
           <div class="set-group">
+            <div class="set-label">正文字色</div>
+            <div class="ink-row">
+              <button class="btn mini" :class="{ on: !正文字色 }" @click="((正文字色 = ''), 改设置())">跟随主题</button>
+              <label class="ink-pick" :class="{ on: !!正文字色 }">
+                <input
+                  type="color"
+                  :value="正文字色 || (暗色 ? '#e9e6f0' : '#242126')"
+                  @input="((正文字色 = ($event.target as HTMLInputElement).value), 改设置())"
+                />
+                <span>{{ 正文字色 ? '自选中' : '自选颜色' }}</span>
+              </label>
+            </div>
+            <p class="set-hint">「跟随主题」=日间深墨、夜间米白自动翻转;自选后固定不变,看不清就点回跟随。</p>
+          </div>
+
+          <div class="set-group">
             <div class="set-label">正文垫板浓度<em>{{ Math.round(垫板浓度 * 100) }}%</em></div>
             <input
               class="set-range"
@@ -259,7 +275,18 @@
             <div class="ui-kicker">{{ 当前房间 ? 'ARRIVE / 到场' : 'HALLWAY / 楼道' }}</div>
             <b>{{ 到场标题 }}</b>
             <p class="arrive-mood">{{ 到场描写 }}</p>
-            <p v-if="当前房间 && 房内名单" class="arrive-who">这里有:{{ 房内名单 }}</p>
+            <div v-if="当前房间 && 房内的人(当前房间).length" class="arrive-who">
+              <span v-for="名 in 房内的人(当前房间)" :key="名" class="who-chip">
+                <img
+                  v-if="!头像失效[头像名(名)]"
+                  :src="头像图(头像名(名))"
+                  :alt="名"
+                  @error="头像失效[头像名(名)] = true"
+                />
+                <b v-else>{{ 名[0] }}</b>
+                <em>{{ 名 }}</em>
+              </span>
+            </div>
             <p class="hint">{{ 到场提示 }}</p>
           </div>
           <div v-for="(条, i) in 在幕中 ? 当前幕 : []" :key="i" class="story-entry">
@@ -294,10 +321,21 @@
           </div>
         </section>
 
-        <!-- 场景条 -->
+        <!-- 场景条(在场者=头像徽章,一眼认人) -->
         <div class="scene-bar">
           <span class="scene-name">{{ 当前房间名 || '楼道里' }}</span>
-          <span class="scene-occ">{{ 当前房间 ? 房内名单 || '此刻没有别人' : '该去敲谁的门?' }}</span>
+          <span v-if="当前房间 && 房内的人(当前房间).length" class="scene-occ">
+            <span v-for="名 in 房内的人(当前房间)" :key="名" class="who-chip mini" :title="名">
+              <img
+                v-if="!头像失效[头像名(名)]"
+                :src="头像图(头像名(名))"
+                :alt="名"
+                @error="头像失效[头像名(名)] = true"
+              />
+              <b v-else>{{ 名[0] }}</b>
+            </span>
+          </span>
+          <span v-else class="scene-occ">{{ 当前房间 ? '此刻没有别人' : '该去敲谁的门?' }}</span>
           <button v-if="当前房间" class="btn icon" :disabled="发送中" @click="离开房间"><Ic n="exit" />离开</button>
         </div>
 
@@ -309,9 +347,9 @@
           </button>
         </div>
 
-        <!-- 行动选项(AI 每轮给 4 条,点了直接发送;想自由发挥就打字) -->
-        <div v-if="显示选项" class="option-row">
-          <button v-for="(项, i) in 行动选项" :key="i" class="option-chip" @click="发出(项)">▸ {{ 项 }}</button>
+        <!-- 行动选项(AI 每轮给 4 条,点了直接发送;gal 式居中选择条,纸条底=AI 水彩件) -->
+        <div v-if="显示选项" class="option-row" :style="{ '--opt-img': `url(${素材基址}/界面/选项条.webp)` }">
+          <button v-for="(项, i) in 行动选项" :key="i" class="option-chip gal" @click="发出(项)">{{ 项 }}</button>
         </div>
 
         <!-- 游戏内输入(玩家不碰酒馆输入框) -->
@@ -461,7 +499,18 @@
                 <div class="rm-hero" :class="{ pub: !/^\d+$/.test(房卡) }">
                   <div class="ui-kicker light">{{ 房卡kicker }}</div>
                   <b>{{ 房卡名称 }}</b>
-                  <em v-if="房卡在场">这里有:{{ 房卡在场 }}</em>
+                  <span v-if="房内的人(房卡).length" class="rm-who">
+                    <span v-for="名 in 房内的人(房卡)" :key="名" class="who-chip mini" :title="名">
+                      <img
+                        v-if="!头像失效[头像名(名)]"
+                        :src="头像图(头像名(名))"
+                        :alt="名"
+                        @error="头像失效[头像名(名)] = true"
+                      />
+                      <b v-else>{{ 名[0] }}</b>
+                    </span>
+                    <em>{{ 房卡在场 }}</em>
+                  </span>
                   <em v-else>此刻没有人</em>
                 </div>
                 <p class="rc-mood">{{ 房卡氛围 }}</p>
@@ -633,9 +682,14 @@
 
       <!-- ═══════════ 商店(次日达网购;礼物页签=裂缝解锁后现,商店自己就是进度条) ═══════════ -->
       <div v-if="显示商店" class="mask" @click.self="显示商店 = false">
-        <div class="sheet">
+        <div class="sheet shop">
           <button class="sheet-close" @click="显示商店 = false">✕</button>
-          <div class="sheet-title">商 店</div>
+          <div class="shop-hero">
+            <div class="ui-kicker light">WUTONGLI MALL / 网购商城</div>
+            <b>商 店</b>
+            <em>次日达 · 送到管理员室</em>
+            <span class="shop-cash">¥ {{ data.现金 }}</span>
+          </div>
           <div class="shop-tabs">
             <button
               v-for="页 in 货架"
@@ -646,17 +700,25 @@
             >
               {{ 页.页签 }}
             </button>
-            <span class="shop-cash">¥ {{ data.现金 }}</span>
           </div>
-          <div class="sheet-body">
-            <div v-for="项 in 当前货架" :key="项.id" class="ware">
-              <b>{{ 项.名称 }} <em class="ware-price">¥{{ 项.价格 }}</em></b>
-              <span class="ware-desc">{{ 项.描述 }}</span>
-              <span class="ware-acts">
-                <button class="btn mini" :disabled="data.现金 < (项.价格 ?? 0)" @click="买(项.id)">
-                  {{ data.现金 < (项.价格 ?? 0) ? '钱不够' : '买下' }}
-                </button>
+          <div class="sheet-body shop-grid">
+            <div v-for="项 in 当前货架" :key="项.id" class="ware-card">
+              <span class="ware-pic">
+                <img
+                  v-if="!道具图失效[项.id]"
+                  :src="道具图(项.id)"
+                  :alt="项.名称"
+                  draggable="false"
+                  @error="道具图失效[项.id] = true"
+                />
+                <b v-else>{{ 项.名称[0] }}</b>
+                <em class="ware-price">¥{{ 项.价格 }}</em>
               </span>
+              <b class="ware-name">{{ 项.名称 }}</b>
+              <span class="ware-desc">{{ 项.描述 }}</span>
+              <button class="btn rite ware-buy" :disabled="发送中 || data.现金 < (项.价格 ?? 0)" @click="买(项.id)">
+                {{ data.现金 < (项.价格 ?? 0) ? '钱不够' : '买下' }}
+              </button>
             </div>
           </div>
         </div>
@@ -1060,7 +1122,6 @@ function 房内首字(房间id: string): string {
 }
 
 const 当前房间名 = computed(() => (当前房间.value ? (查房间(当前房间.value)?.名称 ?? 当前房间.value) : ''));
-const 房内名单 = computed(() => (当前房间.value ? 房内的人(当前房间.value).join('、') : ''));
 
 // ── 到场卡与氛围色(移动的沉浸反馈:每个地点有自己的"开场镜头"和颜色) ──
 
@@ -1145,6 +1206,13 @@ function 头像图(名: string): string {
 
 /** 图挂了(断网/边缘缓存未热)回退首字圆徽 */
 const 头像失效 = ref<Record<string, boolean>>({});
+
+/** 商店道具图(rq0.12 生图入库;挂了回退首字) */
+function 道具图(id: string): string {
+  return `${素材基址}/道具/${id}.webp`;
+}
+
+const 道具图失效 = ref<Record<string, boolean>>({});
 
 function 背景图(房间id: string | null): string {
   // 楼道没有专属图,借楼梯间的(同一栋楼的筒子间气质)
@@ -1454,8 +1522,10 @@ const 显示监控 = ref(false);
 const 监控列表 = ref<门牌[]>([]);
 
 function 刷新监控() {
-  const v = (_.get(getVariables({ type: 'chat' }), '_摄像头') ?? {}) as Record<string, boolean>;
-  监控列表.value = 门牌列表.filter(m => v[m]);
+  // 布设名单主账在 stat(与背包同生共死,重掷/撤回同步回滚);旧局 chat 变量 `_摄像头` 只读兼容
+  const 布设 = (data.value?.系统 as { _摄像头布设?: Record<string, boolean> } | undefined)?._摄像头布设 ?? {};
+  const legacy = (_.get(getVariables({ type: 'chat' }), '_摄像头') ?? {}) as Record<string, boolean>;
+  监控列表.value = 门牌列表.filter(m => 布设[m] || legacy[m]);
 }
 
 function 看监控(门牌号: 门牌) {
@@ -1539,7 +1609,18 @@ let 玩家正则表: 玩家正则项[] = [];
 
 function 刷新玩家正则() {
   try {
-    const 原 = [...getTavernRegexes({ type: 'global' }), ...getTavernRegexes({ type: 'preset', name: 'in_use' })];
+    // 分源读取:预设正则读取失败不连累全局正则(2026-07-17 摘要块漏显修复)
+    const 原: ReturnType<typeof getTavernRegexes> = [];
+    try {
+      原.push(...getTavernRegexes({ type: 'global' }));
+    } catch (e) {
+      console.warn('[人妻公寓客户端] 读取全局正则失败:', e);
+    }
+    try {
+      原.push(...getTavernRegexes({ type: 'preset', name: 'in_use' }));
+    } catch (e) {
+      console.warn('[人妻公寓客户端] 读取预设正则失败:', e);
+    }
     玩家正则表 = 原
       .filter(r => r.enabled && r.destination?.display && (r.source?.ai_output || r.source?.user_input))
       .map(r => {
@@ -1584,6 +1665,9 @@ function 清洗(原文: string): string {
     原文
       .replace(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/g, '')
       .replace(/<StatusPlaceHolderImpl\/>/g, '')
+      // 预设的摘要/折叠块(<details>)只藏不删:楼层原文保留给 AI 与预设当记忆,显示层吞掉
+      .replace(/<details[^>]*>[\s\S]*?<\/details>/gi, '')
+      .replace(/<details[^>]*>[\s\S]*$/i, '')
       .replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, '')
       .replace(/<reason(?:ing)?>[\s\S]*?<\/reason(?:ing)?>/gi, '')
       .replace(/<!--[\s\S]*?-->/g, '')
@@ -1737,8 +1821,9 @@ function 应用主题(开: boolean) {
 }
 
 function 切换主题() {
-  应用主题(!暗色.value);
-  持久化设置();
+  // 右上角日月钮=显式切档(不再绕过主题档直改暗色——"跟随"下被绕改会失同步,2026-07-17 修复)
+  主题模式.value = 暗色.value ? '日间' : '夜间';
+  改设置();
 }
 
 // ── 界面偏好设置(全走 localStorage,不碰游戏变量) ──
@@ -1750,6 +1835,8 @@ const 设置存储键 = '人妻公寓_界面偏好';
 const 主题模式 = ref<'日间' | '夜间' | '跟随'>('日间');
 /** 正文字号档 */
 const 字号档 = ref<'小' | '中' | '大'>('中');
+/** 正文字色(''=跟随主题日夜自动翻转;自选后固定不随主题) */
+const 正文字色 = ref('');
 /** 正文垫板不透明度(0.2~1.0,越高字越清背景越淡) */
 const 垫板浓度 = ref(0.66);
 /** 省流:关掉全部背景图/立绘/图标,回纯 CSS */
@@ -1762,15 +1849,11 @@ const 字号档表: Record<'小' | '中' | '大', string> = { 小: '0.82em', 中
 /** 主题「跟随」时按游戏时段推日夜(晚上/深夜=暗) */
 const 时段偏暗 = computed(() => 时段.value === '晚上' || 时段.value === '深夜');
 
-/** 派生实际暗色:跟随档看时段,否则看用户选的档 */
-function 结算主题() {
+// 主题结算全响应式(2026-07-17 跟随时段黑字修复):挂载恢复/切档/楼层推进换时段/回合完成,
+// 任何一路动到依赖都立刻重算,不再依赖手工调用点的时序
+watchEffect(() => {
   const 该暗 = 主题模式.value === '跟随' ? 时段偏暗.value : 主题模式.value === '夜间';
   应用主题(该暗);
-}
-
-// 「跟随」档下,游戏时段变了自动切日夜
-watch(时段偏暗, () => {
-  if (主题模式.value === '跟随') 结算主题();
 });
 
 /** 把偏好写进根元素的 CSS 变量 + body class(省流/减动效) */
@@ -1778,9 +1861,10 @@ function 应用界面偏好() {
   const root = document.documentElement;
   root.style.setProperty('--prose-size', 字号档表[字号档.value]);
   root.style.setProperty('--entry-veil', String(垫板浓度.value));
+  if (正文字色.value) root.style.setProperty('--prose-ink', 正文字色.value);
+  else root.style.removeProperty('--prose-ink');
   root.classList.toggle('rq-lite', 省流.value);
   root.classList.toggle('rq-still', 减动效.value);
-  结算主题();
 }
 
 function 持久化设置() {
@@ -1791,6 +1875,7 @@ function 持久化设置() {
       JSON.stringify({
         主题模式: 主题模式.value,
         字号档: 字号档.value,
+        正文字色: 正文字色.value,
         垫板浓度: 垫板浓度.value,
         省流: 省流.value,
         减动效: 减动效.value,
@@ -1815,6 +1900,7 @@ function 恢复设置() {
       if (s.主题模式) 主题模式.value = s.主题模式;
       else 主题模式.value = localStorage.getItem(主题存储键) === '1' ? '夜间' : '日间'; // 旧键迁移
       if (s.字号档) 字号档.value = s.字号档;
+      if (typeof s.正文字色 === 'string') 正文字色.value = s.正文字色;
       if (typeof s.垫板浓度 === 'number') 垫板浓度.value = s.垫板浓度;
       省流.value = !!s.省流;
       减动效.value = !!s.减动效;
@@ -1850,6 +1936,7 @@ function 点重开() {
 function 重置偏好() {
   主题模式.value = '日间';
   字号档.value = '中';
+  正文字色.value = '';
   垫板浓度.value = 0.66;
   省流.value = false;
   减动效.value = false;
@@ -2226,13 +2313,13 @@ onUnmounted(() => {
 .avatar-glyph {
   display: grid;
   place-items: center;
-  width: 36px;
-  height: 36px;
+  width: 52px;
+  height: 52px;
   border-radius: 50%;
   border: 2px solid #fff;
   background: linear-gradient(160deg, #ffe3ee, #ffd0e2);
   color: #d4407a;
-  font-size: 0.95em;
+  font-size: 1.15em;
   font-weight: 800;
   box-shadow: 0 3px 10px rgba(30, 26, 38, 0.16);
 }
@@ -2250,9 +2337,9 @@ onUnmounted(() => {
 }
 
 .avatar-glyph.big {
-  width: 46px;
-  height: 46px;
-  font-size: 1.2em;
+  width: 64px;
+  height: 64px;
+  font-size: 1.4em;
 }
 
 /* 头像图版本(AI 生成素材;加载失败回退首字圆徽) */
@@ -2263,7 +2350,7 @@ onUnmounted(() => {
 }
 
 .avatar-name {
-  font-size: 0.68em;
+  font-size: 0.78em;
   color: var(--ink-soft);
 }
 
@@ -2431,7 +2518,8 @@ onUnmounted(() => {
 
 .narr {
   font-family: var(--font-prose);
-  color: var(--ink);
+  /* 字色三级:玩家自选 > 主题墨色(rq-dark 自动翻浅) */
+  color: var(--prose-ink, var(--ink));
   font-size: var(--prose-size, 0.9em);
   line-height: 1.85;
   margin: 5px 0;
@@ -2535,11 +2623,12 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
+/* 2×2 双列(2026-07-17 用户反馈:竖排四条太占空间) */
 .option-row {
   flex: none;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
   margin-top: 6px;
 }
 
@@ -2555,6 +2644,49 @@ onUnmounted(() => {
   cursor: pointer;
   box-shadow: 0 2px 6px rgba(30, 26, 38, 0.06);
   transition: all 0.18s;
+}
+
+/* gal 式选择条(rq0.12):水彩纸条底图居中排字,图挂了退玻璃白条 */
+.option-chip.gal {
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  text-align: center;
+  font-size: 0.82em;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  line-height: 1.35;
+  padding: 7px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 14px;
+  background:
+    var(--opt-img, none) center / cover no-repeat,
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.4),
+      rgba(255, 255, 255, 0.88) 16%,
+      rgba(255, 255, 255, 0.88) 84%,
+      rgba(255, 255, 255, 0.4)
+    ),
+    var(--glass);
+  box-shadow: 0 3px 10px rgba(30, 26, 38, 0.1);
+}
+
+.option-chip.gal:hover:not(:disabled) {
+  border-color: rgba(255, 79, 154, 0.55);
+  box-shadow: 0 6px 18px rgba(255, 79, 154, 0.22);
+  transform: translateY(-1px);
+}
+
+:global(html.rq-lite) .option-row {
+  --opt-img: none;
+}
+
+:global(html.rq-dark) .option-chip.gal {
+  background:
+    linear-gradient(90deg, rgba(44, 46, 64, 0.55), rgba(44, 46, 64, 0.94) 16%, rgba(44, 46, 64, 0.94) 84%, rgba(44, 46, 64, 0.55)),
+    #2c2e40;
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
 .option-chip:hover:not(:disabled) {
@@ -2604,12 +2736,18 @@ onUnmounted(() => {
 
 /* ── 遮罩与玻璃面板 ── */
 
+/* gal 式遮罩(2026-07-17 用户提案重设计):斜纹绢帘+粉蓝双色晕影+中心聚焦,替代死黑蒙版 */
 .mask {
   position: absolute;
   inset: 0;
   z-index: 30;
-  background: rgba(20, 22, 30, 0.42);
-  backdrop-filter: blur(3px);
+  background:
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.045) 0 2px, transparent 2px 6px),
+    radial-gradient(120% 90% at 50% 0%, rgba(255, 79, 154, 0.12), transparent 55%),
+    radial-gradient(130% 100% at 50% 110%, rgba(38, 169, 244, 0.14), transparent 60%),
+    radial-gradient(140% 140% at 50% 50%, rgba(24, 22, 34, 0.3), rgba(16, 14, 26, 0.6)),
+    rgba(20, 22, 30, 0.2);
+  backdrop-filter: blur(4px) saturate(0.9);
   display: grid;
   place-items: center;
   padding: 12px;
@@ -3649,6 +3787,45 @@ onUnmounted(() => {
   border-top: 1px solid var(--line-soft);
 }
 
+/* 正文字色选择行 */
+.ink-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ink-row .btn.on {
+  color: #fff;
+  background: var(--blue);
+  border-color: var(--blue);
+}
+
+.ink-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.8em;
+  color: var(--ink-soft);
+}
+
+.ink-pick.on {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.ink-pick input {
+  width: 28px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
 .btn.ghost {
   background: transparent;
   border: 1px solid var(--line-soft);
@@ -3733,11 +3910,196 @@ onUnmounted(() => {
   box-shadow: 0 4px 12px rgba(38, 169, 244, 0.3);
 }
 
+/* ═══ gal 商店(rq0.12):hero 色带 + 双列商品卡,道具图=AI 生成入库 ═══ */
+
+.sheet.shop {
+  width: min(520px, 96%);
+}
+
+.shop-hero {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: -14px -16px 10px;
+  padding: 16px 18px 12px;
+  color: #fff;
+  background:
+    linear-gradient(180deg, rgba(20, 22, 30, 0.06), rgba(20, 22, 30, 0.4)),
+    linear-gradient(130deg, #ff8ab9, #ffca35 58%, #4ab7ff);
+  border-radius: 18px 18px 0 0;
+}
+
+.shop-hero b {
+  font-size: 1.2em;
+  font-weight: 900;
+  letter-spacing: 0.28em;
+}
+
+.shop-hero em {
+  font-style: normal;
+  font-size: 0.75em;
+  opacity: 0.92;
+}
+
 .shop-cash {
-  margin-left: auto;
+  position: absolute;
+  right: 16px;
+  bottom: 12px;
   font-family: var(--font-mono);
-  font-size: 0.78em;
-  color: var(--blue);
+  font-size: 1.05em;
+  font-weight: 700;
+  color: #fff;
+  text-shadow: 0 1px 6px rgba(20, 22, 30, 0.45);
+}
+
+.shop-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  align-content: start;
+}
+
+.ware-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  background: var(--glass);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  box-shadow: 0 3px 10px rgba(30, 26, 38, 0.08);
+}
+
+.ware-pic {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  overflow: hidden;
+  background: linear-gradient(160deg, #fff7f0, #f2f7ff);
+}
+
+.ware-pic img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ware-pic > b {
+  font-size: 1.7em;
+  color: var(--ink-faint);
+}
+
+.ware-pic .ware-price {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.72em;
+  font-style: normal;
+  font-weight: 700;
+  color: #fff;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(24, 26, 40, 0.72);
+  backdrop-filter: blur(2px);
+}
+
+.ware-name {
+  font-size: 0.85em;
+}
+
+.ware-card .ware-desc {
+  flex: 1;
+  font-size: 0.72em;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.ware-buy {
+  align-self: stretch;
+  padding: 6px 10px;
+  font-size: 0.8em;
+}
+
+:global(html.rq-dark) .ware-card {
+  background: #2c2e40;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* ═══ 在场头像徽章(到场卡/场景条/房卡:认脸不认字) ═══ */
+
+.arrive-who {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 14px;
+  margin: 8px 0 2px;
+}
+
+.who-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.who-chip img,
+.who-chip > b {
+  box-sizing: border-box;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: top;
+  background: linear-gradient(160deg, #ffe3ee, #ffd0e2);
+  box-shadow: 0 2px 8px rgba(30, 26, 38, 0.2);
+  color: #d4407a;
+  font-size: 0.8em;
+  font-style: normal;
+}
+
+.who-chip em {
+  font-style: normal;
+  font-size: 0.82em;
+  color: var(--ink-soft);
+}
+
+.who-chip.mini img,
+.who-chip.mini > b {
+  width: 24px;
+  height: 24px;
+  border-width: 1.5px;
+}
+
+.scene-occ {
+  display: inline-flex;
+  align-items: center;
+}
+
+.scene-occ .who-chip.mini + .who-chip.mini {
+  margin-left: -6px;
+}
+
+.rm-who {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rm-who .who-chip.mini img,
+.rm-who .who-chip.mini > b {
+  border-color: rgba(255, 255, 255, 0.92);
+}
+
+.rm-who em {
+  font-style: normal;
+  font-size: 0.8em;
 }
 
 /* ═══ 偷窥余像 / 读信 ═══ */
