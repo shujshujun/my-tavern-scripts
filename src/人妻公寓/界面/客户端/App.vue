@@ -866,6 +866,14 @@
 
       <!-- ═══════════ 提示 toast ═══════════ -->
       <div v-if="提示文本" class="toast">{{ 提示文本 }}</div>
+
+      <!-- ═══════════ 拾获卡(2026-07-17 用户反馈:翻出东西不能一闪而过)——带【】的重要提示
+           (线索/收获类)升级成点击才收下的 gal 卡,普通提示仍走 toast ═══════════ -->
+      <div v-if="拾获卡 && !发送中" class="loot-card" title="点击收下" @click="拾获卡 = ''">
+        <div class="ui-kicker">FOUND / 拾获</div>
+        <p>{{ 拾获卡 }}</p>
+        <span class="loot-hint">点击收下</span>
+      </div>
     </div>
   </div>
 </template>
@@ -2123,6 +2131,8 @@ function 重置偏好() {
 // ── 提示 toast ──
 
 const 提示文本 = ref('');
+/** 拾获卡:带【】的重要提示(线索/收获)驻留展示,点击收下;开新回合自动收 */
+const 拾获卡 = ref('');
 let 提示timer: ReturnType<typeof setTimeout> | undefined;
 
 function 弹提示(文本: string, 时长 = 2600) {
@@ -2151,8 +2161,9 @@ onMounted(() => {
   刷新偷窥待选();
 
   eventOn('人妻公寓:生成开始', () => {
-    // 脚本侧发起的回合(查看监控等)也要锁输入+亮书写态
+    // 脚本侧发起的回合(查看监控等)也要锁输入+亮书写态;驻留的拾获卡顺手收掉不挡戏
     发送中.value = true;
+    拾获卡.value = '';
   });
   eventOn('人妻公寓:流式', (文本: string) => {
     // 流式半截文本只走本卡清洗,不过玩家正则(闭合标记未到会整段吞空)
@@ -2200,6 +2211,8 @@ onMounted(() => {
   eventOn('人妻公寓:提示', (消息: string) => {
     // 地图行动卡开着:结果以"线索卡"翻出(动画),不走 toast
     if (显示地图.value && 房卡.value) 结果卡.value = 消息;
+    // 带【】的重要提示(线索/收获)=拾获卡驻留,点击才收下(2026-07-17 用户反馈:出货不能一闪而过)
+    else if (消息.startsWith('【')) 拾获卡.value = 消息;
     else 弹提示(消息);
     // 侦探/商店操作是纯 UI 回合(不产楼):软计数即时刷新,store 拉新(监控列表是 computed 自动跟)
     刷新偷窥待选();
@@ -3083,6 +3096,45 @@ onUnmounted(() => {
   white-space: nowrap;
   box-shadow: 0 10px 26px rgba(30, 26, 38, 0.25);
   animation: toast-pop 0.25s ease;
+}
+
+/* 拾获卡:线索/收获的正经展示位——驻留到点击,金边纸卡(信物感),压 toast 一层 */
+.loot-card {
+  position: absolute;
+  left: 50%;
+  bottom: 110px;
+  transform: translateX(-50%);
+  z-index: 41;
+  width: max-content;
+  max-width: min(86%, 420px);
+  background: rgba(255, 252, 240, 0.97);
+  border: 1.5px solid rgba(255, 202, 53, 0.85);
+  border-radius: 14px;
+  color: var(--ink);
+  padding: 11px 16px 9px;
+  cursor: pointer;
+  box-shadow: 0 12px 32px rgba(30, 26, 38, 0.28);
+  animation: card-pop-in 0.28s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.loot-card p {
+  margin: 3px 0 4px;
+  font-size: 0.86em;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.loot-card .loot-hint {
+  display: block;
+  text-align: right;
+  font-size: 0.68em;
+  opacity: 0.55;
+}
+
+:global(html.rq-dark) .loot-card {
+  background: rgba(44, 46, 64, 0.97);
+  border-color: rgba(255, 202, 53, 0.45);
+  color: #e8e6f0;
 }
 
 @keyframes toast-pop {
