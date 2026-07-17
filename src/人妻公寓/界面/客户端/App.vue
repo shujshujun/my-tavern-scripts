@@ -2528,22 +2528,24 @@ onUnmounted(() => {
   transition: background 0.5s ease;
 }
 
-/* 立绘:她在这场戏里才入画;垫板压立绘(文字永远可读),左缘羽化不硬切 */
+/* 立绘:她在这场戏里才入画;垫板压立绘(文字永远可读),左缘羽化不硬切。
+   2026-07-17 用户反馈加大:2/3 身位近景素材+高度提到 84%,细白描边(叠 drop-shadow)+柔光 */
 .portrait {
   position: absolute;
-  right: -6px;
+  right: -10px;
   bottom: 0;
   z-index: 1;
-  height: 62%;
-  max-height: 380px;
+  height: 84%;
+  max-height: 500px;
   pointer-events: none;
-  filter: drop-shadow(0 6px 16px rgba(20, 24, 40, 0.3));
-  mask-image: linear-gradient(to right, transparent, #000 16%);
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 16%);
+  filter: drop-shadow(0 0 1.2px rgba(255, 255, 255, 0.85)) drop-shadow(0 0 1.2px rgba(255, 255, 255, 0.85))
+    drop-shadow(0 8px 20px rgba(20, 24, 40, 0.35));
+  mask-image: linear-gradient(to right, transparent, #000 14%);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 14%);
 }
 
 :global(html.rq-dark) .portrait {
-  filter: brightness(0.82) drop-shadow(0 6px 16px rgba(0, 0, 0, 0.5));
+  filter: brightness(0.84) drop-shadow(0 0 1.2px rgba(255, 255, 255, 0.5)) drop-shadow(0 8px 20px rgba(0, 0, 0, 0.55));
 }
 
 :global(html.rq-lite) .portrait {
