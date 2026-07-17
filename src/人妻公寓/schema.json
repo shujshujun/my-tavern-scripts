@@ -159,10 +159,30 @@
               "当前情绪": {
                 "default": "平静",
                 "type": "string"
+              },
+              "_疑心冻结至": {
+                "default": -1,
+                "type": "number"
+              },
+              "_外出至": {
+                "default": -1,
+                "type": "number"
+              },
+              "_上次出差楼": {
+                "default": -1,
+                "type": "number"
               }
             }
           },
           "_入住楼层": {
+            "default": 0,
+            "type": "number"
+          },
+          "_上次收租期": {
+            "default": -1,
+            "type": "number"
+          },
+          "_欠租笔数": {
             "default": 0,
             "type": "number"
           }
@@ -252,6 +272,34 @@
         "_上次杀时间楼层": {
           "default": -1,
           "type": "number"
+        },
+        "_上次上交期": {
+          "default": -1,
+          "type": "number"
+        },
+        "_通牒期": {
+          "default": -1,
+          "type": "number"
+        },
+        "_待接来电": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "期": {
+              "default": -1,
+              "type": "number"
+            },
+            "分数段": {
+              "type": "string"
+            },
+            "报表": {
+              "type": "string"
+            },
+            "通牒": {
+              "default": false,
+              "type": "boolean"
+            }
+          }
         }
       }
     }

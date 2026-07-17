@@ -1,7 +1,7 @@
 import type { SchemaType, 户节点Type } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
 import { 户静态表, 晋阶门槛, 阶段标题 } from '../../stageConfig';
-import { 丈夫状态推算, 妻位置推算, 当前时段 } from './楼层时钟';
+import { 丈夫在楼, 妻位置推算, 当前时段 } from './楼层时钟';
 import { 镜像直写 } from './守护系统';
 import { 读场景 } from './snapshotSystem';
 
@@ -71,7 +71,7 @@ export function 夜访结算(data: SchemaType, 楼层: number): void {
   if (!节点 || 节点.妻.当前阶段 >= 2) return;
   const 钟 = (进房末楼 ?? 楼层) + data.系统._时段偏移楼;
   if (当前时段(钟) !== '深夜') return;
-  const 有人 = 妻位置推算(房间id as 门牌, 钟) === 房间id || 丈夫状态推算(房间id as 门牌, 钟) !== '外出';
+  const 有人 = 妻位置推算(房间id as 门牌, 钟) === 房间id || 丈夫在楼(节点, 房间id as 门牌, 钟) !== '外出';
   if (!有人) return;
   节点.夫.疑心值 = _.clamp(节点.夫.疑心值 + 夜访疑心每楼, 0, 100);
   data.风闻 = _.clamp(data.风闻 + 夜访风闻每楼, 0, 100);

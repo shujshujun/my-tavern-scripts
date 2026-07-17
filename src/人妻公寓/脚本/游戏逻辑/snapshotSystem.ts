@@ -1,7 +1,7 @@
 import type { SchemaType } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
 import { 户静态表, 查房间, 查裂缝, 越界应对话术, 阶段行为基调, 阶段接受上限 } from '../../stageConfig';
-import { 丈夫状态推算, 妻位置推算, 当前时段 } from './楼层时钟';
+import { 丈夫在楼, 妻位置推算, 当前时段 } from './楼层时钟';
 
 /**
  * 快照注入器(双通道:记账通道=数字仅供 AI 做 ±3 更新;表现通道=脚本查表编译感知语)
@@ -106,7 +106,7 @@ export function 检测焦点(
     const 种子楼 = (进房末楼 ?? 楼层) + data.系统._时段偏移楼;
     const 在此 = 候选.filter(m => {
       if (妻位置推算(m, 种子楼) === 房间id) return true;
-      return m === 房间id && 丈夫状态推算(m, 种子楼) !== '外出';
+      return m === 房间id && 丈夫在楼(data.户[m], m, 种子楼) !== '外出';
     });
     return { 焦点: 在此.slice(0, 1), 在场: 在此.slice(1, 3) };
   }
@@ -273,7 +273,7 @@ export function 组公寓快照(chat: { role: string; content: string }[], data:
     for (const m of 焦点) {
       const 配 = 户静态表[m];
       const { 妻, 夫 } = data.户[m];
-      const 夫状态 = 丈夫状态推算(m, 种子楼);
+      const 夫状态 = 丈夫在楼(data.户[m], m, 种子楼);
       const 妻位置 = 妻位置推算(m, 种子楼);
       const 感知段 = [好感感知(妻.好感值), 阶段行为基调[妻.当前阶段], 婚姻感知(妻.婚姻值)];
       const 罪 = 罪恶感知(罪恶感(妻));

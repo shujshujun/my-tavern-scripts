@@ -2,6 +2,7 @@ import type { SchemaType } from '../../schema';
 import { Schema, 创建户节点 } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
 import { 户静态表, 难度表, 首批门牌 } from '../../stageConfig';
+import { 经济结算 } from './经济系统';
 import { 夜访结算, 惰性结算户, 结算焦点疑心, 冷落检测 } from './结算系统';
 import { PROMOTE_MIRROR_KEY, 捕获保护快照, 回滚保护字段, 清保护快照, 镜像直写 } from './守护系统';
 import { 中断卡文案, 记违规清零, 结算违规代价, 输出稽查, 未遂余波指引 } from './稽查系统';
@@ -155,6 +156,12 @@ function 回合结算(newStat: SchemaType, snapStat: SchemaType, 焦点: 门牌[
 
   // 深夜杵在低阶段住户门口的代价(演出层纪律在快照,账面在此)
   夜访结算(newStat, 楼层);
+
+  // 经济:收租日/上交日/父亲来电/最后通牒(期号去重,杀时间跨期惰性补收)
+  {
+    const 经提示 = 经济结算(newStat, 楼层);
+    if (经提示.length) eventEmit('人妻公寓:提示', 经提示.join('\n'));
+  }
 
   // 冷落检测:排队"她主动来找你"(一次一人)
   冷落检测(newStat, 楼层);

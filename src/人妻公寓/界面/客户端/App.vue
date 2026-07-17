@@ -468,6 +468,7 @@
               >
                 <span class="spot-plate">{{ 点.名 }}</span>
                 <span v-if="点.空置" class="spot-note">招租</span>
+                <span v-else-if="欠租中(点.id)" class="spot-note owe">欠租</span>
                 <span v-else-if="当前房间 === 点.id || 房内的人(点.id).length" class="spot-faces">
                   <img
                     v-if="当前房间 === 点.id && !头像失效['主角']"
@@ -688,6 +689,9 @@
           <button v-if="选中可晋阶" class="btn rite" :disabled="发送中" @click="晋阶(选中档案.门牌)">
             ✦ 跨过界线
           </button>
+          <button v-if="选中可要钱" class="btn" :disabled="发送中" title="她的钱,现在也是你的钱" @click="开口要钱(选中档案.门牌)">
+            ¥ 开口要钱
+          </button>
         </div>
       </div>
 
@@ -716,6 +720,15 @@
               <span class="ware-acts">
                 <button v-if="项.可读信" class="btn mini" @click="打开信(项.信门牌!)">读</button>
                 <button v-if="项.可布设" class="btn mini" :disabled="发送中" @click="布设()">装在这个房间</button>
+                <button v-if="项.可用运作" class="btn mini" @click="用运作(项.id)">使用</button>
+                <button
+                  v-for="夫 in 项.运作对象"
+                  :key="'运' + 夫.门牌"
+                  class="btn mini"
+                  @click="用运作(项.id, 夫.门牌)"
+                >
+                  给{{ 夫.夫名 }}
+                </button>
                 <button
                   v-for="妻 in 项.可送对象"
                   :key="妻.门牌"
@@ -774,6 +787,7 @@
                 {{ data.现金 < (项.价格 ?? 0) ? '钱不够' : '买下' }}
               </button>
             </div>
+            <p v-if="!当前货架.length" class="hint center">{{ 当前空文案 }}</p>
           </div>
         </div>
       </div>
@@ -882,8 +896,9 @@
 import type { FunctionalComponent } from 'vue';
 
 import type { SchemaType } from '../../schema';
-import { 户静态表, 房间表, 查房间, 查裂缝, 查道具, 道具表, 门牌列表, 难度表, type 门牌 } from '../../stageConfig';
-import { 丈夫状态推算, 妻位置推算, 当前天数, 当前时段 } from '../../脚本/游戏逻辑/楼层时钟';
+import { 户静态表, 房间表, 查房间, 查裂缝, 查道具, 道具表, 门牌列表, 难度表, type 道具配置, type 门牌 } from '../../stageConfig';
+import { 丈夫在楼, 妻位置推算, 当前天数, 当前时段 } from '../../脚本/游戏逻辑/楼层时钟';
+import { 查金币 } from '../../脚本/游戏逻辑/经济系统';
 import { 可晋阶 } from '../../脚本/游戏逻辑/结算系统';
 import { useDataStore } from './store';
 
@@ -908,6 +923,7 @@ const 图标库: Record<string, string> = {
   trash: '<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="m19 6-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
   clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   tv: '<rect x="2" y="7" width="20" height="15" rx="2"/><path d="m17 2-5 5-5-5"/>',
+  coin: '<circle cx="12" cy="12" r="9"/><path d="m8.5 7.5 3.5 4 3.5-4M12 11.5V17M9.5 13.5h5M9.5 15.5h5"/>',
 };
 
 /** 线条 SVG 兜底(水彩图标加载失败时用,颜色取墨色定值) */
@@ -1121,6 +1137,16 @@ function 房间动作(id: string | null): 卡动作[] {
     if (!data.value.户[id]) return []; // 招租中,没有可做的事
     if (房内有人在(id)) {
       动作.push({ kicker: 'VISIT', icon: 'door', 文案: '过去串门', 做: () => 进入(id) });
+      // 催租三选(P3,天生欠租户):她在家且账上挂着欠租才摆得上台面
+      if ((data.value.户[id]?._欠租笔数 ?? 0) > 0 && 妻位置推算(id as 门牌, 位置种子.value) === id) {
+        const 催 = (选择: '硬催' | '宽限' | '垫上') => {
+          if (当前房间.value !== id) 进入(id, false, true);
+          eventEmit('人妻公寓:催租', { 门牌: id, 选择 });
+        };
+        动作.push({ kicker: 'RENT', icon: 'coin', 文案: '硬催房租', 类: 'risky', 做: () => 催('硬催') });
+        动作.push({ kicker: 'RENT', icon: 'coin', 文案: '批张宽限条', 做: () => 催('宽限') });
+        动作.push({ kicker: 'RENT', icon: 'coin', 文案: '悄悄垫上', 做: () => 催('垫上') });
+      }
     } else {
       动作.push({ kicker: 'KNOCK', icon: 'bell', 文案: '敲敲门', 做: () => 进入(id) });
       动作.push({
@@ -1130,6 +1156,16 @@ function 房间动作(id: string | null): 卡动作[] {
         类: 'risky',
         做: () => 敲撬门(id),
       });
+      // 空房偷窃(P3):撬进空屋才有翻现金一说;冷却与察觉全在脚本
+      if (当前房间.value === id && 已破门进入.value) {
+        动作.push({
+          kicker: 'SEARCH',
+          icon: 'coin',
+          文案: '翻找明面上的现金',
+          类: 'risky',
+          做: () => eventEmit('人妻公寓:空房偷窃', id),
+        });
+      }
     }
     return 动作;
   }
@@ -1153,6 +1189,21 @@ function 房间动作(id: string | null): 卡动作[] {
 
   // 公共区
   动作.push({ kicker: 'GO', icon: 'arrow', 文案: '走过去', 做: () => 进入(id) });
+  // 公共区零钱(P3:路过的小惊喜;种子+期号与脚本同一真值,拾没拾过看 chat 计数)
+  {
+    const 零钱 = 查金币(id, 钟楼号.value);
+    if (零钱 > 0) {
+      动作.push({
+        kicker: 'PICK',
+        icon: 'coin',
+        文案: `捡起零钱(¥${零钱})`,
+        做: () => {
+          if (当前房间.value !== id) 进入(id, false, true);
+          eventEmit('人妻公寓:捡金币', id);
+        },
+      });
+    }
+  }
   if (id === '垃圾房') {
     for (const 袋 of 垃圾袋列表.value) {
       动作.push({
@@ -1168,6 +1219,11 @@ function 房间动作(id: string | null): 卡动作[] {
     }
   }
   return 动作;
+}
+
+/** 欠租门牌(P3:地图挂"欠租"角标=催租入口可视化) */
+function 欠租中(id: string): boolean {
+  return (data.value?.户[id]?._欠租笔数 ?? 0) > 0;
 }
 
 /** 天暗后有人在家=窗户亮灯(gal地图的生活感;也是"丈夫在不在家"的免费可视化) */
@@ -1200,7 +1256,7 @@ function 房内的人(房间id: string): string[] {
   const 名单: string[] = [];
   for (const m of 可见门牌.value) {
     if (妻位置推算(m, 位置种子.value) === 房间id) 名单.push(户静态表[m].妻名);
-    if (m === 房间id && 丈夫状态推算(m, 位置种子.value) !== '外出' && 户静态表[m].夫名) {
+    if (m === 房间id && 丈夫在楼(data.value.户[m], m, 位置种子.value) !== '外出' && 户静态表[m].夫名) {
       名单.push(户静态表[m].夫名);
     }
   }
@@ -1563,7 +1619,7 @@ const 选中档案 = computed(() => {
     门牌: m,
     妻名: 户静态表[m].妻名,
     夫名: 户静态表[m].夫名 || '她丈夫',
-    夫状态: 丈夫状态推算(m, 位置种子.value),
+    夫状态: 丈夫在楼(data.value.户[m], m, 位置种子.value),
     妻,
     夫,
     三轴: [
@@ -1594,6 +1650,16 @@ const 选中可晋阶 = computed(() => {
   if (!m || !data.value.户[m]) return false;
   return 可晋阶(data.value.户[m].妻);
 });
+
+/** L4 要钱按钮(P3:钱的流向反转=堕落可视化;冷却与刹车全在脚本) */
+const 选中可要钱 = computed(() => {
+  const m = 选中门牌.value;
+  return !!m && (data.value.户[m]?.妻.当前阶段 ?? 0) >= 4;
+});
+
+function 开口要钱(门牌号: 门牌) {
+  eventEmit('人妻公寓:要钱', 门牌号);
+}
 
 function 晋阶(门牌号: 门牌) {
   eventEmit('人妻公寓:请求晋阶', 门牌号);
@@ -1626,32 +1692,58 @@ const 背包列表 = computed(() =>
       信门牌,
       // 摄像头:须在已入住户的房内且屋里没人
       可布设: id === '针孔摄像头' && 在户内 && !房内有人在(当前房间.value!),
-      // 礼物等可送出:须与她同处一室(当面);工具类常驻不可送
+      // 礼物等可送出:须与她同处一室(当面);工具/运作类不走"送"
       可送对象:
-        !配?.常驻 && !信门牌 && id !== '针孔摄像头'
+        !配?.常驻 && !信门牌 && id !== '针孔摄像头' && 配?.类别 !== '运作' && 配?.类别 !== '工具'
           ? 可见门牌.value
               .filter(m => 当前房间.value && 妻位置推算(m, 位置种子.value) === 当前房间.value)
               .map(m => ({ 门牌: m, 妻名: 户静态表[m].妻名 }))
+          : [],
+      // 运作道具(P3):全局四件直接"使用";户向四件按丈夫点名(须该户已入住且有夫)
+      可用运作: 配?.类别 === '运作' && !['钓鱼团购券', '夜班内推', '外地项目介绍', '代订惊喜'].includes(id),
+      运作对象:
+        配?.类别 === '运作' && ['钓鱼团购券', '夜班内推', '外地项目介绍', '代订惊喜'].includes(id)
+          ? 可见门牌.value
+              .filter(m => 户静态表[m].夫名)
+              .map(m => ({ 门牌: m, 夫名: 户静态表[m].夫名 }))
           : [],
     };
   }),
 );
 
-// ── 商店(P2 工具+礼物两页签;礼物页签=任一裂缝确认后现) ──
+function 用运作(道具id: string, 门牌号?: 门牌) {
+  显示背包.value = false;
+  eventEmit('人妻公寓:使用运作', { 道具id, 门牌: 门牌号 });
+}
+
+// ── 商店(P3 八页签框架:工具/人情/运作常驻,余者随进度亮起——商店自己就是进度条) ──
 
 const 显示商店 = ref(false);
 const 商店页签 = ref('工具');
 
 const 货架 = computed(() => {
   const 全部 = Object.values(道具表).filter(d => (d.价格 ?? 0) > 0);
-  const 架 = [{ 页签: '工具', 商品: 全部.filter(d => d.类别 === '工具') }];
-  if (Object.values(data.value?.户 ?? {}).some(节点 => 节点.妻.裂缝.已确认)) {
-    架.push({ 页签: '礼物', 商品: 全部.filter(d => d.类别 === '礼物') });
-  }
+  const 按类 = (类: 道具配置['类别']) => 全部.filter(d => d.类别 === 类);
+  const 户们 = Object.values(data.value?.户 ?? {});
+  const 最高阶段 = 户们.reduce((高, 节点) => Math.max(高, 节点.妻.当前阶段), 0);
+  const 架: { 页签: string; 商品: 道具配置[]; 空文案?: string }[] = [
+    { 页签: '工具', 商品: 按类('工具') },
+    { 页签: '人情', 商品: 按类('人情') },
+    { 页签: '运作', 商品: 按类('运作') },
+  ];
+  if (户们.some(节点 => 节点.妻.裂缝.已确认)) 架.push({ 页签: '礼物', 商品: 按类('礼物') });
+  // 进度页签:亮起即奖励;SKU 归 P5,先摆"到货中"的空货架占位
+  if (最高阶段 >= 2) 架.push({ 页签: '服饰', 商品: 按类('服饰'), 空文案: '新一季衣装正在打包发货——很快上架。' });
+  if (最高阶段 >= 3) 架.push({ 页签: '特殊场景', 商品: 按类('特殊场景'), 空文案: '有些节目要等合适的人到齐才开演。' });
+  if (最高阶段 >= 4) 架.push({ 页签: '性癖', 商品: 按类('性癖'), 空文案: '这一栏的货,认人。到货会通知你。' });
+  // 药物页签不常驻:剧情节点开窗时上架(P5),平时不出现
   return 架;
 });
 
 const 当前货架 = computed(() => 货架.value.find(页 => 页.页签 === 商店页签.value)?.商品 ?? []);
+const 当前空文案 = computed(
+  () => 货架.value.find(页 => 页.页签 === 商店页签.value)?.空文案 ?? '(暂时没货)',
+);
 
 function 买(道具id: string) {
   eventEmit('人妻公寓:购买', 道具id);
@@ -5179,6 +5271,15 @@ onUnmounted(() => {
   font-size: 9px;
   line-height: 1;
   color: var(--ink-faint);
+}
+
+/* 欠租角标(P3:催租入口可视化,红底白字压过普通注记) */
+.spot-note.owe {
+  background: rgba(192, 57, 43, 0.92);
+  color: #fff;
+  border-radius: 6px;
+  padding: 1px 5px;
+  font-weight: 700;
 }
 
 .spot-faces {
