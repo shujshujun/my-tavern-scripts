@@ -416,6 +416,14 @@
           <button class="dock-btn" title="网购商城,次日达到管理员室" @click="显示商店 = true">
             <Ic n="cart" /><span>商店</span>
           </button>
+          <button
+            class="dock-btn"
+            :class="{ ring: 手机来电, budge: 手机未读 }"
+            :title="手机来电 ? '有来电!' : '你的手机'"
+            @click="开手机"
+          >
+            <Ic n="phone" /><span>手机</span>
+          </button>
           <button class="dock-btn" :disabled="!背包列表.length" @click="显示背包 = true">
             <Ic n="bag" /><span>背包</span>
           </button>
@@ -1224,6 +1232,15 @@ function 房间动作(id: string | null): 卡动作[] {
 /** 欠租门牌(P3:地图挂"欠租"角标=催租入口可视化) */
 function 欠租中(id: string): boolean {
   return (data.value?.户[id]?._欠租笔数 ?? 0) > 0;
+}
+
+// ── 手机(P4:设备本体在酒馆页面层,游戏界面只管跳动指示与红点) ──
+
+const 手机来电 = computed(() => (data.value?.系统?._待接来电?.期 ?? -1) >= 0);
+const 手机未读 = ref(false);
+
+function 开手机() {
+  eventEmit('人妻公寓:开手机', 手机来电.value);
 }
 
 /** 天暗后有人在家=窗户亮灯(gal地图的生活感;也是"丈夫在不在家"的免费可视化) */
@@ -2309,6 +2326,9 @@ onMounted(() => {
     // 脚本侧已写好 _场景=302 并即将开偷窥回合,这里只同步画面(进入 重写同值场景,幂等)
     if (当前房间.value !== '302') 进入('302');
   });
+  eventOn('人妻公寓:手机状态', (状: { 未读?: boolean }) => {
+    手机未读.value = !!状?.未读;
+  });
   eventOn('人妻公寓:提示', (消息: string) => {
     // 地图行动卡开着:结果以"线索卡"翻出(动画),不走 toast
     if (显示地图.value && 房卡.value) 结果卡.value = 消息;
@@ -3197,6 +3217,40 @@ onUnmounted(() => {
   white-space: nowrap;
   box-shadow: 0 10px 26px rgba(30, 26, 38, 0.25);
   animation: toast-pop 0.25s ease;
+}
+
+/* 手机 dock 钮(P4):来电=铃振跳动,未读=红点 */
+.dock-btn.budge {
+  position: relative;
+}
+
+.dock-btn.budge::after {
+  content: '';
+  position: absolute;
+  top: 6px;
+  right: 14px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #fa5151;
+}
+
+.dock-btn.ring {
+  animation: dock-ring 0.6s ease-in-out infinite;
+  color: #fa5151;
+}
+
+@keyframes dock-ring {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  25% {
+    transform: rotate(-8deg) scale(1.05);
+  }
+  75% {
+    transform: rotate(8deg) scale(1.05);
+  }
 }
 
 /* 拾获卡:线索/收获的正经展示位——驻留到点击,金边纸卡(信物感),压 toast 一层 */
