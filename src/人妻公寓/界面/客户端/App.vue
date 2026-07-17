@@ -1381,13 +1381,15 @@ function 刷新可重掷() {
  * 找人时用位置推算查她此刻真实在哪:在楼里就带过去;"外出"不是房间=不挪窝照常发,
  * 快照的"她不在场"纪律会让 AI 演一场扑空,真实不穿帮。
  */
-const 移动意图 = /去|前往|走到|来到|送到|回到|回去|上楼|下楼|找/;
+// 紧邻匹配(2026-07-17 二版):移动动词后 ≤6 字内出现目标才算移动意图——
+// "给101发消息找她确认"(找与101不相邻)不误触;"到"排除 想到/提到/说到 等表意搭配
+const 移动动词组 = '去|前往|找|(?<![想提念说听猜料])到';
 
 function 选项移动目标(文本: string): string | null {
-  if (!移动意图.test(文本)) return null;
-  const 房 = 房间表.find(r => 文本.includes(r.id) || 文本.includes(r.名称));
+  const 试 = (词: string) => new RegExp(`(?:${移动动词组})[^,。;!?、]{0,6}${_.escapeRegExp(词)}`).test(文本);
+  const 房 = 房间表.find(r => 试(r.id) || 试(r.名称));
   if (房) return 房.id;
-  const 牌 = 可见门牌.value.find(m => 文本.includes(户静态表[m].妻名));
+  const 牌 = 可见门牌.value.find(m => 试(户静态表[m].妻名));
   if (牌) {
     const 位 = 妻位置推算(牌, 末楼号.value);
     if (查房间(位)) return 位;
