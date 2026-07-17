@@ -4,7 +4,7 @@ import { reloadOnChatChange } from '@/util/script';
 import type { SchemaType } from '../../schema';
 import { Schema, 创建户节点 } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
-import { 户静态表, 首批门牌, 阶段标题 } from '../../stageConfig';
+import { 户静态表, 查道具, 首批门牌, 阶段标题 } from '../../stageConfig';
 import { 惰性结算户, 结算焦点疑心, 冷落检测, 请求晋阶 } from './结算系统';
 import { 捕获保护快照, 回滚保护字段, 有保护快照, 镜像直写 } from './守护系统';
 import { 布设摄像头, 查看摄像头, 清偷窥挂起, 读信揭晓, 翻垃圾, 偷窥选细节, type 侦探结果 } from './侦探系统';
@@ -275,7 +275,16 @@ function 挂载监听() {
   );
 
   eventOn('人妻公寓:送礼', (载荷: { 道具id: string; 门牌: 门牌 }) =>
-    安全操作((raw, data) => 落地(送礼(data, String(载荷.道具id), 载荷.门牌), raw, data)),
+    安全操作((raw, data) => {
+      const 结果 = 送礼(data, String(载荷.道具id), 载荷.门牌);
+      落地(结果, raw, data);
+      // 排了戏就立刻开演(2026-07-17 用户反馈"点了送礼没动静没AI回复"):与查看摄像头同型——
+      // 开门正戏/礼貌收下/普通赠礼都当场演;失败分支(没这东西/送不得)只toast不动戏
+      if (结果.成功 && 结果.变动) {
+        const 名 = 查道具(String(载荷.道具id))?.名称 ?? '礼物';
+        void 执行回合(`(把「${名}」当面送给${户静态表[载荷.门牌].妻名})`);
+      }
+    }),
   );
 
   // 晋阶按钮(UI 抬升点):脚本结算+镜像直写,正戏事件排队到下一楼
