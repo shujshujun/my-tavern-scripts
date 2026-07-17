@@ -65,8 +65,11 @@ export interface 稽查结果 {
  * 稽查一楼正文。
  * @param 阶段 本轮焦点妻的当前阶段(=许可等级;无焦点妻时传 null 跳过)
  * @param 免检 正戏楼免检(场景引擎激活/药物事件窗口,放行至该正戏许可等级;P5 接入)
+ * @param 检词文本 关键词兜底的扫描范围——必须传清洗后的正文!思维链里模型爱自我提醒
+ *   "此阶段不能出现插入等内容"、选项块第4条被要求写情色试探型,拿原始输出扫词=自带误杀
+ *   (2026-07-17 用户"夏女士你也在这里啊"被斩案)。缺省退回原文,仅作兼容。
  */
-export function 输出稽查(原文: string, 阶段: number | null, 免检 = false): 稽查结果 {
+export function 输出稽查(原文: string, 阶段: number | null, 免检 = false, 检词文本?: string): 稽查结果 {
   const 自报等级 = 解析行为等级(原文);
   if (免检 || 阶段 === null) return { 违规: false, 原因: '', 自报等级 };
 
@@ -78,13 +81,14 @@ export function 输出稽查(原文: string, 阶段: number | null, 免检 = fal
   if (自报等级 !== null && 自报等级 > 熔断上限) {
     return { 违规: true, 原因: `自报行为等级${自报等级}超过阶段上限${阶段}(熔断线${熔断上限})`, 自报等级 };
   }
-  // 探测器②:关键词兜底(自报可被越狱的 AI 谎报)
+  // 探测器②:关键词兜底(自报可被越狱的 AI 谎报;只扫正文,思维链/选项块不作数)
+  const 扫 = 检词文本 ?? 原文;
   if (阶段 < 3) {
-    const 命中 = 性行为词表.find(w => 原文.includes(w));
+    const 命中 = 性行为词表.find(w => 扫.includes(w));
     if (命中) return { 违规: true, 原因: `阶段${阶段}正文出现性行为词「${命中}」`, 自报等级 };
   }
   if (阶段 < 4) {
-    const 命中 = 进阶花样词表.find(w => 原文.includes(w));
+    const 命中 = 进阶花样词表.find(w => 扫.includes(w));
     if (命中) return { 违规: true, 原因: `阶段${阶段}正文出现进阶花样词「${命中}」`, 自报等级 };
   }
   return { 违规: false, 原因: '', 自报等级 };
