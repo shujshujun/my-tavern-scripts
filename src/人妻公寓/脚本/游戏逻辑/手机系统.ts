@@ -7,7 +7,9 @@ import { 捕获保护快照 } from './守护系统';
 import { Schema } from '../../schema';
 
 /**
- * 手机系统(P4:微信一 App;形态参考 玉子手机(yuzi83)·柚月,经双授权改造,谨此致谢)
+ * 手机系统(P4:微信一 App)
+ * 外观=柚月小手机(yuzuki, github.com/gaigai315/yuzuki-phone)授权砍装:华为全面屏壳/药丸双摄/
+ * 状态栏/主屏 app-grid+dock 同构复刻;挂载范式参考玉子手机(yuzi83)。经双授权改造,谨此致谢。
  *
  * 挂载:注入酒馆页面文档(window.parent)——与游戏卡片 iframe 平级的独立手机(用户拍板,
  * 非游戏内浮层);玉子同款防重复加载。游戏界面只有"跳动来电指示/红点",点击唤起本机。
@@ -293,16 +295,39 @@ function el(tag: string, cls: string, html?: string): HTMLElement {
 }
 
 const 手机CSS = `
-#${ROOT_ID}{position:fixed;right:18px;bottom:76px;z-index:99990;font-family:-apple-system,"Segoe UI",Roboto,"Noto Sans SC",sans-serif;}
+#${ROOT_ID}{position:fixed;right:18px;bottom:76px;z-index:99990;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","HarmonyOS Sans","Segoe UI",Roboto,"Noto Sans SC",sans-serif;}
 #${ROOT_ID} *{box-sizing:border-box;margin:0;padding:0;}
 #${ROOT_ID} .rqp-toggle{width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;background:#1a1c22;color:#fff;font-size:24px;box-shadow:0 6px 18px rgba(0,0,0,.35);position:relative;}
 #${ROOT_ID} .rqp-toggle .dot{position:absolute;top:4px;right:4px;width:12px;height:12px;border-radius:50%;background:#fa5151;display:none;}
 #${ROOT_ID}.has-unread .rqp-toggle .dot{display:block;}
 #${ROOT_ID}.ringing .rqp-toggle{animation:rqp-ring .6s ease-in-out infinite;}
 @keyframes rqp-ring{0%,100%{transform:rotate(0)}25%{transform:rotate(-12deg) scale(1.06)}75%{transform:rotate(12deg) scale(1.06)}}
-#${ROOT_ID} .rqp-shell{display:none;position:absolute;right:0;bottom:64px;width:340px;height:640px;max-height:78vh;background:#111;border-radius:28px;padding:10px;box-shadow:0 18px 50px rgba(0,0,0,.5);}
-#${ROOT_ID}.open .rqp-shell{display:block;}
-#${ROOT_ID} .rqp-screen{width:100%;height:100%;background:#ededed;border-radius:20px;overflow:hidden;display:flex;flex-direction:column;position:relative;}
+/* ── 手机壳(柚月小手机同款华为全面屏风:金属机身/药丸双摄/状态栏;yuzuki 授权改造) ── */
+#${ROOT_ID} .rqp-shell{display:none;position:absolute;right:0;bottom:64px;width:min(320px,92vw);height:min(692px,80vh);background:#1a1a1a;border-radius:40px;padding:4px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),0 15px 50px rgba(0,0,0,.4),0 5px 20px rgba(0,0,0,.3);}
+#${ROOT_ID}.open .rqp-shell{display:block;animation:rqp-slidein .5s cubic-bezier(.4,0,.2,1);}
+@keyframes rqp-slidein{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}
+#${ROOT_ID} .rqp-punch{position:absolute;top:12px;left:25px;width:44px;height:15px;background:#000;border-radius:9px;z-index:60;box-shadow:0 1px 3px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.05);}
+#${ROOT_ID} .rqp-punch::before{content:'';position:absolute;top:50%;left:6px;transform:translateY(-50%);width:8px;height:8px;border-radius:50%;background:radial-gradient(circle,#1a3a52 0%,#0a1a2a 50%,#000 100%);box-shadow:0 0 2px rgba(26,77,122,.5),inset 0 1px 2px rgba(255,255,255,.15);}
+#${ROOT_ID} .rqp-punch::after{content:'';position:absolute;top:50%;right:7px;transform:translateY(-50%);width:5px;height:5px;border-radius:50%;background:radial-gradient(circle,#2a2a2a 0%,#0a0a0a 100%);}
+#${ROOT_ID} .rqp-status{position:absolute;top:8px;left:8px;right:8px;height:26px;display:flex;justify-content:space-between;align-items:center;padding:0 8px;z-index:55;pointer-events:none;font-weight:600;}
+#${ROOT_ID} .rqp-status .tm{margin-left:66px;font-size:11px;letter-spacing:.3px;color:#000;}
+#${ROOT_ID} .rqp-status .rt{display:flex;align-items:center;gap:4px;margin-right:6px;}
+#${ROOT_ID} .rqp-status .bars{display:flex;align-items:flex-end;gap:1.5px;height:12px;}
+#${ROOT_ID} .rqp-status .bars i{width:3px;background:#333;border-radius:1px;}
+#${ROOT_ID} .rqp-status .bars i:nth-child(1){height:3px}#${ROOT_ID} .rqp-status .bars i:nth-child(2){height:5px}#${ROOT_ID} .rqp-status .bars i:nth-child(3){height:8px}#${ROOT_ID} .rqp-status .bars i:nth-child(4){height:11px}
+#${ROOT_ID} .rqp-batt{width:12px;height:18px;border:1.5px solid #333;border-radius:3px;position:relative;display:flex;align-items:flex-end;overflow:hidden;}
+#${ROOT_ID} .rqp-batt::before{content:'';position:absolute;top:-4px;left:50%;transform:translateX(-50%);width:5px;height:2.5px;background:#333;border-radius:1px;}
+#${ROOT_ID} .rqp-batt i{display:block;width:100%;height:78%;background:#4cd964;}
+#${ROOT_ID} .rqp-screen{width:100%;height:100%;background:#ededed;border-radius:36px;overflow:hidden;display:flex;flex-direction:column;position:relative;padding-top:34px;}
+/* ── 主屏(柚月 home-screen 同构:壁纸+app-grid+dock) ── */
+#${ROOT_ID} .rqp-home{flex:1;position:relative;overflow:hidden;background:linear-gradient(160deg,#8fb8de 0%,#c3a6d8 45%,#f2c4ae 100%);}
+#${ROOT_ID} .rqp-home .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:3.5%;padding:14% 5% 4%;justify-items:center;}
+#${ROOT_ID} .rqp-home .app{display:flex;flex-direction:column;align-items:center;border:none;background:none;cursor:pointer;position:relative;width:100%;}
+#${ROOT_ID} .rqp-home .app .bg{width:52px;height:52px;border-radius:13px;display:grid;place-items:center;font-size:26px;color:#fff;box-shadow:0 4px 10px rgba(0,0,0,.22);}
+#${ROOT_ID} .rqp-home .app span{margin-top:4px;font-size:11px;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.5);}
+#${ROOT_ID} .rqp-home .app .dot{position:absolute;top:-3px;right:12%;width:11px;height:11px;border-radius:50%;background:#fa5151;border:1.5px solid #fff;}
+#${ROOT_ID} .rqp-home .dock{position:absolute;bottom:5%;left:50%;transform:translateX(-50%);display:flex;gap:16px;background:rgba(255,255,255,.22);backdrop-filter:blur(8px);border-radius:22px;padding:9px 18px;}
+#${ROOT_ID} .rqp-home .dock .app span{display:none;}
 #${ROOT_ID} .rqp-head{flex:none;background:#ededed;padding:12px 14px 8px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #ddd;}
 #${ROOT_ID} .rqp-head b{font-size:15px;color:#111;flex:1;text-align:center;}
 #${ROOT_ID} .rqp-back{border:none;background:none;font-size:16px;cursor:pointer;color:#111;width:24px;}
@@ -372,8 +397,18 @@ export function 挂载手机(): void {
   doc.head.appendChild(style);
   const root = el('div', '');
   root.id = ROOT_ID;
-  root.innerHTML = `<div class="rqp-shell"><div class="rqp-screen"></div></div><button class="rqp-toggle" title="手机">📱<span class="dot"></span></button>`;
+  root.innerHTML =
+    `<div class="rqp-shell"><div class="rqp-punch"></div>` +
+    `<div class="rqp-status"><span class="tm"></span><span class="rt"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="rqp-batt"><i></i></span></span></div>` +
+    `<div class="rqp-screen"></div></div><button class="rqp-toggle" title="手机">📱<span class="dot"></span></button>`;
   doc.body.appendChild(root);
+  // 状态栏时间(柚月同款真实时钟)
+  const 走钟 = () => {
+    const t = root.querySelector('.rqp-status .tm');
+    if (t) t.textContent = new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+  };
+  走钟();
+  setInterval(走钟, 30000);
   root.querySelector('.rqp-toggle')!.addEventListener('click', () => {
     root.classList.toggle('open');
     if (root.classList.contains('open')) {
@@ -466,30 +501,42 @@ function 渲染(): void {
   };
 
   if (当前页.名 === 'home') {
-    头('手机', undefined, true);
-    const 体 = el('div', 'rqp-body');
-    const 格 = el('div', 'rqp-grid');
+    // 柚月同构主屏:壁纸+app-grid+dock(我们只有三个 app,格局照旧)
+    const 家 = el('div', 'rqp-home');
+    const 格 = el('div', 'grid');
     const 未读 = 库.消息.some(m => m.楼 <= 楼 && m.发 === '对方' && m.楼 > (库.读到[m.会话] ?? -1));
     const 圈新 = 库.圈.some(c => c.楼 <= 楼 && c.楼 > 库.圈读到);
     const 应用 = (名: string, 底色: string, 图: string, 点: boolean, 去: () => void) => {
-      const a = el('button', 'rqp-app', `<span class="ic" style="background:${底色}">${图}</span><span>${名}</span>${点 ? '<span class="dot"></span>' : ''}`);
+      const a = el('button', 'app', `<span class="bg" style="background:${底色}">${图}</span><span>${名}</span>${点 ? '<span class="dot"></span>' : ''}`);
       a.addEventListener('click', 去);
-      格.appendChild(a);
+      return a;
     };
-    应用('微信', '#07c160', '💬', 未读 || 有来电(), () => {
+    const 去微信 = () => {
       当前页 = 有来电() ? { 名: 'call' } : { 名: 'chats' };
       渲染();
-    });
-    应用('朋友圈', '#576b95', '🌁', 圈新, () => {
-      当前页 = { 名: 'moments' };
-      const 库2 = 读库();
-      库2.圈读到 = 楼;
-      写库(库2);
-      渲染();
-      刷新红点();
-    });
-    体.appendChild(格);
-    屏.appendChild(体);
+    };
+    格.appendChild(应用('微信', '#07c160', '💬', 未读 || 有来电(), 去微信));
+    格.appendChild(
+      应用('朋友圈', '#576b95', '🌁', 圈新, () => {
+        当前页 = { 名: 'moments' };
+        const 库2 = 读库();
+        库2.圈读到 = 楼;
+        写库(库2);
+        渲染();
+        刷新红点();
+      }),
+    );
+    格.appendChild(
+      应用('设置', '#8e8e93', '⚙️', false, () => {
+        当前页 = { 名: 'settings' };
+        渲染();
+      }),
+    );
+    家.appendChild(格);
+    const dock = el('div', 'dock');
+    dock.appendChild(应用('微信', '#07c160', '💬', 未读 || 有来电(), 去微信));
+    家.appendChild(dock);
+    屏.appendChild(家);
     return;
   }
 
@@ -643,7 +690,7 @@ function 渲染(): void {
       <label>模型<input class="i-model" value="${_.escape(c.model)}" placeholder="gpt-4.1-mini 等"/></label>
       <label>动态频率<select class="i-freq"><option${c.频率 === '勤' ? ' selected' : ''}>勤</option><option${c.频率 === '普通' ? ' selected' : ''}>普通</option><option${c.频率 === '静' ? ' selected' : ''}>静</option><option${c.频率 === '关' ? ' selected' : ''}>关</option></select></label>
       <button class="save">保存</button>
-      <p class="credit">手机形态参考:玉子手机(yuzi83)与柚月手机方案,经作者授权改造,谨此致谢。<br/>本机内容由系统生成,不占用正文楼层与 token。</p>`;
+      <p class="credit">手机外观:柚月小手机(yuzuki)授权砍装;挂载范式参考玉子手机(yuzi83)。经双授权改造,谨此致谢。<br/>本机内容由系统生成,不占用正文楼层与 token。</p>`;
     (区.querySelector('.save') as HTMLButtonElement).addEventListener('click', () => {
       存配置({
         base: (区.querySelector('.i-base') as HTMLInputElement).value.trim(),
