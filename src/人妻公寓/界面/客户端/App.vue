@@ -364,7 +364,7 @@
 
         <!-- 行动选项(AI 每轮给 4 条,点了直接发送;gal 式居中选择条,纸条底=AI 水彩件) -->
         <div v-if="显示选项" class="option-row" :style="{ '--opt-img': `url(${素材基址}/界面/选项条.webp)` }">
-          <button v-for="(项, i) in 行动选项" :key="i" class="option-chip gal" @click="发出(项)">{{ 项 }}</button>
+          <button v-for="(项, i) in 行动选项" :key="i" class="option-chip gal" @click="点选项(项)">{{ 项 }}</button>
         </div>
 
         <!-- 游戏内输入(玩家不碰酒馆输入框) -->
@@ -826,7 +826,7 @@
 import type { FunctionalComponent } from 'vue';
 
 import type { SchemaType } from '../../schema';
-import { 户静态表, 查房间, 查裂缝, 查道具, 道具表, 门牌列表, 难度表, type 门牌 } from '../../stageConfig';
+import { 户静态表, 房间表, 查房间, 查裂缝, 查道具, 道具表, 门牌列表, 难度表, type 门牌 } from '../../stageConfig';
 import { 丈夫状态推算, 妻位置推算, 当前天数, 当前时段 } from '../../脚本/游戏逻辑/楼层时钟';
 import { 可晋阶 } from '../../脚本/游戏逻辑/结算系统';
 import { useDataStore } from './store';
@@ -1315,6 +1315,19 @@ const 可重掷 = ref(false);
 
 function 刷新可重掷() {
   可重掷.value = Boolean(_.get(getVariables({ type: 'chat' }), '_上次回合'));
+}
+
+/**
+ * 点行动选项(2026-07-17 用户反馈:开局引导选项点了不移动):楼道态的引导选项常指名
+ * 去某处("去101看看水管""去信箱区看单子"——序章四条全是),点击先把人挪进目标房间再发,
+ * 否则戏在楼道里凭空演。在房间里时不解析(AI 的移动类选项已被双层拦截,不会出现)。
+ */
+function 点选项(文本: string) {
+  if (!当前房间.value) {
+    const 目标 = 房间表.find(r => 文本.includes(r.id) || 文本.includes(r.名称));
+    if (目标) 进入(目标.id);
+  }
+  发出(文本);
 }
 
 /** 发出一条行动(输入框与行动选项按钮共用) */
