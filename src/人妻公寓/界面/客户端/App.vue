@@ -339,6 +339,21 @@
           <button v-if="当前房间" class="btn icon" :disabled="发送中" @click="离开房间"><Ic n="exit" />离开</button>
         </div>
 
+        <!-- 房内动作(输入门控收紧后的补位:站在垃圾房/空户里,翻袋撬门不用开地图) -->
+        <div v-if="!发送中 && 当前房间动作.length" class="scene-acts">
+          <button
+            v-for="(动作, i) in 当前房间动作"
+            :key="i"
+            class="tile"
+            :class="动作.类"
+            @click="动作.做()"
+          >
+            <Ic :n="动作.icon" />
+            <span class="act-kicker">{{ 动作.kicker }}</span>
+            <strong>{{ 动作.文案 }}</strong>
+          </button>
+        </div>
+
         <!-- 偷窥余像:"你注意到了什么?"(摄像头渠道,选对收进线索板) -->
         <div v-if="偷窥待选 && !发送中" class="peep-card">
           <p class="hint">画面看完了。你注意到了什么?</p>
@@ -1027,8 +1042,17 @@ interface 卡动作 {
   做: () => void;
 }
 
-const 房卡动作 = computed<卡动作[]>(() => {
-  const id = 房卡.value;
+const 房卡动作 = computed<卡动作[]>(() => 房间动作(房卡.value));
+
+/**
+ * 房内动作(2026-07-17 垃圾房"不能翻"修复):输入门控收紧后,人站在房里满屏无可点——
+ * 把非移动类的房间动作(翻垃圾/撬门)晒进场景视图,不开地图也摸得到下级菜单。
+ */
+const 当前房间动作 = computed<卡动作[]>(() =>
+  房间动作(当前房间.value).filter(a => !['GO', 'VISIT', 'KNOCK', 'HOME'].includes(a.kicker)),
+);
+
+function 房间动作(id: string | null): 卡动作[] {
   if (!id) return [];
   const 房 = 查房间(id);
   const 动作: 卡动作[] = [];
@@ -1072,7 +1096,7 @@ const 房卡动作 = computed<卡动作[]>(() => {
     }
   }
   return 动作;
-});
+}
 
 /** 天暗后有人在家=窗户亮灯(gal地图的生活感;也是"丈夫在不在家"的免费可视化) */
 function 窗灯(房间id: string): boolean {
@@ -3785,6 +3809,19 @@ onUnmounted(() => {
   padding-top: 14px;
   margin-top: 4px;
   border-top: 1px solid var(--line-soft);
+}
+
+/* 房内动作行(场景视图里的下级菜单;瓷砖复用房卡的 .tile) */
+.scene-acts {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.scene-acts .tile {
+  padding: 8px 10px;
 }
 
 /* 正文字色选择行 */
