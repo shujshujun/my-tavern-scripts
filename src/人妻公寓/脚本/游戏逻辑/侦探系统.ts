@@ -44,7 +44,10 @@ function 读计数(): 侦探计数 {
 }
 
 function 写计数(c: 侦探计数): void {
-  void insertOrAssignVariables({ _侦探: c }, { type: 'chat' }).catch((e: unknown) =>
+  // Promise.resolve 包一层(2026-07-17 实测事故):insertOrAssignVariables 在部分酒馆助手版本
+  // 是同步函数不返回 Promise——写入已成功,裸链 .catch 却在 undefined 上炸,把调用方后半段
+  // (落库+提示)全炸没="翻垃圾没反应但锁记上了"的真凶
+  void Promise.resolve(insertOrAssignVariables({ _侦探: c }, { type: 'chat' })).catch((e: unknown) =>
     console.error('[人妻公寓·侦探] 计数写入失败', e),
   );
 }

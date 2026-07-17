@@ -100,8 +100,9 @@ function 同步镜像(): void {
         入住楼层: 节点._入住楼层,
       };
     }
-    void insertOrAssignVariables({ [PROMOTE_MIRROR_KEY]: 新镜像 }, { type: 'chat' }).catch((e: unknown) =>
-      console.error('[人妻公寓] 镜像写入失败', e),
+    // Promise.resolve 包一层:insertOrAssignVariables 部分版本同步返回 undefined,裸链 .catch 会炸
+    void Promise.resolve(insertOrAssignVariables({ [PROMOTE_MIRROR_KEY]: 新镜像 }, { type: 'chat' })).catch(
+      (e: unknown) => console.error('[人妻公寓] 镜像写入失败', e),
     );
   } catch (e) {
     console.error('[人妻公寓] 镜像同步失败', e);
@@ -136,8 +137,8 @@ export function 镜像直写(门牌号: string, 抬升: Partial<户镜像>): voi
       入住楼层: Math.max(m.入住楼层, 抬升.入住楼层 ?? 0),
     };
     mirror.楼层 = floor;
-    void insertOrAssignVariables({ [PROMOTE_MIRROR_KEY]: mirror }, { type: 'chat' }).catch((e: unknown) =>
-      console.error('[人妻公寓] 镜像直写失败', e),
+    void Promise.resolve(insertOrAssignVariables({ [PROMOTE_MIRROR_KEY]: mirror }, { type: 'chat' })).catch(
+      (e: unknown) => console.error('[人妻公寓] 镜像直写失败', e),
     );
   } catch (e) {
     console.error('[人妻公寓] 镜像直写失败', e);
