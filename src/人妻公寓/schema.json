@@ -70,6 +70,13 @@
                 "default": "素颜",
                 "type": "string"
               },
+              "_穿戴锁": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
               "特殊": {
                 "default": [],
                 "type": "array",
