@@ -191,9 +191,9 @@ export async function 手机节拍(): Promise<void> {
       库.节拍[键] = 钟;
       const 妻 = 节点.妻;
       const 文 = await 小生成(
-        '你替一款都市题材游戏生成一条中国已婚女性的微信朋友圈文案。只输出文案本身(可含emoji),不超过60字,不要引号,不要解释。' +
-          '纪律:内容=日常生活切片(做饭/天气/追剧/楼里琐事),按人物状态微调语气;绝不提及任何秘密、暧昧对象或游戏机制。',
-        `人物:${配.妻名},${配.初始?.气质描述 ?? '一位住在老公寓里的太太'}。当前状态档:${档位标签(妻.当前阶段, 妻.好感值, 妻.堕落值)};时段:${当前时段(钟)}。生成她此刻发的一条朋友圈。`,
+        '你替一款都市题材游戏生成一条中国已婚女性发的微博。只输出微博文案本身(可含emoji,可含至多一个#话题#),不超过70字,不要引号,不要解释。' +
+          '纪律:内容=日常生活切片(做饭/天气/追剧/小区琐事),这是公开平台,语气比朋友圈更"晒"一点;绝不提及任何秘密、暧昧对象或游戏机制。',
+        `人物:${配.妻名},${配.初始?.气质描述 ?? '一位住在老公寓里的太太'}。当前状态档:${档位标签(妻.当前阶段, 妻.好感值, 妻.堕落值)};时段:${当前时段(钟)}。生成她此刻发的一条微博。`,
       );
       if (文) {
         库.圈.unshift({ 楼, 谁: 配.妻名, 文, 评: [] });
@@ -355,11 +355,21 @@ const 手机CSS = `
 #${ROOT_ID} .rqp-app .ic{width:52px;height:52px;border-radius:12px;display:grid;place-items:center;font-size:26px;color:#fff;}
 #${ROOT_ID} .rqp-app span{font-size:11px;color:#333;}
 #${ROOT_ID} .rqp-app .dot{position:absolute;top:-3px;right:8px;width:10px;height:10px;border-radius:50%;background:#fa5151;}
-#${ROOT_ID} .rqp-moment{background:#fff;padding:12px 14px;border-bottom:8px solid #ededed;}
-#${ROOT_ID} .rqp-moment .who{display:flex;gap:8px;align-items:center;margin-bottom:6px;}
-#${ROOT_ID} .rqp-moment .who b{font-size:13px;color:#576b95;}
-#${ROOT_ID} .rqp-moment p{font-size:13px;color:#111;line-height:1.55;}
-#${ROOT_ID} .rqp-moment .tm{font-size:11px;color:#aaa;margin-top:6px;}
+/* ── 微博(柚月 weibo.css 同构:白卡流/橙标签/社交蓝话题/转评赞栏) ── */
+#${ROOT_ID} .rqw-feed{background:#f5f5f5;min-height:100%;}
+#${ROOT_ID} .rqw-post{background:rgba(255,255,255,.9);margin-bottom:6px;padding:10px 12px;}
+#${ROOT_ID} .rqw-head{display:flex;align-items:center;margin-bottom:6px;gap:8px;}
+#${ROOT_ID} .rqw-head .rqp-ava{width:30px;height:30px;border-radius:50%;border:1px solid #e0e0e0;font-size:12px;background:#fff;color:#666;}
+#${ROOT_ID} .rqw-meta{flex:1;min-width:0;}
+#${ROOT_ID} .rqw-name{font-size:12px;color:#1a1a1a;display:flex;align-items:center;gap:4px;}
+#${ROOT_ID} .rqw-tag{font-size:8px;padding:1px 3px;border-radius:2px;background:#fff3e0;color:#ff8200;}
+#${ROOT_ID} .rqw-time{font-size:10px;color:#bbb;margin-top:1px;}
+#${ROOT_ID} .rqw-text{font-size:12px;color:#1a1a1a;line-height:1.5;margin-bottom:6px;word-break:break-word;}
+#${ROOT_ID} .rqw-text .tp{color:#576b95;}
+#${ROOT_ID} .rqw-stats{display:flex;align-items:center;padding-top:6px;border-top:.5px solid rgba(0,0,0,.06);}
+#${ROOT_ID} .rqw-stats span{flex:1;display:flex;align-items:center;justify-content:center;gap:4px;font-size:11px;color:#666;}
+#${ROOT_ID} .rqw-cmt{margin-top:6px;background:#f7f7f7;border-radius:4px;padding:6px 8px;font-size:11px;color:#333;line-height:1.5;}
+#${ROOT_ID} .rqw-cmt b{color:#576b95;font-weight:400;}
 #${ROOT_ID} .rqp-call{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:linear-gradient(180deg,#3a3f4b,#22252d);color:#fff;}
 #${ROOT_ID} .rqp-call .rqp-ava{width:84px;height:84px;border-radius:14px;font-size:34px;}
 #${ROOT_ID} .rqp-call b{font-size:18px;}
@@ -517,7 +527,7 @@ function 渲染(): void {
     };
     格.appendChild(应用('微信', '#07c160', '💬', 未读 || 有来电(), 去微信));
     格.appendChild(
-      应用('朋友圈', '#576b95', '🌁', 圈新, () => {
+      应用('微博', '#ff8200', '📣', 圈新, () => {
         当前页 = { 名: 'moments' };
         const 库2 = 读库();
         库2.圈读到 = 楼;
@@ -611,18 +621,29 @@ function 渲染(): void {
   }
 
   if (当前页.名 === 'moments') {
-    头('朋友圈', () => {
+    // 动态广场载体=微博(2026-07-18 用户拍板改制,柚月 weibo 样式;逻辑仍我们的近期流)
+    头('微博', () => {
       当前页 = { 名: 'home' };
       渲染();
     });
-    const 体 = el('div', 'rqp-body');
+    const 体 = el('div', 'rqp-body rqw-feed');
     const 圈们 = 库.圈.filter(c => c.楼 <= 楼);
-    if (!圈们.length) 体.appendChild(el('div', 'rqp-moment', '<p style="color:#999">还没有动态。</p>'));
+    if (!圈们.length) 体.appendChild(el('div', 'rqw-post', '<p class="rqw-text" style="color:#999">刷不出新内容,过会儿再来。</p>'));
     for (const c of 圈们) {
+      const 赞 = 1 + Math.floor(seededRandom(c.楼, c.谁, '赞') * 68);
+      const 评数 = Math.floor(seededRandom(c.楼, c.谁, '评数') * 12);
+      const 转 = Math.floor(seededRandom(c.楼, c.谁, '转') * 5);
+      const 正文 = _.escape(c.文).replace(/#([^#\s]{1,12})#/g, '<span class="tp">#$1#</span>');
+      const 评块 = c.评.length
+        ? `<div class="rqw-cmt">${c.评.map(e => `<b>${_.escape(e.谁)}:</b>${_.escape(e.文)}`).join('<br/>')}</div>`
+        : '';
       const 卡 = el(
         'div',
-        'rqp-moment',
-        `<div class="who">${头像块(c.谁)}<b>${_.escape(c.谁)}</b></div><p>${_.escape(c.文)}</p><div class="tm">${时段字(c.楼, 偏移)}</div>`,
+        'rqw-post',
+        `<div class="rqw-head">${头像块(c.谁)}<span class="rqw-meta"><span class="rqw-name">${_.escape(c.谁)}<span class="rqw-tag">同小区</span></span><span class="rqw-time">${时段字(c.楼, 偏移)} · 来自梧桐里</span></span></div>` +
+          `<div class="rqw-text">${正文}</div>` +
+          `<div class="rqw-stats"><span>↻ ${转 || '转发'}</span><span>💬 ${评数 || '评论'}</span><span>♡ ${赞}</span></div>` +
+          评块,
       );
       体.appendChild(卡);
     }
