@@ -405,7 +405,8 @@ const 手机CSS = `
 `;
 
 function 头像块(名: string): string {
-  return `<span class="rqp-ava"><img src="${素材基址}/头像/${名}.webp" onerror="this.remove();this.parentElement.textContent='${名[0] ?? '?'}'"/></span>`;
+  const 文件 = 名 === '父亲' ? '影子' : 名; // 五夫+父亲=柯南影子头像(设计拍板共用)
+  return `<span class="rqp-ava"><img src="${素材基址}/头像/${文件}.webp" onerror="this.remove();this.parentElement.textContent='${名[0] ?? '?'}'"/></span>`;
 }
 
 function 时段字(楼戳: number, 偏移: number): string {
