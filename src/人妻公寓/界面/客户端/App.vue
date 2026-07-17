@@ -93,6 +93,14 @@
 
           <div class="set-group row">
             <div>
+              <div class="set-label">立绘显示</div>
+              <p class="set-hint">她在场时右下角入画;文字垫板永远压在立绘上面,不遮正文。</p>
+            </div>
+            <button class="toggle" :class="{ on: 立绘显示 }" @click="((立绘显示 = !立绘显示), 改设置())"><i /></button>
+          </div>
+
+          <div class="set-group row">
+            <div>
               <div class="set-label">省流模式</div>
               <p class="set-hint">关掉背景图与图标,回纯色——省流量。</p>
             </div>
@@ -268,8 +276,21 @@
           <button class="btn mini" title="收起待办" @click="划掉待办">✕</button>
         </div>
 
-        <!-- 正文卷轴:只演当前幕,且幕跟着房间走——人走了戏就收,回来戏还在(氛围色随位置) -->
-        <section ref="卷轴容器" class="story" :style="[场景色, 场景图样式]">
+        <!-- 正文舞台:背景四层在 wrap 上,立绘钉右下,正文滚动层浮最上(垫板压立绘,gal 层次) -->
+        <div class="story-wrap" :style="[场景色, 场景图样式]">
+          <transition name="fade">
+            <img
+              v-if="立绘显示 && 立绘图"
+              :key="立绘图"
+              class="portrait"
+              :src="立绘图"
+              alt=""
+              draggable="false"
+              @error="立绘失效[立绘图] = true"
+            />
+          </transition>
+          <!-- 正文卷轴:只演当前幕,且幕跟着房间走——人走了戏就收,回来戏还在(氛围色随位置) -->
+          <section ref="卷轴容器" class="story">
           <!-- 到场卡:走动后的新场景,给地点一个"开场镜头"(旧正文属于旧场景,隐去) -->
           <div v-if="!在幕中 && !发送中" class="arrive">
             <div class="ui-kicker">{{ 当前房间 ? 'ARRIVE / 到场' : 'HALLWAY / 楼道' }}</div>
@@ -319,7 +340,8 @@
               <button class="btn mini" title="打断,本回合作废" @click="取消回合">取消</button>
             </p>
           </div>
-        </section>
+          </section>
+        </div>
 
         <!-- 场景条(在场者=头像徽章,一眼认人) -->
         <div class="scene-bar">
@@ -673,9 +695,22 @@
           <button class="sheet-close" @click="显示背包 = false">✕</button>
           <div class="sheet-title">背 包</div>
           <div class="sheet-body">
-            <div v-for="(项, i) in 背包列表" :key="i" class="ware">
-              <b>{{ 项.名称 }}</b>
-              <span class="ware-desc">{{ 项.描述 }}</span>
+            <div v-for="(项, i) in 背包列表" :key="i" class="ware-card">
+              <span class="ware-pic">
+                <img
+                  v-if="查道具(项.id) && !道具图失效[项.id]"
+                  :src="道具图(项.id)"
+                  :alt="项.名称"
+                  loading="lazy"
+                  draggable="false"
+                  @error="道具图失效[项.id] = true"
+                />
+                <b v-else>{{ 项.可读信 ? '✉' : 项.名称[0] }}</b>
+              </span>
+              <span class="ware-main">
+                <b class="ware-name">{{ 项.名称 }}</b>
+                <span class="ware-desc">{{ 项.描述 }}</span>
+              </span>
               <span class="ware-acts">
                 <button v-if="项.可读信" class="btn mini" @click="打开信(项.信门牌!)">读</button>
                 <button v-if="项.可布设" class="btn mini" :disabled="发送中" @click="布设()">装在这个房间</button>
@@ -723,14 +758,16 @@
                   v-if="!道具图失效[项.id]"
                   :src="道具图(项.id)"
                   :alt="项.名称"
+                  loading="lazy"
                   draggable="false"
                   @error="道具图失效[项.id] = true"
                 />
                 <b v-else>{{ 项.名称[0] }}</b>
-                <em class="ware-price">¥{{ 项.价格 }}</em>
               </span>
-              <b class="ware-name">{{ 项.名称 }}</b>
-              <span class="ware-desc">{{ 项.描述 }}</span>
+              <span class="ware-main">
+                <b class="ware-name">{{ 项.名称 }} <em class="ware-price">¥{{ 项.价格 }}</em></b>
+                <span class="ware-desc">{{ 项.描述 }}</span>
+              </span>
               <button class="btn rite ware-buy" :disabled="发送中 || data.现金 < (项.价格 ?? 0)" @click="买(项.id)">
                 {{ data.现金 < (项.价格 ?? 0) ? '钱不够' : '买下' }}
               </button>
@@ -743,17 +780,26 @@
       <div v-if="显示监控" class="mask" @click.self="显示监控 = false">
         <div class="sheet">
           <button class="sheet-close" @click="显示监控 = false">✕</button>
-          <div class="sheet-title">监 控</div>
-          <p class="hint center">没人看着的时候的她。看完记得想想:你注意到了什么?</p>
+          <div class="shop-hero cams">
+            <div class="ui-kicker light">HIDDEN EYES / 你装下的眼睛</div>
+            <b>监 控</b>
+            <em>没人看着的时候的她。看完记得想想:你注意到了什么?</em>
+          </div>
           <div class="sheet-body">
-            <button
-              v-for="m in 监控列表"
-              :key="m"
-              class="option-chip"
-              :disabled="发送中"
-              @click="看监控(m)"
-            >
-              📷 调出 {{ m }} 室的画面({{ 户静态表[m].妻名 }}家)
+            <button v-for="m in 监控列表" :key="m" class="cam-row" :disabled="发送中" @click="看监控(m)">
+              <img
+                v-if="!头像失效[户静态表[m].妻名]"
+                class="cam-face"
+                :src="头像图(户静态表[m].妻名)"
+                :alt="户静态表[m].妻名"
+                @error="头像失效[户静态表[m].妻名] = true"
+              />
+              <b v-else class="cam-face fb">{{ 户静态表[m].妻名[0] }}</b>
+              <span class="cam-main">
+                <b>{{ m }} 室 · {{ 户静态表[m].妻名 }}</b>
+                <em>调出画面</em>
+              </span>
+              <span class="cam-rec">● REC</span>
             </button>
           </div>
         </div>
@@ -1238,6 +1284,18 @@ function 道具图(id: string): string {
 
 const 道具图失效 = ref<Record<string, boolean>>({});
 
+// ── 立绘(2026-07-17 用户拍板:右下角、垫板压立绘;她在这场戏里才入画,人走戏收) ──
+
+const 立绘失效 = ref<Record<string, boolean>>({});
+
+const 立绘图 = computed(() => {
+  if (!当前房间.value) return '';
+  const m = 可见门牌.value.find(k => 妻位置推算(k, 位置种子.value) === 当前房间.value);
+  if (!m) return '';
+  const src = `${素材基址}/立绘/${户静态表[m].妻名}.webp`;
+  return 立绘失效.value[src] ? '' : src;
+});
+
 function 背景图(房间id: string | null): string {
   // 楼道没有专属图,借楼梯间的(同一栋楼的筒子间气质)
   return `${素材基址}/背景/${房间id && 房间色[房间id] ? 房间id : '楼梯间'}.webp`;
@@ -1318,15 +1376,28 @@ function 刷新可重掷() {
 }
 
 /**
- * 点行动选项(2026-07-17 用户反馈:开局引导选项点了不移动):楼道态的引导选项常指名
- * 去某处("去101看看水管""去信箱区看单子"——序章四条全是),点击先把人挪进目标房间再发,
- * 否则戏在楼道里凭空演。在房间里时不解析(AI 的移动类选项已被双层拦截,不会出现)。
+ * 点行动选项(2026-07-17 用户拍板:移动类选项从"拦"改"接住"——房间与角色名都是有限集,
+ * 关键词解析即移动):选项带移动意图且指名地点/人名时,先把人挪过去再发。
+ * 找人时用位置推算查她此刻真实在哪:在楼里就带过去;"外出"不是房间=不挪窝照常发,
+ * 快照的"她不在场"纪律会让 AI 演一场扑空,真实不穿帮。
  */
-function 点选项(文本: string) {
-  if (!当前房间.value) {
-    const 目标 = 房间表.find(r => 文本.includes(r.id) || 文本.includes(r.名称));
-    if (目标) 进入(目标.id);
+const 移动意图 = /去|前往|走到|来到|送到|回到|回去|上楼|下楼|找/;
+
+function 选项移动目标(文本: string): string | null {
+  if (!移动意图.test(文本)) return null;
+  const 房 = 房间表.find(r => 文本.includes(r.id) || 文本.includes(r.名称));
+  if (房) return 房.id;
+  const 牌 = 可见门牌.value.find(m => 文本.includes(户静态表[m].妻名));
+  if (牌) {
+    const 位 = 妻位置推算(牌, 末楼号.value);
+    if (查房间(位)) return 位;
   }
+  return null;
+}
+
+function 点选项(文本: string) {
+  const 目标 = 选项移动目标(文本);
+  if (目标 && 目标 !== 当前房间.value) 进入(目标);
   发出(文本);
 }
 
@@ -1874,6 +1945,8 @@ const 主题模式 = ref<'日间' | '夜间' | '跟随'>('日间');
 const 字号档 = ref<'小' | '中' | '大'>('中');
 /** 正文字色(''=跟随主题日夜自动翻转;自选后固定不随主题) */
 const 正文字色 = ref('');
+/** 立绘显示(右下角入画;垫板压立绘) */
+const 立绘显示 = ref(true);
 /** 正文垫板不透明度(0.2~1.0,越高字越清背景越淡) */
 const 垫板浓度 = ref(0.66);
 /** 省流:关掉全部背景图/立绘/图标,回纯 CSS */
@@ -1916,6 +1989,7 @@ function 持久化设置() {
         垫板浓度: 垫板浓度.value,
         省流: 省流.value,
         减动效: 减动效.value,
+        立绘显示: 立绘显示.value,
       }),
     );
   } catch {
@@ -1941,6 +2015,7 @@ function 恢复设置() {
       if (typeof s.垫板浓度 === 'number') 垫板浓度.value = s.垫板浓度;
       省流.value = !!s.省流;
       减动效.value = !!s.减动效;
+      if (typeof s.立绘显示 === 'boolean') 立绘显示.value = s.立绘显示;
     } else {
       主题模式.value = localStorage.getItem(主题存储键) === '1' ? '夜间' : '日间';
     }
@@ -1977,6 +2052,7 @@ function 重置偏好() {
   垫板浓度.value = 0.66;
   省流.value = false;
   减动效.value = false;
+  立绘显示.value = true;
   try {
     localStorage.removeItem(设置存储键);
     localStorage.removeItem(主题存储键);
@@ -2424,11 +2500,14 @@ onUnmounted(() => {
 
 /* ── 卷轴:玻璃阅读卡(正文用衬线,小说质感) ── */
 
-.story {
+/* 正文舞台(rq0.14 立绘分层):背景四层与边框在 wrap,立绘 z1 钉右下,滚动层 z2 浮最上 */
+.story-wrap {
+  position: relative;
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
-  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   /* 四层:氛围色渐变 > 薄纱(背景放开看,可读性交给正文磨砂垫板) > 地点背景图(素材) > 玻璃底(图挂了的兜底) */
   background:
     linear-gradient(180deg, rgba(var(--sc-a, 165, 175, 195), 0.14), rgba(var(--sc-b, 205, 215, 230), 0.05) 42%, transparent 72%),
@@ -2439,9 +2518,50 @@ onUnmounted(() => {
   border-radius: var(--radius);
   box-shadow: var(--card-shadow);
   backdrop-filter: blur(6px);
+  transition: background 0.5s ease;
+}
+
+/* 立绘:她在这场戏里才入画;垫板压立绘(文字永远可读),左缘羽化不硬切 */
+.portrait {
+  position: absolute;
+  right: -6px;
+  bottom: 0;
+  z-index: 1;
+  height: 62%;
+  max-height: 380px;
+  pointer-events: none;
+  filter: drop-shadow(0 6px 16px rgba(20, 24, 40, 0.3));
+  mask-image: linear-gradient(to right, transparent, #000 16%);
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 16%);
+}
+
+:global(html.rq-dark) .portrait {
+  filter: brightness(0.82) drop-shadow(0 6px 16px rgba(0, 0, 0, 0.5));
+}
+
+:global(html.rq-lite) .portrait {
+  display: none;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.4s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.story {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px 12px;
   scrollbar-width: thin;
   scrollbar-color: rgba(38, 169, 244, 0.4) transparent;
-  transition: background 0.5s ease;
 }
 
 /* 到场卡:走动后的"开场镜头" */
@@ -4004,30 +4124,31 @@ onUnmounted(() => {
   text-shadow: 0 1px 6px rgba(20, 22, 30, 0.45);
 }
 
+/* 紧凑横条(2026-07-17 用户反馈:大方图卡太占地,道具多了会卡)——64px 缩略图+文字+买钮,单列可长列表 */
 .shop-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  align-content: start;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .ware-card {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 9px;
   background: var(--glass);
   border: 1px solid rgba(0, 0, 0, 0.06);
-  border-radius: 14px;
-  box-shadow: 0 3px 10px rgba(30, 26, 38, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(30, 26, 38, 0.07);
 }
 
 .ware-pic {
-  position: relative;
+  flex: none;
   display: grid;
   place-items: center;
-  aspect-ratio: 1;
-  border-radius: 10px;
+  width: 64px;
+  height: 64px;
+  border-radius: 9px;
   overflow: hidden;
   background: linear-gradient(160deg, #fff7f0, #f2f7ff);
 }
@@ -4039,45 +4160,146 @@ onUnmounted(() => {
 }
 
 .ware-pic > b {
-  font-size: 1.7em;
+  font-size: 1.4em;
+  font-style: normal;
   color: var(--ink-faint);
 }
 
-.ware-pic .ware-price {
-  position: absolute;
-  right: 6px;
-  bottom: 6px;
-  font-family: var(--font-mono);
-  font-size: 0.72em;
-  font-style: normal;
-  font-weight: 700;
-  color: #fff;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: rgba(24, 26, 40, 0.72);
-  backdrop-filter: blur(2px);
+.ware-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .ware-name {
   font-size: 0.85em;
 }
 
+.ware-price {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+  font-style: normal;
+  font-weight: 700;
+  color: var(--blue);
+  margin-left: 6px;
+}
+
 .ware-card .ware-desc {
-  flex: 1;
   font-size: 0.72em;
-  line-height: 1.5;
+  line-height: 1.45;
   color: var(--ink-soft);
 }
 
 .ware-buy {
-  align-self: stretch;
-  padding: 6px 10px;
+  flex: none;
+  align-self: center;
+  padding: 6px 12px;
   font-size: 0.8em;
+}
+
+.ware-card .ware-acts {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 :global(html.rq-dark) .ware-card {
   background: #2c2e40;
   border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* 监控 gal 化(2026-07-17):紫调 hero + 头像行 + REC 呼吸点 */
+.shop-hero.cams {
+  background:
+    linear-gradient(180deg, rgba(20, 22, 30, 0.1), rgba(20, 22, 30, 0.45)),
+    linear-gradient(130deg, #8c73ff, #4ab7ff 70%);
+}
+
+.cam-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  font-family: inherit;
+  text-align: left;
+  background: var(--glass);
+  border: 1px solid rgba(140, 115, 255, 0.3);
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(140, 115, 255, 0.12);
+  transition: all 0.18s;
+}
+
+.cam-row:hover:not(:disabled) {
+  border-color: rgba(140, 115, 255, 0.7);
+  box-shadow: 0 6px 16px rgba(140, 115, 255, 0.25);
+}
+
+.cam-row:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.cam-face {
+  box-sizing: border-box;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: top;
+  background: linear-gradient(160deg, #ffe3ee, #ffd0e2);
+  box-shadow: 0 2px 8px rgba(30, 26, 38, 0.2);
+}
+
+.cam-face.fb {
+  display: grid;
+  place-items: center;
+  font-style: normal;
+  color: #d4407a;
+}
+
+.cam-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.cam-main b {
+  font-size: 0.88em;
+  color: var(--ink);
+}
+
+.cam-main em {
+  font-style: normal;
+  font-size: 0.72em;
+  color: var(--ink-faint);
+}
+
+.cam-rec {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 0.68em;
+  font-weight: 700;
+  color: var(--red);
+  animation: rec-blink 1.6s infinite;
+}
+
+@keyframes rec-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+:global(html.rq-dark) .cam-row {
+  background: #2c2e40;
 }
 
 /* ═══ 在场头像徽章(到场卡/场景条/房卡:认脸不认字) ═══ */
@@ -4973,7 +5195,7 @@ onUnmounted(() => {
 }
 
 /* 夜间:薄深纱,背景图微压暗;可读性同样交给磨砂垫板 */
-:global(html.rq-dark) .story {
+:global(html.rq-dark) .story-wrap {
   background:
     linear-gradient(180deg, rgba(var(--sc-a, 165, 175, 195), 0.18), rgba(var(--sc-b, 205, 215, 230), 0.07) 42%, transparent 72%),
     linear-gradient(rgba(30, 32, 48, 0.42), rgba(30, 32, 48, 0.52)),
@@ -4986,7 +5208,7 @@ onUnmounted(() => {
 }
 
 /* ── 省流模式:关掉重量级场景位图(背景/立面),回纯 CSS 渐变;头像/图标小,保留 ── */
-:global(html.rq-lite) .story {
+:global(html.rq-lite) .story-wrap {
   --scene-img: none !important;
 }
 
