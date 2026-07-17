@@ -280,10 +280,10 @@ const ROOT_ID = 'rq-phone-root';
 const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.19/dist/人妻公寓/素材';
 
 let 当前页: {
-  名: 'chats' | 'chat' | 'moments' | 'profile' | 'call' | 'talk' | 'settings';
+  名: 'chats' | 'chat' | 'moments' | 'call' | 'talk' | 'settings';
   会话?: string;
-  展开?: number; // profile:考古已加载条数
-  题?: number; // profile:展开中的"哪里不对劲?"动态序
+  展开?: number; // moments:考古已加载条数(混排流)
+  题?: string; // moments:展开中的"哪里不对劲?"(`门牌:序`)
 } = { 名: 'chats' };
 let 通话记录: { 谁: string; 文: string }[] = [];
 let 通话上下文: { 分数段: string; 报表: string; 通牒: boolean } | null = null;
@@ -650,56 +650,43 @@ function 渲染(): void {
           `<div class="rqw-stats"><span>♡ ${赞} 位邻居觉得很赞</span></div>` +
           评块,
       );
-      // 点头像/名字进个人主页(考古入口:往下翻,翻它的历史)
-      const 谁门牌 = 门牌列表.find(k => 户静态表[k].妻名 === c.谁);
-      if (谁门牌) {
-        (卡.querySelector('.rqw-head') as HTMLElement).addEventListener('click', () => {
-          当前页 = { 名: 'profile', 会话: 谁门牌, 展开: 6 };
-          渲染();
-        });
-      }
       体.appendChild(卡);
     }
-    屏.appendChild(体);
-    底栏('moments');
-    return;
-  }
-
-  if (当前页.名 === 'profile' && 当前页.会话) {
-    // 个人主页=双层广场的考古层(近期流在上,历史静态配置在下;"加载更早"=考古仪式感)
-    const 门牌号 = 当前页.会话 as 门牌;
-    const 配 = 户静态表[门牌号];
-    头(`${配?.妻名 ?? 门牌号}的相册`, () => {
-      当前页 = { 名: 'moments' };
-      渲染();
-    });
-    const 体 = el('div', 'rqp-body rqw-feed');
-    体.appendChild(
-      el('div', 'rqw-hero', `${头像块(配?.妻名 ?? '?')}<span><b>${_.escape(配?.妻名 ?? '')}</b><i>梧桐里7号 · 已关注你 0 天</i></span>`),
-    );
-    // 近期流(现编层)
-    for (const c of 库.圈.filter(x => x.谁 === 配?.妻名 && x.楼 <= 楼)) {
-      体.appendChild(el('div', 'rqw-post', `<div class="rqw-text">${_.escape(c.文)}</div><div class="rqw-time">${时段字(c.楼, 偏移)}</div>`));
-    }
+    // 考古层直接混在朋友圈里(2026-07-18 用户拍板:不做个人相册——往下翻,
+    // 众人的旧动态按年代交错混排,"加载更早"翻的是整栋楼的过去)
     体.appendChild(el('div', 'rqw-divider', '—— 更早以前 ——'));
-    // 考古层(静态配置,分页加载)
-    const 史 = 查考古(门牌号);
-    const 展开 = Math.min(当前页.展开 ?? 6, 史.length);
-    史.slice(0, 展开).forEach((条, 序) => {
-      const 开题 = 当前页.题 === 序;
+    const 混史: { 门牌: 门牌; 序: number; 条: ReturnType<typeof 查考古>[number] }[] = [];
+    {
+      // 各户历史各自按近→远排;轮转合并近似年代混排(每条自带时间字样,观感自洽)
+      const 各 = 门牌列表
+        .map(m => ({ m, 史: 查考古(m) }))
+        .filter(x => x.史.length);
+      const 最长 = Math.max(0, ...各.map(x => x.史.length));
+      for (let i = 0; i < 最长; i++) {
+        for (const { m, 史 } of 各) {
+          if (史[i]) 混史.push({ 门牌: m, 序: i, 条: 史[i] });
+        }
+      }
+    }
+    const 展开 = Math.min(当前页.展开 ?? 6, 混史.length);
+    for (const { 门牌: m, 序, 条 } of 混史.slice(0, 展开)) {
+      const 妻名 = 户静态表[m].妻名;
+      const 键 = `${m}:${序}`;
+      const 开题 = 当前页.题 === 键;
       const 图块 = 条.图
         ? `<img class="rqw-img" src="${素材基址}/微博/${条.图}.webp" loading="lazy" onerror="this.remove()"/>`
         : '';
       const 卡 = el(
         'div',
         `rqw-post${开题 ? ' key-open' : ''}`,
-        `<div class="rqw-text">${_.escape(条.文).replace(/#([^#\s]{1,12})#/g, '<span class="tp">#$1#</span>')}</div>${图块}<div class="rqw-time">${_.escape(条.时间)}</div>`,
+        `<div class="rqw-head">${头像块(妻名)}<span class="rqw-meta"><span class="rqw-name">${_.escape(妻名)}</span><span class="rqw-time">${_.escape(条.时间)}</span></span></div>` +
+          `<div class="rqw-text">${_.escape(条.文).replace(/#([^#\s]{1,12})#/g, '<span class="tp">#$1#</span>')}</div>${图块}`,
       );
       if (条.关键) {
         卡.style.cursor = 'pointer';
         卡.addEventListener('click', ev => {
           if ((ev.target as HTMLElement).closest('.rqw-quiz')) return;
-          当前页 = { ...当前页, 题: 开题 ? undefined : 序 };
+          当前页 = { ...当前页, 题: 开题 ? undefined : 键 };
           渲染();
         });
         if (开题) {
@@ -708,7 +695,7 @@ function 渲染(): void {
             const b = el('button', '', _.escape(文));
             b.addEventListener('click', () => {
               当前页 = { ...当前页, 题: undefined };
-              eventEmit('人妻公寓:考古选细节', { 门牌: 门牌号, 序, 选项: i });
+              eventEmit('人妻公寓:考古选细节', { 门牌: m, 序, 选项: i });
               渲染();
             });
             题区.appendChild(b);
@@ -717,18 +704,19 @@ function 渲染(): void {
         }
       }
       体.appendChild(卡);
-    });
-    const 更 = el('button', 'rqw-more', 展开 < 史.length ? '加载更早的动态…' : '翻到底了');
+    }
+    const 更 = el('button', 'rqw-more', 展开 < 混史.length ? '加载更早的动态…' : '翻到底了');
     更.addEventListener('click', () => {
-      if (展开 < 史.length) {
+      if (展开 < 混史.length) {
         当前页 = { ...当前页, 展开: 展开 + 6 };
         渲染();
       } else {
-        eventEmit('人妻公寓:考古到底', 门牌号);
+        eventEmit('人妻公寓:考古到底');
       }
     });
     体.appendChild(更);
     屏.appendChild(体);
+    底栏('moments');
     return;
   }
 

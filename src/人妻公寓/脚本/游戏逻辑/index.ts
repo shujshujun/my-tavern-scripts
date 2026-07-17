@@ -330,9 +330,7 @@ function 挂载监听() {
   eventOn('人妻公寓:考古选细节', (载荷: { 门牌: 门牌; 序: number; 选项: number }) =>
     安全操作((raw, data) => 落地(考古选细节(data, 载荷.门牌, Number(载荷.序), Number(载荷.选项)), raw, data)),
   );
-  eventOn('人妻公寓:考古到底', (门牌号: 门牌) =>
-    安全操作((raw, data) => 落地(考古到底(data, 门牌号), raw, data)),
-  );
+  eventOn('人妻公寓:考古到底', () => 安全操作((raw, data) => 落地(考古到底(data), raw, data)));
 
   eventOn('人妻公寓:读信', (门牌号: 门牌) =>
     安全操作((raw, data) => 落地(读信揭晓(data, 门牌号), raw, data)),
