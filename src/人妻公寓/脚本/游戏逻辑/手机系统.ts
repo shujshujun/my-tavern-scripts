@@ -439,6 +439,64 @@ export function 挂载手机(): void {
   };
   走钟();
   setInterval(走钟, 30000);
+  // 手机可拖动(柚月同款;抓顶部状态栏/挖孔区拖,位移记 localStorage,重建后复位)
+  const 壳 = root.querySelector('.rqp-shell') as HTMLElement;
+  const 位置键 = '人妻公寓_手机位置';
+  const 夹 = (dx: number, dy: number): [number, number] => {
+    const w = doc.documentElement.clientWidth;
+    const h = doc.documentElement.clientHeight;
+    const r = 壳.getBoundingClientRect();
+    const 基x = r.left - 当前位.dx;
+    const 基y = r.top - 当前位.dy;
+    return [
+      Math.min(Math.max(dx, -基x - r.width + 60), w - 基x - 60),
+      Math.min(Math.max(dy, -基y), h - 基y - 60),
+    ];
+  };
+  const 当前位 = { dx: 0, dy: 0 };
+  const 应用位 = () => {
+    壳.style.transform = `translate(${当前位.dx}px, ${当前位.dy}px)`;
+  };
+  try {
+    const 存 = JSON.parse(localStorage.getItem(位置键) ?? 'null') as { dx: number; dy: number } | null;
+    if (存 && Number.isFinite(存.dx) && Number.isFinite(存.dy)) {
+      当前位.dx = 存.dx;
+      当前位.dy = 存.dy;
+      应用位();
+    }
+  } catch {
+    /* 位置记录坏了就回默认位 */
+  }
+  for (const 柄名 of ['.rqp-status', '.rqp-punch']) {
+    const 柄 = root.querySelector(柄名) as HTMLElement | null;
+    if (!柄) continue;
+    柄.style.cursor = 'grab';
+    柄.style.touchAction = 'none';
+    柄.addEventListener('pointerdown', ev => {
+      ev.preventDefault();
+      柄.setPointerCapture(ev.pointerId);
+      柄.style.cursor = 'grabbing';
+      const 起 = { x: ev.clientX, y: ev.clientY, dx: 当前位.dx, dy: 当前位.dy };
+      const 动 = (e: PointerEvent) => {
+        [当前位.dx, 当前位.dy] = 夹(起.dx + e.clientX - 起.x, 起.dy + e.clientY - 起.y);
+        应用位();
+      };
+      const 停 = () => {
+        柄.removeEventListener('pointermove', 动);
+        柄.removeEventListener('pointerup', 停);
+        柄.removeEventListener('pointercancel', 停);
+        柄.style.cursor = 'grab';
+        try {
+          localStorage.setItem(位置键, JSON.stringify(当前位));
+        } catch {
+          /* 存不上就只影响下次复位 */
+        }
+      };
+      柄.addEventListener('pointermove', 动);
+      柄.addEventListener('pointerup', 停);
+      柄.addEventListener('pointercancel', 停);
+    });
+  }
   root.querySelector('.rqp-toggle')!.addEventListener('click', () => {
     root.classList.toggle('open');
     if (root.classList.contains('open')) {
@@ -631,7 +689,10 @@ function 渲染(): void {
   if (当前页.名 === 'moments') {
     // 动态广场载体=微信朋友圈(2026-07-18 用户二次改拍:独立微博App作废,好友动态混排时间流;
     // 非好友的动态(入住预告等)照混不较真——用户原话"不要在意这些细节")
-    头('朋友圈');
+    头('朋友圈', () => {
+      当前页 = { 名: 'chats' };
+      渲染();
+    });
     const 体 = el('div', 'rqp-body rqw-feed');
     const 我名 = (SillyTavern as unknown as { name1?: string })?.name1 || '我';
     体.appendChild(el('div', 'rqm-cover', `<b>${_.escape(我名)}</b>${头像块('主角')}`));
@@ -769,16 +830,53 @@ function 渲染(): void {
   }
 
   if (当前页.名 === 'settings') {
-    头('我');
+    头('我', () => {
+      当前页 = { 名: 'chats' };
+      渲染();
+    });
     const c = 读配置();
     const 区 = el('div', 'rqp-set');
     区.innerHTML = `
       <label>独立API 地址(OpenAI兼容,留空=用主API静默兜底)<input class="i-base" value="${_.escape(c.base)}" placeholder="https://…/v1"/></label>
       <label>API Key<input class="i-key" type="password" value="${_.escape(c.key)}"/></label>
-      <label>模型<input class="i-model" value="${_.escape(c.model)}" placeholder="gpt-4.1-mini 等"/></label>
+      <label>模型<span style="display:flex;gap:6px"><input class="i-model" style="flex:1" value="${_.escape(c.model)}" placeholder="gpt-4.1-mini 等"/><button class="fetch-models" style="flex:none;padding:0 10px">读取模型</button></span></label>
+      <select class="i-models" style="display:none"><option value="">— 从列表选择 —</option></select>
+      <p class="models-tip" style="display:none;color:#999;font-size:12px;margin:2px 0 0"></p>
       <label>动态频率<select class="i-freq"><option${c.频率 === '勤' ? ' selected' : ''}>勤</option><option${c.频率 === '普通' ? ' selected' : ''}>普通</option><option${c.频率 === '静' ? ' selected' : ''}>静</option><option${c.频率 === '关' ? ' selected' : ''}>关</option></select></label>
       <button class="save">保存</button>
       <p class="credit">手机外观:柚月小手机(yuzuki)授权砍装;挂载范式参考玉子手机(yuzi83)。经双授权改造,谨此致谢。<br/>本机内容由系统生成,不占用正文楼层与 token。</p>`;
+    // 读取模型列表(OpenAI 兼容 GET {base}/models;与 小生成 同一 base 约定=填到 /v1)
+    (区.querySelector('.fetch-models') as HTMLButtonElement).addEventListener('click', () => {
+      const base = (区.querySelector('.i-base') as HTMLInputElement).value.trim().replace(/\/+$/, '');
+      const key = (区.querySelector('.i-key') as HTMLInputElement).value.trim();
+      const 选 = 区.querySelector('.i-models') as HTMLSelectElement;
+      const 提 = 区.querySelector('.models-tip') as HTMLElement;
+      const 说 = (t: string) => {
+        提.style.display = 'block';
+        提.textContent = t;
+      };
+      if (!base || !key) {
+        说('先填好地址和 Key 再读取。');
+        return;
+      }
+      说('读取中…');
+      void fetch(`${base}/models`, { headers: { Authorization: `Bearer ${key}` } })
+        .then(async r => {
+          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          const j = (await r.json()) as { data?: { id?: string }[] };
+          const 们 = (j.data ?? []).map(m => m.id).filter((x): x is string => !!x);
+          if (!们.length) throw new Error('列表为空');
+          选.innerHTML =
+            '<option value="">— 从列表选择 —</option>' + 们.map(m => `<option value="${_.escape(m)}">${_.escape(m)}</option>`).join('');
+          选.style.display = 'block';
+          说(`读到 ${们.length} 个模型,从下拉里选一个。`);
+        })
+        .catch(e => 说(`读取失败:${String(e).slice(0, 80)}(地址要填到 /v1;也可能是该服务不开放模型列表,直接手填模型名即可)`));
+    });
+    (区.querySelector('.i-models') as HTMLSelectElement).addEventListener('change', ev => {
+      const v = (ev.target as HTMLSelectElement).value;
+      if (v) (区.querySelector('.i-model') as HTMLInputElement).value = v;
+    });
     (区.querySelector('.save') as HTMLButtonElement).addEventListener('click', () => {
       存配置({
         base: (区.querySelector('.i-base') as HTMLInputElement).value.trim(),
