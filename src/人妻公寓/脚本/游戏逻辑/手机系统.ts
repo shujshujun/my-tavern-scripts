@@ -470,6 +470,18 @@ let 挂好 = false;
 /** 手机壳拉回视口(悬浮钮被拖到屏幕边缘后,弹开的壳可能在视口外;挂载时闭包赋值) */
 let 拉回视口: () => void = () => {};
 
+/**
+ * 开合防抖(2026-07-18 用户实测rq0.21:点一下手机闪一下就消失)——移动端一次点按会
+ * 双触发(touch合成click+原生click);开关语义下第二发变成"关"。450ms 内只认第一发。
+ */
+let 上次开合 = 0;
+function 开合防抖(): boolean {
+  const now = Date.now();
+  if (now - 上次开合 < 450) return false;
+  上次开合 = now;
+  return true;
+}
+
 export function 挂载手机(): void {
   if (挂好) return;
   const doc = 根文档();
@@ -626,6 +638,7 @@ export function 挂载手机(): void {
       拖过 = false; // 拖完松手触发的 click 不当开合
       return;
     }
+    if (!开合防抖()) return;
     root.classList.toggle('open');
     if (root.classList.contains('open')) {
       // 有来电先接来电,否则开机即微信(2026-07-18 用户拍板:不做主屏,手机=微信)
@@ -669,6 +682,7 @@ export function 打开手机(直达来电 = false): void {
   挂载手机();
   const root = 根文档().getElementById(ROOT_ID);
   if (!root) return;
+  if (!开合防抖()) return;
   if (root.classList.contains('open') && !直达来电) {
     root.classList.remove('open');
     return;
