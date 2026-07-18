@@ -118,7 +118,10 @@ function 清洗正文(原文: string): string {
     .replace(/<!DOCTYPE[\s\S]*?<\/html\s*>/gi, '')
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replace(/<StatusPlaceHolderImpl\/>/g, '');
+    .replace(/<StatusPlaceHolderImpl\/>/g, '')
+    // 玩家预设夹带的包装 div(2026-07-19 玩家实测:konata-thinking-wrapper/tucao-w 这类空壳
+    // 或漏闭合的裸 div 直接印在正文里)——正文永远不该有裸 div,标签一律剥壳(内容保留)
+    .replace(/<\/?div[^>]*>/gi, '');
   const 全清 = 闭合清
     // 生成被截断时的未闭合块也吞掉,否则半截标记块会永久留在楼层原文里
     .replace(/<think(?:ing)?>[\s\S]*$/i, '')

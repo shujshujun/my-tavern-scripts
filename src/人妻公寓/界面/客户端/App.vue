@@ -1990,7 +1990,10 @@ function 清洗(原文: string, 流式 = false): string {
     .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*?```/gi, '')
     .replace(/<!DOCTYPE[\s\S]*?<\/html\s*>/gi, '')
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    // 玩家预设夹带的包装 div(2026-07-19,同脚本侧):konata-thinking-wrapper/tucao-w 等
+    // 空壳或漏闭合裸 div 剥壳(内容保留;对旧档已污染楼层同样生效)
+    .replace(/<\/?div[^>]*>/gi, '');
   const 全清 = 闭合清
     // 未闭合块也吞掉:流式=防半截标记块闪现;完整楼层=防截断残块
     .replace(/<details[^>]*>[\s\S]*$/i, '')
@@ -2401,6 +2404,13 @@ onMounted(() => {
 
   // 恢复界面偏好(主题三档/字号/垫板/省流/减动效)
   恢复设置();
+
+  // 手机端默认全屏画幅(2026-07-19 用户拍板:移动端适配已达标,直接以全屏模式起步)。
+  // 走 CSS 画幅而非 Fullscreen API——后者没有用户手势会被浏览器拒;右上角全屏钮仍可切真全屏
+  if (window.matchMedia('(max-width: 540px)').matches && !全屏中.value) {
+    全屏中.value = true;
+    应用画幅(true);
+  }
 
   // 真全屏状态同步(按钮/Esc/系统手势退出都走这里)
   for (const 事件名 of ['fullscreenchange', 'webkitfullscreenchange']) {
@@ -5573,17 +5583,19 @@ onUnmounted(() => {
   border-color: rgba(255, 255, 255, 0.08);
 }
 
-/* 夜间:薄深纱,背景图微压暗;可读性同样交给磨砂垫板 */
+/* 夜间:深纱压背景图;2026-07-19 玩家手机截图实测:亮色场景图(白墙房间/白裙立绘)会把
+   半透明深纱衬成浅灰,浅色字浮在上面看不清——深纱加厚 */
 :global(html.rq-dark) .story-wrap {
   background:
-    linear-gradient(180deg, rgba(var(--sc-a, 165, 175, 195), 0.18), rgba(var(--sc-b, 205, 215, 230), 0.07) 42%, transparent 72%),
-    linear-gradient(rgba(30, 32, 48, 0.42), rgba(30, 32, 48, 0.52)),
+    linear-gradient(180deg, rgba(var(--sc-a, 165, 175, 195), 0.14), rgba(var(--sc-b, 205, 215, 230), 0.05) 42%, transparent 72%),
+    linear-gradient(rgba(24, 26, 40, 0.58), rgba(24, 26, 40, 0.68)),
     var(--scene-img, none) center / cover no-repeat,
     var(--glass);
 }
 
+/* 垫板浓度给夜间设下限:玩家把滑杆拉多低,深底也至少 0.78,浅字永远有得靠 */
 :global(html.rq-dark) .story-entry {
-  background: rgba(32, 34, 50, calc(var(--entry-veil, 0.66) + 0.02));
+  background: rgba(26, 28, 42, max(0.78, calc(var(--entry-veil, 0.66) + 0.1)));
 }
 
 /* ── 省流模式:关掉重量级场景位图(背景/立面),回纯 CSS 渐变;头像/图标小,保留 ── */
