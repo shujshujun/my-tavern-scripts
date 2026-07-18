@@ -107,6 +107,22 @@ function 称呼纪律(): string {
   return `对方是公寓管理员,名叫"${玩家名()}"——称呼他只能用"${玩家名()}"或"管理员"(关系近了可用由这个名字自然衍生的昵称),严禁臆造别的姓氏或称呼(如"王师傅/李哥")。`;
 }
 
+/**
+ * 手机消息净化(2026-07-18 用户实测:回复里长出 <行为等级>1</行为等级>)——
+ * 独立API若走的是带破限注入的代理,模型会把主预设的协议标签/思维链原样吐进微信消息;
+ * 手机侧不吃任何协议,一律剥干净只留人话。
+ */
+function 净化消息(原: string): string {
+  return 原
+    .replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, '')
+    .replace(/<行为等级>[\s\S]*?<\/行为等级>/g, '')
+    .replace(/<options>[\s\S]*?<\/options>/gi, '')
+    .replace(/<变量更新>[\s\S]*?<\/变量更新>/g, '')
+    .replace(/```[\s\S]*?```/g, '')
+    .replace(/<\/?[a-zA-Z一-龥][^>]*>/g, '')
+    .trim();
+}
+
 async function 小生成(系统提示: string, 用户提示: string): Promise<string> {
   const c = 读配置();
   if (c.base && c.key && c.model) {
@@ -125,7 +141,7 @@ async function 小生成(系统提示: string, 用户提示: string): Promise<st
         }),
       });
       const j = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-      const 文 = j.choices?.[0]?.message?.content?.trim();
+      const 文 = 净化消息(j.choices?.[0]?.message?.content?.trim() ?? '');
       if (文) return 文;
     } catch (e) {
       console.warn('[人妻公寓·手机] 独立API失败,回落主API:', e);
@@ -137,7 +153,7 @@ async function 小生成(系统提示: string, 用户提示: string): Promise<st
       user_input: 用户提示,
       should_stream: false,
     });
-    return String(原 ?? '').trim();
+    return 净化消息(String(原 ?? ''));
   } catch (e) {
     console.warn('[人妻公寓·手机] 主API兜底也失败,本拍跳过:', e);
     return '';
@@ -949,8 +965,8 @@ async function 发消息(会话: string, 文: string): Promise<void> {
       .map(m => `${m.发 === '我' ? 玩家名() : 配.妻名}:${m.文}`)
       .join('\n');
     const 回 = await 小生成(
-      '你在扮演一款都市题材游戏中的已婚女性,正在和公寓管理员微信聊天。只输出她的下一条回复(口语,不超过50字,可含emoji,不要引号,不要旁白)。' +
-        '纪律:按状态档把握亲疏分寸;不提及任何游戏机制;她此刻在自己的生活场景里(可自然带一句在做什么)。',
+      '你在扮演一款都市题材游戏中的已婚女性,正在和公寓管理员微信聊天。只输出她的下一条回复(口语,不超过50字,可含emoji,不要引号,不要旁白,不要任何标签或标记)。' +
+        '纪律:下面给出的状态档是两人关系的唯一权威,态度亲疏严格照档拿捏,不因单条消息内容自行升降关系;不提及任何游戏机制;她此刻在自己的生活场景里(可自然带一句在做什么)。',
       `人物:${配.妻名},${配.初始?.气质描述 ?? ''}。状态档:${档位标签(节点.妻.当前阶段, 节点.妻.好感值, 节点.妻.堕落值)};她此刻大致在:${妻位置推算(会话 as 门牌, 楼 + data.系统._时段偏移楼)}。${称呼纪律()}\n最近聊天:\n${近况}\n生成她的回复。`,
     );
     if (回) {
