@@ -347,8 +347,11 @@ const 手机CSS = `
 @keyframes rqp-ring{0%,100%{transform:rotate(0)}25%{transform:rotate(-12deg) scale(1.06)}75%{transform:rotate(12deg) scale(1.06)}}
 /* ── 手机壳(柚月小手机同款华为全面屏风:金属机身/药丸双摄/状态栏;yuzuki 授权改造) ── */
 #${ROOT_ID} .rqp-shell{display:none;position:absolute;right:0;bottom:64px;width:min(320px,92vw);height:min(692px,80vh);background:#1a1a1a;border-radius:40px;padding:4px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),0 15px 50px rgba(0,0,0,.4),0 5px 20px rgba(0,0,0,.3);}
-#${ROOT_ID}.open .rqp-shell{display:block;animation:rqp-slidein .5s cubic-bezier(.4,0,.2,1);}
-@keyframes rqp-slidein{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}
+#${ROOT_ID}.open .rqp-shell{display:block;}
+/* 滑入动画放内层屏幕:壳的 transform 留给拖动位移专用——动画接管壳transform会在
+   结束瞬间跳回内联位移(2026-07-18 手机闪现即失真凶:动画期显示默认位,结束跳到屏外陈旧位移) */
+#${ROOT_ID}.open .rqp-screen{animation:rqp-slidein .45s cubic-bezier(.4,0,.2,1);}
+@keyframes rqp-slidein{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:scale(1)}}
 #${ROOT_ID} .rqp-punch{position:absolute;top:12px;left:25px;width:44px;height:15px;background:#000;border-radius:9px;z-index:60;box-shadow:0 1px 3px rgba(0,0,0,.3),inset 0 1px 0 rgba(255,255,255,.05);}
 #${ROOT_ID} .rqp-punch::before{content:'';position:absolute;top:50%;left:6px;transform:translateY(-50%);width:8px;height:8px;border-radius:50%;background:radial-gradient(circle,#1a3a52 0%,#0a1a2a 50%,#000 100%);box-shadow:0 0 2px rgba(26,77,122,.5),inset 0 1px 2px rgba(255,255,255,.15);}
 #${ROOT_ID} .rqp-punch::after{content:'';position:absolute;top:50%;right:7px;transform:translateY(-50%);width:5px;height:5px;border-radius:50%;background:radial-gradient(circle,#2a2a2a 0%,#0a0a0a 100%);}
