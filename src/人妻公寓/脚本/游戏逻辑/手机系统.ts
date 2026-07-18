@@ -334,61 +334,71 @@ const 手机CSS = `
 #${ROOT_ID} .rqm-cover{height:132px;background:url('${素材基址}/界面/手机壁纸.webp') center/cover no-repeat,linear-gradient(160deg,#8fb8de,#c3a6d8);position:relative;margin-bottom:26px;}
 #${ROOT_ID} .rqm-cover b{position:absolute;right:74px;bottom:-10px;color:#fff;font-size:15px;text-shadow:0 1px 4px rgba(0,0,0,.5);}
 #${ROOT_ID} .rqm-cover .rqp-ava{position:absolute;right:12px;bottom:-22px;width:52px;height:52px;border-radius:8px;border:1.5px solid #fff;}
-#${ROOT_ID} .rqp-head{flex:none;background:#ededed;padding:12px 14px 8px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #ddd;}
-#${ROOT_ID} .rqp-head b{font-size:15px;color:#111;flex:1;text-align:center;}
-#${ROOT_ID} .rqp-back{border:none;background:none;font-size:16px;cursor:pointer;color:#111;width:24px;}
+#${ROOT_ID} .rqp-head{flex:none;background:#ededed;padding:12px 14px 9px;display:flex;align-items:center;gap:8px;border-bottom:.5px solid #d9d9d9;}
+#${ROOT_ID} .rqp-head b{font-size:16px;font-weight:600;color:#111;flex:1;text-align:center;}
+#${ROOT_ID} .rqp-back{border:none;background:none;font-size:18px;cursor:pointer;color:#111;width:24px;font-weight:300;}
 #${ROOT_ID} .rqp-gear{border:none;background:none;font-size:15px;cursor:pointer;color:#555;width:24px;}
 #${ROOT_ID} .rqp-body{flex:1;overflow-y:auto;overscroll-behavior:contain;}
-#${ROOT_ID} .rqp-row{display:flex;gap:10px;padding:11px 14px;background:#fff;border-bottom:1px solid #f2f2f2;cursor:pointer;align-items:center;}
-#${ROOT_ID} .rqp-row:hover{background:#f7f7f7;}
-#${ROOT_ID} .rqp-ava{width:42px;height:42px;border-radius:6px;background:#c8cad0;flex:none;overflow:hidden;display:grid;place-items:center;font-weight:700;color:#fff;font-size:18px;}
+#${ROOT_ID} .rqp-body.chatlist{background:#fff;}
+#${ROOT_ID} .rqp-row{display:flex;gap:11px;padding:10px 14px;background:#fff;cursor:pointer;align-items:center;position:relative;}
+#${ROOT_ID} .rqp-row::after{content:'';position:absolute;left:71px;right:0;bottom:0;height:.5px;background:#e5e5e5;}
+#${ROOT_ID} .rqp-row:active{background:#ececec;}
+#${ROOT_ID} .rqp-ava{width:46px;height:46px;border-radius:4px;background:#c8cad0;flex:none;overflow:hidden;display:grid;place-items:center;font-weight:700;color:#fff;font-size:18px;}
 #${ROOT_ID} .rqp-ava img{width:100%;height:100%;object-fit:cover;}
 #${ROOT_ID} .rqp-row .mid{flex:1;min-width:0;}
-#${ROOT_ID} .rqp-row .mid b{font-size:14px;color:#111;display:block;}
-#${ROOT_ID} .rqp-row .mid i{font-style:normal;font-size:12px;color:#999;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:200px;}
-#${ROOT_ID} .rqp-row .dot{width:9px;height:9px;border-radius:50%;background:#fa5151;flex:none;}
-#${ROOT_ID} .rqp-bubbles{padding:12px;display:flex;flex-direction:column;gap:10px;}
-#${ROOT_ID} .rqp-b{max-width:76%;padding:8px 11px;border-radius:8px;font-size:13px;line-height:1.5;color:#111;word-break:break-word;}
-#${ROOT_ID} .rqp-b.me{align-self:flex-end;background:#95ec69;}
-#${ROOT_ID} .rqp-b.ta{align-self:flex-start;background:#fff;}
-#${ROOT_ID} .rqp-b.sys{align-self:center;background:none;color:#999;font-size:11px;}
-#${ROOT_ID} .rqp-input{flex:none;display:flex;gap:8px;padding:8px;background:#f7f7f7;border-top:1px solid #ddd;}
-#${ROOT_ID} .rqp-input textarea{flex:1;resize:none;border:1px solid #ddd;border-radius:6px;padding:6px 8px;font-size:13px;height:38px;font-family:inherit;}
-#${ROOT_ID} .rqp-input button{border:none;border-radius:6px;background:#07c160;color:#fff;padding:0 14px;cursor:pointer;font-size:13px;}
+#${ROOT_ID} .rqp-row .mid b{font-size:14.5px;font-weight:500;color:#111;display:block;}
+#${ROOT_ID} .rqp-row .mid i{font-style:normal;font-size:12px;color:#9b9b9b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:200px;margin-top:2px;}
+#${ROOT_ID} .rqp-row .dot{position:absolute;top:7px;left:50px;width:10px;height:10px;border-radius:50%;background:#fa5151;border:1.5px solid #fff;}
+#${ROOT_ID} .rqp-bubbles{padding:12px 10px;display:flex;flex-direction:column;gap:12px;}
+#${ROOT_ID} .rqp-line{display:flex;gap:9px;align-items:flex-start;}
+#${ROOT_ID} .rqp-line.me{flex-direction:row-reverse;}
+#${ROOT_ID} .rqp-line .rqp-ava{width:38px;height:38px;border-radius:4px;font-size:15px;}
+#${ROOT_ID} .rqp-b{position:relative;max-width:72%;padding:8px 11px;border-radius:5px;font-size:13.5px;line-height:1.5;color:#111;word-break:break-word;}
+#${ROOT_ID} .rqp-b.me{background:#95ec69;}
+#${ROOT_ID} .rqp-b.me::after{content:'';position:absolute;top:13px;right:-5px;border-style:solid;border-width:5px 0 5px 6px;border-color:transparent transparent transparent #95ec69;}
+#${ROOT_ID} .rqp-b.ta{background:#fff;}
+#${ROOT_ID} .rqp-b.ta::before{content:'';position:absolute;top:13px;left:-5px;border-style:solid;border-width:5px 6px 5px 0;border-color:transparent #fff transparent transparent;}
+#${ROOT_ID} .rqp-b.sys{align-self:center;background:none;color:#a8a8a8;font-size:11px;max-width:90%;}
+#${ROOT_ID} .rqp-input{flex:none;display:flex;gap:8px;padding:8px 10px;background:#f7f7f7;border-top:.5px solid #d9d9d9;align-items:flex-end;}
+#${ROOT_ID} .rqp-input textarea{flex:1;resize:none;border:none;border-radius:4px;padding:8px 9px;font-size:13.5px;height:38px;font-family:inherit;background:#fff;}
+#${ROOT_ID} .rqp-input button{border:none;border-radius:4px;background:#07c160;color:#fff;padding:8px 14px;cursor:pointer;font-size:13px;font-weight:500;}
 #${ROOT_ID} .rqp-input button:disabled{opacity:.5;cursor:default;}
 #${ROOT_ID} .rqp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;padding:26px 20px;}
 #${ROOT_ID} .rqp-app{display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;border:none;background:none;position:relative;}
 #${ROOT_ID} .rqp-app .ic{width:52px;height:52px;border-radius:12px;display:grid;place-items:center;font-size:26px;color:#fff;}
 #${ROOT_ID} .rqp-app span{font-size:11px;color:#333;}
 #${ROOT_ID} .rqp-app .dot{position:absolute;top:-3px;right:8px;width:10px;height:10px;border-radius:50%;background:#fa5151;}
-/* ── 微博(柚月 weibo.css 同构:白卡流/橙标签/社交蓝话题/转评赞栏) ── */
-#${ROOT_ID} .rqw-feed{background:#f5f5f5;min-height:100%;}
-#${ROOT_ID} .rqw-post{background:rgba(255,255,255,.9);margin-bottom:6px;padding:10px 12px;}
-#${ROOT_ID} .rqw-head{display:flex;align-items:center;margin-bottom:6px;gap:8px;}
-#${ROOT_ID} .rqw-head .rqp-ava{width:30px;height:30px;border-radius:50%;border:1px solid #e0e0e0;font-size:12px;background:#fff;color:#666;}
-#${ROOT_ID} .rqw-meta{flex:1;min-width:0;}
-#${ROOT_ID} .rqw-name{font-size:12px;color:#1a1a1a;display:flex;align-items:center;gap:4px;}
+/* ── 朋友圈(真微信样式校准 2026-07-18:白底连续流+发丝线分隔,左头像右内容两栏,
+   名字微信蓝#576b95,时间行右侧两点评论钮,赞评进浅灰盒——不是微博卡片流) ── */
+#${ROOT_ID} .rqw-feed{background:#fff;min-height:100%;}
+#${ROOT_ID} .rqw-post{background:#fff;padding:12px 14px 10px;display:flex;gap:10px;align-items:flex-start;position:relative;}
+#${ROOT_ID} .rqw-post::after{content:'';position:absolute;left:62px;right:0;bottom:0;height:.5px;background:#eee;}
+#${ROOT_ID} .rqw-post>.rqp-ava{width:38px;height:38px;border-radius:4px;font-size:15px;flex:none;}
+#${ROOT_ID} .rqw-r{flex:1;min-width:0;}
+#${ROOT_ID} .rqw-name{font-size:13.5px;font-weight:600;color:#576b95;display:block;margin-bottom:2px;}
 #${ROOT_ID} .rqw-tag{font-size:8px;padding:1px 3px;border-radius:2px;background:#fff3e0;color:#ff8200;}
-#${ROOT_ID} .rqw-time{font-size:10px;color:#bbb;margin-top:1px;}
-#${ROOT_ID} .rqw-text{font-size:12px;color:#1a1a1a;line-height:1.5;margin-bottom:6px;word-break:break-word;}
+#${ROOT_ID} .rqw-time{font-size:11px;color:#b2b2b2;}
+#${ROOT_ID} .rqw-foot{display:flex;align-items:center;justify-content:space-between;margin-top:5px;}
+#${ROOT_ID} .rqw-dots{flex:none;background:#f7f7f7;border-radius:3px;padding:1px 7px;color:#576b95;font-size:12px;font-weight:700;letter-spacing:1px;line-height:1.3;}
+#${ROOT_ID} .rqw-text{font-size:13.5px;color:#111;line-height:1.55;word-break:break-word;}
 #${ROOT_ID} .rqw-text .tp{color:#576b95;}
-#${ROOT_ID} .rqw-stats{display:flex;align-items:center;padding-top:6px;border-top:.5px solid rgba(0,0,0,.06);}
-#${ROOT_ID} .rqw-stats span{flex:1;display:flex;align-items:center;justify-content:center;gap:4px;font-size:11px;color:#666;}
-#${ROOT_ID} .rqw-cmt{margin-top:6px;background:#f7f7f7;border-radius:4px;padding:6px 8px;font-size:11px;color:#333;line-height:1.5;}
-#${ROOT_ID} .rqw-cmt b{color:#576b95;font-weight:400;}
-#${ROOT_ID} .rqw-img{display:block;width:100%;max-height:170px;object-fit:cover;border-radius:6px;margin:2px 0 6px;}
+#${ROOT_ID} .rqw-box{margin-top:6px;background:#f7f7f7;border-radius:3px;padding:6px 8px;font-size:12px;color:#333;line-height:1.6;}
+#${ROOT_ID} .rqw-box .lk{color:#576b95;}
+#${ROOT_ID} .rqw-box .lk::before{content:'♡ ';}
+#${ROOT_ID} .rqw-box b{color:#576b95;font-weight:400;}
+#${ROOT_ID} .rqw-img{display:block;max-width:78%;max-height:190px;object-fit:cover;border-radius:2px;margin:6px 0 0;}
 /* 个人主页(考古层:头图+历史流+加载更早) */
 #${ROOT_ID} .rqw-hero{background:linear-gradient(160deg,#8fa6bd,#5c728c);padding:18px 14px 12px;display:flex;align-items:center;gap:10px;color:#fff;}
 #${ROOT_ID} .rqw-hero .rqp-ava{width:52px;height:52px;border-radius:50%;border:2px solid rgba(255,255,255,.8);font-size:20px;}
 #${ROOT_ID} .rqw-hero b{font-size:15px;display:block;}
 #${ROOT_ID} .rqw-hero i{font-style:normal;font-size:11px;opacity:.85;}
-#${ROOT_ID} .rqw-divider{padding:8px 12px;font-size:11px;color:#999;background:#f5f5f5;}
+#${ROOT_ID} .rqw-divider{padding:10px 0;font-size:11px;color:#b2b2b2;background:#fff;text-align:center;}
 #${ROOT_ID} .rqw-post.key-open{box-shadow:inset 0 0 0 1.5px #ff8200;}
 #${ROOT_ID} .rqw-quiz{margin-top:8px;border-top:.5px solid rgba(0,0,0,.06);padding-top:8px;}
 #${ROOT_ID} .rqw-quiz p{font-size:11px;color:#ff8200;font-weight:600;margin-bottom:6px;}
 #${ROOT_ID} .rqw-quiz button{display:block;width:100%;text-align:left;border:1px solid #eee;background:#fafafa;border-radius:5px;padding:6px 9px;font-size:11px;color:#333;cursor:pointer;margin-bottom:5px;font-family:inherit;}
 #${ROOT_ID} .rqw-quiz button:hover{border-color:#ff8200;background:#fff7ef;}
-#${ROOT_ID} .rqw-more{display:block;width:calc(100% - 24px);margin:8px 12px 14px;border:none;border-radius:6px;background:rgba(255,130,0,.1);color:#ff8200;padding:9px;font-size:12px;cursor:pointer;font-family:inherit;}
+#${ROOT_ID} .rqw-more{display:block;width:100%;margin:0;border:none;background:#fff;color:#576b95;padding:12px 0 16px;font-size:12.5px;cursor:pointer;font-family:inherit;}
 #${ROOT_ID} .rqp-call{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:linear-gradient(180deg,#3a3f4b,#22252d);color:#fff;}
 #${ROOT_ID} .rqp-call .rqp-ava{width:84px;height:84px;border-radius:14px;font-size:34px;}
 #${ROOT_ID} .rqp-call b{font-size:18px;}
@@ -620,7 +630,7 @@ function 渲染(): void {
 
   if (当前页.名 === 'chats') {
     头('微信');
-    const 体 = el('div', 'rqp-body');
+    const 体 = el('div', 'rqp-body chatlist');
     const 友们 = data ? 微信好友(data) : [{ id: '父亲', 名: '爸', 类: '父亲' as const }];
     for (const 友 of 友们) {
       const 条 = 库.消息.filter(m => m.会话 === 友.id && m.楼 <= 楼);
@@ -655,13 +665,23 @@ function 渲染(): void {
     });
     const 体 = el('div', 'rqp-body');
     const 泡区 = el('div', 'rqp-bubbles');
+    // 真微信排版:气泡带双侧头像+小尾巴;换楼即插一条居中的灰色时间字(微信的时间分组)
+    const 对方头像名 = 会话 === '父亲' ? '父亲' : 会话 === '群' ? '群' : (户静态表[会话 as 门牌]?.妻名 ?? 会话);
+    let 上楼 = -1;
     for (const m of 库.消息.filter(x => x.会话 === 会话 && x.楼 <= 楼)) {
+      if (m.楼 !== 上楼) {
+        泡区.appendChild(el('div', 'rqp-b sys', 时段字(m.楼, 偏移)));
+        上楼 = m.楼;
+      }
       if (m.类 === '撤回') {
         泡区.appendChild(el('div', 'rqp-b sys', '她撤回了一条消息'));
       } else if (m.类 === '通话') {
         泡区.appendChild(el('div', 'rqp-b sys', `[语音通话] ${_.escape(m.文)}`));
       } else {
-        泡区.appendChild(el('div', `rqp-b ${m.发 === '我' ? 'me' : 'ta'}`, _.escape(m.文)));
+        const 我方 = m.发 === '我';
+        泡区.appendChild(
+          el('div', `rqp-line ${我方 ? 'me' : 'ta'}`, `${头像块(我方 ? '主角' : 对方头像名)}<div class="rqp-b ${我方 ? 'me' : 'ta'}">${_.escape(m.文)}</div>`),
+        );
       }
     }
     体.appendChild(泡区);
@@ -697,20 +717,24 @@ function 渲染(): void {
     const 我名 = (SillyTavern as unknown as { name1?: string })?.name1 || '我';
     体.appendChild(el('div', 'rqm-cover', `<b>${_.escape(我名)}</b>${头像块('主角')}`));
     const 圈们 = 库.圈.filter(c => c.楼 <= 楼);
-    if (!圈们.length) 体.appendChild(el('div', 'rqw-post', '<p class="rqw-text" style="color:#999">朋友圈还静悄悄的。</p>'));
+    if (!圈们.length)
+      体.appendChild(el('div', 'rqw-post', '<div class="rqw-r"><p class="rqw-text" style="color:#999">朋友圈还静悄悄的。</p></div>'));
     for (const c of 圈们) {
       const 赞 = 1 + Math.floor(seededRandom(c.楼, c.谁, '赞') * 9);
       const 正文 = _.escape(c.文).replace(/#([^#\s]{1,12})#/g, '<span class="tp">#$1#</span>');
-      const 评块 = c.评.length
-        ? `<div class="rqw-cmt">${c.评.map(e => `<b>${_.escape(e.谁)}:</b>${_.escape(e.文)}`).join('<br/>')}</div>`
-        : '';
+      // 真微信排版:左头像右内容;时间行右侧两点钮(纯装饰);赞+评合进浅灰盒
+      const 盒 =
+        `<div class="rqw-box"><span class="lk">楼里的 ${赞} 位邻居</span>` +
+        (c.评.length ? `<br/>${c.评.map(e => `<b>${_.escape(e.谁)}:</b>${_.escape(e.文)}`).join('<br/>')}` : '') +
+        `</div>`;
       const 卡 = el(
         'div',
         'rqw-post',
-        `<div class="rqw-head" style="cursor:pointer">${头像块(c.谁)}<span class="rqw-meta"><span class="rqw-name">${_.escape(c.谁)}</span><span class="rqw-time">${时段字(c.楼, 偏移)}</span></span></div>` +
+        `${头像块(c.谁)}<div class="rqw-r"><span class="rqw-name">${_.escape(c.谁)}</span>` +
           `<div class="rqw-text">${正文}</div>` +
-          `<div class="rqw-stats"><span>♡ ${赞} 位邻居觉得很赞</span></div>` +
-          评块,
+          `<div class="rqw-foot"><span class="rqw-time">${时段字(c.楼, 偏移)}</span><span class="rqw-dots">••</span></div>` +
+          盒 +
+          `</div>`,
       );
       体.appendChild(卡);
     }
@@ -741,8 +765,9 @@ function 渲染(): void {
       const 卡 = el(
         'div',
         `rqw-post${开题 ? ' key-open' : ''}`,
-        `<div class="rqw-head">${头像块(妻名)}<span class="rqw-meta"><span class="rqw-name">${_.escape(妻名)}</span><span class="rqw-time">${_.escape(条.时间)}</span></span></div>` +
-          `<div class="rqw-text">${_.escape(条.文).replace(/#([^#\s]{1,12})#/g, '<span class="tp">#$1#</span>')}</div>${图块}`,
+        `${头像块(妻名)}<div class="rqw-r"><span class="rqw-name">${_.escape(妻名)}</span>` +
+          `<div class="rqw-text">${_.escape(条.文).replace(/#([^#\s]{1,12})#/g, '<span class="tp">#$1#</span>')}</div>${图块}` +
+          `<div class="rqw-foot"><span class="rqw-time">${_.escape(条.时间)}</span><span class="rqw-dots">••</span></div></div>`,
       );
       if (条.关键) {
         卡.style.cursor = 'pointer';
@@ -762,7 +787,7 @@ function 渲染(): void {
             });
             题区.appendChild(b);
           });
-          卡.appendChild(题区);
+          (卡.querySelector('.rqw-r') as HTMLElement).appendChild(题区);
         }
       }
       体.appendChild(卡);
