@@ -400,6 +400,11 @@ const 手机CSS = `
 #${ROOT_ID} .rqp-b.ta{background:#fff;}
 #${ROOT_ID} .rqp-b.ta::before{content:'';position:absolute;top:13px;left:-5px;border-style:solid;border-width:5px 6px 5px 0;border-color:transparent #fff transparent transparent;}
 #${ROOT_ID} .rqp-b.sys{align-self:center;background:none;color:#a8a8a8;font-size:11px;max-width:90%;}
+#${ROOT_ID} .rqp-typing{display:flex;gap:4px;align-items:center;min-height:20px;}
+#${ROOT_ID} .rqp-typing i{width:6px;height:6px;border-radius:50%;background:#b0b0b0;animation:rqp-tp 1.2s infinite;}
+#${ROOT_ID} .rqp-typing i:nth-child(2){animation-delay:.2s;}
+#${ROOT_ID} .rqp-typing i:nth-child(3){animation-delay:.4s;}
+@keyframes rqp-tp{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
 #${ROOT_ID} .rqp-input{flex:none;display:flex;gap:8px;padding:8px 10px;background:#f7f7f7;border-top:.5px solid #d9d9d9;align-items:flex-end;}
 #${ROOT_ID} .rqp-input textarea{flex:1;resize:none;border:none;border-radius:4px;padding:8px 9px;font-size:13.5px;height:38px;font-family:inherit;background:#fff;}
 #${ROOT_ID} .rqp-input button{border:none;border-radius:4px;background:#07c160;color:#fff;padding:8px 14px;cursor:pointer;font-size:13px;font-weight:500;}
@@ -472,6 +477,8 @@ function 时段字(楼戳: number, 偏移: number): string {
 let 挂好 = false;
 /** 手机壳拉回视口(悬浮钮被拖到屏幕边缘后,弹开的壳可能在视口外;挂载时闭包赋值) */
 let 拉回视口: () => void = () => {};
+/** 正在输入(2026-07-18 用户提案:微信同款)——她生成回复期间,该会话顶栏+气泡显示打字中 */
+let 正在输入: string | null = null;
 
 /**
  * 开合防抖(2026-07-18 用户实测rq0.21:点一下手机闪一下就消失)——移动端一次点按会
@@ -800,7 +807,7 @@ function 渲染(): void {
   if (当前页.名 === 'chat' && 当前页.会话) {
     const 会话 = 当前页.会话;
     const 名 = 会话 === '父亲' ? '爸' : 会话 === '群' ? '梧桐里7号楼务群' : (户静态表[会话 as 门牌]?.妻名 ?? 会话);
-    头(名, () => {
+    头(正在输入 === 会话 ? '对方正在输入…' : 名, () => {
       当前页 = { 名: 'chats' };
       渲染();
     });
@@ -824,6 +831,12 @@ function 渲染(): void {
           el('div', `rqp-line ${我方 ? 'me' : 'ta'}`, `${头像块(我方 ? '主角' : 对方头像名)}<div class="rqp-b ${我方 ? 'me' : 'ta'}">${_.escape(m.文)}</div>`),
         );
       }
+    }
+    // 正在输入气泡(微信同款三点跳动;她的回复生成完自动消失)
+    if (正在输入 === 会话) {
+      泡区.appendChild(
+        el('div', 'rqp-line ta', `${头像块(对方头像名)}<div class="rqp-b ta"><span class="rqp-typing"><i></i><i></i><i></i></span></div>`),
+      );
     }
     体.appendChild(泡区);
     屏.appendChild(体);
@@ -1102,6 +1115,7 @@ async function 约出来(m: 门牌): Promise<void> {
   const 库 = 读库();
   库.消息.push({ 楼, 会话: m, 发: '我', 文: '在忙吗?想见你一面——我就在楼里,出来陪我走走?' });
   写库(库);
+  正在输入 = m;
   渲染();
   try {
     const rawStat = 读最近有效stat();
@@ -1152,6 +1166,9 @@ async function 约出来(m: 门牌): Promise<void> {
     刷新红点(); // 顺带发"手机状态"事件,游戏界面借它即时刷新赴约位置(约出来不产楼)
   } catch (e) {
     console.error('[人妻公寓·手机] 约出来失败:', e);
+  } finally {
+    正在输入 = null;
+    渲染();
   }
 }
 
@@ -1164,6 +1181,8 @@ async function 发消息(会话: string, 文: string): Promise<void> {
   写库(库);
   渲染();
   if (会话 === '群') return; // 群通知不强制回声
+  正在输入 = 会话;
+  渲染();
   try {
     const rawStat = 读最近有效stat();
     if (!rawStat) return;
@@ -1190,6 +1209,9 @@ async function 发消息(会话: string, 文: string): Promise<void> {
     }
   } catch (e) {
     console.error('[人妻公寓·手机] 回复生成失败:', e);
+  } finally {
+    正在输入 = null;
+    渲染();
   }
 }
 
