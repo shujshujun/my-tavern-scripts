@@ -1,7 +1,7 @@
 import type { SchemaType } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
 import { 户静态表, 查考古, 门牌列表 } from '../../stageConfig';
-import { 妻位置推算, 当前时段, seededRandom } from './楼层时钟';
+import { 丈夫在楼, 妻位置推算, 当前时段, seededRandom } from './楼层时钟';
 import { 读取, 读最近有效stat, 脚本写入 } from './mvuIO';
 import { 捕获保护快照 } from './守护系统';
 import { Schema } from '../../schema';
@@ -317,6 +317,8 @@ const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scr
 
 let 当前页: {
   名: 'chats' | 'chat' | 'moments' | 'call' | 'talk' | 'settings';
+  /** chat:单聊"+"面板是否展开(约出来入口) */
+  加?: boolean;
   会话?: string;
   展开?: number; // moments:考古已加载条数(混排流)
   题?: string; // moments:展开中的"哪里不对劲?"(`门牌:序`)
@@ -399,6 +401,11 @@ const 手机CSS = `
 #${ROOT_ID} .rqp-input textarea{flex:1;resize:none;border:none;border-radius:4px;padding:8px 9px;font-size:13.5px;height:38px;font-family:inherit;background:#fff;}
 #${ROOT_ID} .rqp-input button{border:none;border-radius:4px;background:#07c160;color:#fff;padding:8px 14px;cursor:pointer;font-size:13px;font-weight:500;}
 #${ROOT_ID} .rqp-input button:disabled{opacity:.5;cursor:default;}
+#${ROOT_ID} .rqp-plusbtn{border:none;background:none;font-size:24px;line-height:38px;color:#7a7a7a;cursor:pointer;padding:0 2px;flex:none;}
+#${ROOT_ID} .rqp-plus{flex:none;background:#f7f7f7;border-top:.5px solid #e0e0e0;padding:16px 18px;display:flex;gap:20px;}
+#${ROOT_ID} .rqp-plus button{border:none;background:none;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11px;color:#555;font-family:inherit;padding:0;}
+#${ROOT_ID} .rqp-plus button i{font-style:normal;width:54px;height:54px;border-radius:12px;background:#fff;display:grid;place-items:center;font-size:25px;border:.5px solid #e5e5e5;}
+#${ROOT_ID} .rqp-plus button:disabled{opacity:.45;cursor:default;}
 #${ROOT_ID} .rqp-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;padding:26px 20px;}
 #${ROOT_ID} .rqp-app{display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;border:none;background:none;position:relative;}
 #${ROOT_ID} .rqp-app .ic{width:52px;height:52px;border-radius:12px;display:grid;place-items:center;font-size:26px;color:#fff;}
@@ -805,7 +812,17 @@ function 渲染(): void {
     屏.appendChild(体);
     // 输入(群=只发物业通知;父亲单聊只读——他只打电话)
     if (会话 !== '父亲') {
+      const 是妻 = 会话 !== '群';
       const 行 = el('div', 'rqp-input');
+      if (是妻) {
+        // "+"菜单(2026-07-18 用户提案:仿真微信;第一期只有"约出来")
+        const 加 = el('button', 'rqp-plusbtn', 当前页.加 ? '⊗' : '⊕') as HTMLButtonElement;
+        加.addEventListener('click', () => {
+          当前页 = { ...当前页, 加: !当前页.加 };
+          渲染();
+        });
+        行.appendChild(加);
+      }
       const ta = el('textarea', '') as HTMLTextAreaElement;
       ta.placeholder = 会话 === '群' ? '发一条物业通知…' : '发消息…';
       const 发钮 = el('button', '', '发送') as HTMLButtonElement;
@@ -818,6 +835,21 @@ function 渲染(): void {
       行.appendChild(ta);
       行.appendChild(发钮);
       屏.appendChild(行);
+      if (是妻 && 当前页.加) {
+        const 偏 = data?.系统._时段偏移楼 ?? 0;
+        const 钟 = 楼 + 偏;
+        const 冷 = 钟 - (库.节拍[`约:${会话}`] ?? -999) < 8;
+        const 已约 = !!读赴约条(楼);
+        const 面 = el('div', 'rqp-plus');
+        const b = el('button', '', `<i>📍</i>约出来${已约 ? '·已在身边' : 冷 ? '·刚约过' : ''}`) as HTMLButtonElement;
+        b.disabled = 冷 || 已约;
+        b.addEventListener('click', () => {
+          当前页 = { ...当前页, 加: false };
+          void 约出来(会话 as 门牌);
+        });
+        面.appendChild(b);
+        屏.appendChild(面);
+      }
     }
     体.scrollTop = 体.scrollHeight;
     return;
@@ -1032,6 +1064,77 @@ function 渲染(): void {
     屏.appendChild(区);
     底栏('settings');
     return;
+  }
+}
+
+// ── 约出来(2026-07-18 用户提案:微信"+"菜单;应约与否由脚本按 阶段/好感/时段/丈夫在否 裁定,
+//    AI 只照结果写回复;应约=写 _赴约(有效期2时段),期间她的位置=玩家的位置) ──
+
+function 读赴约条(楼: number): { m: 门牌 } | null {
+  const p = (_.get(getVariables({ type: 'chat' }), '_赴约') ?? null) as {
+    m?: 门牌;
+    起楼?: number;
+    至楼?: number;
+  } | null;
+  if (!p?.m || (p.起楼 ?? 0) > 楼 || (p.至楼 ?? -1) < 楼) return null;
+  return { m: p.m };
+}
+
+async function 约出来(m: 门牌): Promise<void> {
+  const 楼 = 末楼();
+  const 库 = 读库();
+  库.消息.push({ 楼, 会话: m, 发: '我', 文: '在忙吗?想见你一面——我就在楼里,出来陪我走走?' });
+  写库(库);
+  渲染();
+  try {
+    const rawStat = 读最近有效stat();
+    if (!rawStat) return;
+    const data = Schema.parse(rawStat) as SchemaType;
+    const 节点 = data.户[m];
+    const 配 = 户静态表[m];
+    if (!节点 || !配) return;
+    const 钟 = 楼 + data.系统._时段偏移楼;
+    const 时段名 = 当前时段(钟);
+    const 阶段 = 节点.妻.当前阶段;
+    // 应约率〔调参〕:阶段定底,好感加成,晚间低阶段打折,丈夫在家打折(L5=随叫随到基本必来)
+    let 率 = [0.35, 0.55, 0.75, 0.9, 0.98][Math.max(0, 阶段 - 1)] ?? 0.35;
+    if (节点.妻.好感值 >= 70) 率 += 0.1;
+    if ((时段名 === '深夜' || 时段名 === '晚上') && 阶段 < 4) 率 *= 时段名 === '深夜' ? 0.15 : 0.6;
+    if (丈夫在楼(节点, m, 钟) !== '外出' && 阶段 < 5) 率 *= 0.6;
+    const 应 = seededRandom(楼, m, '赴约') < 率;
+    {
+      const 库2 = 读库();
+      库2.节拍[`约:${m}`] = 钟;
+      写库(库2);
+    }
+    const 回 = await 小生成(
+      '你在扮演一款都市题材游戏中的已婚女性,刚收到公寓管理员发来的微信邀约。结果已由系统裁定,你只负责照结果写她的回复(口语,不超过40字,可含emoji,不要引号,不要旁白,不要任何标签)。',
+      `人物:${配.妻名},${配.初始?.气质描述 ?? ''}。${家庭事实(m)}状态档:${档位标签(阶段, 节点.妻.好感值, 节点.妻.堕落值)};时段:${时段名}。${称呼纪律()}裁定结果:${
+        应
+          ? '她答应出来见面(按状态档拿捏语气:关系浅=犹豫着答应,关系深=藏不住的高兴)'
+          : '她婉拒了(给个合乎生活的理由:在做饭/家里有人/不太方便;按状态档拿捏惋惜程度)'
+      }。生成她的回复。`,
+    );
+    {
+      const 库3 = 读库();
+      库3.消息.push({
+        楼: 末楼(),
+        会话: m,
+        发: '对方',
+        文: 回 || (应 ? '好呀,等我几分钟,我出来找你。' : '今天不太方便呢…改天好不好?'),
+      });
+      库3.读到[m] = 末楼();
+      写库(库3);
+    }
+    if (应) {
+      void Promise.resolve(insertOrAssignVariables({ _赴约: { m, 起楼: 楼, 至楼: 楼 + 6 } }, { type: 'chat' })).catch(
+        (e: unknown) => console.error('[人妻公寓·手机] 赴约写入失败', e),
+      );
+    }
+    渲染();
+    刷新红点(); // 顺带发"手机状态"事件,游戏界面借它即时刷新赴约位置(约出来不产楼)
+  } catch (e) {
+    console.error('[人妻公寓·手机] 约出来失败:', e);
   }
 }
 

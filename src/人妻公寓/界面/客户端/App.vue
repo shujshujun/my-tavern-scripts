@@ -999,6 +999,26 @@ const 显示地图 = ref(false);
 const 进房末楼 = ref(0);
 const 位置种子 = computed(() => (当前房间.value ? 进房末楼.value : 末楼号.value) + 偏移楼.value);
 
+/** 赴约(微信"+"约出来,2026-07-18):有效期内她的位置=玩家所在;回档/过期自动失效 */
+const 赴约妻 = ref<string | null>(null);
+function 刷赴约() {
+  try {
+    const p = _.get(getVariables({ type: 'chat' }), '_赴约') as { m?: string; 起楼?: number; 至楼?: number } | null;
+    const 楼 = 末楼号.value;
+    赴约妻.value = p?.m && (p.起楼 ?? 0) <= 楼 && (p.至楼 ?? -1) >= 楼 ? p.m : null;
+  } catch {
+    赴约妻.value = null;
+  }
+}
+/** 妻位置(显示层统一口:赴约中=跟着玩家走,其余走作息推算) */
+function 妻现位(m: 门牌, 楼: number): string {
+  if (赴约妻.value === m) return 当前房间.value ?? '大堂';
+  return 妻位置推算(m, 楼);
+}
+watch(显示地图, 开 => {
+  if (开) 刷赴约(); // 约完人直接开地图(不产楼),开图那刻补一次同步
+});
+
 function 写场景(房间id: string | null, 破门 = false) {
   insertOrAssignVariables(
     { _场景: 房间id ? { 房间id, 破门, 进房末楼: 进房末楼.value } : null },
@@ -1019,7 +1039,7 @@ function 进入(房间id: string, 破门 = false, 保持地图 = false) {
   记待办(房间id);
   闪转场(查房间(房间id)?.名称 ?? 房间id);
   // 头像即时点亮(走到谁身边谁亮;回合结束后脚本按位置系统重算)
-  在场.value = { 焦点: 可见门牌.value.filter(m => 妻位置推算(m, 位置种子.value) === 房间id), 在场: [] };
+  在场.value = { 焦点: 可见门牌.value.filter(m => 妻现位(m, 位置种子.value) === 房间id), 在场: [] };
 }
 
 function 离开房间() {
@@ -1160,7 +1180,7 @@ function 房间动作(id: string | null): 卡动作[] {
     if (房内有人在(id)) {
       动作.push({ kicker: 'VISIT', icon: 'door', 文案: '过去串门', 做: () => 进入(id) });
       // 催租三选(P3,天生欠租户):她在家且账上挂着欠租才摆得上台面
-      if ((data.value.户[id]?._欠租笔数 ?? 0) > 0 && 妻位置推算(id as 门牌, 位置种子.value) === id) {
+      if ((data.value.户[id]?._欠租笔数 ?? 0) > 0 && 妻现位(id as 门牌, 位置种子.value) === id) {
         const 催 = (选择: '硬催' | '宽限' | '垫上') => {
           if (当前房间.value !== id) 进入(id, false, true);
           eventEmit('人妻公寓:催租', { 门牌: id, 选择 });
@@ -1286,7 +1306,7 @@ const 可见门牌 = computed(() =>
 function 房内的人(房间id: string): string[] {
   const 名单: string[] = [];
   for (const m of 可见门牌.value) {
-    if (妻位置推算(m, 位置种子.value) === 房间id) 名单.push(户静态表[m].妻名);
+    if (妻现位(m, 位置种子.value) === 房间id) 名单.push(户静态表[m].妻名);
     if (m === 房间id && 丈夫在楼(data.value.户[m], m, 位置种子.value) !== '外出' && 户静态表[m].夫名) {
       名单.push(户静态表[m].夫名);
     }
@@ -1412,7 +1432,7 @@ interface 立绘项 {
 const 立绘列表 = computed<立绘项[]>(() => {
   if (!当前房间.value) return [];
   const 图 = 可见门牌.value
-    .filter(k => 妻位置推算(k, 位置种子.value) === 当前房间.value)
+    .filter(k => 妻现位(k, 位置种子.value) === 当前房间.value)
     .map(m => `${素材基址}/立绘/${户静态表[m].妻名}.webp`)
     .filter(src => !立绘失效.value[src])
     .slice(0, 6);
@@ -1527,7 +1547,7 @@ function 选项移动目标(文本: string): string | null {
   if (房) return 房.id;
   const 牌 = 可见门牌.value.find(m => 试(户静态表[m].妻名));
   if (牌) {
-    const 位 = 妻位置推算(牌, 钟楼号.value);
+    const 位 = 妻现位(牌, 钟楼号.value);
     if (查房间(位)) return 位;
   }
   return null;
@@ -2320,6 +2340,7 @@ onMounted(() => {
     刷新在场();
     刷新行动选项();
     刷新偷窥待选();
+    刷赴约();
     try {
       (store as unknown as { pull?: () => void }).pull?.();
     } catch {
@@ -2345,6 +2366,7 @@ onMounted(() => {
   });
   eventOn('人妻公寓:手机状态', (状: { 未读?: boolean }) => {
     手机未读.value = !!状?.未读;
+    刷赴约(); // 约出来是纯手机操作不产楼,靠这条通知让地图位置即时跟上
   });
   eventOn('人妻公寓:提示', (消息: string) => {
     // 地图行动卡开着:结果以"线索卡"翻出(动画),不走 toast
@@ -2375,6 +2397,7 @@ onMounted(() => {
   } catch {
     进房末楼.value = 0;
   }
+  刷赴约();
 
   // 恢复界面偏好(主题三档/字号/垫板/省流/减动效)
   恢复设置();
