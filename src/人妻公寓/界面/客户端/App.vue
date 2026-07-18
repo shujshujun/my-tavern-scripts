@@ -5622,4 +5622,127 @@ onUnmounted(() => {
 :global(html.rq-dark) .avatar.focus .avatar-glyph {
   border-color: var(--pink);
 }
+
+/* ── 移动端紧凑档(2026-07-18 用户反馈:手机上正文只剩一小条)──
+   原则:正文区 story-wrap 是 flex:1,只要把上下所有周边框架等比压扁,
+   省出来的高度会自动全部归正文;不动任何逻辑,纯视觉压缩 */
+@media (max-width: 540px) {
+  .page {
+    padding: 4px 7px 6px;
+  }
+
+  /* 题头:kicker 行整行让位,标题缩一号 */
+  .ui-kicker.center:not(.light) {
+    display: none;
+  }
+
+  .masthead {
+    font-size: 0.84em;
+    letter-spacing: 0.22em;
+    padding: 0 0 4px;
+    margin-bottom: 3px;
+  }
+
+  .masthead::after {
+    width: 40px;
+    height: 3px;
+  }
+
+  /* 数据 HUD:半高 */
+  .hud {
+    gap: 6px;
+    padding: 4px 8px;
+    margin-bottom: 4px;
+  }
+
+  .hud-time {
+    min-width: 54px;
+    padding-right: 8px;
+  }
+
+  .hud-time b {
+    font-size: 0.88em;
+  }
+
+  .hud-time .ui-kicker {
+    font-size: 8px;
+  }
+
+  .battery {
+    padding: 2px 6px;
+  }
+
+  .battery .cells {
+    height: 7px;
+  }
+
+  /* 头像行:52→40px */
+  .avatar-row {
+    gap: 2px 8px;
+    margin-bottom: 3px;
+  }
+
+  .avatar-glyph {
+    width: 40px;
+    height: 40px;
+    border-width: 1.5px;
+  }
+
+  .avatar-name {
+    font-size: 0.64em;
+  }
+
+  /* 场景条/选项/输入/撤回行:半高半距 */
+  .scene-bar {
+    gap: 6px;
+    font-size: 0.74em;
+    padding: 4px 2px 0;
+  }
+
+  .option-chip {
+    font-size: 0.74em;
+    padding: 5px 9px;
+  }
+
+  .quill {
+    margin-top: 4px;
+    gap: 5px;
+  }
+
+  .quill textarea {
+    font-size: 0.86em;
+  }
+
+  .reroll-row {
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .reroll-row .btn {
+    font-size: 0.76em;
+    padding: 4px 12px;
+  }
+
+  /* 底部 dock:图标 26→20px,整体半高 */
+  .dock {
+    gap: 4px;
+    padding: 3px 6px;
+    margin-top: 4px;
+    border-radius: 12px;
+  }
+
+  .dock-btn {
+    gap: 1px;
+    padding: 4px 2px 3px;
+  }
+
+  .dock-btn .ic {
+    width: 20px;
+    height: 20px;
+  }
+
+  .dock-btn span {
+    font-size: 0.6em;
+  }
+}
 </style>
