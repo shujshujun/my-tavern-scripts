@@ -78,6 +78,42 @@ function 确保首批入住(data: SchemaType): boolean {
 }
 
 // ============================================
+// 固定0楼全屏化(修道院同款,2026-07-18 补移植):只显示 0 楼(客户端 iframe 常驻),
+// 隐藏酒馆原生输入(输入走游戏内);右下角 ❀ 随时切回原生界面(逃生舱,编辑楼层/排查用)
+// ============================================
+
+function 注入全屏样式(): void {
+  const doc = (window.parent ?? window).document;
+  if (!doc.getElementById('rq-fullscreen-style')) {
+    const s = doc.createElement('style');
+    s.id = 'rq-fullscreen-style';
+    s.textContent =
+      '#chat .mes[mesid]:not([mesid="0"]){display:none !important;}' +
+      '#send_textarea{display:none !important;}' +
+      '#rightSendForm{display:none !important;}';
+    doc.head.appendChild(s);
+  }
+  if (!doc.getElementById('rq-ui-toggle')) {
+    const b = doc.createElement('div');
+    b.id = 'rq-ui-toggle';
+    b.title = '切换酒馆原生界面(逃生舱)';
+    b.setAttribute(
+      'style',
+      'position:fixed;right:10px;bottom:10px;z-index:9999;width:34px;height:34px;border-radius:50%;' +
+        'background:#fff5f9;color:#ff4f9a;border:1px solid #ff9cc5;display:flex;align-items:center;' +
+        'justify-content:center;cursor:pointer;font-size:16px;user-select:none;box-shadow:0 2px 8px rgba(0,0,0,.15);',
+    );
+    b.textContent = '❀';
+    b.addEventListener('click', () => {
+      const s = doc.getElementById('rq-fullscreen-style') as HTMLStyleElement | null;
+      if (!s) return;
+      s.media = s.media === 'not all' ? '' : 'not all';
+    });
+    doc.body.appendChild(b);
+  }
+}
+
+// ============================================
 // 启动引导:等 Mvu 就绪 → 注册 schema → 心跳 → 挂监听(启动三件套,防护16)
 // ============================================
 
@@ -109,6 +145,14 @@ $(() => {
 
       挂载监听();
       reloadOnChatChange();
+
+      // 固定0楼全屏样式(2026-07-18 用户实测:开酒馆全部楼层暴露,要翻上去才见游戏——
+      // 修道院同款注入漏移植;只显示0楼客户端+藏酒馆输入,右下❀=切回原生逃生舱)
+      try {
+        注入全屏样式();
+      } catch (e) {
+        console.error('[人妻公寓] 注入全屏样式失败(游戏仍可玩,楼层未隐藏):', e);
+      }
 
       // 手机挂载(P4:注入酒馆页面层;失败不阻塞游戏本体)
       try {
