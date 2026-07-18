@@ -102,6 +102,38 @@ export function 组快照注入(
   return { 快照: 组公寓快照(对话尾, data, 楼层), 焦点 };
 }
 
+/**
+ * 数据库插件兼容广播(2026-07-19 用户点名要兼容 AlbusKen/shujuku 表格插件):
+ * 主路径 generate()+createChatMessages(refresh:'none') 全程绕开酒馆消息管道,这类插件靠核心
+ * GENERATION_ENDED 唤醒扫楼更新表格,所以在本卡里永远沉睡。落库完成后向酒馆核心补发一对
+ * GENERATION_STARTED('normal')+GENERATION_ENDED(末楼号)——先发 STARTED 是为了覆盖可能残留的
+ * quiet 生成记录(插件门控会拦 quiet/dryRun,无记录或 normal 记录则放行)。
+ * ⚠ 刻意不发 MESSAGE_SENT:会惊醒 MVU 对玩家楼无条件跑一轮进而连锁触发本卡逃生舱补结算=双重记账
+ * (feedback_mvu_message_sent_trap 同族陷阱)。广播失败只警告,绝不影响回合本体。
+ */
+function 广播生成完成事件() {
+  try {
+    const 宿主 = window.parent as any;
+    const 全局ST = 宿主?.SillyTavern;
+    const 上下文 = 全局ST?.getContext?.() ?? 全局ST;
+    const 事件源 = 上下文?.eventSource ?? 全局ST?.eventSource;
+    // 事件表键名随酒馆版本漂移(eventTypes/event_types),两头兼容,取不到就放弃
+    const 事件表 = 上下文?.eventTypes ?? 上下文?.event_types ?? 全局ST?.eventTypes ?? 全局ST?.event_types;
+    if (typeof 事件源?.emit !== 'function' || !事件表?.GENERATION_ENDED) return;
+    const 末楼 = getLastMessageId();
+    void (async () => {
+      try {
+        if (事件表.GENERATION_STARTED) await 事件源.emit(事件表.GENERATION_STARTED, 'normal', {}, false);
+        await 事件源.emit(事件表.GENERATION_ENDED, 末楼);
+      } catch (e) {
+        console.warn('[人妻公寓] 数据库插件兼容广播失败(不影响游戏):', e);
+      }
+    })();
+  } catch (e) {
+    console.warn('[人妻公寓] 数据库插件兼容广播失败(不影响游戏):', e);
+  }
+}
+
 /** 楼层落库前的清洗:思维链/变量块/选项块/行为等级标签不进楼层文本(prompt 与卷轴双干净) */
 function 清洗正文(原文: string): string {
   const 闭合清 = 原文
@@ -247,6 +279,7 @@ export async function 执行回合(行动: string): Promise<void> {
         { _上次回合: { 行动, 回合前末楼, chat快照 } satisfies 上次回合记录, _行动选项: [] },
         { type: 'chat' },
       );
+      广播生成完成事件();
       eventEmit('人妻公寓:回合完成');
       return;
     }
@@ -290,6 +323,7 @@ export async function 执行回合(行动: string): Promise<void> {
       { type: 'chat' },
     );
 
+    广播生成完成事件();
     eventEmit('人妻公寓:回合完成');
   } catch (e) {
     if (已取消) {
@@ -426,6 +460,7 @@ export async function 开始新游戏(难度: string): Promise<boolean> {
     await insertOrAssignVariables({ _行动选项: 序章行动选项 }, { type: 'chat' });
 
     console.info(`[人妻公寓] 序章开局完成(难度:${档},起始资金:${难度表[档].起始资金})`);
+    广播生成完成事件();
     eventEmit('人妻公寓:回合完成');
     return true;
   } catch (e) {
