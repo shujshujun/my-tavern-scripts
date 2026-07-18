@@ -460,6 +460,8 @@ function 时段字(楼戳: number, 偏移: number): string {
 }
 
 let 挂好 = false;
+/** 手机壳拉回视口(悬浮钮被拖到屏幕边缘后,弹开的壳可能在视口外;挂载时闭包赋值) */
+let 拉回视口: () => void = () => {};
 
 export function 挂载手机(): void {
   if (挂好) return;
@@ -543,12 +545,86 @@ export function 挂载手机(): void {
       柄.addEventListener('pointercancel', 停);
     });
   }
-  root.querySelector('.rqp-toggle')!.addEventListener('click', () => {
+  拉回视口 = () => {
+    const r = 壳.getBoundingClientRect();
+    if (!r.width) return;
+    const w = doc.documentElement.clientWidth;
+    const h = doc.documentElement.clientHeight;
+    let dx = 0;
+    let dy = 0;
+    if (r.right > w - 2) dx = w - 2 - r.right;
+    if (r.left + dx < 2) dx = 2 - r.left;
+    if (r.bottom > h - 2) dy = h - 2 - r.bottom;
+    if (r.top + dy < 2) dy = 2 - r.top;
+    if (dx || dy) {
+      当前位.dx += dx;
+      当前位.dy += dy;
+      应用位();
+      try {
+        localStorage.setItem(位置键, JSON.stringify(当前位));
+      } catch {
+        /* 存不上只影响下次复位 */
+      }
+    }
+  };
+  // 悬浮钮:点=开合;拖(>8px)=挪位置(2026-07-18 用户反馈:手机端玩家挪不动按钮不友好)
+  const 钮 = root.querySelector('.rqp-toggle') as HTMLElement;
+  const 钮位置键 = '人妻公寓_手机钮位置';
+  const 定根 = (left: number, top: number) => {
+    const w = doc.documentElement.clientWidth;
+    const h = doc.documentElement.clientHeight;
+    root.style.left = `${Math.min(Math.max(left, 4), w - 60)}px`;
+    root.style.top = `${Math.min(Math.max(top, 4), h - 60)}px`;
+    root.style.right = 'auto';
+    root.style.bottom = 'auto';
+  };
+  try {
+    const 存 = JSON.parse(localStorage.getItem(钮位置键) ?? 'null') as { left: number; top: number } | null;
+    if (存 && Number.isFinite(存.left) && Number.isFinite(存.top)) 定根(存.left, 存.top);
+  } catch {
+    /* 记录坏了用默认位 */
+  }
+  let 拖过 = false;
+  钮.style.touchAction = 'none';
+  钮.addEventListener('pointerdown', ev => {
+    const r0 = root.getBoundingClientRect();
+    const 起 = { x: ev.clientX, y: ev.clientY };
+    拖过 = false;
+    钮.setPointerCapture(ev.pointerId);
+    const 动 = (e: PointerEvent) => {
+      const dx = e.clientX - 起.x;
+      const dy = e.clientY - 起.y;
+      if (!拖过 && Math.hypot(dx, dy) < 8) return;
+      拖过 = true;
+      定根(r0.left + dx, r0.top + dy);
+    };
+    const 停 = () => {
+      钮.removeEventListener('pointermove', 动);
+      钮.removeEventListener('pointerup', 停);
+      钮.removeEventListener('pointercancel', 停);
+      if (拖过) {
+        try {
+          localStorage.setItem(钮位置键, JSON.stringify({ left: parseFloat(root.style.left), top: parseFloat(root.style.top) }));
+        } catch {
+          /* 存不上只影响下次复位 */
+        }
+      }
+    };
+    钮.addEventListener('pointermove', 动);
+    钮.addEventListener('pointerup', 停);
+    钮.addEventListener('pointercancel', 停);
+  });
+  钮.addEventListener('click', () => {
+    if (拖过) {
+      拖过 = false; // 拖完松手触发的 click 不当开合
+      return;
+    }
     root.classList.toggle('open');
     if (root.classList.contains('open')) {
       // 有来电先接来电,否则开机即微信(2026-07-18 用户拍板:不做主屏,手机=微信)
       当前页 = 有来电() ? { 名: 'call' } : 当前页.名 === 'call' || 当前页.名 === 'talk' ? { 名: 'chats' } : 当前页;
       渲染();
+      拉回视口();
     }
   });
   挂好 = true;
@@ -581,14 +657,19 @@ export function 刷新红点(): void {
   eventEmit('人妻公寓:手机状态', { 未读: 未读 || 圈新, 来电: 有来电() });
 }
 
-/** 游戏界面点了来电指示/手机按钮 */
+/** 游戏界面点了来电指示/手机按钮(再点一下=收起,2026-07-18 用户拍板;来电直达不收) */
 export function 打开手机(直达来电 = false): void {
   挂载手机();
   const root = 根文档().getElementById(ROOT_ID);
   if (!root) return;
+  if (root.classList.contains('open') && !直达来电) {
+    root.classList.remove('open');
+    return;
+  }
   root.classList.add('open');
   if (直达来电 && 有来电()) 当前页 = { 名: 'call' };
   渲染();
+  拉回视口();
 }
 
 // ── 渲染(单函数状态机,页面小,直接整屏重绘) ──
