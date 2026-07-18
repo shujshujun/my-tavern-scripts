@@ -7,7 +7,7 @@ import { 夜访结算, 惰性结算户, 结算焦点疑心, 冷落检测 } from 
 import { PROMOTE_MIRROR_KEY, 捕获保护快照, 回滚保护字段, 清保护快照, 镜像直写 } from './守护系统';
 import { 中断卡文案, 记违规清零, 结算违规代价, 输出稽查, 未遂余波指引 } from './稽查系统';
 import { 读取, 读最近有效stat, 脚本写入 } from './mvuIO';
-import { 检测焦点, 组公寓快照 } from './snapshotSystem';
+import { 检测焦点, 组公寓快照, 读场景 } from './snapshotSystem';
 
 /**
  * 回合引擎:固定 0 楼架构的主循环(修道院回合引擎直迁,本作化三处:
@@ -88,6 +88,17 @@ export function 组快照注入(
 ): { 快照: string; 焦点: 门牌[] } {
   const { 焦点, 在场 } = 检测焦点(对话尾, data, 楼层);
   insertOrAssignVariables({ _在场: { 焦点, 在场 } }, { type: 'chat' });
+  // 对话粘滞落库(2026-07-18 用户拍板):当场的人钉在当场,楼层时钟传送不走;
+  // 玩家离开房间(场景清空/换房)后,读侧位置比对自动失效,这里顺手清干净
+  {
+    const 场 = 读场景();
+    const 们 = [...焦点, ...在场];
+    if (场.房间id && 们.length) {
+      insertOrAssignVariables({ _粘滞: { 位置: 场.房间id, 楼: 楼层, 们 } }, { type: 'chat' });
+    } else if (!场.房间id) {
+      insertOrAssignVariables({ _粘滞: null }, { type: 'chat' });
+    }
+  }
   return { 快照: 组公寓快照(对话尾, data, 楼层), 焦点 };
 }
 
@@ -338,7 +349,7 @@ export async function 回档至(楼层: number): Promise<void> {
     await deleteChatMessages(_.range(楼层 + 1, 末楼 + 1), { refresh: 'none' });
     await updateVariablesWith(
       vars => {
-        for (const 键 of [...回合变量键, '_上次回合', '_在场', '_行动选项']) _.set(vars, 键, null);
+        for (const 键 of [...回合变量键, '_上次回合', '_在场', '_行动选项', '_粘滞']) _.set(vars, 键, null);
         return vars;
       },
       { type: 'chat' },
@@ -446,6 +457,7 @@ export async function 重开一局(): Promise<void> {
           '_上次回合',
           '_在场',
           '_行动选项',
+          '_粘滞',
           '_待办',
           '_侦探',
           '_摄像头',
