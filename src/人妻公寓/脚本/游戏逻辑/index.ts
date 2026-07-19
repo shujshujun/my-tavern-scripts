@@ -128,6 +128,16 @@ $(() => {
       );
       await Promise.race([waitGlobalInitialized('Mvu'), 超时]);
 
+      // shujuku(SP·数据库VII)陈旧互斥旗清理(2026-07-20 玩家实测"误判双实例"):
+      // 它把 __ACU_STAR_DB_III_LOADED__ 旗插在酒馆主窗口,自己却跑在会随聊天切换/重开销毁重建的
+      // 脚本iframe里——旗不随实例死亡拔除,重建后的新实例见旗即装死并误报"请勿同时安装油猴与插件"。
+      // 我们每次开机替它拔旗:死旗被清,活实例不受影响(旗只在它初始化那一刻检查)
+      try {
+        delete (window.parent as unknown as Record<string, unknown>)['__ACU_STAR_DB_III_LOADED__'];
+      } catch {
+        /* 无插件/跨域受限时静默 */
+      }
+
       // 安检机第一道:挂载 zod schema
       registerMvuSchema(Schema);
 
@@ -300,6 +310,17 @@ function 挂载监听() {
   );
   eventOn('人妻公寓:对饮', (门牌号: 门牌) =>
     安全操作((raw, data) => 落地(对饮(data, 门牌号, 当前楼层() + data.系统._时段偏移楼), raw, data)),
+  );
+
+  // 工具由头门(2026-07-20 用户拍板):记同工具同户冷却(chat软记录,回档在读侧自净)
+  eventOn('人妻公寓:用由头', (载荷: { 门牌: string; 工具: string }) =>
+    安全操作((raw, data) => {
+      void raw;
+      const 钟 = 当前楼层() + data.系统._时段偏移楼;
+      void Promise.resolve(
+        insertOrAssignVariables(_.set({}, `_工具由头.${String(载荷.门牌)}.${String(载荷.工具)}`, 钟), { type: 'chat' }),
+      ).catch(e => console.error('[人妻公寓] 由头冷却记录失败:', e));
+    }),
   );
 
   // 荣耀洞(P5+:洗手间末隔间;摇签起场三拍连场,离场即收束;时间轴统一钟楼)

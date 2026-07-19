@@ -948,7 +948,7 @@
 import type { FunctionalComponent } from 'vue';
 
 import type { SchemaType } from '../../schema';
-import { 户静态表, 房间表, 查房间, 查性癖, 查特殊场景, 查裂缝, 查道具, 道具表, 门牌列表, 难度表, type 道具配置, type 门牌 } from '../../stageConfig';
+import { 由头冷却楼, 由头工具表, 户静态表, 房间表, 查房间, 查性癖, 查特殊场景, 查裂缝, 查道具, 道具表, 门牌列表, 难度表, type 道具配置, type 门牌 } from '../../stageConfig';
 import { 丈夫在楼, 妻位置推算, 当前天数, 当前时段 } from '../../脚本/游戏逻辑/楼层时钟';
 import { 查金币 } from '../../脚本/游戏逻辑/经济系统';
 import { 可晋阶 } from '../../脚本/游戏逻辑/结算系统';
@@ -1100,11 +1100,44 @@ const 已破门进入 = ref(false);
  * 没人=没有对手戏,输入收起——户只能离开或撬门(撬进去=屋里翻找,输入恢复),
  * 公共区该干的事全在行动卡上(翻垃圾/查信箱);豁免你自己的地盘:302(你家)与管理员室。
  */
+// ── 工具由头门(2026-07-20 用户拍板):裂缝未确认的户,得有拿得出手的由头才张得开嘴 ──
+
+/** chat软记录 _工具由头[门牌][工具id]=使用钟楼(回档陷阱同款:记录在未来=作废) */
+const 工具由头记录 = ref<Record<string, Record<string, number>>>({});
+
+function 刷新工具由头() {
+  const v = _.get(getVariables({ type: 'chat' }), '_工具由头');
+  工具由头记录.value = (v && typeof v === 'object' ? v : {}) as Record<string, Record<string, number>>;
+}
+
+const 需要由头 = computed(() => {
+  const id = 当前房间.value;
+  if (!id || id === '302' || 查房间(id)?.类型 !== '户') return false;
+  const 节 = data.value?.户[id];
+  return Boolean(节) && !节!.妻.裂缝.已确认 && !已破门进入.value;
+});
+
+const 可用由头 = computed(() => {
+  const id = 当前房间.value ?? '';
+  const 包 = data.value?.背包 ?? [];
+  const 记 = 工具由头记录.value[id] ?? {};
+  return Object.keys(由头工具表).filter(w => {
+    if (!包.includes(w)) return false;
+    const 上 = 记[w] ?? -999;
+    const 修 = 上 > 钟楼号.value ? -999 : 上; // 回档自净
+    return 钟楼号.value - 修 >= 由头冷却楼;
+  });
+});
+
 const 可输入 = computed(() => {
   const id = 当前房间.value;
   if (!id) return false;
   if (id === '302' || id === '管理员室') return true;
-  if (房内有人在(id)) return true;
+  if (房内有人在(id)) {
+    // 由头门:裂缝未确认的户,背包里没有可用工具(同工具同户有冷却)=开不了口
+    if (需要由头.value && !可用由头.value.length) return false;
+    return true;
+  }
   return 查房间(id)?.类型 === '户' ? 已破门进入.value : false;
 });
 
@@ -1424,6 +1457,9 @@ const 到场提示 = computed(() => {
   const id = 当前房间.value;
   if (!id) return '打开地图,看看这栋楼此刻亮着的灯。';
   if (可输入.value) return '在这里做点什么——故事会从这里继续。';
+  if (需要由头.value && 房内有人在(id)) {
+    return '没个由头,你在人家门口站不住脚——商店「工具」页签里有你要的借口(同一招对同一家,一天只好使一次)。';
+  }
   return '要么改天再来,要么……对着门连点几下。';
 });
 
@@ -1662,6 +1698,7 @@ function 刷新可重掷() {
   可重掷.value = Boolean(_.get(变量, '_上次回合'));
   // 记回合发生地:人走出这间房,撤回/重演一起收(跨场景回滚只会制造混乱)
   回合房间.value = (_.get(变量, '_场景') as string | undefined) ?? null;
+  刷新工具由头();
 }
 
 /**
@@ -1705,9 +1742,15 @@ function 发出(文本: string) {
 }
 
 function 发送() {
-  const 文本 = 输入文本.value.trim();
+  let 文本 = 输入文本.value.trim();
   if (!文本) return;
   输入文本.value = '';
+  // 由头进门:自动挑第一件可用工具垫话头(舞台指示进正文=AI天然接戏),冷却记账交给脚本
+  if (需要由头.value && 可用由头.value.length) {
+    const 用 = 可用由头.value[0];
+    eventEmit('人妻公寓:用由头', { 门牌: 当前房间.value, 工具: 用 });
+    文本 = `(${用}在手,以${由头工具表[用]}的名义敲开了门)${文本}`;
+  }
   发出(文本);
 }
 
