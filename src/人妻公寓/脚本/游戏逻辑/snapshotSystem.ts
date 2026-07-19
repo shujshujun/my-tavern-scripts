@@ -1,6 +1,6 @@
 import type { SchemaType } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
-import { 户静态表, 查房间, 查裂缝, 越界应对话术, 阶段行为基调, 阶段接受上限 } from '../../stageConfig';
+import { 户静态表, 查房间, 查性癖, 查裂缝, 越界应对话术, 阶段行为基调, 阶段接受上限 } from '../../stageConfig';
 import { 丈夫在楼, 妻位置推算, 当前时段, 每时段楼数, seededRandom } from './楼层时钟';
 import { 雌竞资格, 雌竞演出块, 读余波, 余波缓冲楼 } from './雌竞系统';
 
@@ -366,6 +366,11 @@ export function 组公寓快照(chat: { role: string; content: string }[], data:
       );
       const 疑 = 疑心感知(配.夫名, 夫.疑心值);
       if (疑) 行.push(`  ⚠ ${疑}`);
+      // 性癖生效中(P5):只注入装载中的(数据隔离),编成感知语——AI知道往哪个方向演她的性反应
+      if (妻.性癖装载.length) {
+        const 感知们 = 妻.性癖装载.map(id => 查性癖(id)?.感知).filter(Boolean);
+        if (感知们.length) 行.push(`  性癖(生效中):${感知们.join(' | ')}`);
+      }
       // 裂缝双态注入:确认前=只许埋淡淡违和感(内容不给,AI 不知道就不可能泄底);
       // 确认后=隐痛补丁常驻(裂缝+渗进日常+对症±5 红利;演出铁律:她自己永远不说破)
       const 缝 = 查裂缝(m);

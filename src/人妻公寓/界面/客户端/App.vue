@@ -664,6 +664,19 @@
                 </div>
               </div>
             </div>
+            <!-- 性癖(P5):装载中3槽可卸载;"曾开发"永久留档=她的身体记得 -->
+            <div v-if="选中档案.妻.当前阶段 >= 4 && (选中档案.性癖装载.length || 选中档案.曾开发.length)" class="dsec">
+              <div class="dsec-title">性 癖({{ 选中档案.性癖装载.length }}/3)</div>
+              <div class="kink-row">
+                <span v-for="k in 选中档案.性癖装载" :key="k.id" class="kink-chip on">
+                  {{ k.名 }}
+                  <button class="kink-off" title="卸下(她的身体不会忘)" @click="卸载(选中档案.门牌, k.id)">×</button>
+                </span>
+                <span v-for="(名, i) in 选中档案.曾开发" :key="'曾' + i" class="kink-chip was" title="曾开发过——重装免开幕,直接生效">
+                  {{ 名 }}
+                </span>
+              </div>
+            </div>
             <!-- 丈夫状态栏(解锁后:双轴可见——疑心是风险表,信任是钥匙) -->
             <div class="dsec husband">
               <div class="dsec-title">她 的 丈 夫</div>
@@ -767,6 +780,15 @@
                   @click="送出(项.id, 妻.门牌)"
                 >
                   送给{{ 妻.妻名 }}
+                </button>
+                <button
+                  v-for="妻 in 项.可装载对象"
+                  :key="'载' + 妻.门牌"
+                  class="btn mini"
+                  :disabled="发送中"
+                  @click="装载(项.id, 妻.门牌)"
+                >
+                  装载给{{ 妻.妻名 }}
                 </button>
               </span>
             </div>
@@ -926,7 +948,7 @@
 import type { FunctionalComponent } from 'vue';
 
 import type { SchemaType } from '../../schema';
-import { 户静态表, 房间表, 查房间, 查裂缝, 查道具, 道具表, 门牌列表, 难度表, type 道具配置, type 门牌 } from '../../stageConfig';
+import { 户静态表, 房间表, 查房间, 查性癖, 查裂缝, 查道具, 道具表, 门牌列表, 难度表, type 道具配置, type 门牌 } from '../../stageConfig';
 import { 丈夫在楼, 妻位置推算, 当前天数, 当前时段 } from '../../脚本/游戏逻辑/楼层时钟';
 import { 查金币 } from '../../脚本/游戏逻辑/经济系统';
 import { 可晋阶 } from '../../脚本/游戏逻辑/结算系统';
@@ -1737,6 +1759,9 @@ const 选中档案 = computed(() => {
       { 名: '小屄', 值: 妻.身体开发.小屄 },
       { 名: '屁穴', 值: 妻.身体开发.屁穴 },
     ],
+    // 性癖(P5):装载中3槽(可卸载)+曾开发永久标记(避开云霜凝"卸下即失忆"坑)
+    性癖装载: 妻.性癖装载.map(id => ({ id, 名: 查性癖(id)?.名称 ?? id })),
+    曾开发: 妻.曾开发性癖.filter(id => !妻.性癖装载.includes(id)).map(id => 查性癖(id)?.名称 ?? id),
   };
 });
 
@@ -1787,11 +1812,28 @@ const 背包列表 = computed(() =>
       信门牌,
       // 摄像头:须在已入住户的房内且屋里没人
       可布设: id === '针孔摄像头' && 在户内 && !房内有人在(当前房间.value!),
-      // 礼物等可送出:须与她同处一室(当面);工具/运作类不走"送"
+      // 礼物等可送出:须与她同处一室(当面);工具/运作/药物/性癖不走"送"
+      // (药物=晋阶按钮自动消耗;性癖=装载;302特例:回家时可送妈东西——破妈妈墙的唯一入口,入列前也通)
       可送对象:
-        !配?.常驻 && !信门牌 && id !== '针孔摄像头' && 配?.类别 !== '运作' && 配?.类别 !== '工具'
+        !配?.常驻 && !信门牌 && id !== '针孔摄像头' && !['运作', '工具', '药物', '性癖'].includes(配?.类别 ?? '')
+          ? [
+              ...可见门牌.value
+                .filter(m => 当前房间.value && 妻位置推算(m, 位置种子.value) === 当前房间.value)
+                .map(m => ({ 门牌: m, 妻名: 户静态表[m].妻名 })),
+              ...(当前房间.value === '302' && data.value.户['302'] ? [{ 门牌: '302' as 门牌, 妻名: '妈' }] : []),
+            ].filter((v, i, a) => a.findIndex(x => x.门牌 === v.门牌) === i)
+          : [],
+      // 性癖装载(P5):对象=阶段够档且槽未满的妻(不必同室,装载是管理动作)
+      可装载对象:
+        配?.类别 === '性癖'
           ? 可见门牌.value
-              .filter(m => 当前房间.value && 妻位置推算(m, 位置种子.value) === 当前房间.value)
+              .filter(m => {
+                const 性 = 查性癖(id);
+                const 妻 = data.value.户[m]?.妻;
+                if (!性 || !妻) return false;
+                if (性.限定户 && !性.限定户.includes(m)) return false;
+                return 妻.当前阶段 >= (性.档 === 5 ? 5 : 4) && 妻.性癖装载.length < 3 && !妻.性癖装载.includes(id);
+              })
               .map(m => ({ 门牌: m, 妻名: 户静态表[m].妻名 }))
           : [],
       // 运作道具(P3):全局四件直接"使用";户向四件按丈夫点名(须该户已入住且有夫)
@@ -1809,6 +1851,15 @@ const 背包列表 = computed(() =>
 function 用运作(道具id: string, 门牌号?: 门牌) {
   显示背包.value = false;
   eventEmit('人妻公寓:使用运作', { 道具id, 门牌: 门牌号 });
+}
+
+function 装载(道具id: string, 门牌号: 门牌) {
+  显示背包.value = false;
+  eventEmit('人妻公寓:装载性癖', { 道具id, 门牌: 门牌号 });
+}
+
+function 卸载(门牌号: 门牌, 性癖id: string) {
+  eventEmit('人妻公寓:卸载性癖', { 门牌: 门牌号, 性癖id });
 }
 
 // ── 商店(P3 八页签框架:工具/人情/运作常驻,余者随进度亮起——商店自己就是进度条) ──
@@ -4156,6 +4207,41 @@ onUnmounted(() => {
   text-align: right;
   font-family: var(--font-mono);
   font-size: 0.9em;
+}
+
+/* 性癖槽(P5):装载中=粉底可卸;曾开发=灰底留档 */
+.kink-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.kink-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  border: 1px solid rgba(255, 79, 154, 0.35);
+  background: rgba(255, 79, 154, 0.12);
+  color: #d64d8f;
+}
+
+.kink-chip.was {
+  border-color: rgba(120, 120, 130, 0.3);
+  background: rgba(120, 120, 130, 0.1);
+  color: #8a8890;
+}
+
+.kink-off {
+  border: none;
+  background: none;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 0 0 2px;
 }
 
 /* 丈夫状态栏(解锁后:双轴=风险表与钥匙) */
