@@ -515,7 +515,10 @@ const 手机CSS = `
 /* ── 手机壳(柚月小手机同款华为全面屏风:金属机身/药丸双摄/状态栏;yuzuki 授权改造) ── */
 #${ROOT_ID} .rqp-shell{display:none;position:absolute;right:0;bottom:64px;width:min(320px,92vw);height:min(692px,80vh);background:#1a1a1a;border-radius:40px;padding:4px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),0 15px 50px rgba(0,0,0,.4),0 5px 20px rgba(0,0,0,.3);}
 #${ROOT_ID}.open .rqp-shell{display:block;}
-#${ROOT_ID} .rqp-resize{position:absolute;right:-8px;bottom:-8px;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(26,28,34,.88);color:#9fb0c0;font-size:15px;box-shadow:0 4px 12px rgba(0,0,0,.35);cursor:nwse-resize;z-index:70;touch-action:none;user-select:none;}
+/* 手柄不放壳内:壳带transform自成层叠上下文,z-index再高也压不过后排的悬浮钮(2026-07-20
+   玩家反馈:壳拖到和钮重叠后手柄被钮盖死)——改做钮的后排兄弟,永远浮在钮上;位置随壳右下角在应用位里算 */
+#${ROOT_ID} .rqp-resize{display:none;position:absolute;right:-8px;bottom:56px;width:34px;height:34px;border-radius:50%;align-items:center;justify-content:center;background:rgba(26,28,34,.88);color:#9fb0c0;font-size:15px;box-shadow:0 4px 12px rgba(0,0,0,.35);cursor:nwse-resize;z-index:2;touch-action:none;user-select:none;}
+#${ROOT_ID}.open .rqp-resize{display:flex;}
 /* 滑入动画放内层屏幕:壳的 transform 留给拖动位移专用——动画接管壳transform会在
    结束瞬间跳回内联位移(2026-07-18 手机闪现即失真凶:动画期显示默认位,结束跳到屏外陈旧位移) */
 #${ROOT_ID}.open .rqp-screen{animation:rqp-slidein .45s cubic-bezier(.4,0,.2,1);}
@@ -677,8 +680,8 @@ export function 挂载手机(): void {
     `<div class="rqp-shell"><div class="rqp-punch"></div>` +
     `<div class="rqp-status"><span class="tm"></span><span class="rt"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="rqp-batt"><i></i></span></span></div>` +
     `<div class="rqp-screen"></div>` +
-    `<div class="rqp-resize" title="按住拖动调节手机大小">⤡</div>` +
-    `</div><button class="rqp-toggle" title="手机">📱<span class="dot"></span></button>`;
+    `</div><button class="rqp-toggle" title="手机">📱<span class="dot"></span></button>` +
+    `<div class="rqp-resize" title="按住拖动调节手机大小">⤡</div>`;
   doc.body.appendChild(root);
   // 状态栏时间(柚月同款真实时钟)
   const 走钟 = () => {
@@ -712,12 +715,19 @@ export function 挂载手机(): void {
     /* 忽略 */
   }
   壳.style.transformOrigin = '100% 100%';
+  const 手柄 = root.querySelector('.rqp-resize') as HTMLElement | null;
   const 应用位 = () => {
     壳.style.transform = `translate(${当前位.dx}px, ${当前位.dy}px) scale(${缩放})`;
+    // 手柄在壳外(根容器直属,压得住悬浮钮),手动跟壳右下角:缩放原点=右下,角位只随拖动位移变
+    if (手柄) {
+      手柄.style.right = `${-8 - 当前位.dx}px`;
+      手柄.style.bottom = `${56 - 当前位.dy}px`;
+    }
   };
+  应用位();
   // 右下角拖动缩放(2026-07-20 用户拍板交互形态):壳锚定右下,拖向右下=放大,向左上=缩小
   {
-    const 柄 = root.querySelector('.rqp-resize') as HTMLElement | null;
+    const 柄 = 手柄;
     if (柄) {
       let 起 = { x: 0, y: 0, s: 1 };
       柄.addEventListener('pointerdown', ev => {
