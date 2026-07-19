@@ -239,7 +239,7 @@ export function 微信好友(data: SchemaType): { id: string; 名: string; 类: 
   for (const m of 门牌列表) {
     const 节点 = data.户[m];
     const 配 = 户静态表[m];
-    if (!节点 || 配.隐身) continue;
+    if (!节点 || (配.隐身 && !data.系统._母亲入列)) continue;
     if (节点.妻.当前阶段 >= 1) 友.push({ id: m, 名: 配.妻名, 类: '妻' });
   }
   // 姐妹茶话会(2026-07-19 用户拍板):阶段3+的太太≥2人自动成群并把{{user}}拉进去;
@@ -285,7 +285,7 @@ export async function 手机节拍(): Promise<void> {
     for (const m of 门牌列表) {
       const 节点 = data.户[m];
       const 配 = 户静态表[m];
-      if (!节点 || 配.隐身) continue;
+      if (!节点 || (配.隐身 && !data.系统._母亲入列)) continue;
       const 键 = `圈:${m}`;
       const 上次 = 库.节拍[键] ?? -999;
       const 间隔 = Math.round((8 + Math.floor(seededRandom(m, '圈相位') * 8)) * 倍);
@@ -344,7 +344,7 @@ export async function 手机节拍(): Promise<void> {
     for (const m of 门牌列表) {
       const 节点 = data.户[m];
       const 配 = 户静态表[m];
-      if (!节点 || 配.隐身 || 节点.妻.当前阶段 < 1) continue;
+      if (!节点 || (配.隐身 && !data.系统._母亲入列) || 节点.妻.当前阶段 < 1) continue;
       const 键 = `私:${m}`;
       const 上次 = 库.节拍[键] ?? -999;
       const 阶段 = 节点.妻.当前阶段;

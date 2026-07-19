@@ -260,6 +260,10 @@
           "default": false,
           "type": "boolean"
         },
+        "_母亲首夜第二幕": {
+          "default": false,
+          "type": "boolean"
+        },
         "_系统操作中": {
           "default": false,
           "type": "boolean"

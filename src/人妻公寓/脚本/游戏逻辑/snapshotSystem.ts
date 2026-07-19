@@ -147,7 +147,7 @@ export function 检测焦点(
   data: SchemaType,
   楼层: number,
 ): { 焦点: 门牌[]; 在场: 门牌[] } {
-  const 候选 = (Object.keys(data.户) as 门牌[]).filter(m => !户静态表[m]?.隐身);
+  const 候选 = (Object.keys(data.户) as 门牌[]).filter(m => !户静态表[m]?.隐身 || data.系统._母亲入列);
 
   const { 房间id, 进房末楼 } = 读场景();
   if (房间id) {
@@ -331,7 +331,7 @@ export function 组公寓快照(chat: { role: string; content: string }[], data:
   // 微信内容由手机系统承载,正文只允许"看了眼手机"程度的带过——防AI在正文里直写聊天记录)
   {
     const 妻友 = (Object.keys(data.户) as 门牌[])
-      .filter(m => !户静态表[m]?.隐身 && data.户[m].妻.当前阶段 >= 1)
+      .filter(m => (!户静态表[m]?.隐身 || data.系统._母亲入列) && data.户[m].妻.当前阶段 >= 1)
       .map(m => 户静态表[m].妻名);
     行.push(
       妻友.length
