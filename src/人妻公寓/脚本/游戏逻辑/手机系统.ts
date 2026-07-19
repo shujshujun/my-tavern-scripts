@@ -479,8 +479,8 @@ export async function 手机节拍(): Promise<void> {
 // ============================================
 
 const ROOT_ID = 'rq-phone-root';
-// ⚠ 与 App.vue 素材基址同步:下次推 tag 必须叫 rq0.19,或推前改此处对齐 tag 名
-const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.19/dist/人妻公寓/素材';
+// ⚠ 与 App.vue 素材基址同步:下次推 tag 必须叫 rq0.24,或推前改此处对齐 tag 名
+const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.24/dist/人妻公寓/素材';
 
 let 当前页: {
   名: 'chats' | 'chat' | 'moments' | 'call' | 'talk' | 'settings';
