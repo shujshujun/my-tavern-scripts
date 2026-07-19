@@ -214,6 +214,13 @@ export const Schema = z.object({
       // ── P3 经济与考验(货币只走脚本结算,AI 不碰钱) ──
       _上次上交期: floorMark(-1), // 上交日期号去重
       _通牒期: floorMark(-1), // 最后通牒发出的期号(-1=无);下一期仍不达标=坏结局
+      // ── 荣耀洞(2026-07-19 用户点单):三拍连场戏,状态随楼层快照走=回档/重roll自洽 ──
+      _荣耀洞上次楼: floorMark(-999), // 冷却:一天(18钟楼)一次
+      _荣耀洞门牌: z.string().prefault(''), // ''=未进行;'空'=空军单拍;门牌=对面是她
+      _荣耀洞拍: z.coerce.number().int().catch(-1).prefault(-1), // -1=未进行;0/1/2=三拍进行位
+      _荣耀洞起楼: floorMark(-1), // 回档自净:起楼>当前楼=作废
+      _荣耀洞点破: z.coerce.boolean().catch(false).prefault(false), // 她阶段够高=可亮明身份+专属CG
+      _荣耀洞夫: z.coerce.boolean().catch(false).prefault(false), // 复合事件:丈夫恰好在隔间外(铁律不知真相)
       /** 待接来电(收租/上交日结算生成;P4 手机接听,覆盖=扣胜任度) */
       _待接来电: z
         .object({

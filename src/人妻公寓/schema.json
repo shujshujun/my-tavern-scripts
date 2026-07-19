@@ -316,6 +316,31 @@
           "default": -1,
           "type": "number"
         },
+        "_荣耀洞上次楼": {
+          "default": -999,
+          "type": "number"
+        },
+        "_荣耀洞门牌": {
+          "type": "string"
+        },
+        "_荣耀洞拍": {
+          "default": -1,
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "_荣耀洞起楼": {
+          "default": -1,
+          "type": "number"
+        },
+        "_荣耀洞点破": {
+          "default": false,
+          "type": "boolean"
+        },
+        "_荣耀洞夫": {
+          "default": false,
+          "type": "boolean"
+        },
         "_待接来电": {
           "default": {},
           "type": "object",
