@@ -44,6 +44,9 @@ export interface 朋友圈条 {
   /** 配图(2026-07-19 用户拍板):`{妻名}/{类}_{n}` → 素材基址/微信圈/…webp;
    *  AI 只用 [图:类] marker 选类型,选哪张归脚本;图不存在 onerror 自净=图库可后补 */
   图?: string;
+  /** 仅你可见(P5;spec:L4解锁低频,公开流永远贤妻——这条只有玩家刷得到);
+   *  图走独立池 素材基址/微博/仅你可见/{角色}_{n}.webp(档位=堕落分档,母亲最厚1~5) */
+  私?: { 图序: number };
 }
 
 interface 微信库 {
@@ -410,6 +413,33 @@ export async function 手机节拍(): Promise<void> {
       }
     }
 
+    // ── 仅你可见(P5;L4解锁,低频=物以稀为贵;公开流永远贤妻,这一条只有你刷得到) ──
+    for (const m of 门牌列表) {
+      const 节点 = data.户[m];
+      const 配 = 户静态表[m];
+      if (!节点 || (配.隐身 && !data.系统._母亲入列) || 节点.妻.当前阶段 < 4) continue;
+      const 键 = `私见:${m}`;
+      const 上次 = 库.节拍[键] ?? -999;
+      if (钟 - 上次 < Math.round(28 * 倍)) continue;
+      if (seededRandom(钟, m, '仅你可见') > 0.3) continue;
+      库.节拍[键] = 钟;
+      const 妻 = 节点.妻;
+      // 档位=堕落分档(五妻1~3;母亲1~5=最终boss奖励最厚)
+      const 上限 = m === '302' ? 5 : 3;
+      const 图序 = Math.min(上限, 1 + Math.floor((妻.堕落值 / 100) * 上限));
+      const 首条 = !库.圈.some(c => c.谁 === 配.妻名 && c.私);
+      const 文 = await 小生成(
+        '你替一款成人向游戏生成一条已婚女性发的"仅你可见"朋友圈文案(只有情人一个人刷得到的那种)。只输出文案本身,不超过40字,不要引号。' +
+          '方向:她不能公开的那一面——没头没尾的想念/穿着他送的东西/一句只有他懂的话;可以露骨但要像她本人。',
+        `人物:${配.妻名},${配.初始?.气质描述 ?? ''}。${妻状态包(m, data)}${await 人设段(m)}生成这条只给他看的动态。`,
+      );
+      if (文) {
+        库.圈.unshift({ 楼, 谁: 配.妻名, 文, 评: [], 私: { 图序 } });
+        有新 = true;
+        if (首条) eventEmit('人妻公寓:提示', `📱 ${配.妻名}发了一条「仅你可见」的动态`);
+      }
+    }
+
     // ── 姐妹群主动拍(阶段3+小群;2026-07-19 用户拍板提频:8楼×倍率65%;骂战拌嘴带记忆) ──
     {
       const 上次 = 库.节拍['姐妹群'] ?? -999;
@@ -564,6 +594,7 @@ const 手机CSS = `
 #${ROOT_ID} .rqw-post>.rqp-ava{width:38px;height:38px;border-radius:4px;font-size:15px;flex:none;}
 #${ROOT_ID} .rqw-r{flex:1;min-width:0;}
 #${ROOT_ID} .rqw-name{font-size:13.5px;font-weight:600;color:#576b95;display:block;margin-bottom:2px;}
+#${ROOT_ID} .rqw-only{font-style:normal;font-size:10.5px;color:#d64d8f;background:rgba(214,77,143,.1);border:1px solid rgba(214,77,143,.3);border-radius:999px;padding:1px 7px;margin-left:6px;vertical-align:1px;}
 #${ROOT_ID} .rqw-tag{font-size:8px;padding:1px 3px;border-radius:2px;background:#fff3e0;color:#ff8200;}
 #${ROOT_ID} .rqw-time{font-size:11px;color:#b2b2b2;}
 #${ROOT_ID} .rqw-foot{display:flex;align-items:center;justify-content:space-between;margin-top:5px;}
@@ -1046,9 +1077,9 @@ function 渲染(): void {
       const 卡 = el(
         'div',
         'rqw-post',
-        `${头像块(c.谁)}<div class="rqw-r"><span class="rqw-name">${_.escape(c.谁)}</span>` +
+        `${头像块(c.谁)}<div class="rqw-r"><span class="rqw-name">${_.escape(c.谁)}${c.私 ? '<i class="rqw-only">🔒仅你可见</i>' : ''}</span>` +
           `<div class="rqw-text">${正文}</div>` +
-          (c.图 ? `<img class="rqw-img" src="${素材基址}/微信圈/${c.图}.webp" loading="lazy" onerror="this.remove()"/>` : '') +
+          (c.私 ? `<img class="rqw-img" src="${素材基址}/微博/仅你可见/${encodeURIComponent(c.谁)}_${c.私.图序}.webp" loading="lazy" onerror="this.remove()"/>` : c.图 ? `<img class="rqw-img" src="${素材基址}/微信圈/${c.图}.webp" loading="lazy" onerror="this.remove()"/>` : '') +
           `<div class="rqw-foot"><span class="rqw-time">${时段字(c.楼, 偏移)}</span><span class="rqw-dots">••</span></div>` +
           盒 +
           `</div>`,
