@@ -278,6 +278,14 @@
 
         <!-- 正文舞台:背景四层在 wrap 上,立绘钉右下,正文滚动层浮最上(垫板压立绘,gal 层次) -->
         <div class="story-wrap" :style="[场景色, 场景图样式]">
+          <!-- 隐藏正文(2026-07-19 用户点单,gal惯例):渐隐文字层欣赏立绘;只认这颗钮,再按恢复(误触不弹回) -->
+          <button
+            class="story-hide-btn"
+            :title="正文隐藏 ? '显示正文' : '隐藏正文,欣赏画面'"
+            @click.stop="正文隐藏 = !正文隐藏"
+          >
+            {{ 正文隐藏 ? '👁' : '🙈' }}
+          </button>
           <TransitionGroup v-if="立绘显示" name="fade">
             <img
               v-for="绘 in 立绘列表"
@@ -292,7 +300,7 @@
             />
           </TransitionGroup>
           <!-- 正文卷轴:只演当前幕,且幕跟着房间走——人走了戏就收,回来戏还在(氛围色随位置) -->
-          <section ref="卷轴容器" class="story">
+          <section ref="卷轴容器" class="story" :class="{ 'story-veiled': 正文隐藏 }">
           <!-- 到场卡:走动后的新场景,给地点一个"开场镜头"(旧正文属于旧场景,隐去) -->
           <div v-if="!在幕中 && !发送中" class="arrive">
             <div class="ui-kicker">{{ 当前房间 ? 'ARRIVE / 到场' : 'HALLWAY / 楼道' }}</div>
@@ -2171,6 +2179,9 @@ const 字号档 = ref<'小' | '中' | '大'>('中');
 const 正文字色 = ref('');
 /** 立绘显示(右下角入画;垫板压立绘) */
 const 立绘显示 = ref(true);
+
+/** 隐藏正文(gal惯例小开关:渐隐文字层欣赏立绘;只由按钮开关,再按恢复;不入偏好不持久) */
+const 正文隐藏 = ref(false);
 /** 正文垫板不透明度(0.2~1.0,越高字越清背景越淡) */
 const 垫板浓度 = ref(0.66);
 /** 省流:关掉全部背景图/立绘/图标,回纯 CSS */
@@ -2834,6 +2845,40 @@ onUnmounted(() => {
   padding: 8px 12px;
   scrollbar-width: thin;
   scrollbar-color: rgba(38, 169, 244, 0.4) transparent;
+  transition: opacity 0.28s ease;
+}
+
+/* 隐藏正文:透明度渐隐+穿透点击(层还在,滚动位置不丢);恢复只认按钮 */
+.story.story-veiled {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.story-hide-btn {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 3;
+  width: 30px;
+  height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(4px);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(20, 24, 40, 0.18);
+  transition: transform 0.15s ease;
+}
+
+.story-hide-btn:hover {
+  transform: translateY(-1px);
+}
+
+:global(html.rq-dark) .story-hide-btn {
+  background: rgba(30, 32, 46, 0.72);
+  border-color: rgba(255, 255, 255, 0.2);
 }
 
 /* 到场卡:走动后的"开场镜头" */

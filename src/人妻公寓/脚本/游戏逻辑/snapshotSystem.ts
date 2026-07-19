@@ -2,7 +2,7 @@ import type { SchemaType } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
 import { 户静态表, 查房间, 查裂缝, 越界应对话术, 阶段行为基调, 阶段接受上限 } from '../../stageConfig';
 import { 丈夫在楼, 妻位置推算, 当前时段, 每时段楼数, seededRandom } from './楼层时钟';
-import { 雌竞资格, 雌竞演出块 } from './雌竞系统';
+import { 雌竞资格, 雌竞演出块, 读余波, 余波缓冲楼 } from './雌竞系统';
 
 /**
  * 快照注入器(双通道:记账通道=数字仅供 AI 做 ±3 更新;表现通道=脚本查表编译感知语)
@@ -410,7 +410,15 @@ export function 组公寓快照(chat: { role: string; content: string }[], data:
   {
     const 竞者 = _.uniq([...焦点, ...在场]).filter(m => 雌竞资格(m, data.户[m]));
     if (竞者.length >= 2 && seededRandom(Math.floor(种子楼 / 每时段楼数), '雌竞撞场') < 0.6) {
-      行.push(雌竞演出块(竞者, data, 楼层));
+      // 换装余波作起因(缓冲期后):被议论的人不在场也成立——两位太太当着{{user}}背后嚼舌头
+      const 波 = 读余波(楼层);
+      const 起因 =
+        波 && 楼层 - 波.起楼 >= 余波缓冲楼
+          ? 波.私密
+            ? `${户静态表[波.门牌].妻名}这几天状态不对劲——那种藏不住的春光,女人一眼就懂${竞者.includes(波.门牌) ? '' : '(她本人不在场,正好背后议论)'}`
+            : `${波.物}——楼里的眼睛都看见了${竞者.includes(波.门牌) ? '' : '(她本人不在场,正好背后议论)'}`
+          : undefined;
+      行.push(雌竞演出块(竞者, data, 楼层, 起因));
     }
   }
 

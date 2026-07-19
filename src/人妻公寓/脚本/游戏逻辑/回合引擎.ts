@@ -3,7 +3,7 @@ import { Schema, 创建户节点 } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
 import { 户静态表, 难度表, 首批门牌 } from '../../stageConfig';
 import { 经济结算 } from './经济系统';
-import { 打断检测 } from './打断系统';
+import { 打断检测, 换装起疑 } from './打断系统';
 import { 夜访结算, 惰性结算户, 结算焦点疑心, 冷落检测 } from './结算系统';
 import { PROMOTE_MIRROR_KEY, 捕获保护快照, 回滚保护字段, 清保护快照, 镜像直写 } from './守护系统';
 import { 中断卡文案, 记违规清零, 结算违规代价, 输出稽查, 未遂余波指引 } from './稽查系统';
@@ -209,6 +209,9 @@ function 回合结算(newStat: SchemaType, snapStat: SchemaType, 焦点: 门牌[
     const 经提示 = 经济结算(newStat, 楼层);
     if (经提示.length) eventEmit('人妻公寓:提示', 经提示.join('\n'));
   }
+
+  // 换装起疑(换装余波→丈夫侧):她身上的新东西/异样被在家的丈夫注意到,账与戏一起走
+  换装起疑(newStat, 楼层);
 
   // 丈夫打断(优先于冷落抢事件通道):疑心定级别,信任压频率,反讽格走"兄弟拜托"
   打断检测(newStat, 焦点, 楼层);
