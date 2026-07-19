@@ -197,6 +197,8 @@ export const Schema = z.object({
       _母亲入列: z.coerce.boolean().catch(false).prefault(false),
       /** P5 母亲药物首夜第二幕:首夜正戏后置真,下一楼自动排队早饭桌戏(晋阶正戏固定第二幕) */
       _母亲首夜第二幕: z.coerce.boolean().catch(false).prefault(false),
+      /** P5 撞见系统频控:上次母亲撞见的时段档号(同时段最多一次) */
+      _上次撞见档: z.coerce.number().int().catch(-1).prefault(-1),
       _系统操作中: z.coerce.boolean().catch(false).prefault(false), // 道具使用/模式切换楼跳过轮次推进
       _难度: z.string().prefault('标准'), // 开局三档(轻松/标准/严苛),效果查 stageConfig.难度表
       _序章完成: z.coerce.boolean().catch(false).prefault(false), // 单向语义随楼层快照走(回档到0=重开序章)

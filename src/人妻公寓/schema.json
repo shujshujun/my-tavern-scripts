@@ -264,6 +264,12 @@
           "default": false,
           "type": "boolean"
         },
+        "_上次撞见档": {
+          "default": -1,
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
         "_系统操作中": {
           "default": false,
           "type": "boolean"

@@ -4,7 +4,7 @@ import { reloadOnChatChange } from '@/util/script';
 import type { SchemaType } from '../../schema';
 import { Schema, 创建户节点 } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
-import { 户静态表, 首批门牌, 阶段标题 } from '../../stageConfig';
+import { 户静态表, 首夜差分, 首批门牌, 阶段标题 } from '../../stageConfig';
 import { 使用运作, 催租, 接听来电, 捡金币, 空房偷窃, 经济结算, 要钱 } from './经济系统';
 import { 挂载手机, 打开手机, 刷新红点, 手机节拍, 来电已接 } from './手机系统';
 import { 夜访结算, 惰性结算户, 结算焦点疑心, 冷落检测, 请求晋阶 } from './结算系统';
@@ -421,7 +421,10 @@ function 挂载监听() {
       if (结果.成功) {
         const 妻 = data.户[门牌号].妻;
         const 妻名 = 户静态表[门牌号].妻名;
-        const 第一夜 = 妻.当前阶段 === 3 ? '这是她的第一夜——第一次真正背叛婚姻的性:关灯、心虚、战栗与自我厌恶都要在场。' : '';
+        const 第一夜 =
+          妻.当前阶段 === 3
+            ? `这是她的第一夜——第一次真正背叛婚姻的性:关灯、心虚、战栗与自我厌恶都要在场。${首夜差分[门牌号] ?? ''}。`
+            : '';
         // 母亲药物首夜(P5② spec拍板):她的第一夜必须是"意外";真正的戏在第二天早饭桌(第二幕自动排队)
         const 事件 =
           门牌号 === '302' && 妻.当前阶段 === 3

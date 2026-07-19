@@ -2,10 +2,11 @@ import type { SchemaType } from '../../schema';
 import { Schema, 创建户节点 } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
 import { 户静态表, 难度表, 首批门牌 } from '../../stageConfig';
+// (难度表兼供撞见概率系数查表)
 import { 经济结算 } from './经济系统';
 import { 入住检测 } from './入住系统';
-import { 打断检测, 换装起疑, 父亲来电打断 } from './打断系统';
-import { 夜访结算, 惰性结算户, 结算焦点疑心, 冷落检测 } from './结算系统';
+import { 打断检测, 换装起疑, 母亲撞见检测, 父亲来电打断 } from './打断系统';
+import { 夜访结算, 惰性结算户, 绿帽线检测, 结算焦点疑心, 冷落检测 } from './结算系统';
 import { PROMOTE_MIRROR_KEY, 捕获保护快照, 回滚保护字段, 清保护快照, 镜像直写 } from './守护系统';
 import { 中断卡文案, 记违规清零, 结算违规代价, 输出稽查, 未遂余波指引 } from './稽查系统';
 import { 读取, 读最近有效stat, 脚本写入 } from './mvuIO';
@@ -187,12 +188,14 @@ function 清洗正文(原文: string): string {
  */
 function 回合结算(newStat: SchemaType, snapStat: SchemaType, 焦点: 门牌[], 楼层: number): void {
   // 焦点户:被触碰=惰性结算生效点
+  let 主焦堕落增量 = 0;
   for (const m of 焦点) {
     const 节点 = newStat.户[m];
     if (!节点) continue;
     惰性结算户(节点, 楼层);
     节点.妻.上次互动楼层 = 楼层;
     const 堕落增量 = 节点.妻.堕落值 - (snapStat.户[m]?.妻.堕落值 ?? 节点.妻.堕落值);
+    if (m === 焦点[0]) 主焦堕落增量 = 堕落增量;
     结算焦点疑心(节点, m, 堕落增量);
   }
 
@@ -231,6 +234,18 @@ function 回合结算(newStat: SchemaType, snapStat: SchemaType, 焦点: 门牌[
 
   // 父亲越洋来电(302专属"丈夫回家"位:亲热中屏幕亮起"老公")
   父亲来电打断(newStat, 焦点, 楼层);
+
+  // 母亲撞见(P5⑥:亲密推进被妈看见——入列前=监督者扣胜任度+暗账;入列后=圆场反转+吃醋)
+  母亲撞见检测(
+    newStat,
+    焦点[0],
+    主焦堕落增量,
+    楼层,
+    难度表[newStat.系统._难度]?.撞见概率系数 ?? 1,
+  );
+
+  // 绿帽双线(102观众席"门缝那一眼"/202哑巴亏):开线关键事件,结局轨道单向标记
+  绿帽线检测(newStat, 楼层);
 
   // 冷落检测:排队"她主动来找你"(一次一人)
   冷落检测(newStat, 楼层);
