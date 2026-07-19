@@ -1451,17 +1451,27 @@ const 荣耀洞可用 = computed(() => {
   return 钟楼号.value - 记 >= 18;
 });
 
+// 2026-07-19 用户纠偏:视觉件=抠图透明立绘叠加(素材在 立绘/荣耀洞_*),背景恒定隔间图;环境版CG作废
 const 荣耀洞图 = computed(() => {
   const 系 = data.value?.系统;
+  if (!系 || (系._荣耀洞拍 ?? -1) < 0 || 当前房间.value !== '洗手间') return '';
+  return `${素材基址}/背景/荣耀洞.webp`;
+});
+
+/** 洞戏立绘件:undefined=不在洞戏;''=本拍无件(空军/匿名收尾);否则=件地址 */
+const 荣耀洞件 = computed<string | undefined>(() => {
+  const 系 = data.value?.系统;
   const 拍 = 系?._荣耀洞拍 ?? -1;
-  if (!系 || 拍 < 0 || 当前房间.value !== '洗手间') return '';
+  if (!系 || 拍 < 0 || 当前房间.value !== '洗手间') return undefined;
   const 门 = 系._荣耀洞门牌;
-  if (!门 || 门 === '空') return `${素材基址}/背景/荣耀洞.webp`;
+  if (!门 || 门 === '空') return '';
   const 幕 = Math.min(拍, (门 === '302' ? 5 : 3) - 1) + 1;
-  const 素材名 = 门 === '302' ? '母亲' : 户静态表[门 as 门牌].妻名;
-  return 系._荣耀洞点破
-    ? `${素材基址}/背景/荣耀洞_${素材名}_${幕}.webp`
-    : `${素材基址}/背景/荣耀洞_特写_${Math.min(幕, 3)}.webp`;
+  if (系._荣耀洞点破) {
+    const 名 = 门 === '302' ? '母亲' : 户静态表[门 as 门牌].妻名;
+    return `${素材基址}/立绘/荣耀洞_${名}_${幕}.webp`;
+  }
+  // 匿名(玩家侧机位):1=洞中红唇张嘴等待 2=洞口含入 3=无件(人去洞空)
+  return 幕 <= 2 ? `${素材基址}/立绘/荣耀洞_特写_${幕}.webp` : '';
 });
 
 // 中途离场=就地收束(用户拍板):人一走出洗手间,脚本清场,后续拍不再上演
@@ -1527,6 +1537,11 @@ interface 立绘项 {
 
 const 立绘列表 = computed<立绘项[]>(() => {
   if (!当前房间.value) return [];
+  // 荣耀洞戏中:立绘槽由洞件接管(匿名性:常规妻立绘一律不入画)
+  const 洞件 = 荣耀洞件.value;
+  if (洞件 !== undefined) {
+    return 洞件 && !立绘失效.value[洞件] ? [{ src: 洞件, 位: 'pos-right' as const }] : [];
+  }
   const 图 = 可见门牌.value
     .filter(k => 妻现位(k, 位置种子.value) === 当前房间.value)
     .map(m => {
