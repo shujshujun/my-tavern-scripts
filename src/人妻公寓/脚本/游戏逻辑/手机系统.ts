@@ -515,6 +515,7 @@ const 手机CSS = `
 /* ── 手机壳(柚月小手机同款华为全面屏风:金属机身/药丸双摄/状态栏;yuzuki 授权改造) ── */
 #${ROOT_ID} .rqp-shell{display:none;position:absolute;right:0;bottom:64px;width:min(320px,92vw);height:min(692px,80vh);background:#1a1a1a;border-radius:40px;padding:4px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),0 15px 50px rgba(0,0,0,.4),0 5px 20px rgba(0,0,0,.3);}
 #${ROOT_ID}.open .rqp-shell{display:block;}
+#${ROOT_ID} .rqp-resize{position:absolute;right:-8px;bottom:-8px;width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(26,28,34,.88);color:#9fb0c0;font-size:15px;box-shadow:0 4px 12px rgba(0,0,0,.35);cursor:nwse-resize;z-index:70;touch-action:none;user-select:none;}
 /* 滑入动画放内层屏幕:壳的 transform 留给拖动位移专用——动画接管壳transform会在
    结束瞬间跳回内联位移(2026-07-18 手机闪现即失真凶:动画期显示默认位,结束跳到屏外陈旧位移) */
 #${ROOT_ID}.open .rqp-screen{animation:rqp-slidein .45s cubic-bezier(.4,0,.2,1);}
@@ -675,7 +676,9 @@ export function 挂载手机(): void {
   root.innerHTML =
     `<div class="rqp-shell"><div class="rqp-punch"></div>` +
     `<div class="rqp-status"><span class="tm"></span><span class="rt"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="rqp-batt"><i></i></span></span></div>` +
-    `<div class="rqp-screen"></div></div><button class="rqp-toggle" title="手机">📱<span class="dot"></span></button>`;
+    `<div class="rqp-screen"></div>` +
+    `<div class="rqp-resize" title="按住拖动调节手机大小">⤡</div>` +
+    `</div><button class="rqp-toggle" title="手机">📱<span class="dot"></span></button>`;
   doc.body.appendChild(root);
   // 状态栏时间(柚月同款真实时钟)
   const 走钟 = () => {
@@ -699,9 +702,46 @@ export function 挂载手机(): void {
     ];
   };
   const 当前位 = { dx: 0, dy: 0 };
+  // 手机缩放(2026-07-20 玩家点单:手机端壳太大/太小自由调;并入拖动同一条transform防互踩)
+  const 缩放键 = '人妻公寓_手机缩放';
+  let 缩放 = 1;
+  try {
+    const v = parseFloat(localStorage.getItem(缩放键) ?? '1');
+    if (Number.isFinite(v) && v >= 0.6 && v <= 1.6) 缩放 = v;
+  } catch {
+    /* 忽略 */
+  }
+  壳.style.transformOrigin = '100% 100%';
   const 应用位 = () => {
-    壳.style.transform = `translate(${当前位.dx}px, ${当前位.dy}px)`;
+    壳.style.transform = `translate(${当前位.dx}px, ${当前位.dy}px) scale(${缩放})`;
   };
+  // 右下角拖动缩放(2026-07-20 用户拍板交互形态):壳锚定右下,拖向右下=放大,向左上=缩小
+  {
+    const 柄 = root.querySelector('.rqp-resize') as HTMLElement | null;
+    if (柄) {
+      let 起 = { x: 0, y: 0, s: 1 };
+      柄.addEventListener('pointerdown', ev => {
+        ev.stopPropagation();
+        ev.preventDefault();
+        起 = { x: ev.clientX, y: ev.clientY, s: 缩放 };
+        柄.setPointerCapture(ev.pointerId);
+      });
+      柄.addEventListener('pointermove', ev => {
+        if (!柄.hasPointerCapture(ev.pointerId)) return;
+        const d = ev.clientX - 起.x + (ev.clientY - 起.y);
+        缩放 = Math.min(1.6, Math.max(0.6, 起.s + d / 260));
+        应用位();
+      });
+      柄.addEventListener('pointerup', ev => {
+        if (柄.hasPointerCapture(ev.pointerId)) 柄.releasePointerCapture(ev.pointerId);
+        try {
+          localStorage.setItem(缩放键, String(Math.round(缩放 * 100) / 100));
+        } catch {
+          /* 忽略 */
+        }
+      });
+    }
+  }
   try {
     const 存 = JSON.parse(localStorage.getItem(位置键) ?? 'null') as { dx: number; dy: number } | null;
     if (存 && Number.isFinite(存.dx) && Number.isFinite(存.dy)) {

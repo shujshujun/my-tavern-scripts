@@ -411,7 +411,7 @@
             {{ 发送中 ? '…' : '行动' }}
           </button>
         </div>
-        <div v-if="可重掷 && !发送中" class="reroll-row">
+        <div v-if="可重掷 && !发送中 && 当前房间 === 回合房间" class="reroll-row">
           <button class="btn" title="撤回本回合(你的行动与回应),重新措辞" @click="撤回">⌫ 撤回</button>
           <button class="btn" title="同样的行动重新演一遍" @click="重掷">↻ 重演</button>
         </div>
@@ -1340,7 +1340,17 @@ function 欠租中(id: string): boolean {
 const 手机来电 = computed(() => (data.value?.系统?._待接来电?.期 ?? -1) >= 0);
 const 手机未读 = ref(false);
 
-function 开手机() {
+async function 开手机() {
+  // 真全屏时手机壳挂在父文档,永远被全屏元素盖死(2026-07-20 玩家实测)——先退全屏再弹
+  const 文档 = document as 全屏文档;
+  if (document.fullscreenElement ?? 文档.webkitFullscreenElement) {
+    try {
+      if (document.exitFullscreen) await document.exitFullscreen();
+      else 文档.webkitExitFullscreen?.();
+    } catch {
+      /* 退不掉也照样弹,至少桌面端能见 */
+    }
+  }
   eventEmit('人妻公寓:开手机', 手机来电.value);
 }
 
@@ -1644,9 +1654,14 @@ const 输入文本 = ref('');
 const 发送中 = ref(false);
 const 流式段 = ref<string[]>([]);
 const 可重掷 = ref(false);
+/** 上次回合发生的房间(2026-07-20 玩家点单:人走出房间后撤回/重演一起藏,防跨场景回滚) */
+const 回合房间 = ref<string | null>(null);
 
 function 刷新可重掷() {
-  可重掷.value = Boolean(_.get(getVariables({ type: 'chat' }), '_上次回合'));
+  const 变量 = getVariables({ type: 'chat' });
+  可重掷.value = Boolean(_.get(变量, '_上次回合'));
+  // 记回合发生地:人走出这间房,撤回/重演一起收(跨场景回滚只会制造混乱)
+  回合房间.value = (_.get(变量, '_场景') as string | undefined) ?? null;
 }
 
 /**
@@ -5541,6 +5556,18 @@ onUnmounted(() => {
   width: 100%;
   width: min(100%, calc(100cqh * 0.667));
   aspect-ratio: 2 / 3;
+}
+
+/* 手机端全屏画幅:画里天空占比过高(2026-07-20 玩家实测)——画布锚底放大,天空溢出裁掉;
+   点位是画布内百分比,随画布一起缩放,拓扑不破 */
+@media (max-width: 540px) {
+  .map-stage {
+    overflow: hidden;
+  }
+  .map-canvas {
+    transform: scale(1.24);
+    transform-origin: 50% 100%;
+  }
 }
 
 .map-base {
