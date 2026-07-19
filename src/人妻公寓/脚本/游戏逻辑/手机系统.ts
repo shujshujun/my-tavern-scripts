@@ -5,6 +5,7 @@ import { 丈夫在楼, 妻位置推算, 当前时段, seededRandom } from './楼
 import { 读取, 读最近有效stat, 脚本写入 } from './mvuIO';
 import { 妻状态包 } from './snapshotSystem';
 import { 捕获保护快照 } from './守护系统';
+import { 姐妹群成员, 雌竞火气 } from './雌竞系统';
 import { Schema } from '../../schema';
 
 /**
@@ -241,6 +242,9 @@ export function 微信好友(data: SchemaType): { id: string; 名: string; 类: 
     if (!节点 || 配.隐身) continue;
     if (节点.妻.当前阶段 >= 1) 友.push({ id: m, 名: 配.妻名, 类: '妻' });
   }
+  // 姐妹茶话会(2026-07-19 用户拍板):阶段3+的太太≥2人自动成群并把{{user}}拉进去;
+  // 没有丈夫没有外人=骂战/拌嘴/攀比都在这;楼务群永远和睦(贤妻公开流)
+  if (姐妹群成员(data).length >= 2) 友.push({ id: '姐妹群', 名: '姐妹茶话会', 类: '群' });
   友.push({ id: '群', 名: '梧桐里7号楼务群', 类: '群' });
   return 友;
 }
@@ -372,6 +376,17 @@ export async function 手机节拍(): Promise<void> {
         );
         if (文) {
           库.消息.push({ 楼, 会话: '群', 发: '对方', 文 });
+          有新 = true;
+        }
+      }
+    }
+
+    // ── 姐妹群主动拍(阶段3+小群;比楼务群活跃,骂战拌嘴带记忆) ──
+    {
+      const 上次 = 库.节拍['姐妹群'] ?? -999;
+      if (钟 - 上次 >= Math.round(12 * 倍) && seededRandom(钟, '姐妹群拍') < 0.5) {
+        if (await 姐妹群一拍(data, 库, 楼)) {
+          库.节拍['姐妹群'] = 钟;
           有新 = true;
         }
       }
@@ -886,7 +901,7 @@ function 渲染(): void {
 
   if (当前页.名 === 'chat' && 当前页.会话) {
     const 会话 = 当前页.会话;
-    const 名 = 会话 === '父亲' ? '爸' : 会话 === '群' ? '梧桐里7号楼务群' : (户静态表[会话 as 门牌]?.妻名 ?? 会话);
+    const 名 = 会话 === '父亲' ? '爸' : 会话 === '群' ? '梧桐里7号楼务群' : 会话 === '姐妹群' ? '姐妹茶话会' : (户静态表[会话 as 门牌]?.妻名 ?? 会话);
     头(正在输入 === 会话 ? '对方正在输入…' : 名, () => {
       当前页 = { 名: 'chats' };
       渲染();
@@ -894,7 +909,7 @@ function 渲染(): void {
     const 体 = el('div', 'rqp-body');
     const 泡区 = el('div', 'rqp-bubbles');
     // 真微信排版:气泡带双侧头像+小尾巴;换楼即插一条居中的灰色时间字(微信的时间分组)
-    const 对方头像名 = 会话 === '父亲' ? '父亲' : 会话 === '群' ? '群' : (户静态表[会话 as 门牌]?.妻名 ?? 会话);
+    const 对方头像名 = 会话 === '父亲' ? '父亲' : 会话 === '群' || 会话 === '姐妹群' ? '群' : (户静态表[会话 as 门牌]?.妻名 ?? 会话);
     let 上楼 = -1;
     for (const m of 库.消息.filter(x => x.会话 === 会话 && x.楼 <= 楼)) {
       if (m.楼 !== 上楼) {
@@ -922,7 +937,7 @@ function 渲染(): void {
     屏.appendChild(体);
     // 输入(群=只发物业通知;父亲单聊只读——他只打电话)
     if (会话 !== '父亲') {
-      const 是妻 = 会话 !== '群';
+      const 是妻 = 会话 !== '群' && 会话 !== '姐妹群';
       const 行 = el('div', 'rqp-input');
       if (是妻) {
         // "+"菜单(2026-07-18 用户提案:仿真微信;第一期只有"约出来")
@@ -934,7 +949,7 @@ function 渲染(): void {
         行.appendChild(加);
       }
       const ta = el('textarea', '') as HTMLTextAreaElement;
-      ta.placeholder = 会话 === '群' ? '发一条物业通知…' : '发消息…';
+      ta.placeholder = 会话 === '群' ? '发一条物业通知…' : 会话 === '姐妹群' ? '插一句…' : '发消息…';
       const 发钮 = el('button', '', '发送') as HTMLButtonElement;
       发钮.addEventListener('click', () => {
         const 文 = ta.value.trim();
@@ -1255,6 +1270,41 @@ async function 约出来(m: 门牌): Promise<void> {
   }
 }
 
+// ── 姐妹群一拍(2026-07-19):2~4行你来我往,喂最近8条群记录=有上下文延续性 ──
+
+async function 姐妹群一拍(data: SchemaType, 库: 微信库, 楼: number, 起因?: string): Promise<boolean> {
+  const 成员 = 姐妹群成员(data);
+  if (成员.length < 2) return false;
+  const 近况 = 库.消息
+    .filter(m => m.会话 === '姐妹群')
+    .slice(-8)
+    .map(m => (m.发 === '我' ? `${玩家名()}:${m.文}` : m.文))
+    .join('\n');
+  const 名单 = 成员.map(m => {
+    const 配 = 户静态表[m];
+    return `${配.妻名}(${配.雌竞};此刻:${雌竞火气(data.户[m], 楼)})`;
+  });
+  const 原 = await 小生成(
+    '你替一款成人都市题材游戏生成一段微信小群"姐妹茶话会"的聊天。群里只有楼里几位太太和公寓管理员,没有丈夫没有外人。' +
+      '太太们每人都与管理员有各自心照不宣的关系,彼此隐约有数却谁都不说破——这个群的日常=拌嘴/攀比/阴阳怪气/争风吃醋/互相调侃,火药味是真的,姐妹情也是真的。' +
+      '输出2~4行,每行格式"发言人:内容",内容口语化不超过30字,可含emoji,不要引号不要旁白不要解释。' +
+      '纪律:严禁任何人明说自己或指认别人与管理员的具体越界事实(全靠含沙射影和弦外之音);发言人只能从名单里选;不必每人都发言,按火气大小分配。',
+    `群成员与各自路数:\n${名单.join('\n')}\n管理员${玩家名()}也在群里,平时潜水。${称呼纪律()}` +
+      (近况 ? `\n最近群聊(接着这个气口往下聊,有恩怨接恩怨):\n${近况}` : '') +
+      (起因 ? `\n刚刚:${起因}——太太们对此各自反应。` : '\n生成新的一轮群聊。'),
+  );
+  if (!原) return false;
+  const 妻名集 = new Set(成员.map(m => 户静态表[m].妻名));
+  let 有 = false;
+  for (const 行 of 原.split('\n')) {
+    const m = 行.trim().match(/^([^::]{1,8})[::]\s*(.+)$/);
+    if (!m || !妻名集.has(m[1])) continue;
+    库.消息.push({ 楼, 会话: '姐妹群', 发: '对方', 文: `${m[1]}:${m[2]}` });
+    有 = true;
+  }
+  return 有;
+}
+
 // ── 单聊/群聊发送(玩家侧;她的回复走独立API,不占楼) ──
 
 async function 发消息(会话: string, 文: string): Promise<void> {
@@ -1264,6 +1314,28 @@ async function 发消息(会话: string, 文: string): Promise<void> {
   写库(库);
   渲染();
   if (会话 === '群') return; // 群通知不强制回声
+  if (会话 === '姐妹群') {
+    // 玩家插话=太太们接话一轮(带群记忆)
+    正在输入 = 会话;
+    渲染();
+    try {
+      const rawStat = 读最近有效stat();
+      if (rawStat) {
+        const data = Schema.parse(rawStat) as SchemaType;
+        const 库2 = 读库();
+        if (await 姐妹群一拍(data, 库2, 末楼(), `${玩家名()}在群里说:"${文}"`)) {
+          库2.读到['姐妹群'] = 末楼();
+          写库(库2);
+        }
+      }
+    } catch (e) {
+      console.error('[人妻公寓·手机] 姐妹群接话失败:', e);
+    } finally {
+      正在输入 = null;
+      渲染();
+    }
+    return;
+  }
   正在输入 = 会话;
   渲染();
   try {

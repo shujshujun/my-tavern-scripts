@@ -1,7 +1,8 @@
 import type { SchemaType } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
 import { 户静态表, 查房间, 查裂缝, 越界应对话术, 阶段行为基调, 阶段接受上限 } from '../../stageConfig';
-import { 丈夫在楼, 妻位置推算, 当前时段 } from './楼层时钟';
+import { 丈夫在楼, 妻位置推算, 当前时段, 每时段楼数, seededRandom } from './楼层时钟';
+import { 雌竞资格, 雌竞演出块 } from './雌竞系统';
 
 /**
  * 快照注入器(双通道:记账通道=数字仅供 AI 做 ±3 更新;表现通道=脚本查表编译感知语)
@@ -401,6 +402,15 @@ export function 组公寓快照(chat: { role: string; content: string }[], data:
     for (const m of 在场) {
       const { 妻 } = data.户[m];
       行.push(`· ${户静态表[m].妻名}:${妻.阶段标题}|${好感感知(妻.好感值)}`);
+    }
+  }
+
+  // 雌竞撞场(2026-07-19 用户提案):同场≥2位够资格(阶段≥2且有风格)的太太→注入暗流演出;
+  // 档号做概率种子=同一时段内判定恒定(重roll不换命),不用存冷却状态;演出层纯注入不动账
+  {
+    const 竞者 = _.uniq([...焦点, ...在场]).filter(m => 雌竞资格(m, data.户[m]));
+    if (竞者.length >= 2 && seededRandom(Math.floor(种子楼 / 每时段楼数), '雌竞撞场') < 0.6) {
+      行.push(雌竞演出块(竞者, data, 楼层));
     }
   }
 
