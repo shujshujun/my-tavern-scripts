@@ -102,7 +102,10 @@ export function 组快照注入(
       insertOrAssignVariables({ _粘滞: null }, { type: 'chat' });
     }
   }
-  return { 快照: 组公寓快照(对话尾, data, 楼层), 焦点 };
+  const 快照 = 组公寓快照(对话尾, data, 楼层);
+  // 内容量审计(2026-07-19 用户点名#5):每楼注入体积落日志,测试期拿真实数据定收敛策略
+  console.info(`[人妻公寓·快照] 本楼注入 ${快照.length} 字(焦点${焦点.length}人/在场${在场.length}人)`);
+  return { 快照, 焦点 };
 }
 
 /**
