@@ -246,6 +246,10 @@
           "default": 0,
           "type": "number"
         },
+        "_母亲入列": {
+          "default": false,
+          "type": "boolean"
+        },
         "_系统操作中": {
           "default": false,
           "type": "boolean"
