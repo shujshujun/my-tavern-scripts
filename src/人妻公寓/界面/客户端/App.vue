@@ -1187,6 +1187,18 @@ function 房间动作(id: string | null): 卡动作[] {
     if (!data.value.户[id]) return []; // 招租中,没有可做的事
     if (房内有人在(id)) {
       动作.push({ kicker: 'VISIT', icon: 'door', 文案: '过去串门', 做: () => 进入(id) });
+      // 对饮(P5 丈夫渠道兼信任资源轴):他在家+背包有好酒才摆得上台面
+      if (丈夫在楼(data.value.户[id], id as 门牌, 位置种子.value) === '在家' && (data.value?.背包 ?? []).includes('好酒')) {
+        动作.push({
+          kicker: 'DRINK',
+          icon: 'gift',
+          文案: `请${户静态表[id as 门牌].夫名}喝一杯`,
+          做: () => {
+            if (当前房间.value !== id) 进入(id, false, true);
+            eventEmit('人妻公寓:对饮', id);
+          },
+        });
+      }
       // 催租三选(P3,天生欠租户):她在家且账上挂着欠租才摆得上台面
       if ((data.value.户[id]?._欠租笔数 ?? 0) > 0 && 妻现位(id as 门牌, 位置种子.value) === id) {
         const 催 = (选择: '硬催' | '宽限' | '垫上') => {
@@ -1239,6 +1251,21 @@ function 房间动作(id: string | null): 卡动作[] {
 
   // 公共区
   动作.push({ kicker: 'GO', icon: 'arrow', 文案: '走过去', 做: () => 进入(id) });
+  // 出门打听(P5:201渠道;从大堂出门找街坊,伴手礼盒当弹药)
+  if (id === '大堂' && (data.value?.背包 ?? []).includes('伴手礼盒')) {
+    for (const m of 门牌列表) {
+      if (!data.value.户[m] || 户静态表[m].隐身) continue;
+      动作.push({
+        kicker: 'ASK',
+        icon: 'chat',
+        文案: `打听${户静态表[m].妻名}家`,
+        做: () => {
+          if (当前房间.value !== id) 进入(id, false, true);
+          eventEmit('人妻公寓:打听', m);
+        },
+      });
+    }
+  }
   // 公共区零钱(P3:路过的小惊喜;种子+期号与脚本同一真值,拾没拾过看 chat 计数)
   {
     const 零钱 = 查金币(id, 钟楼号.value);
@@ -1732,9 +1759,9 @@ function 晋阶(门牌号: 门牌) {
 
 const 显示背包 = ref(false);
 
-/** 信物品名 → 门牌("拼合的信·夏乔"/"观察笔记·沈静仪") */
+/** 信物品名 → 门牌(五渠道揭晓实物:拼合的信/观察笔记/考古辑录/街坊札记/酒后真言) */
 function 信物门牌(名: string): 门牌 | null {
-  const m = 名.match(/^(?:拼合的信|观察笔记)·(.+)$/);
+  const m = 名.match(/^(?:拼合的信|观察笔记|考古辑录|街坊札记|酒后真言)·(.+)$/);
   if (!m) return null;
   return (门牌列表.find(k => 户静态表[k].妻名 === m[1]) ?? null) as 门牌 | null;
 }
