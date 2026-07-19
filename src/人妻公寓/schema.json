@@ -178,6 +178,10 @@
               "_上次出差楼": {
                 "default": -1,
                 "type": "number"
+              },
+              "_上次打断档": {
+                "default": -1,
+                "type": "number"
               }
             }
           },
