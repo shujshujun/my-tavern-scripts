@@ -1114,7 +1114,9 @@ const 需要由头 = computed(() => {
   const id = 当前房间.value;
   if (!id || id === '302' || 查房间(id)?.类型 !== '户') return false;
   const 节 = data.value?.户[id];
-  return Boolean(节) && !节!.妻.裂缝.已确认 && !已破门进入.value;
+  // 2026-07-20 用户加码:裂缝破解只是"看清她",她真进了下个阶段(≥1)才算有登门的名分——
+  // 刚读完信还停阶段0的,上门照样要工具由头
+  return Boolean(节) && !(节!.妻.裂缝.已确认 && 节!.妻.当前阶段 >= 1) && !已破门进入.value;
 });
 
 const 可用由头 = computed(() => {
