@@ -111,6 +111,8 @@ const 妻状态 = z
 
     // ── `_` 机制字段(AI 不可见) ──
     _上次结算楼层: floorMark(-1), // 惰性结算水位线(后台户被动账一口气补算)
+    /** P5 服饰:槽→穿着中SKU id(立绘差分文件名后缀;脚本写,AI不可见) */
+    _穿着SKU: z.record(z.string(), z.string()).catch({}).prefault({}),
     _要钱次数: nonNegInt(0), // P3:L4 要钱按钮累计(≥2 触发"向丈夫开口"疑心+)
     _上次要钱楼层: floorMark(-1),
   })

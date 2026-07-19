@@ -132,6 +132,16 @@
                 "default": -1,
                 "type": "number"
               },
+              "_穿着SKU": {
+                "default": {},
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
               "_要钱次数": {
                 "default": 0,
                 "type": "number"
