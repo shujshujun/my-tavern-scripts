@@ -1373,10 +1373,14 @@ function 欠租中(id: string): boolean {
 const 手机来电 = computed(() => (data.value?.系统?._待接来电?.期 ?? -1) >= 0);
 const 手机未读 = ref(false);
 
+/** 这次开手机是不是替玩家退的真全屏——是的话,收手机时自动送回去(2026-07-20 玩家点单) */
+let 收手机回全屏 = false;
+
 async function 开手机() {
   // 真全屏时手机壳挂在父文档,永远被全屏元素盖死(2026-07-20 玩家实测)——先退全屏再弹
   const 文档 = document as 全屏文档;
   if (document.fullscreenElement ?? 文档.webkitFullscreenElement) {
+    收手机回全屏 = true;
     try {
       if (document.exitFullscreen) await document.exitFullscreen();
       else 文档.webkitExitFullscreen?.();
@@ -2349,19 +2353,21 @@ function 应用画幅(开: boolean) {
   }
 }
 
-async function 切换全屏() {
+async function 进真全屏() {
   const 根 = document.documentElement as 全屏根;
+  if (根.requestFullscreen) await 根.requestFullscreen();
+  else if (根.webkitRequestFullscreen) await 根.webkitRequestFullscreen();
+  else throw new Error('Fullscreen API 不可用');
+}
+
+async function 切换全屏() {
   const 文档 = document as 全屏文档;
   try {
     if (document.fullscreenElement ?? 文档.webkitFullscreenElement) {
       if (document.exitFullscreen) await document.exitFullscreen();
       else 文档.webkitExitFullscreen?.();
-    } else if (根.requestFullscreen) {
-      await 根.requestFullscreen();
-    } else if (根.webkitRequestFullscreen) {
-      await 根.webkitRequestFullscreen();
     } else {
-      throw new Error('Fullscreen API 不可用');
+      await 进真全屏();
     }
   } catch (e) {
     console.warn('[人妻公寓客户端] 真全屏不可用,退回网页内画幅:', e);
@@ -2601,6 +2607,17 @@ onMounted(() => {
   eventOn('人妻公寓:手机状态', (状: { 未读?: boolean }) => {
     手机未读.value = !!状?.未读;
     刷赴约(); // 约出来是纯手机操作不产楼,靠这条通知让地图位置即时跟上
+  });
+  eventOn('人妻公寓:手机收起', async () => {
+    // 开手机时替玩家退过真全屏,收起就送回去;收起点按=用户手势,同源iframe吃得到激活态
+    if (!收手机回全屏) return;
+    收手机回全屏 = false;
+    if (document.fullscreenElement ?? (document as 全屏文档).webkitFullscreenElement) return;
+    try {
+      await 进真全屏();
+    } catch (e) {
+      console.warn('[人妻公寓客户端] 收手机自动回全屏被浏览器拒绝(留在窗口态):', e);
+    }
   });
   eventOn('人妻公寓:提示', (消息: string) => {
     // 地图行动卡开着:结果以"线索卡"翻出(动画),不走 toast

@@ -873,6 +873,8 @@ export function 挂载手机(): void {
       当前页 = 有来电() ? { 名: 'call' } : 当前页.名 === 'call' || 当前页.名 === 'talk' ? { 名: 'chats' } : 当前页;
       渲染();
       拉回视口();
+    } else {
+      eventEmit('人妻公寓:手机收起'); // 客户端听它:开机时替玩家退过真全屏的,收起送回去
     }
   });
   挂好 = true;
@@ -913,6 +915,7 @@ export function 打开手机(直达来电 = false): void {
   if (!开合防抖()) return;
   if (root.classList.contains('open') && !直达来电) {
     root.classList.remove('open');
+    eventEmit('人妻公寓:手机收起'); // 客户端听它:开机时替玩家退过真全屏的,收起送回去
     return;
   }
   root.classList.add('open');
