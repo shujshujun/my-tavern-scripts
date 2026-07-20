@@ -7,7 +7,14 @@ import { 妻状态包 } from './snapshotSystem';
 import { 捕获保护快照 } from './守护系统';
 import { 姐妹群成员, 雌竞火气, 雌竞资格, 读余波, 标余波, 余波缓冲楼 } from './雌竞系统';
 import { Schema } from '../../schema';
-import { 安装人妻公寓数据库模板, 打开数据库界面, 读取数据库API预设名, 数据库状态, 通过数据库生成 } from './数据库桥';
+import {
+  安装人妻公寓数据库模板,
+  打开数据库界面,
+  打开数据库设置,
+  读取数据库API预设名,
+  数据库状态,
+  通过数据库生成,
+} from './数据库桥';
 
 /**
  * 手机系统(P4:手机开机即微信,2026-07-18 用户拍板——不做主屏与独立App,
@@ -619,8 +626,8 @@ export async function 手机节拍(): Promise<void> {
 // ============================================
 
 const ROOT_ID = 'rq-phone-root';
-// ⚠ 与 App.vue 素材基址同步：本轮测试发布 tag=rq0.29。
-const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.29/dist/人妻公寓/素材';
+// ⚠ 与 App.vue 素材基址同步：本轮测试发布 tag=rq0.30。
+const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.30/dist/人妻公寓/素材';
 
 let 当前页: {
   名: 'chats' | 'chat' | 'moments' | 'call' | 'talk' | 'settings';
@@ -774,6 +781,9 @@ const 手机CSS = `
 #${ROOT_ID} .rqp-call .acts .ok{background:#07c160;}
 #${ROOT_ID} .rqp-call .acts .no{background:#fa5151;}
 #${ROOT_ID} .rqp-set{padding:16px;display:flex;flex-direction:column;gap:10px;background:#fff;height:100%;}
+#${ROOT_ID} .rqp-set .rqp-api-section{display:flex;flex-direction:column;gap:10px;}
+#${ROOT_ID} .rqp-set .custom-api-fields{display:flex;flex-direction:column;gap:10px;}
+#${ROOT_ID} .rqp-set .toggle-custom{text-align:left;width:100%;}
 #${ROOT_ID} .rqp-set label{font-size:12px;color:#333!important;-webkit-text-fill-color:#333!important;display:flex;flex-direction:column;gap:4px;}
 #${ROOT_ID} .rqp-set input,#${ROOT_ID} .rqp-set select{border:1px solid #ddd;border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit;background:#fff;color:#111!important;-webkit-text-fill-color:#111!important;caret-color:#111;opacity:1;}
 #${ROOT_ID} .rqp-set input::placeholder{color:#8a8a8a!important;-webkit-text-fill-color:#8a8a8a!important;opacity:1;}
@@ -785,8 +795,22 @@ const 手机CSS = `
 `;
 
 function 头像块(名: string): string {
-  const 文件 = 名 === '父亲' ? '影子' : 名; // 五夫+父亲=柯南影子头像(设计拍板共用)
+  const 丈夫名 = new Set(门牌列表.map(m => 户静态表[m].夫名).filter(Boolean));
+  const 文件 = 名 === '父亲' || 丈夫名.has(名) ? '影子' : 名; // 五夫+父亲=柯南影子头像(设计拍板共用)
   return `<span class="rqp-ava"><img src="${素材基址}/头像/${文件}.webp" onerror="this.remove();this.parentElement.textContent='${名[0] ?? '?'}'"/></span>`;
+}
+
+/** 群消息正文以「发言人:内容」保存；气泡头像必须跟发言人走，不能永远显示群头像。 */
+function 群消息头像名(会话: string, 文: string, 默认名: string): string {
+  if (会话 !== '群' && 会话 !== '姐妹群') return 默认名;
+  const 发言人 = 文.match(/^([^::]{1,8})[::]/)?.[1]?.trim();
+  if (!发言人) return 默认名;
+  const 合法名 = new Set<string>();
+  for (const m of 门牌列表) {
+    合法名.add(户静态表[m].妻名);
+    if (户静态表[m].夫名) 合法名.add(户静态表[m].夫名);
+  }
+  return 合法名.has(发言人) ? 发言人 : 默认名;
 }
 
 function 时段字(楼戳: number, 偏移: number): string {
@@ -1182,7 +1206,7 @@ function 渲染(): void {
           : 会话 === '姐妹群'
             ? '姐妹茶话会'
             : (户静态表[会话 as 门牌]?.妻名 ?? 会话);
-    头(正在输入 === 会话 ? '对方正在输入…' : 名, () => {
+    头(正在输入 === 会话 ? (会话 === '群' || 会话 === '姐妹群' ? '群成员正在输入…' : '对方正在输入…') : 名, () => {
       当前页 = { 名: 'chats' };
       渲染();
     });
@@ -1203,11 +1227,12 @@ function 渲染(): void {
         泡区.appendChild(el('div', 'rqp-b sys', `[语音通话] ${_.escape(m.文)}`));
       } else {
         const 我方 = m.发 === '我';
+        const 消息头像 = 我方 ? '主角' : 群消息头像名(会话, m.文, 对方头像名);
         泡区.appendChild(
           el(
             'div',
             `rqp-line ${我方 ? 'me' : 'ta'}`,
-            `${头像块(我方 ? '主角' : 对方头像名)}<div class="rqp-b ${我方 ? 'me' : 'ta'}">${_.escape(m.文)}</div>`,
+            `${头像块(消息头像)}<div class="rqp-b ${我方 ? 'me' : 'ta'}">${_.escape(m.文)}</div>`,
           ),
         );
       }
@@ -1438,32 +1463,58 @@ function 渲染(): void {
         <option value="正文"${c.ai来源 === '正文' ? ' selected' : ''}>只用正文 API</option>
         <option value="自定义"${c.ai来源 === '自定义' ? ' selected' : ''}>自定义 OpenAI API</option>
       </select></label>
-      <p class="db-status" style="color:${db.可调用AI ? '#287a50' : '#666'};font-size:12px;margin:2px 0 8px">数据库：${
-        db.可调用AI
-          ? `已连接${db.已装游戏模板 ? '，人妻公寓表已安装' : '，尚未安装人妻公寓表'}`
-          : '未检测到公开 API（自动模式会使用正文 API）'
-      }</p>
-      <label>数据库 API 预设名（留空=数据库当前配置）<input class="i-db-preset" list="rq-db-presets" value="${_.escape(c.数据库预设)}" placeholder="例如：手机小模型"/></label>
-      <datalist id="rq-db-presets">${db预设名.map(name => `<option value="${_.escape(name)}"></option>`).join('')}</datalist>
-      <p style="color:#666;font-size:11px;margin:0 0 6px">${
-        db预设名.length
-          ? `旧版数据库公开了 ${db预设名.length} 个预设名称，可直接选择。`
-          : db.已安装
-            ? '数据库 8.4 不向外公开预设列表；可手填名称，或留空使用数据库当前配置。'
-            : '安装数据库后可使用其 AI 配置；没有数据库也不影响游戏。'
-      }</p>
-      <label style="display:flex;align-items:center;gap:8px"><input class="i-db-fallback" type="checkbox" style="width:auto"${
-        c.数据库失败回退 ? ' checked' : ''
-      }/>数据库请求报错时再尝试正文 API（可能造成双请求）</label>
-      <span style="display:flex;gap:6px"><button class="install-db" style="flex:1">安装/更新本游戏表</button><button class="open-db" style="flex:1">打开数据库</button></span>
-      <label>自定义API 地址（OpenAI兼容）<input class="i-base" value="${_.escape(c.base)}" placeholder="https://…/v1"/></label>
-      <label>API Key<input class="i-key" type="password" value="${_.escape(c.key)}"/></label>
-      <label>模型<span style="display:flex;gap:6px"><input class="i-model" style="flex:1" value="${_.escape(c.model)}" placeholder="gpt-4.1-mini 等"/><button class="fetch-models" style="flex:none;padding:0 10px">读取模型</button></span></label>
-      <select class="i-models" style="display:none"><option value="">— 从列表选择 —</option></select>
-      <p class="models-tip" style="display:none;color:#666;font-size:12px;margin:2px 0 0"></p>
+      <div class="rqp-api-section db-api-section">
+        <p class="db-status" style="color:${db.可调用AI ? '#287a50' : '#666'};font-size:12px;margin:2px 0 8px">数据库：${
+          db.可调用AI
+            ? `已连接${db.已装游戏模板 ? '，人妻公寓表已安装' : '，尚未安装人妻公寓表'}`
+            : '未检测到公开 API（自动模式会使用正文 API）'
+        }</p>
+        <label>手机专用数据库预设名（留空=数据库当前配置）<input class="i-db-preset" list="rq-db-presets" value="${_.escape(c.数据库预设)}" placeholder="例如：人妻公寓手机"/></label>
+        <datalist id="rq-db-presets">${db预设名.map(name => `<option value="${_.escape(name)}"></option>`).join('')}</datalist>
+        <p style="color:#666;font-size:11px;margin:0 0 6px">${
+          db预设名.length
+            ? `旧版数据库公开了 ${db预设名.length} 个预设名称，可直接选择。`
+            : db.已安装
+              ? '可在数据库里新建“人妻公寓手机”预设：沿用同一地址和 Key，但选择另一模型；这里填预设名即可。数据库 8.4 不向外公开预设列表，所以也可以留空使用当前配置。'
+              : '安装数据库后可使用其 AI 配置；没有数据库也不影响游戏。'
+        }</p>
+        <label style="display:flex;align-items:center;gap:8px"><input class="i-db-fallback" type="checkbox" style="width:auto"${
+          c.数据库失败回退 ? ' checked' : ''
+        }/>数据库请求报错时再尝试正文 API（可能造成双请求）</label>
+        <span style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button class="install-db">安装/更新本游戏表</button><button class="open-db">查看数据库表</button><button class="open-db-settings" style="grid-column:1/-1">配置手机专用模型</button></span>
+      </div>
+      <div class="rqp-api-section custom-api-section">
+        <button type="button" class="toggle-custom">手机自定义 API（独立配置）</button>
+        <div class="custom-api-fields">
+          <p style="color:#666;font-size:11px">不经过数据库时使用。可以填写同一 API 的地址和 Key，再为手机选择不同模型。</p>
+          <label>自定义API 地址（OpenAI兼容）<input class="i-base" value="${_.escape(c.base)}" placeholder="https://…/v1"/></label>
+          <label>API Key<input class="i-key" type="password" value="${_.escape(c.key)}"/></label>
+          <label>模型<span style="display:flex;gap:6px"><input class="i-model" style="flex:1" value="${_.escape(c.model)}" placeholder="gpt-4.1-mini 等"/><button class="fetch-models" style="flex:none;padding:0 10px">读取自定义模型</button></span></label>
+          <select class="i-models" style="display:none"><option value="">— 从列表选择 —</option></select>
+          <p class="models-tip" style="display:none;color:#666;font-size:12px;margin:2px 0 0"></p>
+        </div>
+      </div>
       <label>动态频率<select class="i-freq"><option${c.频率 === '勤' ? ' selected' : ''}>勤</option><option${c.频率 === '普通' ? ' selected' : ''}>普通</option><option${c.频率 === '静' ? ' selected' : ''}>静</option><option${c.频率 === '关' ? ' selected' : ''}>关</option></select></label>
       <button class="save">保存</button>
       <p class="credit">自动模式：检测到数据库公开API就由数据库代发；未安装数据库才使用正文API。数据库调用失败默认不二次请求，避免重复计费。游戏硬状态始终由MVU管理。<br/>手机外观:柚月小手机(yuzuki)授权砍装;挂载范式参考玉子手机(yuzi83)。经双授权改造,谨此致谢。</p>`;
+    const 来源选择 = 区.querySelector('.i-source') as HTMLSelectElement;
+    const 数据库区 = 区.querySelector('.db-api-section') as HTMLElement;
+    const 自定义开关 = 区.querySelector('.toggle-custom') as HTMLButtonElement;
+    const 自定义字段 = 区.querySelector('.custom-api-fields') as HTMLElement;
+    let 自定义展开 = c.ai来源 === '自定义';
+    const 刷新API分区 = () => {
+      const 来源 = 来源选择.value as 手机AI来源;
+      数据库区.style.display = 来源 === '自动' || 来源 === '数据库' ? 'flex' : 'none';
+      if (来源 === '自定义') 自定义展开 = true;
+      自定义字段.style.display = 自定义展开 ? 'flex' : 'none';
+      自定义开关.textContent = `${自定义展开 ? '▾' : '▸'} 手机自定义 API（独立配置）`;
+    };
+    来源选择.addEventListener('change', 刷新API分区);
+    自定义开关.addEventListener('click', () => {
+      自定义展开 = !自定义展开;
+      刷新API分区();
+    });
+    刷新API分区();
     (区.querySelector('.install-db') as HTMLButtonElement).addEventListener('click', () => {
       const 宿主 = window.parent ?? window;
       if (!db.已安装) {
@@ -1489,6 +1540,11 @@ function 渲染(): void {
         if (!ok) (window.parent ?? window).alert('未检测到可打开的数据库界面。');
       });
     });
+    (区.querySelector('.open-db-settings') as HTMLButtonElement).addEventListener('click', () => {
+      void 打开数据库设置().then(ok => {
+        if (!ok) (window.parent ?? window).alert('当前数据库版本没有提供可打开的设置页。');
+      });
+    });
     // 读取模型列表(OpenAI 兼容 GET {base}/models;与 小生成 同一 base 约定=填到 /v1)
     (区.querySelector('.fetch-models') as HTMLButtonElement).addEventListener('click', () => {
       const base = (区.querySelector('.i-base') as HTMLInputElement).value.trim().replace(/\/+$/, '');
@@ -1506,7 +1562,10 @@ function 渲染(): void {
       说('读取中…');
       void 限时请求(`${base}/models`, { headers: { Authorization: `Bearer ${key}` } })
         .then(async r => {
-          if (!r.ok) throw new Error(`HTTP ${r.status}`);
+          if (!r.ok) {
+            if (r.status === 401) throw new Error('HTTP 401：自定义 API 鉴权失败；这里不会读取数据库保存的密钥');
+            throw new Error(`HTTP ${r.status}`);
+          }
           const j = (await r.json()) as { data?: { id?: string }[] };
           const 们 = (j.data ?? []).map(m => m.id).filter((x): x is string => !!x);
           if (!们.length) throw new Error('列表为空');
@@ -1516,9 +1575,7 @@ function 渲染(): void {
           选.style.display = 'block';
           说(`读到 ${们.length} 个模型,从下拉里选一个。`);
         })
-        .catch(e =>
-          说(`读取失败:${String(e).slice(0, 80)}(地址要填到 /v1;也可能是该服务不开放模型列表,直接手填模型名即可)`),
-        );
+        .catch(e => 说(`读取失败:${String(e).slice(0, 100)}（请检查这里单独填写的地址和 Key；也可以直接手填模型名）`));
     });
     (区.querySelector('.i-models') as HTMLSelectElement).addEventListener('change', ev => {
       const v = (ev.target as HTMLSelectElement).value;
@@ -1655,6 +1712,39 @@ async function 姐妹群一拍(data: SchemaType, 库: 微信库, 楼: number, �
   return 有;
 }
 
+// ── 楼务群接话：公开、克制、只谈住户共同可见的楼务，不泄露任何私下剧情 ──
+
+async function 楼务群一拍(data: SchemaType, 库: 微信库, 楼: number, 起因: string): Promise<boolean> {
+  const 成员 = 门牌列表.filter(m => {
+    const 配 = 户静态表[m];
+    return Boolean(data.户[m]) && (!配.隐身 || data.系统._母亲入列);
+  });
+  if (!成员.length) return false;
+  const 名单 = 成员.map(m => `${户静态表[m].妻名}(${m}室住户)`).join('、');
+  const 近况 = 库.消息
+    .filter(m => m.会话 === '群' && m.类 !== '撤回')
+    .slice(-12)
+    .map(m => (m.发 === '我' ? `${玩家名()}:${m.文}` : m.文))
+    .join('\n');
+  const 原 = await 小生成(
+    '你为都市公寓游戏生成一小段和睦、真实的楼务微信群回复。只允许当前已入住的住户妻子发言；她们把管理员当物业联系人。' +
+      '回复应针对管理员刚发的通知，可以是确认收到、补充实际情况、提出一个简短问题或报告同类楼务问题。' +
+      '只谈公共可见的物业与邻里事项，严禁暧昧、隐私、婚姻秘密、游戏机制，也严禁虚构名单外住户。' +
+      '输出1~3行，每行严格为“发言人:内容”，每条不超过35字，不要旁白、引号或解释；发言人只能从给定名单选择。',
+    `当前可发言住户:${名单}\n管理员:${玩家名()}\n最近楼务群记录:\n${近况 || '暂无'}\n刚刚:${起因}\n请让最相关的一至三人自然接话。`,
+  );
+  if (!原) return false;
+  const 合法名 = new Set(成员.map(m => 户静态表[m].妻名));
+  let 有 = false;
+  for (const 行 of 原.split('\n')) {
+    const m = 行.trim().match(/^([^::]{1,8})[::]\s*(.+)$/);
+    if (!m || !合法名.has(m[1])) continue;
+    库.消息.push({ 楼, 会话: '群', 发: '对方', 文: `${m[1]}:${m[2]}` });
+    有 = true;
+  }
+  return 有;
+}
+
 // ── 单聊/群聊发送(玩家侧;她的回复走独立API,不占楼) ──
 
 async function 发消息(会话: string, 文: string): Promise<void> {
@@ -1663,7 +1753,27 @@ async function 发消息(会话: string, 文: string): Promise<void> {
   库.消息.push({ 楼, 会话, 发: '我', 文 });
   await 写库(库);
   渲染();
-  if (会话 === '群') return; // 群通知不强制回声
+  if (会话 === '群') {
+    正在输入 = 会话;
+    渲染();
+    try {
+      const rawStat = 读最近有效stat();
+      if (rawStat) {
+        const data = Schema.parse(rawStat) as SchemaType;
+        const 库2 = 读库();
+        if (await 楼务群一拍(data, 库2, 末楼(), `${玩家名()}发布通知：“${文}”`)) {
+          库2.读到['群'] = 末楼();
+          await 写库(库2);
+        }
+      }
+    } catch (e) {
+      console.error('[人妻公寓·手机] 楼务群接话失败:', e);
+    } finally {
+      正在输入 = null;
+      渲染();
+    }
+    return;
+  }
   if (会话 === '姐妹群') {
     // 玩家插话=太太们接话一轮(带群记忆)
     正在输入 = 会话;

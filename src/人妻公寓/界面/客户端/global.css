@@ -7,6 +7,7 @@
   --ink: #242126;
   --ink-soft: #5f5b66;
   --ink-faint: #8b8794;
+  --prose-default: #242126;
   /* 底与卡 */
   --white: #fffefd;
   --glass: rgba(255, 255, 255, 0.88);
@@ -62,6 +63,7 @@ html.rq-dark {
   --ink: #e9e6f0;
   --ink-soft: #b3aec0;
   --ink-faint: #7d798c;
+  --prose-default: #f4f2f7;
   --white: #262838;
   --glass: rgba(34, 36, 50, 0.88);
   --paper-card: #262838;

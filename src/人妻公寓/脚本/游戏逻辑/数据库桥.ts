@@ -233,6 +233,17 @@ export async function 打开数据库界面(): Promise<boolean> {
   return false;
 }
 
+/** 打开数据库自身的设置页，用于配置手机专用预设（同一 API 可选择不同模型）。 */
+export async function 打开数据库设置(): Promise<boolean> {
+  const api = 取数据库API();
+  try {
+    if (typeof api?.openSettings === 'function') return await api.openSettings();
+  } catch (error) {
+    console.warn('[人妻公寓·数据库] 打开数据库设置失败:', error);
+  }
+  return false;
+}
+
 export interface 数据库回合事件 {
   楼层: number;
   时间: string;

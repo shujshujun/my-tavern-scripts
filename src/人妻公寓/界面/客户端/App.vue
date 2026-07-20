@@ -14,9 +14,6 @@
 
       <!-- 右上角:主题切换 + 全屏 + 设置(meta 类操作,不进游戏功能区) -->
       <span class="corner-btns">
-        <button class="btn mini icon" title="查看 AI 收到的全部提示词" @click="打开提示词查看器">
-          <Ic n="search" />
-        </button>
         <button class="btn mini icon" :title="暗色 ? '切回日间模式' : '切换夜间模式'" @click="切换主题">
           <Ic :n="暗色 ? 'sun' : 'moon'" />
         </button>
@@ -349,6 +346,14 @@
               </template>
               <template v-else>
                 <button
+                  v-if="条.谁 === '叙事' && 条.楼 !== undefined && 条.楼 > 0 && !发送中"
+                  class="entry-prompt"
+                  title="查看这一回合的提示词"
+                  @click="打开楼层提示词(条.楼)"
+                >
+                  提示词
+                </button>
+                <button
                   v-if="条.原文 !== undefined && !发送中"
                   class="entry-edit"
                   title="改写这一段(同酒馆的铅笔编辑)"
@@ -392,12 +397,36 @@
 
         <!-- 房内动作(输入门控收紧后的补位:站在垃圾房/空户里,翻袋撬门不用开地图) -->
         <div v-if="!发送中 && 当前房间 === '垃圾房' && 垃圾袋列表.length" class="garbage-pick">
-          <span><Ic n="trash" />翻谁家的垃圾</span>
-          <select v-model="垃圾目标" aria-label="选择垃圾袋">
-            <option v-for="袋 in 垃圾袋列表" :key="袋.门牌" :value="袋.门牌">{{ 袋.门牌 }} · {{ 袋.妻名 }}</option>
-          </select>
-          <button class="btn risky" :disabled="发送中" @click="翻(垃圾目标)">翻找</button>
+          <button class="tile risky garbage-open" @click="垃圾选择开 = true">
+            <Ic n="trash" />
+            <span class="act-kicker">SEARCH</span>
+            <strong>翻垃圾</strong>
+            <small>选择对应房间的垃圾袋</small>
+          </button>
         </div>
+        <transition name="card-pop">
+          <div v-if="垃圾选择开" class="garbage-mask" @click.self="垃圾选择开 = false">
+            <section class="garbage-modal" aria-modal="true" aria-label="选择垃圾袋">
+              <button class="sheet-close" @click="垃圾选择开 = false">✕</button>
+              <div class="ui-kicker">TRASH ROOM / BAG INDEX</div>
+              <h3>翻谁家的垃圾</h3>
+              <p>认准门牌。每只袋子只通向对应住户的线索。</p>
+              <div class="garbage-grid">
+                <button v-for="袋 in 垃圾袋列表" :key="袋.门牌" class="garbage-tile" @click="选垃圾袋(袋.门牌)">
+                  <img
+                    v-if="!头像失效[袋.妻名]"
+                    :src="头像图(袋.妻名)"
+                    :alt="袋.妻名"
+                    @error="头像失效[袋.妻名] = true"
+                  />
+                  <span v-else class="garbage-fallback">{{ 袋.妻名[0] }}</span>
+                  <b>{{ 袋.门牌 }}</b>
+                  <em>{{ 袋.妻名 }}家</em>
+                </button>
+              </div>
+            </section>
+          </div>
+        </transition>
         <div v-if="!发送中 && 普通房间动作.length" class="scene-acts">
           <button v-for="(动作, i) in 普通房间动作" :key="i" class="tile" :class="动作.类" @click="动作.做()">
             <Ic :n="动作.icon" />
@@ -629,8 +658,8 @@
                 <span class="hearts" :title="'阶段:' + 选中档案.妻.阶段标题">
                   <i v-for="n in 5" :key="n" :class="{ on: n <= 选中档案.妻.当前阶段 }">♥</i>
                 </span>
+                <span class="dossier-stage">{{ 选中档案.妻.阶段标题 }}</span>
               </span>
-              <span class="dossier-stage">{{ 选中档案.妻.阶段标题 }}</span>
             </div>
             <div class="dossier-portrait" aria-hidden="true">
               <img
@@ -649,7 +678,15 @@
                 ><b>{{ 轴.名 }}</b
                 ><i>{{ Math.round(轴.值) }}</i></span
               >
-              <div class="axis"><i class="bar" :class="轴.类" :style="{ width: 轴.值 + '%' }" /></div>
+              <div class="axis dossier-battery" role="meter" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="轴.值">
+                <i
+                  v-for="格 in 10"
+                  :key="格"
+                  class="axis-cell"
+                  :class="[轴.类, { on: 格 <= Math.ceil(轴.值 / 10) }]"
+                  :style="{ '--cell-index': 格 }"
+                />
+              </div>
             </div>
           </div>
 
@@ -946,6 +983,14 @@
               </template>
               <template v-else>
                 <button
+                  v-if="条.谁 === '叙事' && 条.楼 !== undefined && 条.楼 > 0 && !发送中"
+                  class="entry-prompt"
+                  title="查看这一回合的提示词"
+                  @click="打开楼层提示词(条.楼)"
+                >
+                  提示词
+                </button>
+                <button
                   v-if="条.原文 !== undefined && !发送中"
                   class="entry-edit"
                   title="改写这一段"
@@ -1088,6 +1133,8 @@ const 当前房间 = ref<string | null>(null);
 const 显示地图 = ref(false);
 /** 进房那一刻的末楼号(随 _场景 持久;只供脚本确认这次碰面,地图始终看当前钟楼) */
 const 进房末楼 = ref(0);
+/** 工具由头只在这一次“从门外进房”的首轮结算一次；留在房内续聊不能再次算检修。 */
+const 本次入房由头已用 = ref(false);
 const 位置种子 = computed(() => 钟楼号.value);
 
 /** 正在与玩家对话的人只固定在当前场景；其余住户在地图上按最新钟楼移动。 */
@@ -1132,7 +1179,9 @@ watch(显示地图, 开 => {
 async function 写场景(房间id: string | null, 破门 = false): Promise<void> {
   await insertOrAssignVariables(
     {
-      _场景: 房间id ? { 房间id, 破门, 进房末楼: 进房末楼.value } : null,
+      _场景: 房间id
+        ? { 房间id, 破门, 进房末楼: 进房末楼.value, 由头已用: 本次入房由头已用.value }
+        : null,
       _粘滞: null, // 玩家一走动就解除旧对话固定；重回同一房间也不能把已经离开的人“复活”
     },
     { type: 'chat' },
@@ -1146,6 +1195,7 @@ async function 进入(房间id: string, 破门 = false, 保持地图 = false): P
     进房末楼.value = 末楼号.value;
   }
   当前房间.value = 房间id;
+  本次入房由头已用.value = false;
   已破门进入.value = 破门;
   粘滞在场.value = { 位置: null, 们: [] };
   if (!保持地图) 关地图();
@@ -1158,6 +1208,7 @@ async function 进入(房间id: string, 破门 = false, 保持地图 = false): P
 
 async function 离开房间(): Promise<void> {
   当前房间.value = null;
+  本次入房由头已用.value = false;
   粘滞在场.value = { 位置: null, 们: [] };
   已破门进入.value = false;
   await 写场景(null);
@@ -1206,7 +1257,12 @@ const 需要由头 = computed(() => {
   const 节 = data.value?.户[id];
   // 2026-07-20 用户加码:裂缝破解只是"看清她",她真进了下个阶段(≥1)才算有登门的名分——
   // 刚读完信还停阶段0的,上门照样要工具由头
-  return Boolean(节) && !(节!.妻.裂缝.已确认 && 节!.妻.当前阶段 >= 1) && !已破门进入.value;
+  return (
+    Boolean(节) &&
+    !(节!.妻.裂缝.已确认 && 节!.妻.当前阶段 >= 1) &&
+    !已破门进入.value &&
+    !本次入房由头已用.value
+  );
 });
 
 const 可用由头 = computed(() => {
@@ -1448,18 +1504,17 @@ function 房间动作(id: string | null): 卡动作[] {
     }
   }
   if (id === '垃圾房') {
-    for (const 袋 of 垃圾袋列表.value) {
-      动作.push({
-        kicker: 'SEARCH',
-        icon: 'trash',
-        文案: `翻${袋.妻名}家的垃圾袋`,
-        类: 'risky',
-        做: async () => {
-          if (当前房间.value !== '垃圾房') await 进入('垃圾房', false, true); // 人先走过去,地图和卡都不收
-          翻(袋.门牌);
-        },
-      });
-    }
+    动作.push({
+      kicker: 'SEARCH',
+      icon: 'trash',
+      文案: '翻垃圾',
+      类: 'risky',
+      做: async () => {
+        if (当前房间.value !== '垃圾房') await 进入('垃圾房', false, true);
+        房卡.value = null;
+        垃圾选择开.value = true;
+      },
+    });
   }
   return 动作;
 }
@@ -1669,8 +1724,8 @@ const 底层公共 = [
 
 // ── 素材(AI 生成,2026-07-17 入库;素材 TAG 与发布 TAG 解耦——素材没变就不用动这里) ──
 
-// ⚠ 与手机系统同步：本轮测试发布 tag=rq0.29。
-const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.29/dist/人妻公寓/素材';
+// ⚠ 与手机系统同步：本轮测试发布 tag=rq0.30。
+const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.30/dist/人妻公寓/素材';
 
 function 头像图(名: string): string {
   return `${素材基址}/头像/${名}.webp`;
@@ -1921,8 +1976,16 @@ async function 发送() {
     const 新记录 = { 日: 今日, 已用: [...new Set([...已用, 用])] };
     由头写入中.value = true;
     try {
-      await insertOrAssignVariables(_.set({}, `_工具由头.${门牌号}`, 新记录), { type: 'chat' });
+      const 更新 = _.set({}, `_工具由头.${门牌号}`, 新记录);
+      _.set(更新, '_场景', {
+        房间id: 门牌号,
+        破门: 已破门进入.value,
+        进房末楼: 进房末楼.value,
+        由头已用: true,
+      });
+      await insertOrAssignVariables(更新, { type: 'chat' });
       工具由头记录.value = { ...工具由头记录.value, [门牌号]: 新记录 };
+      本次入房由头已用.value = true;
     } catch (e) {
       输入文本.value = 文本;
       弹提示(`工具箱使用记录没有保存：${e instanceof Error ? e.message : String(e)}`);
@@ -2219,10 +2282,15 @@ function 送出(道具id: string, 门牌号: 门牌) {
 // ── 侦探:翻垃圾 / 摄像头 / 偷窥选细节 / 读信 ──
 
 const 垃圾袋列表 = computed(() => 可见门牌.value.map(m => ({ 门牌: m, 妻名: 户静态表[m].妻名 })));
-const 垃圾目标 = ref<门牌>('101');
+const 垃圾选择开 = ref(false);
 
 function 翻(门牌号: 门牌) {
   eventEmit('人妻公寓:翻垃圾', 门牌号);
+}
+
+function 选垃圾袋(门牌号: 门牌) {
+  垃圾选择开.value = false;
+  翻(门牌号);
 }
 
 function 布设() {
@@ -2553,20 +2621,23 @@ async function 进真全屏() {
   else throw new Error('Fullscreen API 不可用');
 }
 
-/** 复用酒馆助手原生提示词查看器：点击它传送到 extensionsMenu 的真实入口，不另造阉割版窗口。 */
-async function 打开提示词查看器() {
+/** 复用酒馆每条消息「… → Prompt」的原生入口；传入楼号，只打开这一回合。 */
+async function 打开楼层提示词(楼: number) {
   let 根文档: Document;
   try {
     根文档 = window.parent?.document ?? document;
   } catch {
-    弹提示('无法访问酒馆页面，提示词查看器没有打开。');
+    弹提示('无法访问酒馆页面，这一回合的提示词没有打开。');
     return;
   }
-  const 入口 = Array.from(根文档.querySelectorAll<HTMLElement>('#extensionsMenu .list-group-item')).find(el =>
-    /提示词查看器|Prompt Viewer/i.test(el.textContent ?? ''),
-  );
+  const 入口 = 根文档.querySelector<HTMLElement>(`.mes[mesid="${Math.trunc(楼)}"] .mes_prompt`);
   if (!入口) {
-    弹提示('没有找到酒馆助手的提示词查看器，请确认酒馆助手已启用。', 5000);
+    弹提示('没有找到这一回合对应的酒馆消息。', 4000);
+    return;
+  }
+  const 样式 = window.parent?.getComputedStyle?.(入口) ?? getComputedStyle(入口);
+  if (样式.display === 'none') {
+    弹提示('这一回合没有保存可查看的提示词。', 4000);
     return;
   }
 
@@ -2580,23 +2651,23 @@ async function 打开提示词查看器() {
       /* 即使退出失败也尝试唤起原生窗口 */
     }
   }
-  入口.click();
+  // 酒馆原生监听的是 pointerup，不是 click。
+  const Pointer事件 = window.parent?.PointerEvent ?? PointerEvent;
+  入口.dispatchEvent(new Pointer事件('pointerup', { bubbles: true, cancelable: true }));
 
-  // 原生窗口挂在父文档；若是本按钮替玩家退的全屏，点原生关闭钮后送回游戏全屏。
+  // 原生窗口挂在父文档；若本按钮替玩家退出了全屏，等原生窗口真正关闭后再恢复。
   if (原本全屏) {
-    setTimeout(() => {
-      const 对话框 = Array.from(根文档.querySelectorAll<HTMLElement>('[role="dialog"]')).find(el =>
-        /提示词查看器|Prompt Viewer/i.test(el.textContent ?? ''),
-      );
-      const 关闭 = 对话框?.querySelector<HTMLElement>('[title="关闭"], [title="Close"]');
-      关闭?.addEventListener(
-        'click',
-        () => {
-          void 进真全屏().catch(e => console.warn('[人妻公寓客户端] 提示词查看器关闭后恢复全屏失败:', e));
-        },
-        { once: true },
-      );
-    }, 0);
+    let 看见窗口 = false;
+    let 次数 = 0;
+    const 轮询 = window.setInterval(() => {
+      次数++;
+      const 有窗口 = Boolean(根文档.querySelector('dialog[open], [role="dialog"], .popup[open]'));
+      看见窗口 ||= 有窗口;
+      if ((看见窗口 && !有窗口) || 次数 > 1200) {
+        clearInterval(轮询);
+        if (看见窗口) void 进真全屏().catch(e => console.warn('[人妻公寓客户端] 原生提示词关闭后恢复全屏失败:', e));
+      }
+    }, 250);
   }
 }
 
@@ -2890,14 +2961,17 @@ onMounted(() => {
     房间id?: string;
     破门?: boolean;
     进房末楼?: number;
+    由头已用?: boolean;
   } | null;
   当前房间.value = 场景?.房间id ?? null;
   已破门进入.value = !!场景?.破门;
+  本次入房由头已用.value = !!场景?.由头已用;
   幕房间.value = 当前房间.value; // 刷新恢复:已有正文与选项视为当前场景的
   try {
     进房末楼.value = 场景?.进房末楼 ?? getLastMessageId();
   } catch {
     进房末楼.value = 0;
+    本次入房由头已用.value = false;
   }
   刷赴约();
 
@@ -3480,7 +3554,7 @@ onUnmounted(() => {
 .narr {
   font-family: var(--font-prose);
   /* 字色三级:玩家自选 > 主题墨色(rq-dark 自动翻浅) */
-  color: var(--prose-ink, var(--ink));
+  color: var(--prose-ink, var(--prose-default, var(--ink)));
   font-size: var(--prose-size, 0.9em);
   line-height: 1.85;
   margin: 5px 0;
@@ -3508,8 +3582,37 @@ onUnmounted(() => {
   transition: opacity 0.2s;
 }
 
-.story-entry:hover .entry-edit {
+.entry-prompt {
+  position: absolute;
+  z-index: 2;
+  top: 1px;
+  right: 27px;
+  padding: 2px 6px;
+  border: 1px solid rgba(86, 112, 142, 0.2);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.74);
+  color: var(--ink-faint);
+  font: 600 0.62em/1.35 var(--font-mono);
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.story-entry:hover .entry-edit,
+.story-entry:hover .entry-prompt,
+.entry-prompt:focus-visible {
   opacity: 0.85;
+}
+
+.entry-prompt:hover {
+  color: var(--blue);
+  border-color: rgba(68, 118, 174, 0.5);
+}
+
+@media (hover: none), (pointer: coarse) {
+  .entry-prompt {
+    opacity: 0.72;
+  }
 }
 
 .edit-area {
@@ -4603,10 +4706,7 @@ onUnmounted(() => {
 }
 
 .dossier-stage {
-  position: absolute;
-  z-index: 3;
-  left: 20px;
-  bottom: 20px;
+  align-self: flex-start;
   color: #fff;
   background: linear-gradient(180deg, #ff6cab, #ff4f9a);
   border-radius: 999px;
@@ -4654,6 +4754,46 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.76);
   border: 1px solid rgba(255, 79, 154, 0.13);
   box-shadow: 0 3px 10px rgba(44, 40, 56, 0.05);
+}
+
+.dossier-battery {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 2px;
+  height: 9px;
+  padding: 1px;
+  background: rgba(36, 33, 38, 0.06);
+}
+
+.dossier-battery .axis-cell {
+  min-width: 0;
+  height: 100%;
+  border-radius: 2px;
+  background: rgba(36, 33, 38, 0.09);
+  transform: scaleY(0.72);
+  transition:
+    background 0.32s ease calc(var(--cell-index) * 24ms),
+    box-shadow 0.32s ease calc(var(--cell-index) * 24ms),
+    transform 0.32s cubic-bezier(0.2, 0.9, 0.25, 1.35) calc(var(--cell-index) * 24ms);
+}
+
+.dossier-battery .axis-cell.on {
+  transform: scaleY(1);
+}
+
+.dossier-battery .axis-cell.fav.on {
+  background: linear-gradient(180deg, #ff9cc3, var(--pink));
+  box-shadow: 0 0 5px rgba(255, 79, 154, 0.24);
+}
+
+.dossier-battery .axis-cell.sin.on {
+  background: linear-gradient(180deg, #ffb091, var(--red));
+  box-shadow: 0 0 5px rgba(228, 82, 90, 0.22);
+}
+
+.dossier-battery .axis-cell.marr.on {
+  background: linear-gradient(180deg, #9cebd7, var(--green));
+  box-shadow: 0 0 5px rgba(49, 179, 146, 0.22);
 }
 
 .axis-top {
@@ -5075,44 +5215,130 @@ onUnmounted(() => {
 
 .garbage-pick {
   flex: none;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 7px;
+  display: flex;
   margin-top: 6px;
-  padding: 6px 8px;
+  padding: 0;
+}
+
+.garbage-open {
+  width: min(230px, 100%);
+  min-height: 68px;
+  grid-template-columns: 34px 1fr;
+  grid-template-rows: auto auto auto;
+  text-align: left;
+}
+
+.garbage-open .ic {
+  grid-row: 1 / -1;
+  width: 30px;
+  height: 30px;
+}
+
+.garbage-open small {
+  color: var(--ink-faint);
+  font-size: 0.68em;
+}
+
+.garbage-mask {
+  position: fixed;
+  z-index: 145;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(12, 12, 18, 0.68);
+  backdrop-filter: blur(5px);
+}
+
+.garbage-modal {
+  position: relative;
+  width: min(600px, 94vw);
+  max-height: min(72vh, 620px);
+  overflow: hidden auto;
+  padding: 18px;
+  color: var(--ink);
+  background: var(--paper-card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+
+.garbage-modal h3 {
+  margin: 4px 0 2px;
+}
+
+.garbage-modal > p {
+  margin: 0 0 12px;
   color: var(--ink-soft);
   font-size: 0.76em;
-  background: var(--glass);
-  border: 1px solid rgba(229, 83, 63, 0.2);
-  border-radius: 12px;
 }
 
-.garbage-pick > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  white-space: nowrap;
+.garbage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+  gap: 9px;
 }
 
-.garbage-pick .ic {
-  width: 18px;
-  height: 18px;
+.garbage-tile {
+  position: relative;
+  min-height: 132px;
+  overflow: hidden;
+  padding: 0;
+  color: #fff;
+  text-align: left;
+  background: linear-gradient(150deg, #454b59, #252832);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 13px;
+  cursor: pointer;
+  box-shadow: 0 5px 14px rgba(15, 15, 22, 0.18);
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
 }
 
-.garbage-pick select {
-  min-width: 0;
-  padding: 5px 7px;
-  color: var(--ink);
-  font: inherit;
-  background: var(--glass);
-  border: 1px solid var(--line-soft);
-  border-radius: 8px;
+.garbage-tile:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 22px rgba(15, 15, 22, 0.28);
 }
 
-.garbage-pick .btn.risky {
-  color: var(--red);
-  border-color: rgba(229, 83, 63, 0.35);
+.garbage-tile img,
+.garbage-fallback {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.garbage-tile::after {
+  content: '';
+  position: absolute;
+  inset: 35% 0 0;
+  background: linear-gradient(transparent, rgba(8, 9, 14, 0.9));
+}
+
+.garbage-tile b,
+.garbage-tile em {
+  position: absolute;
+  z-index: 2;
+  left: 9px;
+}
+
+.garbage-tile b {
+  bottom: 25px;
+  font: 900 1.08em/1 var(--font-display);
+}
+
+.garbage-tile em {
+  bottom: 8px;
+  font-size: 0.72em;
+  font-style: normal;
+}
+
+.garbage-fallback {
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.7);
+  font: 900 2.2em/1 var(--font-display);
+  background: linear-gradient(135deg, #6f7180, #30333e);
 }
 
 /* 正文字色选择行 */
@@ -6390,7 +6616,13 @@ onUnmounted(() => {
 
 /* 垫板浓度给夜间设下限:玩家把滑杆拉多低,深底也至少 0.78,浅字永远有得靠 */
 :global(html.rq-dark) .story-entry {
-  background: rgba(26, 28, 42, max(0.78, calc(var(--entry-veil, 0.66) + 0.1)));
+  background: rgba(8, 10, 16, 0.88) !important;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* 自选字色仍优先；“跟随主题”时强制使用夜间浅白，避免父级或旧内联色残留。 */
+:global(html.rq-dark) .story-entry .narr {
+  color: var(--prose-ink, #f4f2f7) !important;
 }
 
 /* ── 省流模式:关掉重量级场景位图(背景/立面),回纯 CSS 渐变;头像/图标小,保留 ── */
@@ -6675,11 +6907,6 @@ onUnmounted(() => {
 
   .dossier-role {
     font-size: 0.55em;
-  }
-
-  .dossier-stage {
-    left: 13px;
-    bottom: 15px;
   }
 
   .dossier-portrait {

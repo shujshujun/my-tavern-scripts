@@ -47,7 +47,7 @@
           "id": "5abb4858-945f-4fd0-9659-2baa9050935c",
           "scriptName": "客户端界面(吞正文)",
           "findRegex": "/^[\\s\\S]*<StatusPlaceHolderImpl\\/>[\\s\\S]*$/",
-          "replaceString": "```\n<body>\n<script>\n$('body').load('https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.29/dist/人妻公寓/界面/客户端/index.html')\n</script>\n</body>\n```",
+          "replaceString": "```\n<body>\n<script>\n$('body').load('https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.30/dist/人妻公寓/界面/客户端/index.html')\n</script>\n</body>\n```",
           "placement": [
             2
           ],
@@ -162,7 +162,7 @@
               "enabled": true,
               "buttons": []
             },
-            "content": "import 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.29/dist/人妻公寓/脚本/游戏逻辑/index.js';",
+            "content": "import 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.30/dist/人妻公寓/脚本/游戏逻辑/index.js';",
             "data": {}
           }
         ],
