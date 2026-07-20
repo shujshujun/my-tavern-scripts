@@ -71,14 +71,12 @@ export interface 换装余波 {
 export const 余波缓冲楼 = 3;
 export const 余波过期楼 = 18;
 
-export function 记余波(门牌号: 门牌, 物: string, 私密?: boolean): void {
-  const 楼 = SillyTavern.chat?.length ?? 0;
-  void Promise.resolve(
-    insertOrAssignVariables(
-      { _换装余波: { 门牌: 门牌号, 起楼: 楼, 物, 私密: !!私密 } satisfies 换装余波 },
-      { type: 'chat' },
-    ),
-  ).catch((e: unknown) => console.error('[人妻公寓·雌竞] 余波写入失败', e));
+export async function 记余波(门牌号: 门牌, 物: string, 私密?: boolean): Promise<void> {
+  const 楼 = getLastMessageId();
+  await insertOrAssignVariables(
+    { _换装余波: { 门牌: 门牌号, 起楼: 楼, 物, 私密: !!私密 } satisfies 换装余波 },
+    { type: 'chat' },
+  );
 }
 
 /** 读余波:回档(起楼>当前楼)或过期自动作废 */

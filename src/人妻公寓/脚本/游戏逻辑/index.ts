@@ -12,10 +12,10 @@ import { 捕获保护快照, 回滚保护字段, 有保护快照, 镜像直写 }
 import { 布设摄像头, 查看摄像头, 考古选细节, 考古到底, 清偷窥挂起, 读信揭晓, 翻垃圾, 偷窥选细节, 打听, 对饮, type 侦探结果 } from './侦探系统';
 import { 使用荣耀洞, 荣耀洞离场 } from './荣耀洞';
 import { 装载性癖, 卸载性癖 } from './性癖系统';
-import { 杀时间 } from './楼层时钟';
+import { 杀时间, 妻位置推算 } from './楼层时钟';
 import { 购买, 送礼 } from './商店系统';
-import { 读取, 读最近有效stat, 脚本写入, 脚本写入中 } from './mvuIO';
-import { 检测焦点, 组公寓快照, 取本轮事件文本 } from './snapshotSystem';
+import { 读取最近有效, 读最近有效stat, 脚本写入, 脚本写入中 } from './mvuIO';
+import { 检测焦点, 读场景, 读粘滞, 读赴约, 组公寓快照, 取本轮事件文本 } from './snapshotSystem';
 import { 执行回合, 重掷回合, 重开一局, 回档至, 回合进行中, 取消本回合, 开始新游戏 } from './回合引擎';
 
 /**
@@ -43,7 +43,11 @@ let _本轮焦点: 门牌[] = [];
 const SNAPSHOT_MARKER = '<公寓快照>';
 
 function 当前楼层(): number {
-  return SillyTavern.chat?.length ?? 0;
+  try {
+    return getLastMessageId();
+  } catch {
+    return Math.max(0, (SillyTavern.chat?.length ?? 1) - 1);
+  }
 }
 
 /**
@@ -175,10 +179,10 @@ $(() => {
 
       // 首批入住引导(读到真值才动手)
       try {
-        const rawStat = 读最近有效stat();
-        if (rawStat) {
-          const { raw, data } = 读取();
-          if (确保首批入住(data)) 脚本写入(raw, data);
+        const 有效 = 读取最近有效();
+        if (有效) {
+          const { raw, data } = 有效;
+          if (确保首批入住(data)) await 脚本写入(raw, data);
         }
       } catch (e) {
         console.error('[人妻公寓] 首批入住引导失败:', e);
@@ -259,36 +263,72 @@ function 挂载监听() {
   /** 侦探/商店结果通用落地:排队事件+落库+刷快照+toast。
    * 静默失败清零(2026-07-17 用户实测"翻垃圾点一下没变化,锁却记上了"):落库炸了必须明着报,
    * 否则玩家看到的就是"没反应",而周期锁(chat 变量)已在结算函数里写过=白吃一次冷却 */
-  function 落地(结果: { 提示: string; 事件?: string; 变动?: boolean; 碎片到手?: boolean }, raw: object, data: SchemaType) {
+  async function 落地(
+    结果: { 提示: string; 事件?: string; 变动?: boolean; 碎片到手?: boolean },
+    raw: object,
+    data: SchemaType,
+  ): Promise<boolean> {
     if (结果.事件) {
       data.系统._待发送事件 = data.系统._待发送事件 ? `${data.系统._待发送事件}|${结果.事件}` : 结果.事件;
     }
     if (结果.事件 || 结果.变动 || (结果 as 侦探结果).碎片到手) {
       try {
-        脚本写入(raw, data);
+        await 脚本写入(raw, data);
         捕获保护快照(data);
       } catch (e) {
         console.error('[人妻公寓] 结果落库失败:', e, 结果);
         eventEmit('人妻公寓:提示', `⚠ 结果没记上(请截 F12 控制台给作者):${e instanceof Error ? e.message : String(e)}`);
-        return;
+        return false;
       }
     }
     eventEmit('人妻公寓:提示', 结果.提示);
+    return true;
   }
 
   /** 带毒快照守卫的操作壳(近10楼无 stat 一律不动手;失败一律明着报,不再静默) */
-  function 安全操作(fn: (raw: object, data: SchemaType) => void) {
-    try {
-      if (!读最近有效stat()) {
-        eventEmit('人妻公寓:提示', '变量还没就绪,稍等两秒再试。');
-        return;
+  let 操作队列: Promise<void> = Promise.resolve();
+  function 安全操作(fn: (raw: object, data: SchemaType) => void | Promise<unknown>) {
+    操作队列 = 操作队列.then(async () => {
+      try {
+        const 有效 = 读取最近有效();
+        if (!有效) {
+          eventEmit('人妻公寓:提示', '变量还没就绪,稍等两秒再试。');
+          return;
+        }
+        await fn(有效.raw, 有效.data);
+      } catch (e) {
+        console.error('[人妻公寓] UI 操作失败:', e);
+        eventEmit('人妻公寓:提示', `⚠ 操作没成(请截 F12 控制台给作者):${e instanceof Error ? e.message : String(e)}`);
       }
-      const { raw, data } = 读取();
-      fn(raw, data);
-    } catch (e) {
-      console.error('[人妻公寓] UI 操作失败:', e);
-      eventEmit('人妻公寓:提示', `⚠ 操作没成(请截 F12 控制台给作者):${e instanceof Error ? e.message : String(e)}`);
-    }
+    });
+  }
+
+  /**
+   * 当面交互的脚本终审。UI 只负责藏按钮,真正扣道具/加钱前必须在这里再验一次，
+   * 防止地图陈旧、跨 iframe 事件延迟或手工触发造成隔空送礼/隔空要钱。
+   */
+  function 妻在当前场景(data: SchemaType, m: 门牌): boolean {
+    const 场 = 读场景();
+    if (!场.房间id || !data.户[m]) return false;
+    if (m === '302' && 场.房间id === '302') return true;
+    const 楼 = 当前楼层();
+    if (读赴约(楼)?.m === m) return true;
+    if (读粘滞(楼, 场.房间id).includes(m)) return true;
+    const 碰面钟 = (场.进房末楼 ?? 楼) + data.系统._时段偏移楼;
+    return 妻位置推算(m, 碰面钟) === 场.房间id;
+  }
+
+  /** 纯 UI 点击结算后立即开一轮 AI 演出；失败结果只提示，不消耗回合。 */
+  async function 即时开演(
+    结果: { 提示: string; 事件?: string; 变动?: boolean; 成功?: boolean },
+    raw: object,
+    data: SchemaType,
+    行动: string,
+  ) {
+    const 已落库 = await 落地(结果, raw, data);
+    if (!已落库) return;
+    if (结果.成功 === false || (!结果.事件 && !结果.变动)) return;
+    await 执行回合(行动);
   }
 
   // 侦探系统的"楼层"参数全是时间语义(冷却/种子/位置)——统一喂 真实楼层+杀时间偏移
@@ -312,25 +352,21 @@ function 挂载监听() {
     安全操作((raw, data) => 落地(对饮(data, 门牌号, 当前楼层() + data.系统._时段偏移楼), raw, data)),
   );
 
-  // 工具由头门(2026-07-20 用户拍板):记同工具同户冷却(chat软记录,回档在读侧自净)
-  eventOn('人妻公寓:用由头', (载荷: { 门牌: string; 工具: string }) =>
-    安全操作((raw, data) => {
-      void raw;
-      const 钟 = 当前楼层() + data.系统._时段偏移楼;
-      void Promise.resolve(
-        insertOrAssignVariables(_.set({}, `_工具由头.${String(载荷.门牌)}.${String(载荷.工具)}`, 钟), { type: 'chat' }),
-      ).catch(e => console.error('[人妻公寓] 由头冷却记录失败:', e));
-    }),
-  );
-
   // 荣耀洞(P5+:洗手间末隔间;摇签起场三拍连场,离场即收束;时间轴统一钟楼)
   eventOn('人妻公寓:荣耀洞', () =>
-    安全操作((raw, data) => 落地(使用荣耀洞(data, 当前楼层() + data.系统._时段偏移楼), raw, data)),
+    安全操作((raw, data) =>
+      即时开演(
+        使用荣耀洞(data, 当前楼层() + data.系统._时段偏移楼),
+        raw,
+        data,
+        '(在公共洗手间末隔间闩上门,在荣耀洞前坐定,等候隔板另一侧的动静)',
+      ),
+    ),
   );
   eventOn('人妻公寓:荣耀洞离场', () =>
-    安全操作((raw, data) => {
+    安全操作(async (raw, data) => {
       const 结果 = 荣耀洞离场(data);
-      if (结果) 落地(结果, raw, data);
+      if (结果) await 落地(结果, raw, data);
     }),
   );
 
@@ -349,7 +385,18 @@ function 挂载监听() {
     安全操作((raw, data) => 落地(催租(data, 载荷.门牌, 载荷.选择), raw, data)),
   );
   eventOn('人妻公寓:要钱', (门牌号: 门牌) =>
-    安全操作((raw, data) => 落地(要钱(data, 门牌号, 当前楼层()), raw, data)),
+    安全操作(async (raw, data) => {
+      if (!妻在当前场景(data, 门牌号)) {
+        eventEmit('人妻公寓:提示', '人不在你身边,这话没法当面开口。');
+        return;
+      }
+      await 即时开演(
+        要钱(data, 门牌号, 当前楼层()),
+        raw,
+        data,
+        `(当面向${户静态表[门牌号].妻名}开口要钱,等她回应)`,
+      );
+    }),
   );
   eventOn('人妻公寓:捡金币', (房间id: string) =>
     安全操作((raw, data) => 落地(捡金币(data, String(房间id), 当前楼层()), raw, data)),
@@ -362,10 +409,10 @@ function 挂载监听() {
   );
   // 接听来电(P4 手机调用):记态度分+清挂起,回传报表与分数段给手机侧生成父亲台词
   eventOn('人妻公寓:接听来电', () =>
-    安全操作((raw, data) => {
+    安全操作(async (raw, data) => {
       const 结果 = 接听来电(data);
       if (!结果.成功) return;
-      脚本写入(raw, data);
+      await 脚本写入(raw, data);
       捕获保护快照(data);
       eventEmit('人妻公寓:来电已接', 结果);
     }),
@@ -388,31 +435,29 @@ function 挂载监听() {
 
   // 查看摄像头:排队偷窥场景事件后自动跑一回合(偷窥剧情由 AI 演出,选项卡在回合完成后弹出)
   eventOn('人妻公寓:查看摄像头', (门牌号: 门牌) =>
-    安全操作((raw, data) => {
+    安全操作(async (raw, data) => {
       const 结果 = 查看摄像头(data, 门牌号, 当前楼层() + data.系统._时段偏移楼);
       if ('提示' in 结果) {
-        落地(结果, raw, data);
+        await 落地(结果, raw, data);
         return;
       }
       data.系统._待发送事件 = data.系统._待发送事件
         ? `${data.系统._待发送事件}|${结果.事件}`
         : 结果.事件;
-      脚本写入(raw, data);
+      await 脚本写入(raw, data);
       捕获保护快照(data);
       // 看监控=回302自己屋里看(2026-07-17 用户拍板):场景在脚本侧写(await 到位,快照必读到302,
       // UI 写会输给紧接着的快照组装),UI 收"监控回合"事件同步画面;拒绝分支不动窝
-      void (async () => {
-        try {
-          await insertOrAssignVariables(
-            { _场景: { 房间id: '302', 破门: false, 进房末楼: getLastMessageId() } },
-            { type: 'chat' },
-          );
-        } catch (e) {
-          console.error('[人妻公寓] 监控回合写场景失败(照常开回合):', e);
-        }
-        eventEmit('人妻公寓:监控回合');
-        await 执行回合(`(回到302关上门,悄悄调出${门牌号}室的摄像头画面,盯着看)`);
-      })();
+      try {
+        await insertOrAssignVariables(
+          { _场景: { 房间id: '302', 破门: false, 进房末楼: getLastMessageId() } },
+          { type: 'chat' },
+        );
+      } catch (e) {
+        console.error('[人妻公寓] 监控回合写场景失败(照常开回合):', e);
+      }
+      eventEmit('人妻公寓:监控回合');
+      await 执行回合(`(回到302关上门,悄悄调出${门牌号}室的摄像头画面,盯着看)`);
     }),
   );
 
@@ -435,21 +480,27 @@ function 挂载监听() {
   );
 
   eventOn('人妻公寓:送礼', (载荷: { 道具id: string; 门牌: 门牌 }) =>
-    安全操作((raw, data) => {
-      const 结果 = 送礼(data, String(载荷.道具id), 载荷.门牌);
-      // 不自动跑回合(2026-07-17 用户拍板:自动开演太浪费回合,曾短暂上过又撤)——
-      // 戏照旧排进下一楼,但提示里明说,免得玩家以为点了没反应
-      if (结果.成功 && 结果.变动) 结果.提示 += ' 你下一次行动时,这一幕会上演。';
-      落地(结果, raw, data);
+    安全操作(async (raw, data) => {
+      if (!妻在当前场景(data, 载荷.门牌)) {
+        eventEmit('人妻公寓:提示', '她已经不在你身边了——东西没有送出。');
+        return;
+      }
+      const 结果 = await 送礼(data, String(载荷.道具id), 载荷.门牌);
+      await 即时开演(
+        结果,
+        raw,
+        data,
+        `(当面把「${String(载荷.道具id)}」递给${户静态表[载荷.门牌].妻名},停下来等她回应)`,
+      );
     }),
   );
 
   // 晋阶按钮(UI 抬升点):脚本结算+镜像直写,正戏事件排队到下一楼
-  eventOn('人妻公寓:请求晋阶', (门牌号: 门牌) => {
+  eventOn('人妻公寓:请求晋阶', async (门牌号: 门牌) => {
     try {
-      const rawStat = 读最近有效stat();
-      if (!rawStat) return;
-      const { raw, data } = 读取();
+      const 有效 = 读取最近有效();
+      if (!有效) return;
+      const { raw, data } = 有效;
       const 结果 = 请求晋阶(data, 门牌号);
       if (结果.成功) {
         const 妻 = data.户[门牌号].妻;
@@ -468,7 +519,7 @@ function 挂载监听() {
               `${第一夜}用一场符合她性格与你们当下关系的正戏演出这次跨越,张力给足,不要一笔带过`;
         if (门牌号 === '302' && 妻.当前阶段 === 3) data.系统._母亲首夜第二幕 = true;
         data.系统._待发送事件 = data.系统._待发送事件 ? `${data.系统._待发送事件}|${事件}` : 事件;
-        脚本写入(raw, data);
+        await 脚本写入(raw, data);
         捕获保护快照(data);
       }
       eventEmit('人妻公寓:提示', 结果.消息);
@@ -487,11 +538,12 @@ function 挂载监听() {
       if (回合进行中()) return; // 主路径的注入走 generate injects,不走酒馆管道(两路互斥)
       _isInAiCycle = true;
       try {
-        const 楼层 = 当前楼层();
+        const 楼层 = 当前楼层() + 1; // 当前末楼是刚发出的 user，快照描述即将落位的 assistant 楼
         // 毒快照防御+回退取楼(防护7/8):近10楼均无 stat_data → 跳过本轮,绝不造默认值
         const rawStat = 读最近有效stat();
         if (!rawStat) {
           console.warn('[人妻公寓] PROMPT_READY: 近10楼均无 stat_data,跳过快照捕获与注入');
+          _isInAiCycle = false;
           return;
         }
         const data = Schema.parse(rawStat) as SchemaType;
@@ -528,6 +580,7 @@ function 挂载监听() {
         }
       } catch (e) {
         console.error('[人妻公寓] PROMPT_READY 处理失败:', e);
+        _isInAiCycle = false;
       }
     },
   );

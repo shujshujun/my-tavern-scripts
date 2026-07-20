@@ -9,6 +9,7 @@ import { Schema, type SchemaType } from '../../schema';
 
 /** 脚本自己写变量时置 true,VARIABLE_UPDATE_ENDED 据此跳过(防回退循环,防护17) */
 export let 脚本写入中 = false;
+let 待完成写入数 = 0;
 
 /** 读最新楼 stat_data(经 schema 消毒;毒快照场景请先用 读最近有效stat 判存在性) */
 export function 读取(): { raw: object; data: SchemaType } {
@@ -18,13 +19,15 @@ export function 读取(): { raw: object; data: SchemaType } {
 }
 
 /** 带守卫的脚本写入(大额涨幅/机制字段更新只走这里) */
-export function 脚本写入(raw: object, data?: SchemaType) {
+export async function 脚本写入(raw: object, data?: SchemaType): Promise<void> {
   if (data) _.set(raw, 'stat_data', data);
+  待完成写入数 += 1;
   脚本写入中 = true;
   try {
-    Mvu.replaceMvuData(raw as Mvu.MvuData, { type: 'message', message_id: -1 });
+    await Mvu.replaceMvuData(raw as Mvu.MvuData, { type: 'message', message_id: -1 });
   } finally {
-    脚本写入中 = false;
+    待完成写入数 -= 1;
+    脚本写入中 = 待完成写入数 > 0;
   }
 }
 
@@ -49,4 +52,15 @@ export function 读最近有效stat(): unknown {
     }
   }
   return undefined;
+}
+
+/**
+ * 读取可安全继续写回的最近有效数据。
+ * stat_data 可以回退取旧楼真值，但容器必须取当前末楼，避免把旧楼的其它 MVU 字段整包盖回。
+ */
+export function 读取最近有效(): { raw: object; data: SchemaType } | undefined {
+  const rawStat = 读最近有效stat();
+  if (!rawStat) return undefined;
+  const raw = Mvu.getMvuData({ type: 'message', message_id: -1 }) as object;
+  return { raw, data: Schema.parse(rawStat) as SchemaType };
 }

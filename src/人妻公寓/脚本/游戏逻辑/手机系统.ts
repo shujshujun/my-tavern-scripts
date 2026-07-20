@@ -2,7 +2,7 @@ import type { SchemaType } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
 import { 户静态表, 查考古, 门牌列表 } from '../../stageConfig';
 import { 丈夫在楼, 妻位置推算, 当前时段, seededRandom } from './楼层时钟';
-import { 读取, 读最近有效stat, 脚本写入 } from './mvuIO';
+import { 读取最近有效, 读最近有效stat, 脚本写入 } from './mvuIO';
 import { 妻状态包 } from './snapshotSystem';
 import { 捕获保护快照 } from './守护系统';
 import { 姐妹群成员, 雌竞火气, 雌竞资格, 读余波, 标余波, 余波缓冲楼 } from './雌竞系统';
@@ -44,6 +44,8 @@ export interface 朋友圈条 {
   /** 配图(2026-07-19 用户拍板):`{妻名}/{类}_{n}` → 素材基址/微信圈/…webp;
    *  AI 只用 [图:类] marker 选类型,选哪张归脚本;图不存在 onerror 自净=图库可后补 */
   图?: string;
+  /** 脚本预选主题，用于跨角色/跨回合去重；旧存档没有该字段时可从图片路径推断。 */
+  题?: 朋友圈主题;
   /** 仅你可见(P5;spec:L4解锁低频,公开流永远贤妻——这条只有玩家刷得到);
    *  图走独立池 素材基址/微博/仅你可见/{角色}_{n}.webp(档位=堕落分档,母亲最厚1~5) */
   私?: { 图序: number };
@@ -62,13 +64,27 @@ function 读库(): 微信库 {
   return { 消息: v.消息 ?? [], 圈: v.圈 ?? [], 读到: v.读到 ?? {}, 圈读到: v.圈读到 ?? -1, 节拍: v.节拍 ?? {} };
 }
 
-function 写库(库: 微信库): void {
-  void Promise.resolve(insertOrAssignVariables({ _微信: 库 }, { type: 'chat' })).catch((e: unknown) =>
-    console.error('[人妻公寓·手机] 微信库写入失败', e),
-  );
+async function 写库(库: 微信库): Promise<void> {
+  await insertOrAssignVariables({ _微信: 库 }, { type: 'chat' });
 }
 
-const 末楼 = () => SillyTavern.chat?.length ?? 0;
+const 末楼 = () => {
+  try {
+    return getLastMessageId();
+  } catch {
+    return Math.max(0, (SillyTavern.chat?.length ?? 1) - 1);
+  }
+};
+
+async function 限时请求(url: string, init: RequestInit, 毫秒 = 20000): Promise<Response> {
+  const 控制器 = new AbortController();
+  const 计时 = setTimeout(() => 控制器.abort(), 毫秒);
+  try {
+    return await fetch(url, { ...init, signal: 控制器.signal });
+  } finally {
+    clearTimeout(计时);
+  }
+}
 
 // ============================================
 // 手机配置(localStorage:独立API + 动态频率总闸)
@@ -200,7 +216,7 @@ async function 小生成(系统提示: string, 用户提示: string): Promise<st
   const c = 读配置();
   if (c.base && c.key && c.model) {
     try {
-      const res = await fetch(`${c.base.replace(/\/+$/, '')}/chat/completions`, {
+      const res = await 限时请求(`${c.base.replace(/\/+$/, '')}/chat/completions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${c.key}` },
         body: JSON.stringify({
@@ -213,6 +229,7 @@ async function 小生成(系统提示: string, 用户提示: string): Promise<st
           temperature: 0.9,
         }),
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const j = (await res.json()) as { choices?: { message?: { content?: string } }[] };
       const 文 = 净化消息(j.choices?.[0]?.message?.content?.trim() ?? '');
       if (文) return 文;
@@ -263,6 +280,54 @@ const 频率倍率: Record<手机配置['频率'], number> = { 勤: 0.6, 普通:
 /** 〔调参〕朋友圈图库每类张数(命名约定 素材/微信圈/{妻名}/{类}_{1..N}.webp) */
 const 圈图每类张数 = 3;
 
+type 朋友圈主题 = '美食' | '自拍' | '居家' | '窗外' | '购物' | '追剧' | '楼务';
+
+/** 人物只是偏好不同，不把任何人锁死成单一生活标签。重复项代表轻权重。 */
+const 发圈偏好: Record<门牌, 朋友圈主题[]> = {
+  '101': ['楼务', '居家', '美食', '窗外', '楼务', '自拍'],
+  '102': ['窗外', '居家', '追剧', '自拍', '窗外', '购物'],
+  '201': ['购物', '自拍', '楼务', '居家', '购物', '美食'],
+  '202': ['追剧', '居家', '窗外', '楼务', '美食', '追剧'],
+  '301': ['自拍', '购物', '窗外', '追剧', '自拍', '楼务'],
+  '302': ['居家', '美食', '楼务', '窗外', '居家', '追剧'],
+};
+
+const 主题提示: Record<朋友圈主题, string> = {
+  美食: '主题已定为一顿具体但普通的吃喝；写食物、口味或一起吃饭的小插曲，避免精致摆拍腔。',
+  自拍: '主题已定为本人出镜；可写发型、衣服、状态或出门前后的随手一拍，避免网红广告腔。',
+  居家: '主题已定为居家生活；从收拾、洗晒、植物、宠物、修补或家里一个小麻烦中选一个具体切片。',
+  窗外: '主题已定为窗外见闻；写天气、光线、楼下声音、路人或附近变化中的一个具体细节。',
+  购物: '主题已定为购物或消费；可以是犹豫、踩雷、捡便宜、到货或缺货，不要写成带货文案。',
+  追剧: '主题已定为休闲娱乐；从电视剧、短视频、音乐、游戏或睡前消遣中选一个具体片段。',
+  楼务: '主题已定为公寓日常；写邻里、快递、停水、电梯、装修声、楼道或物业中的一件小事。',
+};
+
+function 圈主题(条?: 朋友圈条): 朋友圈主题 | undefined {
+  if (条?.题) return 条.题;
+  const 匹配 = 条?.图?.match(/\/(美食|自拍|居家|窗外|购物)_\d+$/);
+  return 匹配?.[1] as 朋友圈主题 | undefined;
+}
+
+function 选发圈主题(库: 微信库, m: 门牌, 钟: number, 晒装: boolean): 朋友圈主题 {
+  if (晒装) return '自拍';
+  const 妻名 = 户静态表[m].妻名;
+  const 上条个人 = 库.圈.find(x => x.谁 === 妻名 && !x.私);
+  const 上题 = 圈主题(上条个人);
+  const 近期题 = 库.圈.filter(x => !x.私).slice(0, 4).map(圈主题);
+  const 时段 = 当前时段(钟);
+  let 候选 = 发圈偏好[m].filter(x => x !== 上题);
+  // 四条公开动态内最多一条美食；非饭点进一步降权，避免全楼跟着同一钟点晒饭。
+  if (近期题.includes('美食') || !['早上', '中午', '晚上'].includes(时段)) 候选 = 候选.filter(x => x !== '美食');
+  if (!候选.length) 候选 = ['居家', '窗外', '追剧', '楼务'];
+  return 候选[Math.floor(seededRandom(钟, m, '朋友圈主题') * 候选.length)];
+}
+
+function 主题配图类(题: 朋友圈主题): '美食' | '自拍' | '居家' | '窗外' | '购物' | undefined {
+  return ['美食', '自拍', '居家', '窗外', '购物'].includes(题)
+    ? (题 as '美食' | '自拍' | '居家' | '窗外' | '购物')
+    : undefined;
+}
+
 function 档位标签(阶段: number, 好感: number, 堕落: number): string {
   const 阶 = ['陌生', '贞淑', '动摇', '越界', '沉沦', '归属'][_.clamp(阶段, 0, 5)];
   const 感 = 好感 >= 60 ? '好感高' : 好感 >= 25 ? '好感中' : '好感浅';
@@ -284,44 +349,52 @@ export async function 手机节拍(): Promise<void> {
     const 库 = 读库();
     let 有新 = false;
 
-    // ── 朋友圈近期流(每户 8~15 楼一条,种子错开相位;纯演出永不承载伏笔) ──
+    // ── 朋友圈近期流(每户 8~15 楼一条;一拍最多一条普通动态,避免同一时刻集体晒同类内容) ──
+    const 普通到期 = 门牌列表.filter(m => {
+      const 节点 = data.户[m];
+      const 配 = 户静态表[m];
+      if (!节点 || (配.隐身 && !data.系统._母亲入列)) return false;
+      const 上次 = 库.节拍[`圈:${m}`] ?? -999;
+      const 间隔 = Math.round((8 + Math.floor(seededRandom(m, '圈相位') * 8)) * 倍);
+      return 钟 - 上次 >= 间隔;
+    });
+    const 本拍普通门牌 = 普通到期.length
+      ? 普通到期[Math.floor(seededRandom(钟, '本拍发圈人') * 普通到期.length)]
+      : undefined;
     for (const m of 门牌列表) {
       const 节点 = data.户[m];
       const 配 = 户静态表[m];
       if (!节点 || (配.隐身 && !data.系统._母亲入列)) continue;
       const 键 = `圈:${m}`;
-      const 上次 = 库.节拍[键] ?? -999;
-      const 间隔 = Math.round((8 + Math.floor(seededRandom(m, '圈相位') * 8)) * 倍);
       // 晒装拍(换装余波·2026-07-19):她得了外显新东西,缓冲后忍不住发圈晒(不点名);私密件不走公开流
       const 波 = 读余波(楼);
       const 晒装 = !!波 && 波.门牌 === m && !波.私密 && !波.圈晒 && 楼 - 波.起楼 >= 2 && 节点.妻.当前阶段 >= 3;
-      if (!晒装 && 钟 - 上次 < 间隔) continue;
+      if (!晒装 && m !== 本拍普通门牌) continue;
       库.节拍[键] = 钟;
       const 妻 = 节点.妻;
+      const 题 = 选发圈主题(库, m, 钟, 晒装);
       const 原文 = await 小生成(
         '你替一款都市题材游戏生成一条中国已婚女性发的微信朋友圈文案。只输出文案本身(可含emoji),不超过60字,不要引号,不要解释。' +
-          '纪律:内容=日常生活切片(做饭/天气/追剧/楼里琐事),按人物状态微调语气;绝不提及任何秘密、暧昧对象或游戏机制。' +
-          '若这条朋友圈适合配一张图,在文案末尾另起一行输出 [图:美食]/[图:自拍]/[图:居家]/[图:窗外]/[图:购物] 之一;纯文字更自然就不带。',
+          '纪律:按人物状态微调语气;绝不提及任何秘密、暧昧对象或游戏机制;不要输出图片标记或主题名。' +
+          主题提示[题],
         `人物:${配.妻名},${配.初始?.气质描述 ?? '一位住在老公寓里的太太'}。${家庭事实(m)}当前状态档:${档位标签(妻.当前阶段, 妻.好感值, 妻.堕落值)};时段:${当前时段(钟)}。` +
           (晒装
-            ? `她刚得了样新东西(${波!.物.replace(配.妻名, '')}),生成她晒而不点名的一条朋友圈——高兴藏不住,但绝不提东西是谁给的。文案末尾带 [图:自拍]。`
+            ? `她刚得了样新东西(${波!.物.replace(配.妻名, '')}),写她晒而不点名的一条朋友圈；高兴藏不住，但绝不提东西是谁给的。`
             : '生成她此刻发的一条朋友圈。'),
       );
-      // 配图协议(2026-07-19 用户拍板):AI 用极简 marker 选类型,选哪张归脚本(种子随机+防连重);
-      // 图=角色专属图库(素材基址/微信圈/{妻名}/{类}_{n}.webp),图未出 onerror 自净
-      const 配图匹配 = 原文.match(/\[图:(美食|自拍|居家|窗外|购物)\]/);
+      // 主题与配图类型都由脚本决定，AI 只写文字；追剧/楼务保留纯文字，打散图片密度。
       const 文 = 原文.replace(/\s*\[图:[^\]]*\]\s*/g, ' ').trim();
       if (文) {
         let 图: string | undefined;
-        if (配图匹配) {
-          const 类 = 配图匹配[1];
+        const 类 = 主题配图类(题);
+        if (类) {
           const 键2 = `圈图:${m}:${类}`;
           let 选 = 1 + Math.floor(seededRandom(钟, m, '圈图') * 圈图每类张数);
           if (选 === (库.节拍[键2] ?? 0)) 选 = (选 % 圈图每类张数) + 1; // 同类连发不重图
           库.节拍[键2] = 选;
           图 = `${配.妻名}/${类}_${选}`;
         }
-        const 条 = { 楼, 谁: 配.妻名, 文, 评: [] as { 谁: string; 文: string }[], ...(图 ? { 图 } : {}) };
+        const 条 = { 楼, 谁: 配.妻名, 文, 题, 评: [] as { 谁: string; 文: string }[], ...(图 ? { 图 } : {}) };
         库.圈.unshift(条);
         有新 = true;
         // 晒装的评论区=阴阳怪气主战场(换装余波扩展4):其他够格太太来1~2条表面客气的酸话
@@ -465,7 +538,7 @@ export async function 手机节拍(): Promise<void> {
     }
 
     if (有新) {
-      写库(库);
+      await 写库(库);
       刷新红点();
       渲染();
     }
@@ -479,8 +552,8 @@ export async function 手机节拍(): Promise<void> {
 // ============================================
 
 const ROOT_ID = 'rq-phone-root';
-// ⚠ 与 App.vue 素材基址同步:下次推 tag 必须叫 rq0.26,或推前改此处对齐 tag 名
-const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.26/dist/人妻公寓/素材';
+// ⚠ 与 App.vue 素材基址同步：本轮测试发布 tag=rq0.27。
+const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.27/dist/人妻公寓/素材';
 
 let 当前页: {
   名: 'chats' | 'chat' | 'moments' | 'call' | 'talk' | 'settings';
@@ -982,11 +1055,11 @@ function 渲染(): void {
       当前页 = 有来电() ? { 名: 'call' } : { 名: 'chats' };
       渲染();
     });
-    签('moments', '朋友圈', '🌁', 圈新, () => {
+    签('moments', '朋友圈', '🌁', 圈新, async () => {
       当前页 = { 名: 'moments' };
       const 库2 = 读库();
       库2.圈读到 = 楼;
-      写库(库2);
+      await 写库(库2);
       渲染();
       刷新红点();
     });
@@ -1010,11 +1083,11 @@ function 渲染(): void {
         'rqp-row',
         `${头像块(友.类 === '群' ? '群' : 友.类 === '父亲' ? '父亲' : 友.名)}<span class="mid"><b>${友.名}</b><i>${尾 ? (尾.类 === '撤回' ? '[她撤回了一条消息]' : 尾.类 === '通话' ? '[语音通话]' : _.escape(尾.文.slice(0, 24))) : ''}</i></span>${未读 ? '<span class="dot"></span>' : ''}`,
       );
-      r.addEventListener('click', () => {
+      r.addEventListener('click', async () => {
         当前页 = { 名: 'chat', 会话: 友.id };
         const 库2 = 读库();
         库2.读到[友.id] = 楼;
-        写库(库2);
+        await 写库(库2);
         渲染();
         刷新红点();
       });
@@ -1286,7 +1359,7 @@ function 渲染(): void {
         return;
       }
       说('读取中…');
-      void fetch(`${base}/models`, { headers: { Authorization: `Bearer ${key}` } })
+      void 限时请求(`${base}/models`, { headers: { Authorization: `Bearer ${key}` } })
         .then(async r => {
           if (!r.ok) throw new Error(`HTTP ${r.status}`);
           const j = (await r.json()) as { data?: { id?: string }[] };
@@ -1336,7 +1409,7 @@ async function 约出来(m: 门牌): Promise<void> {
   const 楼 = 末楼();
   const 库 = 读库();
   库.消息.push({ 楼, 会话: m, 发: '我', 文: '在忙吗?想见你一面——我就在楼里,出来陪我走走?' });
-  写库(库);
+  await 写库(库);
   正在输入 = m;
   渲染();
   try {
@@ -1358,7 +1431,7 @@ async function 约出来(m: 门牌): Promise<void> {
     {
       const 库2 = 读库();
       库2.节拍[`约:${m}`] = 钟;
-      写库(库2);
+      await 写库(库2);
     }
     const 尾 = 最近正文();
     const 回 = await 小生成(
@@ -1379,12 +1452,12 @@ async function 约出来(m: 门牌): Promise<void> {
         文: 回 || (应 ? '好呀,等我几分钟,我出来找你。' : '今天不太方便呢…改天好不好?'),
       });
       库3.读到[m] = 末楼();
-      写库(库3);
+      await 写库(库3);
     }
     if (应) {
-      void Promise.resolve(insertOrAssignVariables({ _赴约: { m, 起楼: 楼, 至楼: 楼 + 6 } }, { type: 'chat' })).catch(
-        (e: unknown) => console.error('[人妻公寓·手机] 赴约写入失败', e),
-      );
+      // 必须等赴约状态真正落库后再广播位置刷新；旧写法 fire-and-forget，客户端先读到旧值，
+      // 要等后续几个回合的其他刷新才看见她到场。
+      await Promise.resolve(insertOrAssignVariables({ _赴约: { m, 起楼: 楼, 至楼: 楼 + 6 } }, { type: 'chat' }));
     }
     渲染();
     刷新红点(); // 顺带发"手机状态"事件,游戏界面借它即时刷新赴约位置(约出来不产楼)
@@ -1437,7 +1510,7 @@ async function 发消息(会话: string, 文: string): Promise<void> {
   const 楼 = 末楼();
   const 库 = 读库();
   库.消息.push({ 楼, 会话, 发: '我', 文 });
-  写库(库);
+  await 写库(库);
   渲染();
   if (会话 === '群') return; // 群通知不强制回声
   if (会话 === '姐妹群') {
@@ -1451,7 +1524,7 @@ async function 发消息(会话: string, 文: string): Promise<void> {
         const 库2 = 读库();
         if (await 姐妹群一拍(data, 库2, 末楼(), `${玩家名()}在群里说:"${文}"`)) {
           库2.读到['姐妹群'] = 末楼();
-          写库(库2);
+          await 写库(库2);
         }
       }
     } catch (e) {
@@ -1487,7 +1560,7 @@ async function 发消息(会话: string, 文: string): Promise<void> {
       const 库2 = 读库();
       库2.消息.push({ 楼: 末楼(), 会话, 发: '对方', 文: 回 });
       库2.读到[会话] = 末楼();
-      写库(库2);
+      await 写库(库2);
       渲染();
     }
   } catch (e) {
@@ -1549,15 +1622,15 @@ async function 结束通话(): Promise<void> {
   const 楼 = 末楼();
   const 库 = 读库();
   库.消息.push({ 楼, 会话: '父亲', 发: '系统', 文: `通话结束(${通话记录.length}句)`, 类: '通话' });
-  写库(库);
+  await 写库(库);
   // 回流正文一句(排队事件,下一楼注入;通话内容本体只存在于手机里)
   try {
-    const rawStat = 读最近有效stat();
-    if (rawStat) {
-      const { raw, data } = 读取();
+    const 有效 = 读取最近有效();
+    if (有效) {
+      const { raw, data } = 有效;
       const 事件 = `【来电回流】{{user}}刚跟父亲通了个微信语音(内容大意:${摘要 || '例行问账'})。正文只按"刚挂了爸的电话"的程度带过他此刻的心绪,不要复述通话内容`;
       data.系统._待发送事件 = data.系统._待发送事件 ? `${data.系统._待发送事件}|${事件}` : 事件;
-      脚本写入(raw, data);
+      await 脚本写入(raw, data);
       捕获保护快照(data);
     }
   } catch (e) {

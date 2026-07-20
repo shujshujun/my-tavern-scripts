@@ -1,5 +1,5 @@
 <template>
-  <div class="apt">
+  <div class="apt" :class="{ 'keyboard-open': 键盘打开 }">
     <div class="page">
       <!-- 错误护栏:任何运行时异常显示在此,不再整屏空白(点击即散,不常驻) -->
       <div v-if="错误信息" class="err" title="点击关闭" @click="错误信息 = ''">⚠︎ 界面异常:{{ 错误信息 }}(点击关闭)</div>
@@ -14,6 +14,9 @@
 
       <!-- 右上角:主题切换 + 全屏 + 设置(meta 类操作,不进游戏功能区) -->
       <span class="corner-btns">
+        <button class="btn mini icon" title="查看 AI 收到的全部提示词" @click="打开提示词查看器">
+          <Ic n="search" />
+        </button>
         <button class="btn mini icon" :title="暗色 ? '切回日间模式' : '切换夜间模式'" @click="切换主题">
           <Ic :n="暗色 ? 'sun' : 'moon'" />
         </button>
@@ -36,7 +39,7 @@
             <div class="set-label">主题</div>
             <div class="seg">
               <button
-                v-for="m in (['日间', '夜间', '跟随'] as const)"
+                v-for="m in ['日间', '夜间', '跟随'] as const"
                 :key="m"
                 :class="{ on: 主题模式 === m }"
                 @click="((主题模式 = m), 改设置())"
@@ -51,7 +54,7 @@
             <div class="set-label">正文字号</div>
             <div class="seg">
               <button
-                v-for="z in (['小', '中', '大'] as const)"
+                v-for="z in ['小', '中', '大'] as const"
                 :key="z"
                 :class="{ on: 字号档 === z }"
                 @click="((字号档 = z), 改设置())"
@@ -78,7 +81,9 @@
           </div>
 
           <div class="set-group">
-            <div class="set-label">正文垫板浓度<em>{{ Math.round(垫板浓度 * 100) }}%</em></div>
+            <div class="set-label">
+              正文垫板浓度<em>{{ Math.round(垫板浓度 * 100) }}%</em>
+            </div>
             <input
               class="set-range"
               type="range"
@@ -94,7 +99,9 @@
           <div class="set-group row">
             <div>
               <div class="set-label">立绘显示</div>
-              <p class="set-hint">在场者入画:一人右下,两人左右对望,三人添中位,再多并排;垫板永远压立绘,不遮正文。</p>
+              <p class="set-hint">
+                在场者自适应入画:单人大景、两三人分槽、多人阵列；手机四人以上自动换成两排，彼此不遮挡。
+              </p>
             </div>
             <button class="toggle" :class="{ on: 立绘显示 }" @click="((立绘显示 = !立绘显示), 改设置())"><i /></button>
           </div>
@@ -152,7 +159,7 @@
         <div class="ending-body">
           <p class="ending-line">{{ data.系统._坏结局 }}</p>
           <p class="hint">父亲收回了这栋楼。你可以在往事里回到从前的某一页,重新来过。</p>
-          <button class="btn" @click="显示史册 = true">翻开往事</button>
+          <button class="btn" @click="打开史册">翻开往事</button>
         </div>
       </template>
 
@@ -198,7 +205,16 @@
                 <span class="pl-meta">¥{{ 档.起始资金 }}</span>
               </button>
               <div class="title-acts">
-                <button class="btn ghost" :disabled="发送中" @click="难度展开 = false; 选中难度 = ''">返回</button>
+                <button
+                  class="btn ghost"
+                  :disabled="发送中"
+                  @click="
+                    难度展开 = false;
+                    选中难度 = '';
+                  "
+                >
+                  返回
+                </button>
                 <button class="btn rite" :disabled="!选中难度 || 发送中" @click="开始考验">
                   {{ 发送中 ? '电话接通中……' : '接起父亲的电话' }}
                 </button>
@@ -277,7 +293,11 @@
         </div>
 
         <!-- 正文舞台:背景四层在 wrap 上,立绘钉右下,正文滚动层浮最上(垫板压立绘,gal 层次) -->
-        <div class="story-wrap" :style="[场景色, 场景图样式]">
+        <div
+          class="story-wrap"
+          :class="[`portrait-count-${Math.min(立绘列表.length, 6)}`, { 'portraits-many': 立绘列表.length >= 4 }]"
+          :style="[场景色, 场景图样式]"
+        >
           <!-- 隐藏正文(2026-07-19 用户点单,gal惯例):渐隐文字层欣赏立绘;只认这颗钮,再按恢复(误触不弹回) -->
           <button
             class="story-hide-btn"
@@ -291,7 +311,6 @@
               v-for="绘 in 立绘列表"
               :key="绘.src"
               class="portrait"
-              :class="绘.位"
               :style="绘.style"
               :src="绘.src"
               alt=""
@@ -301,55 +320,55 @@
           </TransitionGroup>
           <!-- 正文卷轴:只演当前幕,且幕跟着房间走——人走了戏就收,回来戏还在(氛围色随位置) -->
           <section ref="卷轴容器" class="story" :class="{ 'story-veiled': 正文隐藏 }">
-          <!-- 到场卡:走动后的新场景,给地点一个"开场镜头"(旧正文属于旧场景,隐去) -->
-          <div v-if="!在幕中 && !发送中" class="arrive">
-            <div class="ui-kicker">{{ 当前房间 ? 'ARRIVE / 到场' : 'HALLWAY / 楼道' }}</div>
-            <b>{{ 到场标题 }}</b>
-            <p class="arrive-mood">{{ 到场描写 }}</p>
-            <div v-if="当前房间 && 房内的人(当前房间).length" class="arrive-who">
-              <span v-for="名 in 房内的人(当前房间)" :key="名" class="who-chip">
-                <img
-                  v-if="!头像失效[头像名(名)]"
-                  :src="头像图(头像名(名))"
-                  :alt="名"
-                  @error="头像失效[头像名(名)] = true"
-                />
-                <b v-else>{{ 名[0] }}</b>
-                <em>{{ 名 }}</em>
-              </span>
-            </div>
-            <p class="hint">{{ 到场提示 }}</p>
-          </div>
-          <div v-for="(条, i) in 在幕中 ? 当前幕 : []" :key="i" class="story-entry">
-            <template v-if="条.楼 !== undefined && 条.楼 === 编辑中楼">
-              <textarea v-model="编辑文本" class="edit-area" rows="8"></textarea>
-              <div class="edit-acts">
-                <button class="btn" :disabled="!编辑文本.trim()" @click="存编辑">落笔</button>
-                <button class="btn" @click="编辑中楼 = null">作罢</button>
+            <!-- 到场卡:走动后的新场景,给地点一个"开场镜头"(旧正文属于旧场景,隐去) -->
+            <div v-if="!在幕中 && !发送中" class="arrive">
+              <div class="ui-kicker">{{ 当前房间 ? 'ARRIVE / 到场' : 'HALLWAY / 楼道' }}</div>
+              <b>{{ 到场标题 }}</b>
+              <p class="arrive-mood">{{ 到场描写 }}</p>
+              <div v-if="当前房间 && 房内的人(当前房间).length" class="arrive-who">
+                <span v-for="名 in 房内的人(当前房间)" :key="名" class="who-chip">
+                  <img
+                    v-if="!头像失效[头像名(名)]"
+                    :src="头像图(头像名(名))"
+                    :alt="名"
+                    @error="头像失效[头像名(名)] = true"
+                  />
+                  <b v-else>{{ 名[0] }}</b>
+                  <em>{{ 名 }}</em>
+                </span>
               </div>
-            </template>
-            <template v-else>
-              <button
-                v-if="条.原文 !== undefined && !发送中"
-                class="entry-edit"
-                title="改写这一段(同酒馆的铅笔编辑)"
-                @click="开编辑(条)"
-              >
-                ✎
-              </button>
-              <p v-if="条.谁 === '玩家'" class="story-player">▸ {{ 条.文本[0] }}</p>
-              <template v-else>
-                <p v-for="(段, j) in 条.文本" :key="j" class="narr">{{ 段 }}</p>
+              <p class="hint">{{ 到场提示 }}</p>
+            </div>
+            <div v-for="(条, i) in 在幕中 ? 当前幕 : []" :key="i" class="story-entry">
+              <template v-if="条.楼 !== undefined && 条.楼 === 编辑中楼">
+                <textarea v-model="编辑文本" class="edit-area" rows="8"></textarea>
+                <div class="edit-acts">
+                  <button class="btn" :disabled="!编辑文本.trim()" @click="存编辑">落笔</button>
+                  <button class="btn" @click="编辑中楼 = null">作罢</button>
+                </div>
               </template>
-            </template>
-          </div>
-          <div v-if="发送中" class="story-entry">
-            <p v-for="(段, j) in 流式段" :key="'流' + j" class="narr">{{ 段 }}</p>
-            <p class="scribing">
-              ✎ 这一楼正在发生……
-              <button class="btn mini" title="打断,本回合作废" @click="取消回合">取消</button>
-            </p>
-          </div>
+              <template v-else>
+                <button
+                  v-if="条.原文 !== undefined && !发送中"
+                  class="entry-edit"
+                  title="改写这一段(同酒馆的铅笔编辑)"
+                  @click="开编辑(条)"
+                >
+                  ✎
+                </button>
+                <p v-if="条.谁 === '玩家'" class="story-player">▸ {{ 条.文本[0] }}</p>
+                <template v-else>
+                  <p v-for="(段, j) in 条.文本" :key="j" class="narr">{{ 段 }}</p>
+                </template>
+              </template>
+            </div>
+            <div v-if="发送中" class="story-entry">
+              <p v-for="(段, j) in 流式段" :key="'流' + j" class="narr">{{ 段 }}</p>
+              <p class="scribing">
+                ✎ 这一楼正在发生……
+                <button class="btn mini" title="打断,本回合作废" @click="取消回合">取消</button>
+              </p>
+            </div>
           </section>
         </div>
 
@@ -372,14 +391,15 @@
         </div>
 
         <!-- 房内动作(输入门控收紧后的补位:站在垃圾房/空户里,翻袋撬门不用开地图) -->
-        <div v-if="!发送中 && 当前房间动作.length" class="scene-acts">
-          <button
-            v-for="(动作, i) in 当前房间动作"
-            :key="i"
-            class="tile"
-            :class="动作.类"
-            @click="动作.做()"
-          >
+        <div v-if="!发送中 && 当前房间 === '垃圾房' && 垃圾袋列表.length" class="garbage-pick">
+          <span><Ic n="trash" />翻谁家的垃圾</span>
+          <select v-model="垃圾目标" aria-label="选择垃圾袋">
+            <option v-for="袋 in 垃圾袋列表" :key="袋.门牌" :value="袋.门牌">{{ 袋.门牌 }} · {{ 袋.妻名 }}</option>
+          </select>
+          <button class="btn risky" :disabled="发送中" @click="翻(垃圾目标)">翻找</button>
+        </div>
+        <div v-if="!发送中 && 普通房间动作.length" class="scene-acts">
+          <button v-for="(动作, i) in 普通房间动作" :key="i" class="tile" :class="动作.类" @click="动作.做()">
             <Ic :n="动作.icon" />
             <span class="act-kicker">{{ 动作.kicker }}</span>
             <strong>{{ 动作.文案 }}</strong>
@@ -406,8 +426,10 @@
             rows="2"
             placeholder="你的言行……(Enter 发送,Shift+Enter 换行)"
             @keydown.enter.exact.prevent="发送"
+            @focus="输入聚焦"
+            @blur="输入失焦"
           ></textarea>
-          <button class="btn rite quill-btn" :disabled="发送中 || !输入文本.trim()" @click="发送">
+          <button class="btn rite quill-btn" :disabled="发送中 || 由头写入中 || !输入文本.trim()" @click="发送">
             {{ 发送中 ? '…' : '行动' }}
           </button>
         </div>
@@ -438,9 +460,7 @@
           <button v-if="监控列表.length" class="dock-btn" title="你装下的眼睛" @click="显示监控 = true">
             <Ic n="cctv" /><span>监控</span>
           </button>
-          <button class="dock-btn" title="完整往事与回档" @click="显示史册 = true">
-            <Ic n="book" /><span>往事</span>
-          </button>
+          <button class="dock-btn" title="完整往事与回档" @click="打开史册"><Ic n="book" /><span>往事</span></button>
         </nav>
       </template>
 
@@ -460,7 +480,9 @@
           </div>
           <div class="map-banner">
             <div class="ui-kicker">WUTONGLI APARTMENT / FIELD MAP</div>
-            <div class="mb-line"><b>第 {{ 天数 }} 天</b><em>{{ 时段问候 }}</em></div>
+            <div class="mb-line">
+              <b>第 {{ 天数 }} 天</b><em>{{ 时段问候 }}</em>
+            </div>
           </div>
 
           <!-- 立面画布(rq0.12 描点地图:徽章钉在画里的门窗上;时段=同一张画调色,点位永不漂) -->
@@ -571,13 +593,7 @@
                 </div>
                 <p class="rc-mood">{{ 房卡氛围 }}</p>
                 <div class="rm-grid">
-                  <button
-                    v-for="(动作, i) in 房卡动作"
-                    :key="i"
-                    class="tile"
-                    :class="动作.类"
-                    @click="动作.做()"
-                  >
+                  <button v-for="(动作, i) in 房卡动作" :key="i" class="tile" :class="动作.类" @click="动作.做()">
                     <Ic :n="动作.icon" />
                     <span class="act-kicker">{{ 动作.kicker }}</span>
                     <strong>{{ 动作.文案 }}</strong>
@@ -597,43 +613,55 @@
       <div v-if="选中档案" class="mask" @click.self="选中门牌 = null">
         <div class="sheet dossier">
           <button class="sheet-close" @click="选中门牌 = null">✕</button>
-          <div class="dossier-head">
-            <img
-              v-if="!头像失效[选中档案.妻名]"
-              class="avatar-glyph big img"
-              :src="头像图(选中档案.妻名)"
-              :alt="选中档案.妻名"
-              @error="头像失效[选中档案.妻名] = true"
-            />
-            <span v-else class="avatar-glyph big">{{ 选中档案.妻名[0] }}</span>
-            <span class="dossier-id">
-              <span class="dossier-name">{{ 选中档案.妻名 }}</span>
-              <span class="hearts" :title="'阶段:' + 选中档案.妻.阶段标题">
-                <i v-for="n in 5" :key="n" :class="{ on: n <= 选中档案.妻.当前阶段 }">♥</i>
+          <div class="dossier-hero">
+            <div class="dossier-head">
+              <img
+                v-if="!头像失效[选中档案.妻名]"
+                class="avatar-glyph big img"
+                :src="头像图(选中档案.妻名)"
+                :alt="选中档案.妻名"
+                @error="头像失效[选中档案.妻名] = true"
+              />
+              <span v-else class="avatar-glyph big">{{ 选中档案.妻名[0] }}</span>
+              <span class="dossier-id">
+                <span class="dossier-role">ROOM {{ 选中档案.门牌 }} · RESIDENT FILE</span>
+                <span class="dossier-name">{{ 选中档案.妻名 }}</span>
+                <span class="hearts" :title="'阶段:' + 选中档案.妻.阶段标题">
+                  <i v-for="n in 5" :key="n" :class="{ on: n <= 选中档案.妻.当前阶段 }">♥</i>
+                </span>
               </span>
-            </span>
-            <span class="dossier-role">ROOM {{ 选中档案.门牌 }}</span>
-            <span class="dossier-stage">「{{ 选中档案.妻.阶段标题 }}」</span>
+              <span class="dossier-stage">{{ 选中档案.妻.阶段标题 }}</span>
+            </div>
+            <div class="dossier-portrait" aria-hidden="true">
+              <img
+                v-if="!立绘失效[选中档案.立绘图]"
+                :src="选中档案.立绘图"
+                :alt="选中档案.妻名 + '当前立绘'"
+                @error="立绘失效[选中档案.立绘图] = true"
+              />
+              <img v-else :src="选中档案.基础立绘" :alt="选中档案.妻名" />
+            </div>
           </div>
 
-          <div class="axes">
+          <div class="axes dossier-axes">
             <div v-for="轴 in 选中档案.三轴" :key="轴.名" class="axis-row">
-              <span class="axis-label">{{ 轴.名 }}</span>
+              <span class="axis-top"
+                ><b>{{ 轴.名 }}</b
+                ><i>{{ Math.round(轴.值) }}</i></span
+              >
               <div class="axis"><i class="bar" :class="轴.类" :style="{ width: 轴.值 + '%' }" /></div>
-              <span class="axis-num">{{ Math.round(轴.值) }}</span>
             </div>
           </div>
 
           <template v-if="选中档案.妻.情报可见">
-            <div class="dsec">
+            <div class="dsec dossier-card mind-card">
               <div class="dsec-title">心 镜</div>
               <p class="dline"><b>情绪</b> {{ 选中档案.妻.当前情绪 }}</p>
               <p v-if="选中档案.妻.当前心理想法" class="dline"><b>心声</b> {{ 选中档案.妻.当前心理想法 }}</p>
               <p v-if="选中档案.妻.气质描述" class="dline"><b>气质</b> {{ 选中档案.妻.气质描述 }}</p>
             </div>
-            <div class="dsec">
-              <div class="dsec-title">仪 容</div>
-              <!-- gal 化(2026-07-18 用户反馈排版丑):对得上商店 SKU 的项直接上道具图卡,文字项走软卡行 -->
+            <div class="dsec dossier-card attire-card">
+              <div class="dsec-title"><span>仪 容</span><small>当前穿戴</small></div>
               <div class="attire-grid">
                 <div v-for="a in 选中档案.仪容项" :key="a.标 + a.值" class="a-cell" :class="{ pic: !!a.图id }">
                   <span v-if="a.图id" class="a-pic">
@@ -650,11 +678,12 @@
                   <span class="a-main">
                     <small>{{ a.标 }}</small>
                     <b class="a-val">{{ a.值 }}</b>
+                    <em v-if="a.细节 && a.细节 !== a.值">{{ a.细节 }}</em>
                   </span>
                 </div>
               </div>
             </div>
-            <div v-if="选中档案.妻.当前阶段 >= 3" class="dsec">
+            <div v-if="选中档案.妻.当前阶段 >= 3" class="dsec dossier-card">
               <div class="dsec-title">身 体 开 发</div>
               <div class="dev-grid">
                 <div v-for="部位 in 选中档案.开发" :key="部位.名" class="axis-row">
@@ -665,20 +694,28 @@
               </div>
             </div>
             <!-- 性癖(P5):装载中3槽可卸载;"曾开发"永久留档=她的身体记得 -->
-            <div v-if="选中档案.妻.当前阶段 >= 4 && (选中档案.性癖装载.length || 选中档案.曾开发.length)" class="dsec">
+            <div
+              v-if="选中档案.妻.当前阶段 >= 4 && (选中档案.性癖装载.length || 选中档案.曾开发.length)"
+              class="dsec dossier-card"
+            >
               <div class="dsec-title">性 癖({{ 选中档案.性癖装载.length }}/3)</div>
               <div class="kink-row">
                 <span v-for="k in 选中档案.性癖装载" :key="k.id" class="kink-chip on">
                   {{ k.名 }}
                   <button class="kink-off" title="卸下(她的身体不会忘)" @click="卸载(选中档案.门牌, k.id)">×</button>
                 </span>
-                <span v-for="(名, i) in 选中档案.曾开发" :key="'曾' + i" class="kink-chip was" title="曾开发过——重装免开幕,直接生效">
+                <span
+                  v-for="(名, i) in 选中档案.曾开发"
+                  :key="'曾' + i"
+                  class="kink-chip was"
+                  title="曾开发过——重装免开幕,直接生效"
+                >
                   {{ 名 }}
                 </span>
               </div>
             </div>
             <!-- 丈夫状态栏(解锁后:双轴可见——疑心是风险表,信任是钥匙) -->
-            <div class="dsec husband">
+            <div class="dsec husband dossier-card">
               <div class="dsec-title">她 的 丈 夫</div>
               <div class="hb-row">
                 <img
@@ -729,10 +766,14 @@
             <p class="dline crack-hint">✦ {{ 选中裂缝.对症提示 }}</p>
           </div>
 
-          <button v-if="选中可晋阶" class="btn rite" :disabled="发送中" @click="晋阶(选中档案.门牌)">
-            ✦ 跨过界线
-          </button>
-          <button v-if="选中可要钱" class="btn" :disabled="发送中" title="她的钱,现在也是你的钱" @click="开口要钱(选中档案.门牌)">
+          <button v-if="选中可晋阶" class="btn rite" :disabled="发送中" @click="晋阶(选中档案.门牌)">✦ 跨过界线</button>
+          <button
+            v-if="选中可要钱"
+            class="btn"
+            :disabled="发送中"
+            title="她的钱,现在也是你的钱"
+            @click="开口要钱(选中档案.门牌)"
+          >
             ¥ 开口要钱
           </button>
         </div>
@@ -832,7 +873,9 @@
                 <b v-else>{{ 项.名称[0] }}</b>
               </span>
               <span class="ware-main">
-                <b class="ware-name">{{ 项.名称 }} <em class="ware-price">¥{{ 项.价格 }}</em></b>
+                <b class="ware-name"
+                  >{{ 项.名称 }} <em class="ware-price">¥{{ 项.价格 }}</em></b
+                >
                 <span class="ware-desc">{{ 项.描述 }}</span>
               </span>
               <button class="btn rite ware-buy" :disabled="发送中 || data.现金 < (项.价格 ?? 0)" @click="买(项.id)">
@@ -891,7 +934,8 @@
           <button class="sheet-close" @click="显示史册 = false">✕</button>
           <div class="sheet-title">往 事</div>
           <p class="hint center">每段右下角的 ↺ 可以回到那一刻——点两次,之后的一切就没有发生过。</p>
-          <div class="sheet-body chronicle">
+          <button class="history-latest" title="跳到最新一段" @click="史册到最新">↓ 最新</button>
+          <div ref="史册容器" class="sheet-body chronicle">
             <div v-for="(条, i) in 卷轴" :key="i" class="story-entry">
               <template v-if="条.楼 !== undefined && 条.楼 === 编辑中楼">
                 <textarea v-model="编辑文本" class="edit-area" rows="8"></textarea>
@@ -948,7 +992,22 @@
 import type { FunctionalComponent } from 'vue';
 
 import type { SchemaType } from '../../schema';
-import { 由头冷却楼, 由头工具表, 户静态表, 房间表, 查房间, 查性癖, 查特殊场景, 查裂缝, 查道具, 道具表, 门牌列表, 难度表, type 道具配置, type 门牌 } from '../../stageConfig';
+import {
+  由头每日次数,
+  由头工具表,
+  户静态表,
+  房间表,
+  查房间,
+  查性癖,
+  查特殊场景,
+  查裂缝,
+  查道具,
+  道具表,
+  门牌列表,
+  难度表,
+  type 道具配置,
+  type 门牌,
+} from '../../stageConfig';
 import { 丈夫在楼, 妻位置推算, 当前天数, 当前时段 } from '../../脚本/游戏逻辑/楼层时钟';
 import { 查金币 } from '../../脚本/游戏逻辑/经济系统';
 import { 可晋阶 } from '../../脚本/游戏逻辑/结算系统';
@@ -962,7 +1021,8 @@ const 图标库: Record<string, string> = {
   cctv: '<path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2"/>',
   book: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5Z"/>',
   map: '<path d="m9 18-6 3V6l6-3 6 3 6-3v15l-6 3-6-3Z"/><path d="M9 3v15"/><path d="M15 6v15"/>',
-  expand: '<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
+  expand:
+    '<path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/>',
   exit: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/>',
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/>',
@@ -972,7 +1032,8 @@ const 图标库: Record<string, string> = {
   lock: '<rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
   home: '<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M9 22V12h6v10"/>',
   arrow: '<circle cx="12" cy="12" r="10"/><path d="m12 16 4-4-4-4"/><path d="M8 12h8"/>',
-  trash: '<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="m19 6-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
+  trash:
+    '<path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="m19 6-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>',
   clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   tv: '<rect x="2" y="7" width="20" height="15" rx="2"/><path d="m17 2-5 5-5-5"/>',
   coin: '<circle cx="12" cy="12" r="9"/><path d="m8.5 7.5 3.5 4 3.5-4M12 11.5V17M9.5 13.5h5M9.5 15.5h5"/>',
@@ -1025,9 +1086,24 @@ const 天数 = computed(() => 当前天数(钟楼号.value));
 
 const 当前房间 = ref<string | null>(null);
 const 显示地图 = ref(false);
-/** 进房那一刻的末楼号(随 _场景 持久;位置种子在房内期间冻结——否则身边的人被"传送"走) */
+/** 进房那一刻的末楼号(随 _场景 持久;只供脚本确认这次碰面,地图始终看当前钟楼) */
 const 进房末楼 = ref(0);
-const 位置种子 = computed(() => (当前房间.value ? 进房末楼.value : 末楼号.value) + 偏移楼.value);
+const 位置种子 = computed(() => 钟楼号.value);
+
+/** 正在与玩家对话的人只固定在当前场景；其余住户在地图上按最新钟楼移动。 */
+const 粘滞在场 = ref<{ 位置: string | null; 们: 门牌[] }>({ 位置: null, 们: [] });
+
+function 刷粘滞() {
+  try {
+    const p = _.get(getVariables({ type: 'chat' }), '_粘滞') as { 位置?: string; 们?: 门牌[] } | null;
+    粘滞在场.value = {
+      位置: p?.位置 === 当前房间.value ? (p.位置 ?? null) : null,
+      们: p?.位置 === 当前房间.value && Array.isArray(p.们) ? p.们 : [],
+    };
+  } catch {
+    粘滞在场.value = { 位置: null, 们: [] };
+  }
+}
 
 /** 赴约(微信"+"约出来,2026-07-18):有效期内她的位置=玩家所在;回档/过期自动失效 */
 const 赴约妻 = ref<string | null>(null);
@@ -1043,20 +1119,27 @@ function 刷赴约() {
 /** 妻位置(显示层统一口:赴约中=跟着玩家走,其余走作息推算) */
 function 妻现位(m: 门牌, 楼: number): string {
   if (赴约妻.value === m) return 当前房间.value ?? '大堂';
+  if (粘滞在场.value.位置 && 粘滞在场.value.们.includes(m)) return 粘滞在场.value.位置;
   return 妻位置推算(m, 楼);
 }
 watch(显示地图, 开 => {
-  if (开) 刷赴约(); // 约完人直接开地图(不产楼),开图那刻补一次同步
+  if (开) {
+    刷赴约(); // 约完人直接开地图(不产楼),开图那刻补一次同步
+    刷粘滞();
+  }
 });
 
-function 写场景(房间id: string | null, 破门 = false) {
-  insertOrAssignVariables(
-    { _场景: 房间id ? { 房间id, 破门, 进房末楼: 进房末楼.value } : null },
+async function 写场景(房间id: string | null, 破门 = false): Promise<void> {
+  await insertOrAssignVariables(
+    {
+      _场景: 房间id ? { 房间id, 破门, 进房末楼: 进房末楼.value } : null,
+      _粘滞: null, // 玩家一走动就解除旧对话固定；重回同一房间也不能把已经离开的人“复活”
+    },
     { type: 'chat' },
   );
 }
 
-function 进入(房间id: string, 破门 = false, 保持地图 = false) {
+async function 进入(房间id: string, 破门 = false, 保持地图 = false): Promise<void> {
   try {
     进房末楼.value = getLastMessageId();
   } catch {
@@ -1064,18 +1147,20 @@ function 进入(房间id: string, 破门 = false, 保持地图 = false) {
   }
   当前房间.value = 房间id;
   已破门进入.value = 破门;
+  粘滞在场.value = { 位置: null, 们: [] };
   if (!保持地图) 关地图();
-  写场景(房间id, 破门);
+  await 写场景(房间id, 破门);
   记待办(房间id);
   闪转场(查房间(房间id)?.名称 ?? 房间id);
   // 头像即时点亮(走到谁身边谁亮;回合结束后脚本按位置系统重算)
   在场.value = { 焦点: 可见门牌.value.filter(m => 妻现位(m, 位置种子.value) === 房间id), 在场: [] };
 }
 
-function 离开房间() {
+async function 离开房间(): Promise<void> {
   当前房间.value = null;
+  粘滞在场.value = { 位置: null, 们: [] };
   已破门进入.value = false;
-  写场景(null);
+  await 写场景(null);
   闪转场('楼道');
   在场.value = { 焦点: [], 在场: [] }; // 身边已无人,头像随之熄灭
   显示地图.value = true; // 走出房门=站上楼道,顺手展开地图选下一处
@@ -1102,12 +1187,17 @@ const 已破门进入 = ref(false);
  */
 // ── 工具由头门(2026-07-20 用户拍板):裂缝未确认的户,得有拿得出手的由头才张得开嘴 ──
 
-/** chat软记录 _工具由头[门牌][工具id]=使用钟楼(回档陷阱同款:记录在未来=作废) */
-const 工具由头记录 = ref<Record<string, Record<string, number>>>({});
+interface 由头日记录 {
+  日: number;
+  已用: string[];
+}
+
+/** chat软记录 _工具由头[门牌]={日,已用};回档时若日期不符自然作废。 */
+const 工具由头记录 = ref<Record<string, 由头日记录>>({});
 
 function 刷新工具由头() {
   const v = _.get(getVariables({ type: 'chat' }), '_工具由头');
-  工具由头记录.value = (v && typeof v === 'object' ? v : {}) as Record<string, Record<string, number>>;
+  工具由头记录.value = (v && typeof v === 'object' ? v : {}) as Record<string, 由头日记录>;
 }
 
 const 需要由头 = computed(() => {
@@ -1122,21 +1212,25 @@ const 需要由头 = computed(() => {
 const 可用由头 = computed(() => {
   const id = 当前房间.value ?? '';
   const 包 = data.value?.背包 ?? [];
-  const 记 = 工具由头记录.value[id] ?? {};
-  return Object.keys(由头工具表).filter(w => {
-    if (!包.includes(w)) return false;
-    const 上 = 记[w] ?? -999;
-    const 修 = 上 > 钟楼号.value ? -999 : 上; // 回档自净
-    return 钟楼号.value - 修 >= 由头冷却楼;
-  });
+  if (!包.includes('工具箱')) return [];
+  const 今日 = Math.floor(Math.max(0, 钟楼号.value) / 18);
+  const 记 = 工具由头记录.value[id];
+  const 已用 = 记?.日 === 今日 && Array.isArray(记.已用) ? 记.已用 : [];
+  return Object.keys(由头工具表)
+    .filter(w => !已用.includes(w))
+    .slice(0, 由头每日次数);
 });
 
 const 可输入 = computed(() => {
   const id = 当前房间.value;
   if (!id) return false;
+  // 荣耀洞摇到真人后开放输入,让玩家亲自推进余下3~5拍；空军演完即清场,不会走到这里。
+  if (id === '洗手间' && (data.value?.系统?._荣耀洞拍 ?? -1) >= 0 && data.value?.系统?._荣耀洞门牌 !== '空') {
+    return true;
+  }
   if (id === '302' || id === '管理员室') return true;
   if (房内有人在(id)) {
-    // 由头门:裂缝未确认的户,背包里没有可用工具(同工具同户有冷却)=开不了口
+    // 由头门:低阶段户必须持有工具箱，且该户今日仍有未用过的检修借口。
     if (需要由头.value && !可用由头.value.length) return false;
     return true;
   }
@@ -1222,7 +1316,7 @@ interface 卡动作 {
   icon: string;
   文案: string;
   类?: string;
-  做: () => void;
+  做: () => void | Promise<void>;
 }
 
 const 房卡动作 = computed<卡动作[]>(() => 房间动作(房卡.value));
@@ -1234,6 +1328,8 @@ const 房卡动作 = computed<卡动作[]>(() => 房间动作(房卡.value));
 const 当前房间动作 = computed<卡动作[]>(() =>
   房间动作(当前房间.value).filter(a => !['GO', 'VISIT', 'KNOCK', 'HOME'].includes(a.kicker)),
 );
+/** 垃圾袋由一个紧凑选择器承载，避免住户增多后 SEARCH 瓷砖占满正文下半屏。 */
+const 普通房间动作 = computed(() => 当前房间动作.value.filter(a => a.kicker !== 'SEARCH'));
 
 function 房间动作(id: string | null): 卡动作[] {
   if (!id) return [];
@@ -1245,21 +1341,24 @@ function 房间动作(id: string | null): 卡动作[] {
     if (房内有人在(id)) {
       动作.push({ kicker: 'VISIT', icon: 'door', 文案: '过去串门', 做: () => 进入(id) });
       // 对饮(P5 丈夫渠道兼信任资源轴):他在家+背包有好酒才摆得上台面
-      if (丈夫在楼(data.value.户[id], id as 门牌, 位置种子.value) === '在家' && (data.value?.背包 ?? []).includes('好酒')) {
+      if (
+        丈夫在楼(data.value.户[id], id as 门牌, 位置种子.value) === '在家' &&
+        (data.value?.背包 ?? []).includes('好酒')
+      ) {
         动作.push({
           kicker: 'DRINK',
           icon: 'gift',
           文案: `请${户静态表[id as 门牌].夫名}喝一杯`,
-          做: () => {
-            if (当前房间.value !== id) 进入(id, false, true);
+          做: async () => {
+            if (当前房间.value !== id) await 进入(id, false, true);
             eventEmit('人妻公寓:对饮', id);
           },
         });
       }
       // 催租三选(P3,天生欠租户):她在家且账上挂着欠租才摆得上台面
       if ((data.value.户[id]?._欠租笔数 ?? 0) > 0 && 妻现位(id as 门牌, 位置种子.value) === id) {
-        const 催 = (选择: '硬催' | '宽限' | '垫上') => {
-          if (当前房间.value !== id) 进入(id, false, true);
+        const 催 = async (选择: '硬催' | '宽限' | '垫上') => {
+          if (当前房间.value !== id) await 进入(id, false, true);
           eventEmit('人妻公寓:催租', { 门牌: id, 选择 });
         };
         动作.push({ kicker: 'RENT', icon: 'coin', 文案: '硬催房租', 类: 'risky', 做: () => 催('硬催') });
@@ -1316,8 +1415,8 @@ function 房间动作(id: string | null): 卡动作[] {
         kicker: 'ASK',
         icon: 'chat',
         文案: `打听${户静态表[m].妻名}家`,
-        做: () => {
-          if (当前房间.value !== id) 进入(id, false, true);
+        做: async () => {
+          if (当前房间.value !== id) await 进入(id, false, true);
           eventEmit('人妻公寓:打听', m);
         },
       });
@@ -1341,8 +1440,8 @@ function 房间动作(id: string | null): 卡动作[] {
         kicker: 'PICK',
         icon: 'coin',
         文案: `捡起零钱(¥${零钱})`,
-        做: () => {
-          if (当前房间.value !== id) 进入(id, false, true);
+        做: async () => {
+          if (当前房间.value !== id) await 进入(id, false, true);
           eventEmit('人妻公寓:捡金币', id);
         },
       });
@@ -1355,8 +1454,8 @@ function 房间动作(id: string | null): 卡动作[] {
         icon: 'trash',
         文案: `翻${袋.妻名}家的垃圾袋`,
         类: 'risky',
-        做: () => {
-          if (当前房间.value !== '垃圾房') 进入('垃圾房', false, true); // 人先走过去,地图和卡都不收
+        做: async () => {
+          if (当前房间.value !== '垃圾房') await 进入('垃圾房', false, true); // 人先走过去,地图和卡都不收
           翻(袋.门牌);
         },
       });
@@ -1434,6 +1533,14 @@ function 房内有人在(房间id: string): boolean {
   return 房内的人(房间id).length > 0;
 }
 
+/** 当面交互统一门：送礼、要钱等都只能对当前房间里真实亮起的妻子使用。 */
+function 妻在玩家身边(m: 门牌): boolean {
+  const 房 = 当前房间.value;
+  if (!房) return false;
+  if (m === '302' && 房 === '302' && data.value.户['302']) return true;
+  return 妻现位(m, 位置种子.value) === 房;
+}
+
 function 房内首字(房间id: string): string {
   return 房内的人(房间id)
     .map(n => n[0])
@@ -1464,7 +1571,10 @@ const 到场提示 = computed(() => {
   if (!id) return '打开地图,看看这栋楼此刻亮着的灯。';
   if (可输入.value) return '在这里做点什么——故事会从这里继续。';
   if (需要由头.value && 房内有人在(id)) {
-    return '没个由头,你在人家门口站不住脚——商店「工具」页签里有你要的借口(同一招对同一家,一天只好使一次)。';
+    const 有箱 = (data.value?.背包 ?? []).includes('工具箱');
+    return 有箱
+      ? '这户今天的三个检修借口都用过了，明天再来。'
+      : '没个由头,你在人家门口站不住脚——去商店「工具」页签买一只工具箱。';
   }
   return '要么改天再来,要么……对着门连点几下。';
 });
@@ -1559,8 +1669,8 @@ const 底层公共 = [
 
 // ── 素材(AI 生成,2026-07-17 入库;素材 TAG 与发布 TAG 解耦——素材没变就不用动这里) ──
 
-// ⚠ 基址已含 rq0.26 新素材(荣耀洞抠图件22替换环境CG):下次推 tag 必须叫 rq0.26,或推前改此处对齐 tag 名
-const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.26/dist/人妻公寓/素材';
+// ⚠ 与手机系统同步：本轮测试发布 tag=rq0.27。
+const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.27/dist/人妻公寓/素材';
 
 function 头像图(名: string): string {
   return `${素材基址}/头像/${名}.webp`;
@@ -1576,15 +1686,48 @@ function 道具图(id: string): string {
 
 const 道具图失效 = ref<Record<string, boolean>>({});
 
-// ── 立绘(2026-07-17 用户拍板:垫板压立绘,她在这场戏里才入画,人走戏收;
-//    多人站位同日拍板:1人右下,2人加左下对齐,3人加中位,4~6人并排均分) ──
+// ── 立绘(她在这场戏里才入画,人走戏收;
+//    2026-07-20 重排:桌面 1~6 人独立横槽;手机 1~3 人横槽、4 人 2×2、5~6 人 3×2,绝不互压) ──
 
 const 立绘失效 = ref<Record<string, boolean>>({});
 
 interface 立绘项 {
   src: string;
-  位: 'pos-right' | 'pos-left' | 'pos-center' | 'pos-row';
-  style?: Record<string, string>;
+  style: Record<string, string>;
+}
+
+/** 每位角色同时拥有桌面槽和手机槽；CSS 根据画幅选用，槽位几何永不相交。 */
+function 立绘槽(n: number, i: number): Record<string, string> {
+  const 桌面宽 = 100 / n;
+  const 桌面高 = [0, 98, 92, 84, 76, 70, 66][n] ?? 66;
+  let 手机列数 = n;
+  let 手机行数 = 1;
+  let 手机列 = i;
+  let 手机行 = 0;
+
+  if (n === 4) {
+    手机列数 = 2;
+    手机行数 = 2;
+    手机列 = i % 2;
+    手机行 = Math.floor(i / 2);
+  } else if (n >= 5) {
+    手机列数 = 3;
+    手机行数 = 2;
+    手机行 = Math.floor(i / 3);
+    // 五人时第二排居中，不让右下角留下突兀的空洞。
+    手机列 = i % 3;
+    if (n === 5 && 手机行 === 1) 手机列 += 0.5;
+  }
+
+  return {
+    '--portrait-desktop-left': `${(i * 桌面宽).toFixed(3)}%`,
+    '--portrait-desktop-width': `${桌面宽.toFixed(3)}%`,
+    '--portrait-desktop-height': `${桌面高}%`,
+    '--portrait-mobile-left': `${((手机列 * 100) / 手机列数).toFixed(3)}%`,
+    '--portrait-mobile-top': `${((手机行 * 100) / 手机行数).toFixed(3)}%`,
+    '--portrait-mobile-width': `${(100 / 手机列数).toFixed(3)}%`,
+    '--portrait-mobile-height': `${(100 / 手机行数).toFixed(3)}%`,
+  };
 }
 
 const 立绘列表 = computed<立绘项[]>(() => {
@@ -1592,33 +1735,22 @@ const 立绘列表 = computed<立绘项[]>(() => {
   // 荣耀洞戏中:立绘槽由洞件接管(匿名性:常规妻立绘一律不入画)
   const 洞件 = 荣耀洞件.value;
   if (洞件 !== undefined) {
-    return 洞件 && !立绘失效.value[洞件] ? [{ src: 洞件, 位: 'pos-right' as const }] : [];
+    return 洞件 && !立绘失效.value[洞件] ? [{ src: 洞件, style: 立绘槽(1, 0) }] : [];
   }
   const 图 = 可见门牌.value
     .filter(k => 妻现位(k, 位置种子.value) === 当前房间.value)
     .map(m => {
-      // 立绘随服装差分(P5):穿戴中外装SKU→差分图,无图/图挂回退基础立绘(spec 约定)
+      // 立绘跟随最后换上的衣服；旧档没有 `_立绘` 时优先恢复内衣差分，再回退外装。
       const 妻名 = 户静态表[m].妻名;
-      const sku = data.value.户[m]?.妻._穿着SKU?.['外装'];
+      const 穿着 = data.value.户[m]?.妻._穿着SKU;
+      const sku = 穿着?._立绘 ?? 穿着?.内衣 ?? 穿着?.外装;
       const 差分 = sku ? `${素材基址}/立绘/${妻名}_${sku}.webp` : '';
       return 差分 && !立绘失效.value[差分] ? 差分 : `${素材基址}/立绘/${妻名}.webp`;
     })
     .filter(src => !立绘失效.value[src])
     .slice(0, 6);
   const n = 图.length;
-  if (n >= 4) {
-    // 并排均分画幅(数组顺序即绘制顺序,右邻略压左邻,自然的队列层次)
-    return 图.map((src, i) => ({
-      src,
-      位: 'pos-row' as const,
-      style: { left: `${(((i + 0.5) * 100) / n).toFixed(2)}%` },
-    }));
-  }
-  const 位序 = ['pos-right', 'pos-left', 'pos-center'] as const;
-  const 排 = 图.map((src, i) => ({ src, 位: 位序[i] }));
-  // 绘制顺序=中位垫底、左次之、右(主位)最上;z 不能碰——正文层在 z2,立绘全员必须留在 z1 之下
-  const 层 = { 'pos-center': 0, 'pos-left': 1, 'pos-right': 2 } as const;
-  return 排.sort((a, b) => 层[a.位] - 层[b.位]);
+  return 图.map((src, i) => ({ src, style: 立绘槽(n, i) }));
 });
 
 function 背景图(房间id: string | null): string {
@@ -1680,6 +1812,7 @@ const 在场 = ref<{ 焦点: string[]; 在场: string[] }>({ 焦点: [], 在场:
 function 刷新在场() {
   const v = _.get(getVariables({ type: 'chat' }), '_在场') as { 焦点?: string[]; 在场?: string[] } | undefined;
   在场.value = { 焦点: v?.焦点 ?? [], 在场: v?.在场 ?? [] };
+  刷粘滞();
 }
 
 const 头像列表 = computed(() =>
@@ -1694,16 +1827,43 @@ const 头像列表 = computed(() =>
 
 const 输入文本 = ref('');
 const 发送中 = ref(false);
+const 由头写入中 = ref(false);
 const 流式段 = ref<string[]>([]);
 const 可重掷 = ref(false);
+const 键盘打开 = ref(false);
+let 键盘定位timer: ReturnType<typeof setTimeout> | undefined;
+
+function 让输入露出() {
+  if (!键盘打开.value) return;
+  try {
+    const frame = window.frameElement as HTMLElement | null;
+    frame?.scrollIntoView({ block: 'end', behavior: 'smooth' });
+  } catch {
+    /* 父页不允许滚动时，仍由本页紧凑键盘态兜底 */
+  }
+}
+
+function 输入聚焦() {
+  键盘打开.value = true;
+  clearTimeout(键盘定位timer);
+  // 等软键盘完成第一次视口缩放，再把整个游戏 iframe 的底边送进可视区。
+  键盘定位timer = setTimeout(让输入露出, 260);
+}
+
+function 输入失焦() {
+  clearTimeout(键盘定位timer);
+  键盘定位timer = setTimeout(() => (键盘打开.value = false), 160);
+}
 /** 上次回合发生的房间(2026-07-20 玩家点单:人走出房间后撤回/重演一起藏,防跨场景回滚) */
 const 回合房间 = ref<string | null>(null);
 
 function 刷新可重掷() {
   const 变量 = getVariables({ type: 'chat' });
-  可重掷.value = Boolean(_.get(变量, '_上次回合'));
-  // 记回合发生地:人走出这间房,撤回/重演一起收(跨场景回滚只会制造混乱)
-  回合房间.value = (_.get(变量, '_场景') as string | undefined) ?? null;
+  const 记录 = _.get(变量, '_上次回合') as { chat快照?: { _场景?: { 房间id?: string } | null } } | undefined;
+  可重掷.value = Boolean(记录);
+  // 回合开始前的 chat 快照才是“这轮发生在哪”的凭据。不能读当前 _场景：
+  // 它既是对象而非房间名，又会在玩家走动后改变，曾导致对象与字符串永远不等、两钮全局消失。
+  回合房间.value = 记录?.chat快照?._场景?.房间id ?? null;
   刷新工具由头();
 }
 
@@ -1729,9 +1889,9 @@ function 选项移动目标(文本: string): string | null {
   return null;
 }
 
-function 点选项(文本: string) {
+async function 点选项(文本: string) {
   const 目标 = 选项移动目标(文本);
-  if (目标 && 目标 !== 当前房间.value) 进入(目标);
+  if (目标 && 目标 !== 当前房间.value) await 进入(目标);
   发出(文本);
 }
 
@@ -1747,15 +1907,30 @@ function 发出(文本: string) {
   eventEmit('人妻公寓:玩家行动', 文本);
 }
 
-function 发送() {
+async function 发送() {
   let 文本 = 输入文本.value.trim();
-  if (!文本) return;
+  if (!文本 || 发送中.value || 由头写入中.value) return;
   输入文本.value = '';
-  // 由头进门:自动挑第一件可用工具垫话头(舞台指示进正文=AI天然接戏),冷却记账交给脚本
+  // 由头进门:工具箱每天对同一户依次提供三个不同借口，先确保记录落库再生成。
   if (需要由头.value && 可用由头.value.length) {
     const 用 = 可用由头.value[0];
-    eventEmit('人妻公寓:用由头', { 门牌: 当前房间.value, 工具: 用 });
-    文本 = `(${用}在手,以${由头工具表[用]}的名义敲开了门)${文本}`;
+    const 门牌号 = 当前房间.value!;
+    const 今日 = Math.floor(Math.max(0, 钟楼号.value) / 18);
+    const 旧 = 工具由头记录.value[门牌号];
+    const 已用 = 旧?.日 === 今日 && Array.isArray(旧.已用) ? [...旧.已用] : [];
+    const 新记录 = { 日: 今日, 已用: [...new Set([...已用, 用])] };
+    由头写入中.value = true;
+    try {
+      await insertOrAssignVariables(_.set({}, `_工具由头.${门牌号}`, 新记录), { type: 'chat' });
+      工具由头记录.value = { ...工具由头记录.value, [门牌号]: 新记录 };
+    } catch (e) {
+      输入文本.value = 文本;
+      弹提示(`工具箱使用记录没有保存：${e instanceof Error ? e.message : String(e)}`);
+      return;
+    } finally {
+      由头写入中.value = false;
+    }
+    文本 = `(${用}在手,以${由头工具表[用]}为由敲开了门；这是今天对这户的第${新记录.已用.length}次检修)${文本}`;
   }
   发出(文本);
 }
@@ -1805,7 +1980,6 @@ function 开始考验() {
   eventEmit('人妻公寓:开始新游戏', 选中难度.value);
 }
 
-
 // ── 待办软引导(开局流程③:拿钥匙看信箱→101报修→102收租→回管理员室;不硬锁) ──
 
 const 待办定义 = [
@@ -1836,10 +2010,7 @@ function 划掉待办() {
 }
 
 const 待办列表 = computed(() => 待办定义.map(t => ({ ...t, 完成: Boolean(待办勾.value[t.键]) })));
-const 显示待办 = computed(
-  () =>
-    !待办已划掉.value && 末楼号.value < 24 && 待办列表.value.some(t => !t.完成),
-);
+const 显示待办 = computed(() => !待办已划掉.value && 末楼号.value < 24 && 待办列表.value.some(t => !t.完成));
 
 // ── 档案卡 ──
 
@@ -1849,11 +2020,15 @@ const 选中档案 = computed(() => {
   const m = 选中门牌.value;
   if (!m || !就绪.value || !data.value.户[m]) return null;
   const { 妻, 夫 } = data.value.户[m];
+  const 当前立绘SKU = 妻._穿着SKU._立绘 ?? 妻._穿着SKU.内衣 ?? 妻._穿着SKU.外装;
+  const 基础立绘 = `${素材基址}/立绘/${户静态表[m].妻名}.webp`;
   return {
     门牌: m,
     妻名: 户静态表[m].妻名,
     夫名: 户静态表[m].夫名 || '她丈夫',
     夫状态: 丈夫在楼(data.value.户[m], m, 位置种子.value),
+    基础立绘,
+    立绘图: 当前立绘SKU ? `${素材基址}/立绘/${户静态表[m].妻名}_${当前立绘SKU}.webp` : 基础立绘,
     妻,
     夫,
     三轴: [
@@ -1862,14 +2037,19 @@ const 选中档案 = computed(() => {
       { 名: '婚姻', 类: 'marr', 值: 妻.婚姻值 },
     ],
     仪容项: (() => {
-      // 对得上商店 SKU 的项带 图id(道具图缩略卡);自由描述项纯文字软卡
-      const 配图 = (值: string) => (查道具(值) ? 值 : undefined);
-      const 项: { 标: string; 值: string; 图id?: string }[] = [
-        { 标: '外装', 值: 妻.外装 || '—', 图id: 配图(妻.外装) },
-        { 标: '妆容', 值: 妻.妆容 || '素颜', 图id: 配图(妻.妆容) },
+      const 找描述SKU = (值: string) => Object.values(道具表).find(x => x.服饰?.穿着描述 === 值)?.id;
+      const 做项 = (标: string, 细节: string, 图id?: string) => ({
+        标,
+        值: (图id && 查道具(图id)?.名称) || 细节 || '—',
+        细节: 细节 || undefined,
+        图id: 图id && 查道具(图id) ? 图id : undefined,
+      });
+      const 项: { 标: string; 值: string; 细节?: string; 图id?: string }[] = [
+        做项('外装', 妻.外装, 妻._穿着SKU.外装),
+        做项('妆容', 妻.妆容 || '素颜', 妻._穿着SKU.妆容),
       ];
-      if (妻.内衣) 项.push({ 标: '内衣', 值: 妻.内衣, 图id: 配图(妻.内衣) });
-      for (const 件 of 妻.特殊) 项.push({ 标: '佩着', 值: 件, 图id: 配图(件) });
+      if (妻.内衣) 项.push(做项('内衣', 妻.内衣, 妻._穿着SKU.内衣));
+      for (const 件 of 妻.特殊) 项.push(做项('佩饰', 件, 找描述SKU(件)));
       return 项;
     })(),
     开发: [
@@ -1893,7 +2073,7 @@ const 选中可晋阶 = computed(() => {
 /** L4 要钱按钮(P3:钱的流向反转=堕落可视化;冷却与刹车全在脚本) */
 const 选中可要钱 = computed(() => {
   const m = 选中门牌.value;
-  return !!m && (data.value.户[m]?.妻.当前阶段 ?? 0) >= 4;
+  return !!m && (data.value.户[m]?.妻.当前阶段 ?? 0) >= 4 && 妻在玩家身边(m);
 });
 
 function 开口要钱(门牌号: 门牌) {
@@ -1936,9 +2116,7 @@ const 背包列表 = computed(() =>
       可送对象:
         !配?.常驻 && !信门牌 && id !== '针孔摄像头' && !['运作', '工具', '药物', '性癖'].includes(配?.类别 ?? '')
           ? [
-              ...可见门牌.value
-                .filter(m => 当前房间.value && 妻位置推算(m, 位置种子.value) === 当前房间.value)
-                .map(m => ({ 门牌: m, 妻名: 户静态表[m].妻名 })),
+              ...可见门牌.value.filter(m => 妻在玩家身边(m)).map(m => ({ 门牌: m, 妻名: 户静态表[m].妻名 })),
               ...(当前房间.value === '302' && data.value.户['302'] ? [{ 门牌: '302' as 门牌, 妻名: '妈' }] : []),
             ].filter((v, i, a) => a.findIndex(x => x.门牌 === v.门牌) === i)
           : [],
@@ -1959,9 +2137,7 @@ const 背包列表 = computed(() =>
       可用运作: 配?.类别 === '运作' && !['钓鱼团购券', '夜班内推', '外地项目介绍', '代订惊喜'].includes(id),
       运作对象:
         配?.类别 === '运作' && ['钓鱼团购券', '夜班内推', '外地项目介绍', '代订惊喜'].includes(id)
-          ? 可见门牌.value
-              .filter(m => 户静态表[m].夫名)
-              .map(m => ({ 门牌: m, 夫名: 户静态表[m].夫名 }))
+          ? 可见门牌.value.filter(m => 户静态表[m].夫名).map(m => ({ 门牌: m, 夫名: 户静态表[m].夫名 }))
           : [],
     };
   }),
@@ -2029,9 +2205,7 @@ const 货架 = computed(() => {
 });
 
 const 当前货架 = computed(() => 货架.value.find(页 => 页.页签 === 商店页签.value)?.商品 ?? []);
-const 当前空文案 = computed(
-  () => 货架.value.find(页 => 页.页签 === 商店页签.value)?.空文案 ?? '(暂时没货)',
-);
+const 当前空文案 = computed(() => 货架.value.find(页 => 页.页签 === 商店页签.value)?.空文案 ?? '(暂时没货)');
 
 function 买(道具id: string) {
   eventEmit('人妻公寓:购买', 道具id);
@@ -2045,6 +2219,7 @@ function 送出(道具id: string, 门牌号: 门牌) {
 // ── 侦探:翻垃圾 / 摄像头 / 偷窥选细节 / 读信 ──
 
 const 垃圾袋列表 = computed(() => 可见门牌.value.map(m => ({ 门牌: m, 妻名: 户静态表[m].妻名 })));
+const 垃圾目标 = ref<门牌>('101');
 
 function 翻(门牌号: 门牌) {
   eventEmit('人妻公寓:翻垃圾', 门牌号);
@@ -2141,6 +2316,20 @@ interface 卷轴条 {
 const 卷轴 = ref<卷轴条[]>([]);
 const 卷轴容器 = ref<HTMLElement | null>(null);
 const 显示史册 = ref(false);
+const 史册容器 = ref<HTMLElement | null>(null);
+
+async function 史册到最新() {
+  await nextTick();
+  const 容器 = 史册容器.value;
+  if (容器) 容器.scrollTo({ top: 容器.scrollHeight, behavior: 'smooth' });
+}
+
+async function 打开史册() {
+  显示史册.value = true;
+  await nextTick();
+  const 容器 = 史册容器.value;
+  if (容器) 容器.scrollTop = 容器.scrollHeight;
+}
 
 /** 正文书页只演当前幕:从最后一条玩家行动起;完整历史在史册 */
 const 当前幕 = computed(() => {
@@ -2246,7 +2435,9 @@ function 清洗(原文: string, 流式 = false): string {
   // 吞尾会把整楼显示成空白——完整楼层回退只清闭合块,顺手剥掉裸标记词;流式期间不回退
   if (!流式 && !全清 && 闭合清.trim()) {
     console.warn('[人妻公寓客户端] 显示层吞尾把楼层吞成了空白,回退只清闭合块');
-    return 闭合清.replace(/<\/?(?:think(?:ing)?|reason(?:ing)?|UpdateVariable|options|行为等级|details[^>]*)>/gi, '').trim();
+    return 闭合清
+      .replace(/<\/?(?:think(?:ing)?|reason(?:ing)?|UpdateVariable|options|行为等级|details[^>]*)>/gi, '')
+      .trim();
   }
   return 全清;
 }
@@ -2360,6 +2551,53 @@ async function 进真全屏() {
   if (根.requestFullscreen) await 根.requestFullscreen();
   else if (根.webkitRequestFullscreen) await 根.webkitRequestFullscreen();
   else throw new Error('Fullscreen API 不可用');
+}
+
+/** 复用酒馆助手原生提示词查看器：点击它传送到 extensionsMenu 的真实入口，不另造阉割版窗口。 */
+async function 打开提示词查看器() {
+  let 根文档: Document;
+  try {
+    根文档 = window.parent?.document ?? document;
+  } catch {
+    弹提示('无法访问酒馆页面，提示词查看器没有打开。');
+    return;
+  }
+  const 入口 = Array.from(根文档.querySelectorAll<HTMLElement>('#extensionsMenu .list-group-item')).find(el =>
+    /提示词查看器|Prompt Viewer/i.test(el.textContent ?? ''),
+  );
+  if (!入口) {
+    弹提示('没有找到酒馆助手的提示词查看器，请确认酒馆助手已启用。', 5000);
+    return;
+  }
+
+  const 文档 = document as 全屏文档;
+  const 原本全屏 = Boolean(document.fullscreenElement ?? 文档.webkitFullscreenElement);
+  if (原本全屏) {
+    try {
+      if (document.exitFullscreen) await document.exitFullscreen();
+      else 文档.webkitExitFullscreen?.();
+    } catch {
+      /* 即使退出失败也尝试唤起原生窗口 */
+    }
+  }
+  入口.click();
+
+  // 原生窗口挂在父文档；若是本按钮替玩家退的全屏，点原生关闭钮后送回游戏全屏。
+  if (原本全屏) {
+    setTimeout(() => {
+      const 对话框 = Array.from(根文档.querySelectorAll<HTMLElement>('[role="dialog"]')).find(el =>
+        /提示词查看器|Prompt Viewer/i.test(el.textContent ?? ''),
+      );
+      const 关闭 = 对话框?.querySelector<HTMLElement>('[title="关闭"], [title="Close"]');
+      关闭?.addEventListener(
+        'click',
+        () => {
+          void 进真全屏().catch(e => console.warn('[人妻公寓客户端] 提示词查看器关闭后恢复全屏失败:', e));
+        },
+        { once: true },
+      );
+    }, 0);
+  }
 }
 
 async function 切换全屏() {
@@ -2556,6 +2794,11 @@ onMounted(() => {
   刷新行动选项();
   刷新待办();
   刷新偷窥待选();
+  try {
+    window.parent?.visualViewport?.addEventListener('resize', 让输入露出);
+  } catch {
+    window.visualViewport?.addEventListener('resize', 让输入露出);
+  }
 
   eventOn('人妻公寓:生成开始', () => {
     // 脚本侧发起的回合(查看监控等)也要锁输入+亮书写态;驻留的拾获卡顺手收掉不挡戏
@@ -2609,6 +2852,12 @@ onMounted(() => {
   eventOn('人妻公寓:手机状态', (状: { 未读?: boolean }) => {
     手机未读.value = !!状?.未读;
     刷赴约(); // 约出来是纯手机操作不产楼,靠这条通知让地图位置即时跟上
+    if (当前房间.value) {
+      在场.value = {
+        焦点: 可见门牌.value.filter(m => 妻在玩家身边(m)),
+        在场: [],
+      };
+    }
   });
   eventOn('人妻公寓:手机收起', async () => {
     // 开手机时替玩家退过真全屏,收起就送回去;收起点按=用户手势,同源iframe吃得到激活态
@@ -2689,6 +2938,12 @@ onUnmounted(() => {
   clearInterval(心跳timer);
   clearTimeout(破门计时);
   clearTimeout(提示timer);
+  clearTimeout(键盘定位timer);
+  try {
+    window.parent?.visualViewport?.removeEventListener('resize', 让输入露出);
+  } catch {
+    window.visualViewport?.removeEventListener('resize', 让输入露出);
+  }
 });
 </script>
 
@@ -3005,7 +3260,12 @@ onUnmounted(() => {
   overflow: hidden;
   /* 四层:氛围色渐变 > 薄纱(背景放开看,可读性交给正文磨砂垫板) > 地点背景图(素材) > 玻璃底(图挂了的兜底) */
   background:
-    linear-gradient(180deg, rgba(var(--sc-a, 165, 175, 195), 0.14), rgba(var(--sc-b, 205, 215, 230), 0.05) 42%, transparent 72%),
+    linear-gradient(
+      180deg,
+      rgba(var(--sc-a, 165, 175, 195), 0.14),
+      rgba(var(--sc-b, 205, 215, 230), 0.05) 42%,
+      transparent 72%
+    ),
     linear-gradient(rgba(255, 250, 245, 0.32), rgba(255, 250, 245, 0.42)),
     var(--scene-img, none) center / cover no-repeat,
     var(--glass);
@@ -3016,45 +3276,33 @@ onUnmounted(() => {
   transition: background 0.5s ease;
 }
 
-/* 立绘:她在这场戏里才入画;垫板压立绘(文字永远可读),左缘羽化不硬切。
-   2026-07-17 用户反馈加大:2/3 身位近景素材+高度提到 84%,细白描边(叠 drop-shadow)+柔光 */
+/* 立绘:每人占一个独立横槽。高度随人数递减，宽度受槽硬约束，素材比例再不同也不会互相遮挡。 */
 .portrait {
   position: absolute;
-  right: -10px;
+  left: var(--portrait-desktop-left);
   bottom: 0;
   z-index: 1;
-  height: 84%;
-  max-height: 500px;
+  width: var(--portrait-desktop-width);
+  height: var(--portrait-desktop-height);
+  max-width: none;
+  max-height: none;
+  object-fit: contain;
+  object-position: center bottom;
   pointer-events: none;
   filter: drop-shadow(0 0 1.2px rgba(255, 255, 255, 0.85)) drop-shadow(0 0 1.2px rgba(255, 255, 255, 0.85))
     drop-shadow(0 8px 20px rgba(20, 24, 40, 0.35));
-  mask-image: linear-gradient(to right, transparent, #000 14%);
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 14%);
+  transition:
+    left 0.35s ease,
+    top 0.35s ease,
+    width 0.35s ease,
+    height 0.35s ease,
+    opacity 0.35s ease;
 }
 
-/* 多人站位(2026-07-17 用户拍板):第2人左下与右侧对齐(羽化翻到右缘),第3人居中(双缘羽化),
-   4~6人并排均分(left 由脚本按人数算,统一收身高防打架) */
-.portrait.pos-left {
-  right: auto;
-  left: -10px;
-  mask-image: linear-gradient(to left, transparent, #000 14%);
-  -webkit-mask-image: linear-gradient(to left, transparent, #000 14%);
-}
-
-.portrait.pos-center {
-  right: auto;
-  left: 50%;
-  transform: translateX(-50%);
-  mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
-}
-
-.portrait.pos-row {
-  right: auto;
-  height: 68%;
-  transform: translateX(-50%);
-  mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
-  -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+/* 单人镜头略偏右，给左侧正文保留呼吸；仍处于自己的 78% 宽槽内。 */
+.portrait-count-1 .portrait {
+  left: 22%;
+  width: 78%;
 }
 
 :global(html.rq-dark) .portrait {
@@ -3398,7 +3646,13 @@ onUnmounted(() => {
 
 :global(html.rq-dark) .option-chip.gal {
   background:
-    linear-gradient(90deg, rgba(44, 46, 64, 0.55), rgba(44, 46, 64, 0.94) 16%, rgba(44, 46, 64, 0.94) 84%, rgba(44, 46, 64, 0.55)),
+    linear-gradient(
+      90deg,
+      rgba(44, 46, 64, 0.55),
+      rgba(44, 46, 64, 0.94) 16%,
+      rgba(44, 46, 64, 0.94) 84%,
+      rgba(44, 46, 64, 0.55)
+    ),
     #2c2e40;
   border-color: rgba(255, 255, 255, 0.16);
 }
@@ -3459,8 +3713,7 @@ onUnmounted(() => {
     repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.045) 0 2px, transparent 2px 6px),
     radial-gradient(120% 90% at 50% 0%, rgba(255, 79, 154, 0.12), transparent 55%),
     radial-gradient(130% 100% at 50% 110%, rgba(38, 169, 244, 0.14), transparent 60%),
-    radial-gradient(140% 140% at 50% 50%, rgba(24, 22, 34, 0.3), rgba(16, 14, 26, 0.6)),
-    rgba(20, 22, 30, 0.2);
+    radial-gradient(140% 140% at 50% 50%, rgba(24, 22, 34, 0.3), rgba(16, 14, 26, 0.6)), rgba(20, 22, 30, 0.2);
   backdrop-filter: blur(4px) saturate(0.9);
   display: grid;
   place-items: center;
@@ -3533,6 +3786,39 @@ onUnmounted(() => {
   min-height: 0;
   overflow-y: auto;
   scrollbar-width: thin;
+}
+
+.chronicle {
+  scrollbar-color: var(--pink) rgba(0, 0, 0, 0.08);
+  scrollbar-width: auto;
+}
+
+.chronicle::-webkit-scrollbar {
+  width: 10px;
+}
+
+.chronicle::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 999px;
+}
+
+.chronicle::-webkit-scrollbar-thumb {
+  background: linear-gradient(var(--pink), var(--blue));
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+.history-latest {
+  align-self: flex-end;
+  margin: -2px 4px 6px 0;
+  padding: 4px 10px;
+  color: var(--ink-soft);
+  font: 600 0.72em/1.2 inherit;
+  background: var(--glass);
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  cursor: pointer;
 }
 
 .toast {
@@ -4264,42 +4550,129 @@ onUnmounted(() => {
 
 /* ═══ 档案卡 ═══ */
 
+.sheet.dossier {
+  width: min(640px, 96%);
+  padding: 0 16px 16px;
+  overflow-x: hidden;
+  background: linear-gradient(180deg, rgba(255, 247, 251, 0.98), rgba(246, 250, 255, 0.98)), #fff;
+}
+
+.dossier-hero {
+  position: relative;
+  min-height: 170px;
+  margin: 0 -16px 10px;
+  padding: 24px 210px 16px 20px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 18% 30%, rgba(255, 255, 255, 0.95), transparent 32%),
+    linear-gradient(125deg, rgba(255, 214, 231, 0.86), rgba(220, 239, 255, 0.78) 58%, rgba(255, 240, 196, 0.68));
+  border-bottom: 1px solid rgba(255, 79, 154, 0.18);
+}
+
+.dossier-hero::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.18) 0 1px, transparent 1px 7px);
+  mask-image: linear-gradient(90deg, #000, transparent 75%);
+}
+
 .dossier-head {
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 8px;
+  min-height: 86px;
 }
 
 .dossier-name {
   color: var(--ink);
-  font-size: 1.05em;
+  font-family: var(--font-display);
+  font-size: 1.45em;
   font-weight: 900;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.12em;
 }
 
 .dossier-role {
   font-family: var(--font-mono);
-  color: var(--ink-faint);
-  font-size: 0.72em;
+  color: var(--blue);
+  font-size: 0.62em;
+  letter-spacing: 0.08em;
 }
 
 .dossier-stage {
-  margin-left: auto;
+  position: absolute;
+  z-index: 3;
+  left: 20px;
+  bottom: 20px;
   color: #fff;
   background: linear-gradient(180deg, #ff6cab, #ff4f9a);
   border-radius: 999px;
-  padding: 2px 12px;
-  font-size: 0.76em;
+  padding: 4px 14px;
+  font-size: 0.72em;
   font-weight: 700;
   box-shadow: 0 3px 10px rgba(255, 79, 154, 0.35);
 }
 
-.axes {
+.dossier-portrait {
+  position: absolute;
+  z-index: 1;
+  top: 4px;
+  right: 10px;
+  width: 205px;
+  height: 180px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  pointer-events: none;
+  filter: drop-shadow(0 8px 12px rgba(45, 34, 55, 0.18));
+}
+
+.dossier-portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: 50% 10%;
+}
+
+.dossier-axes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+.dossier-axes .axis-row {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-bottom: 6px;
+  align-items: stretch;
+  gap: 5px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid rgba(255, 79, 154, 0.13);
+  box-shadow: 0 3px 10px rgba(44, 40, 56, 0.05);
+}
+
+.axis-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.axis-top b {
+  color: var(--ink-soft);
+  font-size: 0.76em;
+}
+
+.axis-top i {
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 1.05em;
+  font-style: normal;
+  font-weight: 800;
 }
 
 .axis-row {
@@ -4427,6 +4800,29 @@ onUnmounted(() => {
   margin-top: 5px;
 }
 
+.dossier-card {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(38, 169, 244, 0.11);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: 0 3px 12px rgba(35, 32, 46, 0.045);
+}
+
+.dossier-card .dsec-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 7px;
+}
+
+.dossier-card .dsec-title small {
+  color: var(--ink-faint);
+  font-family: var(--font-body);
+  font-size: 0.82em;
+  letter-spacing: 0;
+}
+
 .dsec-title {
   font-family: var(--font-mono);
   color: var(--blue);
@@ -4462,27 +4858,31 @@ onUnmounted(() => {
 .dev-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 3px 10px;
+  gap: 8px;
 }
 
-/* 仪容 gal 化(2026-07-18):软玻璃卡行;带道具图的项升级缩略卡 */
+/* 仪容图鉴：穿戴 SKU 直接显示商店道具卡，不再拿穿着描述误查图片。 */
 .a-cell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  position: relative;
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  align-items: stretch;
+  min-height: 88px;
+  overflow: hidden;
   font-size: 0.76em;
-  background: var(--glass);
-  border: 1px solid rgba(255, 79, 154, 0.14);
-  border-left: 3px solid var(--pink-soft);
-  border-radius: 10px;
-  padding: 5px 8px;
-  box-shadow: 0 2px 6px rgba(30, 26, 38, 0.05);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(248, 243, 250, 0.9));
+  border: 1px solid rgba(255, 79, 154, 0.16);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(30, 26, 38, 0.07);
 }
 
 .a-cell .a-main {
   display: flex;
   flex-direction: column;
+  justify-content: center;
+  gap: 3px;
   min-width: 0;
+  padding: 9px 10px;
 }
 
 .a-cell.pic {
@@ -4490,16 +4890,13 @@ onUnmounted(() => {
 }
 
 .a-cell .a-pic {
-  flex: none;
-  width: 40px;
-  height: 40px;
-  border-radius: 9px;
+  width: 88px;
+  height: 88px;
   overflow: hidden;
   background: #fff;
-  border: 1px solid rgba(255, 202, 53, 0.55);
   display: grid;
   place-items: center;
-  box-shadow: 0 2px 6px rgba(30, 26, 38, 0.12);
+  border-right: 1px solid rgba(255, 202, 53, 0.4);
 }
 
 .a-cell .a-pic img {
@@ -4510,6 +4907,26 @@ onUnmounted(() => {
 
 .a-cell small {
   color: var(--ink-faint);
+  font-family: var(--font-mono);
+  letter-spacing: 0.12em;
+}
+
+.a-cell .a-val {
+  color: var(--ink);
+  font-size: 1.04em;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.a-cell em {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: 0.88em;
+  font-style: normal;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 /* ═══ 设置弹窗(界面偏好) ═══ */
@@ -4654,6 +5071,48 @@ onUnmounted(() => {
 
 .scene-acts .tile {
   padding: 8px 10px;
+}
+
+.garbage-pick {
+  flex: none;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  margin-top: 6px;
+  padding: 6px 8px;
+  color: var(--ink-soft);
+  font-size: 0.76em;
+  background: var(--glass);
+  border: 1px solid rgba(229, 83, 63, 0.2);
+  border-radius: 12px;
+}
+
+.garbage-pick > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.garbage-pick .ic {
+  width: 18px;
+  height: 18px;
+}
+
+.garbage-pick select {
+  min-width: 0;
+  padding: 5px 7px;
+  color: var(--ink);
+  font: inherit;
+  background: var(--glass);
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+}
+
+.garbage-pick .btn.risky {
+  color: var(--red);
+  border-color: rgba(229, 83, 63, 0.35);
 }
 
 /* 正文字色选择行 */
@@ -5918,7 +6377,12 @@ onUnmounted(() => {
    半透明深纱衬成浅灰,浅色字浮在上面看不清——深纱加厚 */
 :global(html.rq-dark) .story-wrap {
   background:
-    linear-gradient(180deg, rgba(var(--sc-a, 165, 175, 195), 0.14), rgba(var(--sc-b, 205, 215, 230), 0.05) 42%, transparent 72%),
+    linear-gradient(
+      180deg,
+      rgba(var(--sc-a, 165, 175, 195), 0.14),
+      rgba(var(--sc-b, 205, 215, 230), 0.05) 42%,
+      transparent 72%
+    ),
     linear-gradient(rgba(24, 26, 40, 0.58), rgba(24, 26, 40, 0.68)),
     var(--scene-img, none) center / cover no-repeat,
     var(--glass);
@@ -5949,6 +6413,29 @@ onUnmounted(() => {
 :global(html.rq-dark) .sheet {
   background: rgba(38, 40, 56, 0.97);
   border-color: rgba(255, 255, 255, 0.1);
+}
+
+:global(html.rq-dark) .sheet.dossier {
+  background: linear-gradient(180deg, rgba(45, 43, 59, 0.99), rgba(34, 38, 53, 0.99));
+}
+
+:global(html.rq-dark) .dossier-hero {
+  background:
+    radial-gradient(circle at 18% 30%, rgba(255, 255, 255, 0.08), transparent 32%),
+    linear-gradient(125deg, rgba(115, 54, 83, 0.72), rgba(46, 78, 108, 0.72) 58%, rgba(106, 85, 42, 0.58));
+  border-bottom-color: rgba(255, 255, 255, 0.09);
+}
+
+:global(html.rq-dark) .dossier-card,
+:global(html.rq-dark) .dossier-axes .axis-row,
+:global(html.rq-dark) .a-cell {
+  background: rgba(44, 46, 62, 0.82);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+:global(html.rq-dark) .a-cell .a-pic {
+  background: #343648;
+  border-right-color: rgba(255, 255, 255, 0.08);
 }
 
 :global(html.rq-dark) .sheet-close,
@@ -5993,6 +6480,35 @@ onUnmounted(() => {
    原则:正文区 story-wrap 是 flex:1,只要把上下所有周边框架等比压扁,
    省出来的高度会自动全部归正文;不动任何逻辑,纯视觉压缩 */
 @media (max-width: 540px) {
+  /* 手机全屏立绘：1~3 人横向独立槽；4~6 人转为两排半身镜头。
+     每个 img 的几何盒互不相交，因此不依赖 z-index 或遮挡来制造站位。 */
+  :global(html.rqgy-full) .portrait {
+    left: var(--portrait-mobile-left);
+    top: var(--portrait-mobile-top);
+    bottom: auto;
+    width: var(--portrait-mobile-width);
+    height: var(--portrait-mobile-height);
+    object-fit: contain;
+    object-position: center bottom;
+    clip-path: inset(0 2px 0 2px);
+  }
+
+  :global(html.rqgy-full) .portrait-count-1 .portrait {
+    left: 8%;
+    top: 0;
+    width: 92%;
+    height: 100%;
+  }
+
+  /* 四人以上保留脸和上半身，比六人挤成一条细立绘更容易辨认。 */
+  :global(html.rqgy-full) .portraits-many .portrait {
+    object-fit: cover;
+    object-position: center top;
+    clip-path: inset(2px);
+    mask-image: linear-gradient(to bottom, #000 82%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, #000 82%, transparent 100%);
+  }
+
   .page {
     padding: 4px 7px 6px;
   }
@@ -6079,6 +6595,21 @@ onUnmounted(() => {
     font-size: 0.86em;
   }
 
+  /* 软键盘弹起后把非输入功能收起，配合把宿主 iframe 底边滚入可视区。 */
+  .keyboard-open .dock,
+  .keyboard-open .reroll-row,
+  .keyboard-open .scene-acts,
+  .keyboard-open .garbage-pick,
+  .keyboard-open .option-row,
+  .keyboard-open .peep-card {
+    display: none;
+  }
+
+  .keyboard-open .quill {
+    position: relative;
+    z-index: 25;
+  }
+
   .reroll-row {
     gap: 8px;
     margin-top: 4px;
@@ -6109,6 +6640,82 @@ onUnmounted(() => {
 
   .dock-btn span {
     font-size: 0.6em;
+  }
+
+  /* 角色档案：手机上让立绘保留存在感，但不挤压仪容道具图。 */
+  .mask:has(.dossier) {
+    padding: 4px;
+  }
+
+  .sheet.dossier {
+    width: 100%;
+    max-height: 98%;
+    padding: 0 10px 12px;
+    border-radius: 14px;
+  }
+
+  .dossier-hero {
+    min-height: 150px;
+    margin: 0 -10px 8px;
+    padding: 18px 145px 12px 13px;
+  }
+
+  .dossier-head {
+    gap: 7px;
+  }
+
+  .dossier-head .avatar-glyph.big {
+    width: 46px;
+    height: 46px;
+  }
+
+  .dossier-name {
+    font-size: 1.16em;
+  }
+
+  .dossier-role {
+    font-size: 0.55em;
+  }
+
+  .dossier-stage {
+    left: 13px;
+    bottom: 15px;
+  }
+
+  .dossier-portrait {
+    right: 2px;
+    width: 155px;
+    height: 158px;
+  }
+
+  .dossier-axes {
+    gap: 5px;
+  }
+
+  .dossier-axes .axis-row {
+    padding: 6px 7px;
+  }
+
+  .dossier-card {
+    padding: 9px;
+  }
+
+  .attire-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .a-cell {
+    grid-template-columns: 76px minmax(0, 1fr);
+    min-height: 76px;
+  }
+
+  .a-cell .a-pic {
+    width: 76px;
+    height: 76px;
+  }
+
+  .dev-grid {
+    grid-template-columns: 1fr;
   }
 }
 </style>

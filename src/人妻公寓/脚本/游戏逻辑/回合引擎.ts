@@ -8,9 +8,10 @@ import { 入住检测 } from './入住系统';
 import { 打断检测, 换装起疑, 母亲撞见检测, 父亲来电打断 } from './打断系统';
 import { 夜访结算, 惰性结算户, 绿帽线检测, 结算焦点疑心, 冷落检测 } from './结算系统';
 import { 荣耀洞结算 } from './荣耀洞';
+import { 丈夫在楼 } from './楼层时钟';
 import { PROMOTE_MIRROR_KEY, 捕获保护快照, 回滚保护字段, 清保护快照, 镜像直写 } from './守护系统';
 import { 中断卡文案, 记违规清零, 结算违规代价, 输出稽查, 未遂余波指引 } from './稽查系统';
-import { 读取, 读最近有效stat, 脚本写入 } from './mvuIO';
+import { 读取最近有效, 读最近有效stat, 脚本写入 } from './mvuIO';
 import { 检测焦点, 组公寓快照, 读场景 } from './snapshotSystem';
 
 /**
@@ -34,7 +35,34 @@ export const 回合进行中 = () => 进行中;
 // 变量随楼自动回滚(每楼自带 stat_data);晋阶镜像有意不在此列——镜像取大是防打回的正字,重掷不还原
 
 /** 回合内会被脚本改写的 chat 变量键(重掷时按快照整值恢复;_场景 含一幕性的破门标记) */
-const 回合变量键 = ['_场景'] as const;
+const 回合变量键 = [
+  '_场景',
+  '_经济',
+  '_赴约',
+  '_工具由头',
+  '_换装余波',
+  '_待办',
+  '_侦探',
+  '_摄像头',
+  '_在场',
+  '_行动选项',
+  '_粘滞',
+] as const;
+
+/** 手机记录不塞进每回合快照（会令存档平方膨胀），按楼层戳裁掉被删除时间线。 */
+function 裁手机时间线(vars: Record<string, unknown>, 楼层: number): void {
+  const 库 = _.get(vars, '_微信') as
+    | { 消息?: { 楼?: number }[]; 圈?: { 楼?: number }[]; 读到?: Record<string, number>; 圈读到?: number; 节拍?: object }
+    | undefined;
+  if (!库 || typeof 库 !== 'object') return;
+  库.消息 = (库.消息 ?? []).filter(x => Number(x?.楼 ?? -1) <= 楼层);
+  库.圈 = (库.圈 ?? []).filter(x => Number(x?.楼 ?? -1) <= 楼层);
+  库.读到 = Object.fromEntries(Object.entries(库.读到 ?? {}).map(([k, v]) => [k, Math.min(Number(v), 楼层)]));
+  库.圈读到 = Math.min(Number(库.圈读到 ?? -1), 楼层);
+  // 节拍使用“真实楼+杀时间偏移”的钟楼值，无法只凭目标楼可靠裁剪；清空后由确定性种子重新建水位。
+  库.节拍 = {};
+  _.set(vars, '_微信', 库);
+}
 
 type 上次回合记录 = {
   行动: string;
@@ -89,14 +117,15 @@ export function 组快照注入(
   对话尾: { role: string; content: string }[],
   data: SchemaType,
   楼层: number,
-): { 快照: string; 焦点: 门牌[] } {
-  const { 焦点, 在场 } = 检测焦点(对话尾, data, 楼层);
-  insertOrAssignVariables({ _在场: { 焦点, 在场 } }, { type: 'chat' });
+): { 快照: string; 焦点: 门牌[]; 妻在场: 门牌[]; 夫在场: 门牌[] } {
+  const { 焦点, 在场, 妻在场, 夫在场 } = 检测焦点(对话尾, data, 楼层);
+  insertOrAssignVariables({ _在场: { 焦点, 在场, 妻在场, 夫在场 } }, { type: 'chat' });
   // 对话粘滞落库(2026-07-18 用户拍板):当场的人钉在当场,楼层时钟传送不走;
   // 玩家离开房间(场景清空/换房)后,读侧位置比对自动失效,这里顺手清干净
   {
     const 场 = 读场景();
-    const 们 = [...焦点, ...在场];
+    // 粘滞记录的是妻的位置；丈夫只按自己家的作息判断，不能借户级焦点把不在家的妻子钉回来
+    const 们 = 妻在场;
     if (场.房间id && 们.length) {
       insertOrAssignVariables({ _粘滞: { 位置: 场.房间id, 楼: 楼层, 们 } }, { type: 'chat' });
     } else if (!场.房间id) {
@@ -106,7 +135,7 @@ export function 组快照注入(
   const 快照 = 组公寓快照(对话尾, data, 楼层);
   // 内容量审计(2026-07-19 用户点名#5):每楼注入体积落日志,测试期拿真实数据定收敛策略
   console.info(`[人妻公寓·快照] 本楼注入 ${快照.length} 字(焦点${焦点.length}人/在场${在场.length}人)`);
-  return { 快照, 焦点 };
+  return { 快照, 焦点, 妻在场, 夫在场 };
 }
 
 /**
@@ -190,13 +219,22 @@ function 清洗正文(原文: string): string {
  * 回合结算(在落库前对 newStat 就地执行,新楼直接携带结算后数据):
  * 焦点户触碰(惰性补被动账+互动楼层刷新+疑心主通道)+ 事件转存 + 冷落检测。
  */
-function 回合结算(newStat: SchemaType, snapStat: SchemaType, 焦点: 门牌[], 楼层: number): void {
+function 回合结算(
+  newStat: SchemaType,
+  snapStat: SchemaType,
+  焦点: 门牌[],
+  妻在场: readonly 门牌[],
+  楼层: number,
+): void {
   // 焦点户:被触碰=惰性结算生效点
   let 主焦堕落增量 = 0;
   for (const m of 焦点) {
     const 节点 = newStat.户[m];
     if (!节点) continue;
     惰性结算户(节点, 楼层);
+    // `夫.状态`是存档里的丈夫状态栏；此前只有界面临时推算，字段本身长期为空，所以回合后看似从不更新。
+    节点.夫.状态 = 丈夫在楼(节点, m, 楼层 + newStat.系统._时段偏移楼);
+    if (!妻在场.includes(m)) continue;
     节点.妻.上次互动楼层 = 楼层;
     const 堕落增量 = 节点.妻.堕落值 - (snapStat.户[m]?.妻.堕落值 ?? 节点.妻.堕落值);
     if (m === 焦点[0]) 主焦堕落增量 = 堕落增量;
@@ -243,13 +281,7 @@ function 回合结算(newStat: SchemaType, snapStat: SchemaType, 焦点: 门牌[
   父亲来电打断(newStat, 焦点, 楼层);
 
   // 母亲撞见(P5⑥:亲密推进被妈看见——入列前=监督者扣胜任度+暗账;入列后=圆场反转+吃醋)
-  母亲撞见检测(
-    newStat,
-    焦点[0],
-    主焦堕落增量,
-    楼层,
-    难度表[newStat.系统._难度]?.撞见概率系数 ?? 1,
-  );
+  母亲撞见检测(newStat, 焦点[0], 主焦堕落增量, 楼层, 难度表[newStat.系统._难度]?.撞见概率系数 ?? 1);
 
   // 绿帽双线(102观众席"门缝那一眼"/202哑巴亏):开线关键事件,结局轨道单向标记
   绿帽线检测(newStat, 楼层);
@@ -280,7 +312,7 @@ export async function 执行回合(行动: string): Promise<void> {
     捕获保护快照(data); // 回滚基准(含镜像取大并入)
 
     const 对话尾 = 近楼对话(行动);
-    const { 快照, 焦点 } = 组快照注入(对话尾, data, 生成楼层);
+    const { 快照, 焦点, 妻在场, 夫在场 } = 组快照注入(对话尾, data, 生成楼层);
 
     const injects: Omit<InjectionPrompt, 'id'>[] = [
       { role: 'system', content: 快照, position: 'in_chat', depth: 0, should_scan: true },
@@ -297,25 +329,25 @@ export async function 执行回合(行动: string): Promise<void> {
     }
 
     const 旧 = Mvu.getMvuData({ type: 'message', message_id: -1 });
-    const 焦点门牌 = 焦点[0];
-    const 焦点阶段 = 焦点门牌 ? (data.户[焦点门牌]?.妻.当前阶段 ?? null) : null;
+    const 焦点妻门牌 = 焦点.find(m => 妻在场.includes(m));
+    const 焦点阶段 = 焦点妻门牌 ? (data.户[焦点妻门牌]?.妻.当前阶段 ?? null) : null;
 
     // ── 稽查终审(提示词是劝告,脚本是法律):违规=中断卡+AI 变量不采纳+代价 ──
     // 词表兜底只扫清洗后正文:思维链的自我提醒/选项块的情色试探条不作数(2026-07-17 误杀修复)
     const 稽查 = 输出稽查(原文, 焦点阶段, false /* 正戏楼免检 P5 场景引擎接入 */, 清洗正文(原文));
-    if (稽查.违规 && 焦点门牌) {
+    if (稽查.违规 && 焦点妻门牌) {
       console.warn(`[人妻公寓·稽查] 违规拦截:${稽查.原因}`);
       const newStat = _.cloneDeep(data); // 不采纳 AI 的任何变量更新,从快照起步
-      结算违规代价(newStat, 焦点门牌, 生成楼层);
+      结算违规代价(newStat, 焦点妻门牌, 生成楼层);
       // 未遂余波下一楼注入(她怎么拒绝的由 AI 按性格补写,不给示例)
-      const 余波 = 未遂余波指引(焦点门牌);
+      const 余波 = 未遂余波指引(焦点妻门牌);
       newStat.系统._待发送事件 = newStat.系统._待发送事件 ? `${newStat.系统._待发送事件}|${余波}` : 余波;
       const 新 = _.cloneDeep(旧);
       _.set(新, 'stat_data', newStat);
       await createChatMessages(
         [
           { role: 'user', message: 行动 },
-          { role: 'assistant', message: 中断卡文案(户静态表[焦点门牌].妻名), data: 新 },
+          { role: 'assistant', message: 中断卡文案(户静态表[焦点妻门牌].妻名), data: 新 },
         ],
         { refresh: 'none' },
       );
@@ -332,9 +364,9 @@ export async function 执行回合(行动: string): Promise<void> {
     // ── 正常路径:手动解析变量 + 分工表回滚 + 结算 ──
     const 新 = ((await Mvu.parseMessage(原文, 旧)) ?? 旧) as Record<string, unknown>;
     const newStat = Schema.parse(_.get(新, 'stat_data') ?? {}) as SchemaType;
-    回滚保护字段(newStat, 焦点); // 后台户整体拍回,焦点户白名单+delta cap(隔空刷好感在此被拦)
-    if (焦点门牌) 记违规清零(newStat); // 有焦点妻且未违规:连续违规计数断链
-    回合结算(newStat, data, 焦点, 生成楼层);
+    回滚保护字段(newStat, 焦点, { 妻: 妻在场, 夫: 夫在场 }); // 户级焦点内再按实际在场人物分闸
+    if (焦点妻门牌) 记违规清零(newStat); // 有焦点妻且未违规:连续违规计数断链
+    回合结算(newStat, data, 焦点, 妻在场, 生成楼层);
     _.set(新, 'stat_data', newStat);
 
     const 正文 = 清洗正文(原文) || '(楼道里安静了一瞬……本轮 AI 未返回正文,可换个说法再试)';
@@ -402,6 +434,7 @@ export async function 重掷回合(): Promise<void> {
     await updateVariablesWith(
       vars => {
         for (const 键 of 回合变量键) _.set(vars, 键, (记录.chat快照 as Record<string, unknown>)[键] ?? null);
+        裁手机时间线(vars, 记录.回合前末楼);
         return vars;
       },
       { type: 'chat' },
@@ -431,7 +464,8 @@ export async function 回档至(楼层: number): Promise<void> {
     await deleteChatMessages(_.range(楼层 + 1, 末楼 + 1), { refresh: 'none' });
     await updateVariablesWith(
       vars => {
-        for (const 键 of [...回合变量键, '_上次回合', '_在场', '_行动选项', '_粘滞']) _.set(vars, 键, null);
+        for (const 键 of [...回合变量键, '_上次回合']) _.set(vars, 键, null);
+        裁手机时间线(vars, 楼层);
         return vars;
       },
       { type: 'chat' },
@@ -488,7 +522,9 @@ export async function 开始新游戏(难度: string): Promise<boolean> {
   进行中 = true;
   try {
     const 档 = 难度表[难度] ? 难度 : '标准';
-    const { data } = 读取();
+    const 有效 = 读取最近有效();
+    if (!有效) throw new Error('变量还没就绪，请稍等两秒再开始');
+    const { data } = 有效;
     if (data.系统._序章完成) {
       console.warn('[人妻公寓] 序章已完成,忽略重复开局');
       return false;
@@ -496,6 +532,7 @@ export async function 开始新游戏(难度: string): Promise<boolean> {
     data.系统._难度 = 档;
     data.系统._序章完成 = true;
     data.现金 = 难度表[档].起始资金;
+    data.胜任度 = 难度表[档].起始胜任度;
 
     const 旧 = Mvu.getMvuData({ type: 'message', message_id: -1 });
     const 新 = _.cloneDeep(旧);
@@ -544,6 +581,11 @@ export async function 重开一局(): Promise<void> {
           '_待办',
           '_侦探',
           '_摄像头',
+          '_微信',
+          '_经济',
+          '_赴约',
+          '_工具由头',
+          '_换装余波',
           PROMOTE_MIRROR_KEY,
         ]) {
           _.set(vars, 键, null);
@@ -561,7 +603,7 @@ export async function 重开一局(): Promise<void> {
       镜像直写(m, { 入住楼层: 0 });
     }
     const 旧raw = Mvu.getMvuData({ type: 'message', message_id: -1 });
-    脚本写入(旧raw, 出厂);
+    await 脚本写入(旧raw, 出厂);
     捕获保护快照(出厂);
 
     console.info('[人妻公寓] 重开一局:楼层已删,0楼 stat 重建为出厂态(首批入住已就位)');
