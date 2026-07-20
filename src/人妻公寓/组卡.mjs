@@ -107,10 +107,10 @@ for (const 组 of index.条目) {
 if (!开场白) throw new Error('未找到 [开场白] 条目');
 
 // ── 资源走 jsdelivr(手机友好;〔待用户拍板〕首个内测 tag 名,推送后此处生效) ──
-const TAG = 'rq0.27';
+const TAG = 'rq0.28';
 const BASE = `https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@${TAG}`;
 
-const 加载块 = url => '```\n<body>\n<script>\n$(\'body\').load(\'' + url + '\')\n</script>\n</body>\n```';
+const 加载块 = url => "```\n<body>\n<script>\n$('body').load('" + url + "')\n</script>\n</body>\n```";
 
 const 正则骨架 = {
   trimStrings: [],
@@ -201,7 +201,7 @@ const tavern_helper = {
 
 // ── 卡体 ──
 const 卡名 = '人妻公寓';
-const 版本 = '0.27';
+const 版本 = '0.28';
 const data = {
   name: 卡名,
   description: '',
@@ -209,7 +209,7 @@ const data = {
   scenario: '',
   first_mes: '<StatusPlaceHolderImpl/>',
   mes_example: '',
-  creator_notes: `人妻公寓 v${版本} 内测组包(P1+P2:核心循环+侦探层)。需酒馆助手(tavern_helper)启用。开局:0楼即游戏界面,选难度→接父亲电话进入到任首日;酒馆输入框不用,输入走游戏内。`,
+  creator_notes: `人妻公寓 v${版本} 内测组包(P3-P5综合测试版)。需酒馆助手(tavern_helper)启用。开局:0楼即游戏界面,选难度→接父亲电话进入到任首日;酒馆输入框不用,输入走游戏内。`,
   system_prompt: '',
   post_history_instructions: '',
   tags: ['人妻公寓'],
@@ -252,7 +252,11 @@ writeFileSync(输出路径, JSON.stringify(卡, null, 2), 'utf8');
 // 自检
 const 回读 = JSON.parse(readFileSync(输出路径, 'utf8'));
 console.log(`✓ ${输出路径}`);
-console.log(`  世界书条目: ${回读.data.character_book.entries.length}(启用 ${回读.data.character_book.entries.filter(e => e.enabled).length})`);
-console.log(`  正则: ${回读.data.extensions.regex_scripts.length} | 脚本: ${回读.data.extensions.tavern_helper.scripts.length}`);
+console.log(
+  `  世界书条目: ${回读.data.character_book.entries.length}(启用 ${回读.data.character_book.entries.filter(e => e.enabled).length})`,
+);
+console.log(
+  `  正则: ${回读.data.extensions.regex_scripts.length} | 脚本: ${回读.data.extensions.tavern_helper.scripts.length}`,
+);
 console.log(`  first_mes: ${回读.data.first_mes} | alternate_greetings: ${回读.data.alternate_greetings.length}`);
 console.log(`  总大小: ${(readFileSync(输出路径).length / 1024).toFixed(1)} KB | 资源TAG: ${TAG}(须推送后生效)`);

@@ -8,11 +8,12 @@ import { 入住检测 } from './入住系统';
 import { 打断检测, 换装起疑, 母亲撞见检测, 父亲来电打断 } from './打断系统';
 import { 夜访结算, 惰性结算户, 绿帽线检测, 结算焦点疑心, 冷落检测 } from './结算系统';
 import { 荣耀洞结算 } from './荣耀洞';
-import { 丈夫在楼 } from './楼层时钟';
+import { 当前时段, 丈夫在楼 } from './楼层时钟';
 import { PROMOTE_MIRROR_KEY, 捕获保护快照, 回滚保护字段, 清保护快照, 镜像直写 } from './守护系统';
 import { 中断卡文案, 记违规清零, 结算违规代价, 输出稽查, 未遂余波指引 } from './稽查系统';
 import { 读取最近有效, 读最近有效stat, 脚本写入 } from './mvuIO';
 import { 检测焦点, 组公寓快照, 读场景 } from './snapshotSystem';
+import { 读取数据库记忆胶囊, 同步数据库回合 } from './数据库桥';
 
 /**
  * 回合引擎:固定 0 楼架构的主循环(修道院回合引擎直迁,本作化三处:
@@ -52,7 +53,13 @@ const 回合变量键 = [
 /** 手机记录不塞进每回合快照（会令存档平方膨胀），按楼层戳裁掉被删除时间线。 */
 function 裁手机时间线(vars: Record<string, unknown>, 楼层: number): void {
   const 库 = _.get(vars, '_微信') as
-    | { 消息?: { 楼?: number }[]; 圈?: { 楼?: number }[]; 读到?: Record<string, number>; 圈读到?: number; 节拍?: object }
+    | {
+        消息?: { 楼?: number }[];
+        圈?: { 楼?: number }[];
+        读到?: Record<string, number>;
+        圈读到?: number;
+        节拍?: object;
+      }
     | undefined;
   if (!库 || typeof 库 !== 'object') return;
   库.消息 = (库.消息 ?? []).filter(x => Number(x?.楼 ?? -1) <= 楼层);
@@ -132,7 +139,8 @@ export function 组快照注入(
       insertOrAssignVariables({ _粘滞: null }, { type: 'chat' });
     }
   }
-  const 快照 = 组公寓快照(对话尾, data, 楼层);
+  const 记忆人物 = 焦点.flatMap(m => [户静态表[m]?.妻名, 户静态表[m]?.夫名]).filter((name): name is string => !!name);
+  const 快照 = 组公寓快照(对话尾, data, 楼层) + 读取数据库记忆胶囊(记忆人物);
   // 内容量审计(2026-07-19 用户点名#5):每楼注入体积落日志,测试期拿真实数据定收敛策略
   console.info(`[人妻公寓·快照] 本楼注入 ${快照.length} 字(焦点${焦点.length}人/在场${在场.length}人)`);
   return { 快照, 焦点, 妻在场, 夫在场 };
@@ -168,6 +176,28 @@ function 广播生成完成事件() {
   } catch (e) {
     console.warn('[人妻公寓] 数据库插件兼容广播失败(不影响游戏):', e);
   }
+}
+
+async function 记录数据库回合(
+  楼层: number,
+  data: SchemaType,
+  行动: string,
+  结果: string,
+  妻在场: readonly 门牌[],
+  夫在场: readonly 门牌[],
+): Promise<void> {
+  const 场 = 读场景();
+  const 参与者 = [...妻在场.map(m => 户静态表[m]?.妻名), ...夫在场.map(m => 户静态表[m]?.夫名)].filter(
+    (name): name is string => !!name,
+  );
+  await 同步数据库回合({
+    楼层,
+    时间: 当前时段(楼层 + data.系统._时段偏移楼),
+    地点: 场.房间id || '公寓公共区域',
+    参与者,
+    玩家行动: 行动,
+    结果摘要: 结果,
+  });
 }
 
 /** 楼层落库前的清洗:思维链/变量块/选项块/行为等级标签不进楼层文本(prompt 与卷轴双干净) */
@@ -356,6 +386,7 @@ export async function 执行回合(行动: string): Promise<void> {
         { _上次回合: { 行动, 回合前末楼, chat快照 } satisfies 上次回合记录, _行动选项: [] },
         { type: 'chat' },
       );
+      await 记录数据库回合(生成楼层, newStat, 行动, 中断卡文案(户静态表[焦点妻门牌].妻名), 妻在场, 夫在场);
       广播生成完成事件();
       eventEmit('人妻公寓:回合完成');
       return;
@@ -400,6 +431,7 @@ export async function 执行回合(行动: string): Promise<void> {
       { type: 'chat' },
     );
 
+    await 记录数据库回合(生成楼层, newStat, 行动, 正文, 妻在场, 夫在场);
     广播生成完成事件();
     eventEmit('人妻公寓:回合完成');
   } catch (e) {
@@ -542,6 +574,7 @@ export async function 开始新游戏(难度: string): Promise<boolean> {
     await insertOrAssignVariables({ _行动选项: 序章行动选项 }, { type: 'chat' });
 
     console.info(`[人妻公寓] 序章开局完成(难度:${档},起始资金:${难度表[档].起始资金})`);
+    await 记录数据库回合(getLastMessageId(), data, '开始新游戏', 父亲来电正文, [], []);
     广播生成完成事件();
     eventEmit('人妻公寓:回合完成');
     return true;

@@ -1,0 +1,171 @@
+{
+  "mate": {
+    "type": "chatSheets",
+    "version": 1,
+    "updateConfigUiSentinel": -1,
+    "globalInjectionConfig": {
+      "readableEntryPlacement": { "position": "before_char", "depth": 2, "order": 99981 },
+      "wrapperPlacement": { "position": "before_char", "depth": 2, "order": 99980 }
+    }
+  },
+  "sheet_rq_events": {
+    "uid": "sheet_rq_events",
+    "name": "RQ_剧情事件",
+    "sourceData": {
+      "note": "《人妻公寓》脚本维护的确定性事件流水。只记录正文已经发生并成功落楼的事实。禁止由填表AI增删改；地图、金钱、背包、角色位置等硬状态仍以游戏MVU变量为唯一权威。",
+      "initNode": "保持空表，等待游戏脚本在成功回合后写入。",
+      "deleteNode": "禁止操作。",
+      "updateNode": "禁止操作。",
+      "insertNode": "禁止操作；本表由《人妻公寓》脚本通过公开API写入。",
+      "ddl": "CREATE TABLE rq_events (row_id INTEGER PRIMARY KEY, floor_no INTEGER NOT NULL UNIQUE, time_text TEXT, location TEXT, participants TEXT, player_action TEXT, result_summary TEXT, event_code TEXT NOT NULL UNIQUE);"
+    },
+    "content": [["row_id", "楼层", "时间", "地点", "参与者", "玩家行动", "结果摘要", "事件编码"]],
+    "updateConfig": {
+      "uiSentinel": -1,
+      "contextDepth": -1,
+      "updateFrequency": 0,
+      "batchSize": -1,
+      "skipFloors": -1,
+      "groupId": -1
+    },
+    "exportConfig": {
+      "enabled": false,
+      "splitByRow": false,
+      "entryName": "RQ剧情事件",
+      "entryType": "constant",
+      "keywords": "",
+      "preventRecursion": true,
+      "injectionTemplate": "",
+      "extraIndexEnabled": false,
+      "extraIndexEntryName": "",
+      "extraIndexColumns": [],
+      "extraIndexColumnModes": {},
+      "extraIndexInjectionTemplate": "",
+      "entryPlacement": { "position": "at_depth_as_system", "depth": 999, "order": 10000 },
+      "extraIndexPlacement": { "position": "at_depth_as_system", "depth": 1000, "order": 10010 },
+      "fixedEntryPlacement": { "position": "at_depth_as_system", "depth": 9999, "order": 99987 },
+      "fixedIndexPlacement": { "position": "at_depth_as_system", "depth": 9999, "order": 99988 }
+    },
+    "orderNo": 0
+  },
+  "sheet_rq_character_memory": {
+    "uid": "sheet_rq_character_memory",
+    "name": "RQ_人物长期记忆",
+    "sourceData": {
+      "note": "只保存会影响人物未来反应的长期记忆。每个角色与每个主题各保留一行；同一事实不要重复建行。不得抄写数值状态，不得推测正文未发生的事。人物名必须使用《人妻公寓》已有姓名。",
+      "initNode": "无明确长期记忆时保持空表。",
+      "deleteNode": "仅当正文明确证明记忆失效或被覆盖时删除。",
+      "updateNode": "同一人物同一主题出现新进展时更新记忆、影响与最后楼层，不重复插入。",
+      "insertNode": "正文出现承诺、秘密、冲突、偏好、羞耻点、共同经历等会影响以后反应的事实时插入。",
+      "ddl": "CREATE TABLE rq_character_memory (row_id INTEGER PRIMARY KEY, character_name TEXT NOT NULL, topic TEXT NOT NULL, memory_text TEXT NOT NULL, future_impact TEXT, last_floor INTEGER, confidence TEXT DEFAULT '明确', UNIQUE(character_name, topic));"
+    },
+    "content": [["row_id", "人物", "主题", "记忆", "未来影响", "最后楼层", "可信度"]],
+    "updateConfig": {
+      "uiSentinel": -1,
+      "contextDepth": 6,
+      "updateFrequency": 2,
+      "batchSize": 2,
+      "skipFloors": -1,
+      "groupId": -1
+    },
+    "exportConfig": {
+      "enabled": false,
+      "splitByRow": false,
+      "entryName": "RQ人物长期记忆",
+      "entryType": "constant",
+      "keywords": "",
+      "preventRecursion": true,
+      "injectionTemplate": "",
+      "extraIndexEnabled": false,
+      "extraIndexEntryName": "",
+      "extraIndexColumns": [],
+      "extraIndexColumnModes": {},
+      "extraIndexInjectionTemplate": "",
+      "entryPlacement": { "position": "at_depth_as_system", "depth": 999, "order": 10000 },
+      "extraIndexPlacement": { "position": "at_depth_as_system", "depth": 1000, "order": 10010 },
+      "fixedEntryPlacement": { "position": "at_depth_as_system", "depth": 9999, "order": 99987 },
+      "fixedIndexPlacement": { "position": "at_depth_as_system", "depth": 9999, "order": 99988 }
+    },
+    "orderNo": 1
+  },
+  "sheet_rq_promises": {
+    "uid": "sheet_rq_promises",
+    "name": "RQ_承诺与伏笔",
+    "sourceData": {
+      "note": "跨多回合仍可能兑现的承诺、约定、威胁、欠账、疑点与伏笔。已兑现或作废后更新状态，避免剧情遗忘或重复兑现。只记录正文明确内容。",
+      "initNode": "无事项时保持空表。",
+      "deleteNode": "禁止删除历史事项；改为更新状态。",
+      "updateNode": "事项有进展、兑现、失败或作废时更新状态、最后进展与最后楼层。",
+      "insertNode": "出现需要未来处理的明确事项时插入；相同事项不得重复。",
+      "ddl": "CREATE TABLE rq_promises (row_id INTEGER PRIMARY KEY, title TEXT NOT NULL UNIQUE, related_characters TEXT, detail TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('待处理','推进中','已兑现','已作废')), last_progress TEXT, last_floor INTEGER);"
+    },
+    "content": [["row_id", "事项", "相关人物", "内容", "状态", "最后进展", "最后楼层"]],
+    "updateConfig": {
+      "uiSentinel": -1,
+      "contextDepth": 8,
+      "updateFrequency": 2,
+      "batchSize": 2,
+      "skipFloors": -1,
+      "groupId": -1
+    },
+    "exportConfig": {
+      "enabled": false,
+      "splitByRow": false,
+      "entryName": "RQ承诺与伏笔",
+      "entryType": "constant",
+      "keywords": "",
+      "preventRecursion": true,
+      "injectionTemplate": "",
+      "extraIndexEnabled": false,
+      "extraIndexEntryName": "",
+      "extraIndexColumns": [],
+      "extraIndexColumnModes": {},
+      "extraIndexInjectionTemplate": "",
+      "entryPlacement": { "position": "at_depth_as_system", "depth": 999, "order": 10000 },
+      "extraIndexPlacement": { "position": "at_depth_as_system", "depth": 1000, "order": 10010 },
+      "fixedEntryPlacement": { "position": "at_depth_as_system", "depth": 9999, "order": 99987 },
+      "fixedIndexPlacement": { "position": "at_depth_as_system", "depth": 9999, "order": 99988 }
+    },
+    "orderNo": 2
+  },
+  "sheet_rq_social_history": {
+    "uid": "sheet_rq_social_history",
+    "name": "RQ_社交轨迹",
+    "sourceData": {
+      "note": "记录会影响社交连续性的微信、朋友圈、邀约和赠礼结果。只保留有后续意义的事件；普通寒暄和同质化动态不入表。",
+      "initNode": "无重要社交事件时保持空表。",
+      "deleteNode": "禁止删除；过时内容更新状态。",
+      "updateNode": "同一事件产生后续时更新结果与最后楼层。",
+      "insertNode": "出现明确改变关系预期的社交事件时插入。",
+      "ddl": "CREATE TABLE rq_social_history (row_id INTEGER PRIMARY KEY, event_type TEXT NOT NULL, character_name TEXT NOT NULL, event_text TEXT NOT NULL, result TEXT, last_floor INTEGER, event_key TEXT NOT NULL UNIQUE);"
+    },
+    "content": [["row_id", "类型", "人物", "事件", "结果", "最后楼层", "事件键"]],
+    "updateConfig": {
+      "uiSentinel": -1,
+      "contextDepth": 6,
+      "updateFrequency": 3,
+      "batchSize": 2,
+      "skipFloors": -1,
+      "groupId": -1
+    },
+    "exportConfig": {
+      "enabled": false,
+      "splitByRow": false,
+      "entryName": "RQ社交轨迹",
+      "entryType": "constant",
+      "keywords": "",
+      "preventRecursion": true,
+      "injectionTemplate": "",
+      "extraIndexEnabled": false,
+      "extraIndexEntryName": "",
+      "extraIndexColumns": [],
+      "extraIndexColumnModes": {},
+      "extraIndexInjectionTemplate": "",
+      "entryPlacement": { "position": "at_depth_as_system", "depth": 999, "order": 10000 },
+      "extraIndexPlacement": { "position": "at_depth_as_system", "depth": 1000, "order": 10010 },
+      "fixedEntryPlacement": { "position": "at_depth_as_system", "depth": 9999, "order": 99987 },
+      "fixedIndexPlacement": { "position": "at_depth_as_system", "depth": 9999, "order": 99988 }
+    },
+    "orderNo": 3
+  }
+}
