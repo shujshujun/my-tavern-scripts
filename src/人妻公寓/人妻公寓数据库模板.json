@@ -17,7 +17,7 @@
       "deleteNode": "禁止操作。",
       "updateNode": "禁止操作。",
       "insertNode": "禁止操作；本表由《人妻公寓》脚本通过公开API写入。",
-      "ddl": "CREATE TABLE rq_events (row_id INTEGER PRIMARY KEY, floor_no INTEGER NOT NULL UNIQUE, time_text TEXT, location TEXT, participants TEXT, player_action TEXT, result_summary TEXT, event_code TEXT NOT NULL UNIQUE);"
+      "ddl": "CREATE TABLE rq_events (\n  row_id INTEGER PRIMARY KEY, -- row_id\n  floor_no INTEGER NOT NULL UNIQUE, -- 楼层\n  time_text TEXT, -- 时间\n  location TEXT, -- 地点\n  participants TEXT, -- 参与者\n  player_action TEXT, -- 玩家行动\n  result_summary TEXT, -- 结果摘要\n  event_code TEXT NOT NULL UNIQUE -- 事件编码\n);"
     },
     "content": [["row_id", "楼层", "时间", "地点", "参与者", "玩家行动", "结果摘要", "事件编码"]],
     "updateConfig": {
@@ -57,7 +57,7 @@
       "deleteNode": "仅当正文明确证明记忆失效或被覆盖时删除。",
       "updateNode": "同一人物同一主题出现新进展时更新记忆、影响与最后楼层，不重复插入。",
       "insertNode": "正文出现承诺、秘密、冲突、偏好、羞耻点、共同经历等会影响以后反应的事实时插入。",
-      "ddl": "CREATE TABLE rq_character_memory (row_id INTEGER PRIMARY KEY, character_name TEXT NOT NULL, topic TEXT NOT NULL, memory_text TEXT NOT NULL, future_impact TEXT, last_floor INTEGER, confidence TEXT DEFAULT '明确', UNIQUE(character_name, topic));"
+      "ddl": "CREATE TABLE rq_character_memory (\n  row_id INTEGER PRIMARY KEY, -- row_id\n  character_name TEXT NOT NULL, -- 人物\n  topic TEXT NOT NULL, -- 主题\n  memory_text TEXT NOT NULL, -- 记忆\n  future_impact TEXT, -- 未来影响\n  last_floor INTEGER, -- 最后楼层\n  confidence TEXT DEFAULT '明确', -- 可信度\n  UNIQUE(character_name, topic)\n);"
     },
     "content": [["row_id", "人物", "主题", "记忆", "未来影响", "最后楼层", "可信度"]],
     "updateConfig": {
@@ -97,7 +97,7 @@
       "deleteNode": "禁止删除历史事项；改为更新状态。",
       "updateNode": "事项有进展、兑现、失败或作废时更新状态、最后进展与最后楼层。",
       "insertNode": "出现需要未来处理的明确事项时插入；相同事项不得重复。",
-      "ddl": "CREATE TABLE rq_promises (row_id INTEGER PRIMARY KEY, title TEXT NOT NULL UNIQUE, related_characters TEXT, detail TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('待处理','推进中','已兑现','已作废')), last_progress TEXT, last_floor INTEGER);"
+      "ddl": "CREATE TABLE rq_promises (\n  row_id INTEGER PRIMARY KEY, -- row_id\n  title TEXT NOT NULL UNIQUE, -- 事项\n  related_characters TEXT, -- 相关人物\n  detail TEXT NOT NULL, -- 内容\n  status TEXT NOT NULL CHECK(status IN ('待处理','推进中','已兑现','已作废')), -- 状态\n  last_progress TEXT, -- 最后进展\n  last_floor INTEGER -- 最后楼层\n);"
     },
     "content": [["row_id", "事项", "相关人物", "内容", "状态", "最后进展", "最后楼层"]],
     "updateConfig": {
@@ -137,7 +137,7 @@
       "deleteNode": "禁止删除；过时内容更新状态。",
       "updateNode": "同一事件产生后续时更新结果与最后楼层。",
       "insertNode": "出现明确改变关系预期的社交事件时插入。",
-      "ddl": "CREATE TABLE rq_social_history (row_id INTEGER PRIMARY KEY, event_type TEXT NOT NULL, character_name TEXT NOT NULL, event_text TEXT NOT NULL, result TEXT, last_floor INTEGER, event_key TEXT NOT NULL UNIQUE);"
+      "ddl": "CREATE TABLE rq_social_history (\n  row_id INTEGER PRIMARY KEY, -- row_id\n  event_type TEXT NOT NULL, -- 类型\n  character_name TEXT NOT NULL, -- 人物\n  event_text TEXT NOT NULL, -- 事件\n  result TEXT, -- 结果\n  last_floor INTEGER, -- 最后楼层\n  event_key TEXT NOT NULL UNIQUE -- 事件键\n);"
     },
     "content": [["row_id", "类型", "人物", "事件", "结果", "最后楼层", "事件键"]],
     "updateConfig": {

@@ -1669,8 +1669,8 @@ const 底层公共 = [
 
 // ── 素材(AI 生成,2026-07-17 入库;素材 TAG 与发布 TAG 解耦——素材没变就不用动这里) ──
 
-// ⚠ 与手机系统同步：本轮测试发布 tag=rq0.28。
-const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.28/dist/人妻公寓/素材';
+// ⚠ 与手机系统同步：本轮测试发布 tag=rq0.29。
+const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.29/dist/人妻公寓/素材';
 
 function 头像图(名: string): string {
   return `${素材基址}/头像/${名}.webp`;

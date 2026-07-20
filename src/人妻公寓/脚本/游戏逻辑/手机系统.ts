@@ -619,8 +619,8 @@ export async function 手机节拍(): Promise<void> {
 // ============================================
 
 const ROOT_ID = 'rq-phone-root';
-// ⚠ 与 App.vue 素材基址同步：本轮测试发布 tag=rq0.28。
-const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.28/dist/人妻公寓/素材';
+// ⚠ 与 App.vue 素材基址同步：本轮测试发布 tag=rq0.29。
+const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.29/dist/人妻公寓/素材';
 
 let 当前页: {
   名: 'chats' | 'chat' | 'moments' | 'call' | 'talk' | 'settings';
@@ -645,8 +645,10 @@ function el(tag: string, cls: string, html?: string): HTMLElement {
 }
 
 const 手机CSS = `
-#${ROOT_ID}{position:fixed;right:18px;bottom:76px;z-index:99990;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","HarmonyOS Sans","Segoe UI",Roboto,"Noto Sans SC",sans-serif;}
-#${ROOT_ID} *{box-sizing:border-box;margin:0;padding:0;}
+#${ROOT_ID}{position:fixed;right:18px;bottom:76px;z-index:99990;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","HarmonyOS Sans","Segoe UI",Roboto,"Noto Sans SC",sans-serif;color:#111;color-scheme:light;text-shadow:none;}
+/* 手机挂在酒馆父页面，部分深色主题会用 -webkit-text-fill-color 给所有表单和文字染成浅白色。
+   在命名空间内恢复为各元素自己的 color，避免白底白字，同时保留通话页/绿色按钮等原有白字。 */
+#${ROOT_ID},#${ROOT_ID} *{box-sizing:border-box;margin:0;padding:0;-webkit-text-fill-color:currentColor;}
 #${ROOT_ID} .rqp-toggle{width:52px;height:52px;border-radius:50%;border:none;cursor:pointer;background:#1a1c22;color:#fff;font-size:24px;box-shadow:0 6px 18px rgba(0,0,0,.35);position:relative;}
 #${ROOT_ID} .rqp-toggle .dot{position:absolute;top:4px;right:4px;width:12px;height:12px;border-radius:50%;background:#fa5151;display:none;}
 #${ROOT_ID}.has-unread .rqp-toggle .dot{display:block;}
@@ -717,7 +719,8 @@ const 手机CSS = `
 #${ROOT_ID} .rqp-typing i:nth-child(3){animation-delay:.4s;}
 @keyframes rqp-tp{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
 #${ROOT_ID} .rqp-input{flex:none;display:flex;gap:8px;padding:8px 10px;background:#f7f7f7;border-top:.5px solid #d9d9d9;align-items:flex-end;}
-#${ROOT_ID} .rqp-input textarea{flex:1;resize:none;border:none;border-radius:4px;padding:8px 9px;font-size:13.5px;height:38px;font-family:inherit;background:#fff;}
+#${ROOT_ID} .rqp-input textarea{flex:1;resize:none;border:none;border-radius:4px;padding:8px 9px;font-size:13.5px;height:38px;font-family:inherit;background:#fff;color:#111!important;-webkit-text-fill-color:#111!important;caret-color:#111;opacity:1;}
+#${ROOT_ID} .rqp-input textarea::placeholder{color:#8a8a8a!important;-webkit-text-fill-color:#8a8a8a!important;opacity:1;}
 #${ROOT_ID} .rqp-input button{border:none;border-radius:4px;background:#07c160;color:#fff;padding:8px 14px;cursor:pointer;font-size:13px;font-weight:500;}
 #${ROOT_ID} .rqp-input button:disabled{opacity:.5;cursor:default;}
 #${ROOT_ID} .rqp-plusbtn{border:none;background:none;font-size:24px;line-height:38px;color:#7a7a7a;cursor:pointer;padding:0 2px;flex:none;}
@@ -771,10 +774,14 @@ const 手机CSS = `
 #${ROOT_ID} .rqp-call .acts .ok{background:#07c160;}
 #${ROOT_ID} .rqp-call .acts .no{background:#fa5151;}
 #${ROOT_ID} .rqp-set{padding:16px;display:flex;flex-direction:column;gap:10px;background:#fff;height:100%;}
-#${ROOT_ID} .rqp-set label{font-size:12px;color:#333;display:flex;flex-direction:column;gap:4px;}
-#${ROOT_ID} .rqp-set input,#${ROOT_ID} .rqp-set select{border:1px solid #ddd;border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit;}
-#${ROOT_ID} .rqp-set .save{border:none;border-radius:6px;background:#07c160;color:#fff;padding:8px;cursor:pointer;font-size:13px;}
-#${ROOT_ID} .rqp-set .credit{font-size:10px;color:#bbb;margin-top:auto;line-height:1.6;}
+#${ROOT_ID} .rqp-set label{font-size:12px;color:#333!important;-webkit-text-fill-color:#333!important;display:flex;flex-direction:column;gap:4px;}
+#${ROOT_ID} .rqp-set input,#${ROOT_ID} .rqp-set select{border:1px solid #ddd;border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit;background:#fff;color:#111!important;-webkit-text-fill-color:#111!important;caret-color:#111;opacity:1;}
+#${ROOT_ID} .rqp-set input::placeholder{color:#8a8a8a!important;-webkit-text-fill-color:#8a8a8a!important;opacity:1;}
+#${ROOT_ID} .rqp-set button:not(.save){border:1px solid #d4d4d4;border-radius:6px;background:#f5f5f5;color:#333!important;-webkit-text-fill-color:#333!important;padding:7px 10px;cursor:pointer;font-size:12px;font-family:inherit;font-weight:500;}
+#${ROOT_ID} .rqp-set button:not(.save):hover{background:#eaeaea;border-color:#bdbdbd;}
+#${ROOT_ID} .rqp-set button:disabled{color:#777!important;-webkit-text-fill-color:#777!important;opacity:.7;cursor:default;}
+#${ROOT_ID} .rqp-set .save{border:none;border-radius:6px;background:#07c160;color:#fff!important;-webkit-text-fill-color:#fff!important;padding:8px;cursor:pointer;font-size:13px;}
+#${ROOT_ID} .rqp-set .credit{font-size:10px;color:#707070!important;-webkit-text-fill-color:#707070!important;margin-top:auto;line-height:1.6;}
 `;
 
 function 头像块(名: string): string {
@@ -1431,14 +1438,14 @@ function 渲染(): void {
         <option value="正文"${c.ai来源 === '正文' ? ' selected' : ''}>只用正文 API</option>
         <option value="自定义"${c.ai来源 === '自定义' ? ' selected' : ''}>自定义 OpenAI API</option>
       </select></label>
-      <p class="db-status" style="color:${db.可调用AI ? '#35a66f' : '#999'};font-size:12px;margin:2px 0 8px">数据库：${
+      <p class="db-status" style="color:${db.可调用AI ? '#287a50' : '#666'};font-size:12px;margin:2px 0 8px">数据库：${
         db.可调用AI
           ? `已连接${db.已装游戏模板 ? '，人妻公寓表已安装' : '，尚未安装人妻公寓表'}`
           : '未检测到公开 API（自动模式会使用正文 API）'
       }</p>
       <label>数据库 API 预设名（留空=数据库当前配置）<input class="i-db-preset" list="rq-db-presets" value="${_.escape(c.数据库预设)}" placeholder="例如：手机小模型"/></label>
       <datalist id="rq-db-presets">${db预设名.map(name => `<option value="${_.escape(name)}"></option>`).join('')}</datalist>
-      <p style="color:#999;font-size:11px;margin:0 0 6px">${
+      <p style="color:#666;font-size:11px;margin:0 0 6px">${
         db预设名.length
           ? `旧版数据库公开了 ${db预设名.length} 个预设名称，可直接选择。`
           : db.已安装
@@ -1453,7 +1460,7 @@ function 渲染(): void {
       <label>API Key<input class="i-key" type="password" value="${_.escape(c.key)}"/></label>
       <label>模型<span style="display:flex;gap:6px"><input class="i-model" style="flex:1" value="${_.escape(c.model)}" placeholder="gpt-4.1-mini 等"/><button class="fetch-models" style="flex:none;padding:0 10px">读取模型</button></span></label>
       <select class="i-models" style="display:none"><option value="">— 从列表选择 —</option></select>
-      <p class="models-tip" style="display:none;color:#999;font-size:12px;margin:2px 0 0"></p>
+      <p class="models-tip" style="display:none;color:#666;font-size:12px;margin:2px 0 0"></p>
       <label>动态频率<select class="i-freq"><option${c.频率 === '勤' ? ' selected' : ''}>勤</option><option${c.频率 === '普通' ? ' selected' : ''}>普通</option><option${c.频率 === '静' ? ' selected' : ''}>静</option><option${c.频率 === '关' ? ' selected' : ''}>关</option></select></label>
       <button class="save">保存</button>
       <p class="credit">自动模式：检测到数据库公开API就由数据库代发；未安装数据库才使用正文API。数据库调用失败默认不二次请求，避免重复计费。游戏硬状态始终由MVU管理。<br/>手机外观:柚月小手机(yuzuki)授权砍装;挂载范式参考玉子手机(yuzi83)。经双授权改造,谨此致谢。</p>`;

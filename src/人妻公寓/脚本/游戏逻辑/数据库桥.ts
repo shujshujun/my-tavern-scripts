@@ -14,8 +14,6 @@ interface 数据库API {
   openSettings?: () => Promise<boolean>;
   openVisualizer?: () => void;
   getTableTemplate?: () => unknown;
-  /** 旧版公开接口；8.4 出于密钥安全会固定返回空数组。这里只提取名称，绝不保留对象内容。 */
-  getApiPresets?: () => unknown[];
   /** 为未来/分支版保留的只读名称接口。 */
   getApiPresetNames?: () => unknown[];
 }
@@ -23,10 +21,17 @@ interface 数据库API {
 interface 数据表 {
   name?: string;
   content?: unknown[][];
+  sourceData?: { ddl?: string };
 }
 
 const 数据库旗 = '__ACU_STAR_DB_III_LOADED__';
 const 游戏表名 = ['RQ_剧情事件', 'RQ_人物长期记忆', 'RQ_承诺与伏笔', 'RQ_社交轨迹'] as const;
+const 游戏表头: Record<(typeof 游戏表名)[number], readonly string[]> = {
+  RQ_剧情事件: ['row_id', '楼层', '时间', '地点', '参与者', '玩家行动', '结果摘要', '事件编码'],
+  RQ_人物长期记忆: ['row_id', '人物', '主题', '记忆', '未来影响', '最后楼层', '可信度'],
+  RQ_承诺与伏笔: ['row_id', '事项', '相关人物', '内容', '状态', '最后进展', '最后楼层'],
+  RQ_社交轨迹: ['row_id', '类型', '人物', '事件', '结果', '最后楼层', '事件键'],
+};
 
 function 解析数据库数据(value: unknown): unknown {
   if (typeof value !== 'string') return value;
@@ -101,10 +106,11 @@ export function 数据库状态(): { 已安装: boolean; 可调用AI: boolean; �
   let 已装游戏模板 = false;
   try {
     const 模板 = 解析数据库数据(api?.getTableTemplate?.());
-    已装游戏模板 = !!取表(模板, 游戏表名[0]);
+    已装游戏模板 = 游戏表名.every(name => 表结构可用(取表(模板, name), 游戏表头[name]));
     // 一些旧版没有 getTableTemplate，但会通过导出接口返回当前聊天的完整表结构。
     if (!已装游戏模板 && typeof api?.exportTableAsJson === 'function') {
-      已装游戏模板 = !!取表(解析数据库数据(api.exportTableAsJson()), 游戏表名[0]);
+      const 数据 = 解析数据库数据(api.exportTableAsJson());
+      已装游戏模板 = 游戏表名.every(name => 表结构可用(取表(数据, name), 游戏表头[name]));
     }
   } catch {
     /* 旧版没有模板查询接口时只显示未知/未装，不影响其他能力。 */
@@ -123,14 +129,7 @@ export function 读取数据库API预设名(): string[] {
           .map(name => name.trim())
           .filter(Boolean),
       );
-    const 旧预设 = api?.getApiPresets?.();
-    if (!Array.isArray(旧预设)) return [];
-    return _.uniq(
-      旧预设
-        .map(item => (typeof item === 'string' ? item : String((item as { name?: unknown } | null)?.name ?? '')))
-        .map(name => name.trim())
-        .filter(Boolean),
-    );
+    return [];
   } catch {
     return [];
   }
@@ -169,13 +168,31 @@ export async function 安装人妻公寓数据库模板(): Promise<{ success: bo
   try {
     const 游戏模板 = JSON.parse(数据库模板文本) as Record<string, unknown>;
     const 当前 = 解析数据库数据(api.getTableTemplate?.());
+    const 当前数据 = 解析数据库数据(api.exportTableAsJson?.());
     const 当前模板 =
       当前 && typeof 当前 === 'object' && (当前 as { mate?: { type?: string } }).mate?.type === 'chatSheets'
         ? (_.cloneDeep(当前) as Record<string, unknown>)
-        : { mate: 游戏模板.mate };
+        : 当前数据 &&
+            typeof 当前数据 === 'object' &&
+            (当前数据 as { mate?: { type?: string } }).mate?.type === 'chatSheets'
+          ? (_.cloneDeep(当前数据) as Record<string, unknown>)
+          : { mate: 游戏模板.mate };
+    // getTableTemplate 负责结构，exportTableAsJson 才是当前合并后的实值；导入前把所有同表头数据灌回模板，
+    // 否则给现有数据库加 RQ_ 表时，可能把其他作者表格的游玩进度退回模板初始值。
+    for (const value of Object.values(当前模板)) {
+      const sheet = value as 数据表 | null;
+      const 实值表 = sheet?.name ? 取表(当前数据, sheet.name) : undefined;
+      if (实值表?.content?.length && sheet?.content?.length && _.isEqual(实值表.content[0], sheet.content[0])) {
+        sheet.content = _.cloneDeep(实值表.content);
+      }
+    }
     // 只替换同名 RQ_ 表，保留玩家当前模板中的其他表；因此能与不同作者的数据库模板共生。
+    // 同名表的表头未变化时保留已有数据行，避免玩家点“更新”后丢失长期记忆。
+    const 旧游戏表 = new Map<string, 数据表>();
     for (const [key, value] of Object.entries(当前模板)) {
-      if (key.startsWith('sheet_') && 游戏表名.includes((value as 数据表 | null)?.name as (typeof 游戏表名)[number])) {
+      const sheet = value as 数据表 | null;
+      if (key.startsWith('sheet_') && 游戏表名.includes(sheet?.name as (typeof 游戏表名)[number])) {
+        if (sheet?.name) 旧游戏表.set(sheet.name, _.cloneDeep(sheet));
         delete 当前模板[key];
       }
     }
@@ -184,8 +201,12 @@ export async function 安装人妻公寓数据库模板(): Promise<{ success: bo
       let targetKey = key;
       let suffix = 2;
       while (当前模板[targetKey]) targetKey = `${key}_${suffix++}`;
-      const sheet = _.cloneDeep(value) as { uid?: string };
+      const sheet = _.cloneDeep(value) as 数据表 & { uid?: string };
       sheet.uid = targetKey;
+      const 旧表 = sheet.name ? 旧游戏表.get(sheet.name) : undefined;
+      if (旧表?.content?.length && sheet.content?.length && _.isEqual(旧表.content[0], sheet.content[0])) {
+        sheet.content = _.cloneDeep(旧表.content);
+      }
       当前模板[targetKey] = sheet;
     }
     const result = await api.importTemplateFromData(当前模板, { scope: 'chat', presetName: '人妻公寓·长期记忆' });
@@ -260,6 +281,16 @@ function 取表(data: unknown, name: string): 数据表 | undefined {
     const sheet = value as 数据表 | null;
     return sheet?.name === name && Array.isArray(sheet.content);
   }) as 数据表 | undefined;
+}
+
+/** SP·数据库 8.4 会按 DDL 字段后的 `-- 中文表头` 注释做双向映射；缺任一映射会拒绝 hydrate。 */
+function 表结构可用(sheet: 数据表 | undefined, expectedHeaders: readonly string[]): boolean {
+  const headers = (sheet?.content?.[0] ?? []).map(String);
+  if (!_.isEqual(headers, expectedHeaders)) return false;
+  const ddl = sheet?.sourceData?.ddl ?? '';
+  return expectedHeaders
+    .slice(1)
+    .every(header => new RegExp(`--\\s*${_.escapeRegExp(header)}\\s*(?:\\r?\\n|$)`).test(ddl));
 }
 
 function 行转文本(sheet: 数据表, focusNames: readonly string[], 只要未结 = false): string[] {
