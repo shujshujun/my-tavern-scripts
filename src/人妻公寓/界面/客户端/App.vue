@@ -354,6 +354,14 @@
                   提示词
                 </button>
                 <button
+                  v-if="条.谁 === '叙事' && 条.事件提示词 && !发送中"
+                  class="entry-prompt"
+                  title="查看这一拍独立事件的提示词"
+                  @click="打开事件提示词(条.事件提示词)"
+                >
+                  提示词
+                </button>
+                <button
                   v-if="条.原文 !== undefined && !发送中"
                   class="entry-edit"
                   title="改写这一段(同酒馆的铅笔编辑)"
@@ -679,13 +687,7 @@
                 ><i>{{ Math.round(轴.值) }}</i></span
               >
               <div class="axis dossier-battery" role="meter" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="轴.值">
-                <i
-                  v-for="格 in 10"
-                  :key="格"
-                  class="axis-cell"
-                  :class="[轴.类, { on: 格 <= Math.ceil(轴.值 / 10) }]"
-                  :style="{ '--cell-index': 格 }"
-                />
+                <i class="axis-charge" :class="轴.类" :style="{ '--level': `${Math.max(0, Math.min(100, 轴.值))}%` }" />
               </div>
             </div>
           </div>
@@ -700,7 +702,15 @@
             <div class="dsec dossier-card attire-card">
               <div class="dsec-title"><span>仪 容</span><small>当前穿戴</small></div>
               <div class="attire-grid">
-                <div v-for="a in 选中档案.仪容项" :key="a.标 + a.值" class="a-cell" :class="{ pic: !!a.图id }">
+                <div
+                  v-for="a in 选中档案.仪容项"
+                  :key="a.标 + a.值"
+                  class="a-cell pic"
+                  :class="{ initial: a.图id?.startsWith('初始外装_') }"
+                  :title="a.值"
+                  :aria-label="a.标 + ':' + a.值"
+                  tabindex="0"
+                >
                   <span v-if="a.图id" class="a-pic">
                     <img
                       v-if="!道具图失效[a.图id]"
@@ -710,12 +720,7 @@
                       draggable="false"
                       @error="道具图失效[a.图id] = true"
                     />
-                    <b v-else>{{ a.值[0] }}</b>
-                  </span>
-                  <span class="a-main">
-                    <small>{{ a.标 }}</small>
-                    <b class="a-val">{{ a.值 }}</b>
-                    <em v-if="a.细节 && a.细节 !== a.值">{{ a.细节 }}</em>
+                    <b v-else aria-hidden="true">衣</b>
                   </span>
                 </div>
               </div>
@@ -991,6 +996,14 @@
                   提示词
                 </button>
                 <button
+                  v-if="条.谁 === '叙事' && 条.事件提示词 && !发送中"
+                  class="entry-prompt"
+                  title="查看这一拍独立事件的提示词"
+                  @click="打开事件提示词(条.事件提示词)"
+                >
+                  提示词
+                </button>
+                <button
                   v-if="条.原文 !== undefined && !发送中"
                   class="entry-edit"
                   title="改写这一段"
@@ -1016,6 +1029,15 @@
               </template>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- 独立事件不创建酒馆消息，因此用游戏自己的只读提示词查看器。 -->
+      <div v-if="事件提示词文本" class="mask" @click.self="事件提示词文本 = ''">
+        <div class="sheet">
+          <button class="sheet-close" @click="事件提示词文本 = ''">✕</button>
+          <div class="sheet-title">本 拍 提 示 词</div>
+          <pre class="event-prompt-view">{{ 事件提示词文本 }}</pre>
         </div>
       </div>
 
@@ -1177,18 +1199,31 @@ watch(显示地图, 开 => {
 });
 
 async function 写场景(房间id: string | null, 破门 = false): Promise<void> {
+  const 变量 = getVariables({ type: 'chat' });
+  const 旧房间 = (_.get(变量, '_场景.房间id') as string | undefined) ?? null;
+  const 旧轨迹 = (_.get(变量, '_地图轨迹') as string[] | undefined) ?? [];
+  const 从 = 旧房间 ? (查房间(旧房间)?.名称 ?? 旧房间) : '楼道';
+  const 到 = 房间id ? (查房间(房间id)?.名称 ?? 房间id) : '楼道';
+  const 新轨迹 = 旧房间 === 房间id ? 旧轨迹 : [...旧轨迹, `从${从}走到${到}`].slice(-8);
   await insertOrAssignVariables(
     {
       _场景: 房间id
         ? { 房间id, 破门, 进房末楼: 进房末楼.value, 由头已用: 本次入房由头已用.value }
         : null,
       _粘滞: null, // 玩家一走动就解除旧对话固定；重回同一房间也不能把已经离开的人“复活”
+      _地图轨迹: 新轨迹,
     },
     { type: 'chat' },
   );
 }
 
 async function 进入(房间id: string, 破门 = false, 保持地图 = false): Promise<void> {
+  // 地图上重复点当前房间只是“确认留在这里”：不算重新进门，也不能刷新检修借口/进房楼戳。
+  if (房间id === 当前房间.value) {
+    if (!保持地图) 关地图();
+    闪转场(查房间(房间id)?.名称 ?? 房间id);
+    return;
+  }
   try {
     进房末楼.value = getLastMessageId();
   } catch {
@@ -1736,6 +1771,7 @@ const 头像失效 = ref<Record<string, boolean>>({});
 
 /** 商店道具图(rq0.12 生图入库;挂了回退首字) */
 function 道具图(id: string): string {
+  if (id.startsWith('初始外装_')) return `${素材基址}/立绘/${id.slice('初始外装_'.length)}.webp`;
   return `${素材基址}/道具/${id}.webp`;
 }
 
@@ -1885,6 +1921,7 @@ const 发送中 = ref(false);
 const 由头写入中 = ref(false);
 const 流式段 = ref<string[]>([]);
 const 可重掷 = ref(false);
+const 隔离可重掷 = ref(false);
 const 键盘打开 = ref(false);
 let 键盘定位timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -1915,10 +1952,12 @@ const 回合房间 = ref<string | null>(null);
 function 刷新可重掷() {
   const 变量 = getVariables({ type: 'chat' });
   const 记录 = _.get(变量, '_上次回合') as { chat快照?: { _场景?: { 房间id?: string } | null } } | undefined;
-  可重掷.value = Boolean(记录);
+  const 隔离记录 = _.get(变量, '_上次隔离回合') as { 房间?: string } | undefined;
+  隔离可重掷.value = Boolean(隔离记录);
+  可重掷.value = Boolean(隔离记录 ?? 记录);
   // 回合开始前的 chat 快照才是“这轮发生在哪”的凭据。不能读当前 _场景：
   // 它既是对象而非房间名，又会在玩家走动后改变，曾导致对象与字符串永远不等、两钮全局消失。
-  回合房间.value = 记录?.chat快照?._场景?.房间id ?? null;
+  回合房间.value = 隔离记录?.房间 ?? 记录?.chat快照?._场景?.房间id ?? null;
   刷新工具由头();
 }
 
@@ -2004,12 +2043,18 @@ function 重掷() {
   流式段.value = [];
   if (卷轴.value.at(-1)?.谁 === '叙事') 卷轴.value.pop();
   void 滚到底();
-  eventEmit('人妻公寓:重掷');
+  eventEmit(隔离可重掷.value ? '人妻公寓:隔离事件重掷' : '人妻公寓:重掷');
 }
 
 /** 撤回本回合:删掉你的行动与 AI 回应,回到落笔之前 */
 function 撤回() {
   if (发送中.value) return;
+  if (隔离可重掷.value) {
+    发送中.value = true;
+    流式段.value = [];
+    eventEmit('人妻公寓:隔离事件撤回');
+    return;
+  }
   const 记录 = _.get(getVariables({ type: 'chat' }), '_上次回合') as { 回合前末楼?: number } | undefined;
   if (!记录 || typeof 记录.回合前末楼 !== 'number') return;
   发送中.value = true;
@@ -2105,12 +2150,12 @@ const 选中档案 = computed(() => {
         标,
         值: (图id && 查道具(图id)?.名称) || 细节 || '—',
         细节: 细节 || undefined,
-        图id: 图id && 查道具(图id) ? 图id : undefined,
+        图id: 图id && (查道具(图id) || 图id.startsWith('初始外装_')) ? 图id : undefined,
       });
       const 项: { 标: string; 值: string; 细节?: string; 图id?: string }[] = [
-        做项('外装', 妻.外装, 妻._穿着SKU.外装),
-        做项('妆容', 妻.妆容 || '素颜', 妻._穿着SKU.妆容),
+        做项('外装', 妻.外装, 妻._穿着SKU.外装 ?? `初始外装_${户静态表[m].妻名}`),
       ];
+      if (妻._穿着SKU.妆容) 项.push(做项('妆容', 妻.妆容 || '素颜', 妻._穿着SKU.妆容));
       if (妻.内衣) 项.push(做项('内衣', 妻.内衣, 妻._穿着SKU.内衣));
       for (const 件 of 妻.特殊) 项.push(做项('佩饰', 件, 找描述SKU(件)));
       return 项;
@@ -2288,8 +2333,11 @@ function 翻(门牌号: 门牌) {
   eventEmit('人妻公寓:翻垃圾', 门牌号);
 }
 
-function 选垃圾袋(门牌号: 门牌) {
+async function 选垃圾袋(门牌号: 门牌) {
   垃圾选择开.value = false;
+  const 变量 = getVariables({ type: 'chat' });
+  const 旧轨迹 = (_.get(变量, '_地图轨迹') as string[] | undefined) ?? [];
+  await insertOrAssignVariables({ _地图轨迹: [...旧轨迹, `在垃圾房翻查${门牌号}室的垃圾`].slice(-8) }, { type: 'chat' });
   翻(门牌号);
 }
 
@@ -2379,12 +2427,20 @@ interface 卷轴条 {
   楼?: number;
   可回档?: boolean;
   原文?: string;
+  事件id?: string;
+  事件提示词?: string;
+  _排序?: number;
 }
 
 const 卷轴 = ref<卷轴条[]>([]);
 const 卷轴容器 = ref<HTMLElement | null>(null);
 const 显示史册 = ref(false);
 const 史册容器 = ref<HTMLElement | null>(null);
+const 事件提示词文本 = ref('');
+
+function 打开事件提示词(提示词: string) {
+  事件提示词文本.value = 提示词;
+}
 
 async function 史册到最新() {
   await nextTick();
@@ -2530,7 +2586,13 @@ async function 取卷轴() {
       // 0 楼藏着界面占位标记,整楼写回会砸掉客户端,不开放编辑
       const 可编辑 = 消息.message_id > 0 ? { 原文 } : {};
       if (是玩家) {
-        条目.push({ 谁: '玩家', 文本: [净文.replace(/\n+/g, ' ')], 楼: 消息.message_id, ...可编辑 });
+        条目.push({
+          谁: '玩家',
+          文本: [净文.replace(/\n+/g, ' ')],
+          楼: 消息.message_id,
+          _排序: 消息.message_id * 10000,
+          ...可编辑,
+        });
       } else {
         条目.push({
           谁: '叙事',
@@ -2539,11 +2601,34 @@ async function 取卷轴() {
             .map(s => s.trim())
             .filter(Boolean),
           楼: 消息.message_id,
+          _排序: 消息.message_id * 10000,
           可回档: 消息.message_id > 0 && 消息.message_id < 末楼,
           ...可编辑,
         });
       }
     }
+    const 事件日志 = _.get(getVariables({ type: 'chat' }), '_隔离事件.日志');
+    if (Array.isArray(事件日志)) {
+      for (const 原 of 事件日志) {
+        if (!原 || (原.谁 !== '玩家' && 原.谁 !== '叙事') || typeof 原.文本 !== 'string') continue;
+        const 净文 = 清洗(过酒馆正则(原.文本, 原.谁 === '玩家' ? 'user_input' : 'ai_output', 0));
+        if (!净文) continue;
+        条目.push({
+          谁: 原.谁,
+          文本:
+            原.谁 === '玩家'
+              ? [净文.replace(/\n+/g, ' ')]
+              : 净文
+                  .split(/\n+/)
+                  .map((s: string) => s.trim())
+                  .filter(Boolean),
+          事件id: String(原.id ?? ''),
+          事件提示词: typeof 原.提示词 === 'string' ? 原.提示词 : undefined,
+          _排序: Number(原.锚楼 ?? 0) * 10000 + 100 + Number(原.序 ?? 0),
+        });
+      }
+    }
+    条目.sort((a, b) => (a._排序 ?? 0) - (b._排序 ?? 0));
     卷轴.value = 条目;
     待回档楼.value = null;
     await 滚到底();
@@ -2623,19 +2708,35 @@ async function 进真全屏() {
 
 /** 复用酒馆每条消息「… → Prompt」的原生入口；传入楼号，只打开这一回合。 */
 async function 打开楼层提示词(楼: number) {
-  let 根文档: Document;
+  const 文档们: Document[] = [];
   try {
-    根文档 = window.parent?.document ?? document;
+    let 窗: Window = window;
+    for (let i = 0; i < 8; i++) {
+      if (!文档们.includes(窗.document)) 文档们.push(窗.document);
+      if (窗.parent === 窗) break;
+      窗 = 窗.parent;
+    }
   } catch {
-    弹提示('无法访问酒馆页面，这一回合的提示词没有打开。');
-    return;
+    // 跨域祖先不可读时，仍保留已经收集到的同源文档。
   }
-  const 入口 = 根文档.querySelector<HTMLElement>(`.mes[mesid="${Math.trunc(楼)}"] .mes_prompt`);
+  const 楼号 = Math.trunc(楼);
+  let 入口: HTMLElement | null = null;
+  let 入口文档: Document = document;
+  for (const 根文档 of 文档们) {
+    const 消息 = [...根文档.querySelectorAll<HTMLElement>('.mes[mesid]')].find(
+      el => Number(el.getAttribute('mesid')) === 楼号,
+    );
+    入口 = 消息?.querySelector<HTMLElement>('.mes_prompt') ?? null;
+    if (入口) {
+      入口文档 = 根文档;
+      break;
+    }
+  }
   if (!入口) {
-    弹提示('没有找到这一回合对应的酒馆消息。', 4000);
+    弹提示('酒馆当前没有渲染这一回合的原生消息；若是很早的往事，先在酒馆加载到该楼再点。', 5000);
     return;
   }
-  const 样式 = window.parent?.getComputedStyle?.(入口) ?? getComputedStyle(入口);
+  const 样式 = 入口文档.defaultView?.getComputedStyle(入口) ?? getComputedStyle(入口);
   if (样式.display === 'none') {
     弹提示('这一回合没有保存可查看的提示词。', 4000);
     return;
@@ -2652,7 +2753,7 @@ async function 打开楼层提示词(楼: number) {
     }
   }
   // 酒馆原生监听的是 pointerup，不是 click。
-  const Pointer事件 = window.parent?.PointerEvent ?? PointerEvent;
+  const Pointer事件 = 入口文档.defaultView?.PointerEvent ?? PointerEvent;
   入口.dispatchEvent(new Pointer事件('pointerup', { bubbles: true, cancelable: true }));
 
   // 原生窗口挂在父文档；若本按钮替玩家退出了全屏，等原生窗口真正关闭后再恢复。
@@ -2661,7 +2762,7 @@ async function 打开楼层提示词(楼: number) {
     let 次数 = 0;
     const 轮询 = window.setInterval(() => {
       次数++;
-      const 有窗口 = Boolean(根文档.querySelector('dialog[open], [role="dialog"], .popup[open]'));
+      const 有窗口 = Boolean(入口文档.querySelector('dialog[open], [role="dialog"], .popup[open]'));
       看见窗口 ||= 有窗口;
       if ((看见窗口 && !有窗口) || 次数 > 1200) {
         clearInterval(轮询);
@@ -2887,16 +2988,32 @@ onMounted(() => {
       : [];
     void 滚到底();
   });
-  eventOn('人妻公寓:回合完成', () => {
+  eventOn('人妻公寓:回合完成', async () => {
     发送中.value = false;
     流式段.value = [];
     幕房间.value = 当前房间.value; // 本轮的戏与选项绑定产出场景,换地方即收
-    void 取卷轴();
+    // 先拉到最新楼号，再按新时钟重算作息/地图。旧顺序会让地图停在上一楼，直到玩家再点瓷砖才刷新。
+    await 取卷轴();
     刷新可重掷();
+    刷赴约();
     刷新在场();
     刷新行动选项();
     刷新偷窥待选();
+    try {
+      (store as unknown as { pull?: () => void }).pull?.();
+    } catch {
+      /* store 未带 pull 时靠轮询兜底 */
+    }
+  });
+  eventOn('人妻公寓:隔离事件完成', async () => {
+    发送中.value = false;
+    流式段.value = [];
+    幕房间.value = 当前房间.value;
+    await 取卷轴();
+    刷新可重掷();
     刷赴约();
+    刷新在场();
+    刷新偷窥待选();
     try {
       (store as unknown as { pull?: () => void }).pull?.();
     } catch {
@@ -3924,6 +4041,20 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
+.event-prompt-view {
+  max-height: min(68vh, 680px);
+  margin: 14px 0 0;
+  padding: 16px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  color: var(--ink);
+  font: 12px/1.65 ui-monospace, SFMono-Regular, Consolas, monospace;
+}
+
 .toast {
   position: absolute;
   left: 50%;
@@ -4707,6 +4838,10 @@ onUnmounted(() => {
 
 .dossier-stage {
   align-self: flex-start;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: #fff;
   background: linear-gradient(180deg, #ff6cab, #ff4f9a);
   border-radius: 999px;
@@ -4757,42 +4892,48 @@ onUnmounted(() => {
 }
 
 .dossier-battery {
-  display: grid;
-  grid-template-columns: repeat(10, minmax(0, 1fr));
-  gap: 2px;
-  height: 9px;
-  padding: 1px;
-  background: rgba(36, 33, 38, 0.06);
+  position: relative;
+  display: block;
+  height: 14px;
+  padding: 2px;
+  overflow: visible;
+  border: 2px solid rgba(36, 33, 38, 0.28);
+  border-radius: 4px;
+  background: rgba(36, 33, 38, 0.07);
 }
 
-.dossier-battery .axis-cell {
-  min-width: 0;
+.dossier-battery::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  right: -6px;
+  width: 4px;
+  height: 6px;
+  border-radius: 0 2px 2px 0;
+  background: rgba(36, 33, 38, 0.3);
+}
+
+.dossier-battery .axis-charge {
+  display: block;
+  width: var(--level);
   height: 100%;
-  border-radius: 2px;
-  background: rgba(36, 33, 38, 0.09);
-  transform: scaleY(0.72);
-  transition:
-    background 0.32s ease calc(var(--cell-index) * 24ms),
-    box-shadow 0.32s ease calc(var(--cell-index) * 24ms),
-    transform 0.32s cubic-bezier(0.2, 0.9, 0.25, 1.35) calc(var(--cell-index) * 24ms);
+  border-radius: 1px;
+  transform-origin: left center;
+  transition: width 0.8s cubic-bezier(0.2, 0.85, 0.25, 1);
 }
 
-.dossier-battery .axis-cell.on {
-  transform: scaleY(1);
-}
-
-.dossier-battery .axis-cell.fav.on {
-  background: linear-gradient(180deg, #ff9cc3, var(--pink));
+.dossier-battery .axis-charge.fav {
+  background: linear-gradient(90deg, #ffb1cf, var(--pink));
   box-shadow: 0 0 5px rgba(255, 79, 154, 0.24);
 }
 
-.dossier-battery .axis-cell.sin.on {
-  background: linear-gradient(180deg, #ffb091, var(--red));
+.dossier-battery .axis-charge.sin {
+  background: linear-gradient(90deg, #ffb091, var(--red));
   box-shadow: 0 0 5px rgba(228, 82, 90, 0.22);
 }
 
-.dossier-battery .axis-cell.marr.on {
-  background: linear-gradient(180deg, #9cebd7, var(--green));
+.dossier-battery .axis-charge.marr {
+  background: linear-gradient(90deg, #9cebd7, var(--green));
   box-shadow: 0 0 5px rgba(49, 179, 146, 0.22);
 }
 
@@ -5004,10 +5145,10 @@ onUnmounted(() => {
 /* 仪容图鉴：穿戴 SKU 直接显示商店道具卡，不再拿穿着描述误查图片。 */
 .a-cell {
   position: relative;
-  display: grid;
-  grid-template-columns: 88px minmax(0, 1fr);
-  align-items: stretch;
-  min-height: 88px;
+  display: block;
+  min-height: 0;
+  aspect-ratio: 1;
+  overflow: hidden;
   overflow: hidden;
   font-size: 0.76em;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(248, 243, 250, 0.9));
@@ -5016,33 +5157,28 @@ onUnmounted(() => {
   box-shadow: 0 4px 12px rgba(30, 26, 38, 0.07);
 }
 
-.a-cell .a-main {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 3px;
-  min-width: 0;
-  padding: 9px 10px;
-}
-
 .a-cell.pic {
   grid-column: span 1;
 }
 
 .a-cell .a-pic {
-  width: 88px;
-  height: 88px;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   background: #fff;
   display: grid;
   place-items: center;
-  border-right: 1px solid rgba(255, 202, 53, 0.4);
 }
 
 .a-cell .a-pic img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.a-cell.initial .a-pic img {
+  object-position: 50% 48%;
+  transform: scale(1.45);
 }
 
 .a-cell small {
@@ -6268,6 +6404,8 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 0;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .hearts {
@@ -6928,17 +7066,16 @@ onUnmounted(() => {
   }
 
   .attire-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .a-cell {
-    grid-template-columns: 76px minmax(0, 1fr);
-    min-height: 76px;
+    min-height: 0;
   }
 
   .a-cell .a-pic {
-    width: 76px;
-    height: 76px;
+    width: 100%;
+    height: 100%;
   }
 
   .dev-grid {

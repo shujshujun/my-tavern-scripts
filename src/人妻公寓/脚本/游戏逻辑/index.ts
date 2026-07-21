@@ -2,9 +2,9 @@ import { registerMvuSchema } from 'https://testingcf.jsdelivr.net/gh/StageDog/ta
 
 import { reloadOnChatChange } from '@/util/script';
 import type { SchemaType } from '../../schema';
-import { Schema, 创建户节点 } from '../../schema';
+import { Schema } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
-import { 户静态表, 首夜差分, 首批门牌, 阶段标题 } from '../../stageConfig';
+import { 户静态表, 首夜差分, 首批门牌, 阶段标题, 查道具 } from '../../stageConfig';
 import { 使用运作, 催租, 接听来电, 捡金币, 空房偷窃, 经济结算, 要钱 } from './经济系统';
 import { 挂载手机, 打开手机, 刷新红点, 手机节拍, 来电已接 } from './手机系统';
 import { 夜访结算, 惰性结算户, 结算焦点疑心, 冷落检测, 请求晋阶 } from './结算系统';
@@ -22,7 +22,8 @@ import {
   对饮,
   type 侦探结果,
 } from './侦探系统';
-import { 使用荣耀洞, 荣耀洞离场 } from './荣耀洞';
+import { 使用荣耀洞, 荣耀洞当前事件, 荣耀洞离场, 推进荣耀洞隔离拍 } from './荣耀洞';
+import { 取消隔离事件, 执行隔离事件, 隔离事件进行中 } from './隔离事件引擎';
 import { 装载性癖, 卸载性癖 } from './性癖系统';
 import { 杀时间, 妻位置推算 } from './楼层时钟';
 import { 购买, 送礼 } from './商店系统';
@@ -30,6 +31,7 @@ import { 读取最近有效, 读最近有效stat, 脚本写入, 脚本写入中 
 import { 检测焦点, 读场景, 读粘滞, 读赴约, 组公寓快照, 取本轮事件文本 } from './snapshotSystem';
 import { 执行回合, 重掷回合, 重开一局, 回档至, 回合进行中, 取消本回合, 开始新游戏 } from './回合引擎';
 import { 清理数据库陈旧互斥旗 } from './数据库桥';
+import { 创建配置户节点 } from './入住系统';
 
 /**
  * 人妻公寓 - 游戏逻辑脚本(P0 工程骨架)
@@ -89,7 +91,7 @@ function 确保首批入住(data: SchemaType): boolean {
   if (!_.isEmpty(data.户)) return false;
   const 楼 = 当前楼层();
   for (const m of 首批门牌) {
-    data.户[m] = 创建户节点(0);
+    data.户[m] = 创建配置户节点(m, 0);
     镜像直写(m, { 入住楼层: 0 });
   }
   console.info(`[人妻公寓] 首批入住引导完成(楼${楼}):${首批门牌.join('、')}`);
@@ -254,11 +256,49 @@ function 挂载监听() {
   // ─────────────────────────────────────────────
   eventOn('人妻公寓:玩家行动', (行动: string) => {
     if (typeof 行动 !== 'string' || !行动.trim()) return;
+    const 当前 = 读最近有效stat();
+    if (当前?.系统._荣耀洞拍 >= 0 && 读场景().房间id === '洗手间' && !隔离事件进行中()) {
+      安全操作((raw, data) => {
+        const 文本 = 行动.trim();
+        return 运行荣耀洞隔离拍(raw, data, 文本, 建隔离记录('荣耀洞继续', 文本, data));
+      });
+      return;
+    }
     void 执行回合(行动.trim());
   });
   eventOn('人妻公寓:重掷', () => void 重掷回合());
   eventOn('人妻公寓:回档', (楼层: number) => void 回档至(Number(楼层)));
-  eventOn('人妻公寓:取消生成', () => 取消本回合());
+  eventOn('人妻公寓:隔离事件撤回', () =>
+    安全操作(async (raw, data) => {
+      const 记录 = 读隔离记录();
+      if (!记录) {
+        eventEmit('人妻公寓:提示', '没有可撤回的独立事件。');
+        return;
+      }
+      await 恢复隔离记录(raw, 记录);
+      eventEmit('人妻公寓:隔离事件完成', { 类型: '撤回' });
+    }),
+  );
+  eventOn('人妻公寓:隔离事件重掷', () =>
+    安全操作(async (raw, data) => {
+      const 记录 = 读隔离记录();
+      if (!记录) {
+        eventEmit('人妻公寓:提示', '没有可重演的独立事件。');
+        return;
+      }
+      const 恢复后 = await 恢复隔离记录(raw, 记录);
+      if (记录.入口 === '荣耀洞继续') {
+        await 运行荣耀洞隔离拍(raw, 恢复后, 记录.行动, 建隔离记录('荣耀洞继续', 记录.行动, 恢复后));
+      } else if (记录.入口 === '荣耀洞开始') {
+        eventEmit('人妻公寓:荣耀洞');
+      } else if (记录.门牌) {
+        eventEmit('人妻公寓:查看摄像头', 记录.门牌);
+      }
+    }),
+  );
+  eventOn('人妻公寓:取消生成', () => {
+    if (!取消隔离事件()) 取消本回合();
+  });
   eventOn('人妻公寓:开始新游戏', (难度: string) => void 开始新游戏(String(难度 ?? '标准')));
   eventOn('人妻公寓:重开一局', () => void 重开一局());
 
@@ -289,6 +329,67 @@ function 挂载监听() {
     }
     eventEmit('人妻公寓:提示', 结果.提示);
     return true;
+  }
+
+  type 隔离入口 = '荣耀洞开始' | '荣耀洞继续' | '监控';
+  type 隔离回合记录 = {
+    入口: 隔离入口;
+    行动: string;
+    门牌?: 门牌;
+    房间: string;
+    日志长度: number;
+    data快照: SchemaType;
+    chat快照: { _侦探: unknown; _场景: unknown };
+  };
+
+  function 建隔离记录(入口: 隔离入口, 行动: string, data: SchemaType, 门牌号?: 门牌): 隔离回合记录 {
+    const vars = getVariables({ type: 'chat' });
+    const 日志 = _.get(vars, '_隔离事件.日志');
+    return {
+      入口,
+      行动,
+      门牌: 门牌号,
+      房间: 读场景().房间id,
+      日志长度: Array.isArray(日志) ? 日志.length : 0,
+      data快照: _.cloneDeep(data),
+      chat快照: {
+        _侦探: _.cloneDeep(_.get(vars, '_侦探')),
+        _场景: _.cloneDeep(_.get(vars, '_场景')),
+      },
+    };
+  }
+
+  async function 存隔离记录(记录: 隔离回合记录): Promise<void> {
+    await updateVariablesWith(
+      vars => {
+        _.set(vars, '_上次隔离回合', 记录);
+        return vars;
+      },
+      { type: 'chat' },
+    );
+  }
+
+  function 读隔离记录(): 隔离回合记录 | null {
+    const 原 = _.get(getVariables({ type: 'chat' }), '_上次隔离回合');
+    return 原 && typeof 原 === 'object' ? (原 as 隔离回合记录) : null;
+  }
+
+  async function 恢复隔离记录(raw: object, 记录: 隔离回合记录): Promise<SchemaType> {
+    const data = Schema.parse(_.cloneDeep(记录.data快照)) as SchemaType;
+    await 脚本写入(raw, data);
+    await updateVariablesWith(
+      vars => {
+        const 日志 = _.get(vars, '_隔离事件.日志');
+        if (Array.isArray(日志)) _.set(vars, '_隔离事件.日志', 日志.slice(0, 记录.日志长度));
+        _.set(vars, '_侦探', _.cloneDeep(记录.chat快照._侦探));
+        _.set(vars, '_场景', _.cloneDeep(记录.chat快照._场景));
+        _.set(vars, '_上次隔离回合', null);
+        return vars;
+      },
+      { type: 'chat' },
+    );
+    捕获保护快照(data);
+    return data;
   }
 
   /** 带毒快照守卫的操作壳(近10楼无 stat 一律不动手;失败一律明着报,不再静默) */
@@ -337,6 +438,32 @@ function 挂载监听() {
     await 执行回合(行动);
   }
 
+  async function 运行荣耀洞隔离拍(
+    raw: object,
+    data: SchemaType,
+    行动: string,
+    记录: 隔离回合记录,
+  ): Promise<void> {
+    const 导演事件 = 荣耀洞当前事件(data);
+    if (!导演事件) {
+      eventEmit('人妻公寓:回合失败', '荣耀洞事件状态已经结束。');
+      return;
+    }
+    try {
+      const 线程 = '荣耀洞:' + data.系统._荣耀洞起楼 + ':' + data.系统._荣耀洞门牌;
+      const 正文 = await 执行隔离事件({ 类型: '荣耀洞', 线程, 行动, 导演事件, 房间: '洗手间' });
+      if (!正文) throw new Error('荣耀洞事件没有生成正文');
+      推进荣耀洞隔离拍(data);
+      await 脚本写入(raw, data);
+      捕获保护快照(data);
+      await 存隔离记录(记录);
+      eventEmit('人妻公寓:隔离事件完成', { 类型: '荣耀洞' });
+    } catch (e) {
+      console.error('[人妻公寓] 荣耀洞隔离事件失败:', e);
+      eventEmit('人妻公寓:回合失败', e instanceof Error ? e.message : String(e));
+    }
+  }
+
   // 侦探系统的"楼层"参数全是时间语义(冷却/种子/位置)——统一喂 真实楼层+杀时间偏移
   eventOn('人妻公寓:翻垃圾', (门牌号: 门牌) =>
     安全操作((raw, data) => 落地(翻垃圾(data, 门牌号, 当前楼层() + data.系统._时段偏移楼), raw, data)),
@@ -360,14 +487,19 @@ function 挂载监听() {
 
   // 荣耀洞(P5+:洗手间末隔间;摇签起场三拍连场,离场即收束;时间轴统一钟楼)
   eventOn('人妻公寓:荣耀洞', () =>
-    安全操作((raw, data) =>
-      即时开演(
-        使用荣耀洞(data, 当前楼层() + data.系统._时段偏移楼),
-        raw,
-        data,
-        '(在公共洗手间末隔间闩上门,在荣耀洞前坐定,等候隔板另一侧的动静)',
-      ),
-    ),
+    安全操作(async (raw, data) => {
+      const 行动 = '(在公共洗手间末隔间闩上门,在荣耀洞前坐定,等候隔板另一侧的动静)';
+      const 记录 = 建隔离记录('荣耀洞开始', 行动, data);
+      const 结果 = 使用荣耀洞(data, 当前楼层() + data.系统._时段偏移楼);
+      if (!结果.事件) {
+        await 落地(结果, raw, data);
+        return;
+      }
+      await 脚本写入(raw, data);
+      捕获保护快照(data);
+      eventEmit('人妻公寓:提示', 结果.提示);
+      await 运行荣耀洞隔离拍(raw, data, 行动, 记录);
+    }),
   );
   eventOn('人妻公寓:荣耀洞离场', () =>
     安全操作(async (raw, data) => {
@@ -435,14 +567,13 @@ function 挂载监听() {
   // 查看摄像头:排队偷窥场景事件后自动跑一回合(偷窥剧情由 AI 演出,选项卡在回合完成后弹出)
   eventOn('人妻公寓:查看摄像头', (门牌号: 门牌) =>
     安全操作(async (raw, data) => {
+      const 行动 = '(回到302关上门,悄悄调出' + 门牌号 + '室的摄像头画面,盯着看)';
+      const 记录 = 建隔离记录('监控', 行动, data, 门牌号);
       const 结果 = 查看摄像头(data, 门牌号, 当前楼层() + data.系统._时段偏移楼);
       if ('提示' in 结果) {
         await 落地(结果, raw, data);
         return;
       }
-      data.系统._待发送事件 = data.系统._待发送事件 ? `${data.系统._待发送事件}|${结果.事件}` : 结果.事件;
-      await 脚本写入(raw, data);
-      捕获保护快照(data);
       // 看监控=回302自己屋里看(2026-07-17 用户拍板):场景在脚本侧写(await 到位,快照必读到302,
       // UI 写会输给紧接着的快照组装),UI 收"监控回合"事件同步画面;拒绝分支不动窝
       try {
@@ -454,7 +585,23 @@ function 挂载监听() {
         console.error('[人妻公寓] 监控回合写场景失败(照常开回合):', e);
       }
       eventEmit('人妻公寓:监控回合');
-      await 执行回合(`(回到302关上门,悄悄调出${门牌号}室的摄像头画面,盯着看)`);
+      try {
+        const 正文 = await 执行隔离事件({
+          类型: '监控',
+          线程: '监控:' + 门牌号 + ':' + 结果.拍,
+          行动,
+          导演事件: 结果.事件,
+          房间: '302',
+        });
+        if (!正文) throw new Error('监控事件没有生成正文');
+        捕获保护快照(data);
+        await 存隔离记录(记录);
+        eventEmit('人妻公寓:隔离事件完成', { 类型: '监控', 门牌: 门牌号 });
+      } catch (e) {
+        清偷窥挂起();
+        console.error('[人妻公寓] 监控隔离事件失败:', e);
+        eventEmit('人妻公寓:回合失败', e instanceof Error ? e.message : String(e));
+      }
     }),
   );
 
@@ -478,13 +625,21 @@ function 挂载监听() {
         eventEmit('人妻公寓:提示', '她已经不在你身边了——东西没有送出。');
         return;
       }
+      const 赠前阶段 = data.户[载荷.门牌].妻.当前阶段;
+      const 是服饰 = !!查道具(String(载荷.道具id))?.服饰;
       const 结果 = await 送礼(data, String(载荷.道具id), 载荷.门牌);
-      await 即时开演(
-        结果,
-        raw,
-        data,
-        `(当面把「${String(载荷.道具id)}」递给${户静态表[载荷.门牌].妻名},停下来等她回应)`,
-      );
+      const 是开门礼 = 赠前阶段 === 0 && data.户[载荷.门牌].妻.当前阶段 > 0;
+      if (是服饰 || 是开门礼) {
+        await 即时开演(
+          结果,
+          raw,
+          data,
+          `(当面把「${String(载荷.道具id)}」递给${户静态表[载荷.门牌].妻名},停下来等她回应)`,
+        );
+      } else {
+        // 普通礼物不强抢一个 AI 回合；已排队的回响在玩家下一次正常行动时一起演出。
+        await 落地(结果, raw, data);
+      }
     }),
   );
 

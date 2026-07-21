@@ -1,10 +1,10 @@
 import type { SchemaType } from '../../schema';
-import { Schema, 创建户节点 } from '../../schema';
+import { Schema } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
 import { 户静态表, 难度表, 首批门牌 } from '../../stageConfig';
 // (难度表兼供撞见概率系数查表)
 import { 经济结算 } from './经济系统';
-import { 入住检测 } from './入住系统';
+import { 入住检测, 创建配置户节点 } from './入住系统';
 import { 打断检测, 换装起疑, 母亲撞见检测, 父亲来电打断 } from './打断系统';
 import { 夜访结算, 惰性结算户, 绿帽线检测, 结算焦点疑心, 冷落检测 } from './结算系统';
 import { 荣耀洞结算 } from './荣耀洞';
@@ -48,6 +48,7 @@ const 回合变量键 = [
   '_在场',
   '_行动选项',
   '_粘滞',
+  '_地图轨迹',
 ] as const;
 
 /** 手机记录不塞进每回合快照（会令存档平方膨胀），按楼层戳裁掉被删除时间线。 */
@@ -69,6 +70,14 @@ function 裁手机时间线(vars: Record<string, unknown>, 楼层: number): void
   // 节拍使用“真实楼+杀时间偏移”的钟楼值，无法只凭目标楼可靠裁剪；清空后由确定性种子重新建水位。
   库.节拍 = {};
   _.set(vars, '_微信', 库);
+  const 事件日志 = _.get(vars, '_隔离事件.日志');
+  if (Array.isArray(事件日志)) {
+    _.set(
+      vars,
+      '_隔离事件.日志',
+      事件日志.filter(条 => Number((条 as { 锚楼?: number })?.锚楼 ?? -1) <= 楼层),
+    );
+  }
 }
 
 type 上次回合记录 = {
@@ -383,7 +392,12 @@ export async function 执行回合(行动: string): Promise<void> {
       );
       捕获保护快照(newStat);
       insertOrAssignVariables(
-        { _上次回合: { 行动, 回合前末楼, chat快照 } satisfies 上次回合记录, _行动选项: [] },
+        {
+          _上次回合: { 行动, 回合前末楼, chat快照 } satisfies 上次回合记录,
+          _上次隔离回合: null,
+          _行动选项: [],
+          _地图轨迹: [],
+        },
         { type: 'chat' },
       );
       await 记录数据库回合(生成楼层, newStat, 行动, 中断卡文案(户静态表[焦点妻门牌].妻名), 妻在场, 夫在场);
@@ -426,7 +440,9 @@ export async function 执行回合(行动: string): Promise<void> {
     insertOrAssignVariables(
       {
         _上次回合: { 行动, 回合前末楼, chat快照 } satisfies 上次回合记录,
+        _上次隔离回合: null,
         _行动选项: [],
+        _地图轨迹: [],
       },
       { type: 'chat' },
     );
@@ -496,7 +512,7 @@ export async function 回档至(楼层: number): Promise<void> {
     await deleteChatMessages(_.range(楼层 + 1, 末楼 + 1), { refresh: 'none' });
     await updateVariablesWith(
       vars => {
-        for (const 键 of [...回合变量键, '_上次回合']) _.set(vars, 键, null);
+        for (const 键 of [...回合变量键, '_上次回合', '_上次隔离回合']) _.set(vars, 键, null);
         裁手机时间线(vars, 楼层);
         return vars;
       },
@@ -611,6 +627,8 @@ export async function 重开一局(): Promise<void> {
         for (const 键 of [
           ...回合变量键,
           '_上次回合',
+          '_上次隔离回合',
+          '_隔离事件',
           '_在场',
           '_行动选项',
           '_粘滞',
@@ -635,7 +653,7 @@ export async function 重开一局(): Promise<void> {
     // 0 楼 stat 重写成出厂态:默认值 + 首批入住(与 index.确保首批入住 同一套模板)
     const 出厂 = Schema.parse({}) as SchemaType;
     for (const m of 首批门牌) {
-      出厂.户[m] = 创建户节点(0);
+      出厂.户[m] = 创建配置户节点(m, 0);
       镜像直写(m, { 入住楼层: 0 });
     }
     const 旧raw = Mvu.getMvuData({ type: 'message', message_id: -1 });
