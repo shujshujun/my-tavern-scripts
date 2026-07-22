@@ -257,6 +257,11 @@
               <b>{{ Math.round(data.风闻) }}</b>
             </div>
           </div>
+          <div v-if="欠租账.length" class="rent-ledger" :title="欠租账.map(项 => `${项.门牌} ${项.妻名}:${项.笔数}笔`).join('；')">
+            <Ic n="book" />
+            <span><small>待收租</small><b>{{ 欠租账.length }}户 / {{ 欠租总笔数 }}笔</b></span>
+            <i v-for="项 in 欠租账" :key="项.门牌" :title="`${项.门牌} ${项.妻名}`">{{ 项.门牌 }}</i>
+          </div>
         </div>
 
         <!-- 头像行:已入住户(焦点亮/在场半亮/离场暗);点开档案 -->
@@ -292,7 +297,10 @@
         <!-- 正文舞台:背景四层在 wrap 上,立绘钉右下,正文滚动层浮最上(垫板压立绘,gal 层次) -->
         <div
           class="story-wrap"
-          :class="[`portrait-count-${Math.min(立绘列表.length, 6)}`, { 'portraits-many': 立绘列表.length >= 4 }]"
+          :class="[
+            `portrait-count-${Math.min(立绘列表.length, 6)}`,
+            { 'portraits-many': 立绘列表.length >= 4, 'story-glory': !!荣耀洞图 },
+          ]"
           :style="[场景色, 场景图样式]"
         >
           <!-- 隐藏正文(2026-07-19 用户点单,gal惯例):渐隐文字层欣赏立绘;只认这颗钮,再按恢复(误触不弹回) -->
@@ -308,6 +316,7 @@
               v-for="绘 in 立绘列表"
               :key="绘.src"
               class="portrait"
+              :class="{ 'portrait-glory': 绘.src.includes('/立绘/荣耀洞_') }"
               :style="绘.style"
               :src="绘.src"
               alt=""
@@ -773,6 +782,23 @@
                   <small>此刻{{ 选中档案.夫状态 }}</small>
                 </span>
               </div>
+              <div class="husband-risk" aria-label="丈夫疑心与信任风险盘">
+                <span class="trust"><Ic n="lock" /> 信任</span>
+                <i
+                  class="risk-needle"
+                  :style="{
+                    left:
+                      Math.max(
+                        5,
+                        Math.min(
+                          95,
+                          (选中档案.夫.疑心值 / Math.max(1, 选中档案.夫.疑心值 + 选中档案.夫.信任值)) * 100,
+                        ),
+                      ) + '%',
+                  }"
+                />
+                <span class="suspicion"><Ic n="peep" /> 疑心</span>
+              </div>
               <div class="axis-row">
                 <span class="axis-label">疑心</span>
                 <div class="axis"><i class="bar sin" :style="{ width: 选中档案.夫.疑心值 + '%' }" /></div>
@@ -796,9 +822,15 @@
               她的日子隔着一扇门——裂缝线索 {{ 选中档案.妻.裂缝.碎片进度 }}/4。看清她的裂缝,才看得见她。
               <template v-if="选中档案.妻.裂缝.碎片进度 >= 4">线索齐了:背包里那封拼起来的东西,读一读。</template>
             </p>
-            <div v-if="选中线索.length" class="dsec">
+            <div class="dsec clue-board">
               <div class="dsec-title">线 索</div>
-              <p v-for="(条, i) in 选中线索" :key="i" class="dline">· {{ 条 }}</p>
+              <div class="clue-slots">
+                <div v-for="(槽, i) in 裂缝证物槽" :key="槽.标" class="clue-slot" :class="{ found: !!选中线索[i] }">
+                  <span class="clue-source"><Ic :n="槽.图" />{{ 槽.标 }}</span>
+                  <p>{{ 选中线索[i] || '尚未取得' }}</p>
+                  <i>{{ 选中线索[i] ? '已归档' : '空槽' }}</i>
+                </div>
+              </div>
             </div>
           </template>
 
@@ -827,7 +859,7 @@
           <button class="sheet-close" @click="显示背包 = false">✕</button>
           <div class="sheet-title">背 包</div>
           <div class="sheet-body">
-            <div v-for="(项, i) in 背包列表" :key="i" class="ware-card">
+            <div v-for="(项, i) in 背包列表" :key="i" class="ware-card" :class="'ware-' + 项.视觉.类">
               <span class="ware-pic">
                 <img
                   v-if="查道具(项.id) && !道具图失效[项.id]"
@@ -838,9 +870,10 @@
                   @error="道具图失效[项.id] = true"
                 />
                 <b v-else>{{ 项.可读信 ? '✉' : 项.名称[0] }}</b>
+                <span class="ware-kind"><Ic :n="项.视觉.图" /></span>
               </span>
               <span class="ware-main">
-                <b class="ware-name">{{ 项.名称 }}</b>
+                <b class="ware-name">{{ 项.名称 }} <em class="ware-kind-label">{{ 项.视觉.标 }}</em></b>
                 <span class="ware-desc">{{ 项.描述 }}</span>
               </span>
               <span class="ware-acts">
@@ -902,7 +935,7 @@
             </button>
           </div>
           <div class="sheet-body shop-grid">
-            <div v-for="项 in 当前货架" :key="项.id" class="ware-card">
+            <div v-for="项 in 当前货架" :key="项.id" class="ware-card" :class="'ware-' + 道具视觉信息(项).类">
               <span class="ware-pic">
                 <img
                   v-if="!道具图失效[项.id]"
@@ -913,10 +946,12 @@
                   @error="道具图失效[项.id] = true"
                 />
                 <b v-else>{{ 项.名称[0] }}</b>
+                <span class="ware-kind"><Ic :n="道具视觉信息(项).图" /></span>
               </span>
               <span class="ware-main">
                 <b class="ware-name"
-                  >{{ 项.名称 }} <em class="ware-price">¥{{ 项.价格 }}</em></b
+                  >{{ 项.名称 }} <em class="ware-kind-label">{{ 道具视觉信息(项).标 }}</em>
+                  <em class="ware-price">¥{{ 项.价格 }}</em></b
                 >
                 <span class="ware-desc">{{ 项.描述 }}</span>
               </span>
@@ -940,6 +975,7 @@
           </div>
           <div class="sheet-body">
             <button v-for="m in 监控列表" :key="m" class="cam-row" :disabled="发送中" @click="看监控(m)">
+              <img class="cam-room" :src="背景图(m)" :alt="m + '室监控背景'" />
               <img
                 v-if="!头像失效[户静态表[m].妻名]"
                 class="cam-face"
@@ -963,6 +999,9 @@
         <div class="sheet">
           <button class="sheet-close" @click="读信门牌 = null">✕</button>
           <div class="sheet-title">拼 合 的 真 相</div>
+          <div class="truth-fragments" aria-label="四条线索已经拼合">
+            <span v-for="槽 in 裂缝证物槽" :key="槽.标"><Ic :n="槽.图" />{{ 槽.标 }}</span>
+          </div>
           <div class="sheet-body letter">
             <p v-for="(段, i) in 读信正文.split('\n')" :key="i" class="narr no-indent">{{ 段 }}</p>
           </div>
@@ -978,7 +1017,13 @@
           <p class="hint center">每段右下角的 ↺ 可以回到那一刻——点两次,之后的一切就没有发生过。</p>
           <button class="history-latest" title="跳到最新一段" @click="史册到最新">↓ 最新</button>
           <div ref="史册容器" class="sheet-body chronicle">
-            <div v-for="(条, i) in 卷轴" :key="i" class="story-entry">
+            <div
+              v-for="(条, i) in 卷轴"
+              :key="i"
+              class="story-entry chronicle-entry"
+              :class="{ player: 条.谁 === '玩家' }"
+            >
+              <span class="chronicle-mark"><Ic :n="条.谁 === '玩家' ? 'coin' : 'book'" /></span>
               <template v-if="条.楼 !== undefined && 条.楼 === 编辑中楼">
                 <textarea v-model="编辑文本" class="edit-area" rows="8"></textarea>
                 <div class="edit-acts">
@@ -1080,7 +1125,7 @@ import { 查金币 } from '../../脚本/游戏逻辑/经济系统';
 import { 可晋阶 } from '../../脚本/游戏逻辑/结算系统';
 import { useDataStore } from './store';
 
-// ── 描边线条图标(初星 icon-sprite 语法:24×24 stroke=currentColor;feather 风手写路径) ──
+// ── 梧桐里主题图标：统一 24×24 圆角描边，公寓门牌/钥匙孔/信件等语义贯穿全套 ──
 
 const 图标库: Record<string, string> = {
   cart: '<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6"/>',
@@ -1104,27 +1149,29 @@ const 图标库: Record<string, string> = {
   clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   tv: '<rect x="2" y="7" width="20" height="15" rx="2"/><path d="m17 2-5 5-5-5"/>',
   coin: '<circle cx="12" cy="12" r="9"/><path d="m8.5 7.5 3.5 4 3.5-4M12 11.5V17M9.5 13.5h5M9.5 15.5h5"/>',
+  ops: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle class="ic-gem" cx="16" cy="7" r="2"/><circle class="ic-gem" cx="8" cy="17" r="2"/>',
+  tool: '<path d="m14.7 6.3 3-3a4.2 4.2 0 0 1-5.2 5.2L5 16l3 3 7.5-7.5a4.2 4.2 0 0 1 5.2-5.2l-3 3"/><path d="m4 17 3 3"/>',
+  gift: '<rect x="3" y="9" width="18" height="12" rx="2"/><path d="M12 9v12M2 9h20V5H2Z"/><path d="M12 5c-1.6 0-5-.2-5-2.1C7 1.6 8.2 1 9.2 1 11 1 12 5 12 5Zm0 0c1.6 0 5-.2 5-2.1C17 1.6 15.8 1 14.8 1 13 1 12 5 12 5Z"/>',
+  letter: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/><path class="ic-gem" d="m15.5 15.5 2 2 3.5-4"/>',
+  search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/><path class="ic-gem" d="M8 10h5M10.5 7.5v5"/>',
+  rewind: '<path d="m11 7-5 5 5 5"/><path d="M6 12h7a6 6 0 0 1 6 6v1"/>',
+  dice: '<rect x="3" y="3" width="18" height="18" rx="5"/><circle class="ic-gem" cx="8" cy="8" r="1"/><circle class="ic-gem" cx="16" cy="8" r="1"/><circle class="ic-gem" cx="12" cy="12" r="1"/><circle class="ic-gem" cx="8" cy="16" r="1"/><circle class="ic-gem" cx="16" cy="16" r="1"/>',
+  dress: '<path d="M9 3h6l1 5-2 2 5 11H5l5-11-2-2 1-5Z"/><path class="ic-gem" d="M9 3c.5 2 5.5 2 6 0"/>',
+  drug: '<path d="M8.5 4.5a4.2 4.2 0 0 1 6 0l5 5a4.2 4.2 0 0 1-6 6l-5-5a4.2 4.2 0 0 1 0-6Z"/><path d="m10 12 6-6"/><path class="ic-gem" d="M6 17h5M8.5 14.5v5"/>',
+  favor: '<path d="M20.8 5.7c-1.8-2.1-5.1-1.8-6.8.4L12 8.5l-2-2.4C8.3 3.9 5 3.6 3.2 5.7 1.5 7.7 1.8 10.6 3.8 12.4L12 20l8.2-7.6c2-1.8 2.3-4.7.6-6.7Z"/><path class="ic-gem" d="M8 12h2l1-2 2 5 1-3h2"/>',
+  kink: '<path d="M12 21a9 9 0 1 1 9-9c0 4-3 6-6 6-2.8 0-5-1.7-5-4 0-2 1.5-3.5 3.5-3.5 1.6 0 2.8 1 2.8 2.5 0 1.1-.8 2-1.8 2"/><circle class="ic-gem" cx="12" cy="4.5" r="1"/>',
+  peep: '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><path d="M12 9a3 3 0 1 1-1.2 5.8"/><path class="ic-gem" d="m12 12 5-5"/>',
+  scene: '<path d="M3 8h18v12H3Z"/><path d="M3 8 5 3h16l-2 5M8 3 6 8M14 3l-2 5M20 3l-2 5"/><path class="ic-gem" d="m10 12 5 2.5-5 2.5Z"/>',
 };
 
-/** 线条 SVG 兜底(水彩图标加载失败时用,颜色取墨色定值) */
-function 兜底图标(n: string): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#5a5566" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${图标库[n] ?? ''}</svg>`;
-  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-}
-
-// 图标=AI 生成水彩小物(素材/图标/,与背景同画风);onerror 回退线条 SVG
+// 功能图标完全代码原生化：不再先加载混合风格位图，也不会因 CDN 失败换一套视觉语言。
 const Ic: FunctionalComponent<{ n: string }> = props =>
-  h('img', {
+  h('svg', {
     class: 'ic',
-    src: `${素材基址}/图标/${props.n}.webp`,
-    alt: '',
-    draggable: false,
-    onError: (e: Event) => {
-      const t = e.target as HTMLImageElement;
-      if (t.dataset.fb) return;
-      t.dataset.fb = '1';
-      t.src = 兜底图标(props.n);
-    },
+    viewBox: '0 0 24 24',
+    role: 'img',
+    'aria-hidden': 'true',
+    innerHTML: `<path class="ic-plate" d="M5 2.8h11.8L21.2 7v12A2.2 2.2 0 0 1 19 21.2H5A2.2 2.2 0 0 1 2.8 19V5A2.2 2.2 0 0 1 5 2.8Z"/>${图标库[props.n] ?? 图标库.home}`,
   });
 Ic.props = ['n'];
 
@@ -1559,6 +1606,14 @@ function 欠租中(id: string): boolean {
   return (data.value?.户[id]?._欠租笔数 ?? 0) > 0;
 }
 
+/** HUD 账夹：只把已有欠租状态图形化，不新增经济数值或玩法判定。 */
+const 欠租账 = computed(() =>
+  门牌列表
+    .map(门牌 => ({ 门牌, 妻名: 户静态表[门牌].妻名, 笔数: data.value?.户[门牌]?._欠租笔数 ?? 0 }))
+    .filter(项 => 项.笔数 > 0),
+);
+const 欠租总笔数 = computed(() => 欠租账.value.reduce((和, 项) => 和 + 项.笔数, 0));
+
 // ── 手机(P4:设备本体在酒馆页面层,游戏界面只管跳动指示与红点) ──
 
 const 手机来电 = computed(() => (data.value?.系统?._待接来电?.期 ?? -1) >= 0);
@@ -1759,8 +1814,8 @@ const 底层公共 = [
 
 // ── 素材(AI 生成,2026-07-17 入库;素材 TAG 与发布 TAG 解耦——素材没变就不用动这里) ──
 
-// ⚠ 与手机系统同步：本轮测试发布 tag=rq0.30。
-const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.30/dist/人妻公寓/素材';
+// ⚠ 与手机系统同步：正式美术统一版发布 tag=rq0.32。
+const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.32/dist/人妻公寓/素材';
 
 function 头像图(名: string): string {
   return `${素材基址}/头像/${名}.webp`;
@@ -2204,6 +2259,16 @@ function 信物门牌(名: string): 门牌 | null {
   return (门牌列表.find(k => 户静态表[k].妻名 === m[1]) ?? null) as 门牌 | null;
 }
 
+type 道具视觉类型 = 'product' | 'evidence' | 'scene' | 'action';
+
+/** 134张道具不再都伪装成同一种商品缩略图：按真实用途进入四套卡片语法。 */
+function 道具视觉信息(配?: 道具配置, 可读信 = false): { 类: 道具视觉类型; 标: string; 图: string } {
+  if (可读信) return { 类: 'evidence', 标: '证物', 图: 'letter' };
+  if (配?.类别 === '特殊场景') return { 类: 'scene', 标: '场景票', 图: 'scene' };
+  if (配 && ['工具', '运作', '药物', '性癖'].includes(配.类别)) return { 类: 'action', 标: '操作', 图: 'tool' };
+  return { 类: 'product', 标: '物品', 图: 配?.类别 === '服饰' ? 'dress' : 'gift' };
+}
+
 const 背包列表 = computed(() =>
   (data.value?.背包 ?? []).map(id => {
     const 配 = 查道具(id);
@@ -2214,6 +2279,7 @@ const 背包列表 = computed(() =>
       id,
       名称: 配?.名称 ?? id,
       描述: 配?.描述 ?? (信门牌 ? '四条线索拼在一起的东西。读它=看清她的裂缝' : ''),
+      视觉: 道具视觉信息(配, !!信门牌),
       // 读信:碎片集齐后的揭晓时刻
       可读信: !!信门牌 && !data.value.户[信门牌]?.妻.裂缝.已确认,
       信门牌,
@@ -2406,6 +2472,13 @@ function 合上信() {
 }
 
 // ── 档案卡:线索列表与裂缝节 ──
+
+const 裂缝证物槽 = [
+  { 标: '垃圾袋', 图: 'trash' },
+  { 标: '监控', 图: 'cctv' },
+  { 标: '邻里口供', 图: 'peep' },
+  { 标: '丈夫酒话', 图: 'favor' },
+] as const;
 
 const 选中线索 = computed(() => {
   const m = 选中门牌.value;
@@ -3458,7 +3531,7 @@ onUnmounted(() => {
       transparent 72%
     ),
     linear-gradient(rgba(255, 250, 245, 0.32), rgba(255, 250, 245, 0.42)),
-    var(--scene-img, none) center / cover no-repeat,
+    var(--scene-img, none) var(--scene-pos, center) / cover no-repeat,
     var(--glass);
   border: 1px solid rgba(255, 255, 255, 0.6);
   border-radius: var(--radius);
@@ -3494,6 +3567,15 @@ onUnmounted(() => {
 .portrait-count-1 .portrait {
   left: 22%;
   width: 78%;
+}
+
+/* 荣耀洞件与背景共用同一张16:9舞台坐标：不能套普通人物槽，否则洞口接触点会随端宽漂移。 */
+.portrait-count-1 .portrait.portrait-glory {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
 }
 
 :global(html.rq-dark) .portrait {
@@ -5075,6 +5157,47 @@ onUnmounted(() => {
   color: var(--ink-soft);
 }
 
+.husband-risk {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: 30px;
+  padding: 0 9px;
+  margin: 7px 0 8px;
+  overflow: hidden;
+  font-size: 0.68em;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(90deg, #5da88f, #d8b66b 50%, #d86c76);
+  border-radius: 9px;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.36);
+}
+
+.husband-risk span {
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  text-shadow: 0 1px 3px rgba(28, 24, 35, 0.34);
+}
+
+.husband-risk span :deep(.ic) {
+  width: 14px;
+  height: 14px;
+}
+
+.risk-needle {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 3px;
+  background: #fff;
+  border-radius: 3px;
+  box-shadow: 0 0 0 2px rgba(29, 26, 36, 0.34), 0 0 8px rgba(255, 255, 255, 0.72);
+  transform: translateX(-50%);
+}
+
 .dsec {
   border-top: 1px dashed var(--line-soft);
   padding: 7px 0 2px;
@@ -5133,6 +5256,60 @@ onUnmounted(() => {
   padding: 8px 11px;
   margin: 6px 0;
   line-height: 1.6;
+}
+
+.clue-board {
+  margin-top: 9px;
+}
+
+.clue-slots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.clue-slot {
+  min-height: 82px;
+  padding: 8px;
+  color: var(--ink-faint);
+  background: linear-gradient(145deg, rgba(222, 215, 200, 0.46), rgba(238, 234, 226, 0.2));
+  border: 1px dashed rgba(89, 80, 70, 0.22);
+  border-radius: 10px;
+}
+
+.clue-slot.found {
+  color: var(--ink);
+  background: linear-gradient(145deg, #fffaf0, #eef6f8);
+  border-style: solid;
+  border-color: rgba(81, 132, 151, 0.3);
+  box-shadow: 0 3px 10px rgba(53, 63, 76, 0.08);
+}
+
+.clue-source {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72em;
+  font-weight: 800;
+  color: #527d91;
+}
+
+.clue-source :deep(.ic) {
+  width: 15px;
+  height: 15px;
+}
+
+.clue-slot p {
+  margin: 6px 0 4px;
+  font-size: 0.73em;
+  line-height: 1.4;
+}
+
+.clue-slot > i {
+  font-family: var(--font-mono);
+  font-size: 0.62em;
+  font-style: normal;
+  opacity: 0.66;
 }
 
 .attire-grid,
@@ -5663,6 +5840,7 @@ onUnmounted(() => {
 }
 
 .ware-pic {
+  position: relative;
   flex: none;
   display: grid;
   place-items: center;
@@ -5674,9 +5852,83 @@ onUnmounted(() => {
 }
 
 .ware-pic img {
+  box-sizing: border-box;
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+.ware-kind {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  color: #fff;
+  background: rgba(35, 31, 46, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 7px;
+  box-shadow: 0 2px 6px rgba(25, 22, 35, 0.2);
+  backdrop-filter: blur(5px);
+}
+
+.ware-kind :deep(.ic) {
+  width: 13px;
+  height: 13px;
+}
+
+.ware-kind-label {
+  display: inline-block;
+  padding: 1px 5px;
+  margin-left: 5px;
+  font-size: 0.68em;
+  font-style: normal;
+  font-weight: 700;
+  color: var(--ink-soft);
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  border-radius: 999px;
+}
+
+.ware-card.ware-product {
+  border-left: 3px solid #d5a86f;
+}
+
+.ware-card.ware-product .ware-pic,
+.ware-card.ware-action .ware-pic {
+  background: linear-gradient(155deg, #fffaf3, #f5eee5);
+}
+
+.ware-card.ware-product .ware-pic img,
+.ware-card.ware-action .ware-pic img {
+  object-fit: contain;
+  padding: 5px;
+}
+
+.ware-card.ware-evidence {
+  border-left: 3px solid #6e93a9;
+  background-image: linear-gradient(90deg, rgba(110, 147, 169, 0.09), transparent 42%);
+}
+
+.ware-card.ware-evidence .ware-pic {
+  background: linear-gradient(145deg, #efe5cf, #d9c8a8);
+  box-shadow: inset 0 0 0 1px rgba(82, 64, 42, 0.12);
+}
+
+.ware-card.ware-scene {
+  border-left: 3px solid #8c73ff;
+  background-image: linear-gradient(90deg, rgba(140, 115, 255, 0.1), transparent 46%);
+}
+
+.ware-card.ware-scene .ware-pic {
+  border-radius: 7px;
+  box-shadow: inset 0 0 0 2px rgba(140, 115, 255, 0.28);
+}
+
+.ware-card.ware-action {
+  border-left: 3px solid #53a98f;
 }
 
 .ware-pic > b {
@@ -5763,6 +6015,18 @@ onUnmounted(() => {
 .cam-row:disabled {
   opacity: 0.55;
   cursor: default;
+}
+
+.cam-room {
+  box-sizing: border-box;
+  flex: none;
+  width: 72px;
+  height: 46px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  border-radius: 7px;
+  filter: saturate(0.72) contrast(1.04);
+  box-shadow: 0 2px 8px rgba(25, 24, 34, 0.18);
 }
 
 .cam-face {
@@ -5924,6 +6188,41 @@ onUnmounted(() => {
   margin: 4px 0 10px;
 }
 
+.truth-fragments {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 5px;
+  margin: 2px 0 8px;
+}
+
+.truth-fragments span {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 34px;
+  font-size: 0.68em;
+  font-weight: 700;
+  color: #6f5738;
+  background: linear-gradient(145deg, #fff9e8, #eadfc4);
+  border: 1px solid rgba(129, 96, 55, 0.25);
+  box-shadow: 0 2px 7px rgba(78, 58, 36, 0.09);
+}
+
+.truth-fragments span:nth-child(odd) {
+  transform: rotate(-1deg);
+}
+
+.truth-fragments span:nth-child(even) {
+  transform: rotate(1deg);
+}
+
+.truth-fragments span :deep(.ic) {
+  width: 15px;
+  height: 15px;
+}
+
 .narr.no-indent {
   text-indent: 0;
 }
@@ -5949,7 +6248,55 @@ onUnmounted(() => {
 }
 
 .chronicle {
-  padding-right: 4px;
+  position: relative;
+  padding: 2px 4px 2px 30px;
+}
+
+.chronicle::before {
+  content: '';
+  position: absolute;
+  top: 9px;
+  bottom: 9px;
+  left: 14px;
+  width: 2px;
+  border-radius: 999px;
+  background: linear-gradient(var(--blue), var(--pink) 48%, var(--yellow));
+  opacity: 0.42;
+}
+
+.chronicle-entry {
+  border: 1px solid color-mix(in srgb, var(--line-soft) 74%, transparent);
+  box-shadow: 0 2px 8px rgba(48, 39, 54, 0.045);
+}
+
+.chronicle-entry.player {
+  border-color: color-mix(in srgb, var(--blue) 32%, var(--line-soft));
+}
+
+.chronicle-mark {
+  position: absolute;
+  top: 9px;
+  left: -27px;
+  z-index: 1;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  color: var(--pink);
+  background: color-mix(in srgb, var(--paper) 94%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pink) 42%, var(--line));
+  border-radius: 50%;
+  box-shadow: 0 2px 6px rgba(42, 31, 47, 0.13);
+}
+
+.chronicle-entry.player .chronicle-mark {
+  color: var(--blue);
+  border-color: color-mix(in srgb, var(--blue) 48%, var(--line));
+}
+
+.chronicle-mark .ic {
+  width: 12px;
+  height: 12px;
 }
 
 /* ═══ 右上角 meta 钮(主题/全屏) ═══ */
@@ -6117,6 +6464,57 @@ onUnmounted(() => {
   color: var(--red);
 }
 
+.rent-ledger {
+  min-width: 126px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 7px;
+  overflow: hidden;
+  color: var(--ink-soft);
+  background: linear-gradient(145deg, color-mix(in srgb, #fff7e9 88%, var(--paper)), color-mix(in srgb, #f1dfc4 58%, var(--paper)));
+  border: 1px solid rgba(153, 100, 47, 0.3);
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+}
+
+.rent-ledger > .ic {
+  width: 22px;
+  height: 22px;
+  color: #a76435;
+}
+
+.rent-ledger span {
+  min-width: 58px;
+  display: flex;
+  flex-direction: column;
+}
+
+.rent-ledger small {
+  color: #91633f;
+  font: 700 0.58em/1.1 var(--font-mono);
+  letter-spacing: 0.08em;
+}
+
+.rent-ledger b {
+  color: var(--ink);
+  font: 800 0.72em/1.2 var(--font-display);
+  white-space: nowrap;
+}
+
+.rent-ledger > i {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  font: 700 7px/1 var(--font-mono);
+  font-style: normal;
+  color: #885226;
+  background: rgba(255, 255, 255, 0.64);
+  border: 1px solid rgba(148, 91, 43, 0.25);
+  border-radius: 4px;
+}
+
 /* ═══ 底部功能 dock(gal 式:大图标+标签,融进背景的悬浮条) ═══ */
 
 .dock {
@@ -6182,13 +6580,32 @@ onUnmounted(() => {
   transform: translateY(-2px);
 }
 
-/* ═══ 描边图标(初星 icon-sprite 语法:24×24 线条,吃 currentColor) ═══ */
+/* ═══ 梧桐里主题图标：暖白珐琅底 + 墨色圆角线 + 荧光小点 ═══ */
 
 .ic {
   width: 16px;
   height: 16px;
-  object-fit: contain;
+  overflow: visible;
   vertical-align: -3px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 1px 1px rgba(62, 49, 76, 0.14));
+}
+
+.ic .ic-plate {
+  fill: rgba(255, 252, 247, 0.72);
+  stroke: currentColor;
+  stroke-width: 0.55;
+  opacity: 0.34;
+}
+
+.ic .ic-gem {
+  fill: var(--pink);
+  stroke: currentColor;
+  stroke-width: 1.25;
 }
 
 .btn.icon {
@@ -6870,6 +7287,19 @@ onUnmounted(() => {
     height: 100%;
   }
 
+  :global(html.rqgy-full) .portrait-count-1 .portrait.portrait-glory {
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 30% center;
+    clip-path: none;
+  }
+
+  :global(html.rqgy-full) .story-glory {
+    --scene-pos: 30% center;
+  }
+
   /* 四人以上保留脸和上半身，比六人挤成一条细立绘更容易辨认。 */
   :global(html.rqgy-full) .portraits-many .portrait {
     object-fit: cover;
@@ -6926,6 +7356,21 @@ onUnmounted(() => {
 
   .battery .cells {
     height: 7px;
+  }
+
+  .rent-ledger {
+    min-width: 34px;
+    padding: 3px 5px;
+  }
+
+  .rent-ledger > .ic {
+    width: 19px;
+    height: 19px;
+  }
+
+  .rent-ledger span,
+  .rent-ledger > i {
+    display: none;
   }
 
   /* 头像行:52→40px */
