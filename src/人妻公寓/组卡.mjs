@@ -107,7 +107,7 @@ for (const 组 of index.条目) {
 if (!开场白) throw new Error('未找到 [开场白] 条目');
 
 // ── 资源走 jsdelivr(手机友好;〔待用户拍板〕首个内测 tag 名,推送后此处生效) ──
-const TAG = 'rq0.33';
+const TAG = 'rq0.34';
 const BASE = `https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@${TAG}`;
 
 const 加载块 = url => "```\n<body>\n<script>\n$('body').load('" + url + "')\n</script>\n</body>\n```";
@@ -201,7 +201,7 @@ const tavern_helper = {
 
 // ── 卡体 ──
 const 卡名 = '人妻公寓';
-const 版本 = '0.29';
+const 版本 = '0.34';
 const data = {
   name: 卡名,
   description: '',
@@ -209,7 +209,7 @@ const data = {
   scenario: '',
   first_mes: '<StatusPlaceHolderImpl/>',
   mes_example: '',
-  creator_notes: `人妻公寓 v${版本} 内测组包(P3-P5综合测试版)。需酒馆助手(tavern_helper)启用。开局:0楼即游戏界面,选难度→接父亲电话进入到任首日;酒馆输入框不用,输入走游戏内。`,
+  creator_notes: `人妻公寓 v${版本} 测试版。需安装最新版酒馆助手，并启用卡内 MVU 与提示词模板；数据库为可选增强。首次进入会显示安装清单，数据库玩家可按“手机→我→安装/更新本游戏表”完成四张 RQ_ 表。开局：0楼进入游戏界面，选难度→接父亲电话进入到任首日；输入走游戏内。`,
   system_prompt: '',
   post_history_instructions: '',
   tags: ['人妻公寓'],

@@ -142,6 +142,75 @@
         </div>
       </div>
 
+      <!-- ═══════════ rq0.34 首次游玩准备：第一次进卡自动出现，标题页可随时重开 ═══════════ -->
+      <div v-if="首次说明开" class="mask setup-mask" @click.self="首次说明开 = false">
+        <div class="sheet setup-sheet">
+          <button class="sheet-close" @click="首次说明开 = false">✕</button>
+          <div class="ui-kicker">FIRST RUN / 首次游玩准备</div>
+          <h3 class="setup-title">先把四件事准备好</h3>
+          <p class="setup-lead">照顺序检查一次即可。数据库是增强项，不安装也能正常游玩。</p>
+
+          <div class="setup-statuses">
+            <span :class="{ on: 脚本存活 }"
+              ><i>{{ 脚本存活 ? '✓' : '!' }}</i
+              >游戏脚本</span
+            >
+            <span :class="{ on: 数据库检测.已安装 }"
+              ><i>{{ 数据库检测.已安装 ? '✓' : '·' }}</i
+              >数据库插件</span
+            >
+            <span :class="{ on: 数据库检测.已装游戏模板 }"
+              ><i>{{ 数据库检测.已装游戏模板 ? '✓' : '·' }}</i
+              >人妻公寓表</span
+            >
+          </div>
+
+          <ol class="setup-steps">
+            <li class="required">
+              <b><em>1</em>安装角色卡与运行环境</b>
+              <p>
+                导入角色卡后，安装并启用最新版【酒馆助手】，并确认角色卡自带的 MVU
+                脚本已启用。若首页底部“游戏逻辑脚本”显示红色，先刷新页面并检查脚本。
+              </p>
+            </li>
+            <li class="required">
+              <b><em>2</em>启用【提示词模板】插件</b>
+              <p>提示词模板必须开启；如果装有【小白X】，请先关闭，避免两套注入同时工作造成正文或变量异常。</p>
+            </li>
+            <li>
+              <b><em>3</em>安装【数据库插件】（推荐）</b>
+              <p>
+                数据库负责长期人物记忆、承诺伏笔和社交轨迹。安装或更新插件后请刷新酒馆；不使用数据库时，游戏会自动改用正文
+                API。
+              </p>
+            </li>
+            <li>
+              <b><em>4</em>安装人妻公寓数据库模板</b>
+              <p>
+                进入游戏后打开底部【手机】→【我】，保持“自动（数据库优先）”，点击【安装/更新本游戏表】。需要给手机单独选模型时，再点【配置手机专用模型】并保存。
+              </p>
+              <div class="setup-db-actions">
+                <button class="btn mini" @click="刷新数据库检测">重新检测</button>
+                <button
+                  class="btn mini rite"
+                  :disabled="!数据库检测.已安装 || 安装模板中"
+                  @click="从说明安装数据库模板"
+                >
+                  {{ 安装模板中 ? '安装中…' : 数据库检测.已装游戏模板 ? '更新本游戏表' : '现在安装本游戏表' }}
+                </button>
+              </div>
+              <small v-if="!数据库检测.已安装">当前未检测到数据库；可以先关闭说明正常开始游戏。</small>
+              <small v-else-if="数据库检测.已装游戏模板" class="good">已检测到四张 RQ_ 表，可以开始游戏。</small>
+            </li>
+          </ol>
+
+          <div class="setup-foot">
+            <p>以后可在序章首页点“首次游玩说明”再次查看。</p>
+            <button class="btn rite" @click="完成首次说明">我已看完，回到首页</button>
+          </div>
+        </div>
+      </div>
+
       <!-- ═══════════ 数据未就绪 ═══════════ -->
       <template v-if="!就绪">
         <div class="hint center">……楼道的声控灯还没亮(等待存档数据)……</div>
@@ -182,6 +251,10 @@
               <button class="plaque main" :disabled="发送中" @click="难度展开 = true">
                 <span class="pl-main">开始游戏</span>
                 <span class="pl-sub">START</span>
+              </button>
+              <button class="plaque setup-entry" @click="打开首次说明">
+                <span class="pl-main">首次游玩说明</span>
+                <span class="pl-sub">INSTALL &amp; DATABASE</span>
               </button>
               <button class="plaque" @click="设置开 = true">
                 <span class="pl-main">设置</span>
@@ -257,9 +330,15 @@
               <b>{{ Math.round(data.风闻) }}</b>
             </div>
           </div>
-          <div v-if="欠租账.length" class="rent-ledger" :title="欠租账.map(项 => `${项.门牌} ${项.妻名}:${项.笔数}笔`).join('；')">
+          <div
+            v-if="欠租账.length"
+            class="rent-ledger"
+            :title="欠租账.map(项 => `${项.门牌} ${项.妻名}:${项.笔数}笔`).join('；')"
+          >
             <Ic n="book" />
-            <span><small>待收租</small><b>{{ 欠租账.length }}户 / {{ 欠租总笔数 }}笔</b></span>
+            <span
+              ><small>待收租</small><b>{{ 欠租账.length }}户 / {{ 欠租总笔数 }}笔</b></span
+            >
             <i v-for="项 in 欠租账" :key="项.门牌" :title="`${项.门牌} ${项.妻名}`">{{ 项.门牌 }}</i>
           </div>
         </div>
@@ -707,7 +786,13 @@
                 ><b>{{ 轴.名 }}</b
                 ><i>{{ Math.round(轴.值) }}</i></span
               >
-              <div class="axis dossier-battery" role="meter" aria-valuemin="0" aria-valuemax="100" :aria-valuenow="轴.值">
+              <div
+                class="axis dossier-battery"
+                role="meter"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                :aria-valuenow="轴.值"
+              >
                 <i class="axis-charge" :class="轴.类" :style="{ '--level': `${Math.max(0, Math.min(100, 轴.值))}%` }" />
               </div>
             </div>
@@ -802,10 +887,7 @@
                     left:
                       Math.max(
                         5,
-                        Math.min(
-                          95,
-                          (选中档案.夫.疑心值 / Math.max(1, 选中档案.夫.疑心值 + 选中档案.夫.信任值)) * 100,
-                        ),
+                        Math.min(95, (选中档案.夫.疑心值 / Math.max(1, 选中档案.夫.疑心值 + 选中档案.夫.信任值)) * 100),
                       ) + '%',
                   }"
                 />
@@ -885,7 +967,9 @@
                 <span class="ware-kind"><Ic :n="项.视觉.图" /></span>
               </span>
               <span class="ware-main">
-                <b class="ware-name">{{ 项.名称 }} <em class="ware-kind-label">{{ 项.视觉.标 }}</em></b>
+                <b class="ware-name"
+                  >{{ 项.名称 }} <em class="ware-kind-label">{{ 项.视觉.标 }}</em></b
+                >
                 <span class="ware-desc">{{ 项.描述 }}</span>
               </span>
               <span class="ware-acts">
@@ -1133,6 +1217,7 @@ import {
   type 门牌,
 } from '../../stageConfig';
 import { 丈夫在楼, 妻位置推算, 当前天数, 当前时段 } from '../../脚本/游戏逻辑/楼层时钟';
+import { 安装人妻公寓数据库模板, 数据库状态 } from '../../脚本/游戏逻辑/数据库桥';
 import { 查金币 } from '../../脚本/游戏逻辑/经济系统';
 import { 可晋阶 } from '../../脚本/游戏逻辑/结算系统';
 import { useDataStore } from './store';
@@ -1164,16 +1249,20 @@ const 图标库: Record<string, string> = {
   ops: '<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle class="ic-gem" cx="16" cy="7" r="2"/><circle class="ic-gem" cx="8" cy="17" r="2"/>',
   tool: '<path d="m14.7 6.3 3-3a4.2 4.2 0 0 1-5.2 5.2L5 16l3 3 7.5-7.5a4.2 4.2 0 0 1 5.2-5.2l-3 3"/><path d="m4 17 3 3"/>',
   gift: '<rect x="3" y="9" width="18" height="12" rx="2"/><path d="M12 9v12M2 9h20V5H2Z"/><path d="M12 5c-1.6 0-5-.2-5-2.1C7 1.6 8.2 1 9.2 1 11 1 12 5 12 5Zm0 0c1.6 0 5-.2 5-2.1C17 1.6 15.8 1 14.8 1 13 1 12 5 12 5Z"/>',
-  letter: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/><path class="ic-gem" d="m15.5 15.5 2 2 3.5-4"/>',
-  search: '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/><path class="ic-gem" d="M8 10h5M10.5 7.5v5"/>',
+  letter:
+    '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/><path class="ic-gem" d="m15.5 15.5 2 2 3.5-4"/>',
+  search:
+    '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/><path class="ic-gem" d="M8 10h5M10.5 7.5v5"/>',
   rewind: '<path d="m11 7-5 5 5 5"/><path d="M6 12h7a6 6 0 0 1 6 6v1"/>',
   dice: '<rect x="3" y="3" width="18" height="18" rx="5"/><circle class="ic-gem" cx="8" cy="8" r="1"/><circle class="ic-gem" cx="16" cy="8" r="1"/><circle class="ic-gem" cx="12" cy="12" r="1"/><circle class="ic-gem" cx="8" cy="16" r="1"/><circle class="ic-gem" cx="16" cy="16" r="1"/>',
   dress: '<path d="M9 3h6l1 5-2 2 5 11H5l5-11-2-2 1-5Z"/><path class="ic-gem" d="M9 3c.5 2 5.5 2 6 0"/>',
   drug: '<path d="M8.5 4.5a4.2 4.2 0 0 1 6 0l5 5a4.2 4.2 0 0 1-6 6l-5-5a4.2 4.2 0 0 1 0-6Z"/><path d="m10 12 6-6"/><path class="ic-gem" d="M6 17h5M8.5 14.5v5"/>',
-  favor: '<path d="M20.8 5.7c-1.8-2.1-5.1-1.8-6.8.4L12 8.5l-2-2.4C8.3 3.9 5 3.6 3.2 5.7 1.5 7.7 1.8 10.6 3.8 12.4L12 20l8.2-7.6c2-1.8 2.3-4.7.6-6.7Z"/><path class="ic-gem" d="M8 12h2l1-2 2 5 1-3h2"/>',
+  favor:
+    '<path d="M20.8 5.7c-1.8-2.1-5.1-1.8-6.8.4L12 8.5l-2-2.4C8.3 3.9 5 3.6 3.2 5.7 1.5 7.7 1.8 10.6 3.8 12.4L12 20l8.2-7.6c2-1.8 2.3-4.7.6-6.7Z"/><path class="ic-gem" d="M8 12h2l1-2 2 5 1-3h2"/>',
   kink: '<path d="M12 21a9 9 0 1 1 9-9c0 4-3 6-6 6-2.8 0-5-1.7-5-4 0-2 1.5-3.5 3.5-3.5 1.6 0 2.8 1 2.8 2.5 0 1.1-.8 2-1.8 2"/><circle class="ic-gem" cx="12" cy="4.5" r="1"/>',
   peep: '<path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6S2 12 2 12Z"/><path d="M12 9a3 3 0 1 1-1.2 5.8"/><path class="ic-gem" d="m12 12 5-5"/>',
-  scene: '<path d="M3 8h18v12H3Z"/><path d="M3 8 5 3h16l-2 5M8 3 6 8M14 3l-2 5M20 3l-2 5"/><path class="ic-gem" d="m10 12 5 2.5-5 2.5Z"/>',
+  scene:
+    '<path d="M3 8h18v12H3Z"/><path d="M3 8 5 3h16l-2 5M8 3 6 8M14 3l-2 5M20 3l-2 5"/><path class="ic-gem" d="m10 12 5 2.5-5 2.5Z"/>',
 };
 
 // 功能图标完全代码原生化：不再先加载混合风格位图，也不会因 CDN 失败换一套视觉语言。
@@ -1266,9 +1355,7 @@ async function 写场景(房间id: string | null, 破门 = false): Promise<void>
   const 新轨迹 = 旧房间 === 房间id ? 旧轨迹 : [...旧轨迹, `从${从}走到${到}`].slice(-8);
   await insertOrAssignVariables(
     {
-      _场景: 房间id
-        ? { 房间id, 破门, 进房末楼: 进房末楼.value, 由头已用: 本次入房由头已用.value }
-        : null,
+      _场景: 房间id ? { 房间id, 破门, 进房末楼: 进房末楼.value, 由头已用: 本次入房由头已用.value } : null,
       _粘滞: null, // 玩家一走动就解除旧对话固定；重回同一房间也不能把已经离开的人“复活”
       _地图轨迹: 新轨迹,
     },
@@ -1351,12 +1438,7 @@ const 需要由头 = computed(() => {
   const 节 = data.value?.户[id];
   // 2026-07-20 用户加码:裂缝破解只是"看清她",她真进了下个阶段(≥1)才算有登门的名分——
   // 刚读完信还停阶段0的,上门照样要工具由头
-  return (
-    Boolean(节) &&
-    !(节!.妻.裂缝.已确认 && 节!.妻.当前阶段 >= 1) &&
-    !已破门进入.value &&
-    !本次入房由头已用.value
-  );
+  return Boolean(节) && !(节!.妻.裂缝.已确认 && 节!.妻.当前阶段 >= 1) && !已破门进入.value && !本次入房由头已用.value;
 });
 
 const 可用由头 = computed(() => {
@@ -1826,8 +1908,8 @@ const 底层公共 = [
 
 // ── 素材(AI 生成,2026-07-17 入库;素材 TAG 与发布 TAG 解耦——素材没变就不用动这里) ──
 
-// ⚠ 与手机系统同步：Discord 测试版发布 tag=rq0.33。
-const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.33/dist/人妻公寓/素材';
+// ⚠ 与手机系统同步：Discord 测试版发布 tag=rq0.34。
+const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.34/dist/人妻公寓/素材';
 
 function 头像图(名: string): string {
   return `${素材基址}/头像/${名}.webp`;
@@ -2450,7 +2532,10 @@ async function 选垃圾袋(门牌号: 门牌) {
   垃圾选择开.value = false;
   const 变量 = getVariables({ type: 'chat' });
   const 旧轨迹 = (_.get(变量, '_地图轨迹') as string[] | undefined) ?? [];
-  await insertOrAssignVariables({ _地图轨迹: [...旧轨迹, `在垃圾房翻查${门牌号}室的垃圾`].slice(-8) }, { type: 'chat' });
+  await insertOrAssignVariables(
+    { _地图轨迹: [...旧轨迹, `在垃圾房翻查${门牌号}室的垃圾`].slice(-8) },
+    { type: 'chat' },
+  );
   翻(门牌号);
 }
 
@@ -2929,6 +3014,50 @@ function 切换主题() {
 const 设置开 = ref(false);
 const 设置存储键 = '人妻公寓_界面偏好';
 
+// rq0.34：首次进入序章时主动说明安装顺序；按版本换键，让旧玩家升级后也能看到一次。
+const 首次说明开 = ref(false);
+const 首次说明存储键 = '人妻公寓_首次游玩说明_rq034';
+const 数据库检测 = ref(数据库状态());
+const 安装模板中 = ref(false);
+
+function 刷新数据库检测() {
+  数据库检测.value = 数据库状态();
+}
+
+function 打开首次说明() {
+  刷新数据库检测();
+  首次说明开.value = true;
+}
+
+function 完成首次说明() {
+  try {
+    localStorage.setItem(首次说明存储键, '1');
+  } catch {
+    /* 隐私模式下本次关闭仍然有效，下次刷新重新提示。 */
+  }
+  首次说明开.value = false;
+}
+
+async function 从说明安装数据库模板() {
+  刷新数据库检测();
+  if (!数据库检测.value.已安装) {
+    弹提示('未检测到数据库插件。安装并刷新酒馆后，再回来重新检测。', 5000);
+    return;
+  }
+  const 宿主 = window.parent ?? window;
+  if (!宿主.confirm('将《人妻公寓》的四张 RQ_ 表合并到当前聊天，并保留其他作者的表与已有数据。确定继续吗？')) return;
+  安装模板中.value = true;
+  try {
+    const result = await 安装人妻公寓数据库模板();
+    刷新数据库检测();
+    宿主.alert(result.message || (result.success ? '人妻公寓数据库表安装完成。' : '数据库表安装失败。'));
+  } catch (error) {
+    宿主.alert(`数据库表安装失败：${error instanceof Error ? error.message : String(error)}`);
+  } finally {
+    安装模板中.value = false;
+  }
+}
+
 /** 主题三档:日间 / 夜间 / 跟随游戏时段 */
 const 主题模式 = ref<'日间' | '夜间' | '跟随'>('日间');
 /** 正文字号档 */
@@ -3234,6 +3363,16 @@ onMounted(() => {
 
   // 恢复界面偏好(主题三档/字号/垫板/省流/减动效)
   恢复设置();
+
+  // rq0.34 首次准备说明：只在序章自动出现；明确点“我已看完”后记住。
+  // 使用版本化键，保证从旧版升级的玩家也能看到新增的数据库模板步骤。
+  if (!data.value?.系统?._序章完成) {
+    try {
+      if (localStorage.getItem(首次说明存储键) !== '1') setTimeout(打开首次说明, 0);
+    } catch {
+      setTimeout(打开首次说明, 0);
+    }
+  }
 
   // 手机端默认全屏画幅(2026-07-19 用户拍板:移动端适配已达标,直接以全屏模式起步)。
   // 走 CSS 画幅而非 Fullscreen API——后者没有用户手势会被浏览器拒;右上角全屏钮仍可切真全屏
@@ -3874,7 +4013,10 @@ onUnmounted(() => {
   font: 600 0.62em/1.35 var(--font-mono);
   opacity: 0;
   cursor: pointer;
-  transition: opacity 0.2s, color 0.2s, border-color 0.2s;
+  transition:
+    opacity 0.2s,
+    color 0.2s,
+    border-color 0.2s;
 }
 
 .story-entry:hover .entry-edit,
@@ -4220,7 +4362,11 @@ onUnmounted(() => {
   border-radius: 12px;
   background: color-mix(in srgb, var(--paper) 92%, transparent);
   color: var(--ink);
-  font: 12px/1.65 ui-monospace, SFMono-Regular, Consolas, monospace;
+  font:
+    12px/1.65 ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
 }
 
 .toast {
@@ -5280,7 +5426,9 @@ onUnmounted(() => {
   width: 3px;
   background: #fff;
   border-radius: 3px;
-  box-shadow: 0 0 0 2px rgba(29, 26, 36, 0.34), 0 0 8px rgba(255, 255, 255, 0.72);
+  box-shadow:
+    0 0 0 2px rgba(29, 26, 36, 0.34),
+    0 0 8px rgba(255, 255, 255, 0.72);
   transform: translateX(-50%);
 }
 
@@ -5523,6 +5671,167 @@ onUnmounted(() => {
   margin-top: 3px;
 }
 
+/* ═══ rq0.34 首次游玩准备：安装清单 + 数据库模板状态 ═══ */
+
+.sheet.setup-sheet {
+  width: min(520px, 96%);
+  max-height: 94%;
+  padding: 17px 18px 15px;
+  background: linear-gradient(145deg, rgba(255, 247, 239, 0.94), rgba(245, 250, 255, 0.96)), #fff;
+}
+
+.setup-title {
+  margin: 3px 0 4px;
+  color: var(--ink);
+  font-size: 1.16em;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.setup-lead {
+  margin: 0 0 10px;
+  color: var(--ink-soft);
+  font-size: 0.76em;
+  line-height: 1.55;
+}
+
+.setup-statuses {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.setup-statuses span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 7px 8px;
+  color: var(--ink-faint);
+  background: rgba(36, 33, 38, 0.06);
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  font-size: 0.67em;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.setup-statuses span i {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: #fff;
+  background: #9b98a2;
+  font-style: normal;
+}
+
+.setup-statuses span.on {
+  color: #287a50;
+  background: rgba(69, 190, 126, 0.1);
+  border-color: rgba(69, 190, 126, 0.28);
+}
+
+.setup-statuses span.on i {
+  background: #39a86f;
+}
+
+.setup-steps {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.setup-steps li {
+  position: relative;
+  padding: 9px 10px 9px 44px;
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(40, 34, 48, 0.05);
+}
+
+.setup-steps li.required {
+  border-left: 3px solid var(--pink);
+}
+
+.setup-steps b {
+  display: block;
+  color: var(--ink);
+  font-size: 0.8em;
+  line-height: 1.4;
+}
+
+.setup-steps b em {
+  position: absolute;
+  left: 11px;
+  top: 10px;
+  width: 23px;
+  height: 23px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: linear-gradient(145deg, var(--pink), #f08e66);
+  border-radius: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.78em;
+  font-style: normal;
+  box-shadow: 0 3px 8px rgba(255, 79, 154, 0.24);
+}
+
+.setup-steps p {
+  margin: 3px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.71em;
+  line-height: 1.55;
+}
+
+.setup-steps small {
+  display: block;
+  margin-top: 6px;
+  color: #a45e28;
+  font-size: 0.67em;
+  line-height: 1.4;
+}
+
+.setup-steps small.good {
+  color: #287a50;
+}
+
+.setup-db-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.setup-db-actions .btn {
+  flex: 1;
+}
+
+.setup-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 11px;
+}
+
+.setup-foot p {
+  flex: 1;
+  margin: 0;
+  color: var(--ink-faint);
+  font-size: 0.67em;
+  line-height: 1.4;
+}
+
+.setup-foot .btn {
+  flex: none;
+}
+
 /* 分段选择器 */
 .seg {
   display: flex;
@@ -5690,7 +5999,9 @@ onUnmounted(() => {
   border-radius: 13px;
   cursor: pointer;
   box-shadow: 0 5px 14px rgba(15, 15, 22, 0.18);
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
 }
 
 .garbage-tile:hover {
@@ -6558,7 +6869,11 @@ onUnmounted(() => {
   padding: 4px 7px;
   overflow: hidden;
   color: var(--ink-soft);
-  background: linear-gradient(145deg, color-mix(in srgb, #fff7e9 88%, var(--paper)), color-mix(in srgb, #f1dfc4 58%, var(--paper)));
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, #fff7e9 88%, var(--paper)),
+    color-mix(in srgb, #f1dfc4 58%, var(--paper))
+  );
   border: 1px solid rgba(153, 100, 47, 0.3);
   border-radius: 10px;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6);
@@ -6820,6 +7135,21 @@ onUnmounted(() => {
 
 .plaque.main .pl-main {
   color: #b03a6a;
+}
+
+.plaque.setup-entry {
+  min-height: 48px;
+  background: linear-gradient(90deg, rgba(255, 249, 237, 0.92), rgba(242, 250, 255, 0.92)), rgba(255, 250, 242, 0.9);
+  border: 1px solid rgba(255, 212, 124, 0.5);
+}
+
+.plaque.setup-entry .pl-main {
+  color: #7b5a24;
+  font-size: 0.9em;
+}
+
+.plaque.setup-entry .pl-sub {
+  color: #8c8068;
 }
 
 /* 难度木牌:横排(名+说明+金额) */
@@ -7288,6 +7618,21 @@ onUnmounted(() => {
   border-color: rgba(255, 255, 255, 0.1);
 }
 
+:global(html.rq-dark) .sheet.setup-sheet {
+  background: linear-gradient(145deg, rgba(49, 43, 50, 0.98), rgba(34, 40, 54, 0.98));
+}
+
+:global(html.rq-dark) .setup-steps li,
+:global(html.rq-dark) .setup-statuses span {
+  background: rgba(255, 255, 255, 0.055);
+  border-color: rgba(255, 255, 255, 0.09);
+}
+
+:global(html.rq-dark) .setup-statuses span.on {
+  background: rgba(69, 190, 126, 0.1);
+  border-color: rgba(69, 190, 126, 0.24);
+}
+
 :global(html.rq-dark) .sheet.dossier {
   background: linear-gradient(180deg, rgba(45, 43, 59, 0.99), rgba(34, 38, 53, 0.99));
 }
@@ -7397,6 +7742,61 @@ onUnmounted(() => {
 
   .page {
     padding: 4px 7px 6px;
+  }
+
+  .setup-mask {
+    padding: 6px;
+  }
+
+  .sheet.setup-sheet {
+    width: 100%;
+    max-height: 98%;
+    padding: 13px 11px 11px;
+    border-radius: 14px;
+  }
+
+  .setup-statuses {
+    gap: 4px;
+  }
+
+  .setup-statuses span {
+    justify-content: center;
+    padding: 6px 3px;
+    font-size: 0.61em;
+  }
+
+  .setup-statuses span i {
+    width: 16px;
+    height: 16px;
+  }
+
+  .setup-steps {
+    gap: 5px;
+  }
+
+  .setup-steps li {
+    padding: 7px 8px 7px 38px;
+  }
+
+  .setup-steps b em {
+    left: 8px;
+    top: 8px;
+    width: 21px;
+    height: 21px;
+  }
+
+  .setup-steps p {
+    font-size: 0.68em;
+  }
+
+  .setup-foot {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .setup-foot p {
+    text-align: center;
   }
 
   /* 题头:kicker 行整行让位,标题缩一号 */
