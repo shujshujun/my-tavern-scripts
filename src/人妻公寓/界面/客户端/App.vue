@@ -187,7 +187,7 @@
             <li>
               <b><em>4</em>安装人妻公寓数据库模板</b>
               <p>
-                进入游戏后打开底部【手机】→【我】，保持“自动（数据库优先）”，点击【安装/更新本游戏表】。需要给手机单独选模型时，再点【配置手机专用模型】并保存。
+                进入游戏后打开底部【手机】→【我】，保持“自动（数据库优先）”，点击【安装/更新本游戏表】。需要给手机单独选模型时，展开【手机专用模型（自定义API）】，填写地址与Key后点【读取API模型】并保存。
               </p>
               <div class="setup-db-actions">
                 <button class="btn mini" @click="刷新数据库检测">重新检测</button>
@@ -2728,6 +2728,21 @@ function 过酒馆正则(文本: string, 来源: 'ai_output' | 'user_input', 深
 
 function 清洗(原文: string, 流式 = false): string {
   const 闭合清 = 原文
+    // content 包裹型预设：正文边界明确时只显示 content，兼容思考标签开闭名称不一致。
+    // 未闭合 content 也只裁掉前缀，保留其后的正文；流式生成时同样不会露出思考区。
+    .replace(/^[\s\S]*?<content\b[^>]*>/i, '')
+    .replace(/<\/content\s*>[\s\S]*$/i, '')
+    .replace(/【开始思考】[\s\S]*?<\/think_fox~\s*>/gi, '')
+    .replace(/<fox_selc\b[^>]*>[\s\S]*?<\/fox_selc\s*>/gi, '')
+    .replace(/<fox_tip\b[^>]*>[\s\S]*?<\/fox_tip\s*>/gi, '')
+    .replace(/<\/?(?:content|think_fox~|fox_selc|fox_tip)(?:\s[^>]*)?>/gi, '')
+    // 兼容漏写 </draft_notes> 的玩家预设：只在后续完整 bginfor 提供可靠边界时整块删除。
+    // 没有可靠边界时只剥标签，避免重演“清洗吞尾导致整段正文消失”。
+    .replace(/<draft_notes\b[^>]*>[\s\S]*?<bginfor\b[^>]*>[\s\S]*?<\/bginfor\s*>/gi, '')
+    .replace(/<draft_notes\b[^>]*>[\s\S]*?<\/draft_notes\s*>/gi, '')
+    .replace(/<bginfor\b[^>]*>[\s\S]*?<\/bginfor\s*>/gi, '')
+    .replace(/<CEstuff\b[^>]*>[\s\S]*?<\/CEstuff\s*>/gi, '')
+    .replace(/<\/?(?:draft_notes|bginfor|CEstuff)\b[^>]*>/gi, '')
     .replace(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/g, '')
     .replace(/<StatusPlaceHolderImpl\/>/g, '')
     // 预设的摘要/折叠块(<details>)只藏不删:楼层原文保留给 AI 与预设当记忆,显示层吞掉
@@ -2743,6 +2758,8 @@ function 清洗(原文: string, 流式 = false): string {
     .replace(/<!DOCTYPE[\s\S]*?<\/html\s*>/gi, '')
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    // 兼容玩家预设用作换行但没有闭合的裸 <p>；旧档里已经落下的同类标签也在显示时修复。
+    .replace(/<\/?p(?:\s[^>]*)?>/gi, '\n')
     // 玩家预设夹带的包装 div(2026-07-19,同脚本侧):konata-thinking-wrapper/tucao-w 等
     // 空壳或漏闭合裸 div 剥壳(内容保留;对旧档已污染楼层同样生效)
     .replace(/<\/?div[^>]*>/gi, '');

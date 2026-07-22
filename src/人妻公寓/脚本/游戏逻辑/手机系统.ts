@@ -7,14 +7,7 @@ import { 妻状态包 } from './snapshotSystem';
 import { 捕获保护快照 } from './守护系统';
 import { 姐妹群成员, 雌竞火气, 雌竞资格, 读余波, 标余波, 余波缓冲楼 } from './雌竞系统';
 import { Schema } from '../../schema';
-import {
-  安装人妻公寓数据库模板,
-  打开数据库界面,
-  打开数据库设置,
-  读取数据库API预设名,
-  数据库状态,
-  通过数据库生成,
-} from './数据库桥';
+import { 安装人妻公寓数据库模板, 打开数据库界面, 数据库状态, 通过数据库生成 } from './数据库桥';
 
 /**
  * 手机系统(P4:手机开机即微信,2026-07-18 用户拍板——不做主屏与独立App,
@@ -102,7 +95,6 @@ type 手机AI来源 = '自动' | '数据库' | '正文' | '自定义';
 
 interface 手机配置 {
   ai来源: 手机AI来源;
-  数据库预设: string;
   数据库失败回退: boolean;
   base: string;
   key: string;
@@ -115,7 +107,6 @@ const 配置KEY = '人妻公寓_手机配置';
 function 读配置(): 手机配置 {
   const 默认: 手机配置 = {
     ai来源: '自动',
-    数据库预设: '',
     数据库失败回退: false,
     base: '',
     key: '',
@@ -129,7 +120,11 @@ function 读配置(): 手机配置 {
       const 旧 = JSON.parse(raw) as Partial<手机配置>;
       // 0.27 及以前只有独立 API 三件套；已有完整配置的玩家迁移后继续走自定义 API。
       const 迁移来源: 手机AI来源 = 旧.ai来源 ?? (旧.base && 旧.key && 旧.model ? '自定义' : '自动');
-      return { ...默认, ...旧, ai来源: 迁移来源 };
+      return {
+        ...默认,
+        ...旧,
+        ai来源: 迁移来源,
+      };
     }
   } catch {
     /* 读取失败走默认 */
@@ -292,7 +287,7 @@ async function 小生成(系统提示: string, 用户提示: string): Promise<st
           { role: 'system', content: 系统提示 },
           { role: 'user', content: 用户提示 },
         ],
-        c.数据库预设,
+        '',
         600,
       );
       const 文 = 净化消息(String(原 ?? ''));
@@ -657,7 +652,8 @@ const 手机图标路径: Record<string, string> = {
   resize: '<path d="M8 3H3v5M16 21h5v-5M3 8l6-6M21 16l-6 6"/>',
   gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/>',
   chat: '<path d="M21 12a8 8 0 0 1-8 8H6l-4 2 1.3-4A9 9 0 1 1 21 12Z"/><path d="M8 11h8M8 15h5"/>',
-  moments: '<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="m4 17 5-4 3 2 3-4 5 6"/>',
+  moments:
+    '<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="m4 17 5-4 3 2 3-4 5 6"/>',
   me: '<circle cx="12" cy="8" r="4"/><path d="M4.5 21a7.5 7.5 0 0 1 15 0"/>',
   lock: '<rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
   no: '<path d="m6 6 12 12M18 6 6 18"/>',
@@ -809,7 +805,7 @@ const 手机CSS = `
 #${ROOT_ID} .rqp-call .acts button{width:60px;height:60px;border-radius:50%;border:none;font-size:24px;cursor:pointer;color:#fff;}
 #${ROOT_ID} .rqp-call .acts .ok{background:#07c160;}
 #${ROOT_ID} .rqp-call .acts .no{background:#fa5151;}
-#${ROOT_ID} .rqp-set{padding:16px;display:flex;flex-direction:column;gap:10px;background:#fff;height:100%;}
+#${ROOT_ID} .rqp-set{padding:16px 16px max(18px,env(safe-area-inset-bottom));display:flex;flex:1;min-height:0;flex-direction:column;gap:10px;background:#fff;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;}
 #${ROOT_ID} .rqp-set .rqp-api-section{display:flex;flex-direction:column;gap:10px;}
 #${ROOT_ID} .rqp-set .custom-api-fields{display:flex;flex-direction:column;gap:10px;}
 #${ROOT_ID} .rqp-set .toggle-custom{text-align:left;width:100%;}
@@ -819,14 +815,15 @@ const 手机CSS = `
 #${ROOT_ID} .rqp-set button:not(.save){border:1px solid #d4d4d4;border-radius:6px;background:#f5f5f5;color:#333!important;-webkit-text-fill-color:#333!important;padding:7px 10px;cursor:pointer;font-size:12px;font-family:inherit;font-weight:500;}
 #${ROOT_ID} .rqp-set button:not(.save):hover{background:#eaeaea;border-color:#bdbdbd;}
 #${ROOT_ID} .rqp-set button:disabled{color:#777!important;-webkit-text-fill-color:#777!important;opacity:.7;cursor:default;}
-#${ROOT_ID} .rqp-set .save{border:none;border-radius:6px;background:#07c160;color:#fff!important;-webkit-text-fill-color:#fff!important;padding:8px;cursor:pointer;font-size:13px;}
-#${ROOT_ID} .rqp-set .credit{font-size:10px;color:#707070!important;-webkit-text-fill-color:#707070!important;margin-top:auto;line-height:1.6;}
+#${ROOT_ID} .rqp-set .save{position:sticky;bottom:0;z-index:2;flex:none;border:none;border-radius:6px;background:#07c160;color:#fff!important;-webkit-text-fill-color:#fff!important;padding:9px;cursor:pointer;font-size:13px;box-shadow:0 -7px 12px rgba(255,255,255,.92);}
+#${ROOT_ID} .rqp-set .credit{font-size:10px;color:#707070!important;-webkit-text-fill-color:#707070!important;margin-top:4px;line-height:1.6;}
 `;
 
 function 头像块(名: string): string {
   const 丈夫名 = new Set(门牌列表.map(m => 户静态表[m].夫名).filter(Boolean));
   const 文件 = 名 === '父亲' || 丈夫名.has(名) ? '影子' : 名; // 五夫+父亲=柯南影子头像(设计拍板共用)
-  const 语义框 = 文件 === '主角' ? ' avatar-main' : 文件 === '影子' ? ' avatar-shadow' : 文件 === '群' ? ' avatar-group' : '';
+  const 语义框 =
+    文件 === '主角' ? ' avatar-main' : 文件 === '影子' ? ' avatar-shadow' : 文件 === '群' ? ' avatar-group' : '';
   return `<span class="rqp-ava${语义框}"><img src="${素材基址}/头像/${文件}.webp" onerror="this.remove();this.parentElement.textContent='${名[0] ?? '?'}'"/></span>`;
 }
 
@@ -1484,14 +1481,13 @@ function 渲染(): void {
     });
     const c = 读配置();
     const db = 数据库状态();
-    const db预设名 = 读取数据库API预设名();
     const 区 = el('div', 'rqp-set');
     区.innerHTML = `
       <label>手机内容 API<select class="i-source">
         <option value="自动"${c.ai来源 === '自动' ? ' selected' : ''}>自动（数据库优先）</option>
         <option value="数据库"${c.ai来源 === '数据库' ? ' selected' : ''}>只用数据库</option>
         <option value="正文"${c.ai来源 === '正文' ? ' selected' : ''}>只用正文 API</option>
-        <option value="自定义"${c.ai来源 === '自定义' ? ' selected' : ''}>自定义 OpenAI API</option>
+        <option value="自定义"${c.ai来源 === '自定义' ? ' selected' : ''}>手机专用模型（自定义 API）</option>
       </select></label>
       <div class="rqp-api-section db-api-section">
         <p class="db-status" style="color:${db.可调用AI ? '#287a50' : '#666'};font-size:12px;margin:2px 0 8px">数据库：${
@@ -1499,27 +1495,19 @@ function 渲染(): void {
             ? `已连接${db.已装游戏模板 ? '，人妻公寓表已安装' : '，尚未安装人妻公寓表'}`
             : '未检测到公开 API（自动模式会使用正文 API）'
         }</p>
-        <label>手机专用数据库预设名（留空=数据库当前配置）<input class="i-db-preset" list="rq-db-presets" value="${_.escape(c.数据库预设)}" placeholder="例如：人妻公寓手机"/></label>
-        <datalist id="rq-db-presets">${db预设名.map(name => `<option value="${_.escape(name)}"></option>`).join('')}</datalist>
-        <p style="color:#666;font-size:11px;margin:0 0 6px">${
-          db预设名.length
-            ? `旧版数据库公开了 ${db预设名.length} 个预设名称，可直接选择。`
-            : db.已安装
-              ? '可在数据库里新建“人妻公寓手机”预设：沿用同一地址和 Key，但选择另一模型；这里填预设名即可。数据库 8.4 不向外公开预设列表，所以也可以留空使用当前配置。'
-              : '安装数据库后可使用其 AI 配置；没有数据库也不影响游戏。'
-        }</p>
+        <p style="color:#666;font-size:11px;margin:0 0 6px">数据库模式沿用数据库当前配置，不在这里读取或修改数据库密钥与模型。需要给手机单独选模型，请展开下方“手机专用模型”，填写API后读取模型列表。</p>
         <label style="display:flex;align-items:center;gap:8px"><input class="i-db-fallback" type="checkbox" style="width:auto"${
           c.数据库失败回退 ? ' checked' : ''
         }/>数据库请求报错时再尝试正文 API（可能造成双请求）</label>
-        <span style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button class="install-db">安装/更新本游戏表</button><button class="open-db">查看数据库表</button><button class="open-db-settings" style="grid-column:1/-1">配置手机专用模型</button></span>
+        <span style="display:grid;grid-template-columns:1fr 1fr;gap:6px"><button class="install-db">安装/更新本游戏表</button><button class="open-db">查看数据库表</button></span>
       </div>
       <div class="rqp-api-section custom-api-section">
-        <button type="button" class="toggle-custom">手机自定义 API（独立配置）</button>
+        <button type="button" class="toggle-custom">手机专用模型（自定义 API）</button>
         <div class="custom-api-fields">
-          <p style="color:#666;font-size:11px">不经过数据库时使用。可以填写同一 API 的地址和 Key，再为手机选择不同模型。</p>
+          <p style="color:#666;font-size:11px">不经过数据库时使用。填写OpenAI兼容API的地址和Key，再读取该API实际提供的模型。</p>
           <label>自定义API 地址（OpenAI兼容）<input class="i-base" value="${_.escape(c.base)}" placeholder="https://…/v1"/></label>
           <label>API Key<input class="i-key" type="password" value="${_.escape(c.key)}"/></label>
-          <label>模型<span style="display:flex;gap:6px"><input class="i-model" style="flex:1" value="${_.escape(c.model)}" placeholder="gpt-4.1-mini 等"/><button class="fetch-models" style="flex:none;padding:0 10px">读取自定义模型</button></span></label>
+          <label>模型<span style="display:flex;gap:6px"><input class="i-model" style="flex:1;min-width:0" value="${_.escape(c.model)}" placeholder="先读取或直接填写"/><button class="fetch-models" style="flex:none;padding:0 10px">读取API模型</button></span></label>
           <select class="i-models" style="display:none"><option value="">— 从列表选择 —</option></select>
           <p class="models-tip" style="display:none;color:#666;font-size:12px;margin:2px 0 0"></p>
         </div>
@@ -1537,7 +1525,7 @@ function 渲染(): void {
       数据库区.style.display = 来源 === '自动' || 来源 === '数据库' ? 'flex' : 'none';
       if (来源 === '自定义') 自定义展开 = true;
       自定义字段.style.display = 自定义展开 ? 'flex' : 'none';
-      自定义开关.textContent = `${自定义展开 ? '▾' : '▸'} 手机自定义 API（独立配置）`;
+      自定义开关.textContent = `${自定义展开 ? '▾' : '▸'} 手机专用模型（自定义 API）`;
     };
     来源选择.addEventListener('change', 刷新API分区);
     自定义开关.addEventListener('click', () => {
@@ -1570,11 +1558,6 @@ function 渲染(): void {
         if (!ok) (window.parent ?? window).alert('未检测到可打开的数据库界面。');
       });
     });
-    (区.querySelector('.open-db-settings') as HTMLButtonElement).addEventListener('click', () => {
-      void 打开数据库设置().then(ok => {
-        if (!ok) (window.parent ?? window).alert('当前数据库版本没有提供可打开的设置页。');
-      });
-    });
     // 读取模型列表(OpenAI 兼容 GET {base}/models;与 小生成 同一 base 约定=填到 /v1)
     (区.querySelector('.fetch-models') as HTMLButtonElement).addEventListener('click', () => {
       const base = (区.querySelector('.i-base') as HTMLInputElement).value.trim().replace(/\/+$/, '');
@@ -1603,6 +1586,8 @@ function 渲染(): void {
             '<option value="">— 从列表选择 —</option>' +
             们.map(m => `<option value="${_.escape(m)}">${_.escape(m)}</option>`).join('');
           选.style.display = 'block';
+          来源选择.value = '自定义';
+          刷新API分区();
           说(`读到 ${们.length} 个模型,从下拉里选一个。`);
         })
         .catch(e => 说(`读取失败:${String(e).slice(0, 100)}（请检查这里单独填写的地址和 Key；也可以直接手填模型名）`));
@@ -1614,7 +1599,6 @@ function 渲染(): void {
     (区.querySelector('.save') as HTMLButtonElement).addEventListener('click', () => {
       存配置({
         ai来源: (区.querySelector('.i-source') as HTMLSelectElement).value as 手机AI来源,
-        数据库预设: (区.querySelector('.i-db-preset') as HTMLInputElement).value.trim(),
         数据库失败回退: (区.querySelector('.i-db-fallback') as HTMLInputElement).checked,
         base: (区.querySelector('.i-base') as HTMLInputElement).value.trim(),
         key: (区.querySelector('.i-key') as HTMLInputElement).value.trim(),

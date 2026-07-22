@@ -243,6 +243,21 @@ async function 记录数据库回合(
 /** 楼层落库前的清洗:思维链/变量块/选项块/行为等级标签不进楼层文本(prompt 与卷轴双干净) */
 function 清洗正文(原文: string): string {
   const 闭合清 = 原文
+    // 狐系等玩家预设把思考写成不配对的“【开始思考】…</think_fox~>”，但会用
+    // <content> 单独圈正文。content 是可靠的正文白名单边界；闭合缺失时也保住其后剧情。
+    .replace(/^[\s\S]*?<content\b[^>]*>/i, '')
+    .replace(/<\/content\s*>[\s\S]*$/i, '')
+    .replace(/【开始思考】[\s\S]*?<\/think_fox~\s*>/gi, '')
+    .replace(/<fox_selc\b[^>]*>[\s\S]*?<\/fox_selc\s*>/gi, '')
+    .replace(/<fox_tip\b[^>]*>[\s\S]*?<\/fox_tip\s*>/gi, '')
+    .replace(/<\/?(?:content|think_fox~|fox_selc|fox_tip)(?:\s[^>]*)?>/gi, '')
+    // 玩家预设的前置草稿偶尔漏 </draft_notes>，但后续 bginfor 仍完整。用完整的信息栏
+    // 作为安全右边界清掉两块元数据；若右边界也缺失，末尾仅剥标签，绝不吞掉剧情。
+    .replace(/<draft_notes\b[^>]*>[\s\S]*?<bginfor\b[^>]*>[\s\S]*?<\/bginfor\s*>/gi, '')
+    .replace(/<draft_notes\b[^>]*>[\s\S]*?<\/draft_notes\s*>/gi, '')
+    .replace(/<bginfor\b[^>]*>[\s\S]*?<\/bginfor\s*>/gi, '')
+    .replace(/<CEstuff\b[^>]*>[\s\S]*?<\/CEstuff\s*>/gi, '')
+    .replace(/<\/?(?:draft_notes|bginfor|CEstuff)\b[^>]*>/gi, '')
     .replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, '')
     .replace(/<reason(?:ing)?>[\s\S]*?<\/reason(?:ing)?>/gi, '')
     .replace(/<!--[\s\S]*?-->/g, '')
@@ -257,6 +272,9 @@ function 清洗正文(原文: string): string {
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
     .replace(/<StatusPlaceHolderImpl\/>/g, '')
+    // 有些玩家预设把裸 <p> 当换行符且从不输出 </p>。它不是需要“吞到结尾”的协议块，
+    // 只剥标签并补换行，避免未闭合 HTML 扰乱正文，同时不误删标签后的剧情。
+    .replace(/<\/?p(?:\s[^>]*)?>/gi, '\n')
     // 玩家预设夹带的包装 div(2026-07-19 玩家实测:konata-thinking-wrapper/tucao-w 这类空壳
     // 或漏闭合的裸 div 直接印在正文里)——正文永远不该有裸 div,标签一律剥壳(内容保留)
     .replace(/<\/?div[^>]*>/gi, '');

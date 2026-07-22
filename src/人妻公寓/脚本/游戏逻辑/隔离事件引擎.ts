@@ -43,12 +43,25 @@ function 读库(): 隔离事件库 {
 
 function 净化(原文: string): string {
   const 闭合清 = 原文
+    .replace(/^[\s\S]*?<content\b[^>]*>/i, '')
+    .replace(/<\/content\s*>[\s\S]*$/i, '')
+    .replace(/【开始思考】[\s\S]*?<\/think_fox~\s*>/gi, '')
+    .replace(/<fox_selc\b[^>]*>[\s\S]*?<\/fox_selc\s*>/gi, '')
+    .replace(/<fox_tip\b[^>]*>[\s\S]*?<\/fox_tip\s*>/gi, '')
+    .replace(/<\/?(?:content|think_fox~|fox_selc|fox_tip)(?:\s[^>]*)?>/gi, '')
+    .replace(/<draft_notes\b[^>]*>[\s\S]*?<bginfor\b[^>]*>[\s\S]*?<\/bginfor\s*>/gi, '')
+    .replace(/<draft_notes\b[^>]*>[\s\S]*?<\/draft_notes\s*>/gi, '')
+    .replace(/<bginfor\b[^>]*>[\s\S]*?<\/bginfor\s*>/gi, '')
+    .replace(/<CEstuff\b[^>]*>[\s\S]*?<\/CEstuff\s*>/gi, '')
+    .replace(/<\/?(?:draft_notes|bginfor|CEstuff)\b[^>]*>/gi, '')
     .replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, '')
     .replace(/<reason(?:ing)?>[\s\S]*?<\/reason(?:ing)?>/gi, '')
     .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/gi, '')
     .replace(/<options>[\s\S]*?<\/options>/gi, '')
     .replace(/<行为等级>[\s\S]*?<\/行为等级>/g, '')
+    // 兼容把裸 <p> 当换行、却不输出闭合标签的玩家预设；保留其后的事件正文。
+    .replace(/<\/?p(?:\s[^>]*)?>/gi, '\n')
     .replace(/<\/?div[^>]*>/gi, '')
     .trim();
   const 全清 = 闭合清

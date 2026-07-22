@@ -14,8 +14,6 @@ interface 数据库API {
   openSettings?: () => Promise<boolean>;
   openVisualizer?: () => void;
   getTableTemplate?: () => unknown;
-  /** 为未来/分支版保留的只读名称接口。 */
-  getApiPresetNames?: () => unknown[];
 }
 
 interface 数据表 {
@@ -118,23 +116,6 @@ export function 数据库状态(): { 已安装: boolean; 可调用AI: boolean; �
   return { 已安装: !!api, 可调用AI: typeof api?.callAI === 'function', 已装游戏模板 };
 }
 
-export function 读取数据库API预设名(): string[] {
-  const api = 取数据库API();
-  try {
-    const 只读名称 = api?.getApiPresetNames?.();
-    if (Array.isArray(只读名称))
-      return _.uniq(
-        只读名称
-          .map(String)
-          .map(name => name.trim())
-          .filter(Boolean),
-      );
-    return [];
-  } catch {
-    return [];
-  }
-}
-
 export async function 清理数据库陈旧互斥旗(): Promise<void> {
   const 宿主 = 宿主窗口();
   if (取数据库API() || !宿主[数据库旗]) return;
@@ -229,17 +210,6 @@ export async function 打开数据库界面(): Promise<boolean> {
     if (typeof api?.openSettings === 'function') return await api.openSettings();
   } catch (error) {
     console.warn('[人妻公寓·数据库] 打开数据库界面失败:', error);
-  }
-  return false;
-}
-
-/** 打开数据库自身的设置页，用于配置手机专用预设（同一 API 可选择不同模型）。 */
-export async function 打开数据库设置(): Promise<boolean> {
-  const api = 取数据库API();
-  try {
-    if (typeof api?.openSettings === 'function') return await api.openSettings();
-  } catch (error) {
-    console.warn('[人妻公寓·数据库] 打开数据库设置失败:', error);
   }
   return false;
 }
