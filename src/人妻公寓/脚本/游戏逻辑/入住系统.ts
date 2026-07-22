@@ -40,23 +40,41 @@ export function 创建配置户节点(门牌号: 门牌, 楼层: number): Return
   return 节点;
 }
 
-/** 世界书条目开启(酒馆助手 API;绑定的主世界书按妻/夫名匹配条目名) */
-function 开启世界书条目(名们: string[]): void {
-  void (async () => {
-    try {
-      const { primary } = getCharWorldbookNames('current');
-      if (!primary) return;
-      await updateWorldbookWith(primary, 条目们 => {
-        for (const 条 of 条目们) {
-          if (名们.some(名 => 条.name === 名)) 条.enabled = true;
-        }
-        return 条目们;
-      });
-      console.info(`[人妻公寓·入住] 世界书条目已开启:${名们.join('、')}`);
-    } catch (e) {
-      console.warn('[人妻公寓·入住] 世界书条目开启失败(须玩家手动开启):', e);
-    }
-  })();
+/**
+ * 世界书入住绑定。
+ * 顾国栋、何俊生是保留的丈夫专线，分别随 102、202 入住；普通丈夫仍并入妻条目。
+ */
+const 世界书入住绑定: ReadonlyArray<readonly [条目名: string, 门牌号: 门牌]> = [
+  ['夏乔', '101'],
+  ['沈静仪', '102'],
+  ['顾国栋', '102'],
+  ['许曼君', '201'],
+  ['周小满', '202'],
+  ['何俊生', '202'],
+  ['安若妍', '301'],
+];
+
+/**
+ * 按当前存档全量同步入住条目，而不是只做单向开启。
+ * 世界书开关由酒馆全局持久化；新局、回档或切换旧存档时必须同时把未入住角色关回去。
+ */
+export async function 同步入住世界书条目(data: Pick<SchemaType, '户'>): Promise<void> {
+  const 启用状态 = new Map(世界书入住绑定.map(([条目名, 门牌号]) => [条目名, Boolean(data.户[门牌号])]));
+  try {
+    const { primary } = getCharWorldbookNames('current');
+    if (!primary) return;
+    await updateWorldbookWith(primary, 条目们 => {
+      for (const 条 of 条目们) {
+        const 应启用 = 启用状态.get(条.name);
+        if (应启用 !== undefined) 条.enabled = 应启用;
+      }
+      return 条目们;
+    });
+    const 已启用 = [...启用状态].filter(([, enabled]) => enabled).map(([name]) => name);
+    console.info(`[人妻公寓·入住] 世界书入住条目已同步:${已启用.join('、')}`);
+  } catch (e) {
+    console.warn('[人妻公寓·入住] 世界书入住条目同步失败(游戏数据不受影响):', e);
+  }
 }
 
 /** 入住检测:回合结算里调用(排队事件通道;每楼最多一户) */
@@ -75,8 +93,8 @@ export function 入住检测(data: SchemaType, 楼层: number): void {
     data.户[目标] = 节点;
     镜像直写(目标, { 入住楼层: 楼层 });
     data.系统._待发送事件 = 搬家戏[目标] ?? `【新住户】${目标}室今天有人搬进来了。`;
-    // 普通丈夫的人设已经并入妻条目；何俊生承担独立专线，随202入住启用但只在本人在场时激活。
-    开启世界书条目([户静态表[目标].妻名, ...(目标 === '202' ? [户静态表[目标].夫名] : [])].filter(Boolean));
+    // 全量同步可同时修正酒馆全局残留的旧存档开关；专线丈夫仍由“丈夫焦点”关键字决定实际激活。
+    void 同步入住世界书条目(data);
     console.info(`[人妻公寓·入住] ${目标} 入住(${户静态表[目标].妻名})@${楼层}楼`);
     return;
   }

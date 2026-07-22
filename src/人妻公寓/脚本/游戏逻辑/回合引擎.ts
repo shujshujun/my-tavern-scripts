@@ -4,7 +4,7 @@ import type { 门牌 } from '../../stageConfig';
 import { 户静态表, 难度表, 首批门牌 } from '../../stageConfig';
 // (难度表兼供撞见概率系数查表)
 import { 经济结算 } from './经济系统';
-import { 入住检测, 创建配置户节点 } from './入住系统';
+import { 入住检测, 创建配置户节点, 同步入住世界书条目 } from './入住系统';
 import { 打断检测, 换装起疑, 母亲撞见检测, 父亲来电打断 } from './打断系统';
 import { 夜访结算, 惰性结算户, 绿帽线检测, 结算焦点疑心, 冷落检测 } from './结算系统';
 import { 荣耀洞结算 } from './荣耀洞';
@@ -547,6 +547,8 @@ export async function 回档至(楼层: number): Promise<void> {
       },
       { type: 'chat' },
     );
+    const 回档数据 = 读取最近有效();
+    if (回档数据) await 同步入住世界书条目(回档数据.data);
     console.info(`[人妻公寓] 回档至 ${楼层} 楼`);
     eventEmit('人妻公寓:回合完成');
   } catch (e) {
@@ -688,6 +690,7 @@ export async function 重开一局(): Promise<void> {
     const 旧raw = Mvu.getMvuData({ type: 'message', message_id: -1 });
     await 脚本写入(旧raw, 出厂);
     捕获保护快照(出厂);
+    await 同步入住世界书条目(出厂);
 
     console.info('[人妻公寓] 重开一局:楼层已删,0楼 stat 重建为出厂态(首批入住已就位)');
     eventEmit('人妻公寓:已重开');

@@ -31,7 +31,7 @@ import { 读取最近有效, 读最近有效stat, 脚本写入, 脚本写入中 
 import { 检测焦点, 读场景, 读粘滞, 读赴约, 组公寓快照, 取本轮事件文本 } from './snapshotSystem';
 import { 执行回合, 重掷回合, 重开一局, 回档至, 回合进行中, 取消本回合, 开始新游戏 } from './回合引擎';
 import { 清理数据库陈旧互斥旗 } from './数据库桥';
-import { 创建配置户节点 } from './入住系统';
+import { 创建配置户节点, 同步入住世界书条目 } from './入住系统';
 
 /**
  * 人妻公寓 - 游戏逻辑脚本(P0 工程骨架)
@@ -191,6 +191,7 @@ $(() => {
         if (有效) {
           const { raw, data } = 有效;
           if (确保首批入住(data)) await 脚本写入(raw, data);
+          await 同步入住世界书条目(data);
         }
       } catch (e) {
         console.error('[人妻公寓] 首批入住引导失败:', e);
