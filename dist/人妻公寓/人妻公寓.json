@@ -44,10 +44,10 @@
       },
       "regex_scripts": [
         {
-          "id": "ffe80d49-10cb-4aab-ae47-0fab3fd4005d",
+          "id": "08938fab-23ee-4dac-8581-d34850c8177e",
           "scriptName": "客户端界面(吞正文)",
           "findRegex": "/^[\\s\\S]*<StatusPlaceHolderImpl\\/>[\\s\\S]*$/",
-          "replaceString": "```\n<body>\n<script>\n$('body').load('https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.32/dist/人妻公寓/界面/客户端/index.html')\n</script>\n</body>\n```",
+          "replaceString": "```\n<body>\n<script>\n$('body').load('https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.33/dist/人妻公寓/界面/客户端/index.html')\n</script>\n</body>\n```",
           "placement": [
             2
           ],
@@ -61,7 +61,7 @@
           "maxDepth": null
         },
         {
-          "id": "61dc7a89-d4b7-4522-a871-85de4cdfbda0",
+          "id": "0ec9ebc2-c557-4171-9f9b-2b4dd5129d7f",
           "scriptName": "[不显示]玩家楼层(输入走游戏内)",
           "findRegex": "/^[\\s\\S]*$/",
           "replaceString": "",
@@ -78,7 +78,7 @@
           "maxDepth": null
         },
         {
-          "id": "702f2cf5-5a10-4874-a16a-79b82746c4f3",
+          "id": "a605e2ee-36f8-4922-8e40-c57410c0c26f",
           "scriptName": "[不发送]去除变量更新与占位符",
           "findRegex": "/<UpdateVariable>[\\s\\S]*?<\\/UpdateVariable>|<StatusPlaceHolderImpl\\/>/g",
           "replaceString": "",
@@ -95,7 +95,7 @@
           "maxDepth": null
         },
         {
-          "id": "6df83e7a-3172-4a95-aae1-14fc114df183",
+          "id": "09fadb74-d657-4d8b-b44d-8bf556d916f0",
           "scriptName": "[不显示]隐藏变量更新与协议标签",
           "findRegex": "/<UpdateVariable>[\\s\\S]*?<\\/UpdateVariable>|<options>[\\s\\S]*?<\\/options>|<行为等级>[\\s\\S]*?<\\/行为等级>/g",
           "replaceString": "",
@@ -118,7 +118,7 @@
             "type": "script",
             "enabled": true,
             "name": "MVU",
-            "id": "355a4dcb-663b-4d62-8058-e4b9884565e5",
+            "id": "1a94dba3-657c-4583-ab68-14e28ae5f8f6",
             "info": "",
             "button": {
               "enabled": true,
@@ -156,13 +156,13 @@
             "type": "script",
             "enabled": true,
             "name": "人妻公寓游戏逻辑",
-            "id": "e5c9162e-a2f7-469c-a3ed-e9e14beeab59",
+            "id": "e7ed80d8-e35c-415d-bb1b-bb7640814684",
             "info": "构建产物,源码见仓库 src/人妻公寓/脚本/游戏逻辑",
             "button": {
               "enabled": true,
               "buttons": []
             },
-            "content": "import 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.32/dist/人妻公寓/脚本/游戏逻辑/index.js';",
+            "content": "import 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.33/dist/人妻公寓/脚本/游戏逻辑/index.js';",
             "data": {}
           }
         ],
