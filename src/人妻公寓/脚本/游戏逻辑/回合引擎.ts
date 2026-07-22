@@ -93,6 +93,7 @@ function 读上次回合(): 上次回合记录 | undefined {
 // 流式转发:generate 的 iframe 事件转成自定义事件,客户端稳定可收。
 // 用 generation_id 只认自家生成(数据库/总结类第三方脚本自己也会调 generate)。
 let 本回合生成id = '';
+let 解除生成等待: (() => void) | null = null;
 eventClearEvent(iframe_events.STREAM_TOKEN_RECEIVED_FULLY);
 eventOn(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, (文本: string, generation_id: string) => {
   if (!进行中) return;
@@ -105,10 +106,40 @@ let 已取消 = false;
 export function 取消本回合() {
   if (!进行中 || !本回合生成id) return;
   已取消 = true;
+  // 部分公益站会让底层请求长期悬空，stopGenerationById 也不一定能让 Promise 返回。
+  // 先主动结束本卡自己的等待，finally 才能立即释放 `进行中`，玩家才能重新生成。
+  解除生成等待?.();
   try {
     if (!stopGenerationById(本回合生成id)) stopAllGeneration();
   } catch (e) {
     console.error('[人妻公寓] 停止生成失败:', e);
+  }
+}
+
+/**
+ * 给正文生成加一层本卡可控的中止门。
+ * - 手动取消不依赖第三方端点是否正确关闭连接；
+ * - 180 秒硬上限避免失联请求永久锁死整个游戏；
+ * - 底层迟到结果只会结束自己的 Promise，不会落楼或改变量。
+ */
+async function 等待正文生成(参数: Parameters<typeof generate>[0]): Promise<string> {
+  let 超时timer: ReturnType<typeof setTimeout> | undefined;
+  const 中止门 = new Promise<never>((_resolve, reject) => {
+    解除生成等待 = () => reject(new Error('__RQGY_CANCELLED__'));
+    超时timer = setTimeout(() => {
+      try {
+        if (!stopGenerationById(本回合生成id)) stopAllGeneration();
+      } catch (e) {
+        console.warn('[人妻公寓] 超时停止生成失败:', e);
+      }
+      reject(new Error('生成超过180秒仍未返回，已自动解锁；可以重新生成刚才的行动'));
+    }, 180000);
+  });
+  try {
+    return String(await Promise.race([generate(参数), 中止门]));
+  } finally {
+    if (超时timer) clearTimeout(超时timer);
+    解除生成等待 = null;
   }
 }
 
@@ -359,9 +390,7 @@ export async function 执行回合(行动: string): Promise<void> {
 
     已取消 = false;
     本回合生成id = `rqgy-${回合前末楼}-${_.random(1e9)}`;
-    const 原文 = String(
-      await generate({ user_input: 行动, should_stream: true, injects, generation_id: 本回合生成id }),
-    );
+    const 原文 = await 等待正文生成({ user_input: 行动, should_stream: true, injects, generation_id: 本回合生成id });
     if (已取消) {
       eventEmit('人妻公寓:回合失败', '已取消——这一轮没有发生');
       return;

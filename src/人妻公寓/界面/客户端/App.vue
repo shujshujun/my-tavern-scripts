@@ -387,8 +387,16 @@
             <div v-if="发送中" class="story-entry">
               <p v-for="(段, j) in 流式段" :key="'流' + j" class="narr">{{ 段 }}</p>
               <p class="scribing">
-                ✎ 这一楼正在发生……
+                ✎ 这一楼正在发生……<span v-if="生成等待秒">已等待 {{ 生成等待秒 }} 秒</span>
                 <button class="btn mini" title="打断,本回合作废" @click="取消回合">取消</button>
+                <button
+                  v-if="生成等待秒 >= 20 && 待重试行动"
+                  class="btn mini retry-now"
+                  title="本回合作废，随后用同一句行动重新请求"
+                  @click="放弃并重试"
+                >
+                  ↻ 放弃并重新生成
+                </button>
               </p>
             </div>
           </section>
@@ -482,6 +490,10 @@
         <div v-if="可重掷 && !发送中 && 当前房间 === 回合房间" class="reroll-row">
           <button class="btn" title="撤回本回合(你的行动与回应),重新措辞" @click="撤回">⌫ 撤回</button>
           <button class="btn" title="同样的行动重新演一遍" @click="重掷">↻ 重演</button>
+        </div>
+        <div v-else-if="失败行动 && !发送中" class="reroll-row failed-reroll">
+          <span>刚才的生成没有完成。</span>
+          <button class="btn" title="使用刚才完全相同的行动重新请求" @click="重试失败行动">↻ 重新生成刚才行动</button>
         </div>
 
         <!-- 功能区:gal 式底部 dock(大图标按钮,与数据 HUD 分离) -->
@@ -1975,10 +1987,30 @@ const 输入文本 = ref('');
 const 发送中 = ref(false);
 const 由头写入中 = ref(false);
 const 流式段 = ref<string[]>([]);
+const 生成等待秒 = ref(0);
+const 待重试行动 = ref('');
+const 失败行动 = ref('');
+const 取消后自动重试 = ref(false);
 const 可重掷 = ref(false);
 const 隔离可重掷 = ref(false);
 const 键盘打开 = ref(false);
 let 键盘定位timer: ReturnType<typeof setTimeout> | undefined;
+let 生成等待timer: ReturnType<typeof setInterval> | undefined;
+
+function 开始生成计时() {
+  clearInterval(生成等待timer);
+  生成等待秒.value = 0;
+  const 起 = Date.now();
+  生成等待timer = setInterval(() => {
+    生成等待秒.value = Math.floor((Date.now() - 起) / 1000);
+  }, 1000);
+}
+
+function 停止生成计时() {
+  clearInterval(生成等待timer);
+  生成等待timer = undefined;
+  生成等待秒.value = 0;
+}
 
 function 让输入露出() {
   if (!键盘打开.value) return;
@@ -2049,6 +2081,8 @@ function 发出(文本: string) {
   文本 = 文本.trim();
   if (!文本 || 发送中.value) return;
   发送中.value = true;
+  待重试行动.value = 文本;
+  失败行动.value = '';
   流式段.value = [];
   // 乐观渲染:玩家行动先上卷轴,回合完成后由楼层数据重建
   卷轴.value.push({ 谁: '玩家', 文本: [文本.replace(/\n+/g, ' ')] });
@@ -2120,6 +2154,19 @@ function 撤回() {
 function 取消回合() {
   if (!发送中.value) return;
   eventEmit('人妻公寓:取消生成');
+}
+
+function 放弃并重试() {
+  if (!发送中.value || !待重试行动.value) return;
+  取消后自动重试.value = true;
+  取消回合();
+}
+
+function 重试失败行动() {
+  const 文本 = 失败行动.value.trim();
+  if (!文本 || 发送中.value) return;
+  失败行动.value = '';
+  发出(文本);
 }
 
 // ── 行动选项(脚本每回合从 <options> 块提取,存 chat 变量) ──
@@ -3048,6 +3095,7 @@ onMounted(() => {
   eventOn('人妻公寓:生成开始', () => {
     // 脚本侧发起的回合(查看监控等)也要锁输入+亮书写态;驻留的拾获卡顺手收掉不挡戏
     发送中.value = true;
+    开始生成计时();
     拾获卡.value = '';
   });
   eventOn('人妻公寓:流式', (文本: string) => {
@@ -3063,6 +3111,10 @@ onMounted(() => {
   });
   eventOn('人妻公寓:回合完成', async () => {
     发送中.value = false;
+    停止生成计时();
+    待重试行动.value = '';
+    失败行动.value = '';
+    取消后自动重试.value = false;
     流式段.value = [];
     幕房间.value = 当前房间.value; // 本轮的戏与选项绑定产出场景,换地方即收
     // 先拉到最新楼号，再按新时钟重算作息/地图。旧顺序会让地图停在上一楼，直到玩家再点瓷砖才刷新。
@@ -3080,6 +3132,7 @@ onMounted(() => {
   });
   eventOn('人妻公寓:隔离事件完成', async () => {
     发送中.value = false;
+    停止生成计时();
     流式段.value = [];
     幕房间.value = 当前房间.value;
     await 取卷轴();
@@ -3095,12 +3148,26 @@ onMounted(() => {
   });
   eventOn('人妻公寓:回合失败', (原因: string) => {
     发送中.value = false;
+    停止生成计时();
+    const 待重试 = 待重试行动.value.trim();
+    if (待重试) 失败行动.value = 待重试;
+    待重试行动.value = '';
     流式段.value = [];
     偷窥待选.value = null; // 偷窥回合没演成,挂起的选择卡一并作废(脚本侧同步清账)
     // 回合失败=这一轮没发生,是提示不是事故——走可消散 toast,不占常驻错误横幅(2026-07-17 用户反馈)
     if (!原因.startsWith('已取消')) 弹提示(`回合失败,这一轮没有发生:${原因}`, 6000);
     void 取卷轴();
     刷新可重掷();
+    if (取消后自动重试.value && 待重试) {
+      取消后自动重试.value = false;
+      // 回合引擎在发出失败事件后的 finally 才释放内部锁，下一事件循环再重发。
+      setTimeout(() => {
+        失败行动.value = '';
+        发出(待重试);
+      }, 0);
+    } else {
+      取消后自动重试.value = false;
+    }
   });
   eventOn('人妻公寓:已重开', () => {
     // 楼层与过程变量已清,整页重建最干净(幕房间/卷轴/弹窗全归零),回到标题屏
@@ -3200,6 +3267,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   clearInterval(心跳timer);
+  clearInterval(生成等待timer);
   clearTimeout(破门计时);
   clearTimeout(提示timer);
   clearTimeout(键盘定位timer);
@@ -3766,6 +3834,18 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
+}
+
+.scribing > span {
+  font-family: var(--font-mono);
+  color: var(--ink-soft);
+}
+
+.scribing .retry-now {
+  color: #fff;
+  background: linear-gradient(135deg, var(--pink), #8c73ff);
+  border-color: transparent;
 }
 
 .entry-edit {
@@ -4002,6 +4082,12 @@ onUnmounted(() => {
   gap: 10px;
   justify-content: center;
   margin-top: 6px;
+}
+
+.failed-reroll {
+  align-items: center;
+  color: var(--ink-soft);
+  font-size: 0.78em;
 }
 
 /* ── 遮罩与玻璃面板 ── */
