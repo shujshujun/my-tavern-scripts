@@ -5,7 +5,7 @@
   "scenario": "",
   "first_mes": "<StatusPlaceHolderImpl/>",
   "mes_example": "",
-  "creatorcomment": "人妻公寓 v0.34 测试版。需安装最新版酒馆助手，并启用卡内 MVU 与提示词模板；数据库为可选增强。首次进入会显示安装清单，数据库玩家可按“手机→我→安装/更新本游戏表”完成四张 RQ_ 表。开局：0楼进入游戏界面，选难度→接父亲电话进入到任首日；输入走游戏内。",
+  "creatorcomment": "人妻公寓 v0.35 测试版。需安装最新版酒馆助手，并启用卡内 MVU 与提示词模板；数据库为可选增强。首次进入会显示安装清单，数据库玩家可按“手机→我→安装/更新本游戏表”完成四张 RQ_ 表。开局：0楼进入游戏界面，选难度→接父亲电话进入到任首日；输入走游戏内。",
   "avatar": "none",
   "talkativeness": "0.5",
   "fav": false,
@@ -21,14 +21,14 @@
     "scenario": "",
     "first_mes": "<StatusPlaceHolderImpl/>",
     "mes_example": "",
-    "creator_notes": "人妻公寓 v0.34 测试版。需安装最新版酒馆助手，并启用卡内 MVU 与提示词模板；数据库为可选增强。首次进入会显示安装清单，数据库玩家可按“手机→我→安装/更新本游戏表”完成四张 RQ_ 表。开局：0楼进入游戏界面，选难度→接父亲电话进入到任首日；输入走游戏内。",
+    "creator_notes": "人妻公寓 v0.35 测试版。需安装最新版酒馆助手，并启用卡内 MVU 与提示词模板；数据库为可选增强。首次进入会显示安装清单，数据库玩家可按“手机→我→安装/更新本游戏表”完成四张 RQ_ 表。开局：0楼进入游戏界面，选难度→接父亲电话进入到任首日；输入走游戏内。",
     "system_prompt": "",
     "post_history_instructions": "",
     "tags": [
       "人妻公寓"
     ],
     "creator": "",
-    "character_version": "0.34",
+    "character_version": "0.35",
     "alternate_greetings": [
       "---\n# 开场白(叙事版;固定0楼架构下0楼=客户端界面,本条目作 alternate_greetings 备选与逃生舱开场)\n\n傍晚六点,你拖着一只行李箱站在梧桐里7号楼下。\n\n三层的老公寓在暮色里亮起零星几扇窗。一楼101的窗户飘出饭菜香,鞋架堆到了门外;102的窗帘拉得整整齐齐,缝里透出一线暖黄。二楼黑着,三楼只有一扇窗亮——那是你家。窗子推开,你妈探出头来,嗓门穿透整条巷子:\"回来啦?先上来吃饭!汤都炖好了!\"\n\n\"先把东西放了!\"你朝上面喊。\n\n管理员室的门锁有点涩。前任管理员留下的东西不多:一张值班桌,一面挂满钥匙的柜子,墙上钉着几张泛黄的报修单——101的水管报了两个星期,没人修。\n\n桌上压着一张字条,是你爸的字,笔画硬得像钉子:\n\n\"钥匙十六把,一把都不能丢。等我电话。\"\n\n你把行李箱立在墙角,坐进那把吱呀作响的椅子里。楼上传来你妈摆碗筷的动静,101的风铃在门口叮了一声,有个女人的笑声顺着楼道飘下来。\n\n这栋楼,从今晚起归你管了。\n\n桌上的手机,开始震动。"
     ],
@@ -44,10 +44,10 @@
       },
       "regex_scripts": [
         {
-          "id": "bba16ad6-4cdd-4165-88f6-4ff6704e386d",
+          "id": "dfae4e46-4751-4a34-b5cd-06a0ee948349",
           "scriptName": "客户端界面(吞正文)",
           "findRegex": "/^[\\s\\S]*<StatusPlaceHolderImpl\\/>[\\s\\S]*$/",
-          "replaceString": "```\n<body>\n<script>\n$('body').load('https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.34/dist/人妻公寓/界面/客户端/index.html')\n</script>\n</body>\n```",
+          "replaceString": "```\n<body>\n<script>\n$('body').load('https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.35/dist/人妻公寓/界面/客户端/index.html')\n</script>\n</body>\n```",
           "placement": [
             2
           ],
@@ -61,7 +61,7 @@
           "maxDepth": null
         },
         {
-          "id": "0df6cb1e-960e-4ed2-89c8-07d125664bf4",
+          "id": "95bfe1cf-5d18-42e2-b847-c7b1c259dd97",
           "scriptName": "[不显示]玩家楼层(输入走游戏内)",
           "findRegex": "/^[\\s\\S]*$/",
           "replaceString": "",
@@ -78,7 +78,7 @@
           "maxDepth": null
         },
         {
-          "id": "3144e995-2f41-434c-a79f-ea6b7301e288",
+          "id": "53a07da6-4bce-4aab-8cae-b4accb0e0138",
           "scriptName": "[不发送]去除变量更新与占位符",
           "findRegex": "/<UpdateVariable>[\\s\\S]*?<\\/UpdateVariable>|<StatusPlaceHolderImpl\\/>/g",
           "replaceString": "",
@@ -95,7 +95,7 @@
           "maxDepth": null
         },
         {
-          "id": "b0f36f69-25ac-49b4-b3e1-f5000fa7b971",
+          "id": "f82ba994-052a-46d3-b463-502361af9120",
           "scriptName": "[不显示]隐藏变量更新与协议标签",
           "findRegex": "/<UpdateVariable>[\\s\\S]*?<\\/UpdateVariable>|<options>[\\s\\S]*?<\\/options>|<行为等级>[\\s\\S]*?<\\/行为等级>/g",
           "replaceString": "",
@@ -118,7 +118,7 @@
             "type": "script",
             "enabled": true,
             "name": "MVU",
-            "id": "c0f1bd6d-6da5-42bc-b2c0-9c41fcae9d7f",
+            "id": "bfdb9417-d93d-436d-b2cf-93ad17284dbb",
             "info": "",
             "button": {
               "enabled": true,
@@ -156,13 +156,13 @@
             "type": "script",
             "enabled": true,
             "name": "人妻公寓游戏逻辑",
-            "id": "16a4062d-c01f-4acf-be0b-97e28c6d71a1",
+            "id": "7a187295-b441-46ea-a9cd-e7d49928b4c6",
             "info": "构建产物,源码见仓库 src/人妻公寓/脚本/游戏逻辑",
             "button": {
               "enabled": true,
               "buttons": []
             },
-            "content": "import 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.34/dist/人妻公寓/脚本/游戏逻辑/index.js';",
+            "content": "import 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.35/dist/人妻公寓/脚本/游戏逻辑/index.js';",
             "data": {}
           }
         ],

@@ -1,7 +1,7 @@
 /**
  * 人妻公寓 组卡脚本(修道院组卡范式直迁)
  * 用法: node src/人妻公寓/组卡.mjs
- * 产出: dist/人妻公寓/人妻公寓.json (chara_card_v3,可直接导入酒馆)
+ * 产出: dist/人妻公寓/人妻公寓.json + 人妻公寓.png (chara_card_v3,均可直接导入酒馆)
  *
  * 组装内容:
  *  - 世界书: src/人妻公寓/世界书/index.yaml 及其引用文件([开场白]→alternate_greetings)
@@ -21,6 +21,57 @@ import { parse as parseYaml } from 'yaml';
 const 根 = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const 项目 = path.join(根, 'src/人妻公寓');
 const 产物 = path.join(根, 'dist/人妻公寓');
+const 头像源 = path.join(项目, '素材/游戏头像.png');
+
+const CRC32表 = Array.from({ length: 256 }, (_, n) => {
+  let c = n;
+  for (let i = 0; i < 8; i += 1) c = (c & 1) !== 0 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  return c >>> 0;
+});
+
+function crc32(buffer) {
+  let c = 0xffffffff;
+  for (const byte of buffer) c = CRC32表[(c ^ byte) & 0xff] ^ (c >>> 8);
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+function png块(type, data) {
+  const 类型 = Buffer.from(type, 'ascii');
+  const 长度 = Buffer.alloc(4);
+  长度.writeUInt32BE(data.length);
+  const 校验 = Buffer.alloc(4);
+  校验.writeUInt32BE(crc32(Buffer.concat([类型, data])));
+  return Buffer.concat([长度, 类型, data, 校验]);
+}
+
+/** 把 chara_card_v3 JSON 写入头像 PNG 的 chara tEXt 块，导入后图片本身就是游戏头像。 */
+function 写PNG角色卡(头像, json, 输出) {
+  const png = readFileSync(头像);
+  const 签名 = Buffer.from('89504e470d0a1a0a', 'hex');
+  if (!png.subarray(0, 8).equals(签名)) throw new Error(`头像不是有效 PNG:${头像}`);
+
+  const 块们 = [签名];
+  let offset = 8;
+  let 已写入 = false;
+  while (offset < png.length) {
+    const length = png.readUInt32BE(offset);
+    const type = png.toString('ascii', offset + 4, offset + 8);
+    const end = offset + 12 + length;
+    if (end > png.length) throw new Error(`头像 PNG 块损坏:${type}`);
+    const 原块 = png.subarray(offset, end);
+    const data = png.subarray(offset + 8, offset + 8 + length);
+    const 是旧卡数据 = type === 'tEXt' && data.subarray(0, 6).toString('latin1') === 'chara\0';
+    if (type === 'IEND' && !已写入) {
+      const 编码 = Buffer.from(Buffer.from(json, 'utf8').toString('base64'), 'latin1');
+      块们.push(png块('tEXt', Buffer.concat([Buffer.from('chara\0', 'latin1'), 编码])));
+      已写入 = true;
+    }
+    if (!是旧卡数据) 块们.push(原块);
+    offset = end;
+  }
+  if (!已写入) throw new Error('头像 PNG 缺少 IEND 块');
+  writeFileSync(输出, Buffer.concat(块们));
+}
 
 // ── 读取世界书 index ──
 const index = parseYaml(readFileSync(path.join(项目, '世界书/index.yaml'), 'utf8'));
@@ -107,7 +158,7 @@ for (const 组 of index.条目) {
 if (!开场白) throw new Error('未找到 [开场白] 条目');
 
 // ── 资源走 jsdelivr(手机友好;〔待用户拍板〕首个内测 tag 名,推送后此处生效) ──
-const TAG = 'rq0.34';
+const TAG = 'rq0.35';
 const BASE = `https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@${TAG}`;
 
 const 加载块 = url => "```\n<body>\n<script>\n$('body').load('" + url + "')\n</script>\n</body>\n```";
@@ -201,7 +252,7 @@ const tavern_helper = {
 
 // ── 卡体 ──
 const 卡名 = '人妻公寓';
-const 版本 = '0.34';
+const 版本 = '0.35';
 const data = {
   name: 卡名,
   description: '',
@@ -247,11 +298,15 @@ const 卡 = {
 };
 
 const 输出路径 = path.join(产物, `${卡名}.json`);
-writeFileSync(输出路径, JSON.stringify(卡, null, 2), 'utf8');
+const 卡JSON = JSON.stringify(卡, null, 2);
+writeFileSync(输出路径, 卡JSON, 'utf8');
+const PNG输出路径 = path.join(产物, `${卡名}.png`);
+写PNG角色卡(头像源, 卡JSON, PNG输出路径);
 
 // 自检
 const 回读 = JSON.parse(readFileSync(输出路径, 'utf8'));
 console.log(`✓ ${输出路径}`);
+console.log(`✓ ${PNG输出路径}(内嵌卡数据 + 游戏头像)`);
 console.log(
   `  世界书条目: ${回读.data.character_book.entries.length}(启用 ${回读.data.character_book.entries.filter(e => e.enabled).length})`,
 );
