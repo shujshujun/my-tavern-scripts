@@ -163,8 +163,8 @@
               ><i>{{ 智脑检测.已安装 ? '✓' : '·' }}</i
               >智脑插件</span
             >
-            <span :class="{ on: 酒馆助手兼容 }">
-              <i>{{ 酒馆助手检测中 ? '…' : 酒馆助手兼容 ? '✓' : '!' }}</i>
+            <span :class="{ on: 酒馆助手已安装 }">
+              <i>{{ 酒馆助手检测中 ? '…' : !酒馆助手已安装 ? '!' : 酒馆助手为最新版 === false ? '↑' : '✓' }}</i>
               酒馆助手 {{ 酒馆助手版本 || '未检测' }}
             </span>
           </div>
@@ -173,8 +173,8 @@
             <li class="required">
               <b><em>1</em>安装角色卡与运行环境</b>
               <p>
-                导入角色卡后，安装并启用【酒馆助手】48.8.19 或更高版本，并确认角色卡自带的 MVU
-                脚本已启用。当前{{ 酒馆助手检测说明 }}。若版本过低，请更新后刷新页面再开始游戏。
+                导入角色卡后，安装并启用【酒馆助手】，并确认角色卡自带的 MVU
+                脚本已启用。当前{{ 酒馆助手检测说明 }}。若不是最新版，建议更新，但不会阻止开始游戏。
               </p>
             </li>
             <li class="required">
@@ -228,8 +228,8 @@
               <div class="setup-db-actions"><button class="btn mini" @click="刷新全部检测">重新检测</button></div>
               <small :class="{ good: 首次准备完成 }">{{
                 首次准备完成
-                  ? '✓ 酒馆助手版本与长期记忆检测均通过，可以开始游戏。'
-                  : !酒馆助手兼容
+                  ? '✓ 酒馆助手已启用且长期记忆检测通过，可以开始游戏。'
+                  : !酒馆助手已安装
                     ? `✗ ${酒馆助手检测说明}。`
                     : '✗ 长期记忆二选一检测尚未通过。'
               }}</small>
@@ -2140,45 +2140,78 @@ function 停止生成计时() {
 
 function 让输入露出() {
   if (!键盘打开.value) return;
-  // 不再把输入栏 fixed 后叠加“键盘高度”：有些 WebView 已经把 fixed 坐标系缩到
-  // visualViewport，再补一次高度会把输入栏推到屏幕外。这里直接缩短整座游戏画框，
-  // 让 flex 布局压缩正文舞台，输入栏自然落在键盘上沿。
-  let 可用高 = window.visualViewport?.height ?? window.innerHeight;
+  // Android 酒馆全屏常用 overlay 键盘：键盘盖住 WebView，但 innerHeight、
+  // visualViewport 和 iframe 高度全都不变。优先读取 VirtualKeyboard/视口实测值；
+  // 宿主不报告时用手机键盘的保守占屏比兜底，直接把输入栏钉到键盘上沿。
+  let 遮挡 = 0;
+  const 虚拟键盘 = (
+    navigator as Navigator & {
+      virtualKeyboard?: { boundingRect?: { height: number } };
+    }
+  ).virtualKeyboard;
+  遮挡 = Math.max(遮挡, Number(虚拟键盘?.boundingRect?.height ?? 0));
+  // TauriTavern Android 主动消费 IME inset，不让 WebView/visualViewport 缩放，
+  // 再把真实键盘高度写到宿主页 #sheld 的 --tt-ime-bottom。
   try {
-    const frame = window.frameElement as HTMLElement | null;
-    const 父视口 = window.parent?.visualViewport;
-    if (frame && 父视口) {
-      const 框 = frame.getBoundingClientRect();
-      const 可视顶 = Math.max(框.top, 父视口.offsetTop);
-      const 可视底 = Math.min(框.bottom, 父视口.offsetTop + 父视口.height);
-      const iframe露出高 = Math.max(0, 可视底 - 可视顶);
-      if (iframe露出高 >= 240) 可用高 = Math.min(可用高, iframe露出高);
+    let 窗: Window = window;
+    for (let i = 0; i < 8; i++) {
+      const 壳 = 窗.document.getElementById('sheld');
+      if (壳) {
+        const 值 = Number.parseFloat(窗.getComputedStyle(壳).getPropertyValue('--tt-ime-bottom'));
+        if (Number.isFinite(值)) 遮挡 = Math.max(遮挡, 值);
+      }
+      if (窗.parent === 窗) break;
+      窗 = 窗.parent;
     }
   } catch {
-    /* 真全屏或跨域时，本页 visualViewport 就是真值 */
+    /* 跨域祖先不可读时继续使用 Web API 与占屏比兜底 */
   }
-  document.documentElement.style.setProperty('--keyboard-frame-h', `${Math.max(240, Math.round(可用高))}px`);
+  for (const 窗 of [
+    window,
+    (() => {
+      try {
+        return window.parent;
+      } catch {
+        return null;
+      }
+    })(),
+  ]) {
+    if (!窗) continue;
+    try {
+      const 可视 = 窗.visualViewport;
+      if (!可视) continue;
+      遮挡 = Math.max(遮挡, 窗.innerHeight - 可视.height - 可视.offsetTop);
+    } catch {
+      /* 跨域父页不可读时只使用本页数据 */
+    }
+  }
+  if (遮挡 < 80 && window.matchMedia('(max-width: 540px)').matches) {
+    遮挡 = Math.round(window.innerHeight * 0.43);
+  }
+  document.documentElement.style.setProperty('--keyboard-inset', `${Math.max(0, Math.round(遮挡))}px`);
   try {
     const frame = window.frameElement as HTMLElement | null;
     frame?.scrollIntoView({ block: 'end', behavior: 'smooth' });
   } catch {
-    /* 父页不允许滚动时，仍由本页紧凑键盘态兜底 */
+    /* 真全屏或父页禁止滚动时，由固定输入栏兜底 */
   }
-  requestAnimationFrame(() => 输入框.value?.scrollIntoView({ block: 'nearest' }));
 }
 
 function 输入聚焦() {
   键盘打开.value = true;
   clearTimeout(键盘定位timer);
-  // 等软键盘完成第一次视口缩放，再把整个游戏 iframe 的底边送进可视区。
-  键盘定位timer = setTimeout(让输入露出, 260);
+  // TT 的原生 WindowInsets 回调可能晚于 focus；分三拍读取，最后一拍会拿到
+  // #sheld 上更新后的 --tt-ime-bottom。
+  键盘定位timer = setTimeout(让输入露出, 180);
+  setTimeout(让输入露出, 480);
+  setTimeout(让输入露出, 820);
 }
 
 function 输入失焦() {
   clearTimeout(键盘定位timer);
   键盘定位timer = setTimeout(() => {
     键盘打开.value = false;
-    document.documentElement.style.removeProperty('--keyboard-frame-h');
+    document.documentElement.style.removeProperty('--keyboard-inset');
   }, 160);
 }
 /** 上次回合发生的房间(2026-07-20 玩家点单:人走出房间后撤回/重演一起藏,防跨场景回滚) */
@@ -3009,6 +3042,29 @@ const 全屏中 = ref(false);
 
 type 全屏根 = HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void };
 type 全屏文档 = Document & { webkitExitFullscreen?: () => void; webkitFullscreenElement?: Element | null };
+type TT系统界面桥 = {
+  setImmersiveFullscreenEnabled: (enabled: boolean) => void;
+  isImmersiveFullscreenEnabled?: () => boolean;
+};
+type TT宿主窗 = Window & {
+  __TAURITAVERN__?: unknown;
+  TauriTavernAndroidSystemUiBridge?: TT系统界面桥;
+};
+
+/** 同源向上寻找 TT 宿主；有原生桥时绝不调用 HTML Fullscreen API。 */
+function 取TT系统界面桥(): TT系统界面桥 | null {
+  try {
+    let 窗 = window as TT宿主窗;
+    for (let i = 0; i < 8; i++) {
+      if (窗.TauriTavernAndroidSystemUiBridge) return 窗.TauriTavernAndroidSystemUiBridge;
+      if (窗.parent === 窗) break;
+      窗 = 窗.parent as TT宿主窗;
+    }
+  } catch {
+    /* 非同源宿主按普通网页处理 */
+  }
+  return null;
+}
 
 function 应用画幅(开: boolean) {
   document.documentElement.classList.toggle('rqgy-full', 开);
@@ -3027,6 +3083,15 @@ function 应用画幅(开: boolean) {
 }
 
 async function 进真全屏() {
+  const TT桥 = 取TT系统界面桥();
+  if (TT桥) {
+    // TT 的 HTML Fullscreen 会套一层纯黑原生 FrameLayout；直接用它公开的
+    // immersive bridge 隐藏系统栏，可保留全屏而不创建黑色背板。
+    TT桥.setImmersiveFullscreenEnabled(true);
+    全屏中.value = true;
+    应用画幅(true);
+    return;
+  }
   const 根 = document.documentElement as 全屏根;
   if (根.requestFullscreen) await 根.requestFullscreen();
   else if (根.webkitRequestFullscreen) await 根.webkitRequestFullscreen();
@@ -3101,6 +3166,14 @@ async function 打开楼层提示词(楼: number) {
 
 async function 切换全屏() {
   const 文档 = document as 全屏文档;
+  const TT桥 = 取TT系统界面桥();
+  if (TT桥) {
+    const 开 = !全屏中.value;
+    TT桥.setImmersiveFullscreenEnabled(开);
+    全屏中.value = 开;
+    应用画幅(开);
+    return;
+  }
   try {
     if (document.fullscreenElement ?? 文档.webkitFullscreenElement) {
       if (document.exitFullscreen) await document.exitFullscreen();
@@ -3139,7 +3212,10 @@ const 设置存储键 = '人妻公寓_界面偏好';
 // 首次进入序章时主动说明安装顺序；按版本换键，让旧玩家升级后也能看到记忆插件二选一。
 const 首次说明开 = ref(false);
 const 首次说明存储键 = '人妻公寓_首次游玩说明_rq037';
-const 酒馆助手最低版本 = '48.8.19';
+const 酒馆助手版本清单地址 = [
+  'https://raw.githubusercontent.com/N0VI028/JS-Slash-Runner/main/manifest.json',
+  'https://fastly.jsdelivr.net/gh/N0VI028/JS-Slash-Runner@main/manifest.json',
+];
 const 记忆方案存储键 = '人妻公寓_记忆方案';
 const 智脑安装代码 = "import 'https://cdn.jsdelivr.net/gh/sillytavner-jpg/zhino-script@v5.0.8/dist/index.js'";
 const 数据库检测 = ref(数据库状态());
@@ -3154,19 +3230,29 @@ const 记忆方案 = ref<'数据库' | '智脑' | ''>((() => {
 })());
 const 安装模板中 = ref(false);
 const 酒馆助手版本 = ref('');
+const 酒馆助手最新版本 = ref('');
+const 酒馆助手最新版本查询失败 = ref(false);
 const 酒馆助手检测中 = ref(false);
-const 酒馆助手兼容 = computed(() => {
+const 酒馆助手已安装 = computed(() => {
   const 版本 = 酒馆助手版本.value.match(/\d+(?:\.\d+){1,3}/)?.[0];
-  return Boolean(版本 && compare(版本, 酒馆助手最低版本, '>='));
+  return Boolean(版本);
+});
+const 酒馆助手为最新版 = computed<boolean | null>(() => {
+  const 当前版本 = 酒馆助手版本.value.match(/\d+(?:\.\d+){1,3}/)?.[0];
+  const 最新版本 = 酒馆助手最新版本.value.match(/\d+(?:\.\d+){1,3}/)?.[0];
+  if (!当前版本 || !最新版本) return null;
+  return compare(当前版本, 最新版本, '>=');
 });
 const 酒馆助手检测说明 = computed(() =>
   酒馆助手检测中.value
-    ? '正在检测酒馆助手版本'
+    ? '正在检测酒馆助手及官方最新版本'
     : !酒馆助手版本.value
-      ? `未检测到酒馆助手版本（需要 ${酒馆助手最低版本}+）`
-      : 酒馆助手兼容.value
-        ? `检测到 ${酒馆助手版本.value}，版本符合要求`
-        : `检测到 ${酒馆助手版本.value}，低于建议版本 ${酒馆助手最低版本}`,
+      ? '未检测到酒馆助手，请安装并启用后刷新页面'
+      : 酒馆助手最新版本查询失败.value
+        ? `检测到 ${酒馆助手版本.value}；暂时无法查询官方最新版本，可继续游戏`
+        : 酒馆助手为最新版.value
+          ? `检测到 ${酒馆助手版本.value}，已是官方最新版本`
+          : `检测到 ${酒馆助手版本.value}；官方最新版本为 ${酒馆助手最新版本.value}，建议更新（不影响开始游戏）`,
 );
 
 const 记忆方案完成 = computed(() =>
@@ -3176,19 +3262,44 @@ const 记忆方案完成 = computed(() =>
       ? 智脑检测.value.已安装 && !数据库检测.value.已安装
       : false,
 );
-const 首次准备完成 = computed(() => 酒馆助手兼容.value && 记忆方案完成.value);
+const 首次准备完成 = computed(() => 酒馆助手已安装.value && 记忆方案完成.value);
+
+async function 查询酒馆助手最新版本() {
+  let 最后错误: unknown;
+  for (const 地址 of 酒馆助手版本清单地址) {
+    try {
+      const response = await fetch(`${地址}?t=${Date.now()}`, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const manifest = (await response.json()) as { version?: unknown };
+      if (typeof manifest.version !== 'string' || !manifest.version.match(/\d+(?:\.\d+){1,3}/)) {
+        throw new Error('版本清单缺少有效 version');
+      }
+      return manifest.version;
+    } catch (error) {
+      最后错误 = error;
+    }
+  }
+  throw 最后错误 ?? new Error('无法读取版本清单');
+}
 
 async function 刷新酒馆助手检测() {
   酒馆助手检测中.value = true;
+  酒馆助手最新版本.value = '';
+  酒馆助手最新版本查询失败.value = false;
   try {
     const 版本 = await getTavernHelperVersion();
     酒馆助手版本.value = typeof 版本 === 'string' ? 版本 : '';
   } catch (error) {
     酒馆助手版本.value = '';
     console.warn('[人妻公寓] 无法读取酒馆助手版本', error);
-  } finally {
-    酒馆助手检测中.value = false;
   }
+  try {
+    酒馆助手最新版本.value = await 查询酒馆助手最新版本();
+  } catch (error) {
+    酒馆助手最新版本查询失败.value = true;
+    console.warn('[人妻公寓] 无法查询酒馆助手官方最新版本', error);
+  }
+  酒馆助手检测中.value = false;
 }
 
 function 刷新数据库检测() {
@@ -8175,15 +8286,18 @@ onUnmounted(() => {
   }
 
   .keyboard-open .quill {
-    position: relative;
-    z-index: 25;
-  }
-
-  /* 键盘态重排整个 flex 画框：正文舞台变矮并继续内部滚动，输入栏不再被排到屏幕外。 */
-  .apt.keyboard-open {
-    height: var(--keyboard-frame-h, 100dvh);
-    max-height: var(--keyboard-frame-h, 100dvh);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+    position: fixed;
+    z-index: 100;
+    left: 8px;
+    right: 8px;
+    bottom: calc(var(--keyboard-inset, 43vh) + env(safe-area-inset-bottom, 0px) + 6px);
+    box-sizing: border-box;
+    margin: 0;
+    padding: 7px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--paper-card);
+    box-shadow: 0 -8px 28px rgba(30, 26, 38, 0.2);
   }
 
   .reroll-row {
