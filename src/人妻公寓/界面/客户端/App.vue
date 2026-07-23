@@ -3042,29 +3042,6 @@ const 全屏中 = ref(false);
 
 type 全屏根 = HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void };
 type 全屏文档 = Document & { webkitExitFullscreen?: () => void; webkitFullscreenElement?: Element | null };
-type TT系统界面桥 = {
-  setImmersiveFullscreenEnabled: (enabled: boolean) => void;
-  isImmersiveFullscreenEnabled?: () => boolean;
-};
-type TT宿主窗 = Window & {
-  __TAURITAVERN__?: unknown;
-  TauriTavernAndroidSystemUiBridge?: TT系统界面桥;
-};
-
-/** 同源向上寻找 TT 宿主；有原生桥时绝不调用 HTML Fullscreen API。 */
-function 取TT系统界面桥(): TT系统界面桥 | null {
-  try {
-    let 窗 = window as TT宿主窗;
-    for (let i = 0; i < 8; i++) {
-      if (窗.TauriTavernAndroidSystemUiBridge) return 窗.TauriTavernAndroidSystemUiBridge;
-      if (窗.parent === 窗) break;
-      窗 = 窗.parent as TT宿主窗;
-    }
-  } catch {
-    /* 非同源宿主按普通网页处理 */
-  }
-  return null;
-}
 
 function 应用画幅(开: boolean) {
   document.documentElement.classList.toggle('rqgy-full', 开);
@@ -3083,15 +3060,6 @@ function 应用画幅(开: boolean) {
 }
 
 async function 进真全屏() {
-  const TT桥 = 取TT系统界面桥();
-  if (TT桥) {
-    // TT 的 HTML Fullscreen 会套一层纯黑原生 FrameLayout；直接用它公开的
-    // immersive bridge 隐藏系统栏，可保留全屏而不创建黑色背板。
-    TT桥.setImmersiveFullscreenEnabled(true);
-    全屏中.value = true;
-    应用画幅(true);
-    return;
-  }
   const 根 = document.documentElement as 全屏根;
   if (根.requestFullscreen) await 根.requestFullscreen();
   else if (根.webkitRequestFullscreen) await 根.webkitRequestFullscreen();
@@ -3166,14 +3134,6 @@ async function 打开楼层提示词(楼: number) {
 
 async function 切换全屏() {
   const 文档 = document as 全屏文档;
-  const TT桥 = 取TT系统界面桥();
-  if (TT桥) {
-    const 开 = !全屏中.value;
-    TT桥.setImmersiveFullscreenEnabled(开);
-    全屏中.value = 开;
-    应用画幅(开);
-    return;
-  }
   try {
     if (document.fullscreenElement ?? 文档.webkitFullscreenElement) {
       if (document.exitFullscreen) await document.exitFullscreen();
