@@ -60,6 +60,11 @@ function 净化(原文: string): string {
     .replace(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/gi, '')
     .replace(/<options>[\s\S]*?<\/options>/gi, '')
     .replace(/<行为等级>[\s\S]*?<\/行为等级>/g, '')
+    .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*?```/gi, '')
+    .replace(/<!DOCTYPE[\s\S]*?<\/html\s*>/gi, '')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/<StatusPlaceHolderImpl\/>/g, '')
     // 兼容把裸 <p> 当换行、却不输出闭合标签的玩家预设；保留其后的事件正文。
     .replace(/<\/?p(?:\s[^>]*)?>/gi, '\n')
     .replace(/<\/?div[^>]*>/gi, '')
@@ -70,6 +75,11 @@ function 净化(原文: string): string {
     .replace(/<UpdateVariable>[\s\S]*$/i, '')
     .replace(/<options>[\s\S]*$/i, '')
     .replace(/<行为等级>[\s\S]*$/i, '')
+    .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*$/i, '')
+    .replace(/<!DOCTYPE[\s\S]*$/i, '')
+    .replace(/<style[^>]*>[\s\S]*$/i, '')
+    .replace(/<script[^>]*>[\s\S]*$/i, '')
+    .replace(/<!--[\s\S]*$/, '')
     .trim();
   return 全清 || 闭合清;
 }

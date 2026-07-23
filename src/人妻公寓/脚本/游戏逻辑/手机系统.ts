@@ -77,16 +77,6 @@ const 末楼 = () => {
   }
 };
 
-async function 限时请求(url: string, init: RequestInit, 毫秒 = 20000): Promise<Response> {
-  const 控制器 = new AbortController();
-  const 计时 = setTimeout(() => 控制器.abort(), 毫秒);
-  try {
-    return await fetch(url, { ...init, signal: 控制器.signal });
-  } finally {
-    clearTimeout(计时);
-  }
-}
-
 // ============================================
 // 手机配置(localStorage:AI来源 + 独立API + 动态频率总闸)
 // ============================================
@@ -222,14 +212,39 @@ function 最近正文(): string {
  * 手机侧不吃任何协议,一律剥干净只留人话。
  */
 function 净化消息(原: string): string {
-  return 原
+  const 闭合清 = 原
+    // 与正文/隔离事件共用同一组玩家预设兼容边界。尤其兼容 draft_notes
+    // 漏闭合、但后续 bginfor 完整的狐系预设，避免手机把草稿思考当消息显示。
+    .replace(/^[\s\S]*?<content\b[^>]*>/i, '')
+    .replace(/<\/content\s*>[\s\S]*$/i, '')
+    .replace(/【开始思考】[\s\S]*?<\/think_fox~\s*>/gi, '')
+    .replace(/<fox_selc\b[^>]*>[\s\S]*?<\/fox_selc\s*>/gi, '')
+    .replace(/<fox_tip\b[^>]*>[\s\S]*?<\/fox_tip\s*>/gi, '')
+    .replace(/<draft_notes\b[^>]*>[\s\S]*?<bginfor\b[^>]*>[\s\S]*?<\/bginfor\s*>/gi, '')
+    .replace(/<draft_notes\b[^>]*>[\s\S]*?<\/draft_notes\s*>/gi, '')
+    .replace(/<bginfor\b[^>]*>[\s\S]*?<\/bginfor\s*>/gi, '')
+    .replace(/<CEstuff\b[^>]*>[\s\S]*?<\/CEstuff\s*>/gi, '')
     .replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, '')
+    .replace(/<reason(?:ing)?>[\s\S]*?<\/reason(?:ing)?>/gi, '')
     .replace(/<行为等级>[\s\S]*?<\/行为等级>/g, '')
     .replace(/<options>[\s\S]*?<\/options>/gi, '')
     .replace(/<变量更新>[\s\S]*?<\/变量更新>/g, '')
     .replace(/```[\s\S]*?```/g, '')
+    .replace(/<think(?:ing)?>[\s\S]*$/i, '')
+    .replace(/<reason(?:ing)?>[\s\S]*$/i, '')
+    .replace(/<行为等级>[\s\S]*$/i, '')
+    .replace(/<options>[\s\S]*$/i, '')
+    .replace(/<变量更新>[\s\S]*$/i, '')
     .replace(/<\/?[a-zA-Z一-龥][^>]*>/g, '')
     .trim();
+  const 全清 = 闭合清
+    .replace(/<think(?:ing)?>[\s\S]*$/i, '')
+    .replace(/<reason(?:ing)?>[\s\S]*$/i, '')
+    .replace(/<行为等级>[\s\S]*$/i, '')
+    .replace(/<options>[\s\S]*$/i, '')
+    .replace(/<变量更新>[\s\S]*$/i, '')
+    .trim();
+  return 全清 || 闭合清;
 }
 
 async function 正文API生成(系统提示: string, 用户提示: string): Promise<string> {
@@ -252,22 +267,26 @@ async function 自定义API生成(c: 手机配置, 系统提示: string, 用户�
     return '';
   }
   try {
-    const res = await 限时请求(`${c.base.replace(/\/+$/, '')}/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${c.key}` },
-      body: JSON.stringify({
+    // 不从手机 iframe 直接 fetch 外部 API：移动端 WebView/远端 API 的 CORS
+    // 往往会把有效地址也拦成 TypeError: Failed to fetch。统一走酒馆助手的
+    // custom_api 代理链路，与数据库插件和其他脚本的自定义 API 调用方式一致。
+    const 原 = await generateRaw({
+      ordered_prompts: [
+        { role: 'system', content: 系统提示 },
+        { role: 'user', content: 用户提示 },
+      ],
+      should_stream: false,
+      should_silence: true,
+      custom_api: {
+        apiurl: c.base.trim().replace(/\/+$/, ''),
+        key: c.key,
         model: c.model,
-        messages: [
-          { role: 'system', content: 系统提示 },
-          { role: 'user', content: 用户提示 },
-        ],
         max_tokens: 600,
         temperature: 0.9,
-      }),
+        source: 'openai',
+      },
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const j = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-    return 净化消息(j.choices?.[0]?.message?.content?.trim() ?? '');
+    return typeof 原 === 'string' ? 净化消息(原) : '';
   } catch (e) {
     console.warn('[人妻公寓·手机] 自定义API失败,本拍跳过:', e);
     return '';
@@ -621,8 +640,8 @@ export async function 手机节拍(): Promise<void> {
 // ============================================
 
 const ROOT_ID = 'rq-phone-root';
-// ⚠ 与 App.vue 素材基址同步：Discord 测试版发布 tag=rq0.34。
-const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.34/dist/人妻公寓/素材';
+// ⚠ 与 App.vue 素材基址同步：Discord 测试版发布 tag=rq0.37。
+const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.37/dist/人妻公寓/素材';
 
 let 当前页: {
   名: 'chats' | 'chat' | 'moments' | 'call' | 'talk' | 'settings';
@@ -1558,10 +1577,12 @@ function 渲染(): void {
         if (!ok) (window.parent ?? window).alert('未检测到可打开的数据库界面。');
       });
     });
-    // 读取模型列表(OpenAI 兼容 GET {base}/models;与 小生成 同一 base 约定=填到 /v1)
+    // 读取模型列表统一走酒馆助手宿主代理；不能从手机 iframe 直接 fetch，
+    // 否则目标 API 即使可用，也可能被 CORS/移动端 WebView 拦成 Failed to fetch。
     (区.querySelector('.fetch-models') as HTMLButtonElement).addEventListener('click', () => {
       const base = (区.querySelector('.i-base') as HTMLInputElement).value.trim().replace(/\/+$/, '');
       const key = (区.querySelector('.i-key') as HTMLInputElement).value.trim();
+      const 按钮 = 区.querySelector('.fetch-models') as HTMLButtonElement;
       const 选 = 区.querySelector('.i-models') as HTMLSelectElement;
       const 提 = 区.querySelector('.models-tip') as HTMLElement;
       const 说 = (t: string) => {
@@ -1573,14 +1594,13 @@ function 渲染(): void {
         return;
       }
       说('读取中…');
-      void 限时请求(`${base}/models`, { headers: { Authorization: `Bearer ${key}` } })
-        .then(async r => {
-          if (!r.ok) {
-            if (r.status === 401) throw new Error('HTTP 401：自定义 API 鉴权失败；这里不会读取数据库保存的密钥');
-            throw new Error(`HTTP ${r.status}`);
-          }
-          const j = (await r.json()) as { data?: { id?: string }[] };
-          const 们 = (j.data ?? []).map(m => m.id).filter((x): x is string => !!x);
+      按钮.disabled = true;
+      按钮.textContent = '读取中…';
+      void getModelList({ apiurl: base, key })
+        .then(模型们 => {
+          const 们 = [...new Set(模型们.map(String).map(model => model.trim()).filter(Boolean))].sort((a, b) =>
+            a.localeCompare(b),
+          );
           if (!们.length) throw new Error('列表为空');
           选.innerHTML =
             '<option value="">— 从列表选择 —</option>' +
@@ -1590,7 +1610,14 @@ function 渲染(): void {
           刷新API分区();
           说(`读到 ${们.length} 个模型,从下拉里选一个。`);
         })
-        .catch(e => 说(`读取失败:${String(e).slice(0, 100)}（请检查这里单独填写的地址和 Key；也可以直接手填模型名）`));
+        .catch(e => {
+          const 原因 = e instanceof Error ? e.message : String(e);
+          说(`读取失败：${原因.slice(0, 140)}（请确认地址填到兼容API的版本根路径；也可以直接填写模型名）`);
+        })
+        .finally(() => {
+          按钮.disabled = false;
+          按钮.textContent = '读取API模型';
+        });
     });
     (区.querySelector('.i-models') as HTMLSelectElement).addEventListener('change', ev => {
       const v = (ev.target as HTMLSelectElement).value;
@@ -1938,4 +1965,5 @@ async function 结束通话(): Promise<void> {
   当前页 = { 名: 'chats' };
   渲染();
   刷新红点();
+  eventEmit('人妻公寓:父亲通话结束');
 }

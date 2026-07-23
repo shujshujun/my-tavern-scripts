@@ -62,6 +62,34 @@ function 宿主窗口(): Window & Record<string, unknown> {
   }
 }
 
+/**
+ * 智脑 v5 没有公开数据 API；这里仅用其稳定的挂载节点检测是否启用。
+ * 不读取智脑私有存储，也不与其抢记忆注入。
+ */
+export function 智脑状态(): { 已安装: boolean } {
+  const 候选: Window[] = [];
+  const 加入 = (scope: Window | null | undefined) => {
+    if (scope && !候选.includes(scope)) 候选.push(scope);
+  };
+  try {
+    加入(window);
+    加入(window.parent);
+    加入(window.top);
+    加入(window.opener);
+  } catch {
+    /* 跨域窗口忽略 */
+  }
+  const 已安装 = 候选.some(scope => {
+    try {
+      return !!scope.document?.querySelector('.zhino-root, .zhino-fab, #zhino-panel');
+    } catch {
+      return false;
+    }
+  });
+  return { 已安装 };
+}
+
+
 export function 取数据库API(): 数据库API | null {
   type 数据库宿主 = Window & { AutoCardUpdaterAPI?: 数据库API; autoCardUpdaterAPI?: 数据库API };
   const 候选: 数据库宿主[] = [];

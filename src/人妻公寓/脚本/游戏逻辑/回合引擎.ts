@@ -143,6 +143,60 @@ async function 等待正文生成(参数: Parameters<typeof generate>[0]): Promi
   }
 }
 
+/**
+ * 正文是否正由 Gemini 系列模型生成。
+ *
+ * 酒馆可把 Gemini 接在 Google、OpenRouter、AI Studio 或 OpenAI 兼容端点下，
+ * 模型名会落在不同设置键里。这里只扫描“模型/API 来源”类字段，避免把聊天正文里
+ * 偶然出现的 gemini 一词误判成当前模型。
+ */
+function 正文使用Gemini(): boolean {
+  try {
+    const 宿主 = window.parent as any;
+    const 全局ST = 宿主?.SillyTavern ?? (globalThis as any).SillyTavern;
+    const 上下文 = 全局ST?.getContext?.() ?? 全局ST ?? SillyTavern;
+    const 候选根 = [
+      上下文?.chatCompletionSettings,
+      上下文?.textCompletionSettings,
+      上下文?.oai_settings,
+      上下文?.textgenerationwebui_settings,
+      上下文?.mainApi,
+      {
+        mainApi: 上下文?.mainApi,
+        onlineStatus: 上下文?.onlineStatus,
+        tokenizerModel: 上下文?.getTokenizerModel?.(),
+      },
+    ];
+    const 候选值: string[] = [];
+    const 收集 = (值: unknown, 深度: number, 路径 = ''): void => {
+      if (深度 > 3 || 值 == null) return;
+      if (typeof 值 === 'string') {
+        if (/(?:model|source|api|provider|status)/i.test(路径)) 候选值.push(值);
+        return;
+      }
+      if (typeof 值 !== 'object' || Array.isArray(值)) return;
+      for (const [键, 子值] of Object.entries(值 as Record<string, unknown>)) {
+        收集(子值, 深度 + 1, 路径 ? `${路径}.${键}` : 键);
+      }
+    };
+    for (const 根 of 候选根) 收集(根, 0);
+    const 命中 = 候选值.find(值 => /\bgemini(?:[-_.\s]|$)/i.test(值));
+    if (命中) console.info(`[人妻公寓] 检测到 Gemini 正文模型：${命中}`);
+    return !!命中;
+  } catch (e) {
+    console.warn('[人妻公寓] Gemini 模型检测失败，按普通模型继续：', e);
+    return false;
+  }
+}
+
+const GEMINI变量更新强制令 = [
+  '【Gemini变量更新强制令｜最高优先执行】',
+  '本次回复必须在正文末尾输出完整且可解析的 <UpdateVariable>...</UpdateVariable> 块，绝对不得省略、概括、改名或只在思考中提及。',
+  '必须逐项检查快照【焦点】里明确标为“本人在场”的人物。只要本轮互动对她的感受产生了实际正面或负面影响，就务必用 RFC 6902 replace 更新 户.<门牌>.妻.好感值，变化遵守变量规则与单轮上限；不得因为变化幅度小而跳过。',
+  '同时按本轮真实剧情更新在场人物的 当前心理想法 与 当前情绪。无依据的数值不要乱加；不在场人物和系统管理字段绝对不动。',
+  '先写完整正文，再输出变量块；变量块必须是回复的最后一部分。',
+].join('\n');
+
 /** 楼层尾部 + 本次行动 → 伪对话数组(焦点检测/快照组装的扫描源) */
 function 近楼对话(行动?: string): { role: string; content: string }[] {
   const 尾: { role: string; content: string }[] = [];
@@ -405,10 +459,23 @@ export async function 执行回合(行动: string): Promise<void> {
     const injects: Omit<InjectionPrompt, 'id'>[] = [
       { role: 'system', content: 快照, position: 'in_chat', depth: 0, should_scan: true },
     ];
+    const 是Gemini = 正文使用Gemini();
+    if (是Gemini) {
+      injects.push({
+        role: 'system',
+        content: GEMINI变量更新强制令,
+        position: 'in_chat',
+        depth: 0,
+        should_scan: false,
+      });
+    }
 
     已取消 = false;
     本回合生成id = `rqgy-${回合前末楼}-${_.random(1e9)}`;
     const 原文 = await 等待正文生成({ user_input: 行动, should_stream: true, injects, generation_id: 本回合生成id });
+    if (是Gemini && !/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/i.test(原文)) {
+      console.warn('[人妻公寓] Gemini 本轮仍未输出完整 UpdateVariable 块；正文会保留，但本轮无法采纳 AI 数值更新');
+    }
     if (已取消) {
       eventEmit('人妻公寓:回合失败', '已取消——这一轮没有发生');
       return;

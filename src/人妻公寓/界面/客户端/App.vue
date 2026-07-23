@@ -106,7 +106,7 @@
           <div class="set-group row">
             <div>
               <div class="set-label">省流模式</div>
-              <p class="set-hint">关掉背景图与图标,回纯色——省流量。</p>
+              <p class="set-hint">只关闭场景背景与地图立面大图；人物、头像和功能图标仍正常显示。</p>
             </div>
             <button class="toggle" :class="{ on: 省流 }" @click="((省流 = !省流), 改设置())"><i /></button>
           </div>
@@ -143,12 +143,12 @@
       </div>
 
       <!-- ═══════════ rq0.34 首次游玩准备：第一次进卡自动出现，标题页可随时重开 ═══════════ -->
-      <div v-if="首次说明开" class="mask setup-mask" @click.self="首次说明开 = false">
+      <div v-if="首次说明开" class="mask setup-mask" @click.self="记忆方案完成 && (首次说明开 = false)">
         <div class="sheet setup-sheet">
-          <button class="sheet-close" @click="首次说明开 = false">✕</button>
+          <button v-if="记忆方案完成" class="sheet-close" @click="首次说明开 = false">✕</button>
           <div class="ui-kicker">FIRST RUN / 首次游玩准备</div>
-          <h3 class="setup-title">先把四件事准备好</h3>
-          <p class="setup-lead">照顺序检查一次即可。数据库是增强项，不安装也能正常游玩。</p>
+          <h3 class="setup-title">先把记忆方案选好</h3>
+          <p class="setup-lead">数据库与智脑只能二选一。两套同时运行会重复总结和注入，必须关闭其中一个。</p>
 
           <div class="setup-statuses">
             <span :class="{ on: 脚本存活 }"
@@ -159,9 +159,9 @@
               ><i>{{ 数据库检测.已安装 ? '✓' : '·' }}</i
               >数据库插件</span
             >
-            <span :class="{ on: 数据库检测.已装游戏模板 }"
-              ><i>{{ 数据库检测.已装游戏模板 ? '✓' : '·' }}</i
-              >人妻公寓表</span
+            <span :class="{ on: 智脑检测.已安装 }"
+              ><i>{{ 智脑检测.已安装 ? '✓' : '·' }}</i
+              >智脑插件</span
             >
           </div>
 
@@ -177,36 +177,60 @@
               <b><em>2</em>启用【提示词模板】插件</b>
               <p>提示词模板必须开启；如果装有【小白X】，请先关闭，避免两套注入同时工作造成正文或变量异常。</p>
             </li>
-            <li>
-              <b><em>3</em>安装【数据库插件】（推荐）</b>
-              <p>
-                数据库负责长期人物记忆、承诺伏笔和社交轨迹。安装或更新插件后请刷新酒馆；不使用数据库时，游戏会自动改用正文
-                API。
-              </p>
+            <li class="required">
+              <b><em>3</em>长期记忆插件二选一</b>
+              <p>选择路线后先关闭另一套，再点“重新检测”。检测未通过时不要继续安装另一套。</p>
+              <div class="setup-db-actions">
+                <button class="btn mini" :class="{ rite: 记忆方案 === '数据库' }" @click="选择记忆方案('数据库')">
+                  使用数据库
+                </button>
+                <button class="btn mini" :class="{ rite: 记忆方案 === '智脑' }" @click="选择记忆方案('智脑')">使用智脑</button>
+              </div>
+
+              <template v-if="记忆方案 === '数据库'">
+                <p>请在【酒馆助手→脚本→全局脚本】中禁用或删除智脑并刷新页面，然后安装数据库插件和人妻公寓四张 RQ_ 表。</p>
+                <div class="setup-db-actions">
+                  <button class="btn mini" @click="刷新数据库检测">重新检测</button>
+                  <button
+                    class="btn mini rite"
+                    :disabled="智脑检测.已安装 || !数据库检测.已安装 || 安装模板中"
+                    @click="从说明安装数据库模板"
+                  >
+                    {{ 安装模板中 ? '安装中…' : 数据库检测.已装游戏模板 ? '更新本游戏表' : '安装本游戏表' }}
+                  </button>
+                </div>
+                <small v-if="智脑检测.已安装">✗ 智脑仍在运行，请先禁用并刷新。</small>
+                <small v-else-if="!数据库检测.已安装">· 尚未检测到数据库插件。</small>
+                <small v-else-if="!数据库检测.已装游戏模板">· 数据库已启用，还需安装四张 RQ_ 表。</small>
+                <small v-else class="good">✓ 数据库已启用，智脑已关闭，四张 RQ_ 表已就绪。</small>
+              </template>
+
+              <template v-else-if="记忆方案 === '智脑'">
+                <p>请禁用或删除数据库插件并刷新页面；随后把智脑 v5.0.8 作为【全局脚本】安装。智脑自行捕获楼层、总结并注入记忆，不需要 RQ_ 表。</p>
+                <div class="setup-db-actions">
+                  <button class="btn mini" @click="复制智脑安装代码">复制智脑安装代码</button>
+                  <button class="btn mini rite" @click="刷新数据库检测">重新检测</button>
+                </div>
+                <small v-if="数据库检测.已安装">✗ 数据库插件仍在运行，请先禁用并刷新。</small>
+                <small v-else-if="!智脑检测.已安装">· 尚未检测到智脑悬浮窗。</small>
+                <small v-else class="good">✓ 智脑已启用，数据库已关闭，本路线检测完成。</small>
+              </template>
+
+              <small v-else>请先选择一种长期记忆方案。</small>
             </li>
             <li>
-              <b><em>4</em>安装人妻公寓数据库模板</b>
-              <p>
-                进入游戏后打开底部【手机】→【我】，保持“自动（数据库优先）”，点击【安装/更新本游戏表】。需要给手机单独选模型时，展开【手机专用模型（自定义API）】，填写地址与Key后点【读取API模型】并保存。
-              </p>
-              <div class="setup-db-actions">
-                <button class="btn mini" @click="刷新数据库检测">重新检测</button>
-                <button
-                  class="btn mini rite"
-                  :disabled="!数据库检测.已安装 || 安装模板中"
-                  @click="从说明安装数据库模板"
-                >
-                  {{ 安装模板中 ? '安装中…' : 数据库检测.已装游戏模板 ? '更新本游戏表' : '现在安装本游戏表' }}
-                </button>
-              </div>
-              <small v-if="!数据库检测.已安装">当前未检测到数据库；可以先关闭说明正常开始游戏。</small>
-              <small v-else-if="数据库检测.已装游戏模板" class="good">已检测到四张 RQ_ 表，可以开始游戏。</small>
+              <b><em>4</em>完成检测</b>
+              <p>只有目标插件已启用、另一套已关闭时才算完成。手机专用模型仍可在【手机→我】中单独配置。</p>
+              <div class="setup-db-actions"><button class="btn mini" @click="刷新数据库检测">重新检测</button></div>
+              <small :class="{ good: 记忆方案完成 }">{{ 记忆方案完成 ? '✓ 二选一检测通过，可以开始游戏。' : '✗ 二选一检测尚未通过。' }}</small>
             </li>
           </ol>
 
           <div class="setup-foot">
             <p>以后可在序章首页点“首次游玩说明”再次查看。</p>
-            <button class="btn rite" @click="完成首次说明">我已看完，回到首页</button>
+            <button class="btn rite" :disabled="!记忆方案完成" @click="完成首次说明">
+              {{ 记忆方案完成 ? '检测通过，回到首页' : '请先完成二选一检测' }}
+            </button>
           </div>
         </div>
       </div>
@@ -919,7 +943,12 @@
             <div class="dsec clue-board">
               <div class="dsec-title">线 索</div>
               <div class="clue-slots">
-                <div v-for="(槽, i) in 裂缝证物槽" :key="槽.标" class="clue-slot" :class="{ found: !!选中线索[i] }">
+                <div
+                  v-for="(槽, i) in 裂缝证物槽"
+                  :key="`${槽.标}-${i}`"
+                  class="clue-slot"
+                  :class="{ found: !!选中线索[i] }"
+                >
                   <span class="clue-source"><Ic :n="槽.图" />{{ 槽.标 }}</span>
                   <p>{{ 选中线索[i] || '尚未取得' }}</p>
                   <i>{{ 选中线索[i] ? '已归档' : '空槽' }}</i>
@@ -1096,7 +1125,7 @@
           <button class="sheet-close" @click="读信门牌 = null">✕</button>
           <div class="sheet-title">拼 合 的 真 相</div>
           <div class="truth-fragments" aria-label="四条线索已经拼合">
-            <span v-for="槽 in 裂缝证物槽" :key="槽.标"><Ic :n="槽.图" />{{ 槽.标 }}</span>
+            <span v-for="(槽, i) in 裂缝证物槽" :key="`${槽.标}-${i}`"><Ic :n="槽.图" />{{ 槽.标 }}</span>
           </div>
           <div class="sheet-body letter">
             <p v-for="(段, i) in 读信正文.split('\n')" :key="i" class="narr no-indent">{{ 段 }}</p>
@@ -1217,7 +1246,7 @@ import {
   type 门牌,
 } from '../../stageConfig';
 import { 丈夫在楼, 妻位置推算, 当前天数, 当前时段 } from '../../脚本/游戏逻辑/楼层时钟';
-import { 安装人妻公寓数据库模板, 数据库状态 } from '../../脚本/游戏逻辑/数据库桥';
+import { 安装人妻公寓数据库模板, 数据库状态, 智脑状态 } from '../../脚本/游戏逻辑/数据库桥';
 import { 查金币 } from '../../脚本/游戏逻辑/经济系统';
 import { 可晋阶 } from '../../脚本/游戏逻辑/结算系统';
 import { useDataStore } from './store';
@@ -1908,8 +1937,8 @@ const 底层公共 = [
 
 // ── 素材(AI 生成,2026-07-17 入库;素材 TAG 与发布 TAG 解耦——素材没变就不用动这里) ──
 
-// ⚠ 与手机系统同步：Discord 测试版发布 tag=rq0.34。
-const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.34/dist/人妻公寓/素材';
+// ⚠ 与手机系统同步：Discord 测试版发布 tag=rq0.37。
+const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.37/dist/人妻公寓/素材';
 
 function 头像图(名: string): string {
   return `${素材基址}/头像/${名}.webp`;
@@ -2605,12 +2634,23 @@ function 合上信() {
 
 // ── 档案卡:线索列表与裂缝节 ──
 
-const 裂缝证物槽 = [
-  { 标: '垃圾袋', 图: 'trash' },
-  { 标: '监控', 图: 'cctv' },
-  { 标: '邻里口供', 图: 'peep' },
-  { 标: '丈夫酒话', 图: 'favor' },
-] as const;
+const 裂缝证物槽 = computed(() => {
+  const 渠道 = 选中门牌.value ? 查裂缝(选中门牌.value)?.渠道 : undefined;
+  const 同类 = (标: string, 图: string) => Array.from({ length: 4 }, () => ({ 标, 图 }));
+  if (渠道 === '翻垃圾') return 同类('垃圾证物', 'trash');
+  if (渠道 === '摄像头') return 同类('监控观察', 'cctv');
+  if (渠道 === '打听') return 同类('邻里口供', 'peep');
+  if (渠道 === '丈夫') return 同类('丈夫酒话', 'favor');
+  if (渠道 === '动态广场') return 同类('旧动态', 'book');
+  if (渠道 === '特例双拼')
+    return [
+      { 标: '父亲来电', 图: 'phone' },
+      { 标: '电话余音', 图: 'phone' },
+      { 标: '旧动态', 图: 'book' },
+      { 标: '旧动态', 图: 'book' },
+    ];
+  return 同类('未明线索', 'search');
+});
 
 const 选中线索 = computed(() => {
   const m = 选中门牌.value;
@@ -2618,7 +2658,15 @@ const 选中线索 = computed(() => {
   const 缝 = 查裂缝(m);
   const 进度 = data.value.户[m].妻.裂缝.碎片进度;
   if (!缝) return [];
-  const 源 = 缝.碎片信 ?? 缝.偷窥?.map(拍 => 拍.碎片文案) ?? [];
+  const 考古线索 = 查考古(m)
+    .filter(条 => 条.关键)
+    .map(条 => 条.关键!.碎片文案);
+  const 源 =
+    缝.碎片信 ??
+    缝.偷窥?.map(拍 => 拍.碎片文案) ??
+    缝.打听?.map(拍 => 拍.碎片文案) ??
+    缝.夫漏?.map(拍 => 拍.碎片文案) ??
+    (缝.渠道 === '特例双拼' ? [...(缝.来电?.map(拍 => 拍.碎片文案) ?? []), ...考古线索] : 考古线索);
   return 源.slice(0, 进度);
 });
 
@@ -3031,17 +3079,66 @@ function 切换主题() {
 const 设置开 = ref(false);
 const 设置存储键 = '人妻公寓_界面偏好';
 
-// rq0.34：首次进入序章时主动说明安装顺序；按版本换键，让旧玩家升级后也能看到一次。
+// 首次进入序章时主动说明安装顺序；按版本换键，让旧玩家升级后也能看到记忆插件二选一。
 const 首次说明开 = ref(false);
-const 首次说明存储键 = '人妻公寓_首次游玩说明_rq034';
+const 首次说明存储键 = '人妻公寓_首次游玩说明_rq037';
+const 记忆方案存储键 = '人妻公寓_记忆方案';
+const 智脑安装代码 = "import 'https://cdn.jsdelivr.net/gh/sillytavner-jpg/zhino-script@v5.0.8/dist/index.js'";
 const 数据库检测 = ref(数据库状态());
+const 智脑检测 = ref(智脑状态());
+const 记忆方案 = ref<'数据库' | '智脑' | ''>((() => {
+  try {
+    const saved = localStorage.getItem(记忆方案存储键);
+    return saved === '数据库' || saved === '智脑' ? saved : '';
+  } catch {
+    return '';
+  }
+})());
 const 安装模板中 = ref(false);
+
+const 记忆方案完成 = computed(() =>
+  记忆方案.value === '数据库'
+    ? 数据库检测.value.已安装 && 数据库检测.value.已装游戏模板 && !智脑检测.value.已安装
+    : 记忆方案.value === '智脑'
+      ? 智脑检测.value.已安装 && !数据库检测.value.已安装
+      : false,
+);
 
 function 刷新数据库检测() {
   数据库检测.value = 数据库状态();
+  智脑检测.value = 智脑状态();
+  if (!记忆方案.value) {
+    if (数据库检测.value.已安装 && !智脑检测.value.已安装) 记忆方案.value = '数据库';
+    else if (智脑检测.value.已安装 && !数据库检测.value.已安装) 记忆方案.value = '智脑';
+  }
+}
+
+function 选择记忆方案(value: '数据库' | '智脑') {
+  记忆方案.value = value;
+  try {
+    localStorage.setItem(记忆方案存储键, value);
+  } catch {
+    /* 隐私模式下只保留本次选择。 */
+  }
+  刷新数据库检测();
+}
+
+async function 复制智脑安装代码() {
+  try {
+    await navigator.clipboard.writeText(智脑安装代码);
+    弹提示('智脑 v5.0.8 安装代码已复制。', 3000);
+  } catch {
+    (window.parent ?? window).prompt('复制下面这行安装代码：', 智脑安装代码);
+  }
 }
 
 function 打开首次说明() {
+  try {
+    const saved = localStorage.getItem(记忆方案存储键);
+    if (saved === '数据库' || saved === '智脑') 记忆方案.value = saved;
+  } catch {
+    /* ignore */
+  }
   刷新数据库检测();
   首次说明开.value = true;
 }
@@ -3057,6 +3154,14 @@ function 完成首次说明() {
 
 async function 从说明安装数据库模板() {
   刷新数据库检测();
+  if (记忆方案.value !== '数据库') {
+    弹提示('请先选择“数据库”路线。', 4000);
+    return;
+  }
+  if (智脑检测.value.已安装) {
+    弹提示('检测到智脑仍在运行。请先在酒馆助手的全局脚本中禁用智脑并刷新页面。', 6000);
+    return;
+  }
   if (!数据库检测.value.已安装) {
     弹提示('未检测到数据库插件。安装并刷新酒馆后，再回来重新检测。', 5000);
     return;
@@ -3804,10 +3909,6 @@ onUnmounted(() => {
 
 :global(html.rq-dark) .portrait {
   filter: brightness(0.84) drop-shadow(0 0 1.2px rgba(255, 255, 255, 0.5)) drop-shadow(0 8px 20px rgba(0, 0, 0, 0.55));
-}
-
-:global(html.rq-lite) .portrait {
-  display: none;
 }
 
 .fade-enter-active,
@@ -7604,22 +7705,63 @@ onUnmounted(() => {
 
 /* 垫板浓度给夜间设下限:玩家把滑杆拉多低,深底也至少 0.78,浅字永远有得靠 */
 :global(html.rq-dark) .story-entry {
-  background: rgba(8, 10, 16, 0.88) !important;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(7, 9, 15, 0.96) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 5px 18px rgba(0, 0, 0, 0.3);
 }
 
 /* 自选字色仍优先；“跟随主题”时强制使用夜间浅白，避免父级或旧内联色残留。 */
 :global(html.rq-dark) .story-entry .narr {
-  color: var(--prose-ink, #f4f2f7) !important;
+  color: var(--prose-ink, #fbfaff) !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
 }
 
 /* ── 省流模式:关掉重量级场景位图(背景/立面),回纯 CSS 渐变;头像/图标小,保留 ── */
 :global(html.rq-lite) .story-wrap {
   --scene-img: none !important;
+  background:
+    linear-gradient(160deg, rgba(var(--sc-a, 165, 175, 195), 0.16), rgba(var(--sc-b, 205, 215, 230), 0.08)),
+    var(--glass) !important;
 }
 
 :global(html.rq-lite) .title-screen {
   --kv-img: none !important;
+}
+
+/* 省流会使用纯 CSS 楼体兜底；夜间必须同步换深卡，否则浅字落在浅玻璃上。 */
+:global(html.rq-dark.rq-lite) .map-fallback .bldg-body {
+  background: rgba(24, 27, 42, 0.92);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+:global(html.rq-dark.rq-lite) .map-fallback .bfloor {
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+:global(html.rq-dark.rq-lite) .map-fallback .bunit,
+:global(html.rq-dark.rq-lite) .map-fallback .roof-card,
+:global(html.rq-dark.rq-lite) .map-fallback .gunit {
+  color: #f5f3fa;
+  background: rgba(43, 46, 65, 0.9);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+:global(html.rq-dark.rq-lite) .map-fallback .bunit:hover,
+:global(html.rq-dark.rq-lite) .map-fallback .roof-card:hover,
+:global(html.rq-dark.rq-lite) .map-fallback .gunit:hover {
+  background: rgba(60, 64, 88, 0.96);
+}
+
+:global(html.rq-dark.rq-lite) .map-fallback .bunit.here,
+:global(html.rq-dark.rq-lite) .map-fallback .roof-card.here,
+:global(html.rq-dark.rq-lite) .map-fallback .gunit.here {
+  color: #fff;
+  background: rgba(142, 64, 105, 0.92);
+}
+
+:global(html.rq-dark.rq-lite) .map-fallback .bground {
+  background: rgba(20, 23, 36, 0.96);
+  border-color: rgba(255, 255, 255, 0.14);
 }
 
 /* ── 减少动效:关掉全局过渡与动画 ── */

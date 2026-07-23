@@ -14,6 +14,7 @@ import {
   查看摄像头,
   考古选细节,
   考古到底,
+  母亲来电线索,
   清偷窥挂起,
   读信揭晓,
   翻垃圾,
@@ -245,6 +246,7 @@ function 挂载监听() {
     '人妻公寓:接听来电',
     '人妻公寓:开手机',
     '人妻公寓:来电已接',
+    '人妻公寓:父亲通话结束',
     '人妻公寓:回合完成',
     '人妻公寓:考古选细节',
     '人妻公寓:考古到底',
@@ -551,6 +553,13 @@ function 挂载监听() {
       eventEmit('人妻公寓:来电已接', 结果);
     }),
   );
+  eventOn('人妻公寓:父亲通话结束', () =>
+    安全操作((raw, data) => {
+      const 线索 = 母亲来电线索(data);
+      if (!线索) return;
+      return 落地(线索, raw, data);
+    }),
+  );
 
   // ─────────────────────────────────────────────
   // 手机(P4:页面层独立设备,玉子同款挂载;游戏界面只有跳动指示与红点)
@@ -701,13 +710,17 @@ function 挂载监听() {
         捕获保护快照(data);
 
         // 多模态 content 归一成纯文本供焦点扫描
-        const 对话尾 = event_data.chat.map(条 => ({
-          role: 条.role,
-          content:
-            typeof 条.content === 'string'
-              ? 条.content
-              : (条.content ?? []).map(块 => ('text' in 块 ? 块.text : '')).join('\n'),
-        }));
+        // 焦点识别只相信玩家消息与 AI 正文。system 中可能混有世界书、预设、数据库、
+        // 智脑召回记忆及本游戏快照；它们仍照常发给 AI，但不得冒充“当前正在发生的剧情”。
+        const 对话尾 = event_data.chat
+          .filter(条 => 条.role === 'user' || 条.role === 'assistant')
+          .map(条 => ({
+            role: 条.role,
+            content:
+              typeof 条.content === 'string'
+                ? 条.content
+                : (条.content ?? []).map(块 => ('text' in 块 ? 块.text : '')).join('\n'),
+          }));
         _本轮焦点 = 检测焦点(对话尾, data, 楼层).焦点;
 
         // 组快照 + {{user}} 替换(防护24)

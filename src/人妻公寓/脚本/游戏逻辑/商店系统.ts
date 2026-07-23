@@ -52,6 +52,27 @@ export function 取货架(data: SchemaType): { 页签: string; 商品: (typeof �
       商品: 全部.filter(d => d.类别 === '服饰' && (d.服饰?.档 ?? 9) <= Math.min(5, 最高 + 1)),
     });
   }
+  if (最高 >= 3) {
+    架.push({
+      页签: '特殊场景',
+      商品: 全部.filter(d => {
+        if (d.类别 !== '特殊场景') return false;
+        const 场景 = 查特殊场景(d.id);
+        if (!场景) return true;
+        try {
+          return 场景.前置(data as never);
+        } catch {
+          return false;
+        }
+      }),
+    });
+  }
+  if (最高 >= 4) {
+    架.push({ 页签: '性癖', 商品: 全部.filter(d => d.类别 === '性癖') });
+  }
+  if (data.系统._母亲入列 && (data.户['302']?.妻.当前阶段 ?? 0) >= 2) {
+    架.push({ 页签: '药物', 商品: 全部.filter(d => d.类别 === '药物') });
+  }
   return 架;
 }
 
@@ -62,7 +83,10 @@ export function 取货架(data: SchemaType): { 页签: string; 商品: (typeof �
 export function 购买(data: SchemaType, 道具id: string): 商店结果 {
   const 配 = 查道具(道具id);
   if (!配 || !(配.价格 ?? 0)) return { 成功: false, 提示: '货架上没有这件东西。' };
-  if (配.类别 === '礼物' && !礼物页签已解锁(data)) return { 成功: false, 提示: '这个柜台还没开。' };
+  // 权限必须由脚本端复核。否则旧版界面、第三方主题或手工 eventEmit 可以绕过
+  // 页签进度，提前买到特殊场景、性癖与母亲线药物。
+  const 当前在架 = 取货架(data).some(页 => 页.商品.some(商品 => 商品.id === 道具id));
+  if (!当前在架) return { 成功: false, 提示: '这个柜台还没开，或者这件商品尚未上架。' };
   if (配.常驻 && data.背包.includes(道具id)) return { 成功: false, 提示: `「${配.名称}」已经在背包里。` };
   if (data.现金 < 配.价格!) return { 成功: false, 提示: '钱不够。' };
 
@@ -113,7 +137,11 @@ export async function 送礼(data: SchemaType, 道具id: string, 门牌号: 门�
 
     // 破妈妈墙(spec 隐藏机制,UI零提示):阶段0的母亲+外装/妆容类+档≤3 → 破墙正戏
     if (门牌号 === '302' && 妻.当前阶段 === 0) {
-      if ((配.服饰.类 === '外装' || 配.服饰.类 === '妆容') && 配.服饰.档 <= 3) {
+      if (
+        妻.裂缝.已确认 &&
+        (配.服饰.类 === '外装' || 配.服饰.类 === '妆容') &&
+        配.服饰.档 <= 3
+      ) {
         const 撞见次数 = data.系统._母亲撞见次数;
         const 差分 =
           撞见次数 >= 3
