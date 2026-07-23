@@ -13,7 +13,7 @@
       </transition>
 
       <!-- 右上角:主题切换 + 全屏 + 设置(meta 类操作,不进游戏功能区) -->
-      <span class="corner-btns">
+      <span class="corner-btns" :class="{ 'above-setup': 首次说明开 }">
         <button class="btn mini icon" :title="暗色 ? '切回日间模式' : '切换夜间模式'" @click="切换主题">
           <Ic :n="暗色 ? 'sun' : 'moon'" />
         </button>
@@ -143,9 +143,9 @@
       </div>
 
       <!-- ═══════════ rq0.34 首次游玩准备：第一次进卡自动出现，标题页可随时重开 ═══════════ -->
-      <div v-if="首次说明开" class="mask setup-mask" @click.self="记忆方案完成 && (首次说明开 = false)">
+      <div v-if="首次说明开" class="mask setup-mask" @click.self="首次准备完成 && (首次说明开 = false)">
         <div class="sheet setup-sheet">
-          <button v-if="记忆方案完成" class="sheet-close" @click="首次说明开 = false">✕</button>
+          <button v-if="首次准备完成" class="sheet-close" @click="首次说明开 = false">✕</button>
           <div class="ui-kicker">FIRST RUN / 首次游玩准备</div>
           <h3 class="setup-title">先把记忆方案选好</h3>
           <p class="setup-lead">数据库与智脑只能二选一。两套同时运行会重复总结和注入，必须关闭其中一个。</p>
@@ -163,14 +163,18 @@
               ><i>{{ 智脑检测.已安装 ? '✓' : '·' }}</i
               >智脑插件</span
             >
+            <span :class="{ on: 酒馆助手兼容 }">
+              <i>{{ 酒馆助手检测中 ? '…' : 酒馆助手兼容 ? '✓' : '!' }}</i>
+              酒馆助手 {{ 酒馆助手版本 || '未检测' }}
+            </span>
           </div>
 
           <ol class="setup-steps">
             <li class="required">
               <b><em>1</em>安装角色卡与运行环境</b>
               <p>
-                导入角色卡后，安装并启用最新版【酒馆助手】，并确认角色卡自带的 MVU
-                脚本已启用。若首页底部“游戏逻辑脚本”显示红色，先刷新页面并检查脚本。
+                导入角色卡后，安装并启用【酒馆助手】48.8.19 或更高版本，并确认角色卡自带的 MVU
+                脚本已启用。当前{{ 酒馆助手检测说明 }}。若版本过低，请更新后刷新页面再开始游戏。
               </p>
             </li>
             <li class="required">
@@ -190,7 +194,7 @@
               <template v-if="记忆方案 === '数据库'">
                 <p>请在【酒馆助手→脚本→全局脚本】中禁用或删除智脑并刷新页面，然后安装数据库插件和人妻公寓四张 RQ_ 表。</p>
                 <div class="setup-db-actions">
-                  <button class="btn mini" @click="刷新数据库检测">重新检测</button>
+                  <button class="btn mini" @click="刷新全部检测">重新检测</button>
                   <button
                     class="btn mini rite"
                     :disabled="智脑检测.已安装 || !数据库检测.已安装 || 安装模板中"
@@ -209,7 +213,7 @@
                 <p>请禁用或删除数据库插件并刷新页面；随后把智脑 v5.0.8 作为【全局脚本】安装。智脑自行捕获楼层、总结并注入记忆，不需要 RQ_ 表。</p>
                 <div class="setup-db-actions">
                   <button class="btn mini" @click="复制智脑安装代码">复制智脑安装代码</button>
-                  <button class="btn mini rite" @click="刷新数据库检测">重新检测</button>
+                  <button class="btn mini rite" @click="刷新全部检测">重新检测</button>
                 </div>
                 <small v-if="数据库检测.已安装">✗ 数据库插件仍在运行，请先禁用并刷新。</small>
                 <small v-else-if="!智脑检测.已安装">· 尚未检测到智脑悬浮窗。</small>
@@ -221,15 +225,21 @@
             <li>
               <b><em>4</em>完成检测</b>
               <p>只有目标插件已启用、另一套已关闭时才算完成。手机专用模型仍可在【手机→我】中单独配置。</p>
-              <div class="setup-db-actions"><button class="btn mini" @click="刷新数据库检测">重新检测</button></div>
-              <small :class="{ good: 记忆方案完成 }">{{ 记忆方案完成 ? '✓ 二选一检测通过，可以开始游戏。' : '✗ 二选一检测尚未通过。' }}</small>
+              <div class="setup-db-actions"><button class="btn mini" @click="刷新全部检测">重新检测</button></div>
+              <small :class="{ good: 首次准备完成 }">{{
+                首次准备完成
+                  ? '✓ 酒馆助手版本与长期记忆检测均通过，可以开始游戏。'
+                  : !酒馆助手兼容
+                    ? `✗ ${酒馆助手检测说明}。`
+                    : '✗ 长期记忆二选一检测尚未通过。'
+              }}</small>
             </li>
           </ol>
 
           <div class="setup-foot">
             <p>以后可在序章首页点“首次游玩说明”再次查看。</p>
-            <button class="btn rite" :disabled="!记忆方案完成" @click="完成首次说明">
-              {{ 记忆方案完成 ? '检测通过，回到首页' : '请先完成二选一检测' }}
+            <button class="btn rite" :disabled="!首次准备完成" @click="完成首次说明">
+              {{ 首次准备完成 ? '检测通过，回到首页' : '请先完成环境检测' }}
             </button>
           </div>
         </div>
@@ -790,7 +800,7 @@
                 <span class="hearts" :title="'阶段:' + 选中档案.妻.阶段标题">
                   <i v-for="n in 5" :key="n" :class="{ on: n <= 选中档案.妻.当前阶段 }">♥</i>
                 </span>
-                <span class="dossier-stage">{{ 选中档案.妻.阶段标题 }}</span>
+                <span class="dossier-stage" :title="选中档案.妻.阶段标题">{{ 选中档案.妻.阶段标题 }}</span>
               </span>
             </div>
             <div class="dossier-portrait" aria-hidden="true">
@@ -1226,6 +1236,7 @@
 </template>
 
 <script setup lang="ts">
+import { compare } from 'compare-versions';
 import type { FunctionalComponent } from 'vue';
 
 import type { SchemaType } from '../../schema';
@@ -1235,6 +1246,7 @@ import {
   户静态表,
   房间表,
   查房间,
+  查考古,
   查性癖,
   查特殊场景,
   查裂缝,
@@ -2658,15 +2670,33 @@ const 选中线索 = computed(() => {
   const 缝 = 查裂缝(m);
   const 进度 = data.value.户[m].妻.裂缝.碎片进度;
   if (!缝) return [];
-  const 考古线索 = 查考古(m)
-    .filter(条 => 条.关键)
-    .map(条 => 条.关键!.碎片文案);
-  const 源 =
-    缝.碎片信 ??
-    缝.偷窥?.map(拍 => 拍.碎片文案) ??
-    缝.打听?.map(拍 => 拍.碎片文案) ??
-    缝.夫漏?.map(拍 => 拍.碎片文案) ??
-    (缝.渠道 === '特例双拼' ? [...(缝.来电?.map(拍 => 拍.碎片文案) ?? []), ...考古线索] : 考古线索);
+  // 展示层与产出层使用同一条渠道硬门。这里显式按渠道取数，避免新增字段或旧局残留
+  // 让某户错误命中另一渠道（例如夏乔的垃圾线索显示成摄像头观察）。
+  const 考古线索 = () =>
+    查考古(m)
+      .filter(条 => 条.关键)
+      .map(条 => 条.关键!.碎片文案);
+  let 源: string[] = [];
+  switch (缝.渠道) {
+    case '翻垃圾':
+      源 = 缝.碎片信 ?? [];
+      break;
+    case '摄像头':
+      源 = 缝.偷窥?.map(拍 => 拍.碎片文案) ?? [];
+      break;
+    case '打听':
+      源 = 缝.打听?.map(拍 => 拍.碎片文案) ?? [];
+      break;
+    case '丈夫':
+      源 = 缝.夫漏?.map(拍 => 拍.碎片文案) ?? [];
+      break;
+    case '动态广场':
+      源 = 考古线索();
+      break;
+    case '特例双拼':
+      源 = [...(缝.来电?.map(拍 => 拍.碎片文案) ?? []), ...考古线索()];
+      break;
+  }
   return 源.slice(0, 进度);
 });
 
@@ -3082,6 +3112,7 @@ const 设置存储键 = '人妻公寓_界面偏好';
 // 首次进入序章时主动说明安装顺序；按版本换键，让旧玩家升级后也能看到记忆插件二选一。
 const 首次说明开 = ref(false);
 const 首次说明存储键 = '人妻公寓_首次游玩说明_rq037';
+const 酒馆助手最低版本 = '48.8.19';
 const 记忆方案存储键 = '人妻公寓_记忆方案';
 const 智脑安装代码 = "import 'https://cdn.jsdelivr.net/gh/sillytavner-jpg/zhino-script@v5.0.8/dist/index.js'";
 const 数据库检测 = ref(数据库状态());
@@ -3095,6 +3126,21 @@ const 记忆方案 = ref<'数据库' | '智脑' | ''>((() => {
   }
 })());
 const 安装模板中 = ref(false);
+const 酒馆助手版本 = ref('');
+const 酒馆助手检测中 = ref(false);
+const 酒馆助手兼容 = computed(() => {
+  const 版本 = 酒馆助手版本.value.match(/\d+(?:\.\d+){1,3}/)?.[0];
+  return Boolean(版本 && compare(版本, 酒馆助手最低版本, '>='));
+});
+const 酒馆助手检测说明 = computed(() =>
+  酒馆助手检测中.value
+    ? '正在检测酒馆助手版本'
+    : !酒馆助手版本.value
+      ? `未检测到酒馆助手版本（需要 ${酒馆助手最低版本}+）`
+      : 酒馆助手兼容.value
+        ? `检测到 ${酒馆助手版本.value}，版本符合要求`
+        : `检测到 ${酒馆助手版本.value}，低于建议版本 ${酒馆助手最低版本}`,
+);
 
 const 记忆方案完成 = computed(() =>
   记忆方案.value === '数据库'
@@ -3103,6 +3149,20 @@ const 记忆方案完成 = computed(() =>
       ? 智脑检测.value.已安装 && !数据库检测.value.已安装
       : false,
 );
+const 首次准备完成 = computed(() => 酒馆助手兼容.value && 记忆方案完成.value);
+
+async function 刷新酒馆助手检测() {
+  酒馆助手检测中.value = true;
+  try {
+    const 版本 = await getTavernHelperVersion();
+    酒馆助手版本.value = typeof 版本 === 'string' ? 版本 : '';
+  } catch (error) {
+    酒馆助手版本.value = '';
+    console.warn('[人妻公寓] 无法读取酒馆助手版本', error);
+  } finally {
+    酒馆助手检测中.value = false;
+  }
+}
 
 function 刷新数据库检测() {
   数据库检测.value = 数据库状态();
@@ -3111,6 +3171,11 @@ function 刷新数据库检测() {
     if (数据库检测.value.已安装 && !智脑检测.value.已安装) 记忆方案.value = '数据库';
     else if (智脑检测.value.已安装 && !数据库检测.value.已安装) 记忆方案.value = '智脑';
   }
+}
+
+function 刷新全部检测() {
+  刷新数据库检测();
+  void 刷新酒馆助手检测();
 }
 
 function 选择记忆方案(value: '数据库' | '智脑') {
@@ -3139,7 +3204,7 @@ function 打开首次说明() {
   } catch {
     /* ignore */
   }
-  刷新数据库检测();
+  刷新全部检测();
   首次说明开.value = true;
 }
 
@@ -3331,6 +3396,7 @@ onErrorCaptured(err => {
 // ── 挂载:事件接线 + 状态恢复 ──
 
 onMounted(() => {
+  void 刷新酒馆助手检测();
   void 取卷轴();
   刷新可重掷();
   刷新在场();
@@ -5270,10 +5336,11 @@ onUnmounted(() => {
 
 .dossier-stage {
   align-self: flex-start;
-  max-width: 100%;
-  overflow: hidden;
+  min-width: 4em;
+  max-width: none;
+  overflow: visible;
   white-space: nowrap;
-  text-overflow: ellipsis;
+  text-align: center;
   color: #fff;
   background: linear-gradient(180deg, #ff6cab, #ff4f9a);
   border-radius: 999px;
@@ -5815,7 +5882,7 @@ onUnmounted(() => {
 
 .setup-statuses {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 6px;
   margin-bottom: 10px;
 }
@@ -6823,6 +6890,10 @@ onUnmounted(() => {
   z-index: 20;
   display: inline-flex;
   gap: 6px;
+}
+
+.corner-btns.above-setup {
+  z-index: 60;
 }
 
 /* ═══ HUD:数据专属框架(时间块+瓦片,与按钮分离) ═══ */
@@ -7915,6 +7986,7 @@ onUnmounted(() => {
   }
 
   .setup-statuses {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 4px;
   }
 

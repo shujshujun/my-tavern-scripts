@@ -95,25 +95,6 @@ html.rq-dark body {
     linear-gradient(135deg, #1b1824 0%, #161b28 48%, #1e1a15 100%);
 }
 
-html.rq-dark body::before {
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
-}
-
-/* 格纸纹理(初星签名细节:细白网格,向下淡出) */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, 0.4) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.3) 1px, transparent 1px);
-  background-size: 36px 36px;
-  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.6), transparent 65%);
-}
-
 #app {
   min-height: 100px;
 }
