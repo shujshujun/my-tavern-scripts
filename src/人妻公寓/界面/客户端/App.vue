@@ -2140,27 +2140,24 @@ function 停止生成计时() {
 
 function 让输入露出() {
   if (!键盘打开.value) return;
-  let 遮挡 = 0;
-  // Android WebView 可能采用 overlay 模式：布局视口不缩小，只有 visualViewport
-  // 报告键盘实际占掉的底部高度。嵌在酒馆 iframe 时，变化也可能只发生在父页。
-  for (const 窗 of [window, (() => {
-    try {
-      return window.parent;
-    } catch {
-      return null;
+  // 不再把输入栏 fixed 后叠加“键盘高度”：有些 WebView 已经把 fixed 坐标系缩到
+  // visualViewport，再补一次高度会把输入栏推到屏幕外。这里直接缩短整座游戏画框，
+  // 让 flex 布局压缩正文舞台，输入栏自然落在键盘上沿。
+  let 可用高 = window.visualViewport?.height ?? window.innerHeight;
+  try {
+    const frame = window.frameElement as HTMLElement | null;
+    const 父视口 = window.parent?.visualViewport;
+    if (frame && 父视口) {
+      const 框 = frame.getBoundingClientRect();
+      const 可视顶 = Math.max(框.top, 父视口.offsetTop);
+      const 可视底 = Math.min(框.bottom, 父视口.offsetTop + 父视口.height);
+      const iframe露出高 = Math.max(0, 可视底 - 可视顶);
+      if (iframe露出高 >= 240) 可用高 = Math.min(可用高, iframe露出高);
     }
-  })()]) {
-    if (!窗) continue;
-    try {
-      const 可视 = 窗.visualViewport;
-      if (!可视) continue;
-      const 底部遮挡 = Math.max(0, 窗.innerHeight - 可视.height - 可视.offsetTop);
-      遮挡 = Math.max(遮挡, 底部遮挡 >= 80 ? 底部遮挡 : 0);
-    } catch {
-      /* 跨域父页不可读时只使用本页数据 */
-    }
+  } catch {
+    /* 真全屏或跨域时，本页 visualViewport 就是真值 */
   }
-  document.documentElement.style.setProperty('--keyboard-inset', `${Math.round(遮挡)}px`);
+  document.documentElement.style.setProperty('--keyboard-frame-h', `${Math.max(240, Math.round(可用高))}px`);
   try {
     const frame = window.frameElement as HTMLElement | null;
     frame?.scrollIntoView({ block: 'end', behavior: 'smooth' });
@@ -2181,7 +2178,7 @@ function 输入失焦() {
   clearTimeout(键盘定位timer);
   键盘定位timer = setTimeout(() => {
     键盘打开.value = false;
-    document.documentElement.style.removeProperty('--keyboard-inset');
+    document.documentElement.style.removeProperty('--keyboard-frame-h');
   }, 160);
 }
 /** 上次回合发生的房间(2026-07-20 玩家点单:人走出房间后撤回/重演一起藏,防跨场景回滚) */
@@ -8178,18 +8175,15 @@ onUnmounted(() => {
   }
 
   .keyboard-open .quill {
-    position: fixed;
-    z-index: 80;
-    left: 8px;
-    right: 8px;
-    bottom: calc(var(--keyboard-inset, 0px) + env(safe-area-inset-bottom, 0px));
-    box-sizing: border-box;
-    margin: 0;
-    padding: 7px;
-    border: 1px solid var(--line);
-    border-radius: 14px;
-    background: var(--paper-card);
-    box-shadow: 0 -8px 28px rgba(30, 26, 38, 0.2);
+    position: relative;
+    z-index: 25;
+  }
+
+  /* 键盘态重排整个 flex 画框：正文舞台变矮并继续内部滚动，输入栏不再被排到屏幕外。 */
+  .apt.keyboard-open {
+    height: var(--keyboard-frame-h, 100dvh);
+    max-height: var(--keyboard-frame-h, 100dvh);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   .reroll-row {
