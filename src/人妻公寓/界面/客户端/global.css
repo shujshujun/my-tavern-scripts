@@ -80,8 +80,10 @@ html,
 body {
   margin: 0;
   padding: 0;
+  min-height: 100%;
   color: var(--ink);
   font-family: var(--font-body);
+  background-color: #f2f7ff;
   background:
     radial-gradient(circle at 18% 8%, rgba(255, 79, 154, 0.16), transparent 30%),
     radial-gradient(circle at 84% 4%, rgba(38, 169, 244, 0.18), transparent 32%),
@@ -89,6 +91,7 @@ body {
 }
 
 html.rq-dark body {
+  background-color: #161b28;
   background:
     radial-gradient(circle at 18% 8%, rgba(255, 79, 154, 0.1), transparent 30%),
     radial-gradient(circle at 84% 4%, rgba(38, 169, 244, 0.12), transparent 32%),
@@ -97,4 +100,41 @@ html.rq-dark body {
 
 #app {
   min-height: 100px;
+}
+
+/*
+ * Fullscreen API 会在全屏元素背后创建 UA ::backdrop。部分 Android WebView 会把
+ * 透明的根合成层错误混入黑色 backdrop，并在底部做成渐变。真全屏时把整条根链
+ * 锁成不透明动态视口，同时给 backdrop 同色底，避免任何黑层透进游戏画面。
+ */
+html.rqgy-full,
+html.rqgy-full body,
+html.rqgy-full #app {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  overflow: hidden;
+  background-color: #f2f7ff;
+}
+
+html.rqgy-full::backdrop {
+  background: #f2f7ff;
+}
+
+html.rqgy-full:-webkit-full-screen {
+  background-color: #f2f7ff;
+}
+
+html.rqgy-full.rq-dark,
+html.rqgy-full.rq-dark body,
+html.rqgy-full.rq-dark #app {
+  background-color: #161b28;
+}
+
+html.rqgy-full.rq-dark::backdrop {
+  background: #161b28;
+}
+
+html.rqgy-full.rq-dark:-webkit-full-screen {
+  background-color: #161b28;
 }

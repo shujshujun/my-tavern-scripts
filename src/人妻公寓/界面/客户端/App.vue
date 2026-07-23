@@ -589,6 +589,7 @@
         <!-- 游戏内输入(玩家不碰酒馆输入框) -->
         <div v-if="可输入" class="quill">
           <textarea
+            ref="输入框"
             v-model="输入文本"
             rows="2"
             placeholder="你的言行……(Enter 发送,Shift+Enter 换行)"
@@ -2117,6 +2118,8 @@ const 取消后自动重试 = ref(false);
 const 可重掷 = ref(false);
 const 隔离可重掷 = ref(false);
 const 键盘打开 = ref(false);
+const 输入框 = ref<HTMLTextAreaElement | null>(null);
+const 键盘视口们: VisualViewport[] = [];
 let 键盘定位timer: ReturnType<typeof setTimeout> | undefined;
 let 生成等待timer: ReturnType<typeof setInterval> | undefined;
 
@@ -2137,12 +2140,34 @@ function 停止生成计时() {
 
 function 让输入露出() {
   if (!键盘打开.value) return;
+  let 遮挡 = 0;
+  // Android WebView 可能采用 overlay 模式：布局视口不缩小，只有 visualViewport
+  // 报告键盘实际占掉的底部高度。嵌在酒馆 iframe 时，变化也可能只发生在父页。
+  for (const 窗 of [window, (() => {
+    try {
+      return window.parent;
+    } catch {
+      return null;
+    }
+  })()]) {
+    if (!窗) continue;
+    try {
+      const 可视 = 窗.visualViewport;
+      if (!可视) continue;
+      const 底部遮挡 = Math.max(0, 窗.innerHeight - 可视.height - 可视.offsetTop);
+      遮挡 = Math.max(遮挡, 底部遮挡 >= 80 ? 底部遮挡 : 0);
+    } catch {
+      /* 跨域父页不可读时只使用本页数据 */
+    }
+  }
+  document.documentElement.style.setProperty('--keyboard-inset', `${Math.round(遮挡)}px`);
   try {
     const frame = window.frameElement as HTMLElement | null;
     frame?.scrollIntoView({ block: 'end', behavior: 'smooth' });
   } catch {
     /* 父页不允许滚动时，仍由本页紧凑键盘态兜底 */
   }
+  requestAnimationFrame(() => 输入框.value?.scrollIntoView({ block: 'nearest' }));
 }
 
 function 输入聚焦() {
@@ -2154,7 +2179,10 @@ function 输入聚焦() {
 
 function 输入失焦() {
   clearTimeout(键盘定位timer);
-  键盘定位timer = setTimeout(() => (键盘打开.value = false), 160);
+  键盘定位timer = setTimeout(() => {
+    键盘打开.value = false;
+    document.documentElement.style.removeProperty('--keyboard-inset');
+  }, 160);
 }
 /** 上次回合发生的房间(2026-07-20 玩家点单:人走出房间后撤回/重演一起藏,防跨场景回滚) */
 const 回合房间 = ref<string | null>(null);
@@ -2988,7 +3016,9 @@ type 全屏文档 = Document & { webkitExitFullscreen?: () => void; webkitFullsc
 function 应用画幅(开: boolean) {
   document.documentElement.classList.toggle('rqgy-full', 开);
   if (开) {
-    document.documentElement.style.setProperty('--frame-h', '100vh');
+    // 手机真全屏必须跟随动态视口；100vh 在部分 WebView 仍包含已隐藏的浏览器栏，
+    // 多出来的透明合成区会透出 Fullscreen API 的黑色 backdrop。
+    document.documentElement.style.setProperty('--frame-h', '100dvh');
     return;
   }
   try {
@@ -3403,10 +3433,20 @@ onMounted(() => {
   刷新行动选项();
   刷新待办();
   刷新偷窥待选();
-  try {
-    window.parent?.visualViewport?.addEventListener('resize', 让输入露出);
-  } catch {
-    window.visualViewport?.addEventListener('resize', 让输入露出);
+  for (const 视口 of [
+    window.visualViewport,
+    (() => {
+      try {
+        return window.parent?.visualViewport;
+      } catch {
+        return null;
+      }
+    })(),
+  ]) {
+    if (!视口 || 键盘视口们.includes(视口)) continue;
+    键盘视口们.push(视口);
+    视口.addEventListener('resize', 让输入露出);
+    视口.addEventListener('scroll', 让输入露出);
   }
 
   eventOn('人妻公寓:生成开始', () => {
@@ -3598,11 +3638,11 @@ onUnmounted(() => {
   clearTimeout(破门计时);
   clearTimeout(提示timer);
   clearTimeout(键盘定位timer);
-  try {
-    window.parent?.visualViewport?.removeEventListener('resize', 让输入露出);
-  } catch {
-    window.visualViewport?.removeEventListener('resize', 让输入露出);
+  for (const 视口 of 键盘视口们) {
+    视口.removeEventListener('resize', 让输入露出);
+    视口.removeEventListener('scroll', 让输入露出);
   }
+  键盘视口们.length = 0;
 });
 </script>
 
@@ -8138,8 +8178,18 @@ onUnmounted(() => {
   }
 
   .keyboard-open .quill {
-    position: relative;
-    z-index: 25;
+    position: fixed;
+    z-index: 80;
+    left: 8px;
+    right: 8px;
+    bottom: calc(var(--keyboard-inset, 0px) + env(safe-area-inset-bottom, 0px));
+    box-sizing: border-box;
+    margin: 0;
+    padding: 7px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--paper-card);
+    box-shadow: 0 -8px 28px rgba(30, 26, 38, 0.2);
   }
 
   .reroll-row {
