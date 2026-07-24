@@ -838,8 +838,8 @@ export async function 手机节拍(): Promise<void> {
 // ============================================
 
 const ROOT_ID = 'rq-phone-root';
-// ⚠ 与 App.vue 素材基址同步：Discord 测试版发布 tag=rq0.43。
-const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.43/dist/人妻公寓/素材';
+// ⚠ 与 App.vue 素材基址同步：Discord 测试版发布 tag=rq0.45。
+const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.45/dist/人妻公寓/素材';
 
 let 当前页: {
   名: 'chats' | 'chat' | 'moments' | 'call' | 'talk' | 'settings';

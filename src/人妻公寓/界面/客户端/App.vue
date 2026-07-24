@@ -1979,8 +1979,8 @@ const 底层公共 = [
 
 // ── 素材(AI 生成,2026-07-17 入库;素材 TAG 与发布 TAG 解耦——素材没变就不用动这里) ──
 
-// ⚠ 与手机系统同步：Discord 测试版发布 tag=rq0.43。
-const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.43/dist/人妻公寓/素材';
+// ⚠ 与手机系统同步：Discord 测试版发布 tag=rq0.45。
+const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.45/dist/人妻公寓/素材';
 
 function 头像图(名: string): string {
   return `${素材基址}/头像/${名}.webp`;
@@ -2401,12 +2401,12 @@ function 开始考验() {
   eventEmit('人妻公寓:开始新游戏', 选中难度.value);
 }
 
-// ── 待办软引导(开局流程③:拿钥匙看信箱→101报修→102收租→回管理员室;不硬锁) ──
+// ── 待办软引导(开局流程③:拿钥匙看信箱→101报修→102认门→回管理员室;不硬锁) ──
 
 const 待办定义 = [
   { 键: '信箱区', 文字: '去信箱看看租约单子' },
   { 键: '101', 文字: '去 101 修水管' },
-  { 键: '102', 文字: '去 102 收房租' },
+  { 键: '102', 文字: '去 102 登门认识住户' },
   { 键: '管理员室', 文字: '回管理员室' },
 ] as const;
 
