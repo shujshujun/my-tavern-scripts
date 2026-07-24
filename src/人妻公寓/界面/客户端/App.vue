@@ -1347,6 +1347,12 @@ const 显示地图 = ref(false);
 const 进房末楼 = ref(0);
 /** 工具由头只在这一次“从门外进房”的首轮结算一次；留在房内续聊不能再次算检修。 */
 const 本次入房由头已用 = ref(false);
+interface 无耗时拜访记录 {
+  房间id: string;
+  钟楼号: number;
+  进房末楼: number;
+  由头已用: boolean;
+}
 const 位置种子 = computed(() => 钟楼号.value);
 
 /** 正在与玩家对话的人只固定在当前场景；其余住户在地图上按最新钟楼移动。 */
@@ -1390,14 +1396,30 @@ watch(显示地图, 开 => {
 
 async function 写场景(房间id: string | null, 破门 = false): Promise<void> {
   const 变量 = getVariables({ type: 'chat' });
-  const 旧房间 = (_.get(变量, '_场景.房间id') as string | undefined) ?? null;
+  const 旧场景 = (_.get(变量, '_场景') as
+    | { 房间id?: string; 进房末楼?: number; 由头已用?: boolean }
+    | null
+    | undefined) ?? null;
+  const 旧房间 = 旧场景?.房间id ?? null;
   const 旧轨迹 = (_.get(变量, '_地图轨迹') as string[] | undefined) ?? [];
   const 从 = 旧房间 ? (查房间(旧房间)?.名称 ?? 旧房间) : '楼道';
   const 到 = 房间id ? (查房间(房间id)?.名称 ?? 房间id) : '楼道';
   const 新轨迹 = 旧房间 === 房间id ? 旧轨迹 : [...旧轨迹, `从${从}走到${到}`].slice(-8);
+  let 无耗时拜访 = (_.get(变量, '_无耗时拜访') as 无耗时拜访记录 | null | undefined) ?? null;
+  // 临时离开住户场景去翻垃圾/查工具再回来，只要钟楼没有变化，就仍是同一次拜访。
+  // 记录放 chat 变量而不是模块变量，iframe 刷新后也不会重新索要已经用过的由头。
+  if (旧房间 && 旧房间 !== 房间id && 查房间(旧房间)?.类型 === '户' && 旧房间 !== '302') {
+    无耗时拜访 = {
+      房间id: 旧房间,
+      钟楼号: 钟楼号.value,
+      进房末楼: 旧场景?.进房末楼 ?? 进房末楼.value,
+      由头已用: 旧场景?.由头已用 ?? 本次入房由头已用.value,
+    };
+  }
   await insertOrAssignVariables(
     {
       _场景: 房间id ? { 房间id, 破门, 进房末楼: 进房末楼.value, 由头已用: 本次入房由头已用.value } : null,
+      _无耗时拜访: 无耗时拜访,
       _粘滞: null, // 玩家一走动就解除旧对话固定；重回同一房间也不能把已经离开的人“复活”
       _地图轨迹: 新轨迹,
     },
@@ -1412,13 +1434,20 @@ async function 进入(房间id: string, 破门 = false, 保持地图 = false): P
     闪转场(查房间(房间id)?.名称 ?? 房间id);
     return;
   }
-  try {
-    进房末楼.value = getLastMessageId();
-  } catch {
-    进房末楼.value = 末楼号.value;
+  const 无耗时拜访 = (_.get(getVariables({ type: 'chat' }), '_无耗时拜访') as 无耗时拜访记录 | null | undefined) ?? null;
+  const 续接同次拜访 =
+    无耗时拜访?.房间id === 房间id && 无耗时拜访.钟楼号 === 钟楼号.value && 查房间(房间id)?.类型 === '户';
+  if (续接同次拜访) {
+    进房末楼.value = 无耗时拜访.进房末楼;
+  } else {
+    try {
+      进房末楼.value = getLastMessageId();
+    } catch {
+      进房末楼.value = 末楼号.value;
+    }
   }
   当前房间.value = 房间id;
-  本次入房由头已用.value = false;
+  本次入房由头已用.value = 续接同次拜访 ? 无耗时拜访.由头已用 : false;
   已破门进入.value = 破门;
   粘滞在场.value = { 位置: null, 们: [] };
   if (!保持地图) 关地图();
@@ -1950,8 +1979,8 @@ const 底层公共 = [
 
 // ── 素材(AI 生成,2026-07-17 入库;素材 TAG 与发布 TAG 解耦——素材没变就不用动这里) ──
 
-// ⚠ 与手机系统同步：Discord 测试版发布 tag=rq0.37。
-const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.37/dist/人妻公寓/素材';
+// ⚠ 与手机系统同步：Discord 测试版发布 tag=rq0.43。
+const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.43/dist/人妻公寓/素材';
 
 function 头像图(名: string): string {
   return `${素材基址}/头像/${名}.webp`;
@@ -1962,7 +1991,7 @@ const 头像失效 = ref<Record<string, boolean>>({});
 
 /** 商店道具图(rq0.12 生图入库;挂了回退首字) */
 function 道具图(id: string): string {
-  if (id.startsWith('初始外装_')) return `${素材基址}/立绘/${id.slice('初始外装_'.length)}.webp`;
+  if (id.startsWith('初始外装_')) return `${素材基址}/道具/${id}.webp`;
   return `${素材基址}/道具/${id}.webp`;
 }
 
@@ -2003,6 +2032,7 @@ function 立绘槽(n: number, i: number): Record<string, string> {
 
   return {
     '--portrait-desktop-left': `${(i * 桌面宽).toFixed(3)}%`,
+    '--portrait-desktop-center': `${((i + 0.5) * 桌面宽).toFixed(3)}%`,
     '--portrait-desktop-width': `${桌面宽.toFixed(3)}%`,
     '--portrait-desktop-height': `${桌面高}%`,
     '--portrait-mobile-left': `${((手机列 * 100) / 手机列数).toFixed(3)}%`,
@@ -4034,7 +4064,7 @@ onUnmounted(() => {
       transparent 72%
     ),
     linear-gradient(rgba(255, 250, 245, 0.32), rgba(255, 250, 245, 0.42)),
-    var(--scene-img, none) var(--scene-pos, center) / cover no-repeat,
+    var(--scene-img, none) var(--scene-pos, center) / var(--scene-size, cover) no-repeat,
     var(--glass);
   border: 1px solid rgba(255, 255, 255, 0.6);
   border-radius: var(--radius);
@@ -4053,6 +4083,7 @@ onUnmounted(() => {
   height: var(--portrait-desktop-height);
   max-width: none;
   max-height: none;
+  transform: none;
   object-fit: contain;
   object-position: center bottom;
   pointer-events: none;
@@ -4063,6 +4094,7 @@ onUnmounted(() => {
     top 0.35s ease,
     width 0.35s ease,
     height 0.35s ease,
+    transform 0.35s ease,
     opacity 0.35s ease;
 }
 
@@ -4070,6 +4102,10 @@ onUnmounted(() => {
 .portrait-count-1 .portrait {
   left: 22%;
   width: 78%;
+  height: var(--portrait-desktop-height);
+  transform: none;
+  object-fit: contain;
+  object-position: center bottom;
 }
 
 /* 荣耀洞件与背景共用同一张16:9舞台坐标：不能套普通人物槽，否则洞口接触点会随端宽漂移。 */
@@ -4077,8 +4113,14 @@ onUnmounted(() => {
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   object-position: center;
+}
+
+/* 荣耀洞背景与透明叠层都是 1536×1024；共享 contain 坐标面，任意视口均完整并严格对齐。 */
+.story-glory {
+  --scene-pos: center;
+  --scene-size: contain;
 }
 
 :global(html.rq-dark) .portrait {
@@ -7878,7 +7920,7 @@ onUnmounted(() => {
       transparent 72%
     ),
     linear-gradient(rgba(24, 26, 40, 0.58), rgba(24, 26, 40, 0.68)),
-    var(--scene-img, none) center / cover no-repeat,
+    var(--scene-img, none) var(--scene-pos, center) / var(--scene-size, cover) no-repeat,
     var(--glass);
 }
 
@@ -8044,6 +8086,7 @@ onUnmounted(() => {
     bottom: auto;
     width: var(--portrait-mobile-width);
     height: var(--portrait-mobile-height);
+    transform: none;
     object-fit: contain;
     object-position: center bottom;
     clip-path: inset(0 2px 0 2px);
@@ -8060,13 +8103,21 @@ onUnmounted(() => {
     inset: 0;
     width: 100%;
     height: 100%;
-    object-fit: cover;
-    object-position: 30% center;
+    object-fit: contain;
+    object-position: center;
     clip-path: none;
   }
 
+  /* 双人/三人使用同高镜头框：原始透明画布宽度不同也不会把某人缩矮一截。 */
+  :global(html.rqgy-full) .portrait-count-2 .portrait,
+  :global(html.rqgy-full) .portrait-count-3 .portrait {
+    object-fit: cover;
+    object-position: center bottom;
+  }
+
   :global(html.rqgy-full) .story-glory {
-    --scene-pos: 30% center;
+    --scene-pos: center;
+    --scene-size: contain;
   }
 
   /* 四人以上保留脸和上半身，比六人挤成一条细立绘更容易辨认。 */

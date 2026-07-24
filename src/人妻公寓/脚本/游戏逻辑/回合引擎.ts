@@ -12,7 +12,7 @@ import { 当前时段, 丈夫在楼 } from './楼层时钟';
 import { PROMOTE_MIRROR_KEY, 捕获保护快照, 回滚保护字段, 清保护快照, 镜像直写 } from './守护系统';
 import { 中断卡文案, 记违规清零, 结算违规代价, 输出稽查, 未遂余波指引 } from './稽查系统';
 import { 读取最近有效, 读最近有效stat, 脚本写入 } from './mvuIO';
-import { 检测焦点, 组公寓快照, 读场景 } from './snapshotSystem';
+import { 检测焦点, 组公寓快照, 读场景, 读粘滞状态 } from './snapshotSystem';
 import { 读取数据库记忆胶囊, 同步数据库回合 } from './数据库桥';
 
 /**
@@ -41,6 +41,7 @@ const 回合变量键 = [
   '_经济',
   '_赴约',
   '_工具由头',
+  '_无耗时拜访',
   '_换装余波',
   '_待办',
   '_侦探',
@@ -119,38 +120,27 @@ export function 取消本回合() {
 /**
  * 给正文生成加一层本卡可控的中止门。
  * - 手动取消不依赖第三方端点是否正确关闭连接；
- * - 180 秒硬上限避免失联请求永久锁死整个游戏；
- * - 底层迟到结果只会结束自己的 Promise，不会落楼或改变量。
+ * - 不再设置固定时长硬超时：长文本模型即使超过 180 秒也继续等待；
+ * - 手动取消后的底层迟到结果只会结束自己的 Promise，不会落楼或改变量。
  */
 async function 等待正文生成(参数: Parameters<typeof generate>[0]): Promise<string> {
-  let 超时timer: ReturnType<typeof setTimeout> | undefined;
   const 中止门 = new Promise<never>((_resolve, reject) => {
     解除生成等待 = () => reject(new Error('__RQGY_CANCELLED__'));
-    超时timer = setTimeout(() => {
-      try {
-        if (!stopGenerationById(本回合生成id)) stopAllGeneration();
-      } catch (e) {
-        console.warn('[人妻公寓] 超时停止生成失败:', e);
-      }
-      reject(new Error('生成超过180秒仍未返回，已自动解锁；可以重新生成刚才的行动'));
-    }, 180000);
   });
   try {
     return String(await Promise.race([generate(参数), 中止门]));
   } finally {
-    if (超时timer) clearTimeout(超时timer);
     解除生成等待 = null;
   }
 }
 
 /**
- * 正文是否正由 Gemini 系列模型生成。
+ * 识别当前正文模型。
  *
- * 酒馆可把 Gemini 接在 Google、OpenRouter、AI Studio 或 OpenAI 兼容端点下，
- * 模型名会落在不同设置键里。这里只扫描“模型/API 来源”类字段，避免把聊天正文里
- * 偶然出现的 gemini 一词误判成当前模型。
+ * 酒馆可把模型接在原厂、OpenRouter 或 OpenAI 兼容端点下，模型名会落在不同设置键里。
+ * 这里只扫描“模型/API 来源”类字段，避免把聊天正文里的品牌名误判成当前模型。
  */
-function 正文使用Gemini(): boolean {
+function 识别正文模型(): string {
   try {
     const 宿主 = window.parent as any;
     const 全局ST = 宿主?.SillyTavern ?? (globalThis as any).SillyTavern;
@@ -180,12 +170,12 @@ function 正文使用Gemini(): boolean {
       }
     };
     for (const 根 of 候选根) 收集(根, 0);
-    const 命中 = 候选值.find(值 => /\bgemini(?:[-_.\s]|$)/i.test(值));
-    if (命中) console.info(`[人妻公寓] 检测到 Gemini 正文模型：${命中}`);
-    return !!命中;
+    const 命中 = 候选值.find(值 => /\b(?:gemini|deepseek)(?:[-_.:/\s]|$)/i.test(值)) ?? '';
+    if (命中) console.info(`[人妻公寓] 检测到正文模型：${命中}`);
+    return 命中;
   } catch (e) {
-    console.warn('[人妻公寓] Gemini 模型检测失败，按普通模型继续：', e);
-    return false;
+    console.warn('[人妻公寓] 正文模型检测失败，按普通模型继续：', e);
+    return '';
   }
 }
 
@@ -196,6 +186,43 @@ const GEMINI变量更新强制令 = [
   '同时按本轮真实剧情更新在场人物的 当前心理想法 与 当前情绪。无依据的数值不要乱加；不在场人物和系统管理字段绝对不动。',
   '先写完整正文，再输出变量块；变量块必须是回复的最后一部分。',
 ].join('\n');
+
+const DEEPSEEK变量结算令 = [
+  '【DeepSeek独立变量结算｜只输出变量块】',
+  '根据公寓快照、本轮玩家行动和本轮已完成正文，独立检查本轮实际发生的状态变化。',
+  '只输出一个完整且可解析的 <UpdateVariable>...</UpdateVariable> 块，不要复述正文，不要解释，不要输出思考过程或其他标签。',
+  '必须检查快照【焦点】中明确标为“本人在场”的人物：若互动确实产生正面或负面影响，用 RFC 6902 replace 更新 户.<门牌>.妻.好感值，并按剧情更新 当前心理想法 与 当前情绪。',
+  '好感变化必须有正文依据，允许正数、负数或不变；不得为了更新而机械加分。遵守变量规则与单轮上限，不在场人物及系统管理字段绝对不动。',
+].join('\n');
+
+function 取变量块(文本: string): string | null {
+  return 文本.match(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/i)?.[0] ?? null;
+}
+
+/**
+ * DeepSeek 常能完成正文却漏掉记账，因此使用独立的静默结算通道。
+ * 正文仍采用第一遍结果；第二遍只生成变量块，并以它替换正文中可能存在但不稳定的旧变量块。
+ */
+async function 补DeepSeek变量结算(原文: string, 行动: string, 快照: string, 回合前末楼: number): Promise<string> {
+  const 正文 = 清洗正文(原文);
+  本回合生成id = `rqgy-vars-${回合前末楼}-${_.random(1e9)}`;
+  const 结算原文 = await 等待正文生成({
+    user_input: `【本轮玩家行动】\n${行动}\n\n【本轮已完成正文】\n${正文}`,
+    should_stream: false,
+    injects: [
+      { role: 'system', content: 快照, position: 'in_chat', depth: 0, should_scan: true },
+      { role: 'system', content: DEEPSEEK变量结算令, position: 'in_chat', depth: 0, should_scan: false },
+    ],
+    generation_id: 本回合生成id,
+  });
+  const 变量块 = 取变量块(结算原文);
+  if (!变量块) {
+    console.warn('[人妻公寓] DeepSeek 独立变量结算未返回完整 UpdateVariable 块，保留第一遍结果');
+    return 原文;
+  }
+  console.info('[人妻公寓] DeepSeek 独立变量结算完成');
+  return `${正文}\n${变量块}`;
+}
 
 /** 楼层尾部 + 本次行动 → 伪对话数组(焦点检测/快照组装的扫描源) */
 function 近楼对话(行动?: string): { role: string; content: string }[] {
@@ -213,6 +240,64 @@ function 近楼对话(行动?: string): { role: string; content: string }[] {
   return 尾;
 }
 
+interface 反感连续项 {
+  次数?: number;
+  上次楼?: number;
+}
+
+/**
+ * 连续反感离场：只看同场妻子的实际好感负增量；任一回合未下降就断链。
+ * 第三次下降时移出粘滞/赴约，客户端收到回合完成后立即按新位置刷新。
+ */
+async function 结算连续反感(
+  旧Stat: SchemaType,
+  新Stat: SchemaType,
+  妻在场: 门牌[],
+  楼层: number,
+): Promise<门牌[]> {
+  const 离场: 门牌[] = [];
+  await updateVariablesWith(
+    vars => {
+      const 记录 = (_.get(vars, '_反感连续') ?? {}) as Partial<Record<门牌, 反感连续项>>;
+      for (const m of 妻在场) {
+        const 旧好感 = 旧Stat.户[m]?.妻.好感值;
+        const 新好感 = 新Stat.户[m]?.妻.好感值;
+        if (旧好感 == null || 新好感 == null) continue;
+        const 上次次数 = Math.max(0, Number(记录[m]?.次数 ?? 0));
+        const 次数 = 新好感 < 旧好感 ? 上次次数 + 1 : 0;
+        记录[m] = { 次数, 上次楼: 楼层 };
+        if (次数 >= 3) {
+          离场.push(m);
+          记录[m] = { 次数: 0, 上次楼: 楼层 };
+        }
+      }
+      _.set(vars, '_反感连续', 记录);
+      if (离场.length) {
+        const 粘 = (_.get(vars, '_粘滞') ?? null) as
+          | { 位置?: string; 楼?: number; 们?: 门牌[]; 离场?: 门牌[] }
+          | null;
+        if (粘?.位置) {
+          粘.们 = (粘.们 ?? []).filter(m => !离场.includes(m));
+          粘.离场 = _.uniq([...(粘.离场 ?? []), ...离场]);
+          粘.楼 = 楼层;
+          _.set(vars, '_粘滞', 粘);
+        }
+        const 赴约 = (_.get(vars, '_赴约') ?? null) as { m?: 门牌 } | null;
+        if (赴约?.m && 离场.includes(赴约.m)) _.set(vars, '_赴约', null);
+      }
+      return vars;
+    },
+    { type: 'chat' },
+  );
+  return 离场;
+}
+
+function 补离场正文(正文: string, 离场: 门牌[]): string {
+  if (!离场.length || /告辞|离开|走出|转身(?:就)?走|脚步声.{0,12}(?:远|消失)|关上.{0,8}门/.test(正文)) return 正文;
+  const 名 = 离场.map(m => 户静态表[m]?.妻名).filter(Boolean).join('、');
+  return `${正文}\n\n${名}的神情彻底冷了下来。她没有再给这场对话继续下去的余地，简短告辞后转身离开了这里。`;
+}
+
 /** 快照 + 焦点一次组装;顺手把在场名单落 chat 变量供客户端头像行点亮 */
 export function 组快照注入(
   对话尾: { role: string; content: string }[],
@@ -228,7 +313,17 @@ export function 组快照注入(
     // 粘滞记录的是妻的位置；丈夫只按自己家的作息判断，不能借户级焦点把不在家的妻子钉回来
     const 们 = 妻在场;
     if (场.房间id && 们.length) {
-      insertOrAssignVariables({ _粘滞: { 位置: 场.房间id, 楼: 楼层, 们 } }, { type: 'chat' });
+      insertOrAssignVariables(
+        {
+          _粘滞: {
+            位置: 场.房间id,
+            楼: 楼层,
+            们,
+            离场: 读粘滞状态()?.位置 === 场.房间id ? (读粘滞状态()?.离场 ?? []) : [],
+          },
+        },
+        { type: 'chat' },
+      );
     } else if (!场.房间id) {
       insertOrAssignVariables({ _粘滞: null }, { type: 'chat' });
     }
@@ -459,7 +554,9 @@ export async function 执行回合(行动: string): Promise<void> {
     const injects: Omit<InjectionPrompt, 'id'>[] = [
       { role: 'system', content: 快照, position: 'in_chat', depth: 0, should_scan: true },
     ];
-    const 是Gemini = 正文使用Gemini();
+    const 正文模型 = 识别正文模型();
+    const 是Gemini = /\bgemini(?:[-_.:/\s]|$)/i.test(正文模型);
+    const 是DeepSeek = /\bdeepseek(?:[-_.:/\s]|$)/i.test(正文模型);
     if (是Gemini) {
       injects.push({
         role: 'system',
@@ -472,7 +569,19 @@ export async function 执行回合(行动: string): Promise<void> {
 
     已取消 = false;
     本回合生成id = `rqgy-${回合前末楼}-${_.random(1e9)}`;
-    const 原文 = await 等待正文生成({ user_input: 行动, should_stream: true, injects, generation_id: 本回合生成id });
+    let 原文 = await 等待正文生成({ user_input: 行动, should_stream: true, injects, generation_id: 本回合生成id });
+    if (已取消) {
+      eventEmit('人妻公寓:回合失败', '已取消——这一轮没有发生');
+      return;
+    }
+    if (是DeepSeek) {
+      try {
+        原文 = await 补DeepSeek变量结算(原文, 行动, 快照, 回合前末楼);
+      } catch (e) {
+        if (已取消 || (e instanceof Error && e.message === '__RQGY_CANCELLED__')) throw e;
+        console.warn('[人妻公寓] DeepSeek 独立变量结算失败，保留第一遍结果：', e);
+      }
+    }
     if (是Gemini && !/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/i.test(原文)) {
       console.warn('[人妻公寓] Gemini 本轮仍未输出完整 UpdateVariable 块；正文会保留，但本轮无法采纳 AI 数值更新');
     }
@@ -492,15 +601,17 @@ export async function 执行回合(行动: string): Promise<void> {
       console.warn(`[人妻公寓·稽查] 违规拦截:${稽查.原因}`);
       const newStat = _.cloneDeep(data); // 不采纳 AI 的任何变量更新,从快照起步
       结算违规代价(newStat, 焦点妻门牌, 生成楼层);
+      const 反感离场 = await 结算连续反感(data, newStat, 妻在场, 生成楼层);
       // 未遂余波下一楼注入(她怎么拒绝的由 AI 按性格补写,不给示例)
       const 余波 = 未遂余波指引(焦点妻门牌);
       newStat.系统._待发送事件 = newStat.系统._待发送事件 ? `${newStat.系统._待发送事件}|${余波}` : 余波;
       const 新 = _.cloneDeep(旧);
       _.set(新, 'stat_data', newStat);
+      const 中断正文 = 补离场正文(中断卡文案(户静态表[焦点妻门牌].妻名), 反感离场);
       await createChatMessages(
         [
           { role: 'user', message: 行动 },
-          { role: 'assistant', message: 中断卡文案(户静态表[焦点妻门牌].妻名), data: 新 },
+          { role: 'assistant', message: 中断正文, data: 新 },
         ],
         { refresh: 'none' },
       );
@@ -514,7 +625,7 @@ export async function 执行回合(行动: string): Promise<void> {
         },
         { type: 'chat' },
       );
-      await 记录数据库回合(生成楼层, newStat, 行动, 中断卡文案(户静态表[焦点妻门牌].妻名), 妻在场, 夫在场);
+      await 记录数据库回合(生成楼层, newStat, 行动, 中断正文, 妻在场, 夫在场);
       广播生成完成事件();
       eventEmit('人妻公寓:回合完成');
       return;
@@ -526,9 +637,13 @@ export async function 执行回合(行动: string): Promise<void> {
     回滚保护字段(newStat, 焦点, { 妻: 妻在场, 夫: 夫在场 }); // 户级焦点内再按实际在场人物分闸
     if (焦点妻门牌) 记违规清零(newStat); // 有焦点妻且未违规:连续违规计数断链
     回合结算(newStat, data, 焦点, 妻在场, 生成楼层);
+    const 反感离场 = await 结算连续反感(data, newStat, 妻在场, 生成楼层);
     _.set(新, 'stat_data', newStat);
 
-    const 正文 = 清洗正文(原文) || '(楼道里安静了一瞬……本轮 AI 未返回正文,可换个说法再试)';
+    const 正文 = 补离场正文(
+      清洗正文(原文) || '(楼道里安静了一瞬……本轮 AI 未返回正文,可换个说法再试)',
+      反感离场,
+    );
     await createChatMessages(
       [
         { role: 'user', message: 行动 },

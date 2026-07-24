@@ -97,12 +97,19 @@ function 读地图轨迹(): string[] {
  * 组快照注入 每轮把"当场的人"钉在当场;读取自校验:位置对不上(玩家换了地方)=不生效,
  * 楼戳在未来(回档过)=作废——粘滞天然随玩家脚步失效,不需要显式清理。
  */
+export interface 粘滞状态 {
+  位置?: string;
+  楼?: number;
+  们?: 门牌[];
+  离场?: 门牌[];
+}
+
+export function 读粘滞状态(): 粘滞状态 | null {
+  return (_.get(getVariables({ type: 'chat' }), '_粘滞') ?? null) as 粘滞状态 | null;
+}
+
 export function 读粘滞(楼层: number, 房间id: string): 门牌[] {
-  const p = (_.get(getVariables({ type: 'chat' }), '_粘滞') ?? null) as {
-    位置?: string;
-    楼?: number;
-    们?: 门牌[];
-  } | null;
+  const p = 读粘滞状态();
   if (!p || p.位置 !== 房间id || (p.楼 ?? 0) > 楼层) return [];
   return p.们 ?? [];
 }
@@ -160,11 +167,16 @@ export function 检测焦点(
     // 杀时间偏移一并吃进种子:进房期间偏移不可能变(杀时间只在管理员室),冻结语义不破
     const 种子楼 = (进房末楼 ?? 楼层) + data.系统._时段偏移楼;
     const 粘 = 读粘滞(楼层, 房间id);
-    const 妻在场 = 候选.filter(m => 粘.includes(m) || 妻位置推算(m, 种子楼) === 房间id);
+    const 赴约 = 读赴约(楼层);
+    const 粘态 = 读粘滞状态();
+    const 已离场 = new Set(粘态?.位置 === 房间id ? (粘态.离场 ?? []) : []);
+    const 妻在场 = 候选.filter(
+      m => !已离场.has(m) && (粘.includes(m) || 妻位置推算(m, 种子楼) === 房间id),
+    );
     const 夫在场 = 候选.filter(m => m === 房间id && 丈夫在楼(data.户[m], m, 种子楼) !== '外出');
     const 在此 = _.uniq([...妻在场, ...夫在场]);
     // 赴约妻:她的位置=玩家的位置(微信约出来的),排焦点首位
-    const 约 = 读赴约(楼层);
+    const 约 = 赴约;
     if (约 && 候选.includes(约.m)) {
       if (!妻在场.includes(约.m)) 妻在场.push(约.m);
       const i = 在此.indexOf(约.m);
@@ -401,7 +413,7 @@ export function 组公寓快照(chat: { role: string; content: string }[], data:
 
   // 场景、认知、通讯三条短核心常驻。只有命中对应风险时，后面再加详则。
   行.push(
-    '【场景】本楼锁定当前位置；只让【焦点/在场】人物说话。不在场者不得出现，点名寻找只告知其不在这里；不得替{{user}}离开或收尾。角色可以说“准备回家”，但本楼不得继续描写她已经进入某户或切到屋内；地图未移动就不转场，对话者也不实际离开镜头。',
+    '【场景】本楼锁定当前位置；只让【焦点/在场】人物说话。不在场者不得出现，点名寻找只告知其不在这里；不得替{{user}}离开或收尾。地图未移动就不转场，对话者也不实际离开镜头。每轮结尾必须停在当前场景并留下可继续接话的动作、神态或话头；禁止把“告辞、回家、走出房间、关门离开”当作普通聊天的固定收尾。只有{{user}}明确要求结束见面或地图已经移动时，才允许演出真正离场。',
     认知核心规则,
   );
 
@@ -428,6 +440,9 @@ export function 组公寓快照(chat: { role: string; content: string }[], data:
       const 妻同场 = 妻在场.includes(m);
       const 丈夫同场 = 夫在场.includes(m);
       const 赴约中 = 读赴约(楼层)?.m === m;
+      const 反感连续 = Number(
+        _.get(getVariables({ type: 'chat' }), `_反感连续.${m}.次数`) ?? 0,
+      );
       const 妻位置 =
         (房间id && 读粘滞(楼层, 房间id).includes(m)) || (房间id && 赴约中) ? 房间id : 妻位置推算(m, 种子楼);
       if (妻同场) {
@@ -444,6 +459,11 @@ export function 组公寓快照(chat: { role: string; content: string }[], data:
             ? `  着装:${[妻.外装, 妻.妆容 !== '素颜' ? 妻.妆容 : '', ...妻.特殊].filter(Boolean).join('|')}${妻._穿戴锁.length ? '(其中他送的部分她一直穿着,正文里不要让她换下)' : ''}`
             : '',
         );
+        if (反感连续 >= 2) {
+          行.push(
+            '  ⚠ 她已经连续两个互动回合因{{user}}的言行降低好感。本轮若她仍感到反感并继续降低好感，正文必须明确演出她自然告辞、转身离开当前场景；离开后本轮不得继续对话或重新返回。',
+          );
+        }
       } else {
         行.push(`◆ ${配.夫名 || `${m}室丈夫`}(${m}室)|丈夫本人在场|${配.妻名}本人不在场`);
       }

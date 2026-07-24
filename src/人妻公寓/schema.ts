@@ -221,6 +221,8 @@ export const Schema = z.object({
       _荣耀洞起楼: floorMark(-1), // 回档自净:起楼>当前楼=作废
       _荣耀洞点破: z.coerce.boolean().catch(false).prefault(false), // 她阶段够高=可亮明身份+专属CG
       _荣耀洞夫: z.coerce.boolean().catch(false).prefault(false), // 复合事件:丈夫恰好在隔间外(铁律不知真相)
+      _荣耀洞动态门牌: z.string().prefault(''), // 真人完整服务后留给朋友圈事件钩子
+      _荣耀洞动态楼: floorMark(-1), // 钟楼去重；中途离场/空军不写
       /** 待接来电(收租/上交日结算生成;P4 手机接听,覆盖=扣胜任度) */
       _待接来电: z
         .object({

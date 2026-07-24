@@ -341,6 +341,13 @@
           "default": false,
           "type": "boolean"
         },
+        "_荣耀洞动态门牌": {
+          "type": "string"
+        },
+        "_荣耀洞动态楼": {
+          "default": -1,
+          "type": "number"
+        },
         "_待接来电": {
           "default": {},
           "type": "object",

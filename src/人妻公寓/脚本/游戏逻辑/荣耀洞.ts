@@ -139,6 +139,11 @@ function 清荣耀洞(系: SchemaType['系统']): void {
   系._荣耀洞夫 = false;
 }
 
+function 标荣耀洞动态(系: SchemaType['系统'], m: string): void {
+  系._荣耀洞动态门牌 = m;
+  系._荣耀洞动态楼 = 系._荣耀洞起楼;
+}
+
 /** 隔离事件引擎读取当前拍；不经过主聊天的待发送/已注入通道。 */
 export function 荣耀洞当前事件(data: SchemaType): string {
   const 系 = data.系统;
@@ -157,6 +162,7 @@ export function 推进荣耀洞隔离拍(data: SchemaType): void {
       const 妻 = data.户[m as 门牌]!.妻;
       妻.堕落值 = _.clamp(妻.堕落值 + 完成堕落, 0, 100);
       妻.好感值 = _.clamp(妻.好感值 + 完成好感, 0, 100);
+      标荣耀洞动态(系, m);
     }
     清荣耀洞(系);
     return;
@@ -190,6 +196,7 @@ export function 荣耀洞结算(data: SchemaType, 楼层: number): void {
       const 妻 = data.户[m as 门牌]!.妻;
       妻.堕落值 = _.clamp(妻.堕落值 + 完成堕落, 0, 100);
       妻.好感值 = _.clamp(妻.好感值 + 完成好感, 0, 100);
+      标荣耀洞动态(系, m);
     }
     清荣耀洞(系);
     return;
