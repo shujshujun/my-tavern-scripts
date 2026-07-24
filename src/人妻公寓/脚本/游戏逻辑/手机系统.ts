@@ -838,8 +838,8 @@ export async function 手机节拍(): Promise<void> {
 // ============================================
 
 const ROOT_ID = 'rq-phone-root';
-// ⚠ 与 App.vue 素材基址同步：Discord 测试版发布 tag=rq0.45。
-const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.45/dist/人妻公寓/素材';
+// ⚠ 与 App.vue 素材基址同步：Discord 测试版发布 tag=rq0.46。
+const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.46/dist/人妻公寓/素材';
 
 let 当前页: {
   名: 'chats' | 'chat' | 'moments' | 'call' | 'talk' | 'settings';
@@ -895,10 +895,19 @@ const 手机CSS = `
 /* ── 手机壳(柚月小手机同款华为全面屏风:金属机身/药丸双摄/状态栏;yuzuki 授权改造) ── */
 #${ROOT_ID} .rqp-shell{display:none;position:absolute;right:0;bottom:64px;width:min(320px,92vw);height:min(692px,80vh);background:#1a1a1a;border-radius:40px;padding:4px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),0 15px 50px rgba(0,0,0,.4),0 5px 20px rgba(0,0,0,.3);}
 #${ROOT_ID}.open .rqp-shell{display:block;}
+#${ROOT_ID}.open .rqp-toggle{visibility:hidden;pointer-events:none;}
+#${ROOT_ID} .rqp-close{display:none;position:absolute;left:-14px;top:-14px;width:40px;height:40px;border:2px solid #fff;border-radius:50%;background:#20242d;color:#fff;font-size:24px;line-height:1;align-items:center;justify-content:center;cursor:pointer;z-index:80;box-shadow:0 5px 16px rgba(0,0,0,.38);}
+#${ROOT_ID}.open .rqp-close{display:flex;}
 /* 手柄不放壳内:壳带transform自成层叠上下文,z-index再高也压不过后排的悬浮钮(2026-07-20
    玩家反馈:壳拖到和钮重叠后手柄被钮盖死)——改做钮的后排兄弟,永远浮在钮上;位置随壳右下角在应用位里算 */
 #${ROOT_ID} .rqp-resize{display:none;position:absolute;right:-8px;bottom:56px;width:34px;height:34px;border-radius:50%;align-items:center;justify-content:center;background:rgba(26,28,34,.92);color:#b9c8d7;font-size:17px;box-shadow:0 4px 12px rgba(0,0,0,.35);cursor:nwse-resize;z-index:2;touch-action:none;user-select:none;}
 #${ROOT_ID}.open .rqp-resize{display:flex;}
+#${ROOT_ID} .rqp-guide{position:absolute;inset:44px 14px 18px;z-index:75;border-radius:22px;background:rgba(18,22,29,.94);color:#fff;padding:22px 18px;display:flex;flex-direction:column;justify-content:center;gap:13px;box-shadow:0 10px 35px rgba(0,0,0,.45);}
+#${ROOT_ID} .rqp-guide h3{font-size:20px;text-align:center;color:#fff;}
+#${ROOT_ID} .rqp-guide p{font-size:13px;line-height:1.65;color:#e9edf3;}
+#${ROOT_ID} .rqp-guide b{color:#9dd8ff;}
+#${ROOT_ID} .rqp-guide button{border:0;border-radius:10px;background:#07c160;color:#fff;padding:11px 14px;font-size:14px;font-weight:700;cursor:pointer;}
+#${ROOT_ID} .rqp-guide small{font-size:11px;line-height:1.5;color:#b9c3d0;text-align:center;}
 /* 滑入动画放内层屏幕:壳的 transform 留给拖动位移专用——动画接管壳transform会在
    结束瞬间跳回内联位移(2026-07-18 手机闪现即失真凶:动画期显示默认位,结束跳到屏外陈旧位移) */
 #${ROOT_ID}.open .rqp-screen{animation:rqp-slidein .45s cubic-bezier(.4,0,.2,1);}
@@ -1065,6 +1074,8 @@ function 时段字(楼戳: number, 偏移: number): string {
 let 挂好 = false;
 /** 手机壳拉回视口(悬浮钮被拖到屏幕边缘后,弹开的壳可能在视口外;挂载时闭包赋值) */
 let 拉回视口: () => void = () => {};
+/** 首次操作教程由挂载闭包赋值，游戏内 Dock 打开手机时也能调用。 */
+let 显示手机教程: () => void = () => {};
 /** 正在输入(2026-07-18 用户提案:微信同款)——她生成回复期间,该会话顶栏+气泡显示打字中 */
 let 正在输入: string | null = null;
 
@@ -1093,7 +1104,7 @@ export function 挂载手机(): void {
   const root = el('div', '');
   root.id = ROOT_ID;
   root.innerHTML =
-    `<div class="rqp-shell"><div class="rqp-punch"></div>` +
+    `<div class="rqp-shell"><button class="rqp-close" type="button" title="收起手机" aria-label="收起手机">×</button><div class="rqp-punch"></div>` +
     `<div class="rqp-status"><span class="tm"></span><span class="rt"><span class="bars"><i></i><i></i><i></i><i></i></span><span class="rqp-batt"><i></i></span></span></div>` +
     `<div class="rqp-screen"></div>` +
     `</div><button class="rqp-toggle" title="手机">${手机图标('phone')}<span class="dot"></span></button>` +
@@ -1108,6 +1119,17 @@ export function 挂载手机(): void {
   setInterval(走钟, 30000);
   // 手机可拖动(柚月同款;抓顶部状态栏/挖孔区拖,位移记 localStorage,重建后复位)
   const 壳 = root.querySelector('.rqp-shell') as HTMLElement;
+  const 首次教程键 = '人妻公寓_手机操作教程_v1';
+  const 关闭手机 = () => {
+    root.classList.remove('open');
+    root.querySelector('.rqp-guide')?.remove();
+    eventEmit('人妻公寓:手机收起');
+  };
+  (root.querySelector('.rqp-close') as HTMLButtonElement).addEventListener('click', ev => {
+    ev.stopPropagation();
+    if (!开合防抖()) return;
+    关闭手机();
+  });
   const 位置键 = '人妻公寓_手机位置';
   const 夹 = (dx: number, dy: number): [number, number] => {
     const w = doc.documentElement.clientWidth;
@@ -1213,9 +1235,10 @@ export function 挂载手机(): void {
     let dx = 0;
     let dy = 0;
     if (r.right > w - 2) dx = w - 2 - r.right;
-    if (r.left + dx < 2) dx = 2 - r.left;
+    // 左上角外侧有独立关闭钮，给它留出安全边距，避免手机贴边后按钮被视口裁掉。
+    if (r.left + dx < 18) dx = 18 - r.left;
     if (r.bottom > h - 2) dy = h - 2 - r.bottom;
-    if (r.top + dy < 2) dy = 2 - r.top;
+    if (r.top + dy < 18) dy = 18 - r.top;
     if (dx || dy) {
       当前位.dx += dx;
       当前位.dy += dy;
@@ -1226,6 +1249,30 @@ export function 挂载手机(): void {
         /* 存不上只影响下次复位 */
       }
     }
+  };
+  显示手机教程 = () => {
+    try {
+      if (localStorage.getItem(首次教程键) === '1' || root.querySelector('.rqp-guide')) return;
+    } catch {
+      if (root.querySelector('.rqp-guide')) return;
+    }
+    const 教程 = el('div', 'rqp-guide');
+    教程.innerHTML = `
+      <h3>手机怎么移动和缩放？</h3>
+      <p><b>移动：</b>按住手机顶部的状态栏或黑色摄像头区域拖动。</p>
+      <p><b>缩放：</b>拖动手机右下角的斜向缩放按钮，可在 60%～160% 间调整。</p>
+      <p><b>收起：</b>点击手机左上角外侧的“×”；原来的悬浮手机图标在展开时会隐藏，不再挡住界面。</p>
+      <button type="button">我知道了，开始使用</button>
+      <small>位置和大小会自动记住，下次打开继续沿用。</small>`;
+    教程.querySelector('button')?.addEventListener('click', () => {
+      try {
+        localStorage.setItem(首次教程键, '1');
+      } catch {
+        /* 记不住只会下次再提示 */
+      }
+      教程.remove();
+    });
+    壳.appendChild(教程);
   };
   // 悬浮钮:点=开合;拖(>8px)=挪位置(2026-07-18 用户反馈:手机端玩家挪不动按钮不友好)
   const 钮 = root.querySelector('.rqp-toggle') as HTMLElement;
@@ -1289,8 +1336,9 @@ export function 挂载手机(): void {
       当前页 = 有来电() ? { 名: 'call' } : 当前页.名 === 'call' || 当前页.名 === 'talk' ? { 名: 'chats' } : 当前页;
       渲染();
       拉回视口();
+      显示手机教程();
     } else {
-      eventEmit('人妻公寓:手机收起'); // 客户端听它:开机时替玩家退过真全屏的,收起送回去
+      关闭手机(); // 客户端听它:开机时替玩家退过真全屏的,收起送回去
     }
   });
   挂好 = true;
@@ -1331,6 +1379,7 @@ export function 打开手机(直达来电 = false): void {
   if (!开合防抖()) return;
   if (root.classList.contains('open') && !直达来电) {
     root.classList.remove('open');
+    root.querySelector('.rqp-guide')?.remove();
     eventEmit('人妻公寓:手机收起'); // 客户端听它:开机时替玩家退过真全屏的,收起送回去
     return;
   }
@@ -1338,6 +1387,7 @@ export function 打开手机(直达来电 = false): void {
   if (直达来电 && 有来电()) 当前页 = { 名: 'call' };
   渲染();
   拉回视口();
+  显示手机教程();
 }
 
 // ── 渲染(单函数状态机,页面小,直接整屏重绘) ──

@@ -4,6 +4,17 @@
       <!-- 错误护栏:任何运行时异常显示在此,不再整屏空白(点击即散,不常驻) -->
       <div v-if="错误信息" class="err" title="点击关闭" @click="错误信息 = ''">⚠︎ 界面异常:{{ 错误信息 }}(点击关闭)</div>
 
+      <!-- 消息内嵌首屏：移动端必须由玩家手势触发 Fullscreen API，给一个看得见的大入口。 -->
+      <button
+        v-if="移动端 && !真全屏中"
+        class="mobile-fullscreen-cta"
+        type="button"
+        @click="打开移动端全屏"
+      >
+        <Ic n="expand" />
+        <span><b>点击全屏打开游戏</b><small>首次进入建议先全屏，之后可在右上角随时退出</small></span>
+      </button>
+
       <!-- 转场横幅(gal 式地点闪卡:走动的即时反馈) -->
       <transition name="loc-flash">
         <div v-if="转场" :key="转场" class="loc-banner">
@@ -117,6 +128,22 @@
               <p class="set-hint">关掉转场、弹跳、呼吸等动画。</p>
             </div>
             <button class="toggle" :class="{ on: 减动效 }" @click="((减动效 = !减动效), 改设置())"><i /></button>
+          </div>
+
+          <div class="set-group row">
+            <div>
+              <div class="set-label">模型二次变量结算</div>
+              <p class="set-hint">
+                DeepSeek 与 Gemini 写完正文后，再静默请求一次只输出变量块。关闭可少一次请求，但模型漏更变量时不会自动补救。
+              </p>
+            </div>
+            <button
+              class="toggle"
+              :class="{ on: 二次变量结算 }"
+              @click="((二次变量结算 = !二次变量结算), 改设置())"
+            >
+              <i />
+            </button>
           </div>
 
           <div class="set-group row">
@@ -1979,8 +2006,8 @@ const 底层公共 = [
 
 // ── 素材(AI 生成,2026-07-17 入库;素材 TAG 与发布 TAG 解耦——素材没变就不用动这里) ──
 
-// ⚠ 与手机系统同步：Discord 测试版发布 tag=rq0.45。
-const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.45/dist/人妻公寓/素材';
+// ⚠ 与手机系统同步：Discord 测试版发布 tag=rq0.46。
+const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.46/dist/人妻公寓/素材';
 
 function 头像图(名: string): string {
   return `${素材基址}/头像/${名}.webp`;
@@ -3069,6 +3096,8 @@ async function 存编辑() {
 // ── 沉浸全屏(iframe 内对自身文档 requestFullscreen;失败退回画幅撑满) ──
 
 const 全屏中 = ref(false);
+const 真全屏中 = ref(false);
+const 移动端 = ref(window.matchMedia('(max-width: 540px)').matches);
 
 type 全屏根 = HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void };
 type 全屏文档 = Document & { webkitExitFullscreen?: () => void; webkitFullscreenElement?: Element | null };
@@ -3094,6 +3123,17 @@ async function 进真全屏() {
   if (根.requestFullscreen) await 根.requestFullscreen();
   else if (根.webkitRequestFullscreen) await 根.webkitRequestFullscreen();
   else throw new Error('Fullscreen API 不可用');
+}
+
+async function 打开移动端全屏() {
+  try {
+    await 进真全屏();
+  } catch (e) {
+    console.warn('[人妻公寓客户端] 移动端真全屏失败:', e);
+    错误信息.value = '浏览器拒绝进入全屏，请允许网页全屏后再点一次';
+    全屏中.value = true;
+    应用画幅(true);
+  }
 }
 
 /** 复用酒馆每条消息「… → Prompt」的原生入口；传入楼号，只打开这一回合。 */
@@ -3390,6 +3430,8 @@ const 垫板浓度 = ref(0.66);
 const 省流 = ref(false);
 /** 减少动效 */
 const 减动效 = ref(false);
+/** DeepSeek / Gemini 正文完成后，是否追加一次只输出变量块的静默结算。 */
+const 二次变量结算 = ref(true);
 
 const 字号档表: Record<'小' | '中' | '大', string> = { 小: '0.82em', 中: '0.9em', 大: '1.02em' };
 
@@ -3427,6 +3469,7 @@ function 持久化设置() {
         省流: 省流.value,
         减动效: 减动效.value,
         立绘显示: 立绘显示.value,
+        二次变量结算: 二次变量结算.value,
       }),
     );
   } catch {
@@ -3453,6 +3496,7 @@ function 恢复设置() {
       省流.value = !!s.省流;
       减动效.value = !!s.减动效;
       if (typeof s.立绘显示 === 'boolean') 立绘显示.value = s.立绘显示;
+      if (typeof s.二次变量结算 === 'boolean') 二次变量结算.value = s.二次变量结算;
     } else {
       主题模式.value = localStorage.getItem(主题存储键) === '1' ? '夜间' : '日间';
     }
@@ -3490,6 +3534,7 @@ function 重置偏好() {
   省流.value = false;
   减动效.value = false;
   立绘显示.value = true;
+  二次变量结算.value = true;
   try {
     localStorage.removeItem(设置存储键);
     localStorage.removeItem(主题存储键);
@@ -3711,6 +3756,7 @@ onMounted(() => {
   for (const 事件名 of ['fullscreenchange', 'webkitfullscreenchange']) {
     document.addEventListener(事件名, () => {
       const 开 = !!(document.fullscreenElement ?? (document as 全屏文档).webkitFullscreenElement);
+      真全屏中.value = 开;
       全屏中.value = 开;
       应用画幅(开);
     });
@@ -3745,6 +3791,53 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.mobile-fullscreen-cta {
+  display: none;
+}
+
+@media (max-width: 540px) {
+  .mobile-fullscreen-cta {
+    position: fixed;
+    z-index: 120;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: min(88vw, 360px);
+    min-height: 76px;
+    padding: 13px 18px;
+    border: 2px solid rgba(255, 255, 255, 0.9);
+    border-radius: 18px;
+    background: linear-gradient(135deg, #8e5270, #4b385f);
+    color: #fff;
+    box-shadow: 0 10px 34px rgba(21, 10, 26, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .mobile-fullscreen-cta :deep(svg) {
+    width: 30px;
+    height: 30px;
+    flex: none;
+  }
+  .mobile-fullscreen-cta span {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 4px;
+    text-align: left;
+  }
+  .mobile-fullscreen-cta b {
+    font-size: 17px;
+    line-height: 1.2;
+  }
+  .mobile-fullscreen-cta small {
+    font-size: 11px;
+    line-height: 1.35;
+    color: rgba(255, 255, 255, 0.82);
+  }
+}
 /* ═══════════════════════════════════════════════════════════════
    学マス系流行日系(2026-07-16 用户给样「初星育成」前端解析定调)
    语法:暖白渐变底(global.css)/玻璃白卡大圆角软影/荧光粉·天蓝·柠黄
@@ -4117,10 +4210,10 @@ onUnmounted(() => {
   object-position: center;
 }
 
-/* 荣耀洞背景与透明叠层都是 1536×1024；共享 contain 坐标面，任意视口均完整并严格对齐。 */
+/* 背景必须始终铺满正文舞台；contain 只属于上方的透明抠图件，不能传给背景层。 */
 .story-glory {
   --scene-pos: center;
-  --scene-size: contain;
+  --scene-size: cover;
 }
 
 :global(html.rq-dark) .portrait {
@@ -8117,7 +8210,7 @@ onUnmounted(() => {
 
   :global(html.rqgy-full) .story-glory {
     --scene-pos: center;
-    --scene-size: contain;
+    --scene-size: cover;
   }
 
   /* 四人以上保留脸和上半身，比六人挤成一条细立绘更容易辨认。 */

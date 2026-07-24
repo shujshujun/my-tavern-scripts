@@ -187,8 +187,8 @@ const GEMINI变量更新强制令 = [
   '先写完整正文，再输出变量块；变量块必须是回复的最后一部分。',
 ].join('\n');
 
-const DEEPSEEK变量结算令 = [
-  '【DeepSeek独立变量结算｜只输出变量块】',
+const 二次变量结算令 = [
+  '【独立变量结算｜只输出变量块】',
   '根据公寓快照、本轮玩家行动和本轮已完成正文，独立检查本轮实际发生的状态变化。',
   '只输出一个完整且可解析的 <UpdateVariable>...</UpdateVariable> 块，不要复述正文，不要解释，不要输出思考过程或其他标签。',
   '必须检查快照【焦点】中明确标为“本人在场”的人物：若互动确实产生正面或负面影响，用 RFC 6902 replace 更新 户.<门牌>.妻.好感值，并按剧情更新 当前心理想法 与 当前情绪。',
@@ -200,10 +200,16 @@ function 取变量块(文本: string): string | null {
 }
 
 /**
- * DeepSeek 常能完成正文却漏掉记账，因此使用独立的静默结算通道。
+ * DeepSeek / Gemini 可能完成正文却漏掉记账，因此可使用独立的静默结算通道。
  * 正文仍采用第一遍结果；第二遍只生成变量块，并以它替换正文中可能存在但不稳定的旧变量块。
  */
-async function 补DeepSeek变量结算(原文: string, 行动: string, 快照: string, 回合前末楼: number): Promise<string> {
+async function 补模型变量结算(
+  模型: 'DeepSeek' | 'Gemini',
+  原文: string,
+  行动: string,
+  快照: string,
+  回合前末楼: number,
+): Promise<string> {
   const 正文 = 清洗正文(原文);
   本回合生成id = `rqgy-vars-${回合前末楼}-${_.random(1e9)}`;
   const 结算原文 = await 等待正文生成({
@@ -211,17 +217,28 @@ async function 补DeepSeek变量结算(原文: string, 行动: string, 快照: s
     should_stream: false,
     injects: [
       { role: 'system', content: 快照, position: 'in_chat', depth: 0, should_scan: true },
-      { role: 'system', content: DEEPSEEK变量结算令, position: 'in_chat', depth: 0, should_scan: false },
+      { role: 'system', content: 二次变量结算令, position: 'in_chat', depth: 0, should_scan: false },
     ],
     generation_id: 本回合生成id,
   });
   const 变量块 = 取变量块(结算原文);
   if (!变量块) {
-    console.warn('[人妻公寓] DeepSeek 独立变量结算未返回完整 UpdateVariable 块，保留第一遍结果');
+    console.warn(`[人妻公寓] ${模型} 独立变量结算未返回完整 UpdateVariable 块，保留第一遍结果`);
     return 原文;
   }
-  console.info('[人妻公寓] DeepSeek 独立变量结算完成');
+  console.info(`[人妻公寓] ${模型} 独立变量结算完成`);
   return `${正文}\n${变量块}`;
+}
+
+/** 游戏右上角“设置”中的总开关；旧存档没有该字段时默认开启，保持 DeepSeek 现有行为。 */
+function 二次变量结算开启(): boolean {
+  try {
+    const raw = (window.parent ?? window).localStorage?.getItem('人妻公寓_界面偏好');
+    if (!raw) return true;
+    return (JSON.parse(raw) as { 二次变量结算?: boolean }).二次变量结算 !== false;
+  } catch {
+    return true;
+  }
 }
 
 /** 楼层尾部 + 本次行动 → 伪对话数组(焦点检测/快照组装的扫描源) */
@@ -574,12 +591,13 @@ export async function 执行回合(行动: string): Promise<void> {
       eventEmit('人妻公寓:回合失败', '已取消——这一轮没有发生');
       return;
     }
-    if (是DeepSeek) {
+    if ((是DeepSeek || 是Gemini) && 二次变量结算开启()) {
+      const 模型 = 是DeepSeek ? 'DeepSeek' : 'Gemini';
       try {
-        原文 = await 补DeepSeek变量结算(原文, 行动, 快照, 回合前末楼);
+        原文 = await 补模型变量结算(模型, 原文, 行动, 快照, 回合前末楼);
       } catch (e) {
         if (已取消 || (e instanceof Error && e.message === '__RQGY_CANCELLED__')) throw e;
-        console.warn('[人妻公寓] DeepSeek 独立变量结算失败，保留第一遍结果：', e);
+        console.warn(`[人妻公寓] ${模型} 独立变量结算失败，保留第一遍结果：`, e);
       }
     }
     if (是Gemini && !/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/i.test(原文)) {
