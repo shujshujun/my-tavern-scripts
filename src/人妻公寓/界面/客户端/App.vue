@@ -2146,8 +2146,8 @@ const 底层公共 = [
 
 // ── 素材(AI 生成,2026-07-17 入库;素材 TAG 与发布 TAG 解耦——素材没变就不用动这里) ──
 
-// ⚠ 与手机系统同步：Discord 测试版发布 tag=rq0.56。
-const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.56/dist/人妻公寓/素材';
+// 普通素材固定使用含完整720个文件的rq0.55快照；代码版本Tag不再承担素材仓职责。
+const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.55/dist/人妻公寓/素材';
 const 成人CG基址 = 'https://testingcf.jsdelivr.net/gh/shujun8520-design/qgy-assets@cg1/cg1';
 const CG解锁存储键 = '人妻公寓_成人CG解锁_cg1';
 const 当前成人CG = ref<成人CG项 | null>(null);
