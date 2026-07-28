@@ -683,8 +683,6 @@ export async function 执行回合(行动: string): Promise<void> {
     // 本轮行动锚(2026-07-27 玩家反馈"AI永远回应上一轮指令"):历史楼层一旦出现过一对
     // 行动/回应错位(撤回或异常回合造成),模型会在上下文里无限模仿这个错位节奏。
     // 系统侧明写"本轮唯一新行动是哪条",以此为准=错位当轮即自愈,不再级联。
-    // 常驻短锚：user_input 虽然也传本轮行动，但部分预设会重排历史消息；显式末位系统锚可避免
-    // 普通回合也回应上一轮。风险窗仍保留给回档状态维护与旧档兼容，但不再决定是否注入。
     const 行动锚 =
       `\n【本轮玩家行动】\n${行动}\n` +
       '(以上是{{user}}本轮唯一的新行动,本次回复只回应这条行动。之前楼层的行动均已演出完毕,' +
@@ -705,6 +703,17 @@ export async function 执行回合(行动: string): Promise<void> {
         should_scan: false,
       });
     }
+    // generate.user_input 会受玩家当前预设的提示词顺序控制；有些预设没有放置内置
+    // user_input，失败后重试时模型看到的最后一条 user 就会退回上一轮。再注入一条
+    // depth=0 的真实 user 消息作为兜底，并保持在所有系统约束之后。正常预设即使同时
+    // 带有 user_input，也只是重复确认同一行动，不会把旧行动重新变成本轮请求。
+    injects.push({
+      role: 'user',
+      content: 行动,
+      position: 'in_chat',
+      depth: 0,
+      should_scan: false,
+    });
 
     已取消 = false;
     本回合生成id = `rqgy-${回合前末楼}-${_.random(1e9)}`;
