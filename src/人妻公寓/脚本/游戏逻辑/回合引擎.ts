@@ -10,10 +10,10 @@ import { 夜访结算, 惰性结算户, 绿帽线检测, 结算焦点疑心, 冷
 import { 荣耀洞结算 } from './荣耀洞';
 import { 当前时段, 丈夫在楼 } from './楼层时钟';
 import { PROMOTE_MIRROR_KEY, 捕获保护快照, 回滚保护字段, 清保护快照, 镜像直写 } from './守护系统';
-import { 中断卡文案, 记违规清零, 结算违规代价, 输出稽查, 未遂余波指引 } from './稽查系统';
-import { 读取最近有效, 读最近有效stat, 脚本写入 } from './mvuIO';
-import { 检测焦点, 组公寓快照, 读场景, 读粘滞状态 } from './snapshotSystem';
-import { 读取数据库记忆胶囊, 同步数据库回合 } from './数据库桥';
+import { 中断卡文案, 解析行为等级, 记违规清零, 结算违规代价, 输出稽查, 未遂余波指引 } from './稽查系统';
+import { 同步整表视图, 读取最近有效, 读最近有效stat, 脚本写入 } from './mvuIO';
+import { 事件角色标记, 检测焦点, 取本轮事件文本, 组公寓快照, 读场景, 读粘滞状态 } from './snapshotSystem';
+import { 读取数据库记忆胶囊, 同步数据库回合, 数据库状态 } from './数据库桥';
 
 /**
  * 回合引擎:固定 0 楼架构的主循环(修道院回合引擎直迁,本作化三处:
@@ -50,17 +50,21 @@ const 回合变量键 = [
   '_行动选项',
   '_粘滞',
   '_地图轨迹',
+  // 连续反感计数是 chat 变量,不随楼层回滚——不入此表则"稽查违规→重掷"会让计数只涨不还原,
+  // 三次重掷就把人永久逼走(2026-07-26 审计 H1)
+  '_反感连续',
 ] as const;
 
-/** 手机记录不塞进每回合快照（会令存档平方膨胀），按楼层戳裁掉被删除时间线。 */
-function 裁手机时间线(vars: Record<string, unknown>, 楼层: number): void {
+/** 手机记录不塞进每回合快照（会令存档平方膨胀），按楼层戳裁掉被删除时间线。
+ * @param 目标钟 目标楼对应的钟楼(真实楼+回滚后 stat 的杀时间偏移)——节拍水位线全用钟楼轴。 */
+function 裁手机时间线(vars: Record<string, unknown>, 楼层: number, 目标钟: number): void {
   const 库 = _.get(vars, '_微信') as
     | {
         消息?: { 楼?: number }[];
         圈?: { 楼?: number }[];
         读到?: Record<string, number>;
         圈读到?: number;
-        节拍?: object;
+        节拍?: Record<string, number>;
       }
     | undefined;
   if (!库 || typeof 库 !== 'object') return;
@@ -68,8 +72,10 @@ function 裁手机时间线(vars: Record<string, unknown>, 楼层: number): void
   库.圈 = (库.圈 ?? []).filter(x => Number(x?.楼 ?? -1) <= 楼层);
   库.读到 = Object.fromEntries(Object.entries(库.读到 ?? {}).map(([k, v]) => [k, Math.min(Number(v), 楼层)]));
   库.圈读到 = Math.min(Number(库.圈读到 ?? -1), 楼层);
-  // 节拍使用“真实楼+杀时间偏移”的钟楼值，无法只凭目标楼可靠裁剪；清空后由确定性种子重新建水位。
-  库.节拍 = {};
+  // 节拍水位线夹到目标钟(2026-07-26 审计 M4):旧版直接清空,各渠道间隔门 ?? -999 全部立即到期,
+  // 重掷/回档一次=朋友圈+私聊+群聊+仅你可见+姐妹群同拍齐开火(每条都是一次 AI 计费)。
+  // 夹到目标钟=视为"刚发过",间隔门从回滚点重新起算,既不爆发也不永久卡死。
+  库.节拍 = Object.fromEntries(Object.entries(库.节拍 ?? {}).map(([k, v]) => [k, Math.min(Number(v) || 0, 目标钟)]));
   _.set(vars, '_微信', 库);
   const 事件日志 = _.get(vars, '_隔离事件.日志');
   if (Array.isArray(事件日志)) {
@@ -102,11 +108,20 @@ eventOn(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, (文本: string, generation_i
   eventEmit('人妻公寓:流式', 文本);
 });
 
+/** 行动锚风险窗(chat 变量,存真实楼层界;过楼自然过期,回档陈旧值也只是多注入几轮,无害) */
+const 行动锚窗键 = '_行动锚窗';
+function 开行动锚窗(至楼: number): void {
+  Promise.resolve(insertOrAssignVariables({ [行动锚窗键]: 至楼 }, { type: 'chat' })).catch(e =>
+    console.warn('[人妻公寓] 行动锚窗写入失败(仅少一层保险):', e),
+  );
+}
+
 // ── 取消本回合:停掉生成,作废的回合不落楼 ──
 let 已取消 = false;
 export function 取消本回合() {
   if (!进行中 || !本回合生成id) return;
   已取消 = true;
+  开行动锚窗(getLastMessageId() + 6); // 取消后 3 回合内注入行动锚,防中断残留的错位节奏
   // 部分公益站会让底层请求长期悬空，stopGenerationById 也不一定能让 Promise 返回。
   // 先主动结束本卡自己的等待，finally 才能立即释放 `进行中`，玩家才能重新生成。
   解除生成等待?.();
@@ -196,7 +211,49 @@ const 二次变量结算令 = [
 ].join('\n');
 
 function 取变量块(文本: string): string | null {
-  return 文本.match(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/i)?.[0] ?? null;
+  // 标准形:完整 <UpdateVariable> 块
+  const 完整 = 文本.match(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/i)?.[0];
+  if (完整) return 完整;
+  // 兜底①(2026-07-26 玩家反馈"变量不更新"):模型漏了外层包装,只输出 <JSONPatch> 块
+  const 裸补丁 = 文本.match(/<json_?patch>[\s\S]*?<\/json_?patch>/i)?.[0];
+  if (裸补丁) return `<UpdateVariable>\n${裸补丁}\n</UpdateVariable>`;
+  // 兜底②:连标签都没有,只输出了裸 JSON Patch 数组(可能带代码围栏)
+  const 数组 = 文本.match(/\[\s*\{[\s\S]*?"op"\s*:[\s\S]*?\}\s*\]/)?.[0];
+  if (数组) {
+    try {
+      if (Array.isArray(JSON.parse(数组))) {
+        return `<UpdateVariable>\n<JSONPatch>\n${数组}\n</JSONPatch>\n</UpdateVariable>`;
+      }
+    } catch {
+      /* 不是合法 JSON 就放弃这条兜底 */
+    }
+  }
+  // 兜底③:_.set 老格式命令行(MVU 全文扫描也认,但包起来便于清洗与落账一致)
+  const 命令行 = 文本.split('\n').filter(行 => /_\.(?:set|insert|assign|remove|unset|delete|add)\(/.test(行));
+  if (命令行.length) return `<UpdateVariable>\n${命令行.join('\n')}\n</UpdateVariable>`;
+  return null;
+}
+
+/**
+ * 首遍正文里是否已带 MVU 可解析的变量命令(2026-07-26 玩家反馈修复):
+ * - `_.set(...)` 老格式:MVU 全文扫描,存在即可用;
+ * - `<JSONPatch>` 标签块:内容必须真能 JSON.parse 成数组(空数组=模型判定无变化,也算可用;
+ *   Gemini 爱写尾逗号/注释,解析不动的畸形块=等于没写,须触发兜底重算)。
+ */
+function 有可用变量命令(文本: string): boolean {
+  if (/_\.(?:set|insert|assign|remove|unset|delete|add)\(/.test(文本)) return true;
+  for (const m of 文本.matchAll(/<(json_?patch)>([\s\S]*?)<\/\1>/gi)) {
+    const 体 = m[2]
+      .replace(/^\s*```[a-z]*\s*/i, '')
+      .replace(/```\s*$/, '')
+      .trim();
+    try {
+      if (Array.isArray(JSON.parse(体))) return true;
+    } catch {
+      /* 畸形块,继续看下一个 */
+    }
+  }
+  return false;
 }
 
 /**
@@ -204,7 +261,7 @@ function 取变量块(文本: string): string | null {
  * 正文仍采用第一遍结果；第二遍只生成变量块，并以它替换正文中可能存在但不稳定的旧变量块。
  */
 async function 补模型变量结算(
-  模型: 'DeepSeek' | 'Gemini',
+  模型: string,
   原文: string,
   行动: string,
   快照: string,
@@ -246,9 +303,12 @@ function 近楼对话(行动?: string): { role: string; content: string }[] {
   const 尾: { role: string; content: string }[] = [];
   try {
     const 末楼 = getLastMessageId();
-    const 起 = Math.max(0, 末楼 - 3);
-    for (const 消息 of getChatMessages(`${起}-${末楼}`) ?? []) {
-      尾.push({ role: 消息.role, content: 消息.message ?? '' });
+    // 起点跳过 0 楼(审计 M10-d):固定 0 楼是客户端 HTML,拿它做焦点扫描=拿界面代码认人
+    const 起 = Math.max(1, 末楼 - 3);
+    if (末楼 >= 1) {
+      for (const 消息 of getChatMessages(`${起}-${末楼}`) ?? []) {
+        尾.push({ role: 消息.role, content: 消息.message ?? '' });
+      }
     }
   } catch (e) {
     console.error('[人妻公寓] 读取楼层尾部失败:', e);
@@ -266,12 +326,7 @@ interface 反感连续项 {
  * 连续反感离场：只看同场妻子的实际好感负增量；任一回合未下降就断链。
  * 第三次下降时移出粘滞/赴约，客户端收到回合完成后立即按新位置刷新。
  */
-async function 结算连续反感(
-  旧Stat: SchemaType,
-  新Stat: SchemaType,
-  妻在场: 门牌[],
-  楼层: number,
-): Promise<门牌[]> {
+async function 结算连续反感(旧Stat: SchemaType, 新Stat: SchemaType, 妻在场: 门牌[], 楼层: number): Promise<门牌[]> {
   const 离场: 门牌[] = [];
   await updateVariablesWith(
     vars => {
@@ -290,9 +345,7 @@ async function 结算连续反感(
       }
       _.set(vars, '_反感连续', 记录);
       if (离场.length) {
-        const 粘 = (_.get(vars, '_粘滞') ?? null) as
-          | { 位置?: string; 楼?: number; 们?: 门牌[]; 离场?: 门牌[] }
-          | null;
+        const 粘 = (_.get(vars, '_粘滞') ?? null) as { 位置?: string; 楼?: number; 们?: 门牌[]; 离场?: 门牌[] } | null;
         if (粘?.位置) {
           粘.们 = (粘.们 ?? []).filter(m => !离场.includes(m));
           粘.离场 = _.uniq([...(粘.离场 ?? []), ...离场]);
@@ -311,7 +364,10 @@ async function 结算连续反感(
 
 function 补离场正文(正文: string, 离场: 门牌[]): string {
   if (!离场.length || /告辞|离开|走出|转身(?:就)?走|脚步声.{0,12}(?:远|消失)|关上.{0,8}门/.test(正文)) return 正文;
-  const 名 = 离场.map(m => 户静态表[m]?.妻名).filter(Boolean).join('、');
+  const 名 = 离场
+    .map(m => 户静态表[m]?.妻名)
+    .filter(Boolean)
+    .join('、');
   return `${正文}\n\n${名}的神情彻底冷了下来。她没有再给这场对话继续下去的余地，简短告辞后转身离开了这里。`;
 }
 
@@ -346,7 +402,14 @@ export function 组快照注入(
     }
   }
   const 记忆人物 = 焦点.flatMap(m => [户静态表[m]?.妻名, 户静态表[m]?.夫名]).filter((name): name is string => !!name);
-  const 快照 = 组公寓快照(对话尾, data, 楼层) + 读取数据库记忆胶囊(记忆人物);
+  const 公寓快照 = 组公寓快照(对话尾, data, 楼层);
+  const 数据库记忆 = 读取数据库记忆胶囊(记忆人物, 楼层);
+  // 数据库位于快照之后时，模型容易把较近的旧叙述误当当前事实。末位再压一次裁决：
+  // 数据库只补长期连续性，绝不参与当前时间、地点和在场判定。
+  const 当前场景裁决 = 数据库记忆
+    ? '\n【当前场景硬裁决】数据库记忆只补充过去经历；当前时间、当前位置、人物是否在场及丈夫是否外出，必须完全服从上方《公寓快照》。若两者冲突，忽略数据库中的旧状态，禁止让不在场人物出现。\n'
+    : '';
+  const 快照 = 公寓快照 + 数据库记忆 + 当前场景裁决;
   // 内容量审计(2026-07-19 用户点名#5):每楼注入体积落日志,测试期拿真实数据定收敛策略
   console.info(`[人妻公寓·快照] 本楼注入 ${快照.length} 字(焦点${焦点.length}人/在场${在场.length}人)`);
   return { 快照, 焦点, 妻在场, 夫在场 };
@@ -361,7 +424,7 @@ export function 组快照注入(
  * ⚠ 刻意不发 MESSAGE_SENT:会惊醒 MVU 对玩家楼无条件跑一轮进而连锁触发本卡逃生舱补结算=双重记账
  * (feedback_mvu_message_sent_trap 同族陷阱)。广播失败只警告,绝不影响回合本体。
  */
-function 广播生成完成事件() {
+async function 广播生成完成事件(): Promise<void> {
   try {
     const 宿主 = window.parent as any;
     const 全局ST = 宿主?.SillyTavern;
@@ -371,14 +434,25 @@ function 广播生成完成事件() {
     const 事件表 = 上下文?.eventTypes ?? 上下文?.event_types ?? 全局ST?.eventTypes ?? 全局ST?.event_types;
     if (typeof 事件源?.emit !== 'function' || !事件表?.GENERATION_ENDED) return;
     const 末楼 = getLastMessageId();
-    void (async () => {
-      try {
-        if (事件表.GENERATION_STARTED) await 事件源.emit(事件表.GENERATION_STARTED, 'normal', {}, false);
-        await 事件源.emit(事件表.GENERATION_ENDED, 末楼);
-      } catch (e) {
-        console.warn('[人妻公寓] 数据库插件兼容广播失败(不影响游戏):', e);
-      }
-    })();
+    const 数据库已启用 = 数据库状态().已安装;
+    if (数据库已启用) eventEmit('人妻公寓:运行阶段', '数据库正在整理本回合');
+    let 超时器: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        (async () => {
+          if (事件表.GENERATION_STARTED) await 事件源.emit(事件表.GENERATION_STARTED, 'normal', {}, false);
+          await 事件源.emit(事件表.GENERATION_ENDED, 末楼);
+        })(),
+        new Promise<void>(resolve => {
+          超时器 = setTimeout(() => {
+            if (数据库已启用) console.warn('[人妻公寓] 数据库兼容广播等待超过30秒，游戏先继续显示正文。');
+            resolve();
+          }, 30000);
+        }),
+      ]);
+    } finally {
+      if (超时器) clearTimeout(超时器);
+    }
   } catch (e) {
     console.warn('[人妻公寓] 数据库插件兼容广播失败(不影响游戏):', e);
   }
@@ -396,14 +470,20 @@ async function 记录数据库回合(
   const 参与者 = [...妻在场.map(m => 户静态表[m]?.妻名), ...夫在场.map(m => 户静态表[m]?.夫名)].filter(
     (name): name is string => !!name,
   );
-  await 同步数据库回合({
-    楼层,
-    时间: 当前时段(楼层 + data.系统._时段偏移楼),
-    地点: 场.房间id || '公寓公共区域',
-    参与者,
-    玩家行动: 行动,
-    结果摘要: 结果,
-  });
+  const 数据库已启用 = 数据库状态().已装游戏模板;
+  if (数据库已启用) eventEmit('人妻公寓:运行阶段', '数据库正在写入回合记录');
+  try {
+    await 同步数据库回合({
+      楼层,
+      时间: 当前时段(楼层 + data.系统._时段偏移楼),
+      地点: 场.房间id || '公寓公共区域',
+      参与者,
+      玩家行动: 行动,
+      结果摘要: 结果,
+    });
+  } finally {
+    if (数据库已启用) eventEmit('人妻公寓:运行阶段', '数据库记录完成');
+  }
 }
 
 /** 楼层落库前的清洗:思维链/变量块/选项块/行为等级标签不进楼层文本(prompt 与卷轴双干净) */
@@ -413,10 +493,14 @@ function 清洗正文(原文: string): string {
     // <content> 单独圈正文。content 是可靠的正文白名单边界；闭合缺失时也保住其后剧情。
     .replace(/^[\s\S]*?<content\b[^>]*>/i, '')
     .replace(/<\/content\s*>[\s\S]*$/i, '')
+    // story_scene 是部分预设使用的正文包装标签：语义与 content 相同，只保留标签内剧情。
+    // 开标签未闭合时保留其后文本，避免流式截断或模型漏闭合导致整段正文丢失。
+    .replace(/^[\s\S]*?<story_scene\b[^>]*>/i, '')
+    .replace(/<\/story_scene\s*>[\s\S]*$/i, '')
     .replace(/【开始思考】[\s\S]*?<\/think_fox~\s*>/gi, '')
     .replace(/<fox_selc\b[^>]*>[\s\S]*?<\/fox_selc\s*>/gi, '')
     .replace(/<fox_tip\b[^>]*>[\s\S]*?<\/fox_tip\s*>/gi, '')
-    .replace(/<\/?(?:content|think_fox~|fox_selc|fox_tip)(?:\s[^>]*)?>/gi, '')
+    .replace(/<\/?(?:content|story_scene|think_fox~|fox_selc|fox_tip)(?:\s[^>]*)?>/gi, '')
     // 玩家预设的前置草稿偶尔漏 </draft_notes>，但后续 bginfor 仍完整。用完整的信息栏
     // 作为安全右边界清掉两块元数据；若右边界也缺失，末尾仅剥标签，绝不吞掉剧情。
     .replace(/<draft_notes\b[^>]*>[\s\S]*?<bginfor\b[^>]*>[\s\S]*?<\/bginfor\s*>/gi, '')
@@ -481,18 +565,21 @@ function 回合结算(
   楼层: number,
 ): void {
   // 焦点户:被触碰=惰性结算生效点
+  const 现钟 = 楼层 + newStat.系统._时段偏移楼;
   let 主焦堕落增量 = 0;
   for (const m of 焦点) {
     const 节点 = newStat.户[m];
     if (!节点) continue;
-    惰性结算户(节点, 楼层);
+    // 惰性结算走钟楼轴(2026-07-26 审计 低危7):收租/冷却/作息全按钟楼,婚姻阴跌与疑心回落
+    // 若按真实楼走,反复杀时间=用 1/3 婚姻代价换整期房租
+    惰性结算户(节点, 现钟);
     // `夫.状态`是存档里的丈夫状态栏；此前只有界面临时推算，字段本身长期为空，所以回合后看似从不更新。
-    节点.夫.状态 = 丈夫在楼(节点, m, 楼层 + newStat.系统._时段偏移楼);
+    节点.夫.状态 = 丈夫在楼(节点, m, 现钟);
     if (!妻在场.includes(m)) continue;
     节点.妻.上次互动楼层 = 楼层;
     const 堕落增量 = 节点.妻.堕落值 - (snapStat.户[m]?.妻.堕落值 ?? 节点.妻.堕落值);
     if (m === 焦点[0]) 主焦堕落增量 = 堕落增量;
-    结算焦点疑心(节点, m, 堕落增量);
+    结算焦点疑心(节点, m, 堕落增量, 现钟);
   }
 
   // 一次性事件消费转存(防护10):本轮快照已注入的排队事件挪到已注入档
@@ -517,7 +604,7 @@ function 回合结算(
   if (newStat.系统._母亲首夜第二幕 && !newStat.系统._待发送事件) {
     newStat.系统._母亲首夜第二幕 = false;
     newStat.系统._待发送事件 =
-      '【早饭桌】第二天一早,妈照常在厨房——照常煎蛋,照常唠叨"趁热吃",围裙照常系得整整齐齐。只有拿筷子的手在抖。' +
+      `${事件角色标记({ 在场妻: ['302'] })}【早饭桌】第二天一早,妈照常在厨房——照常煎蛋,照常唠叨"趁热吃",围裙照常系得整整齐齐。只有拿筷子的手在抖。` +
       '"什么都没发生"这场戏她演得越用力,越是承认发生了什么。演出这顿早饭:两个人隔着一张桌子各自演"寻常",' +
       '谁都不看谁的眼睛;她给你添饭的那一下,手停了半拍。全程不说破一个字——罪恶感的螺旋从这顿饭开始拧紧';
   }
@@ -564,12 +651,29 @@ export async function 执行回合(行动: string): Promise<void> {
     }
     const data = Schema.parse(rawStat) as SchemaType;
     捕获保护快照(data); // 回滚基准(含镜像取大并入)
+    // 生成前刷新整表视图:两轮之间的 UI 写入(买衣/晋阶/送礼)必须先进视图再进 prompt
+    await 同步整表视图(data);
 
     const 对话尾 = 近楼对话(行动);
+    if (数据库状态().已装游戏模板) {
+      eventEmit('人妻公寓:运行阶段', '数据库正在读取长期记忆');
+      // 先让全屏客户端绘制状态条，再进入可能同步阻塞的数据库导出接口。
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+    }
     const { 快照, 焦点, 妻在场, 夫在场 } = 组快照注入(对话尾, data, 生成楼层);
 
+    // 本轮行动锚(2026-07-27 玩家反馈"AI永远回应上一轮指令"):历史楼层一旦出现过一对
+    // 行动/回应错位(撤回或异常回合造成),模型会在上下文里无限模仿这个错位节奏。
+    // 系统侧明写"本轮唯一新行动是哪条",以此为准=错位当轮即自愈,不再级联。
+    // 常驻短锚：user_input 虽然也传本轮行动，但部分预设会重排历史消息；显式末位系统锚可避免
+    // 普通回合也回应上一轮。风险窗仍保留给回档状态维护与旧档兼容，但不再决定是否注入。
+    const 行动锚 =
+      `\n【本轮玩家行动】\n${行动}\n` +
+      '(以上是{{user}}本轮唯一的新行动,本次回复只回应这条行动。之前楼层的行动均已演出完毕,' +
+      '严禁重演、复述或把本次正文写成对任何旧行动的回应;若历史楼层存在行动与回应错位,一律以本条为准。)';
+
     const injects: Omit<InjectionPrompt, 'id'>[] = [
-      { role: 'system', content: 快照, position: 'in_chat', depth: 0, should_scan: true },
+      { role: 'system', content: 快照 + 行动锚, position: 'in_chat', depth: 0, should_scan: true },
     ];
     const 正文模型 = 识别正文模型();
     const 是Gemini = /\bgemini(?:[-_.:/\s]|$)/i.test(正文模型);
@@ -586,22 +690,40 @@ export async function 执行回合(行动: string): Promise<void> {
 
     已取消 = false;
     本回合生成id = `rqgy-${回合前末楼}-${_.random(1e9)}`;
+    eventEmit('人妻公寓:运行阶段', 'AI正在生成正文');
     let 原文 = await 等待正文生成({ user_input: 行动, should_stream: true, injects, generation_id: 本回合生成id });
     if (已取消) {
       eventEmit('人妻公寓:回合失败', '已取消——这一轮没有发生');
       return;
     }
+    let 已补结算 = false;
     if ((是DeepSeek || 是Gemini) && 二次变量结算开启()) {
       const 模型 = 是DeepSeek ? 'DeepSeek' : 'Gemini';
+      已补结算 = true;
       try {
+        eventEmit('人妻公寓:运行阶段', '正在核对角色变量');
         原文 = await 补模型变量结算(模型, 原文, 行动, 快照, 回合前末楼);
       } catch (e) {
         if (已取消 || (e instanceof Error && e.message === '__RQGY_CANCELLED__')) throw e;
         console.warn(`[人妻公寓] ${模型} 独立变量结算失败，保留第一遍结果：`, e);
       }
     }
-    if (是Gemini && !/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/i.test(原文)) {
-      console.warn('[人妻公寓] Gemini 本轮仍未输出完整 UpdateVariable 块；正文会保留，但本轮无法采纳 AI 数值更新');
+    // 按结果兜底(2026-07-26 玩家反馈"每轮都要手点 MVU 重新处理变量"):
+    // 上面的预防性二次结算只认模型名,公益站/反代改名(DS-R1、flash别名等)一律漏网;
+    // 首遍正文里连一条可解析的变量命令都没有、且本轮确有可更新的人物在场时,
+    // 无论什么模型都补一遍独立结算——触发条件看"结果"不看"名字",总开关同一个。
+    if (!已补结算 && 二次变量结算开启() && !有可用变量命令(原文) && (妻在场.length || 夫在场.length)) {
+      console.warn('[人妻公寓] 首遍输出没有可解析的变量命令,触发通用兜底结算');
+      try {
+        eventEmit('人妻公寓:运行阶段', '正在补全角色变量');
+        原文 = await 补模型变量结算('通用兜底', 原文, 行动, 快照, 回合前末楼);
+      } catch (e) {
+        if (已取消 || (e instanceof Error && e.message === '__RQGY_CANCELLED__')) throw e;
+        console.warn('[人妻公寓] 通用兜底变量结算失败，保留第一遍结果：', e);
+      }
+    }
+    if (!有可用变量命令(原文) && (妻在场.length || 夫在场.length)) {
+      console.warn('[人妻公寓] 本轮最终仍无可解析的变量命令,数值将保持不变(请玩家截此日志反馈)');
     }
     if (已取消) {
       eventEmit('人妻公寓:回合失败', '已取消——这一轮没有发生');
@@ -614,7 +736,12 @@ export async function 执行回合(行动: string): Promise<void> {
 
     // ── 稽查终审(提示词是劝告,脚本是法律):违规=中断卡+AI 变量不采纳+代价 ──
     // 词表兜底只扫清洗后正文:思维链的自我提醒/选项块的情色试探条不作数(2026-07-17 误杀修复)
-    const 稽查 = 输出稽查(原文, 焦点阶段, false /* 正戏楼免检 P5 场景引擎接入 */, 清洗正文(原文));
+    // 正戏免检接线(2026-07-26 审计 M7):脚本自己排的特殊场景/晋阶正戏自带露骨词
+    // (录像带剧情含"调教""录像"两票即熔断),不免检=玩家花钱买的戏被自己的稽查斩掉。
+    // 只认脚本导演的正戏标记,冷落/搬家等普通事件不豁免。
+    const 本楼事件 = 取本轮事件文本(data, 生成楼层);
+    const 正戏免检 = /【特殊场景·|【转折正戏】|【药物首夜】|【早饭桌】|【破墙】/.test(本楼事件);
+    const 稽查 = 输出稽查(原文, 焦点阶段, 正戏免检, 清洗正文(原文));
     if (稽查.违规 && 焦点妻门牌) {
       console.warn(`[人妻公寓·稽查] 违规拦截:${稽查.原因}`);
       const newStat = _.cloneDeep(data); // 不采纳 AI 的任何变量更新,从快照起步
@@ -634,6 +761,7 @@ export async function 执行回合(行动: string): Promise<void> {
         { refresh: 'none' },
       );
       捕获保护快照(newStat);
+      void 同步整表视图(newStat);
       insertOrAssignVariables(
         {
           _上次回合: { 行动, 回合前末楼, chat快照 } satisfies 上次回合记录,
@@ -644,7 +772,7 @@ export async function 执行回合(行动: string): Promise<void> {
         { type: 'chat' },
       );
       await 记录数据库回合(生成楼层, newStat, 行动, 中断正文, 妻在场, 夫在场);
-      广播生成完成事件();
+      await 广播生成完成事件();
       eventEmit('人妻公寓:回合完成');
       return;
     }
@@ -652,16 +780,13 @@ export async function 执行回合(行动: string): Promise<void> {
     // ── 正常路径:手动解析变量 + 分工表回滚 + 结算 ──
     const 新 = ((await Mvu.parseMessage(原文, 旧)) ?? 旧) as Record<string, unknown>;
     const newStat = Schema.parse(_.get(新, 'stat_data') ?? {}) as SchemaType;
-    回滚保护字段(newStat, 焦点, { 妻: 妻在场, 夫: 夫在场 }); // 户级焦点内再按实际在场人物分闸
+    回滚保护字段(newStat, 焦点, { 妻: 妻在场, 夫: 夫在场 }, 生成楼层); // 户级焦点内再按实际在场人物分闸
     if (焦点妻门牌) 记违规清零(newStat); // 有焦点妻且未违规:连续违规计数断链
     回合结算(newStat, data, 焦点, 妻在场, 生成楼层);
     const 反感离场 = await 结算连续反感(data, newStat, 妻在场, 生成楼层);
     _.set(新, 'stat_data', newStat);
 
-    const 正文 = 补离场正文(
-      清洗正文(原文) || '(楼道里安静了一瞬……本轮 AI 未返回正文,可换个说法再试)',
-      反感离场,
-    );
+    const 正文 = 补离场正文(清洗正文(原文) || '(楼道里安静了一瞬……本轮 AI 未返回正文,可换个说法再试)', 反感离场);
     await createChatMessages(
       [
         { role: 'user', message: 行动 },
@@ -670,6 +795,7 @@ export async function 执行回合(行动: string): Promise<void> {
       { refresh: 'none' },
     );
     捕获保护快照(newStat);
+    void 同步整表视图(newStat);
 
     // 破门是一幕性的突发标记:演完这一楼即清除(场景保留,玩家还在房里)
     const 场景 = _.get(getVariables({ type: 'chat' }), '_场景') as { 破门?: boolean } | undefined;
@@ -695,7 +821,16 @@ export async function 执行回合(行动: string): Promise<void> {
     );
 
     await 记录数据库回合(生成楼层, newStat, 行动, 正文, 妻在场, 夫在场);
-    广播生成完成事件();
+    eventEmit('人妻公寓:CG回合信号', {
+      门牌: 焦点妻门牌 ?? null,
+      角色阶段: 焦点妻门牌 ? (newStat.户[焦点妻门牌]?.妻.当前阶段 ?? null) : null,
+      行为等级: 解析行为等级(原文),
+      正文,
+      行动,
+      事件: 本楼事件,
+      楼层: 生成楼层,
+    });
+    await 广播生成完成事件();
     eventEmit('人妻公寓:回合完成');
   } catch (e) {
     if (已取消) {
@@ -716,7 +851,11 @@ export async function 执行回合(行动: string): Promise<void> {
  * 然后用原行动重新执行一回合。
  */
 export async function 重掷回合(): Promise<void> {
-  if (进行中) return;
+  if (进行中) {
+    // 静默返回会闩死客户端的乐观 发送中 锁(2026-07-26 审计 C6):必须回一个事件解锁
+    eventEmit('人妻公寓:回合失败', '上一轮还没结束,稍等片刻再重来');
+    return;
+  }
   const 记录 = 读上次回合();
   const 末楼 = getLastMessageId();
   if (!记录 || 末楼 <= 记录.回合前末楼) {
@@ -725,11 +864,13 @@ export async function 重掷回合(): Promise<void> {
   }
   try {
     await deleteChatMessages(_.range(记录.回合前末楼 + 1, 末楼 + 1), { refresh: 'none' });
+    // 楼已删,此刻读到的 stat 就是回滚后真值,拿它的杀时间偏移换算节拍钟楼轴
+    const 回滚偏移 = Number(_.get(读最近有效stat() ?? {}, '系统._时段偏移楼')) || 0;
     // updateVariablesWith + _.set 整值替换(insertOrAssign 对对象是深合并,会残留回合内新增的键)
     await updateVariablesWith(
       vars => {
         for (const 键 of 回合变量键) _.set(vars, 键, (记录.chat快照 as Record<string, unknown>)[键] ?? null);
-        裁手机时间线(vars, 记录.回合前末楼);
+        裁手机时间线(vars, 记录.回合前末楼, 记录.回合前末楼 + 回滚偏移);
         return vars;
       },
       { type: 'chat' },
@@ -739,16 +880,22 @@ export async function 重掷回合(): Promise<void> {
     eventEmit('人妻公寓:回合失败', e instanceof Error ? e.message : String(e));
     return;
   }
+  开行动锚窗(记录.回合前末楼 + 6);
   await 执行回合(记录.行动);
 }
 
 /**
  * 回档:删掉指定楼层之后的一切。
  * 变量随楼回滚;回合类 chat 变量一律清空(排队于被删时间线,保守清掉最安全);
- * 晋阶镜像不清——守护系统按"镜像楼层>当前楼=回档作废"规则自行处理(防护9)。
+ * 晋阶镜像在此显式作废(2026-07-26 审计 H2/M12):守护系统的楼层比较无法区分
+ * "重掷删楼(镜像该保)"和"回档到更早时间线(镜像该废)",作废语义只能由本入口自己宣告——
+ * 否则回档后任意一次 UI 抬升(镜像直写)会把整份旧局镜像重新盖上当前楼戳,旧阶段全数复活。
  */
 export async function 回档至(楼层: number): Promise<void> {
-  if (进行中) return;
+  if (进行中) {
+    eventEmit('人妻公寓:回合失败', '上一轮还没结束,稍等片刻再回档');
+    return;
+  }
   const 末楼 = getLastMessageId();
   if (!Number.isInteger(楼层) || 楼层 < 0 || 楼层 >= 末楼) {
     eventEmit('人妻公寓:回合失败', '没有可回退的楼层');
@@ -757,16 +904,22 @@ export async function 回档至(楼层: number): Promise<void> {
   进行中 = true;
   try {
     await deleteChatMessages(_.range(楼层 + 1, 末楼 + 1), { refresh: 'none' });
+    const 回滚偏移 = Number(_.get(读最近有效stat() ?? {}, '系统._时段偏移楼')) || 0;
     await updateVariablesWith(
       vars => {
-        for (const 键 of [...回合变量键, '_上次回合', '_上次隔离回合']) _.set(vars, 键, null);
-        裁手机时间线(vars, 楼层);
+        for (const 键 of [...回合变量键, '_上次回合', '_上次隔离回合', PROMOTE_MIRROR_KEY]) _.set(vars, 键, null);
+        裁手机时间线(vars, 楼层, 楼层 + 回滚偏移);
         return vars;
       },
       { type: 'chat' },
     );
+    清保护快照(); // 内存快照连同镜像一起作废,下一次捕获从回档后真值重建
     const 回档数据 = 读取最近有效();
-    if (回档数据) await 同步入住世界书条目(回档数据.data);
+    if (回档数据) {
+      await 同步入住世界书条目(回档数据.data);
+      await 同步整表视图(回档数据.data);
+    }
+    开行动锚窗(楼层 + 6); // 回档/撤回后 3 回合内注入行动锚(玩家反馈的错位高发窗口)
     console.info(`[人妻公寓] 回档至 ${楼层} 楼`);
     eventEmit('人妻公寓:回合完成');
   } catch (e) {
@@ -815,7 +968,10 @@ const 序章行动选项 = [
  * 幂等:已完成序章直接拒绝(单向语义随楼层快照走,回档到 0 楼=重开序章)。
  */
 export async function 开始新游戏(难度: string): Promise<boolean> {
-  if (进行中) return false;
+  if (进行中) {
+    eventEmit('人妻公寓:回合失败', '上一轮还没结束,稍等片刻再开始');
+    return false;
+  }
   进行中 = true;
   try {
     const 档 = 难度表[难度] ? 难度 : '标准';
@@ -824,6 +980,7 @@ export async function 开始新游戏(难度: string): Promise<boolean> {
     const { data } = 有效;
     if (data.系统._序章完成) {
       console.warn('[人妻公寓] 序章已完成,忽略重复开局');
+      eventEmit('人妻公寓:回合失败', '序章已经开始过了'); // 解锁客户端乐观锁(审计 C6)
       return false;
     }
     data.系统._难度 = 档;
@@ -843,7 +1000,7 @@ export async function 开始新游戏(难度: string): Promise<boolean> {
 
     console.info(`[人妻公寓] 序章开局完成(难度:${档},起始资金:${难度表[档].起始资金})`);
     await 记录数据库回合(getLastMessageId(), data, '开始新游戏', 父亲来电正文, [], []);
-    广播生成完成事件();
+    await 广播生成完成事件();
     eventEmit('人妻公寓:回合完成');
     return true;
   } catch (e) {
@@ -864,7 +1021,11 @@ export async function 开始新游戏(难度: string): Promise<boolean> {
  * 残留旧局镜像会把旧阶段"取大"进新局,防护9 反向路径)。
  */
 export async function 重开一局(): Promise<void> {
-  if (进行中) return;
+  if (进行中) {
+    // 静默返回=客户端 发送中 永久闩死只能刷新页面(2026-07-26 审计 C6 最易触发路径)
+    eventEmit('人妻公寓:回合失败', '上一轮还没结束,稍等片刻再重开');
+    return;
+  }
   进行中 = true;
   try {
     const 末楼 = getLastMessageId();
@@ -889,6 +1050,7 @@ export async function 重开一局(): Promise<void> {
           '_赴约',
           '_工具由头',
           '_换装余波',
+          '_行动锚窗',
           PROMOTE_MIRROR_KEY,
         ]) {
           _.set(vars, 键, null);

@@ -284,6 +284,51 @@ export async function 同步数据库回合(event: 数据库回合事件): Promi
   }
 }
 
+export interface 社交轨迹条目 {
+  类型: '邀约' | '来电' | '赠礼';
+  人物: string;
+  事件: string;
+  结果: string;
+  楼层: number;
+  事件键: string;
+}
+
+/**
+ * 手机/商店硬事件直写社交轨迹(措辞全部脚本模板固定,不含AI文本与裸数值)。
+ * 填表AI只读楼层,看不见手机内容;这条通道与 同步数据库回合 同范式,不受填表字数门槛影响。
+ */
+export async function 同步社交轨迹(条目: 社交轨迹条目): Promise<boolean> {
+  const api = 取数据库API();
+  if (typeof api?.insertRow !== 'function' || !数据库状态().已装游戏模板) return false;
+  try {
+    const data: Record<string, unknown> = {
+      类型: 条目.类型,
+      人物: 条目.人物,
+      事件: 条目.事件.slice(0, 200),
+      结果: 条目.结果.replace(/\s+/g, ' ').slice(0, 300),
+      最后楼层: 条目.楼层,
+      事件键: 条目.事件键,
+    };
+    // 事件键在 DDL 里是 UNIQUE;回档重写时旧行可能短暂仍在运行态,原位更新避免冲突/重复行。
+    const tableData = 解析数据库数据(api.exportTableAsJson?.());
+    const sheet = 取表(tableData, 'RQ_社交轨迹');
+    const headers = (sheet?.content?.[0] ?? []).map(String);
+    const keyCol = headers.indexOf('事件键');
+    const existingRow =
+      keyCol < 0
+        ? -1
+        : (sheet?.content ?? []).findIndex((row, index) => index > 0 && String(row[keyCol]) === 条目.事件键);
+    if (existingRow >= 1 && typeof api.updateRow === 'function') {
+      return await 限时等待(api.updateRow('RQ_社交轨迹', existingRow, data), 4000, '社交轨迹更新');
+    }
+    const row = await 限时等待(api.insertRow('RQ_社交轨迹', data), 4000, '社交轨迹写入');
+    return row >= 1;
+  } catch (error) {
+    console.warn('[人妻公寓·数据库] 社交轨迹同步失败(不影响游戏):', error);
+    return false;
+  }
+}
+
 function 取表(data: unknown, name: string): 数据表 | undefined {
   if (!data || typeof data !== 'object') return undefined;
   return Object.values(data as Record<string, unknown>).find(value => {
@@ -302,16 +347,26 @@ function 表结构可用(sheet: 数据表 | undefined, expectedHeaders: readonly
     .every(header => new RegExp(`--\\s*${_.escapeRegExp(header)}\\s*(?:\\r?\\n|$)`).test(ddl));
 }
 
-function 行转文本(sheet: 数据表, focusNames: readonly string[], 只要未结 = false): string[] {
+function 行转文本(
+  sheet: 数据表,
+  focusNames: readonly string[],
+  当前楼层: number,
+  只要未结 = false,
+): string[] {
   const content = sheet.content ?? [];
   const headers = (content[0] ?? []).map(String);
+  const 楼层列 = headers.indexOf('最后楼层');
   return content
     .slice(1)
     .filter(row => {
       const text = row.map(String).join('|');
       const 命中人物 = focusNames.length === 0 || focusNames.some(name => text.includes(name));
       const 未结 = !只要未结 || (!text.includes('已兑现') && !text.includes('已作废'));
-      return 命中人物 && 未结;
+      // 数据库表不随酒馆回档自动回滚。未来楼层记录属于已删除时间线，绝不能重新注入当前剧情。
+      // 缺少/损坏楼层的旧数据保守放行，避免升级后整张长期记忆表突然失效。
+      const 记录楼层 = 楼层列 >= 0 ? Number(row[楼层列]) : NaN;
+      const 不在未来 = !Number.isFinite(记录楼层) || 记录楼层 <= 当前楼层;
+      return 命中人物 && 未结 && 不在未来;
     })
     .slice(-4)
     .map(row =>
@@ -322,7 +377,7 @@ function 行转文本(sheet: 数据表, focusNames: readonly string[], 只要未
     );
 }
 
-export function 读取数据库记忆胶囊(focusNames: readonly string[]): string {
+export function 读取数据库记忆胶囊(focusNames: readonly string[], 当前楼层: number): string {
   const api = 取数据库API();
   if (typeof api?.exportTableAsJson !== 'function' || !数据库状态().已装游戏模板) return '';
   try {
@@ -331,12 +386,12 @@ export function 读取数据库记忆胶囊(focusNames: readonly string[]): stri
     const 伏笔表 = 取表(data, 'RQ_承诺与伏笔');
     const 社交表 = 取表(data, 'RQ_社交轨迹');
     const rows = [
-      ...(人物表 ? 行转文本(人物表, focusNames) : []),
-      ...(伏笔表 ? 行转文本(伏笔表, focusNames, true) : []),
-      ...(社交表 ? 行转文本(社交表, focusNames) : []),
+      ...(人物表 ? 行转文本(人物表, focusNames, 当前楼层) : []),
+      ...(伏笔表 ? 行转文本(伏笔表, focusNames, 当前楼层, true) : []),
+      ...(社交表 ? 行转文本(社交表, focusNames, 当前楼层) : []),
     ].slice(-8);
     if (!rows.length) return '';
-    return `\n<人妻公寓数据库记忆>\n以下是数据库中与本场人物相关的长期事实，只用于保持连续性；若与本楼MVU硬状态冲突，以MVU为准。\n${rows
+    return `\n<人妻公寓数据库记忆>\n与本场人物相关的过去事实，仅用于保持连续性：\n${rows
       .map(row => `- ${row}`)
       .join('\n')}\n</人妻公寓数据库记忆>`.slice(0, 2200);
   } catch (error) {

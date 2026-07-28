@@ -152,6 +152,9 @@
 
       # 整表注入=MVU 记账地基(云霜凝同款,勿关):AI 的 JSON Patch replace 须知当前值,身体开发等
       # 可写字段只在这张表里。防泄底靠"裂缝内容在代码不进变量";AI 拿背包/现金加戏靠快照演出纪律拦。
+      # 2026-07-27 瘦身:改读脚本维护的过滤视图 _整表视图(format 宏只滤 `$`,裸读 stat_data 会把
+      # `_` 机制字段和已消费剧情事件全文每轮塞进 prompt)。视图=stat_data 剥 `_`/`$` 键,可写字段全保留;
+      # 由 mvuIO.同步整表视图 在生成前/落楼后/回档后/MVU 事件各变更点同步。须与同版脚本配套(旧脚本无视图)。
       - 名称: 变量更新列表
         启用: true
         激活策略:
@@ -163,5 +166,5 @@
         内容: |
           ---
           <status_current_variable>
-          {{format_message_variable::stat_data}}
+          {{format_chat_variable::_整表视图}}
           </status_current_variable>

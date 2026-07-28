@@ -1,4 +1,5 @@
 import { 数据库状态, 通过数据库生成 } from './数据库桥';
+import { 预设破限段 } from './预设桥';
 
 export type 隔离事件类型 = '荣耀洞' | '监控';
 
@@ -115,18 +116,25 @@ export async function 执行隔离事件(参数: {
   try {
     const system = 系统提示(参数.类型, 参数.导演事件);
     const history = 最近线程(参数.线程);
-    const ordered_prompts: ({ role: 'system' | 'user' | 'assistant'; content: string } | 'user_input')[] = [
+    // 预设破限段护航(2026-07-27):特殊场景正戏最敏感,裸发必被 Gemini 安全截断
+    const { 前, 后 } = 预设破限段();
+    // 核心段单列:存档日志(史册考古的"提示词"字段)只记核心,预设破限段不进 chat 变量(防存档膨胀)
+    const 核心段: ({ role: 'system' | 'user' | 'assistant'; content: string } | 'user_input')[] = [
       { role: 'system', content: system },
       ...history,
       'user_input',
     ];
-    let 原文: string | null | undefined;
+    const ordered_prompts: typeof 核心段 = [...前, ...核心段, ...后];
+    // generateRaw 可能返回 GenerateToolCallResult(本卡不传 tools,该分支不触发),统一按 unknown 收
+    let 原文: unknown;
     if (数据库状态().可调用AI) {
       原文 = await 通过数据库生成(
         [
+          ...前,
           { role: 'system', content: system },
           ...history,
           { role: 'user', content: 参数.行动 },
+          ...后,
         ],
         '',
         1400,
@@ -144,7 +152,7 @@ export async function 执行隔离事件(参数: {
     const 序起 = 库.日志.filter(条 => 条.锚楼 === 锚楼).reduce((max, 条) => Math.max(max, 条.序), -1) + 1;
     const 时间 = Date.now();
     const 基 = 参数.类型 + '-' + 时间;
-    const 提示词 = ordered_prompts
+    const 提示词 = 核心段
       .map(项 => (项 === 'user_input' ? 'USER\n' + 参数.行动 : 项.role.toUpperCase() + '\n' + 项.content))
       .join('\n\n');
     库.日志.push(

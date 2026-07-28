@@ -4,13 +4,19 @@
       <!-- 错误护栏:任何运行时异常显示在此,不再整屏空白(点击即散,不常驻) -->
       <div v-if="错误信息" class="err" title="点击关闭" @click="错误信息 = ''">⚠︎ 界面异常:{{ 错误信息 }}(点击关闭)</div>
 
+      <!-- 酒馆外层的数据库公告在移动端真全屏不可见；在游戏层镜像真实运行阶段。 -->
+      <transition name="loc-flash">
+        <div v-if="数据库运行文案" class="db-running-banner" role="status" aria-live="polite">
+          <span class="db-running-pulse" />
+          <span
+            ><b>{{ 数据库运行文案 }}</b
+            ><small>长期记忆正在计算，请稍候，不要重复点击</small></span
+          >
+        </div>
+      </transition>
+
       <!-- 消息内嵌首屏：移动端必须由玩家手势触发 Fullscreen API，给一个看得见的大入口。 -->
-      <button
-        v-if="移动端 && !真全屏中"
-        class="mobile-fullscreen-cta"
-        type="button"
-        @click="打开移动端全屏"
-      >
+      <button v-if="移动端 && !真全屏中" class="mobile-fullscreen-cta" type="button" @click="打开移动端全屏">
         <Ic n="expand" />
         <span><b>点击全屏打开游戏</b><small>首次进入建议先全屏，之后可在右上角随时退出</small></span>
       </button>
@@ -23,9 +29,9 @@
         </div>
       </transition>
 
-      <!-- 右上角:主题切换 + 全屏 + 设置(meta 类操作,不进游戏功能区) -->
+      <!-- 右上角:手机只留全屏+设置；桌面仍保留主题快捷钮 -->
       <span class="corner-btns" :class="{ 'above-setup': 首次说明开 }">
-        <button class="btn mini icon" :title="暗色 ? '切回日间模式' : '切换夜间模式'" @click="切换主题">
+        <button v-if="!移动端" class="btn mini icon" :title="暗色 ? '切回日间模式' : '切换夜间模式'" @click="切换主题">
           <Ic :n="暗色 ? 'sun' : 'moon'" />
         </button>
         <button class="btn mini icon" :title="全屏中 ? '退出全屏' : '沉浸全屏'" @click="切换全屏">
@@ -134,14 +140,12 @@
             <div>
               <div class="set-label">模型二次变量结算</div>
               <p class="set-hint">
-                DeepSeek 与 Gemini 写完正文后，再静默请求一次只输出变量块。关闭可少一次请求，但模型漏更变量时不会自动补救。
+                模型写完正文却没输出可解析的变量更新（DeepSeek/Gemini
+                常见）时，自动再静默请求一次只补变量块。关闭可少一次请求，但漏更变量时数值不会变，需手动点 MVU
+                的"重新处理变量"。
               </p>
             </div>
-            <button
-              class="toggle"
-              :class="{ on: 二次变量结算 }"
-              @click="((二次变量结算 = !二次变量结算), 改设置())"
-            >
+            <button class="toggle" :class="{ on: 二次变量结算 }" @click="((二次变量结算 = !二次变量结算), 改设置())">
               <i />
             </button>
           </div>
@@ -200,8 +204,9 @@
             <li class="required">
               <b><em>1</em>安装角色卡与运行环境</b>
               <p>
-                导入角色卡后，安装并启用【酒馆助手】，并确认角色卡自带的 MVU
-                脚本已启用。当前{{ 酒馆助手检测说明 }}。若不是最新版，建议更新，但不会阻止开始游戏。
+                导入角色卡后，安装并启用【酒馆助手】，并确认角色卡自带的 MVU 脚本已启用。当前{{
+                  酒馆助手检测说明
+                }}。若不是最新版，建议更新，但不会阻止开始游戏。
               </p>
             </li>
             <li class="required">
@@ -215,11 +220,15 @@
                 <button class="btn mini" :class="{ rite: 记忆方案 === '数据库' }" @click="选择记忆方案('数据库')">
                   使用数据库
                 </button>
-                <button class="btn mini" :class="{ rite: 记忆方案 === '智脑' }" @click="选择记忆方案('智脑')">使用智脑</button>
+                <button class="btn mini" :class="{ rite: 记忆方案 === '智脑' }" @click="选择记忆方案('智脑')">
+                  使用智脑
+                </button>
               </div>
 
               <template v-if="记忆方案 === '数据库'">
-                <p>请在【酒馆助手→脚本→全局脚本】中禁用或删除智脑并刷新页面，然后安装数据库插件和人妻公寓四张 RQ_ 表。</p>
+                <p>
+                  请在【酒馆助手→脚本→全局脚本】中禁用或删除智脑并刷新页面，然后安装数据库插件和人妻公寓四张 RQ_ 表。
+                </p>
                 <div class="setup-db-actions">
                   <button class="btn mini" @click="刷新全部检测">重新检测</button>
                   <button
@@ -237,7 +246,10 @@
               </template>
 
               <template v-else-if="记忆方案 === '智脑'">
-                <p>请禁用或删除数据库插件并刷新页面；随后把智脑 v5.0.8 作为【全局脚本】安装。智脑自行捕获楼层、总结并注入记忆，不需要 RQ_ 表。</p>
+                <p>
+                  请禁用或删除数据库插件并刷新页面；随后把智脑 v5.0.8
+                  作为【全局脚本】安装。智脑自行捕获楼层、总结并注入记忆，不需要 RQ_ 表。
+                </p>
                 <div class="setup-db-actions">
                   <button class="btn mini" @click="复制智脑安装代码">复制智脑安装代码</button>
                   <button class="btn mini rite" @click="刷新全部检测">重新检测</button>
@@ -439,7 +451,11 @@
           class="story-wrap"
           :class="[
             `portrait-count-${Math.min(立绘列表.length, 6)}`,
-            { 'portraits-many': 立绘列表.length >= 4, 'story-glory': !!荣耀洞图 },
+            {
+              'portraits-many': 立绘列表.length >= 4,
+              'story-glory': !!荣耀洞图,
+              'story-adult-cg': 显示成人CG,
+            },
           ]"
           :style="[场景色, 场景图样式]"
         >
@@ -451,7 +467,17 @@
           >
             {{ 正文隐藏 ? '👁' : '🙈' }}
           </button>
-          <TransitionGroup v-if="立绘显示" name="fade">
+          <Transition name="fade">
+            <div
+              v-if="显示成人CG"
+              class="adult-cg-stage"
+              :class="{ loading: 成人CG加载中 }"
+              :style="{ '--adult-cg-img': `url(${当前成人CG地址})` }"
+            >
+              <img :src="当前成人CG地址" alt="" draggable="false" @load="成人CG已加载" @error="成人CG加载失败" />
+            </div>
+          </Transition>
+          <TransitionGroup v-if="立绘显示 && !显示成人CG" name="fade">
             <img
               v-for="绘 in 立绘列表"
               :key="绘.src"
@@ -527,7 +553,7 @@
             <div v-if="发送中" class="story-entry">
               <p v-for="(段, j) in 流式段" :key="'流' + j" class="narr">{{ 段 }}</p>
               <p class="scribing">
-                ✎ 这一楼正在发生……<span v-if="生成等待秒">已等待 {{ 生成等待秒 }} 秒</span>
+                ✎ {{ 运行阶段 || '这一楼正在发生……' }}<span v-if="生成等待秒"> · 已等待 {{ 生成等待秒 }} 秒</span>
                 <button class="btn mini" title="打断,本回合作废" @click="取消回合">取消</button>
                 <button
                   v-if="生成等待秒 >= 20 && 待重试行动"
@@ -792,7 +818,16 @@
                 </div>
                 <p class="rc-mood">{{ 房卡氛围 }}</p>
                 <div class="rm-grid">
-                  <button v-for="(动作, i) in 房卡动作" :key="i" class="tile" :class="动作.类" @click="动作.做()">
+                  <!-- :disabled 发送中(审计 C5):点房守了发送中,但已开的卡在生成开始后仍活着——
+                       瓷砖点击会落进脚本操作队列,等在飞回合结束后才执行,发起未被请求的第二个回合 -->
+                  <button
+                    v-for="(动作, i) in 房卡动作"
+                    :key="i"
+                    class="tile"
+                    :class="动作.类"
+                    :disabled="发送中"
+                    @click="动作.做()"
+                  >
                     <Ic :n="动作.icon" />
                     <span class="act-kicker">{{ 动作.kicker }}</span>
                     <strong>{{ 动作.文案 }}</strong>
@@ -894,7 +929,12 @@
               </div>
             </div>
             <div v-if="选中档案.妻.当前阶段 >= 3" class="dsec dossier-card">
-              <div class="dsec-title">身 体 开 发</div>
+              <div class="dsec-title">
+                <span>身 体 开 发</span>
+                <button class="cg-progress" type="button" @click.stop="打开CG图库(选中档案.门牌)">
+                  CG {{ 选中档案.CG进度.已解锁 }}/{{ 选中档案.CG进度.总数 }} ›
+                </button>
+              </div>
               <div class="dev-grid">
                 <div v-for="部位 in 选中档案.开发" :key="部位.名" class="axis-row">
                   <span class="axis-label">{{ 部位.名 }}</span>
@@ -912,7 +952,14 @@
               <div class="kink-row">
                 <span v-for="k in 选中档案.性癖装载" :key="k.id" class="kink-chip on">
                   {{ k.名 }}
-                  <button class="kink-off" title="卸下(她的身体不会忘)" @click="卸载(选中档案.门牌, k.id)">×</button>
+                  <button
+                    class="kink-off"
+                    title="卸下(她的身体不会忘)"
+                    :disabled="发送中"
+                    @click="卸载(选中档案.门牌, k.id)"
+                  >
+                    ×
+                  </button>
                 </span>
                 <span
                   v-for="(名, i) in 选中档案.曾开发"
@@ -1014,6 +1061,44 @@
         </div>
       </div>
 
+      <!-- ═══════════ 角色CG图库：已解锁显示缩略图，未解锁不泄露画面 ═══════════ -->
+      <div v-if="CG图库门牌" class="mask cg-library-mask" @click.self="关闭CG图库">
+        <div class="sheet cg-library">
+          <button class="sheet-close" @click="关闭CG图库">✕</button>
+          <div class="sheet-title">{{ CG图库角色名 }} · CG 图库</div>
+          <div class="cg-library-tabs">
+            <button
+              v-for="页 in CG图库页签"
+              :key="页.值"
+              class="btn mini"
+              :class="{ on: CG图库阶段 === 页.值 }"
+              @click="CG图库阶段 = 页.值"
+            >
+              {{ 页.名 }} {{ 页.已解锁 }}/{{ 页.总数 }}
+            </button>
+          </div>
+          <div class="sheet-body cg-library-grid">
+            <button
+              v-for="项 in CG图库当前项"
+              :key="项.id"
+              class="cg-tile"
+              :class="{ locked: !已解锁CG.has(项.id) }"
+              :disabled="!已解锁CG.has(项.id)"
+              :title="已解锁CG.has(项.id) ? '查看大图' : '尚未解锁'"
+              @click="CG预览 = 项"
+            >
+              <img v-if="已解锁CG.has(项.id)" :src="成人CG地址(项)" alt="" loading="lazy" draggable="false" />
+              <span v-else class="cg-lock">🔒</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="CG预览" class="mask cg-preview-mask" @click.self="CG预览 = null">
+        <button class="sheet-close cg-preview-close" @click="CG预览 = null">✕</button>
+        <img :src="成人CG地址(CG预览)" alt="" draggable="false" />
+      </div>
+
       <!-- ═══════════ 背包(道具可用:布设/送礼/读信) ═══════════ -->
       <div v-if="显示背包" class="mask" @click.self="显示背包 = false">
         <div class="sheet">
@@ -1040,13 +1125,14 @@
                 <span class="ware-desc">{{ 项.描述 }}</span>
               </span>
               <span class="ware-acts">
-                <button v-if="项.可读信" class="btn mini" @click="打开信(项.信门牌!)">读</button>
+                <button v-if="项.可读信" class="btn mini" :disabled="发送中" @click="打开信(项.信门牌!)">读</button>
                 <button v-if="项.可布设" class="btn mini" :disabled="发送中" @click="布设()">装在这个房间</button>
-                <button v-if="项.可用运作" class="btn mini" @click="用运作(项.id)">使用</button>
+                <button v-if="项.可用运作" class="btn mini" :disabled="发送中" @click="用运作(项.id)">使用</button>
                 <button
                   v-for="夫 in 项.运作对象"
                   :key="'运' + 夫.门牌"
                   class="btn mini"
+                  :disabled="发送中"
                   @click="用运作(项.id, 夫.门牌)"
                 >
                   给{{ 夫.夫名 }}
@@ -1157,10 +1243,12 @@
         </div>
       </div>
 
-      <!-- ═══════════ 读信(揭晓时刻:碎片拼合的实物) ═══════════ -->
-      <div v-if="读信门牌" class="mask" @click.self="读信门牌 = null">
+      <!-- ═══════════ 读信(揭晓时刻:碎片拼合的实物) ═══════════
+           三条关闭路径全走 合上信(审计 C3):点遮罩/✕ 若只清 读信门牌,揭晓从未登记——
+           信留在背包、可晋阶 恒 false、由头门照锁,玩家没有任何提示知道要重读一遍 -->
+      <div v-if="读信门牌" class="mask" @click.self="合上信">
         <div class="sheet">
-          <button class="sheet-close" @click="读信门牌 = null">✕</button>
+          <button class="sheet-close" @click="合上信">✕</button>
           <div class="sheet-title">拼 合 的 真 相</div>
           <div class="truth-fragments" aria-label="四条线索已经拼合">
             <span v-for="(槽, i) in 裂缝证物槽" :key="`${槽.标}-${i}`"><Ic :n="槽.图" />{{ 槽.标 }}</span>
@@ -1279,6 +1367,7 @@ import {
   查特殊场景,
   查裂缝,
   查道具,
+  荣耀洞冷却楼,
   道具表,
   门牌列表,
   难度表,
@@ -1289,6 +1378,15 @@ import { 丈夫在楼, 妻位置推算, 当前天数, 当前时段 } from '../..
 import { 安装人妻公寓数据库模板, 数据库状态, 智脑状态 } from '../../脚本/游戏逻辑/数据库桥';
 import { 查金币 } from '../../脚本/游戏逻辑/经济系统';
 import { 可晋阶 } from '../../脚本/游戏逻辑/结算系统';
+import {
+  CG条目,
+  角色CG列表,
+  角色CG总数,
+  选择成人CG,
+  type CG回合信号,
+  type CG阶段,
+  type 成人CG项,
+} from '../../脚本/游戏逻辑/成人CG系统';
 import { useDataStore } from './store';
 
 // ── 梧桐里主题图标：统一 24×24 圆角描边，公寓门牌/钥匙孔/信件等语义贯穿全套 ──
@@ -1380,7 +1478,10 @@ interface 无耗时拜访记录 {
   进房末楼: number;
   由头已用: boolean;
 }
-const 位置种子 = computed(() => 钟楼号.value);
+/** 位置推算种子:进房期间冻结在 进房末楼(审计 C1)。脚本侧全部读者都这么冻
+ * (楼层时钟.妻位置推算 的强制要求),客户端旧版始终用当前钟楼——差 1 楼就是独立抽签,
+ * 会把脚本认定不在场的人"抽"进当前房间:立绘/头像/送礼按钮全亮,脚本却拒绝操作。 */
+const 位置种子 = computed(() => (当前房间.value ? 进房末楼.value + 偏移楼.value : 钟楼号.value));
 
 /** 正在与玩家对话的人只固定在当前场景；其余住户在地图上按最新钟楼移动。 */
 const 粘滞在场 = ref<{ 位置: string | null; 们: 门牌[] }>({ 位置: null, 们: [] });
@@ -1423,11 +1524,13 @@ watch(显示地图, 开 => {
 
 async function 写场景(房间id: string | null, 破门 = false): Promise<void> {
   const 变量 = getVariables({ type: 'chat' });
-  const 旧场景 = (_.get(变量, '_场景') as
-    | { 房间id?: string; 进房末楼?: number; 由头已用?: boolean }
-    | null
-    | undefined) ?? null;
+  const 旧场景 =
+    (_.get(变量, '_场景') as { 房间id?: string; 进房末楼?: number; 由头已用?: boolean } | null | undefined) ?? null;
   const 旧房间 = 旧场景?.房间id ?? null;
+  if (旧房间 !== 房间id) {
+    当前成人CG.value = null;
+    最近CG信号 = null;
+  }
   const 旧轨迹 = (_.get(变量, '_地图轨迹') as string[] | undefined) ?? [];
   const 从 = 旧房间 ? (查房间(旧房间)?.名称 ?? 旧房间) : '楼道';
   const 到 = 房间id ? (查房间(房间id)?.名称 ?? 房间id) : '楼道';
@@ -1461,7 +1564,8 @@ async function 进入(房间id: string, 破门 = false, 保持地图 = false): P
     闪转场(查房间(房间id)?.名称 ?? 房间id);
     return;
   }
-  const 无耗时拜访 = (_.get(getVariables({ type: 'chat' }), '_无耗时拜访') as 无耗时拜访记录 | null | undefined) ?? null;
+  const 无耗时拜访 =
+    (_.get(getVariables({ type: 'chat' }), '_无耗时拜访') as 无耗时拜访记录 | null | undefined) ?? null;
   const 续接同次拜访 =
     无耗时拜访?.房间id === 房间id && 无耗时拜访.钟楼号 === 钟楼号.value && 查房间(房间id)?.类型 === '户';
   if (续接同次拜访) {
@@ -1494,6 +1598,36 @@ async function 离开房间(): Promise<void> {
   闪转场('楼道');
   在场.value = { 焦点: [], 在场: [] }; // 身边已无人,头像随之熄灭
   显示地图.value = true; // 走出房门=站上楼道,顺手展开地图选下一处
+}
+
+/**
+ * 以 chat 变量 _场景 为唯一真值重建场景态(审计 C2):撤回/回档会把 _场景 置 null、
+ * 隔离撤回会把它恢复成旧值,客户端旧版从不重读——UI 仍渲染"你在 101 里"而脚本按
+ * "站在楼道"组快照,送礼/要钱永久被拒,只有走出去再走回来才能自修。
+ * 回合完成/隔离完成/回合失败 三个收口都过一遍;与真值一致时是无害幂等。
+ */
+function 同步场景自变量() {
+  try {
+    const 场景 = _.get(getVariables({ type: 'chat' }), '_场景') as {
+      房间id?: string;
+      破门?: boolean;
+      进房末楼?: number;
+      由头已用?: boolean;
+    } | null;
+    const 目标房 = 场景?.房间id ?? null;
+    if (目标房 === 当前房间.value) return; // 场景没变(绝大多数回合),别动进房楼戳
+    当前房间.value = 目标房;
+    已破门进入.value = !!场景?.破门;
+    本次入房由头已用.value = !!场景?.由头已用;
+    粘滞在场.value = { 位置: null, 们: [] };
+    try {
+      进房末楼.value = 场景?.进房末楼 ?? getLastMessageId();
+    } catch {
+      进房末楼.value = 末楼号.value;
+    }
+  } catch (e) {
+    console.error('[人妻公寓客户端] 场景同步失败:', e);
+  }
 }
 
 // ── 转场横幅(走动的即时反馈) ──
@@ -1546,9 +1680,12 @@ const 可用由头 = computed(() => {
   const 今日 = Math.floor(Math.max(0, 钟楼号.value) / 18);
   const 记 = 工具由头记录.value[id];
   const 已用 = 记?.日 === 今日 && Array.isArray(记.已用) ? 记.已用 : [];
+  // 每日上限按"今天已用次数"扣减(审计 低危12):旧版 slice 在过滤之后,上限实际=工具表大小,
+  // 工具表加到第 4 项时每日上限会静默失效
+  if (已用.length >= 由头每日次数) return [];
   return Object.keys(由头工具表)
     .filter(w => !已用.includes(w))
-    .slice(0, 由头每日次数);
+    .slice(0, 由头每日次数 - 已用.length);
 });
 
 const 可输入 = computed(() => {
@@ -1947,7 +2084,7 @@ const 荣耀洞可用 = computed(() => {
   const 系 = data.value?.系统;
   if (!系 || (系._荣耀洞拍 ?? -1) >= 0) return false;
   const 记 = (系._荣耀洞上次楼 ?? -999) > 钟楼号.value ? -999 : (系._荣耀洞上次楼 ?? -999); // 回档陷阱自净
-  return 钟楼号.value - 记 >= 18;
+  return 钟楼号.value - 记 >= 荣耀洞冷却楼; // 与脚本同一份配置(审计 低危20:此前硬编码 18 重复定义)
 });
 
 // 2026-07-19 用户纠偏:视觉件=抠图透明立绘叠加(素材在 立绘/荣耀洞_*),背景恒定隔间图;环境版CG作废
@@ -1956,6 +2093,9 @@ const 荣耀洞图 = computed(() => {
   if (!系 || (系._荣耀洞拍 ?? -1) < 0 || 当前房间.value !== '洗手间') return '';
   return `${素材基址}/背景/荣耀洞.webp`;
 });
+
+/** 荣耀洞拥有独立三拍CG；渲染层硬互斥，普通成人CG永远不能盖住它。 */
+const 显示成人CG = computed(() => Boolean(当前成人CG.value && !荣耀洞图.value));
 
 /** 洞戏立绘件:undefined=不在洞戏;''=本拍无件(空军/匿名收尾);否则=件地址 */
 const 荣耀洞件 = computed<string | undefined>(() => {
@@ -2008,6 +2148,53 @@ const 底层公共 = [
 
 // ⚠ 与手机系统同步：Discord 测试版发布 tag=rq0.46。
 const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.46/dist/人妻公寓/素材';
+const 成人CG基址 = 'https://testingcf.jsdelivr.net/gh/shujun8520-design/qgy-assets@cg1/cg1';
+const CG解锁存储键 = '人妻公寓_成人CG解锁_cg1';
+const 当前成人CG = ref<成人CG项 | null>(null);
+const 成人CG加载中 = ref(false);
+const 成人CG本次失效 = new Set<string>();
+const 已解锁CG = ref<Set<string>>(new Set());
+let 最近CG信号: CG回合信号 | null = null;
+
+function 成人CG地址(项: 成人CG项): string {
+  return `${成人CG基址}/${项.path}`;
+}
+
+const 当前成人CG地址 = computed(() => (当前成人CG.value ? `${成人CG基址}/${当前成人CG.value.path}` : ''));
+
+function 读取CG解锁(): void {
+  try {
+    const raw = JSON.parse(localStorage.getItem(CG解锁存储键) ?? '[]');
+    已解锁CG.value = new Set(Array.isArray(raw) ? raw.filter(x => typeof x === 'string' && CG条目(x)) : []);
+  } catch {
+    已解锁CG.value = new Set();
+  }
+}
+
+function 处理CG回合信号(信号: CG回合信号): void {
+  最近CG信号 = 信号;
+  const 排除 = new Set([...已解锁CG.value, ...成人CG本次失效]);
+  当前成人CG.value = 选择成人CG(信号, 排除);
+  成人CG加载中.value = Boolean(当前成人CG.value);
+}
+
+function 成人CG已加载(): void {
+  成人CG加载中.value = false;
+  const id = 当前成人CG.value?.id;
+  if (!id || 已解锁CG.value.has(id)) return;
+  const next = new Set(已解锁CG.value);
+  next.add(id);
+  已解锁CG.value = next;
+  localStorage.setItem(CG解锁存储键, JSON.stringify([...next]));
+}
+
+function 成人CG加载失败(): void {
+  const id = 当前成人CG.value?.id;
+  if (id) 成人CG本次失效.add(id);
+  当前成人CG.value = null;
+  成人CG加载中.value = false;
+  if (最近CG信号 && 成人CG本次失效.size < 12) 处理CG回合信号(最近CG信号);
+}
 
 function 头像图(名: string): string {
   return `${素材基址}/头像/${名}.webp`;
@@ -2018,7 +2205,6 @@ const 头像失效 = ref<Record<string, boolean>>({});
 
 /** 商店道具图(rq0.12 生图入库;挂了回退首字) */
 function 道具图(id: string): string {
-  if (id.startsWith('初始外装_')) return `${素材基址}/道具/${id}.webp`;
   return `${素材基址}/道具/${id}.webp`;
 }
 
@@ -2168,6 +2354,8 @@ const 输入文本 = ref('');
 const 发送中 = ref(false);
 const 由头写入中 = ref(false);
 const 流式段 = ref<string[]>([]);
+const 运行阶段 = ref('');
+const 数据库运行文案 = computed(() => (运行阶段.value.startsWith('数据库') ? 运行阶段.value : ''));
 const 生成等待秒 = ref(0);
 const 待重试行动 = ref('');
 const 失败行动 = ref('');
@@ -2463,6 +2651,40 @@ const 显示待办 = computed(() => !待办已划掉.value && 末楼号.value < 
 // ── 档案卡 ──
 
 const 选中门牌 = ref<门牌 | null>(null);
+const CG图库门牌 = ref<门牌 | null>(null);
+const CG图库阶段 = ref<CG阶段>('foreplay');
+const CG预览 = ref<成人CG项 | null>(null);
+const CG阶段名: Record<CG阶段, string> = {
+  foreplay: '前戏',
+  active: '进行中',
+  climax_after: '高潮事后',
+};
+
+const CG图库角色名 = computed(() => (CG图库门牌.value ? 户静态表[CG图库门牌.value].妻名 : ''));
+const CG图库全部项 = computed(() => (CG图库门牌.value ? 角色CG列表(CG图库门牌.value) : []));
+const CG图库当前项 = computed(() => CG图库全部项.value.filter(item => item.phase === CG图库阶段.value));
+const CG图库页签 = computed(() =>
+  (Object.keys(CG阶段名) as CG阶段[]).map(值 => {
+    const 项 = CG图库全部项.value.filter(item => item.phase === 值);
+    return {
+      值,
+      名: CG阶段名[值],
+      总数: 项.length,
+      已解锁: 项.filter(item => 已解锁CG.value.has(item.id)).length,
+    };
+  }),
+);
+
+function 打开CG图库(门牌号: 门牌): void {
+  CG图库门牌.value = 门牌号;
+  CG图库阶段.value = 'foreplay';
+  CG预览.value = null;
+}
+
+function 关闭CG图库(): void {
+  CG预览.value = null;
+  CG图库门牌.value = null;
+}
 
 const 选中档案 = computed(() => {
   const m = 选中门牌.value;
@@ -2509,6 +2731,10 @@ const 选中档案 = computed(() => {
     // 性癖(P5):装载中3槽(可卸载)+曾开发永久标记(避开云霜凝"卸下即失忆"坑)
     性癖装载: 妻.性癖装载.map(id => ({ id, 名: 查性癖(id)?.名称 ?? id })),
     曾开发: 妻.曾开发性癖.filter(id => !妻.性癖装载.includes(id)).map(id => 查性癖(id)?.名称 ?? id),
+    CG进度: {
+      已解锁: [...已解锁CG.value].filter(id => CG条目(id)?.door === m).length,
+      总数: 角色CG总数(m),
+    },
   };
 });
 
@@ -2925,10 +3151,14 @@ function 清洗(原文: string, 流式 = false): string {
     // 未闭合 content 也只裁掉前缀，保留其后的正文；流式生成时同样不会露出思考区。
     .replace(/^[\s\S]*?<content\b[^>]*>/i, '')
     .replace(/<\/content\s*>[\s\S]*$/i, '')
+    // story_scene 与 content 同为正文包装：保留内部剧情、剥掉标签外的预设噪声。
+    // 未闭合开标签也只裁前缀，兼容流式半截输出。
+    .replace(/^[\s\S]*?<story_scene\b[^>]*>/i, '')
+    .replace(/<\/story_scene\s*>[\s\S]*$/i, '')
     .replace(/【开始思考】[\s\S]*?<\/think_fox~\s*>/gi, '')
     .replace(/<fox_selc\b[^>]*>[\s\S]*?<\/fox_selc\s*>/gi, '')
     .replace(/<fox_tip\b[^>]*>[\s\S]*?<\/fox_tip\s*>/gi, '')
-    .replace(/<\/?(?:content|think_fox~|fox_selc|fox_tip)(?:\s[^>]*)?>/gi, '')
+    .replace(/<\/?(?:content|story_scene|think_fox~|fox_selc|fox_tip)(?:\s[^>]*)?>/gi, '')
     // 兼容漏写 </draft_notes> 的玩家预设：只在后续完整 bginfor 提供可靠边界时整块删除。
     // 没有可靠边界时只剥标签，避免重演“清洗吞尾导致整段正文消失”。
     .replace(/<draft_notes\b[^>]*>[\s\S]*?<bginfor\b[^>]*>[\s\S]*?<\/bginfor\s*>/gi, '')
@@ -3250,14 +3480,16 @@ const 记忆方案存储键 = '人妻公寓_记忆方案';
 const 智脑安装代码 = "import 'https://cdn.jsdelivr.net/gh/sillytavner-jpg/zhino-script@v5.0.8/dist/index.js'";
 const 数据库检测 = ref(数据库状态());
 const 智脑检测 = ref(智脑状态());
-const 记忆方案 = ref<'数据库' | '智脑' | ''>((() => {
-  try {
-    const saved = localStorage.getItem(记忆方案存储键);
-    return saved === '数据库' || saved === '智脑' ? saved : '';
-  } catch {
-    return '';
-  }
-})());
+const 记忆方案 = ref<'数据库' | '智脑' | ''>(
+  (() => {
+    try {
+      const saved = localStorage.getItem(记忆方案存储键);
+      return saved === '数据库' || saved === '智脑' ? saved : '';
+    } catch {
+      return '';
+    }
+  })(),
+);
 const 安装模板中 = ref(false);
 const 酒馆助手版本 = ref('');
 const 酒馆助手最新版本 = ref('');
@@ -3516,6 +3748,9 @@ watch(设置开, 开 => {
 });
 
 function 点重开() {
+  // 生成中不受理(审计 C6):脚本侧回合进行中会拒绝重开,乐观置上的 发送中 若无人回事件
+  // 就永久闩死;脚本侧同样已改为拒绝时回 回合失败,双保险
+  if (发送中.value) return;
   if (!重开确认.value) {
     重开确认.value = true;
     return;
@@ -3569,6 +3804,7 @@ onErrorCaptured(err => {
 // ── 挂载:事件接线 + 状态恢复 ──
 
 onMounted(() => {
+  读取CG解锁();
   void 刷新酒馆助手检测();
   void 取卷轴();
   刷新可重掷();
@@ -3595,10 +3831,12 @@ onMounted(() => {
   eventOn('人妻公寓:生成开始', () => {
     // 脚本侧发起的回合(查看监控等)也要锁输入+亮书写态;驻留的拾获卡顺手收掉不挡戏
     发送中.value = true;
+    运行阶段.value = '正在准备本回合';
     开始生成计时();
     拾获卡.value = '';
   });
   eventOn('人妻公寓:流式', (文本: string) => {
+    if (!运行阶段.value.startsWith('数据库')) 运行阶段.value = 'AI正在生成正文';
     // 流式半截文本只走本卡清洗,不过玩家正则(闭合标记未到会整段吞空)
     const 净文 = 清洗(文本, true);
     流式段.value = 净文
@@ -3609,13 +3847,27 @@ onMounted(() => {
       : [];
     void 滚到底();
   });
+  eventOn('人妻公寓:运行阶段', (阶段: string) => {
+    运行阶段.value = typeof 阶段 === 'string' ? 阶段 : '';
+  });
+  eventOn('人妻公寓:CG回合信号', (信号: CG回合信号) => {
+    // 荣耀洞拥有独立三拍画面；这里仍可接收事件，但渲染层与解锁层均不采用普通CG。
+    if (荣耀洞图.value) {
+      当前成人CG.value = null;
+      最近CG信号 = null;
+      return;
+    }
+    处理CG回合信号(信号);
+  });
   eventOn('人妻公寓:回合完成', async () => {
     发送中.value = false;
+    运行阶段.value = '';
     停止生成计时();
     待重试行动.value = '';
     失败行动.value = '';
     取消后自动重试.value = false;
     流式段.value = [];
+    同步场景自变量(); // 回档把 _场景 清空后 UI 必须跟着回楼道(审计 C2)
     幕房间.value = 当前房间.value; // 本轮的戏与选项绑定产出场景,换地方即收
     // 先拉到最新楼号，再按新时钟重算作息/地图。旧顺序会让地图停在上一楼，直到玩家再点瓷砖才刷新。
     await 取卷轴();
@@ -3632,8 +3884,10 @@ onMounted(() => {
   });
   eventOn('人妻公寓:隔离事件完成', async () => {
     发送中.value = false;
+    运行阶段.value = '';
     停止生成计时();
     流式段.value = [];
+    同步场景自变量(); // 隔离撤回会把 _场景 恢复成事件前旧值(审计 C2)
     幕房间.value = 当前房间.value;
     await 取卷轴();
     刷新可重掷();
@@ -3648,7 +3902,9 @@ onMounted(() => {
   });
   eventOn('人妻公寓:回合失败', (原因: string) => {
     发送中.value = false;
+    运行阶段.value = '';
     停止生成计时();
+    同步场景自变量(); // 监控回合失败时脚本已把 _场景 回滚,画面跟着回原位(审计 C4)
     const 待重试 = 待重试行动.value.trim();
     if (待重试) 失败行动.value = 待重试;
     待重试行动.value = '';
@@ -3809,7 +4065,9 @@ onUnmounted(() => {
     border-radius: 18px;
     background: linear-gradient(135deg, #8e5270, #4b385f);
     color: #fff;
-    box-shadow: 0 10px 34px rgba(21, 10, 26, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    box-shadow:
+      0 10px 34px rgba(21, 10, 26, 0.48),
+      inset 0 1px 0 rgba(255, 255, 255, 0.22);
     align-items: center;
     justify-content: center;
     gap: 12px;
@@ -4166,6 +4424,47 @@ onUnmounted(() => {
   transition: background 0.5s ease;
 }
 
+/* 成人CG：一套竖图同时服务手机与桌面。完整图 contain；桌面余白由同图模糊铺底。 */
+.adult-cg-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: rgba(12, 10, 16, 0.94);
+}
+
+.adult-cg-stage::before {
+  position: absolute;
+  inset: -28px;
+  content: '';
+  background: var(--adult-cg-img) center / cover no-repeat;
+  filter: blur(22px) brightness(0.42) saturate(0.82);
+  transform: scale(1.08);
+}
+
+.adult-cg-stage::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+  background: linear-gradient(90deg, rgba(8, 7, 12, 0.22), transparent 28% 72%, rgba(8, 7, 12, 0.22));
+}
+
+.adult-cg-stage img {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  filter: drop-shadow(0 10px 28px rgba(0, 0, 0, 0.42));
+}
+
+.adult-cg-stage.loading img {
+  opacity: 0;
+}
+
 /* 立绘:每人占一个独立横槽。高度随人数递减，宽度受槽硬约束，素材比例再不同也不会互相遮挡。 */
 .portrait {
   position: absolute;
@@ -4342,6 +4641,76 @@ onUnmounted(() => {
   letter-spacing: 0.3em;
   text-indent: 0.3em;
   color: var(--ink);
+}
+
+.db-running-banner {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  z-index: 70;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: calc(100% - 112px);
+  padding: 9px 15px;
+  border: 1px solid rgba(92, 185, 255, 0.42);
+  border-radius: 14px;
+  color: #eef8ff;
+  background: rgba(18, 36, 58, 0.92);
+  box-shadow: 0 8px 28px rgba(0, 18, 38, 0.34);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+}
+
+.db-running-banner > span:last-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.db-running-banner b {
+  overflow: hidden;
+  font-size: 0.86em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.db-running-banner small {
+  opacity: 0.72;
+  font-size: 0.7em;
+}
+
+.db-running-pulse {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+  background: #62c5ff;
+  box-shadow: 0 0 0 0 rgba(98, 197, 255, 0.5);
+  animation: db-pulse 1.3s ease-out infinite;
+}
+
+@keyframes db-pulse {
+  70% {
+    box-shadow: 0 0 0 8px rgba(98, 197, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(98, 197, 255, 0);
+  }
+}
+
+@media (max-width: 720px) {
+  .db-running-banner {
+    top: 8px;
+    max-width: calc(100% - 92px);
+    padding: 8px 11px;
+  }
+
+  .db-running-banner small {
+    display: none;
+  }
 }
 
 .loc-flash-enter-active {
@@ -5887,6 +6256,120 @@ onUnmounted(() => {
   font-family: var(--font-body);
   font-size: 0.82em;
   letter-spacing: 0;
+}
+
+.dossier-card .dsec-title .cg-progress {
+  margin-left: auto;
+  padding: 2px 7px;
+  border: 1px solid color-mix(in srgb, var(--pink) 45%, transparent);
+  border-radius: 999px;
+  color: var(--pink);
+  background: color-mix(in srgb, var(--pink) 9%, transparent);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.cg-library {
+  width: min(980px, calc(100vw - 28px));
+  height: min(820px, calc(100dvh - 28px));
+  display: flex;
+  flex-direction: column;
+}
+
+.cg-library-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 14px 10px;
+}
+
+.cg-library-tabs .btn.on {
+  color: #fff;
+  border-color: var(--pink);
+  background: var(--pink);
+}
+
+.cg-library-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-content: start;
+  gap: 10px;
+  overflow-y: auto;
+}
+
+.cg-tile {
+  position: relative;
+  min-width: 0;
+  aspect-ratio: 2 / 3;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 10px;
+  background: rgba(28, 26, 36, 0.92);
+  cursor: zoom-in;
+}
+
+.cg-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.2s ease;
+}
+
+.cg-tile:hover img {
+  transform: scale(1.035);
+}
+
+.cg-tile.locked {
+  cursor: default;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.055), transparent), rgba(28, 26, 36, 0.94);
+}
+
+.cg-lock {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  opacity: 0.5;
+  filter: grayscale(1);
+}
+
+.cg-preview-mask {
+  z-index: 80;
+  padding: 18px;
+  background: rgba(5, 4, 8, 0.94);
+}
+
+.cg-preview-mask > img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.cg-preview-close {
+  position: fixed;
+  z-index: 81;
+  top: 14px;
+  right: 14px;
+}
+
+@media (max-width: 720px) {
+  .cg-library {
+    width: calc(100vw - 12px);
+    height: calc(100dvh - 12px);
+  }
+
+  .cg-library-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    padding: 8px;
+  }
+
+  .cg-library-tabs {
+    padding-inline: 8px;
+  }
 }
 
 .dsec-title {

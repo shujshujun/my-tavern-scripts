@@ -1,13 +1,14 @@
 import type { SchemaType } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
-import { 户静态表, 查考古, 查裂缝, 门牌列表 } from '../../stageConfig';
+import { 户静态表, 查考古, 门牌列表 } from '../../stageConfig';
 import { 丈夫在楼, 妻位置推算, 当前时段, seededRandom } from './楼层时钟';
 import { 读取最近有效, 读最近有效stat, 脚本写入 } from './mvuIO';
 import { 妻状态包 } from './snapshotSystem';
 import { 捕获保护快照 } from './守护系统';
 import { 姐妹群成员, 雌竞火气, 雌竞资格, 读余波, 标余波, 余波缓冲楼 } from './雌竞系统';
 import { Schema } from '../../schema';
-import { 安装人妻公寓数据库模板, 打开数据库界面, 数据库状态, 通过数据库生成 } from './数据库桥';
+import { 同步社交轨迹, 安装人妻公寓数据库模板, 打开数据库界面, 数据库状态, 通过数据库生成 } from './数据库桥';
+import { 预设破限段 } from './预设桥';
 
 /**
  * 手机系统(P4:手机开机即微信,2026-07-18 用户拍板——不做主屏与独立App,
@@ -68,7 +69,45 @@ function 读库(): 微信库 {
 }
 
 async function 写库(库: 微信库): Promise<void> {
-  await insertOrAssignVariables({ _微信: 库 }, { type: 'chat' });
+  // 整值替换(2026-07-26 审计 M3):insertOrAssignVariables 是深合并,数组按下标并——
+  // 并发窗口里两份错位的 消息/圈 数组会把不同条目的字段搅在一起,不只是丢失
+  await updateVariablesWith(
+    vars => {
+      _.set(vars, '_微信', 库);
+      return vars;
+    },
+    { type: 'chat' },
+  );
+}
+
+/**
+ * 增量落库(审计 M3):手机节拍一拍横跨 6+ 次 AI 小生成(可达几十秒),期间玩家发消息/已读
+ * 标记都会写库——拍结束时把"拍开头快照"整包写回会吞掉窗口期的全部写入。
+ * 改为只带走本拍新增的条目与节拍水位变化,落库前重读新鲜库再合并。
+ */
+async function 写库增量(增: {
+  新圈: 朋友圈条[];
+  新消息: 微信消息[];
+  节拍改: Record<string, number>;
+}): Promise<void> {
+  await updateVariablesWith(
+    vars => {
+      const v = (_.get(vars, '_微信') ?? {}) as Partial<微信库>;
+      const 新鲜: 微信库 = {
+        消息: v.消息 ?? [],
+        圈: v.圈 ?? [],
+        读到: v.读到 ?? {},
+        圈读到: v.圈读到 ?? -1,
+        节拍: v.节拍 ?? {},
+      };
+      新鲜.圈.unshift(...增.新圈);
+      新鲜.消息.push(...增.新消息);
+      Object.assign(新鲜.节拍, 增.节拍改);
+      _.set(vars, '_微信', 新鲜);
+      return vars;
+    },
+    { type: 'chat' },
+  );
 }
 
 const 末楼 = () => {
@@ -214,7 +253,23 @@ function 最近正文(): string {
  * 手机侧不吃任何协议,一律剥干净只留人话。
  */
 function 净化消息(原: string): string {
-  const 闭合清 = 原
+  // 抽取协议(2026-07-27 万能兼容层):小生成要求 AI 把最终内容装进<回复>标签,这里只取
+  // 标签内的部分——预设再怎么逼模型输出思考/前言/私有标签,都留在标签外被扔掉。
+  // 未闭合(被截断)也取到结尾;模型没照办时整段进下面的剥离漏斗,行为同旧版。
+  const 包 = 原.match(/<回复>([\s\S]*?)(?:<\/回复>|$)/i);
+  if (包?.[1]?.trim()) 原 = 包[1];
+  // 部分预设改用 story_scene 包正文；与 <回复> 一样抽取内部文本，闭合缺失时取到结尾。
+  const 场景包 = 原.match(/<story_scene\b[^>]*>([\s\S]*?)(?:<\/story_scene\s*>|$)/i);
+  if (场景包?.[1]?.trim()) 原 = 场景包[1];
+  let 过正则 = 原;
+  // 玩家预设自带的正则先走一遍(2026-07-27 用户点单:与正文同一套规则源,防预设协议标签
+  // 漏进气泡;酒馆助手一站式接口=全局+预设+角色卡正则,失败退回原文走硬编码清洗)
+  try {
+    过正则 = formatAsTavernRegexedString(原, 'ai_output', 'display', { depth: 0 });
+  } catch (e) {
+    console.warn('[人妻公寓·手机] 预设正则应用失败,退回硬编码清洗:', e);
+  }
+  const 闭合清 = 过正则
     // 与正文/隔离事件共用同一组玩家预设兼容边界。尤其兼容 draft_notes
     // 漏闭合、但后续 bginfor 完整的狐系预设，避免手机把草稿思考当消息显示。
     .replace(/^[\s\S]*?<content\b[^>]*>/i, '')
@@ -228,6 +283,9 @@ function 净化消息(原: string): string {
     .replace(/<CEstuff\b[^>]*>[\s\S]*?<\/CEstuff\s*>/gi, '')
     .replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, '')
     .replace(/<reason(?:ing)?>[\s\S]*?<\/reason(?:ing)?>/gi, '')
+    // 通用思考族(2026-07-27):预设上千种标签名各异,凡名字含 think/reason/draft/cot/plan/meta
+    // 的成对标签连内容整块剥——没配正则的预设也罩住;正常剧情文本不会用这种标签名
+    .replace(/<([a-zA-Z_~-]*(?:think|reason|draft|cot|plan|meta)[a-zA-Z_~-]*)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
     .replace(/<行为等级>[\s\S]*?<\/行为等级>/g, '')
     .replace(/<options>[\s\S]*?<\/options>/gi, '')
     .replace(/<变量更新>[\s\S]*?<\/变量更新>/g, '')
@@ -238,6 +296,8 @@ function 净化消息(原: string): string {
     .replace(/<options>[\s\S]*$/i, '')
     .replace(/<变量更新>[\s\S]*$/i, '')
     .replace(/<\/?[a-zA-Z一-龥][^>]*>/g, '')
+    // 破限词条常令"每条消息以[地点,日期,时间]开头"(RONG等叙事预设指令渗透):微信气泡剥掉行首方括号头
+    .replace(/^\[[^\]\n]{2,60}\]\s*/, '')
     .trim();
   const 全清 = 闭合清
     .replace(/<think(?:ing)?>[\s\S]*$/i, '')
@@ -251,8 +311,10 @@ function 净化消息(原: string): string {
 
 async function 正文API生成(系统提示: string, 用户提示: string): Promise<string> {
   try {
+    // 预设破限段护航(2026-07-27):裸发会被 Gemini 安全截断,与正文同一套通行证
+    const { 前, 后 } = 预设破限段();
     const 原 = await generateRaw({
-      ordered_prompts: [{ role: 'system', content: 系统提示 }, 'user_input'],
+      ordered_prompts: [...前, { role: 'system', content: 系统提示 }, 'user_input', ...后],
       user_input: 用户提示,
       should_stream: false,
     });
@@ -272,10 +334,13 @@ async function 自定义API生成(c: 手机配置, 系统提示: string, 用户�
     // 不从手机 iframe 直接 fetch 外部 API：移动端 WebView/远端 API 的 CORS
     // 往往会把有效地址也拦成 TypeError: Failed to fetch。统一走酒馆助手的
     // custom_api 代理链路，与数据库插件和其他脚本的自定义 API 调用方式一致。
+    const { 前, 后 } = 预设破限段();
     const 原 = await generateRaw({
       ordered_prompts: [
+        ...前,
         { role: 'system', content: 系统提示 },
         { role: 'user', content: 用户提示 },
+        ...后,
       ],
       should_stream: false,
       should_silence: true,
@@ -296,6 +361,11 @@ async function 自定义API生成(c: 手机配置, 系统提示: string, 用户�
 }
 
 async function 小生成(系统提示: string, 用户提示: string): Promise<string> {
+  // 输出协议(万能兼容层,与 净化消息 的抽取配对):无论预设要求什么输出格式,
+  // 最终内容都装进<回复>标签。协议句在破限前段之后、紧贴本次任务,权重足以压过
+  // 预设的格式指令;模型不照办时抽取落空,自动退回四层剥离漏斗,不会更糟
+  系统提示 +=
+    '\n【输出协议·最高优先】把你最终要输出的内容完整装进<回复></回复>标签;标签外不写任何字符——没有思考过程、没有开场白、没有场景头、没有其他标签。';
   const c = 读配置();
   if (c.ai来源 === '自定义') return 自定义API生成(c, 系统提示, 用户提示);
   if (c.ai来源 === '正文') return 正文API生成(系统提示, 用户提示);
@@ -303,10 +373,14 @@ async function 小生成(系统提示: string, 用户提示: string): Promise<st
   const db = 数据库状态();
   if (db.可调用AI) {
     try {
+      // 数据库的"预设"只是 API 连接配置,消息原样转发——破限段同样要自己垫
+      const { 前, 后 } = 预设破限段();
       const 原 = await 通过数据库生成(
         [
+          ...前,
           { role: 'system', content: 系统提示 },
           { role: 'user', content: 用户提示 },
+          ...后,
         ],
         '',
         600,
@@ -574,8 +648,13 @@ function 档位标签(阶段: number, 好感: number, 堕落: number): string {
   return `${阶}/${感}/${堕}`;
 }
 
-/** 回合完成后驱动一拍(fire-and-forget;每类内容独立水位线,种子错开相位) */
+/** 回合完成后驱动一拍(fire-and-forget;每类内容独立水位线,种子错开相位)。
+ * in-flight 闸(审计 M3):回档也 emit 回合完成,"回合刚完成就回档"会让两拍并发,
+ * 后写者整包覆盖前写者——一拍在跑时后来的直接跳过(内容引擎是锦上添花,漏一拍无害)。 */
+let 节拍进行中 = false;
 export async function 手机节拍(): Promise<void> {
+  if (节拍进行中) return;
+  节拍进行中 = true;
   try {
     const rawStat = 读最近有效stat();
     if (!rawStat) return;
@@ -586,6 +665,10 @@ export async function 手机节拍(): Promise<void> {
     const 楼 = 末楼();
     const 钟 = 楼 + data.系统._时段偏移楼;
     const 库 = 读库();
+    // 增量记账基线:拍内所有代码照旧改 库,收尾按差量合并进新鲜库(见 写库增量)
+    const 原圈数 = 库.圈.length;
+    const 原消息数 = 库.消息.length;
+    const 原节拍 = { ...库.节拍 };
     let 有新 = false;
 
     // ── 荣耀洞完成后的专属暗示动态(真人完整服务才由荣耀洞.ts 留钩；无固定文案) ──
@@ -823,13 +906,24 @@ export async function 手机节拍(): Promise<void> {
       }
     }
 
-    if (有新) {
-      await 写库(库);
+    // 节拍水位变化即使无新内容也要落(小生成失败但水位已记:不落=下一拍重掷重复计费)
+    const 节拍改: Record<string, number> = {};
+    for (const [k, v] of Object.entries(库.节拍)) {
+      if (原节拍[k] !== v) 节拍改[k] = v;
+    }
+    if (有新 || Object.keys(节拍改).length) {
+      await 写库增量({
+        新圈: 库.圈.slice(0, 库.圈.length - 原圈数),
+        新消息: 库.消息.slice(原消息数),
+        节拍改,
+      });
       刷新红点();
       渲染();
     }
   } catch (e) {
     console.error('[人妻公寓·手机] 节拍失败:', e);
+  } finally {
+    节拍进行中 = false;
   }
 }
 
@@ -1649,8 +1743,10 @@ function 渲染(): void {
         }
       }
     }
-    const 展开 = Math.min(当前页.展开 ?? 6, 混史.length);
-    for (const { 门牌: m, 序, 条 } of 混史.slice(0, 展开)) {
+    // rq0.45 每次只渲染一轮混排，后续内容依赖列表底部的“加载更早”按钮；
+    // 部分酒馆/手机尺寸中该按钮不可达，导致 301 只能看到第一条普通动态，整条裂缝线锁死。
+    // 历史条目均为本地静态数据，直接完整渲染，不增加任何 AI 上下文或数据库调用。
+    for (const { 门牌: m, 序, 条 } of 混史) {
       const 妻名 = 户静态表[m].妻名;
       const 键 = `${m}:${序}`;
       const 开题 = 当前页.题 === 键;
@@ -1687,15 +1783,8 @@ function 渲染(): void {
       }
       体.appendChild(卡);
     }
-    const 更 = el('button', 'rqw-more', 展开 < 混史.length ? '加载更早的动态…' : '翻到底了');
-    更.addEventListener('click', () => {
-      if (展开 < 混史.length) {
-        当前页 = { ...当前页, 展开: 展开 + 6 };
-        渲染();
-      } else {
-        eventEmit('人妻公寓:考古到底');
-      }
-    });
+    const 更 = el('button', 'rqw-more', '翻到底了');
+    更.addEventListener('click', () => eventEmit('人妻公寓:考古到底'));
     体.appendChild(更);
     屏.appendChild(体);
     底栏('moments');
@@ -1960,6 +2049,15 @@ async function 约出来(m: 门牌): Promise<void> {
       库3.读到[m] = 末楼();
       await 写库(库3);
     }
+    // 长期记忆直写(措辞固定,不带聊天原文;无数据库时静默返回 false 不影响流程)
+    void 同步社交轨迹({
+      类型: '邀约',
+      人物: 配.妻名,
+      事件: '微信约她出来见面',
+      结果: 应 ? '她答应出来见面了' : '她婉拒了,没出来',
+      楼层: 楼,
+      事件键: `RQP-约-${m}-${楼}`,
+    });
     if (应) {
       // 必须等赴约状态真正落库后再广播位置刷新；旧写法 fire-and-forget，客户端先读到旧值，
       // 要等后续几个回合的其他刷新才看见她到场。
@@ -2209,6 +2307,23 @@ async function 结束通话(): Promise<void> {
   const 库 = 读库();
   库.消息.push({ 楼, 会话: '父亲', 发: '系统', 文: `通话结束(${通话记录.length}句)`, 类: '通话' });
   await 写库(库);
+  // 长期记忆直写:只记结论档位的固定措辞,通话原文一个字不进表
+  if (通话上下文) {
+    void 同步社交轨迹({
+      类型: '来电',
+      人物: '父亲',
+      事件: '父亲来电问账',
+      结果: 通话上下文.通牒
+        ? '父亲撂下狠话:再管不好这栋楼,就换人来管'
+        : 通话上下文.分数段 === '满意'
+          ? '父亲对近期楼务还算满意'
+          : 通话上下文.分数段 === '平淡'
+            ? '父亲例行过账,敲打了几句'
+            : '父亲很不满,逐条问了账',
+      楼层: 楼,
+      事件键: `RQP-来电-${楼}`,
+    });
+  }
   // 回流正文一句(排队事件,下一楼注入;通话内容本体只存在于手机里)
   try {
     const 有效 = 读取最近有效();

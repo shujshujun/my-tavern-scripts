@@ -132,6 +132,20 @@
                 "default": -1,
                 "type": "number"
               },
+              "_堕落日账": {
+                "default": {},
+                "type": "object",
+                "properties": {
+                  "日": {
+                    "default": -1,
+                    "type": "number"
+                  },
+                  "值": {
+                    "default": 0,
+                    "type": "number"
+                  }
+                }
+              },
               "_穿着SKU": {
                 "default": {},
                 "type": "object",

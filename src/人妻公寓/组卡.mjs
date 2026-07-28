@@ -99,7 +99,16 @@ for (const 组 of index.条目) {
   for (const 条 of 列表) {
     const 内容 = 条.内容 !== undefined ? String(条.内容).trim() : 读内容文件(条.文件);
     if (条.名称.startsWith('[开场白]')) {
-      开场白 = 内容;
+      // 开场白文件是 raw 读取(不过 YAML 解析),文档分隔符与开发者注释会原样进
+      // alternate_greetings 泄给玩家(审计 低危1)——剥掉开头的 `---` 与整行 `#` 注释
+      开场白 = 内容
+        .split('\n')
+        .filter((行, i, 全) => {
+          const 前面全是元行 = 全.slice(0, i).every(x => /^\s*(?:---\s*)?$/.test(x) || /^\s*#/.test(x));
+          return !(前面全是元行 && (/^\s*---\s*$/.test(行) || /^\s*#/.test(行)));
+        })
+        .join('\n')
+        .trim();
       continue;
     }
     const 插 = 位置映射[条.插入位置.类型];
@@ -158,7 +167,7 @@ for (const 组 of index.条目) {
 if (!开场白) throw new Error('未找到 [开场白] 条目');
 
 // ── 资源走 jsdelivr(手机友好;〔待用户拍板〕首个内测 tag 名,推送后此处生效) ──
-const TAG = 'rq0.45';
+const TAG = 'rq0.50';
 const BASE = `https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@${TAG}`;
 
 const 加载块 = url => "```\n<body>\n<script>\n$('body').load('" + url + "')\n</script>\n</body>\n```";
@@ -252,7 +261,7 @@ const tavern_helper = {
 
 // ── 卡体 ──
 const 卡名 = '人妻公寓';
-const 版本 = '0.45';
+const 版本 = '0.50';
 const data = {
   name: 卡名,
   description: '',

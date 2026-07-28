@@ -31,12 +31,14 @@ const nonNegInt = (def: number) =>
     .transform(v => (isNaN(v) ? def : Math.max(0, Math.round(v))))
     .prefault(def);
 
-/** 楼层标记(-1 = 未设置/旧档首见校准) */
+/** 楼层标记(-1 = 未设置/旧档首见校准)。
+ * 下限取 min(-1, def):zod 的 .prefault 会让默认值走完整 transform 管道,
+ * 固定夹 -1 会把 -999 这类"从未发生"哨兵吃掉(2026-07-26 审计 H4:荣耀洞开局误报冷却)。 */
 const floorMark = (def: number) =>
   z.coerce
     .number()
     .catch(def)
-    .transform(v => (isNaN(v) ? def : Math.max(-1, Math.round(v))))
+    .transform(v => (isNaN(v) ? def : Math.max(Math.min(-1, def), Math.round(v))))
     .prefault(def);
 
 // ============================================
@@ -111,6 +113,9 @@ const 妻状态 = z
 
     // ── `_` 机制字段(AI 不可见) ──
     _上次结算楼层: floorMark(-1), // 惰性结算水位线(后台户被动账一口气补算)
+    /** 同日堕落收益账(2026-07-27 拍板C,根治"关房间刷一天直通下一阶段"):AI 涨幅当日累计,
+     *  超每日上限的楼戏照演账不涨;脚本大额结算(正戏/特殊场景)不走此账。随楼层快照回滚自洽 */
+    _堕落日账: z.object({ 日: floorMark(-1), 值: nonNegInt(0) }).prefault({}),
     /** P5 服饰:槽→穿着中SKU id(立绘差分文件名后缀;脚本写,AI不可见) */
     _穿着SKU: z.record(z.string(), z.string()).catch({}).prefault({}),
     _要钱次数: nonNegInt(0), // P3:L4 要钱按钮累计(≥2 触发"向丈夫开口"疑心+)

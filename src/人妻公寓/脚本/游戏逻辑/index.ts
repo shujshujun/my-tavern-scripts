@@ -28,8 +28,8 @@ import { 取消隔离事件, 执行隔离事件, 隔离事件进行中 } from '.
 import { 装载性癖, 卸载性癖 } from './性癖系统';
 import { 杀时间, 妻位置推算 } from './楼层时钟';
 import { 购买, 送礼 } from './商店系统';
-import { 读取最近有效, 读最近有效stat, 脚本写入, 脚本写入中 } from './mvuIO';
-import { 检测焦点, 读场景, 读粘滞, 读赴约, 组公寓快照, 取本轮事件文本 } from './snapshotSystem';
+import { 同步整表视图, 读取最近有效, 读最近有效stat, 脚本写入, 脚本写入中 } from './mvuIO';
+import { 事件角色标记, 检测焦点, 读场景, 读粘滞, 读赴约, 组公寓快照, 取本轮事件文本 } from './snapshotSystem';
 import { 执行回合, 重掷回合, 重开一局, 回档至, 回合进行中, 取消本回合, 开始新游戏 } from './回合引擎';
 import { 清理数据库陈旧互斥旗 } from './数据库桥';
 import { 创建配置户节点, 同步入住世界书条目 } from './入住系统';
@@ -135,6 +135,42 @@ function 注入全屏样式(): void {
   }
 }
 
+/**
+ * 玩家把酒馆助手"渲染楼层数"设成非 0(只渲染最近 N 楼)时,0 楼的游戏界面 iframe 会被
+ * 深度裁剪直接不渲染=开卡白屏。载入时强制归 0(0=渲染全部楼层)。
+ * 兼容两代助手:4.x 存 extension_settings.tavern_helper.render.depth 且运行态在 Pinia
+ * store 里(直接改 extension_settings 不生效还会被 store 回写覆盖,须经挂载点触达 store);
+ * 3.x 存 extension_settings.TavernHelper.render.render_depth,改完存盘即生效。
+ */
+function 强制渲染全部楼层(): void {
+  try {
+    const 宿主 = (window.parent ?? window) as unknown as Record<string, unknown> & Window;
+    const ST = (宿主 as { SillyTavern?: { extensionSettings?: Record<string, unknown>; saveSettingsDebounced?: () => Promise<void> } }).SillyTavern;
+    const 设置 = ST?.extensionSettings;
+    if (!设置) return;
+    let 改过 = false;
+    for (const 键 of ['tavern_helper.render.depth', 'TavernHelper.render.render_depth']) {
+      const 值 = _.get(设置, 键);
+      if (typeof 值 === 'number' && 值 !== 0) {
+        _.set(设置, 键, 0);
+        改过 = true;
+      }
+    }
+    const piniaApp = (宿主.document?.getElementById('tavern_helper') as unknown as { __vue_app__?: { config?: { globalProperties?: { $pinia?: { state?: { value?: Record<string, any> } } } } } } | null)?.__vue_app__;
+    const 渲染态 = piniaApp?.config?.globalProperties?.$pinia?.state?.value?.global_settings?.settings?.render;
+    if (渲染态 && typeof 渲染态.depth === 'number' && 渲染态.depth !== 0) {
+      渲染态.depth = 0; // Pinia 响应式:store 的 watch 会自行回写 extension_settings 并存盘
+      改过 = true;
+    }
+    if (改过) {
+      void ST?.saveSettingsDebounced?.();
+      console.info('[人妻公寓] 检测到酒馆助手渲染楼层数非 0,已改回 0(渲染全部楼层),防止 0 楼游戏界面被裁剪');
+    }
+  } catch (e) {
+    console.warn('[人妻公寓] 渲染楼层数自检失败(不影响游戏):', e);
+  }
+}
+
 // ============================================
 // 启动引导:等 Mvu 就绪 → 注册 schema → 心跳 → 挂监听(启动三件套,防护16)
 // ============================================
@@ -179,6 +215,9 @@ $(() => {
         console.error('[人妻公寓] 注入全屏样式失败(游戏仍可玩,楼层未隐藏):', e);
       }
 
+      // 渲染楼层数归 0(玩家设成非 0 时 0 楼界面会被深度裁剪=白屏)
+      强制渲染全部楼层();
+
       // 手机挂载(P4:注入酒馆页面层;失败不阻塞游戏本体)
       try {
         挂载手机();
@@ -193,6 +232,7 @@ $(() => {
           const { raw, data } = 有效;
           if (确保首批入住(data)) await 脚本写入(raw, data);
           await 同步入住世界书条目(data);
+          await 同步整表视图(data); // 旧档升级/开新聊天:视图就位后整表条目才有内容
         }
       } catch (e) {
         console.error('[人妻公寓] 首批入住引导失败:', e);
@@ -250,6 +290,15 @@ function 挂载监听() {
     '人妻公寓:回合完成',
     '人妻公寓:考古选细节',
     '人妻公寓:考古到底',
+    // 补齐清理名单(审计 低危3):以下 8 个此前注册了却不在清单里(防御一致性,防护16)
+    '人妻公寓:隔离事件撤回',
+    '人妻公寓:隔离事件重掷',
+    '人妻公寓:装载性癖',
+    '人妻公寓:卸载性癖',
+    '人妻公寓:打听',
+    '人妻公寓:对饮',
+    '人妻公寓:荣耀洞',
+    '人妻公寓:荣耀洞离场',
   ]) {
     eventClearEvent(名);
   }
@@ -260,7 +309,8 @@ function 挂载监听() {
   eventOn('人妻公寓:玩家行动', (行动: string) => {
     if (typeof 行动 !== 'string' || !行动.trim()) return;
     const 当前 = 读最近有效stat();
-    if (当前?.系统._荣耀洞拍 >= 0 && 读场景().房间id === '洗手间' && !隔离事件进行中()) {
+    // raw stat 未过 schema 消毒,可选链护全程再转数(审计 低危21-①)
+    if (Number(_.get(当前 ?? {}, '系统._荣耀洞拍') ?? -1) >= 0 && 读场景().房间id === '洗手间' && !隔离事件进行中()) {
       安全操作((raw, data) => {
         const 文本 = 行动.trim();
         return 运行荣耀洞隔离拍(raw, data, 文本, 建隔离记录('荣耀洞继续', 文本, data));
@@ -271,22 +321,24 @@ function 挂载监听() {
   });
   eventOn('人妻公寓:重掷', () => void 重掷回合());
   eventOn('人妻公寓:回档', (楼层: number) => void 回档至(Number(楼层)));
+  // 撤回/重掷两入口客户端会先乐观置 发送中 锁,任何"什么都没干"的分支必须回 回合失败
+  // 解锁,只回 提示 会把输入永久闩死(审计 C6)
   eventOn('人妻公寓:隔离事件撤回', () =>
-    安全操作(async (raw, data) => {
+    安全操作(async raw => {
       const 记录 = 读隔离记录();
       if (!记录) {
-        eventEmit('人妻公寓:提示', '没有可撤回的独立事件。');
+        eventEmit('人妻公寓:回合失败', '没有可撤回的独立事件');
         return;
       }
       await 恢复隔离记录(raw, 记录);
       eventEmit('人妻公寓:隔离事件完成', { 类型: '撤回' });
-    }),
+    }, true),
   );
   eventOn('人妻公寓:隔离事件重掷', () =>
-    安全操作(async (raw, data) => {
+    安全操作(async raw => {
       const 记录 = 读隔离记录();
       if (!记录) {
-        eventEmit('人妻公寓:提示', '没有可重演的独立事件。');
+        eventEmit('人妻公寓:回合失败', '没有可重演的独立事件');
         return;
       }
       const 恢复后 = await 恢复隔离记录(raw, 记录);
@@ -297,7 +349,7 @@ function 挂载监听() {
       } else if (记录.门牌) {
         eventEmit('人妻公寓:查看摄像头', 记录.门牌);
       }
-    }),
+    }, true),
   );
   eventOn('人妻公寓:取消生成', () => {
     if (!取消隔离事件()) 取消本回合();
@@ -352,7 +404,7 @@ function 挂载监听() {
       入口,
       行动,
       门牌: 门牌号,
-      房间: 读场景().房间id,
+      房间: 读场景().房间id ?? '',
       日志长度: Array.isArray(日志) ? 日志.length : 0,
       data快照: _.cloneDeep(data),
       chat快照: {
@@ -395,20 +447,25 @@ function 挂载监听() {
     return data;
   }
 
-  /** 带毒快照守卫的操作壳(近10楼无 stat 一律不动手;失败一律明着报,不再静默) */
+  /** 带毒快照守卫的操作壳(近10楼无 stat 一律不动手;失败一律明着报,不再静默)。
+   * @param 失败解锁 客户端在 emit 前已乐观置 发送中 的入口传 true:失败分支改发 回合失败
+   *   事件解锁输入,否则只回 提示 会永久闩死(审计 C6) */
   let 操作队列: Promise<void> = Promise.resolve();
-  function 安全操作(fn: (raw: object, data: SchemaType) => void | Promise<unknown>) {
+  function 安全操作(fn: (raw: object, data: SchemaType) => void | Promise<unknown>, 失败解锁 = false) {
     操作队列 = 操作队列.then(async () => {
       try {
         const 有效 = 读取最近有效();
         if (!有效) {
-          eventEmit('人妻公寓:提示', '变量还没就绪,稍等两秒再试。');
+          eventEmit(失败解锁 ? '人妻公寓:回合失败' : '人妻公寓:提示', '变量还没就绪,稍等两秒再试。');
           return;
         }
         await fn(有效.raw, 有效.data);
       } catch (e) {
         console.error('[人妻公寓] UI 操作失败:', e);
-        eventEmit('人妻公寓:提示', `⚠ 操作没成(请截 F12 控制台给作者):${e instanceof Error ? e.message : String(e)}`);
+        eventEmit(
+          失败解锁 ? '人妻公寓:回合失败' : '人妻公寓:提示',
+          `⚠ 操作没成(请截 F12 控制台给作者):${e instanceof Error ? e.message : String(e)}`,
+        );
       }
     });
   }
@@ -623,6 +680,13 @@ function 挂载监听() {
         eventEmit('人妻公寓:隔离事件完成', { 类型: '监控', 门牌: 门牌号 });
       } catch (e) {
         清偷窥挂起();
+        // 场景在隔离事件之前就被改写成 302,失败必须回滚,否则玩家被凭空挪进 302
+        // 且没有任何正文(审计 C4);客户端的 回合失败 handler 会重读 _场景 同步画面
+        try {
+          await insertOrAssignVariables({ _场景: 记录.chat快照._场景 ?? null }, { type: 'chat' });
+        } catch (e2) {
+          console.error('[人妻公寓] 监控失败后场景回滚失败:', e2);
+        }
         console.error('[人妻公寓] 监控隔离事件失败:', e);
         eventEmit('人妻公寓:回合失败', e instanceof Error ? e.message : String(e));
       }
@@ -673,6 +737,12 @@ function 挂载监听() {
       const 有效 = 读取最近有效();
       if (!有效) return;
       const { raw, data } = 有效;
+      // 每楼一段闸(2026-07-26 审计 M6):晋阶不耗堕落不记楼层,攒够 80 连点=2→3→4→5
+      // 多段正戏被 | 挤进同一楼演;上一段转折还没上演前不放下一段(一段一楼是设计)
+      if (/【转折正戏】|【药物首夜】/.test(data.系统._待发送事件)) {
+        eventEmit('人妻公寓:提示', '刚跨过的那道坎还没来得及演——先把这一楼走完,再谈下一步。');
+        return;
+      }
       const 结果 = 请求晋阶(data, 门牌号);
       if (结果.成功) {
         const 妻 = data.户[门牌号].妻;
@@ -690,7 +760,8 @@ function 挂载监听() {
             : `【转折正戏】这一楼是${妻名}越过心里那道坎的一楼——她刚进入「${妻.阶段标题}」。` +
               `${第一夜}用一场符合她性格与你们当下关系的正戏演出这次跨越,张力给足,不要一笔带过`;
         if (门牌号 === '302' && 妻.当前阶段 === 3) data.系统._母亲首夜第二幕 = true;
-        data.系统._待发送事件 = data.系统._待发送事件 ? `${data.系统._待发送事件}|${事件}` : 事件;
+        const 绑定事件 = `${事件角色标记({ 在场妻: [门牌号] })}${事件}`;
+        data.系统._待发送事件 = data.系统._待发送事件 ? `${data.系统._待发送事件}|${绑定事件}` : 绑定事件;
         await 脚本写入(raw, data);
         捕获保护快照(data);
       }
@@ -778,21 +849,22 @@ function 挂载监听() {
       // 也不该被当成 AI 楼推进引擎
       {
         const 末楼 = SillyTavern.chat?.[SillyTavern.chat.length - 1];
-        if (末楼?.is_user) return;
+        // 逃生舱原生发送:MESSAGE_SENT 后、prompt 组装前,用刚拷贝的真值刷一次整表视图
+        if (末楼?.is_user) {
+          void 同步整表视图(rawStat);
+          return;
+        }
       }
-      // 手动"重新处理变量"(非生成周期):只恢复不推进(防护13)——
-      // 恢复源优先当前楼真值(含快照之后的 UI 写入,比内存快照新)
+      // 手动"重新处理变量"(非生成周期):只恢复不推进(防护13)。
+      // 不再从当前楼真值重捕快照(审计 低危15):当前楼是"已截过"的终值,拿它当 delta cap
+      // 基准=每按一次再放行 +3,连按可无限抬升。内存快照本就随每次 UI 落地(落地→捕获保护快照)
+      // 刷新,含全部 UI 写入,直接用它做基准即可。
       if (!_isInAiCycle) {
         if (有保护快照()) {
-          try {
-            const 真值 = 读最近有效stat();
-            if (真值) 捕获保护快照(Schema.parse(真值) as SchemaType);
-          } catch (e) {
-            console.warn('[人妻公寓] 重处理恢复:读当前楼真值失败,退回内存快照', e);
-          }
           const restored = Schema.parse(rawStat) as SchemaType;
-          回滚保护字段(restored, _本轮焦点);
+          回滚保护字段(restored, _本轮焦点, undefined, 当前楼层());
           _.set(新变量, 'stat_data', restored);
+          void 同步整表视图(restored);
           console.info('[人妻公寓] 非生成周期的变量重处理:脚本管字段已按快照恢复(引擎未推进)');
         }
         return;
@@ -803,7 +875,7 @@ function 挂载监听() {
       const 楼层 = 当前楼层();
 
       // 1. 回滚脚本管字段(变量分工表落码;后台户整体拍回,焦点户白名单+delta cap)
-      回滚保护字段(newData, _本轮焦点);
+      回滚保护字段(newData, _本轮焦点, undefined, 楼层);
 
       // 1.5 首批入住兜底(启动时无 stat 的全新对话在此接上)
       确保首批入住(newData);
@@ -826,6 +898,7 @@ function 挂载监听() {
       // 3. 坏结局锁定:引擎全停(回滚保护仍生效)
       if (newData.系统._坏结局) {
         _.set(新变量, 'stat_data', newData);
+        void 同步整表视图(newData);
         _isInAiCycle = false;
         return;
       }
@@ -844,13 +917,14 @@ function 挂载监听() {
         } catch {
           /* 旧值不可读时疑心增量按 0 处理 */
         }
+        const 现钟 = 楼层 + newData.系统._时段偏移楼;
         for (const m of _本轮焦点) {
           const 节点 = newData.户[m];
           if (!节点) continue;
-          惰性结算户(节点, 楼层);
+          惰性结算户(节点, 现钟); // 钟楼轴(审计 低危7,与主路径一致)
           节点.妻.上次互动楼层 = 楼层;
           const 基准堕落 = oldStat?.户[m]?.妻.堕落值;
-          结算焦点疑心(节点, m, 节点.妻.堕落值 - (基准堕落 ?? 节点.妻.堕落值));
+          结算焦点疑心(节点, m, 节点.妻.堕落值 - (基准堕落 ?? 节点.妻.堕落值), 现钟);
         }
         夜访结算(newData, 楼层);
         {
@@ -862,6 +936,7 @@ function 挂载监听() {
 
       // 6. 写回
       _.set(新变量, 'stat_data', newData);
+      void 同步整表视图(newData);
       _isInAiCycle = false;
     } catch (err) {
       console.error('[人妻公寓] VARIABLE_UPDATE_ENDED 处理失败:', err);

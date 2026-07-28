@@ -50,11 +50,15 @@ const 进阶花样词表: readonly string[] = [
 // 行为等级自报解析
 // ============================================
 
-const 等级正则 = /<行为等级>\s*(\d)\s*<\/行为等级>/;
+const 等级正则 = /<行为等级>\s*(\d)\s*<\/行为等级>/g;
 
-/** 从 AI 原文提取自报等级;缺失返回 null(缺报不算违规,靠词表兜底) */
+/** 从 AI 原文提取自报等级;缺失返回 null(缺报不算违规,靠词表兜底)。
+ * 取最后一个匹配(2026-07-26 审计 M8):协议规定标签必须在末行,而思维链里模型爱草拟/复述
+ * 等级标签——旧版取首个匹配,CoT 草稿值既能误伤(草稿高值超线熔断)也能漏杀(草稿低值盖住末行高值)。
+ * 清洗正文会把 <行为等级> 块整个剥掉,所以这里只能扫原文,靠"取末"绕开 CoT。 */
 export function 解析行为等级(原文: string): number | null {
-  const m = 原文.match(等级正则);
+  const ms = [...原文.matchAll(等级正则)];
+  const m = ms[ms.length - 1];
   if (!m) return null;
   const n = Number(m[1]);
   return Number.isInteger(n) ? _.clamp(n, 0, 5) : null;

@@ -29,6 +29,49 @@ export async function 脚本写入(raw: object, data?: SchemaType): Promise<void
     待完成写入数 -= 1;
     脚本写入中 = 待完成写入数 > 0;
   }
+  await 同步整表视图(_.get(raw, 'stat_data'));
+}
+
+/**
+ * 整表瘦身(2026-07-27 拍板):酒馆助手的 format_message_variable 只滤 `$` 键,schema 里
+ * 注释"AI 不可见"的 `_` 机制字段(荣耀洞位、撞见次数、疑心冻结、已注入事件全文等)其实
+ * 每轮原样进 prompt——既膨胀又泄底。世界书整表条目改读 chat 变量 `_整表视图`,由本函数
+ * 在每个 stat 变更点同步:只剥 `_`/`$` 前缀键与剥空后的空对象(系统 块整块消失),
+ * 其余字段一个不动——AI 可读可写的记账地基与今天完全一致。
+ */
+function 过滤机制字段(节点: unknown): unknown {
+  if (Array.isArray(节点)) return 节点.map(过滤机制字段);
+  if (_.isPlainObject(节点)) {
+    const 出: Record<string, unknown> = {};
+    for (const [键, 值] of Object.entries(节点 as Record<string, unknown>)) {
+      if (键.startsWith('_') || 键.startsWith('$')) continue;
+      const 滤后 = 过滤机制字段(值);
+      if (_.isPlainObject(滤后) && _.isEmpty(滤后)) continue;
+      出[键] = 滤后;
+    }
+    return 出;
+  }
+  return 节点;
+}
+
+/** 同步注入视图(视图在 await 前同步算完,调用方 fire-and-forget 也不怕源对象随后被改) */
+export async function 同步整表视图(stat: unknown): Promise<void> {
+  if (!stat || _.isEmpty(stat)) return; // 毒快照纪律:无真值绝不写空视图
+  try {
+    const 视图 = 过滤机制字段(stat);
+    // updateVariablesWith + _.set 整值替换(insertOrAssign 深合并会让缩短的数组残留旧尾)
+    await Promise.resolve(
+      updateVariablesWith(
+        vars => {
+          _.set(vars, '_整表视图', 视图);
+          return vars;
+        },
+        { type: 'chat' },
+      ),
+    );
+  } catch (e) {
+    console.warn('[人妻公寓] 整表视图同步失败(下一个变更点会重试):', e);
+  }
 }
 
 /**

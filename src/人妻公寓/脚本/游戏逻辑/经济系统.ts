@@ -2,6 +2,7 @@ import type { SchemaType } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
 import { 户静态表, 查道具, 经济配置, 难度表 } from '../../stageConfig';
 import { seededRandom, 丈夫在楼, 妻位置推算 } from './楼层时钟';
+import { 惰性结算全楼 } from './结算系统';
 import { 读场景 } from './snapshotSystem';
 
 /**
@@ -76,6 +77,7 @@ export function 经济结算(data: SchemaType, 楼层: number): string[] {
   const 全局期 = Math.floor(现钟 / 期长);
   if (全局期 >= 1 && 全局期 > data.系统._上次上交期) {
     data.系统._上次上交期 = 全局期;
+    惰性结算全楼(data, 现钟); // 上交日全楼补被动账(审计 低危8:文档承诺过但从未接线,非焦点户轴值长期陈旧)
     const 报表行: string[] = [];
     const 难度 = 难度表[data.系统._难度] ?? 难度表['标准'];
 
@@ -281,7 +283,8 @@ export function 空房偷窃(data: SchemaType, 门牌号: 门牌, 楼层: number
   if (房间id !== 门牌号 || !破门) return { 提示: '得先进得去,才翻得着。' };
   const 现钟 = 钟(data, 楼层);
   // 进房那刻已经确认是空屋，之后的演出冻结在该时点，不能因停留期间跨时段把住客瞬移回来。
-  const 进房钟 = 钟(data, 进房末楼 ?? 楼层);
+  // 未来作废守卫(审计 低危11):酒馆原生删楼后 chat 变量不回滚,进房末楼可能停在"未来"
+  const 进房钟 = 钟(data, 进房末楼 != null && 进房末楼 <= 楼层 ? 进房末楼 : 楼层);
   if (妻位置推算(门牌号, 进房钟) === 门牌号 || 丈夫在楼(节点, 门牌号, 进房钟) !== '外出') {
     return { 提示: '屋里有人,你的手缩了回来。' };
   }
@@ -404,7 +407,8 @@ export function 使用运作(data: SchemaType, 道具id: string, 门牌号: 门�
     case '物业巡检表': {
       用掉();
       const 行 = Object.keys(data.户)
-        .filter(m => !户静态表[m as 门牌]?.隐身)
+        // 存在性守卫(审计 低危13):`!undefined?.隐身` 为 true,野门牌会放行到下面的裸取炸掉
+        .filter(m => 户静态表[m as 门牌] && !户静态表[m as 门牌].隐身)
         .map(m => {
           const 配2 = 户静态表[m as 门牌];
           const 妻在 = 妻位置推算(m as 门牌, 现钟) === m ? '在家' : '不在';
