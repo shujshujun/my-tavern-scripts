@@ -145,7 +145,11 @@ function 注入全屏样式(): void {
 function 强制渲染全部楼层(): void {
   try {
     const 宿主 = (window.parent ?? window) as unknown as Record<string, unknown> & Window;
-    const ST = (宿主 as { SillyTavern?: { extensionSettings?: Record<string, unknown>; saveSettingsDebounced?: () => Promise<void> } }).SillyTavern;
+    const ST = (
+      宿主 as {
+        SillyTavern?: { extensionSettings?: Record<string, unknown>; saveSettingsDebounced?: () => Promise<void> };
+      }
+    ).SillyTavern;
     const 设置 = ST?.extensionSettings;
     if (!设置) return;
     let 改过 = false;
@@ -156,7 +160,11 @@ function 强制渲染全部楼层(): void {
         改过 = true;
       }
     }
-    const piniaApp = (宿主.document?.getElementById('tavern_helper') as unknown as { __vue_app__?: { config?: { globalProperties?: { $pinia?: { state?: { value?: Record<string, any> } } } } } } | null)?.__vue_app__;
+    const piniaApp = (
+      宿主.document?.getElementById('tavern_helper') as unknown as {
+        __vue_app__?: { config?: { globalProperties?: { $pinia?: { state?: { value?: Record<string, any> } } } } };
+      } | null
+    )?.__vue_app__;
     const 渲染态 = piniaApp?.config?.globalProperties?.$pinia?.state?.value?.global_settings?.settings?.render;
     if (渲染态 && typeof 渲染态.depth === 'number' && 渲染态.depth !== 0) {
       渲染态.depth = 0; // Pinia 响应式:store 的 watch 会自行回写 extension_settings 并存盘
@@ -521,12 +529,7 @@ function 挂载监听() {
     await 执行回合(行动);
   }
 
-  async function 运行荣耀洞隔离拍(
-    raw: object,
-    data: SchemaType,
-    行动: string,
-    记录: 隔离回合记录,
-  ): Promise<void> {
+  async function 运行荣耀洞隔离拍(raw: object, data: SchemaType, 行动: string, 记录: 隔离回合记录): Promise<void> {
     const 导演事件 = 荣耀洞当前事件(data);
     if (!导演事件) {
       eventEmit('人妻公寓:回合失败', '荣耀洞事件状态已经结束。');

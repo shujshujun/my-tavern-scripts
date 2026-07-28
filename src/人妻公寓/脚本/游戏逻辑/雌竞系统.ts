@@ -90,7 +90,7 @@ export function 读余波(当前楼: number): 换装余波 | null {
 export function 标余波(补: Partial<换装余波>): void {
   const p = (_.get(getVariables({ type: 'chat' }), '_换装余波') ?? null) as 换装余波 | null;
   if (!p) return;
-  void Promise.resolve(insertOrAssignVariables({ _换装余波: { ...p, ...补 } }, { type: 'chat' })).catch(
-    (e: unknown) => console.error('[人妻公寓·雌竞] 余波标记失败', e),
+  void Promise.resolve(insertOrAssignVariables({ _换装余波: { ...p, ...补 } }, { type: 'chat' })).catch((e: unknown) =>
+    console.error('[人妻公寓·雌竞] 余波标记失败', e),
   );
 }

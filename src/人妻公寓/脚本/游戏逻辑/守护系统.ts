@@ -225,13 +225,7 @@ export function 回滚保护字段(
 }
 
 /** 焦点户:先按人物在场分闸,再对白名单做 delta cap,其余拍回 */
-function 回滚户字段(
-  节点: 户节点Type,
-  快照节点: 户节点Type,
-  妻可写: boolean,
-  夫可写: boolean,
-  钟日?: number,
-): void {
+function 回滚户字段(节点: 户节点Type, 快照节点: 户节点Type, 妻可写: boolean, 夫可写: boolean, 钟日?: number): void {
   if (!妻可写) {
     节点.妻 = _.cloneDeep(快照节点.妻);
   } else {
@@ -254,7 +248,8 @@ function 回滚户字段(
       const 账 = 妻快照._堕落日账.日 === 钟日 ? 妻快照._堕落日账.值 : 0;
       if (钟日 !== undefined && 涨 > 0) {
         const 允许 = Math.min(涨, Math.max(0, 每日堕落上限 - 账));
-        if (允许 < 涨) console.info(`[人妻公寓·守护] 同日堕落收益已达上限(${账}/${每日堕落上限}),本楼 +${涨} 截为 +${允许}`);
+        if (允许 < 涨)
+          console.info(`[人妻公寓·守护] 同日堕落收益已达上限(${账}/${每日堕落上限}),本楼 +${涨} 截为 +${允许}`);
         妻.堕落值 = _.clamp(妻快照.堕落值 + 允许, 0, 100);
         妻._堕落日账 = { 日: 钟日, 值: 账 + 允许 };
       } else {

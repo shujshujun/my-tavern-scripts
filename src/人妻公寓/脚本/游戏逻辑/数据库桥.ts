@@ -89,7 +89,6 @@ export function 智脑状态(): { 已安装: boolean } {
   return { 已安装 };
 }
 
-
 export function 取数据库API(): 数据库API | null {
   type 数据库宿主 = Window & { AutoCardUpdaterAPI?: 数据库API; autoCardUpdaterAPI?: 数据库API };
   const 候选: 数据库宿主[] = [];
@@ -347,12 +346,7 @@ function 表结构可用(sheet: 数据表 | undefined, expectedHeaders: readonly
     .every(header => new RegExp(`--\\s*${_.escapeRegExp(header)}\\s*(?:\\r?\\n|$)`).test(ddl));
 }
 
-function 行转文本(
-  sheet: 数据表,
-  focusNames: readonly string[],
-  当前楼层: number,
-  只要未结 = false,
-): string[] {
+function 行转文本(sheet: 数据表, focusNames: readonly string[], 当前楼层: number, 只要未结 = false): string[] {
   const content = sheet.content ?? [];
   const headers = (content[0] ?? []).map(String);
   const 楼层列 = headers.indexOf('最后楼层');

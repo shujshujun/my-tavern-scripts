@@ -508,12 +508,12 @@ function 清洗正文(原文: string): string {
     .replace(/<(VariableCheck|Disclaimer|w2g)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
     // 双人成行：这些都是 content 正文之后的摘要、选项或独立展示模块。
     // content 缺失时也要按块清除，防止预设协议被落库并在下一轮继续污染上下文。
+    .replace(/<(meow_FM|branches|parallel_world|historic_events|htm1fenge)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
+    // 流式截断或模型漏闭合时，以上附加模块一旦开始，后面都不再属于正文。
     .replace(
-      /<(meow_FM|branches|parallel_world|historic_events|htm1fenge)\b[^>]*>[\s\S]*?<\/\1\s*>/gi,
+      /<(?:VariableCheck|Disclaimer|w2g|meow_FM|branches|parallel_world|historic_events|htm1fenge)\b[^>]*>[\s\S]*$/i,
       '',
     )
-    // 流式截断或模型漏闭合时，以上附加模块一旦开始，后面都不再属于正文。
-    .replace(/<(?:VariableCheck|Disclaimer|w2g|meow_FM|branches|parallel_world|historic_events|htm1fenge)\b[^>]*>[\s\S]*$/i, '')
     .replace(
       /<\/?(?:content|story_scene|now_plot|think_fox~|fox_selc|fox_tip|konatan_planning~|tucao|SexualScene|VariableCheck|Disclaimer|w2g|meow_FM|branches|parallel_world|historic_events|htm1fenge)(?:\s[^>]*)?>/gi,
       '',

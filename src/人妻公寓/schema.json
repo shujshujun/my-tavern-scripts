@@ -51,6 +51,7 @@
                 }
               },
               "当前心理想法": {
+                "default": "",
                 "type": "string"
               },
               "当前情绪": {
@@ -58,12 +59,15 @@
                 "type": "string"
               },
               "气质描述": {
+                "default": "",
                 "type": "string"
               },
               "外装": {
+                "default": "",
                 "type": "string"
               },
               "内衣": {
+                "default": "",
                 "type": "string"
               },
               "妆容": {
@@ -179,12 +183,15 @@
                 "type": "number"
               },
               "状态": {
+                "default": "",
                 "type": "string"
               },
               "结局轨道": {
+                "default": "",
                 "type": "string"
               },
               "当前心理想法": {
+                "default": "",
                 "type": "string"
               },
               "当前情绪": {
@@ -248,9 +255,11 @@
       "type": "object",
       "properties": {
         "_坏结局": {
+          "default": "",
           "type": "string"
         },
         "_待发送事件": {
+          "default": "",
           "type": "string"
         },
         "_已注入事件": {
@@ -262,6 +271,7 @@
               "type": "number"
             },
             "内容": {
+              "default": "",
               "type": "string"
             }
           }
@@ -335,6 +345,7 @@
           "type": "number"
         },
         "_荣耀洞门牌": {
+          "default": "",
           "type": "string"
         },
         "_荣耀洞拍": {
@@ -356,6 +367,7 @@
           "type": "boolean"
         },
         "_荣耀洞动态门牌": {
+          "default": "",
           "type": "string"
         },
         "_荣耀洞动态楼": {
@@ -371,9 +383,11 @@
               "type": "number"
             },
             "分数段": {
+              "default": "",
               "type": "string"
             },
             "报表": {
+              "default": "",
               "type": "string"
             },
             "通牒": {

@@ -129,13 +129,7 @@ export async function 执行隔离事件(参数: {
     let 原文: unknown;
     if (数据库状态().可调用AI) {
       原文 = await 通过数据库生成(
-        [
-          ...前,
-          { role: 'system', content: system },
-          ...history,
-          { role: 'user', content: 参数.行动 },
-          ...后,
-        ],
+        [...前, { role: 'system', content: system }, ...history, { role: 'user', content: 参数.行动 }, ...后],
         '',
         1400,
       );
