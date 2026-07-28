@@ -9,6 +9,7 @@ import { 姐妹群成员, 雌竞火气, 雌竞资格, 读余波, 标余波, 余�
 import { Schema } from '../../schema';
 import { 同步社交轨迹, 安装人妻公寓数据库模板, 打开数据库界面, 数据库状态, 通过数据库生成 } from './数据库桥';
 import { 预设破限段 } from './预设桥';
+import { 私聊图库清单, type 私聊图库项 } from './私聊图库清单';
 
 /**
  * 手机系统(P4:手机开机即微信,2026-07-18 用户拍板——不做主屏与独立App,
@@ -36,7 +37,7 @@ export interface 微信消息 {
   发: '我' | '对方' | '系统';
   文: string;
   类?: '文本' | '照片' | '撤回' | '通话';
-  /** 私聊随消息发送的配图；路径相对 `素材/微信圈/`。 */
+  /** 私聊随消息发送的配图；普通路径相对 `素材/微信圈/`，`@adult/` 路径来自独立成人素材仓。 */
   图?: string;
 }
 
@@ -61,6 +62,8 @@ interface 微信库 {
   读到: Record<string, number>; // 会话 → 已读到的楼层戳
   圈读到: number;
   节拍: Record<string, number>; // 内容引擎水位线(`圈:${门牌}`/`私:${门牌}`/`群`)
+  /** 每户已经实际发送成功的共享图库ID；只存短ID，不把图片或描述塞进存档。 */
+  已发私聊图: Partial<Record<门牌, string[]>>;
 }
 
 function 读库(): 微信库 {
@@ -78,7 +81,14 @@ function 读库(): 微信库 {
   const 圈 = (v.圈 ?? [])
     .filter(x => 验收短文本(x.文, 60) !== null)
     .map(x => ({ ...x, 评: x.评.filter(p => 验收短文本(p.文, 20) !== null) }));
-  return { 消息, 圈, 读到: v.读到 ?? {}, 圈读到: v.圈读到 ?? -1, 节拍: v.节拍 ?? {} };
+  return {
+    消息,
+    圈,
+    读到: v.读到 ?? {},
+    圈读到: v.圈读到 ?? -1,
+    节拍: v.节拍 ?? {},
+    已发私聊图: v.已发私聊图 ?? {},
+  };
 }
 
 async function 写库(库: 微信库): Promise<void> {
@@ -98,7 +108,12 @@ async function 写库(库: 微信库): Promise<void> {
  * 标记都会写库——拍结束时把"拍开头快照"整包写回会吞掉窗口期的全部写入。
  * 改为只带走本拍新增的条目与节拍水位变化,落库前重读新鲜库再合并。
  */
-async function 写库增量(增: { 新圈: 朋友圈条[]; 新消息: 微信消息[]; 节拍改: Record<string, number> }): Promise<void> {
+async function 写库增量(增: {
+  新圈: 朋友圈条[];
+  新消息: 微信消息[];
+  节拍改: Record<string, number>;
+  已发私聊图改?: Partial<Record<门牌, string[]>>;
+}): Promise<void> {
   await updateVariablesWith(
     vars => {
       const v = (_.get(vars, '_微信') ?? {}) as Partial<微信库>;
@@ -108,10 +123,12 @@ async function 写库增量(增: { 新圈: 朋友圈条[]; 新消息: 微信消�
         读到: v.读到 ?? {},
         圈读到: v.圈读到 ?? -1,
         节拍: v.节拍 ?? {},
+        已发私聊图: v.已发私聊图 ?? {},
       };
       新鲜.圈.unshift(...增.新圈);
       新鲜.消息.push(...增.新消息);
       Object.assign(新鲜.节拍, 增.节拍改);
+      if (增.已发私聊图改) Object.assign(新鲜.已发私聊图, 增.已发私聊图改);
       _.set(vars, '_微信', 新鲜);
       return vars;
     },
@@ -262,6 +279,9 @@ function 最近正文(): string {
  * 手机侧不吃任何协议,一律剥干净只留人话。
  */
 function 净化消息(原: string): string {
+  // 最终短文本压缩器使用独立 <微信> 包；若第一次生成主动遵守，也可直接跳过压缩。
+  const 微信包 = 原.match(/<微信>([\s\S]*?)(?:<\/微信>|$)/i);
+  if (微信包?.[1]?.trim()) 原 = 微信包[1];
   // 抽取协议(2026-07-27 万能兼容层):小生成要求 AI 把最终内容装进<回复>标签,这里只取
   // 标签内的部分——预设再怎么逼模型输出思考/前言/私有标签,都留在标签外被扔掉。
   // 未闭合(被截断)也取到结尾;模型没照办时整段进下面的剥离漏斗,行为同旧版。
@@ -351,10 +371,10 @@ function 验收单条群消息(原: string, 合法发言人: ReadonlySet<string>
   return `${发言人}:${内容}`;
 }
 
-async function 正文API生成(系统提示: string, 用户提示: string): Promise<string> {
+async function 正文API生成(系统提示: string, 用户提示: string, 使用预设 = true): Promise<string> {
   try {
     // 预设破限段护航(2026-07-27):裸发会被 Gemini 安全截断,与正文同一套通行证
-    const { 前, 后 } = 预设破限段();
+    const { 前, 后 } = 使用预设 ? 预设破限段() : { 前: [], 后: [] };
     const 原 = await generateRaw({
       ordered_prompts: [...前, { role: 'system', content: 系统提示 }, 'user_input', ...后],
       user_input: 用户提示,
@@ -367,7 +387,7 @@ async function 正文API生成(系统提示: string, 用户提示: string): Prom
   }
 }
 
-async function 自定义API生成(c: 手机配置, 系统提示: string, 用户提示: string): Promise<string> {
+async function 自定义API生成(c: 手机配置, 系统提示: string, 用户提示: string, 使用预设 = true): Promise<string> {
   if (!c.base || !c.key || !c.model) {
     console.warn('[人妻公寓·手机] 自定义API配置不完整,本拍跳过。');
     return '';
@@ -376,7 +396,7 @@ async function 自定义API生成(c: 手机配置, 系统提示: string, 用户�
     // 不从手机 iframe 直接 fetch 外部 API：移动端 WebView/远端 API 的 CORS
     // 往往会把有效地址也拦成 TypeError: Failed to fetch。统一走酒馆助手的
     // custom_api 代理链路，与数据库插件和其他脚本的自定义 API 调用方式一致。
-    const { 前, 后 } = 预设破限段();
+    const { 前, 后 } = 使用预设 ? 预设破限段() : { 前: [], 后: [] };
     const 原 = await generateRaw({
       ordered_prompts: [...前, { role: 'system', content: 系统提示 }, { role: 'user', content: 用户提示 }, ...后],
       should_stream: false,
@@ -397,21 +417,21 @@ async function 自定义API生成(c: 手机配置, 系统提示: string, 用户�
   }
 }
 
-async function 小生成(系统提示: string, 用户提示: string): Promise<string> {
+async function 小生成(系统提示: string, 用户提示: string, 使用预设 = true): Promise<string> {
   // 输出协议(万能兼容层,与 净化消息 的抽取配对):无论预设要求什么输出格式,
   // 最终内容都装进<回复>标签。协议句在破限前段之后、紧贴本次任务,权重足以压过
   // 预设的格式指令;模型不照办时抽取落空,自动退回四层剥离漏斗,不会更糟
   系统提示 +=
     '\n【输出协议·最高优先】把你最终要输出的内容完整装进<回复></回复>标签;标签外不写任何字符——没有思考过程、没有开场白、没有场景头、没有其他标签。';
   const c = 读配置();
-  if (c.ai来源 === '自定义') return 自定义API生成(c, 系统提示, 用户提示);
-  if (c.ai来源 === '正文') return 正文API生成(系统提示, 用户提示);
+  if (c.ai来源 === '自定义') return 自定义API生成(c, 系统提示, 用户提示, 使用预设);
+  if (c.ai来源 === '正文') return 正文API生成(系统提示, 用户提示, 使用预设);
 
   const db = 数据库状态();
   if (db.可调用AI) {
     try {
       // 数据库的"预设"只是 API 连接配置,消息原样转发——破限段同样要自己垫
-      const { 前, 后 } = 预设破限段();
+      const { 前, 后 } = 使用预设 ? 预设破限段() : { 前: [], 后: [] };
       const 原 = await 通过数据库生成(
         [...前, { role: 'system', content: 系统提示 }, { role: 'user', content: 用户提示 }, ...后],
         '',
@@ -423,7 +443,7 @@ async function 小生成(系统提示: string, 用户提示: string): Promise<st
     } catch (e) {
       console.warn('[人妻公寓·手机] 数据库API调用失败:', e);
       // 默认不二次请求，避免数据库请求其实已计费/仍在执行时又调用正文API。
-      if (c.ai来源 === '自动' && c.数据库失败回退) return 正文API生成(系统提示, 用户提示);
+      if (c.ai来源 === '自动' && c.数据库失败回退) return 正文API生成(系统提示, 用户提示, 使用预设);
       return '';
     }
   }
@@ -433,7 +453,47 @@ async function 小生成(系统提示: string, 用户提示: string): Promise<st
     return '';
   }
   // 自动模式只在数据库能力不存在时无缝使用正文 API。
-  return 正文API生成(系统提示, 用户提示);
+  return 正文API生成(系统提示, 用户提示, 使用预设);
+}
+
+/**
+ * 高权重长预设可能持续要求千字输出。第一次保留预设文风；若不合规，第二次把原文交给
+ * 完全不加载预设的压缩器。压缩器只做格式收口，避免“长文再次被同一预设拉成长文”。
+ */
+async function 微信短文本(原: string, 最大字数: number, 语境: string): Promise<string | null> {
+  const 直接 = 验收短文本(净化消息(原), 最大字数);
+  if (直接) return 直接;
+  if (!原.trim()) return null;
+  const 压缩 = await 小生成(
+    `你是微信短文本压缩器。把输入改写为一条符合“${语境}”的自然中文消息，保留原意、态度和人物口吻。必须单行且不超过${最大字数}个汉字（标点也计数）。只输出<微信>消息</微信>，不得输出分析、旁白或其他内容。`,
+    `待压缩原文：\n${原.slice(0, 4000)}`,
+    false,
+  );
+  return 验收短文本(净化消息(压缩), 最大字数);
+}
+
+async function 微信群文本(
+  原: string,
+  合法发言人: ReadonlySet<string>,
+  最大字数: number,
+  最多条数: number,
+  语境: string,
+): Promise<string[]> {
+  const 取合法 = (文本: string) =>
+    文本
+      .split(/\r?\n/)
+      .map(行 => 验收单条群消息(行, 合法发言人, 最大字数))
+      .filter((行): 行 is string => Boolean(行))
+      .slice(0, 最多条数);
+  const 直接 = 取合法(净化消息(原));
+  if (直接.length) return 直接;
+  if (!原.trim() || !合法发言人.size) return [];
+  const 压缩 = await 小生成(
+    `你是微信群短文本压缩器。把输入改写为1至${最多条数}条“${语境}”消息。每行严格使用“发言人:内容”，发言人只能从给定名单选择，每条内容不超过${最大字数}字。只输出消息行，不要标签、旁白或解释。`,
+    `合法发言人：${[...合法发言人].join('、')}\n待压缩原文：\n${原.slice(0, 4000)}`,
+    false,
+  );
+  return 取合法(净化消息(压缩));
 }
 
 // ============================================
@@ -602,40 +662,47 @@ function 攻略私聊提示(m: 门牌, 阶段: number, 已确认: boolean): stri
 }
 
 interface 私聊候选图 {
+  id: string;
   图: string;
-  文本方向: string;
+  提示: string;
+  /** 当前阶段可用池已经全部看过；本次成功后从这一张开始新一轮。 */
+  新一轮: boolean;
 }
 
-/** 未入选朋友圈主池、但审图正常的候选进入私聊池；图片和文字语义成对选择。 */
-function 选私聊候选图(m: 门牌, 阶段: number, 钟: number): 私聊候选图 | undefined {
-  if (阶段 < 2) return undefined;
-  const 几率 = [0, 0, 0.12, 0.25, 0.45, 0.65][_.clamp(阶段, 0, 5)];
+function 私聊照片提示(项: 私聊图库项): string {
+  const 来源 =
+    项.拍摄者 === '玩家'
+      ? '这是前几天玩家为她拍下的照片；她现在是在重新提起、评价或调侃当时的画面。'
+      : '这是她主动挑选并发送给玩家的自拍。';
+  const 事后 = 项.事后体液
+    ? '画面中的精液、射精痕迹、体液或事后状态，来自她前几天与玩家的性经历；只围绕她对此的记忆、感受或期待表达，不得解释成其他男性、未知事件或此刻仍有人在场。'
+    : '';
+  return `照片事实：${项.画面事实}。${来源}${事后}不要逐字复述照片说明，只写她现在为什么发这张照片、想向玩家表达什么；不得改变场景、衣着、道具、身体状态和拍摄者，不得超越当前阶段。`;
+}
+
+/** 用户逐张审核的共享图库：阶段3才开始发送，只能抽取不高于角色当前阶段的图片。 */
+function 选私聊候选图(
+  m: 门牌,
+  阶段: number,
+  钟: number,
+  最近图片: readonly string[] = [],
+  已发送ID: readonly string[] = [],
+): 私聊候选图 | undefined {
+  if (阶段 < 3) return undefined;
+  const 几率 = [0, 0, 0, 0.5, 0.75, 0.9][_.clamp(阶段, 0, 5)];
   if (seededRandom(钟, m, '私聊候选图概率') >= 几率) return undefined;
-  const 池: Record<门牌, string[]> = {
-    '101': [
-      '自然妆站在门口，像是刚准备出门，问玩家这样是否好看',
-      '自然妆出门自拍，借口问今天的搭配',
-      '穿碎花短裙自拍，含蓄问玩家更喜欢哪一种风格',
-    ],
-    '102': [
-      '穿针织裙在古琴旁的居家照片，用曲子或安静午后来起话头',
-      '镜前自拍但手机遮住半张脸，犹豫地问玩家是否能认出她的变化',
-    ],
-    '201': ['穿酒红上衣拆礼物，拿礼物或人情账当作搭话借口', '穿酒红上衣看账单，用一笔算不清的账暗示想念'],
-    '202': ['穿初始浅蓝裙坐在刺绣桌旁，把乱掉的针脚说成心绪', '穿浅蓝裙镜前淡妆自拍，轻声问玩家觉得今天哪里不同'],
-    '301': [
-      '单肩造型镜前自拍，像发试镜废片一样问玩家是否喜欢真实的她',
-      '穿日常针织上衣坐在床边自拍，借口让玩家帮她选照片',
-    ],
-    '302': [
-      '穿白针织整理衣物，借整理家务问玩家什么时候回来',
-      '穿白针织整理首饰，问玩家替她挑哪一件',
-      '粉针织配碎花半身裙，像第一次为自己打扮后等玩家评价',
-    ],
-  };
-  const 候选 = 池[m];
+  const 最近 = new Set(最近图片);
+  const 已发 = new Set(已发送ID);
+  const 全部 = 私聊图库清单.filter(项 => 项.门牌 === m && 项.最低阶段 <= 阶段);
+  const 未看 = 全部.filter(项 => !已发.has(项.id));
+  const 新一轮 = 全部.length > 0 && 未看.length === 0;
+  const 本轮 = 未看.length ? 未看 : 全部;
+  const 未近期 = 本轮.filter(项 => !最近.has(`@adult/${项.path}`));
+  const 候选 = 未近期.length ? 未近期 : 本轮;
+  if (!候选.length) return undefined;
   const 序 = Math.floor(seededRandom(钟, m, '私聊候选图序') * 候选.length);
-  return { 图: `${户静态表[m].妻名}/私聊_${序 + 1}`, 文本方向: 候选[序] };
+  const 项 = 候选[序];
+  return { id: 项.id, 图: `@adult/${项.path}`, 提示: 私聊照片提示(项), 新一轮 };
 }
 
 /**
@@ -752,6 +819,7 @@ export async function 手机节拍(): Promise<void> {
     const 原圈数 = 库.圈.length;
     const 原消息数 = 库.消息.length;
     const 原节拍 = { ...库.节拍 };
+    const 原已发私聊图 = JSON.stringify(库.已发私聊图);
     let 有新 = false;
 
     // ── 荣耀洞完成后的专属暗示动态(真人完整服务才由荣耀洞.ts 留钩；无固定文案) ──
@@ -769,7 +837,7 @@ export async function 手机节拍(): Promise<void> {
           `人物:${配.妻名},${配.初始?.气质描述 ?? ''}。${妻状态包(荣耀门牌, data)}${await 人设段(荣耀门牌)}` +
             '她刚完整参与过那场隔墙服务，身体和情绪的余韵还在。生成一句只有玩家知道真正含义、其他人只会当成普通日常的动态。',
         );
-        const 文 = 校验朋友圈文案(原文, 配.妻名, 荣耀门牌);
+        const 文 = 校验朋友圈文案((await 微信短文本(原文, 50, `${配.妻名}的朋友圈文案`)) ?? '', 配.妻名, 荣耀门牌);
         const 泄底 = /荣耀洞|洗手间|隔板|口交|阴茎|精液|管理员/.test(文);
         if (节点 && 文 && !泄底) {
           const 图序 = 1 + Math.floor(seededRandom(荣耀楼, 荣耀门牌, '荣耀洞动态配图') * 3);
@@ -809,7 +877,6 @@ export async function 手机节拍(): Promise<void> {
       const 波 = 读余波(楼);
       const 晒装 = !!波 && 波.门牌 === m && !波.私密 && !波.圈晒 && 楼 - 波.起楼 >= 2 && 节点.妻.当前阶段 >= 3;
       if (!晒装 && m !== 本拍普通门牌) continue;
-      库.节拍[键] = 钟;
       const 妻 = 节点.妻;
       const 题 = 选发圈主题(库, m, 钟, 晒装);
       const 裂缝确认 = 妻.裂缝.已确认;
@@ -825,8 +892,9 @@ export async function 手机节拍(): Promise<void> {
             : '生成她此刻发的一条朋友圈。'),
       );
       // 主题与配图类型都由脚本决定，AI 只写文字；追剧/楼务保留纯文字，打散图片密度。
+      const 压缩文 = await 微信短文本(原文, 60, `${配.妻名}的朋友圈文案`);
       const 文 =
-        校验朋友圈文案(原文, 配.妻名, m) ||
+        校验朋友圈文案(压缩文 ?? '', 配.妻名, m) ||
         (裂缝确认 && 妻.当前阶段 >= 1 ? 取攻略兜底(m, 妻.当前阶段) : 取朋友圈兜底(题, 钟, m, 晒装));
       if (文) {
         let 图: string | undefined;
@@ -843,6 +911,7 @@ export async function 手机节拍(): Promise<void> {
         }
         const 条 = { 楼, 谁: 配.妻名, 文, 题, 评: [] as { 谁: string; 文: string }[], ...(图 ? { 图 } : {}) };
         库.圈.unshift(条);
+        库.节拍[键] = 钟;
         有新 = true;
         // 晒装的评论区=阴阳怪气主战场(换装余波扩展4):其他够格太太来1~2条表面客气的酸话
         if (晒装) {
@@ -854,10 +923,9 @@ export async function 手机节拍(): Promise<void> {
               `动态(${配.妻名}发的):${文}\n可评论的人与各自路数:\n${评者.map(x => `${户静态表[x].妻名}(${户静态表[x].雌竞})`).join('\n')}`,
             );
             const 名集 = new Set(评者.map(x => 户静态表[x].妻名));
-            for (const 行 of (评原 ?? '').split('\n').slice(0, 2)) {
-              const mm = 行.trim().match(/^([^::]{1,8})[::]\s*(.+)$/);
-              const 合法评论 = mm && 名集.has(mm[1]) ? 验收短文本(mm[2], 20) : null;
-              if (mm && 合法评论) 条.评.push({ 谁: mm[1], 文: 合法评论 });
+            for (const 行 of await 微信群文本(评原 ?? '', 名集, 20, 2, '朋友圈评论')) {
+              const mm = 行.match(/^([^:]+):(.+)$/);
+              if (mm) 条.评.push({ 谁: mm[1], 文: mm[2] });
             }
           }
         }
@@ -872,30 +940,41 @@ export async function 手机节拍(): Promise<void> {
       const 键 = `私:${m}`;
       const 上次 = 库.节拍[键] ?? -999;
       const 阶段 = 节点.妻.当前阶段;
-      const 基础间隔 = 阶段 >= 4 ? 10 : 阶段 >= 3 ? 14 : 20;
+      const 基础间隔 = 阶段 >= 5 ? 6 : 阶段 >= 4 ? 8 : 阶段 >= 3 ? 12 : 20;
       if (钟 - 上次 < Math.round(基础间隔 * 倍)) continue;
-      if (seededRandom(钟, m, '主动消息') > (阶段 >= 4 ? 0.5 : 0.3)) continue;
-      库.节拍[键] = 钟;
+      const 主动率 = 阶段 >= 5 ? 0.8 : 阶段 >= 4 ? 0.65 : 阶段 >= 3 ? 0.45 : 0.3;
+      if (seededRandom(钟, m, '主动消息') > 主动率) continue;
       const 时段名 = 当前时段(钟);
       const 深夜档 = 阶段 === 3 && (时段名 === '晚上' || 时段名 === '深夜');
       const 撤回 = 深夜档 && seededRandom(钟, m, '撤回') < 0.4;
       if (撤回) {
         库.消息.push({ 楼, 会话: m, 发: '对方', 文: '', 类: '撤回' });
+        库.节拍[键] = 钟;
         有新 = true;
       } else {
         const 方向 = 深夜档 ? '夜里睡不着，按阶段关系试探，话可以说一半。' : 攻略私聊提示(m, 阶段, 节点.妻.裂缝.已确认);
-        const 附图 = 选私聊候选图(m, 阶段, 钟);
+        const 最近图片 = 库.消息
+          .filter(消息 => 消息.会话 === m && 消息.发 === '对方' && 消息.图)
+          .slice(-10)
+          .map(消息 => 消息.图!);
+        const 附图 = 选私聊候选图(m, 阶段, 钟, 最近图片, 库.已发私聊图[m] ?? []);
         const 文 = await 小生成(
           '你替一款都市题材游戏生成一条中国已婚女性发给公寓管理员的微信私聊。只输出消息文本(口语,可含emoji),不超过40字,不要引号。关系变化必须循序渐进，不能把低阶段写成高阶段。',
           `人物:${配.妻名},${配.初始?.气质描述 ?? ''}。${家庭事实(m)}${妻状态包(m, data)}${await 人设段(m)}时段:${时段名}。消息方向:${方向}。${
             附图
-              ? `她会随消息发送一张照片，画面是：${附图.文本方向}。消息必须直接围绕这张照片说话，不能写成与图片无关的泛泛问候。`
+              ? `她会随消息发送一张照片。${附图.提示}消息必须直接围绕照片说话，不能写成无关的泛泛问候。`
               : ''
           }${称呼纪律()}${口吻纪律}`,
         );
-        const 合法私聊 = 验收短文本(文, 40);
+        const 合法私聊 = await 微信短文本(文, 40, `${配.妻名}发给管理员的私聊`);
         if (合法私聊) {
           库.消息.push({ 楼, 会话: m, 发: '对方', 文: 合法私聊, 图: 附图?.图 });
+          if (附图) {
+            const 本轮 = 附图.新一轮 ? [] : [...(库.已发私聊图[m] ?? [])];
+            if (!本轮.includes(附图.id)) 本轮.push(附图.id);
+            库.已发私聊图[m] = 本轮;
+          }
+          库.节拍[键] = 钟;
           有新 = true;
         }
       }
@@ -909,7 +988,6 @@ export async function 手机节拍(): Promise<void> {
       const 波2 = 读余波(楼);
       const 探针到点 = !!波2 && !波2.私密 && !波2.探针 && 楼 - 波2.起楼 >= 余波缓冲楼;
       if (钟 - 上次 >= 间隔 && (探针到点 || seededRandom(钟, '群聊') < (data.风闻 >= 50 ? 0.6 : 0.25))) {
-        库.节拍['群'] = 钟;
         const 在群 = 微信好友(data).filter(f => f.类 === '妻');
         const 谁 = 在群.length ? 在群[Math.floor(seededRandom(钟, '群谁') * 在群.length)].名 : '';
         const 文 = await 小生成(
@@ -932,10 +1010,17 @@ export async function 手机节拍(): Promise<void> {
               .map(m => `${户静态表[m].妻名}的丈夫=${户静态表[m].夫名}`)
               .join(',')}。`,
         );
-        const 合法群消息 = 验收单条群消息(文, new Set(在群.map(f => f.名)));
+        const [合法群消息] = await 微信群文本(
+          文,
+          new Set(在群.map(f => f.名)),
+          30,
+          1,
+          '公寓楼务群消息',
+        );
         if (合法群消息) {
           if (探针到点) 标余波({ 探针: true });
           库.消息.push({ 楼, 会话: '群', 发: '对方', 文: 合法群消息 });
+          库.节拍['群'] = 钟;
           有新 = true;
         } else if (文) {
           console.warn('[人妻公寓·手机] 自动楼务群输出不符合“发言人:30字内单行”，已丢弃。');
@@ -952,7 +1037,6 @@ export async function 手机节拍(): Promise<void> {
       const 上次 = 库.节拍[键] ?? -999;
       if (钟 - 上次 < Math.round(28 * 倍)) continue;
       if (seededRandom(钟, m, '仅你可见') > 0.3) continue;
-      库.节拍[键] = 钟;
       const 妻 = 节点.妻;
       // 档位=堕落分档(五妻1~3;母亲1~5=最终boss奖励最厚)
       const 上限 = m === '302' ? 5 : 3;
@@ -963,9 +1047,10 @@ export async function 手机节拍(): Promise<void> {
           '方向:她不能公开的那一面——没头没尾的想念/穿着他送的东西/一句只有他懂的话;可以露骨但要像她本人。',
         `人物:${配.妻名},${配.初始?.气质描述 ?? ''}。${妻状态包(m, data)}${await 人设段(m)}生成这条只给他看的动态。`,
       );
-      const 合法私密动态 = 验收短文本(文, 40);
+      const 合法私密动态 = await 微信短文本(文, 40, `${配.妻名}发布的仅你可见朋友圈`);
       if (合法私密动态) {
         库.圈.unshift({ 楼, 谁: 配.妻名, 文: 合法私密动态, 评: [], 私: { 图序 } });
+        库.节拍[键] = 钟;
         有新 = true;
         if (首条) eventEmit('人妻公寓:提示', `📱 ${配.妻名}发了一条「仅你可见」的动态`);
       }
@@ -995,16 +1080,18 @@ export async function 手机节拍(): Promise<void> {
       }
     }
 
-    // 节拍水位变化即使无新内容也要落(小生成失败但水位已记:不落=下一拍重掷重复计费)
+    // 只有内容成功入库才推进常规节拍；一次长预设/压缩失败不会让该入口沉默整个冷却期。
     const 节拍改: Record<string, number> = {};
     for (const [k, v] of Object.entries(库.节拍)) {
       if (原节拍[k] !== v) 节拍改[k] = v;
     }
-    if (有新 || Object.keys(节拍改).length) {
+    const 已发私聊图改 = JSON.stringify(库.已发私聊图) === 原已发私聊图 ? undefined : 库.已发私聊图;
+    if (有新 || Object.keys(节拍改).length || 已发私聊图改) {
       await 写库增量({
         新圈: 库.圈.slice(0, 库.圈.length - 原圈数),
         新消息: 库.消息.slice(原消息数),
         节拍改,
+        已发私聊图改,
       });
       刷新红点();
       渲染();
@@ -1021,8 +1108,23 @@ export async function 手机节拍(): Promise<void> {
 // ============================================
 
 const ROOT_ID = 'rq-phone-root';
-// ⚠ 与 App.vue 素材基址同步：Discord 测试版发布 tag=rq0.55。
-const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.55/dist/人妻公寓/素材';
+// ⚠ 与 App.vue 素材基址同步：Discord 测试版发布 tag=rq0.56。
+const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.56/dist/人妻公寓/素材';
+const 成人素材基址 = 'https://testingcf.jsdelivr.net/gh/shujun8520-design/qgy-assets@cg2/cg1';
+
+function 私聊图片地址(图: string): string {
+  if (图.startsWith('@adult/')) {
+    return `${成人素材基址}/${图
+      .slice('@adult/'.length)
+      .split('/')
+      .map(段 => encodeURIComponent(段))
+      .join('/')}`;
+  }
+  return `${素材基址}/微信圈/${图
+    .split('/')
+    .map(段 => encodeURIComponent(段))
+    .join('/')}.webp`;
+}
 
 let 当前页: {
   名: 'chats' | 'chat' | 'moments' | 'call' | 'talk' | 'settings';
@@ -1713,10 +1815,7 @@ function 渲染(): void {
             `rqp-line ${我方 ? 'me' : 'ta'}`,
             `${头像块(消息头像)}<div class="rqp-b ${我方 ? 'me' : 'ta'}">${_.escape(m.文)}${
               m.图
-                ? `<img class="rqp-chat-photo" src="${素材基址}/微信圈/${m.图
-                    .split('/')
-                    .map(段 => encodeURIComponent(段))
-                    .join('/')}.webp" loading="lazy" onerror="this.remove()"/>`
+                ? `<img class="rqp-chat-photo" src="${私聊图片地址(m.图)}" loading="lazy" onerror="this.remove()"/>`
                 : ''
             }</div>`,
           ),
@@ -2129,7 +2228,7 @@ async function 约出来(m: 门牌): Promise<void> {
       await 写库(库2);
     }
     const 尾 = 最近正文();
-    const 回 = 验收短文本(
+    const 回 = await 微信短文本(
       await 小生成(
         '你在扮演一款都市题材游戏中的已婚女性,刚收到公寓管理员发来的微信邀约。结果已由系统裁定,你只负责照结果写她的回复(口语,不超过40字,可含emoji,不要引号,不要旁白,不要任何标签)。' +
           口吻纪律,
@@ -2140,6 +2239,7 @@ async function 约出来(m: 门牌): Promise<void> {
         }。生成她的回复。`,
       ),
       40,
+      `${配.妻名}对管理员邀约的私聊回复`,
     );
     {
       const 库3 = 读库();
@@ -2201,13 +2301,9 @@ async function 姐妹群一拍(data: SchemaType, 库: 微信库, 楼: number, �
       (近况 ? `\n最近群聊(接着这个气口往下聊,有恩怨接恩怨):\n${近况}` : '') +
       (起因 ? `\n刚刚:${起因}——太太们对此各自反应。` : '\n生成新的一轮群聊。'),
   );
-  if (!原) return false;
   const 妻名集 = new Set(成员.map(m => 户静态表[m].妻名));
   let 有 = false;
-  for (const 行 of 原.split('\n').slice(0, 4)) {
-    const m = 行.trim().match(/^([^::]{1,8})[::]\s*(.+)$/);
-    const 合法消息 = m && 妻名集.has(m[1]) ? 验收单条群消息(行, 妻名集, 30) : null;
-    if (!合法消息) continue;
+  for (const 合法消息 of await 微信群文本(原, 妻名集, 30, 4, '姐妹茶话会群聊')) {
     库.消息.push({ 楼, 会话: '姐妹群', 发: '对方', 文: 合法消息 });
     有 = true;
   }
@@ -2235,13 +2331,9 @@ async function 楼务群一拍(data: SchemaType, 库: 微信库, 楼: number, �
       '输出1~3行，每行严格为“发言人:内容”，每条不超过35字，不要旁白、引号或解释；发言人只能从给定名单选择。',
     `当前可发言住户:${名单}\n管理员:${玩家名()}\n最近楼务群记录:\n${近况 || '暂无'}\n刚刚:${起因}\n请让最相关的一至三人自然接话。`,
   );
-  if (!原) return false;
   const 合法名 = new Set(成员.map(m => 户静态表[m].妻名));
   let 有 = false;
-  for (const 行 of 原.split('\n').slice(0, 3)) {
-    const m = 行.trim().match(/^([^::]{1,8})[::]\s*(.+)$/);
-    const 合法消息 = m && 合法名.has(m[1]) ? 验收单条群消息(行, 合法名, 35) : null;
-    if (!合法消息) continue;
+  for (const 合法消息 of await 微信群文本(原, 合法名, 35, 3, '公寓楼务群回复')) {
     库.消息.push({ 楼, 会话: '群', 发: '对方', 文: 合法消息 });
     有 = true;
   }
@@ -2324,7 +2416,7 @@ async function 发消息(会话: string, 文: string): Promise<void> {
         节点.妻.裂缝.已确认,
       )}她此刻大致在:${妻位置推算(会话 as 门牌, 楼 + data.系统._时段偏移楼)}。${称呼纪律()}${尾 ? `\n刚刚现实里发生的事(正文节选,她的微信口吻要接得上这口气):${尾}` : ''}\n最近聊天:\n${近况}\n生成她的回复。`,
     );
-    const 合法回复 = 验收短文本(回, 50);
+    const 合法回复 = await 微信短文本(回, 50, `${配.妻名}回复管理员的微信私聊`);
     if (合法回复) {
       const 库2 = 读库();
       库2.消息.push({ 楼: 末楼(), 会话, 发: '对方', 文: 合法回复 });
@@ -2389,13 +2481,14 @@ async function 父亲台词(玩家说: string): Promise<string> {
         : '不满:语气沉,逐条问账,话里带刺("这楼交给你是让你练手,不是让你练胆")';
   const 记录 = 通话记录.map(t => `${t.谁 === '我' ? '儿子' : '父亲'}:${t.文}`).join('\n');
   return (
-    验收短文本(
+    (await 微信短文本(
       await 小生成(
         '你在扮演一位常年在海外做生意的中国父亲,正和管理公寓的儿子微信语音通话。只输出父亲的下一句话(口语,不超过60字,不要引号,不要旁白)。他务实、寡言、看重账目,爱藏在训话里。每通电话应有不同的具体事务，严禁机械地总问“你妈怎么样”。只有本通主题涉及家里或儿子主动提到母亲时，才自然谈母亲。',
         `儿子名叫"${玩家名()}"(直呼其名或"你",不要用别的称呼)。本期情况:${上?.报表 || '账目平平'}。谈话基调=${段}。本通主题=${本通父亲主题 || '楼务近况'}。第一次开口先谈本通主题；之后紧接儿子的回答，不要突然换题。\n通话记录:\n${记录 || '(刚接通)'}\n儿子刚说:${玩家说}\n父亲接话。`,
       ),
       60,
-    ) ?? ''
+      '父亲在微信语音通话中的一句话',
+    )) ?? ''
   );
 }
 
