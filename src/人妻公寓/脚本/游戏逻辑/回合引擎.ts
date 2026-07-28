@@ -653,6 +653,8 @@ function 回合结算(
 export async function 执行回合(行动: string): Promise<void> {
   if (进行中) return;
   进行中 = true;
+  let 临时用户楼层: number | null = null;
+  let 临时用户已转正 = false;
   try {
     eventEmit('人妻公寓:生成开始');
 
@@ -668,6 +670,9 @@ export async function 执行回合(行动: string): Promise<void> {
       return;
     }
     const data = Schema.parse(rawStat) as SchemaType;
+    // 生成前保存旧楼 MVU 数据。稍后会先落一层临时 user，让依赖 {{lastUserMessage}}
+    // 的玩家预设读到本轮行动；变量解析仍必须以本回合开始前的 assistant 楼为基准。
+    const 旧 = Mvu.getMvuData({ type: 'message', message_id: -1 });
     捕获保护快照(data); // 回滚基准(含镜像取大并入)
     // 生成前刷新整表视图:两轮之间的 UI 写入(买衣/晋阶/送礼)必须先进视图再进 prompt
     await 同步整表视图(data);
@@ -703,17 +708,13 @@ export async function 执行回合(行动: string): Promise<void> {
         should_scan: false,
       });
     }
-    // generate.user_input 会受玩家当前预设的提示词顺序控制；有些预设没有放置内置
-    // user_input，失败后重试时模型看到的最后一条 user 就会退回上一轮。再注入一条
-    // depth=0 的真实 user 消息作为兜底，并保持在所有系统约束之后。正常预设即使同时
-    // 带有 user_input，也只是重复确认同一行动，不会把旧行动重新变成本轮请求。
-    injects.push({
-      role: 'user',
-      content: 行动,
-      position: 'in_chat',
-      depth: 0,
-      should_scan: false,
-    });
+    // generate.user_input 和注入消息都无法覆盖预设里的 {{lastUserMessage}} 宏；必须让当前
+    // 行动先成为真实聊天尾楼。成功时该楼直接转正并只补 assistant，失败/取消由 finally 删除。
+    await createChatMessages([{ role: 'user', message: 行动 }], { refresh: 'none' });
+    临时用户楼层 = getLastMessageId();
+    if (临时用户楼层 !== 回合前末楼 + 1) {
+      throw new Error(`临时行动楼层错位：预期 ${回合前末楼 + 1}，实际 ${临时用户楼层}`);
+    }
 
     已取消 = false;
     本回合生成id = `rqgy-${回合前末楼}-${_.random(1e9)}`;
@@ -757,7 +758,6 @@ export async function 执行回合(行动: string): Promise<void> {
       return;
     }
 
-    const 旧 = Mvu.getMvuData({ type: 'message', message_id: -1 });
     const 焦点妻门牌 = 焦点.find(m => 妻在场.includes(m));
     const 焦点阶段 = 焦点妻门牌 ? (data.户[焦点妻门牌]?.妻.当前阶段 ?? null) : null;
 
@@ -780,13 +780,8 @@ export async function 执行回合(行动: string): Promise<void> {
       const 新 = _.cloneDeep(旧);
       _.set(新, 'stat_data', newStat);
       const 中断正文 = 补离场正文(中断卡文案(户静态表[焦点妻门牌].妻名), 反感离场);
-      await createChatMessages(
-        [
-          { role: 'user', message: 行动 },
-          { role: 'assistant', message: 中断正文, data: 新 },
-        ],
-        { refresh: 'none' },
-      );
+      await createChatMessages([{ role: 'assistant', message: 中断正文, data: 新 }], { refresh: 'none' });
+      临时用户已转正 = true;
       捕获保护快照(newStat);
       void 同步整表视图(newStat);
       insertOrAssignVariables(
@@ -814,13 +809,8 @@ export async function 执行回合(行动: string): Promise<void> {
     _.set(新, 'stat_data', newStat);
 
     const 正文 = 补离场正文(清洗正文(原文) || '(楼道里安静了一瞬……本轮 AI 未返回正文,可换个说法再试)', 反感离场);
-    await createChatMessages(
-      [
-        { role: 'user', message: 行动 },
-        { role: 'assistant', message: 正文, data: 新 },
-      ],
-      { refresh: 'none' },
-    );
+    await createChatMessages([{ role: 'assistant', message: 正文, data: 新 }], { refresh: 'none' });
+    临时用户已转正 = true;
     捕获保护快照(newStat);
     void 同步整表视图(newStat);
 
@@ -867,6 +857,13 @@ export async function 执行回合(行动: string): Promise<void> {
       eventEmit('人妻公寓:回合失败', e instanceof Error ? e.message : String(e));
     }
   } finally {
+    if (临时用户楼层 !== null && !临时用户已转正) {
+      try {
+        await deleteChatMessages([临时用户楼层], { refresh: 'none' });
+      } catch (e) {
+        console.error('[人妻公寓] 清理未完成的临时玩家楼层失败:', e);
+      }
+    }
     进行中 = false;
     本回合生成id = ''; // 防回档等无生成的回合被"取消"误伤
   }
