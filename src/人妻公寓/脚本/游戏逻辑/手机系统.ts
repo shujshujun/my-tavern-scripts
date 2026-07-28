@@ -932,8 +932,8 @@ export async function 手机节拍(): Promise<void> {
 // ============================================
 
 const ROOT_ID = 'rq-phone-root';
-// ⚠ 与 App.vue 素材基址同步：Discord 测试版发布 tag=rq0.46。
-const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.46/dist/人妻公寓/素材';
+// ⚠ 与 App.vue 素材基址同步：Discord 测试版发布 tag=rq0.51。
+const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.51/dist/人妻公寓/素材';
 
 let 当前页: {
   名: 'chats' | 'chat' | 'moments' | 'call' | 'talk' | 'settings';
@@ -942,6 +942,7 @@ let 当前页: {
   会话?: string;
   展开?: number; // moments:考古已加载条数(混排流)
   题?: string; // moments:展开中的"哪里不对劲?"(`门牌:序`)
+  滚动?: number; // moments:题目展开/作答触发整页重绘时恢复当前位置
 } = { 名: 'chats' };
 let 通话记录: { 谁: string; 文: string }[] = [];
 let 通话上下文: { 分数段: string; 报表: string; 通牒: boolean } | null = null;
@@ -1750,6 +1751,11 @@ function 渲染(): void {
       const 妻名 = 户静态表[m].妻名;
       const 键 = `${m}:${序}`;
       const 开题 = 当前页.题 === 键;
+      // 历史动态可以在该户正式入住前作为长期伏笔出现，但裂缝调查必须等角色入列。
+      // rq0.50 曾只判断“条目是否关键”，导致开局即可点开 301 的“哪里不对劲？”
+      // （后台虽会拒绝发碎片，UI 仍然提前泄题）。母亲还需服从系统级入列门。
+      const 可调查关键 =
+        Boolean(条.关键 && data?.户[m]) && (m !== '302' || Boolean(data?.系统._母亲入列));
       const 图块 = 条.图
         ? `<span class="rqw-photo history"><img class="rqw-img" src="${素材基址}/微信圈/${条.图}.webp" loading="lazy" onerror="this.parentElement.remove()"/></span>`
         : '';
@@ -1760,11 +1766,11 @@ function 渲染(): void {
           `<div class="rqw-text">${_.escape(条.文).replace(/#([^#\s]{1,12})#/g, '<span class="tp">#$1#</span>')}</div>${图块}` +
           `<div class="rqw-foot"><span class="rqw-time">${_.escape(条.时间)}</span><span class="rqw-dots">••</span></div></div>`,
       );
-      if (条.关键) {
+      if (可调查关键 && 条.关键) {
         卡.style.cursor = 'pointer';
         卡.addEventListener('click', ev => {
           if ((ev.target as HTMLElement).closest('.rqw-quiz')) return;
-          当前页 = { ...当前页, 题: 开题 ? undefined : 键 };
+          当前页 = { ...当前页, 题: 开题 ? undefined : 键, 滚动: 体.scrollTop };
           渲染();
         });
         if (开题) {
@@ -1772,7 +1778,7 @@ function 渲染(): void {
           条.关键.选项.forEach((文, i) => {
             const b = el('button', '', _.escape(文));
             b.addEventListener('click', () => {
-              当前页 = { ...当前页, 题: undefined };
+              当前页 = { ...当前页, 题: undefined, 滚动: 体.scrollTop };
               eventEmit('人妻公寓:考古选细节', { 门牌: m, 序, 选项: i });
               渲染();
             });
@@ -1787,6 +1793,7 @@ function 渲染(): void {
     更.addEventListener('click', () => eventEmit('人妻公寓:考古到底'));
     体.appendChild(更);
     屏.appendChild(体);
+    体.scrollTop = Math.max(0, 当前页.滚动 ?? 0);
     底栏('moments');
     return;
   }
