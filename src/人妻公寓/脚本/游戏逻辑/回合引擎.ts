@@ -709,8 +709,10 @@ export async function 执行回合(行动: string): Promise<void> {
       });
     }
     // generate.user_input 和注入消息都无法覆盖预设里的 {{lastUserMessage}} 宏；必须让当前
-    // 行动先成为真实聊天尾楼。成功时该楼直接转正并只补 assistant，失败/取消由 finally 删除。
-    await createChatMessages([{ role: 'user', message: 行动 }], { refresh: 'none' });
+    // 行动先成为真实聊天尾楼。临时楼必须继承旧楼 MVU 快照：客户端 store 固定读取 -1，
+    // 若这里只有文字没有 stat_data，会在生成途中把有效存档误判成初始值并跳回序章。
+    // 成功时该楼直接转正并只补 assistant，失败/取消由 finally 删除。
+    await createChatMessages([{ role: 'user', message: 行动, data: _.cloneDeep(旧) }], { refresh: 'none' });
     临时用户楼层 = getLastMessageId();
     if (临时用户楼层 !== 回合前末楼 + 1) {
       throw new Error(`临时行动楼层错位：预期 ${回合前末楼 + 1}，实际 ${临时用户楼层}`);

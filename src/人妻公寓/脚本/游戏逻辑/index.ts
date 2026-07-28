@@ -227,10 +227,33 @@ $(() => {
 
       // 首批入住引导(读到真值才动手)
       try {
-        const 有效 = 读取最近有效();
+        let 有效 = 读取最近有效();
+        let 检测到临时尾楼回归 = false;
+        // 已受 rq0.54 影响的存档，临时 user 尾楼可能已经被 MVU 填成一份“非空的默认
+        // stat_data”，普通的最近有效回退会误把它当真值。仅在尾楼是 user、当前显示
+        // 未完成序章、而前 10 楼确有已完成序章的存档时，认定为这次回归并恢复旧真值。
+        const 末楼 = 当前楼层();
+        const 末消息 = SillyTavern.chat?.[末楼];
+        const 当前raw = Mvu.getMvuData({ type: 'message', message_id: -1 }) as object;
+        if (末消息?.is_user && !_.get(当前raw, 'stat_data.系统._序章完成')) {
+          for (let id = 末楼 - 1; id >= 0 && id > 末楼 - 10; id--) {
+            const 前raw = Mvu.getMvuData({ type: 'message', message_id: id }) as object;
+            const 前stat = _.get(前raw, 'stat_data');
+            if (前stat && !_.isEmpty(前stat) && _.get(前stat, '系统._序章完成')) {
+              有效 = { raw: 当前raw, data: Schema.parse(前stat) as SchemaType };
+              检测到临时尾楼回归 = true;
+              console.warn(`[人妻公寓] 检测到 rq0.54 临时尾楼存档回归，已准备从 ${id} 楼恢复`);
+              break;
+            }
+          }
+        }
         if (有效) {
           const { raw, data } = 有效;
-          if (确保首批入住(data)) await 脚本写入(raw, data);
+          // rq0.54 曾创建过不带 stat_data 的临时玩家尾楼；若玩家在生成完成前刷新，
+          // 该尾楼会留在存档并让固定读取 -1 的客户端误回序章。启动时用最近有效楼
+          // 修复当前尾楼，同时也覆盖 MVU 尚未自动继承变量的普通玩家楼竞态。
+          const 尾楼缺存档 = !_.get(raw, 'stat_data') || _.isEmpty(_.get(raw, 'stat_data'));
+          if (确保首批入住(data) || 尾楼缺存档 || 检测到临时尾楼回归) await 脚本写入(raw, data);
           await 同步入住世界书条目(data);
           await 同步整表视图(data); // 旧档升级/开新聊天:视图就位后整表条目才有内容
         }
