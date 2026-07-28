@@ -2146,8 +2146,8 @@ const 底层公共 = [
 
 // ── 素材(AI 生成,2026-07-17 入库;素材 TAG 与发布 TAG 解耦——素材没变就不用动这里) ──
 
-// ⚠ 与手机系统同步：Discord 测试版发布 tag=rq0.51。
-const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.51/dist/人妻公寓/素材';
+// ⚠ 与手机系统同步：Discord 测试版发布 tag=rq0.52。
+const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.52/dist/人妻公寓/素材';
 const 成人CG基址 = 'https://testingcf.jsdelivr.net/gh/shujun8520-design/qgy-assets@cg1/cg1';
 const CG解锁存储键 = '人妻公寓_成人CG解锁_cg1';
 const 当前成人CG = ref<成人CG项 | null>(null);
@@ -3158,7 +3158,22 @@ function 清洗(原文: string, 流式 = false): string {
     .replace(/【开始思考】[\s\S]*?<\/think_fox~\s*>/gi, '')
     .replace(/<fox_selc\b[^>]*>[\s\S]*?<\/fox_selc\s*>/gi, '')
     .replace(/<fox_tip\b[^>]*>[\s\S]*?<\/fox_tip\s*>/gi, '')
-    .replace(/<\/?(?:content|story_scene|think_fox~|fox_selc|fox_tip)(?:\s[^>]*)?>/gi, '')
+    // Izumi 预设：konatan_planning~ 是思考规划，tucao 是正文后的吐槽/总结；两块均不显示。
+    .replace(/<konatan_planning~[^>]*>[\s\S]*?<\/konatan_planning~\s*>/gi, '')
+    .replace(/<tucao\b[^>]*>[\s\S]*?<\/tucao\s*>/gi, '')
+    // TG：SexualScene 内是应显示的特写剧情；w2g/校验/免责声明不属于正文。
+    .replace(/<\/?SexualScene\b[^>]*>/gi, '')
+    .replace(/<(VariableCheck|Disclaimer|w2g)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
+    // 双人成行的摘要、选项、平行世界与前端组件只供该预设渲染，不混入游戏卷轴。
+    .replace(
+      /<(meow_FM|branches|parallel_world|historic_events|htm1fenge)\b[^>]*>[\s\S]*?<\/\1\s*>/gi,
+      '',
+    )
+    .replace(/<(?:VariableCheck|Disclaimer|w2g|meow_FM|branches|parallel_world|historic_events|htm1fenge)\b[^>]*>[\s\S]*$/i, '')
+    .replace(
+      /<\/?(?:content|story_scene|now_plot|think_fox~|fox_selc|fox_tip|konatan_planning~|tucao|SexualScene|VariableCheck|Disclaimer|w2g|meow_FM|branches|parallel_world|historic_events|htm1fenge)(?:\s[^>]*)?>/gi,
+      '',
+    )
     // 兼容漏写 </draft_notes> 的玩家预设：只在后续完整 bginfor 提供可靠边界时整块删除。
     // 没有可靠边界时只剥标签，避免重演“清洗吞尾导致整段正文消失”。
     .replace(/<draft_notes\b[^>]*>[\s\S]*?<bginfor\b[^>]*>[\s\S]*?<\/bginfor\s*>/gi, '')
@@ -3195,6 +3210,7 @@ function 清洗(原文: string, 流式 = false): string {
     .replace(/<UpdateVariable>[\s\S]*$/, '')
     .replace(/<options>[\s\S]*$/, '')
     .replace(/<行为等级>[\s\S]*$/, '')
+    .replace(/<tucao\b[^>]*>[\s\S]*$/i, '')
     .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*$/i, '')
     .replace(/<!DOCTYPE[\s\S]*$/i, '')
     .replace(/<style[^>]*>[\s\S]*$/i, '')
@@ -3205,7 +3221,10 @@ function 清洗(原文: string, 流式 = false): string {
   if (!流式 && !全清 && 闭合清.trim()) {
     console.warn('[人妻公寓客户端] 显示层吞尾把楼层吞成了空白,回退只清闭合块');
     return 闭合清
-      .replace(/<\/?(?:think(?:ing)?|reason(?:ing)?|UpdateVariable|options|行为等级|details[^>]*)>/gi, '')
+      .replace(
+        /<\/?(?:think(?:ing)?|reason(?:ing)?|UpdateVariable|options|行为等级|details[^>]*|konatan_planning~|tucao|now_plot|SexualScene|VariableCheck|Disclaimer|w2g|meow_FM|branches|parallel_world|historic_events|htm1fenge)>/gi,
+        '',
+      )
       .trim();
   }
   return 全清;

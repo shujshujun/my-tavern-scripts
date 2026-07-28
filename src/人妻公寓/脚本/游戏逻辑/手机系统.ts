@@ -277,6 +277,13 @@ function 净化消息(原: string): string {
     .replace(/【开始思考】[\s\S]*?<\/think_fox~\s*>/gi, '')
     .replace(/<fox_selc\b[^>]*>[\s\S]*?<\/fox_selc\s*>/gi, '')
     .replace(/<fox_tip\b[^>]*>[\s\S]*?<\/fox_tip\s*>/gi, '')
+    .replace(/<konatan_planning~[^>]*>[\s\S]*?<\/konatan_planning~\s*>/gi, '')
+    .replace(/<tucao\b[^>]*>[\s\S]*?<\/tucao\s*>/gi, '')
+    .replace(/<\/?SexualScene\b[^>]*>/gi, '')
+    .replace(
+      /<(VariableCheck|Disclaimer|w2g|meow_FM|branches|parallel_world|historic_events|htm1fenge)\b[^>]*>[\s\S]*?<\/\1\s*>/gi,
+      '',
+    )
     .replace(/<draft_notes\b[^>]*>[\s\S]*?<bginfor\b[^>]*>[\s\S]*?<\/bginfor\s*>/gi, '')
     .replace(/<draft_notes\b[^>]*>[\s\S]*?<\/draft_notes\s*>/gi, '')
     .replace(/<bginfor\b[^>]*>[\s\S]*?<\/bginfor\s*>/gi, '')
@@ -295,6 +302,8 @@ function 净化消息(原: string): string {
     .replace(/<行为等级>[\s\S]*$/i, '')
     .replace(/<options>[\s\S]*$/i, '')
     .replace(/<变量更新>[\s\S]*$/i, '')
+    .replace(/<tucao\b[^>]*>[\s\S]*$/i, '')
+    .replace(/<(?:VariableCheck|Disclaimer|w2g|meow_FM|branches|parallel_world|historic_events|htm1fenge)\b[^>]*>[\s\S]*$/i, '')
     .replace(/<\/?[a-zA-Z一-龥][^>]*>/g, '')
     // 破限词条常令"每条消息以[地点,日期,时间]开头"(RONG等叙事预设指令渗透):微信气泡剥掉行首方括号头
     .replace(/^\[[^\]\n]{2,60}\]\s*/, '')
@@ -932,8 +941,8 @@ export async function 手机节拍(): Promise<void> {
 // ============================================
 
 const ROOT_ID = 'rq-phone-root';
-// ⚠ 与 App.vue 素材基址同步：Discord 测试版发布 tag=rq0.51。
-const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.51/dist/人妻公寓/素材';
+// ⚠ 与 App.vue 素材基址同步：Discord 测试版发布 tag=rq0.52。
+const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.52/dist/人妻公寓/素材';
 
 let 当前页: {
   名: 'chats' | 'chat' | 'moments' | 'call' | 'talk' | 'settings';

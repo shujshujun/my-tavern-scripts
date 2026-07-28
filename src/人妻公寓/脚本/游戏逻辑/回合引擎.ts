@@ -500,7 +500,24 @@ function 清洗正文(原文: string): string {
     .replace(/【开始思考】[\s\S]*?<\/think_fox~\s*>/gi, '')
     .replace(/<fox_selc\b[^>]*>[\s\S]*?<\/fox_selc\s*>/gi, '')
     .replace(/<fox_tip\b[^>]*>[\s\S]*?<\/fox_tip\s*>/gi, '')
-    .replace(/<\/?(?:content|story_scene|think_fox~|fox_selc|fox_tip)(?:\s[^>]*)?>/gi, '')
+    // Izumi 预设：konatan_planning~ 是思考规划，tucao 是正文后的吐槽/总结；两块均非正文。
+    .replace(/<konatan_planning~[^>]*>[\s\S]*?<\/konatan_planning~\s*>/gi, '')
+    .replace(/<tucao\b[^>]*>[\s\S]*?<\/tucao\s*>/gi, '')
+    // TG：SexualScene 是剧情特写容器，保留内部正文；校验/免责声明/行动选项不是剧情。
+    .replace(/<\/?SexualScene\b[^>]*>/gi, '')
+    .replace(/<(VariableCheck|Disclaimer|w2g)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
+    // 双人成行：这些都是 content 正文之后的摘要、选项或独立展示模块。
+    // content 缺失时也要按块清除，防止预设协议被落库并在下一轮继续污染上下文。
+    .replace(
+      /<(meow_FM|branches|parallel_world|historic_events|htm1fenge)\b[^>]*>[\s\S]*?<\/\1\s*>/gi,
+      '',
+    )
+    // 流式截断或模型漏闭合时，以上附加模块一旦开始，后面都不再属于正文。
+    .replace(/<(?:VariableCheck|Disclaimer|w2g|meow_FM|branches|parallel_world|historic_events|htm1fenge)\b[^>]*>[\s\S]*$/i, '')
+    .replace(
+      /<\/?(?:content|story_scene|now_plot|think_fox~|fox_selc|fox_tip|konatan_planning~|tucao|SexualScene|VariableCheck|Disclaimer|w2g|meow_FM|branches|parallel_world|historic_events|htm1fenge)(?:\s[^>]*)?>/gi,
+      '',
+    )
     // 玩家预设的前置草稿偶尔漏 </draft_notes>，但后续 bginfor 仍完整。用完整的信息栏
     // 作为安全右边界清掉两块元数据；若右边界也缺失，末尾仅剥标签，绝不吞掉剧情。
     .replace(/<draft_notes\b[^>]*>[\s\S]*?<bginfor\b[^>]*>[\s\S]*?<\/bginfor\s*>/gi, '')
@@ -535,6 +552,7 @@ function 清洗正文(原文: string): string {
     .replace(/<UpdateVariable>[\s\S]*$/, '')
     .replace(/<options>[\s\S]*$/, '')
     .replace(/<行为等级>[\s\S]*$/, '')
+    .replace(/<tucao\b[^>]*>[\s\S]*$/i, '')
     .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*$/i, '')
     .replace(/<!DOCTYPE[\s\S]*$/i, '')
     .replace(/<style[^>]*>[\s\S]*$/i, '')
