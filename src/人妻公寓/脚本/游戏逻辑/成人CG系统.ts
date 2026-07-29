@@ -42,15 +42,22 @@ function 哈希(text: string): number {
   return value >>> 0;
 }
 
-/** 行为等级只作为上限证据，必须同时有正文动作证据；普通招呼不会因等级误报而出CG。 */
-export function 判定CG阶段(信号: CG回合信号): CG阶段 | null {
-  if (!信号.门牌 || (信号.角色阶段 ?? 0) < 3) return null;
-  const 文本 = `${信号.行动}\n${信号.正文}\n${信号.事件}`;
-  const 等级 = 信号.行为等级 ?? 0;
+function 判定文本阶段(文本: string, 等级: number): CG阶段 | null {
   if (等级 >= 3 && 高潮事后词.test(文本)) return 'climax_after';
   if (等级 >= 3 && 进行中词.test(文本)) return 'active';
   if (等级 >= 2 && 前戏动作词.test(文本)) return 'foreplay';
   return null;
+}
+
+/**
+ * 行为等级只作为上限证据，必须同时有实际动作证据；普通招呼不会因等级误报而出CG。
+ * 玩家行动优先于 AI 正文，避免长回复末尾的高潮描写吞掉本轮明确发起的前戏或过程。
+ * 事件说明可能包含未来的整场弧线，不作为“本轮已经发生”的 CG 证据。
+ */
+export function 判定CG阶段(信号: CG回合信号): CG阶段 | null {
+  if (!信号.门牌 || (信号.角色阶段 ?? 0) < 3) return null;
+  const 等级 = 信号.行为等级 ?? 0;
+  return 判定文本阶段(信号.行动, 等级) ?? 判定文本阶段(信号.正文, 等级);
 }
 
 export function 判定CG部位(文本: string): CG部位 | null {
@@ -72,7 +79,7 @@ export function 角色CG列表(门牌号: 门牌): readonly 成人CG项[] {
 export function 选择成人CG(信号: CG回合信号, 已播放: ReadonlySet<string>): 成人CG项 | null {
   const phase = 判定CG阶段(信号);
   if (!phase || !信号.门牌) return null;
-  const 文本 = `${信号.行动}\n${信号.正文}\n${信号.事件}`;
+  const 文本 = `${信号.行动}\n${信号.正文}`;
   const 部位 = 判定CG部位(文本);
   let 池 = 清单.filter(item => item.door === 信号.门牌 && item.phase === phase);
   if (部位) {

@@ -1,4 +1,5 @@
 import 数据库模板文本 from '../../人妻公寓数据库模板.json?raw';
+import { 提取数据库脚本版本 } from './数据库版本';
 
 type 数据库消息 = { role: 'system' | 'user' | 'assistant'; content: string };
 
@@ -126,7 +127,16 @@ export function 取数据库API(): 数据库API | null {
   return null;
 }
 
-export function 数据库状态(): { 已安装: boolean; 可调用AI: boolean; 已装游戏模板: boolean } {
+function 读取数据库脚本版本(): string {
+  try {
+    if (typeof getScriptTrees !== 'function') return '';
+    return 提取数据库脚本版本(getScriptTrees({ type: 'global' }));
+  } catch {
+    return '';
+  }
+}
+
+export function 数据库状态(): { 已安装: boolean; 可调用AI: boolean; 已装游戏模板: boolean; 版本: string } {
   const api = 取数据库API();
   let 已装游戏模板 = false;
   try {
@@ -140,7 +150,7 @@ export function 数据库状态(): { 已安装: boolean; 可调用AI: boolean; �
   } catch {
     /* 旧版没有模板查询接口时只显示未知/未装，不影响其他能力。 */
   }
-  return { 已安装: !!api, 可调用AI: typeof api?.callAI === 'function', 已装游戏模板 };
+  return { 已安装: !!api, 可调用AI: typeof api?.callAI === 'function', 已装游戏模板, 版本: 读取数据库脚本版本() };
 }
 
 export async function 清理数据库陈旧互斥旗(): Promise<void> {

@@ -188,7 +188,7 @@
             >
             <span :class="{ on: 数据库检测.已安装 }"
               ><i>{{ 数据库检测.已安装 ? '✓' : '·' }}</i
-              >数据库插件</span
+              >数据库插件 {{ 数据库检测.已安装 ? (数据库检测.版本 ? `v${数据库检测.版本}` : '版本未知') : '' }}</span
             >
             <span :class="{ on: 智脑检测.已安装 }"
               ><i>{{ 智脑检测.已安装 ? '✓' : '·' }}</i
@@ -241,8 +241,14 @@
                 </div>
                 <small v-if="智脑检测.已安装">✗ 智脑仍在运行，请先禁用并刷新。</small>
                 <small v-else-if="!数据库检测.已安装">· 尚未检测到数据库插件。</small>
-                <small v-else-if="!数据库检测.已装游戏模板">· 数据库已启用，还需安装四张 RQ_ 表。</small>
-                <small v-else class="good">✓ 数据库已启用，智脑已关闭，四张 RQ_ 表已就绪。</small>
+                <small v-else-if="!数据库检测.已装游戏模板"
+                  >· 数据库 {{ 数据库检测.版本 ? `v${数据库检测.版本}` : '版本未知' }} 已启用，还需安装四张 RQ_
+                  表。</small
+                >
+                <small v-else class="good"
+                  >✓ 数据库 {{ 数据库检测.版本 ? `v${数据库检测.版本}` : '版本未知' }}
+                  已启用，智脑已关闭，四张 RQ_ 表已就绪。</small
+                >
               </template>
 
               <template v-else-if="记忆方案 === '智脑'">
@@ -1072,7 +1078,7 @@
               :key="页.值"
               class="btn mini"
               :class="{ on: CG图库阶段 === 页.值 }"
-              @click="CG图库阶段 = 页.值"
+              @click="切换CG图库阶段(页.值)"
             >
               {{ 页.名 }} {{ 页.已解锁 }}/{{ 页.总数 }}
             </button>
@@ -1090,6 +1096,11 @@
               <img v-if="已解锁CG.has(项.id)" :src="成人CG地址(项)" alt="" loading="lazy" draggable="false" />
               <span v-else class="cg-lock">🔒</span>
             </button>
+          </div>
+          <div v-if="CG图库总页数 > 1" class="cg-pagination">
+            <button class="btn mini" :disabled="CG图库页码 <= 1" @click="翻CG图库页(-1)">‹ 上一页</button>
+            <span>第 {{ CG图库页码 }} / {{ CG图库总页数 }} 页</span>
+            <button class="btn mini" :disabled="CG图库页码 >= CG图库总页数" @click="翻CG图库页(1)">下一页 ›</button>
           </div>
         </div>
       </div>
@@ -2653,6 +2664,8 @@ const 显示待办 = computed(() => !待办已划掉.value && 末楼号.value < 
 const 选中门牌 = ref<门牌 | null>(null);
 const CG图库门牌 = ref<门牌 | null>(null);
 const CG图库阶段 = ref<CG阶段>('foreplay');
+const CG图库页码 = ref(1);
+const CG图库每页 = 15;
 const CG预览 = ref<成人CG项 | null>(null);
 const CG阶段名: Record<CG阶段, string> = {
   foreplay: '前戏',
@@ -2662,7 +2675,12 @@ const CG阶段名: Record<CG阶段, string> = {
 
 const CG图库角色名 = computed(() => (CG图库门牌.value ? 户静态表[CG图库门牌.value].妻名 : ''));
 const CG图库全部项 = computed(() => (CG图库门牌.value ? 角色CG列表(CG图库门牌.value) : []));
-const CG图库当前项 = computed(() => CG图库全部项.value.filter(item => item.phase === CG图库阶段.value));
+const CG图库阶段全部项 = computed(() => CG图库全部项.value.filter(item => item.phase === CG图库阶段.value));
+const CG图库总页数 = computed(() => Math.max(1, Math.ceil(CG图库阶段全部项.value.length / CG图库每页)));
+const CG图库当前项 = computed(() => {
+  const 起点 = (CG图库页码.value - 1) * CG图库每页;
+  return CG图库阶段全部项.value.slice(起点, 起点 + CG图库每页);
+});
 const CG图库页签 = computed(() =>
   (Object.keys(CG阶段名) as CG阶段[]).map(值 => {
     const 项 = CG图库全部项.value.filter(item => item.phase === 值);
@@ -2678,12 +2696,23 @@ const CG图库页签 = computed(() =>
 function 打开CG图库(门牌号: 门牌): void {
   CG图库门牌.value = 门牌号;
   CG图库阶段.value = 'foreplay';
+  CG图库页码.value = 1;
   CG预览.value = null;
+}
+
+function 切换CG图库阶段(阶段: CG阶段): void {
+  CG图库阶段.value = 阶段;
+  CG图库页码.value = 1;
+}
+
+function 翻CG图库页(偏移: number): void {
+  CG图库页码.value = _.clamp(CG图库页码.value + 偏移, 1, CG图库总页数.value);
 }
 
 function 关闭CG图库(): void {
   CG预览.value = null;
   CG图库门牌.value = null;
+  CG图库页码.value = 1;
 }
 
 const 选中档案 = computed(() => {
@@ -6316,6 +6345,22 @@ onUnmounted(() => {
   align-content: start;
   gap: 10px;
   overflow-y: auto;
+}
+
+.cg-pagination {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 14px 14px;
+  color: var(--ink-soft);
+  font-size: 0.82em;
+  font-variant-numeric: tabular-nums;
+}
+
+.cg-pagination .btn:disabled {
+  opacity: 0.38;
 }
 
 .cg-tile {
