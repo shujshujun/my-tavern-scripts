@@ -508,12 +508,12 @@ function 清洗正文(原文: string): string {
     .replace(/<(VariableCheck|Disclaimer|w2g)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
     // 双人成行：这些都是 content 正文之后的摘要、选项或独立展示模块。
     // content 缺失时也要按块清除，防止预设协议被落库并在下一轮继续污染上下文。
-    .replace(/<(meow_FM|branches|parallel_world|historic_events|htm1fenge)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
-    // 流式截断或模型漏闭合时，以上附加模块一旦开始，后面都不再属于正文。
     .replace(
-      /<(?:VariableCheck|Disclaimer|w2g|meow_FM|branches|parallel_world|historic_events|htm1fenge)\b[^>]*>[\s\S]*$/i,
+      /<(meow_FM|branches|parallel_world|historic_events|htm1fenge)\b[^>]*>[\s\S]*?<\/\1\s*>/gi,
       '',
     )
+    // 流式截断或模型漏闭合时，以上附加模块一旦开始，后面都不再属于正文。
+    .replace(/<(?:VariableCheck|Disclaimer|w2g|meow_FM|branches|parallel_world|historic_events|htm1fenge)\b[^>]*>[\s\S]*$/i, '')
     .replace(
       /<\/?(?:content|story_scene|now_plot|think_fox~|fox_selc|fox_tip|konatan_planning~|tucao|SexualScene|VariableCheck|Disclaimer|w2g|meow_FM|branches|parallel_world|historic_events|htm1fenge)(?:\s[^>]*)?>/gi,
       '',
@@ -654,6 +654,7 @@ export async function 执行回合(行动: string): Promise<void> {
   if (进行中) return;
   进行中 = true;
   let 临时用户楼层: number | null = null;
+  let 临时助手楼层: number | null = null;
   let 临时用户已转正 = false;
   try {
     eventEmit('人妻公寓:生成开始');
@@ -801,17 +802,35 @@ export async function 执行回合(行动: string): Promise<void> {
       return;
     }
 
-    // ── 正常路径:手动解析变量 + 分工表回滚 + 结算 ──
-    const 新 = ((await Mvu.parseMessage(原文, 旧)) ?? 旧) as Record<string, unknown>;
+    // ── 正常路径:先落 AI 楼，再按 MVU“重新处理变量”的时序解析并明确写回该楼 ──
+    // 只保存清洗后的正文 + 规范变量块：客户端/卡内正则会隐藏变量块，但 MVU 面板以后
+    // 仍能从真实 AI 楼重新解析。思维链、摘要与外部预设格式不会因此重新进入聊天历史。
+    const 基础正文 = 清洗正文(原文) || '(楼道里安静了一瞬……本轮 AI 未返回正文,可换个说法再试)';
+    const 变量块 = 取变量块(原文);
+    const 可重处理楼层正文 = 变量块 ? `${基础正文}\n${变量块}` : 基础正文;
+    const 解析基准 = _.cloneDeep(Mvu.getMvuData({ type: 'message', message_id: -1 }) ?? 旧) as Record<string, unknown>;
+    await createChatMessages(
+      [{ role: 'assistant', message: 可重处理楼层正文, data: _.cloneDeep(解析基准) }],
+      { refresh: 'none' },
+    );
+    临时助手楼层 = getLastMessageId();
+    if (临时助手楼层 !== 生成楼层) {
+      throw new Error(`AI楼层错位：预期 ${生成楼层}，实际 ${临时助手楼层}`);
+    }
+
+    const 新 = ((await Mvu.parseMessage(可重处理楼层正文, 解析基准)) ?? 解析基准) as Record<string, unknown>;
     const newStat = Schema.parse(_.get(新, 'stat_data') ?? {}) as SchemaType;
     回滚保护字段(newStat, 焦点, { 妻: 妻在场, 夫: 夫在场 }, 生成楼层); // 户级焦点内再按实际在场人物分闸
     if (焦点妻门牌) 记违规清零(newStat); // 有焦点妻且未违规:连续违规计数断链
     回合结算(newStat, data, 焦点, 妻在场, 生成楼层);
     const 反感离场 = await 结算连续反感(data, newStat, 妻在场, 生成楼层);
     _.set(新, 'stat_data', newStat);
-
-    const 正文 = 补离场正文(清洗正文(原文) || '(楼道里安静了一瞬……本轮 AI 未返回正文,可换个说法再试)', 反感离场);
-    await createChatMessages([{ role: 'assistant', message: 正文, data: 新 }], { refresh: 'none' });
+    const 正文 = 补离场正文(基础正文, 反感离场);
+    if (正文 !== 基础正文) {
+      const 最终楼层正文 = 变量块 ? `${正文}\n${变量块}` : 正文;
+      await setChatMessages([{ message_id: 临时助手楼层, message: 最终楼层正文 }], { refresh: 'none' });
+    }
+    await Promise.resolve(Mvu.replaceMvuData(新 as Mvu.MvuData, { type: 'message', message_id: 临时助手楼层 }));
     临时用户已转正 = true;
     捕获保护快照(newStat);
     void 同步整表视图(newStat);
@@ -859,11 +878,14 @@ export async function 执行回合(行动: string): Promise<void> {
       eventEmit('人妻公寓:回合失败', e instanceof Error ? e.message : String(e));
     }
   } finally {
-    if (临时用户楼层 !== null && !临时用户已转正) {
+    if (!临时用户已转正) {
       try {
-        await deleteChatMessages([临时用户楼层], { refresh: 'none' });
+        const 待删 = [临时用户楼层, 临时助手楼层]
+          .filter((楼层): 楼层 is number => 楼层 !== null)
+          .sort((a, b) => b - a);
+        if (待删.length) await deleteChatMessages(待删, { refresh: 'none' });
       } catch (e) {
-        console.error('[人妻公寓] 清理未完成的临时玩家楼层失败:', e);
+        console.error('[人妻公寓] 清理未完成的临时回合楼层失败:', e);
       }
     }
     进行中 = false;
