@@ -21,7 +21,7 @@ import { 读取数据库记忆胶囊, 同步数据库回合, 数据库状态 } f
  *
  * 显示层永远只有 0 楼的客户端 iframe;后续楼层只是数据库:
  *   玩家行动 → generate(不建楼、不刷新显示) → 稽查终审(违规=中断卡+变量不采纳+代价)
- *   → MVU 官方“重新处理变量”重建本楼 → 回滚保护字段(变量分工表) → 回合结算
+ *   → 正文变量预解析 / MVU 外置模型兜底 → 回滚保护字段(变量分工表) → 回合结算
  *   → createChatMessages({refresh:'none'}) 静默落库(AI 上下文/回档全靠它) → 通知客户端
  *
  * 事件流(客户端 ⇄ 脚本):
@@ -202,14 +202,6 @@ const GEMINI变量更新强制令 = [
   '先写完整正文，再输出变量块；变量块必须是回复的最后一部分。',
 ].join('\n');
 
-const 二次变量结算令 = [
-  '【独立变量结算｜只输出变量块】',
-  '根据公寓快照、本轮玩家行动和本轮已完成正文，独立检查本轮实际发生的状态变化。',
-  '只输出一个完整且可解析的 <UpdateVariable>...</UpdateVariable> 块，不要复述正文，不要解释，不要输出思考过程或其他标签。',
-  '必须检查快照【焦点】中明确标为“本人在场”的人物：若互动确实产生正面或负面影响，用 RFC 6902 replace 更新 户.<门牌>.妻.好感值，并按剧情更新 当前心理想法 与 当前情绪。',
-  '好感变化必须有正文依据，允许正数、负数或不变；不得为了更新而机械加分。遵守变量规则与单轮上限，不在场人物及系统管理字段绝对不动。',
-].join('\n');
-
 function 取变量块(文本: string): string | null {
   // 标准形:完整 <UpdateVariable> 块
   const 完整 = 文本.match(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/i)?.[0];
@@ -256,39 +248,8 @@ function 有可用变量命令(文本: string): boolean {
   return false;
 }
 
-/**
- * DeepSeek / Gemini 可能完成正文却漏掉记账，因此可使用独立的静默结算通道。
- * 正文仍采用第一遍结果；第二遍只生成变量块，并以它替换正文中可能存在但不稳定的旧变量块。
- */
-async function 补模型变量结算(
-  模型: string,
-  原文: string,
-  行动: string,
-  快照: string,
-  回合前末楼: number,
-): Promise<string> {
-  const 正文 = 清洗正文(原文);
-  本回合生成id = `rqgy-vars-${回合前末楼}-${_.random(1e9)}`;
-  const 结算原文 = await 等待正文生成({
-    user_input: `【本轮玩家行动】\n${行动}\n\n【本轮已完成正文】\n${正文}`,
-    should_stream: false,
-    injects: [
-      { role: 'system', content: 快照, position: 'in_chat', depth: 0, should_scan: true },
-      { role: 'system', content: 二次变量结算令, position: 'in_chat', depth: 0, should_scan: false },
-    ],
-    generation_id: 本回合生成id,
-  });
-  const 变量块 = 取变量块(结算原文);
-  if (!变量块) {
-    console.warn(`[人妻公寓] ${模型} 独立变量结算未返回完整 UpdateVariable 块，保留第一遍结果`);
-    return 原文;
-  }
-  console.info(`[人妻公寓] ${模型} 独立变量结算完成`);
-  return `${正文}\n${变量块}`;
-}
-
-/** 游戏右上角“设置”中的总开关；旧存档没有该字段时默认开启，保持 DeepSeek 现有行为。 */
-function 二次变量结算开启(): boolean {
+/** 游戏设置中的外置模型兜底开关；沿用旧键迁移，旧存档默认开启。 */
+function 外置模型补变量开启(): boolean {
   try {
     const raw = (window.parent ?? window).localStorage?.getItem('人妻公寓_界面偏好');
     if (!raw) return true;
@@ -699,7 +660,6 @@ export async function 执行回合(行动: string): Promise<void> {
     ];
     const 正文模型 = 识别正文模型();
     const 是Gemini = /\bgemini(?:[-_.:/\s]|$)/i.test(正文模型);
-    const 是DeepSeek = /\bdeepseek(?:[-_.:/\s]|$)/i.test(正文模型);
     if (是Gemini) {
       injects.push({
         role: 'system',
@@ -722,40 +682,12 @@ export async function 执行回合(行动: string): Promise<void> {
     已取消 = false;
     本回合生成id = `rqgy-${回合前末楼}-${_.random(1e9)}`;
     eventEmit('人妻公寓:运行阶段', 'AI正在生成正文');
-    let 原文 = await 等待正文生成({ user_input: 行动, should_stream: true, injects, generation_id: 本回合生成id });
-    if (已取消) {
-      eventEmit('人妻公寓:回合失败', '已取消——这一轮没有发生');
-      return;
-    }
-    let 已补结算 = false;
-    if ((是DeepSeek || 是Gemini) && 二次变量结算开启()) {
-      const 模型 = 是DeepSeek ? 'DeepSeek' : 'Gemini';
-      已补结算 = true;
-      try {
-        eventEmit('人妻公寓:运行阶段', '正在核对角色变量');
-        原文 = await 补模型变量结算(模型, 原文, 行动, 快照, 回合前末楼);
-      } catch (e) {
-        if (已取消 || (e instanceof Error && e.message === '__RQGY_CANCELLED__')) throw e;
-        console.warn(`[人妻公寓] ${模型} 独立变量结算失败，保留第一遍结果：`, e);
-      }
-    }
-    // 按结果兜底(2026-07-26 玩家反馈"每轮都要手点 MVU 重新处理变量"):
-    // 上面的预防性二次结算只认模型名,公益站/反代改名(DS-R1、flash别名等)一律漏网;
-    // 首遍正文里连一条可解析的变量命令都没有、且本轮确有可更新的人物在场时,
-    // 无论什么模型都补一遍独立结算——触发条件看"结果"不看"名字",总开关同一个。
-    if (!已补结算 && 二次变量结算开启() && !有可用变量命令(原文) && (妻在场.length || 夫在场.length)) {
-      console.warn('[人妻公寓] 首遍输出没有可解析的变量命令,触发通用兜底结算');
-      try {
-        eventEmit('人妻公寓:运行阶段', '正在补全角色变量');
-        原文 = await 补模型变量结算('通用兜底', 原文, 行动, 快照, 回合前末楼);
-      } catch (e) {
-        if (已取消 || (e instanceof Error && e.message === '__RQGY_CANCELLED__')) throw e;
-        console.warn('[人妻公寓] 通用兜底变量结算失败，保留第一遍结果：', e);
-      }
-    }
-    if (!有可用变量命令(原文) && (妻在场.length || 夫在场.length)) {
-      console.warn('[人妻公寓] 本轮最终仍无可解析的变量命令,数值将保持不变(请玩家截此日志反馈)');
-    }
+    const 原文 = await 等待正文生成({
+      user_input: 行动,
+      should_stream: true,
+      injects,
+      generation_id: 本回合生成id,
+    });
     if (已取消) {
       eventEmit('人妻公寓:回合失败', '已取消——这一轮没有发生');
       return;
@@ -802,32 +734,53 @@ export async function 执行回合(行动: string): Promise<void> {
       return;
     }
 
-    // ── 正常路径:先落 AI 楼，再直接走 MVU 官方“重新处理变量”事务 ──
-    // 只保存清洗后的正文 + 规范变量块：客户端/卡内正则会隐藏变量块，但 MVU 面板以后
-    // 仍能从真实 AI 楼重新解析。思维链、摘要与外部预设格式不会因此重新进入聊天历史。
+    // ── 正常路径:正文变量原子落楼；缺失时才调用玩家配置的 MVU 外置模型 ──
+    // rq0.58 已由玩家实测：正文模型给出有效变量时，必须先解析，再把最终 data 随 AI 楼
+    // 一次性创建。rq0.59 的“先建楼→parseMessage→replaceMvuData”正是本次回归来源。
     const 基础正文 = 清洗正文(原文) || '(楼道里安静了一瞬……本轮 AI 未返回正文,可换个说法再试)';
     const 变量块 = 取变量块(原文);
     const 可重处理楼层正文 = 变量块 ? `${基础正文}\n${变量块}` : 基础正文;
-    const 解析基准 = _.cloneDeep(Mvu.getMvuData({ type: 'message', message_id: -1 }) ?? 旧) as Record<string, unknown>;
-    await createChatMessages(
-      [{ role: 'assistant', message: 可重处理楼层正文, data: _.cloneDeep(解析基准) }],
-      { refresh: 'none' },
-    );
-    临时助手楼层 = getLastMessageId();
-    if (临时助手楼层 !== 生成楼层) {
-      throw new Error(`AI楼层错位：预期 ${生成楼层}，实际 ${临时助手楼层}`);
+    const 正文变量可用 = 有可用变量命令(原文);
+    let AI楼已创建 = false;
+    let 新: Record<string, unknown>;
+    if (正文变量可用) {
+      // rq0.58 原子路径：解析发生在 AI 楼创建前，结算后的完整 data 将随楼一次性落库。
+      新 = _.cloneDeep(((await Mvu.parseMessage(可重处理楼层正文, 旧)) ?? 旧) as Record<string, unknown>);
+      console.info('[人妻公寓] 正文含有效变量命令，按 rq0.58 原子路径落账');
+    } else {
+      // 外置模型只能针对已存在的 AI 楼工作。先继承玩家楼真值建楼，再调用 MVU 自己注册的
+      // “重试额外模型解析”；它会使用玩家在 MVU 中配置的模型、提示词和应答格式。
+      const 继承基准 = _.cloneDeep(
+        Mvu.getMvuData({ type: 'message', message_id: -1 }) ?? 旧,
+      ) as Record<string, unknown>;
+      await createChatMessages(
+        [{ role: 'assistant', message: 基础正文, data: _.cloneDeep(继承基准) }],
+        { refresh: 'none' },
+      );
+      临时助手楼层 = getLastMessageId();
+      AI楼已创建 = true;
+      if (临时助手楼层 !== 生成楼层) {
+        throw new Error(`AI楼层错位：预期 ${生成楼层}，实际 ${临时助手楼层}`);
+      }
+      if (外置模型补变量开启() && (妻在场.length || 夫在场.length)) {
+        console.warn('[人妻公寓] 正文无有效变量命令，调用 MVU 官方外置模型解析');
+        eventEmit('人妻公寓:运行阶段', 'MVU外置模型正在解析变量');
+        await eventEmit(getButtonEvent('重试额外模型解析'));
+        const 外置后正文 = getChatMessages(临时助手楼层).at(-1)?.message ?? '';
+        if (有可用变量命令(外置后正文)) {
+          console.info('[人妻公寓] MVU 外置模型变量解析完成');
+        } else {
+          console.warn('[人妻公寓] MVU 外置模型未产生可解析变量；请检查 MVU 更新方式、自动解析配置和日志');
+        }
+      } else {
+        console.warn('[人妻公寓] 正文无有效变量命令，且外置模型兜底未启用或本轮没有在场人物');
+      }
+      新 = _.cloneDeep(
+        Mvu.getMvuData({ type: 'message', message_id: 临时助手楼层 }),
+      ) as Record<string, unknown>;
     }
-
-    // rq0.59 曾把公开 Mvu.parseMessage(text, data)+replaceMvuData 误当成官方按钮的等价路径。
-    // 实际按钮会先清空当前楼 MVU 四类数据，再由 MVU 内部从“当前楼之前最近的有效快照”
-    // 重建 stat/display/delta/schema，最后更新消息与状态占位。Gemini 回合只有走完整事务才会
-    // 稳定落账；这里直接触发卡内 MVU 注册的同一个按钮事件，不再复制其内部实现或猜 API 等价。
-    await eventEmit(getButtonEvent('重新处理变量'));
-    const 新 = _.cloneDeep(
-      Mvu.getMvuData({ type: 'message', message_id: 临时助手楼层 }),
-    ) as Record<string, unknown>;
     if (!_.has(新, 'stat_data') || _.isEmpty(_.get(新, 'stat_data'))) {
-      throw new Error('MVU 官方“重新处理变量”完成后本楼仍无有效 stat_data');
+      throw new Error('变量解析后本楼仍无有效 stat_data');
     }
     const newStat = Schema.parse(_.get(新, 'stat_data') ?? {}) as SchemaType;
     回滚保护字段(newStat, 焦点, { 妻: 妻在场, 夫: 夫在场 }, 生成楼层); // 户级焦点内再按实际在场人物分闸
@@ -836,11 +789,25 @@ export async function 执行回合(行动: string): Promise<void> {
     const 反感离场 = await 结算连续反感(data, newStat, 妻在场, 生成楼层);
     _.set(新, 'stat_data', newStat);
     const 正文 = 补离场正文(基础正文, 反感离场);
-    if (正文 !== 基础正文) {
+    if (!AI楼已创建) {
       const 最终楼层正文 = 变量块 ? `${正文}\n${变量块}` : 正文;
-      await setChatMessages([{ message_id: 临时助手楼层, message: 最终楼层正文 }], { refresh: 'none' });
+      await createChatMessages([{ role: 'assistant', message: 最终楼层正文, data: 新 }], { refresh: 'none' });
+      临时助手楼层 = getLastMessageId();
+      if (临时助手楼层 !== 生成楼层) {
+        throw new Error(`AI楼层错位：预期 ${生成楼层}，实际 ${临时助手楼层}`);
+      }
+    } else {
+      if (正文 !== 基础正文) {
+        const 当前楼层正文 = getChatMessages(临时助手楼层).at(-1)?.message ?? 基础正文;
+        const 最终楼层正文 = 当前楼层正文.startsWith(基础正文)
+          ? 正文 + 当前楼层正文.slice(基础正文.length)
+          : 当前楼层正文;
+        await setChatMessages([{ message_id: 临时助手楼层, message: 最终楼层正文 }], { refresh: 'none' });
+      }
+      await Promise.resolve(
+        Mvu.replaceMvuData(新 as Mvu.MvuData, { type: 'message', message_id: 临时助手楼层 }),
+      );
     }
-    await Promise.resolve(Mvu.replaceMvuData(新 as Mvu.MvuData, { type: 'message', message_id: 临时助手楼层 }));
     临时用户已转正 = true;
     捕获保护快照(newStat);
     void 同步整表视图(newStat);

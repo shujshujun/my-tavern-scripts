@@ -138,11 +138,9 @@
 
           <div class="set-group row">
             <div>
-              <div class="set-label">模型二次变量结算</div>
+              <div class="set-label">MVU外置模型补变量</div>
               <p class="set-hint">
-                模型写完正文却没输出可解析的变量更新（DeepSeek/Gemini
-                常见）时，自动再静默请求一次只补变量块。关闭可少一次请求，但漏更变量时数值不会变，需手动点 MVU
-                的"重新处理变量"。
+                正文没有输出可解析的变量更新时，调用你在 MVU 中配置的额外模型补变量。正文变量正常时不会额外请求；关闭可避免额外费用。
               </p>
             </div>
             <button class="toggle" :class="{ on: 二次变量结算 }" @click="((二次变量结算 = !二次变量结算), 改设置())">
@@ -3710,7 +3708,7 @@ const 垫板浓度 = ref(0.66);
 const 省流 = ref(false);
 /** 减少动效 */
 const 减动效 = ref(false);
-/** DeepSeek / Gemini 正文完成后，是否追加一次只输出变量块的静默结算。 */
+/** 正文缺少有效变量时，是否调用玩家在 MVU 中配置的外置模型兜底。 */
 const 二次变量结算 = ref(true);
 
 const 字号档表: Record<'小' | '中' | '大', string> = { 小: '0.82em', 中: '0.9em', 大: '1.02em' };
