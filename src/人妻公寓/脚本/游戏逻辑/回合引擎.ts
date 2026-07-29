@@ -21,7 +21,7 @@ import { 读取数据库记忆胶囊, 同步数据库回合, 数据库状态 } f
  *
  * 显示层永远只有 0 楼的客户端 iframe;后续楼层只是数据库:
  *   玩家行动 → generate(不建楼、不刷新显示) → 稽查终审(违规=中断卡+变量不采纳+代价)
- *   → Mvu.parseMessage 手动解析变量 → 回滚保护字段(变量分工表) → 回合结算
+ *   → MVU 官方“重新处理变量”重建本楼 → 回滚保护字段(变量分工表) → 回合结算
  *   → createChatMessages({refresh:'none'}) 静默落库(AI 上下文/回档全靠它) → 通知客户端
  *
  * 事件流(客户端 ⇄ 脚本):
@@ -802,7 +802,7 @@ export async function 执行回合(行动: string): Promise<void> {
       return;
     }
 
-    // ── 正常路径:先落 AI 楼，再按 MVU“重新处理变量”的时序解析并明确写回该楼 ──
+    // ── 正常路径:先落 AI 楼，再直接走 MVU 官方“重新处理变量”事务 ──
     // 只保存清洗后的正文 + 规范变量块：客户端/卡内正则会隐藏变量块，但 MVU 面板以后
     // 仍能从真实 AI 楼重新解析。思维链、摘要与外部预设格式不会因此重新进入聊天历史。
     const 基础正文 = 清洗正文(原文) || '(楼道里安静了一瞬……本轮 AI 未返回正文,可换个说法再试)';
@@ -818,7 +818,17 @@ export async function 执行回合(行动: string): Promise<void> {
       throw new Error(`AI楼层错位：预期 ${生成楼层}，实际 ${临时助手楼层}`);
     }
 
-    const 新 = ((await Mvu.parseMessage(可重处理楼层正文, 解析基准)) ?? 解析基准) as Record<string, unknown>;
+    // rq0.59 曾把公开 Mvu.parseMessage(text, data)+replaceMvuData 误当成官方按钮的等价路径。
+    // 实际按钮会先清空当前楼 MVU 四类数据，再由 MVU 内部从“当前楼之前最近的有效快照”
+    // 重建 stat/display/delta/schema，最后更新消息与状态占位。Gemini 回合只有走完整事务才会
+    // 稳定落账；这里直接触发卡内 MVU 注册的同一个按钮事件，不再复制其内部实现或猜 API 等价。
+    await eventEmit(getButtonEvent('重新处理变量'));
+    const 新 = _.cloneDeep(
+      Mvu.getMvuData({ type: 'message', message_id: 临时助手楼层 }),
+    ) as Record<string, unknown>;
+    if (!_.has(新, 'stat_data') || _.isEmpty(_.get(新, 'stat_data'))) {
+      throw new Error('MVU 官方“重新处理变量”完成后本楼仍无有效 stat_data');
+    }
     const newStat = Schema.parse(_.get(新, 'stat_data') ?? {}) as SchemaType;
     回滚保护字段(newStat, 焦点, { 妻: 妻在场, 夫: 夫在场 }, 生成楼层); // 户级焦点内再按实际在场人物分闸
     if (焦点妻门牌) 记违规清零(newStat); // 有焦点妻且未违规:连续违规计数断链
