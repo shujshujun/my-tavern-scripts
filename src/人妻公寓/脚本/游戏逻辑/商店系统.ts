@@ -6,6 +6,7 @@ import { 记余波 } from './雌竞系统';
 import { 请求晋阶 } from './结算系统';
 import { 同步社交轨迹 } from './数据库桥';
 import { 事件角色标记 } from './snapshotSystem';
+import { 开始录像带首送, 录像带前置键 } from './特殊场景系统';
 
 /**
  * 商店系统(P2:工具+礼物两页签起步;八页签全量框架/次日达快递箱归 P3)
@@ -90,18 +91,40 @@ export function 购买(data: SchemaType, 道具id: string): 商店结果 {
   const 当前在架 = 取货架(data).some(页 => 页.商品.some(商品 => 商品.id === 道具id));
   if (!当前在架) return { 成功: false, 提示: '这个柜台还没开，或者这件商品尚未上架。' };
   if (配.常驻 && data.背包.includes(道具id)) return { 成功: false, 提示: `「${配.名称}」已经在背包里。` };
+  if (道具id === '男用贞操带') {
+    const 未完成数 = (['102', '202'] as const).filter(
+      门牌号 => !data.系统._特殊场景前置.includes(录像带前置键(门牌号)),
+    ).length;
+    const 已持有数 = data.背包.filter(id => id === 道具id).length;
+    if (未完成数 <= 已持有数) return { 成功: false, 提示: '录像带所需的贞操带已经备齐。' };
+  }
   if (data.现金 < 配.价格!) return { 成功: false, 提示: '钱不够。' };
 
-  // 特殊场景(P5):买下即触发定制正戏,不入背包(男用贞操带等无场景配置的照常入包)
+  // 特殊场景(P5):配置为“背包使用”的先买票、到指定地点二次确认；其余旧场景仍买下即开演。
   const 场景 = 查特殊场景(道具id);
   if (场景) {
     if (!场景.前置(data as never)) return { 成功: false, 提示: '这场戏的人还没到齐。' };
-    if (data.系统._待发送事件) return { 成功: false, 提示: '眼下已有一桩事在发生——过一楼再来。' };
+    if (data.背包.includes(道具id) || data.系统._已完成特殊场景.includes(道具id)) {
+      return { 成功: false, 提示: `「${配.名称}」已经买过了。` };
+    }
+    if (data.系统._特殊场景.id) return { 成功: false, 提示: '眼下已有一场特殊事件正在进行。' };
+    if (data.系统._待发送事件) {
+      return { 成功: false, 提示: '眼下已有一桩事在发生——过一楼再来。' };
+    }
     data.现金 -= 配.价格!;
+    if (场景.启动?.方式 === '背包使用') {
+      data.背包.push(道具id);
+      return {
+        成功: true,
+        提示: `「${配.名称}」已经放进背包。去${场景.启动.地点}使用。`,
+        变动: true,
+      };
+    }
     const 参与妻 = 场景.参与(data as never);
     const 演出妻 = 场景.演出妻?.(data as never) ?? 参与妻;
     const 演出夫 = 场景.演出夫?.(data as never) ?? [];
     data.系统._待发送事件 = `${事件角色标记({ 在场妻: 演出妻, 在场夫: 演出夫 })}${场景.剧情}`;
+    场景.结算?.(data as never);
     // 结算:参与妻堕落+2(spec:自洽小戏,不触疑心/摊牌,不影响正文其他进展)
     for (const m of 参与妻) {
       const 妻 = data.户[m]?.妻;
@@ -139,6 +162,15 @@ export async function 送礼(data: SchemaType, 道具id: string, 门牌号: 门�
       事件键: `RQP-礼-${门牌号}-${道具id}-${getLastMessageId()}`,
     });
 
+  if (道具id === '男用贞操带') {
+    if (门牌号 !== '102' && 门牌号 !== '202') return { 成功: false, 提示: '这件东西不是为她准备的。' };
+    const 开始 = 开始录像带首送(data, 门牌号, getLastMessageId());
+    if (!开始.成功) return 开始;
+    data.背包.splice(i, 1);
+    记赠礼('她答应设法让丈夫佩戴，并会把钥匙交给玩家保管');
+    return { ...开始, 变动: true };
+  }
+
   // ── 送衣流程(P5;服饰SKU走专属分支) ──
   if (配.服饰) {
     const 妻 = 节点.妻;
@@ -172,7 +204,7 @@ export async function 送礼(data: SchemaType, 道具id: string, 门牌号: 门�
               ? '她哭的时候多说了一句话——那句话让你意识到,楼里的那些事,她其实早就知道了'
               : '';
         妻.当前阶段 = 1;
-        妻.阶段标题 = 阶段标题(1);
+        妻.阶段标题 = 阶段标题(1, 门牌号);
         镜像直写(门牌号, { 阶段: 1 });
         data.系统._待发送事件 =
           `${事件角色标记({ 在场妻: [门牌号] })}【破墙】{{user}}把「${配.名称}」递给了妈——不是保健品,不是按摩仪,是一件给"女人"买的东西。` +

@@ -1,7 +1,7 @@
 import type { SchemaType } from '../../schema';
 import { Schema } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
-import { 户静态表, 难度表, 首批门牌 } from '../../stageConfig';
+import { 户静态表, 难度表, 首批门牌, 查特殊场景 } from '../../stageConfig';
 // (难度表兼供撞见概率系数查表)
 import { 经济结算 } from './经济系统';
 import { 入住检测, 创建配置户节点, 同步入住世界书条目 } from './入住系统';
@@ -10,10 +10,13 @@ import { 夜访结算, 惰性结算户, 绿帽线检测, 结算焦点疑心, 冷
 import { 荣耀洞结算 } from './荣耀洞';
 import { 当前时段, 丈夫在楼 } from './楼层时钟';
 import { PROMOTE_MIRROR_KEY, 捕获保护快照, 回滚保护字段, 清保护快照, 镜像直写 } from './守护系统';
-import { 中断卡文案, 解析行为等级, 记违规清零, 结算违规代价, 输出稽查, 未遂余波指引 } from './稽查系统';
+import { 无处罚拒绝正文, 输出稽查, type 尺度模式, type 稽查结果 } from './稽查系统';
 import { 同步整表视图, 读取最近有效, 读最近有效stat, 脚本写入 } from './mvuIO';
 import { 事件角色标记, 检测焦点, 取本轮事件文本, 组公寓快照, 读场景, 读粘滞状态 } from './snapshotSystem';
-import { 读取数据库记忆胶囊, 同步数据库回合, 数据库状态 } from './数据库桥';
+import { 读取数据库记忆胶囊, 读取微信进展胶囊, 同步数据库回合, 数据库状态 } from './数据库桥';
+import { 上报阶段线路事件 } from './阶段线路系统';
+import { 当前微信摘要引用, 等待微信摘要任务, 设置静音会议手机生成中 } from './手机系统';
+import { 推进特殊场景, 静音会议正式运行中 } from './特殊场景系统';
 
 /**
  * 回合引擎:固定 0 楼架构的主循环(修道院回合引擎直迁,本作化三处:
@@ -202,6 +205,14 @@ const GEMINI变量更新强制令 = [
   '先写完整正文，再输出变量块；变量块必须是回复的最后一部分。',
 ].join('\n');
 
+const 二次变量结算令 = [
+  '【独立变量结算｜只输出变量块】',
+  '根据公寓快照、本轮玩家行动和本轮已完成正文，独立检查本轮实际发生的状态变化。',
+  '只输出一个完整且可解析的 <UpdateVariable>...</UpdateVariable> 块，不要复述正文，不要解释，不要输出思考过程或其他标签。',
+  '必须检查快照【焦点】中明确标为“本人在场”的人物：若互动确实产生正面或负面影响，用 RFC 6902 replace 更新 户.<门牌>.妻.好感值，并按剧情更新 当前心理想法 与 当前情绪。',
+  '好感变化必须有正文依据，允许正数、负数或不变；不得为了更新而机械加分。遵守变量规则与单轮上限，不在场人物及系统管理字段绝对不动。',
+].join('\n');
+
 function 取变量块(文本: string): string | null {
   // 标准形:完整 <UpdateVariable> 块
   const 完整 = 文本.match(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/i)?.[0];
@@ -248,6 +259,37 @@ function 有可用变量命令(文本: string): boolean {
   return false;
 }
 
+/**
+ * DeepSeek / Gemini 可能完成正文却漏掉记账，因此可使用独立的静默结算通道。
+ * 正文仍采用第一遍结果；第二遍只生成变量块，并以它替换正文中可能存在但不稳定的旧变量块。
+ */
+async function 补模型变量结算(
+  模型: string,
+  原文: string,
+  行动: string,
+  快照: string,
+  回合前末楼: number,
+): Promise<string> {
+  const 正文 = 清洗正文(原文);
+  本回合生成id = `rqgy-vars-${回合前末楼}-${_.random(1e9)}`;
+  const 结算原文 = await 等待正文生成({
+    user_input: `【本轮玩家行动】\n${行动}\n\n【本轮已完成正文】\n${正文}`,
+    should_stream: false,
+    injects: [
+      { role: 'system', content: 快照, position: 'in_chat', depth: 0, should_scan: true },
+      { role: 'system', content: 二次变量结算令, position: 'in_chat', depth: 0, should_scan: false },
+    ],
+    generation_id: 本回合生成id,
+  });
+  const 变量块 = 取变量块(结算原文);
+  if (!变量块) {
+    console.warn(`[人妻公寓] ${模型} 独立变量结算未返回完整 UpdateVariable 块，保留第一遍结果`);
+    return 原文;
+  }
+  console.info(`[人妻公寓] ${模型} 独立变量结算完成`);
+  return `${正文}\n${变量块}`;
+}
+
 /** 游戏设置中的外置模型兜底开关；沿用旧键迁移，旧存档默认开启。 */
 function 外置模型补变量开启(): boolean {
   try {
@@ -257,6 +299,11 @@ function 外置模型补变量开启(): boolean {
   } catch {
     return true;
   }
+}
+
+/** 与外置模型兜底共用玩家设置开关，旧存档默认开启。 */
+function 二次变量结算开启(): boolean {
+  return 外置模型补变量开启();
 }
 
 /** 楼层尾部 + 本次行动 → 伪对话数组(焦点检测/快照组装的扫描源) */
@@ -337,8 +384,9 @@ export function 组快照注入(
   对话尾: { role: string; content: string }[],
   data: SchemaType,
   楼层: number,
-): { 快照: string; 焦点: 门牌[]; 妻在场: 门牌[]; 夫在场: 门牌[] } {
-  const { 焦点, 在场, 妻在场, 夫在场 } = 检测焦点(对话尾, data, 楼层);
+  记忆截止楼层 = 楼层,
+): { 快照: string; 焦点: 门牌[]; 妻在场: 门牌[]; 夫在场: 门牌[]; 尺度模式: 尺度模式 } {
+  const { 焦点, 在场, 妻在场, 夫在场, 私聊可召回妻 } = 检测焦点(对话尾, data, 楼层);
   insertOrAssignVariables({ _在场: { 焦点, 在场, 妻在场, 夫在场 } }, { type: 'chat' });
   // 对话粘滞落库(2026-07-18 用户拍板):当场的人钉在当场,楼层时钟传送不走;
   // 玩家离开房间(场景清空/换房)后,读侧位置比对自动失效,这里顺手清干净
@@ -362,9 +410,14 @@ export function 组快照注入(
       insertOrAssignVariables({ _粘滞: null }, { type: 'chat' });
     }
   }
-  const 记忆人物 = 焦点.flatMap(m => [户静态表[m]?.妻名, 户静态表[m]?.夫名]).filter((name): name is string => !!name);
+  const 记忆人物 = [
+    ...妻在场.map(m => 户静态表[m]?.妻名),
+    ...夫在场.map(m => 户静态表[m]?.夫名),
+  ].filter((name): name is string => !!name);
   const 公寓快照 = 组公寓快照(对话尾, data, 楼层);
-  const 数据库记忆 = 读取数据库记忆胶囊(记忆人物, 楼层);
+  const 私聊引用 = 当前微信摘要引用(私聊可召回妻, 记忆截止楼层);
+  const 数据库记忆 =
+    读取数据库记忆胶囊(记忆人物, 记忆截止楼层) + 读取微信进展胶囊(私聊引用, 记忆截止楼层);
   // 数据库位于快照之后时，模型容易把较近的旧叙述误当当前事实。末位再压一次裁决：
   // 数据库只补长期连续性，绝不参与当前时间、地点和在场判定。
   const 当前场景裁决 = 数据库记忆
@@ -373,7 +426,7 @@ export function 组快照注入(
   const 快照 = 公寓快照 + 数据库记忆 + 当前场景裁决;
   // 内容量审计(2026-07-19 用户点名#5):每楼注入体积落日志,测试期拿真实数据定收敛策略
   console.info(`[人妻公寓·快照] 本楼注入 ${快照.length} 字(焦点${焦点.length}人/在场${在场.length}人)`);
-  return { 快照, 焦点, 妻在场, 夫在场 };
+  return { 快照, 焦点, 妻在场, 夫在场, 尺度模式: 公寓快照.includes('【尺度判定·详】') ? '详' : '简' };
 }
 
 /**
@@ -447,8 +500,8 @@ async function 记录数据库回合(
   }
 }
 
-/** 楼层落库前的清洗:思维链/变量块/选项块/行为等级标签不进楼层文本(prompt 与卷轴双干净) */
-function 清洗正文(原文: string): string {
+/** 楼层落库前的清洗:思维链/变量块/选项块/临时尺度标签不进楼层文本(prompt 与卷轴双干净) */
+export function 清洗正文(原文: string): string {
   const 闭合清 = 原文
     // 狐系等玩家预设把思考写成不配对的“【开始思考】…</think_fox~>”，但会用
     // <content> 单独圈正文。content 是可靠的正文白名单边界；闭合缺失时也保住其后剧情。
@@ -469,12 +522,12 @@ function 清洗正文(原文: string): string {
     .replace(/<(VariableCheck|Disclaimer|w2g)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
     // 双人成行：这些都是 content 正文之后的摘要、选项或独立展示模块。
     // content 缺失时也要按块清除，防止预设协议被落库并在下一轮继续污染上下文。
+    .replace(/<(meow_FM|branches|parallel_world|historic_events|htm1fenge)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
+    // 流式截断或模型漏闭合时，以上附加模块一旦开始，后面都不再属于正文。
     .replace(
-      /<(meow_FM|branches|parallel_world|historic_events|htm1fenge)\b[^>]*>[\s\S]*?<\/\1\s*>/gi,
+      /<(?:VariableCheck|Disclaimer|w2g|meow_FM|branches|parallel_world|historic_events|htm1fenge)\b[^>]*>[\s\S]*$/i,
       '',
     )
-    // 流式截断或模型漏闭合时，以上附加模块一旦开始，后面都不再属于正文。
-    .replace(/<(?:VariableCheck|Disclaimer|w2g|meow_FM|branches|parallel_world|historic_events|htm1fenge)\b[^>]*>[\s\S]*$/i, '')
     .replace(
       /<\/?(?:content|story_scene|now_plot|think_fox~|fox_selc|fox_tip|konatan_planning~|tucao|SexualScene|VariableCheck|Disclaimer|w2g|meow_FM|branches|parallel_world|historic_events|htm1fenge)(?:\s[^>]*)?>/gi,
       '',
@@ -493,6 +546,7 @@ function 清洗正文(原文: string): string {
     .replace(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/g, '')
     .replace(/<options>[\s\S]*?<\/options>/g, '')
     .replace(/<行为等级>[\s\S]*?<\/行为等级>/g, '')
+    .replace(/<尺度判定\b[^>]*>[\s\S]*?<\/尺度判定>/gi, '')
     // 玩家预设夹带的整篇 HTML 组件(2026-07-18 玩家实测:破限预设让模型在正文后附"选项分支"
     // HTML 文档,原生酒馆渲染成卡,固定0楼界面=裸代码墙,还白吃上下文token)——整体剥除
     .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*?```/gi, '')
@@ -513,6 +567,7 @@ function 清洗正文(原文: string): string {
     .replace(/<UpdateVariable>[\s\S]*$/, '')
     .replace(/<options>[\s\S]*$/, '')
     .replace(/<行为等级>[\s\S]*$/, '')
+    .replace(/<尺度判定\b[^>]*>[\s\S]*$/i, '')
     .replace(/<tucao\b[^>]*>[\s\S]*$/i, '')
     .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*$/i, '')
     .replace(/<!DOCTYPE[\s\S]*$/i, '')
@@ -529,6 +584,41 @@ function 清洗正文(原文: string): string {
   return 全清;
 }
 
+/**
+ * 静音会议的 AI 楼永远不允许保留任何可重放变量协议。普通清洗为防误吞正文会在“整楼只剩
+ * 未闭合协议”时回退原文；隔离场必须反过来宁可判失败，也不能让旧楼日后重新处理变量。
+ */
+export function 清洗静音会议正文(原文: string): string {
+  let 正文 = 清洗正文(原文)
+    .replace(/<UpdateVariable\b[^>]*>[\s\S]*?(?:<\/UpdateVariable\s*>|$)/gi, '')
+    .replace(/<json_?patch\b[^>]*>[\s\S]*?(?:<\/json_?patch\s*>|$)/gi, '')
+    .replace(/^\s*_\.(?:set|insert|assign|remove|unset|delete|add)\(.*\)\s*;?\s*$/gim, '')
+    .trim();
+
+  // MVU 还接受不带标签的裸 RFC 6902 数组；只在它位于正文末尾且可解析为补丁对象时剥除。
+  const 裸补丁 = 正文.match(/(?:```(?:json)?\s*)?(\[\s*\{[\s\S]*?"op"\s*:[\s\S]*?\}\s*\])\s*(?:```)?\s*$/i);
+  if (裸补丁?.index !== undefined) {
+    try {
+      const 值 = JSON.parse(裸补丁[1]) as unknown;
+      if (
+        Array.isArray(值) &&
+        值.every(
+          项 =>
+            typeof 项 === 'object' &&
+            项 !== null &&
+            typeof (项 as Record<string, unknown>).op === 'string' &&
+            typeof (项 as Record<string, unknown>).path === 'string',
+        )
+      ) {
+        正文 = 正文.slice(0, 裸补丁.index).trim();
+      }
+    } catch {
+      /* 不是合法补丁就作为普通正文保留 */
+    }
+  }
+  return 正文;
+}
+
 // 行动选项系统已下线(2026-07-17 用户拍板:序章四条硬编码引导=唯一的选项,点掉即新手引导结束;
 // AI 不再被要求输出 <options>,回合完成后 _行动选项 恒清空,选项区自然消失)
 
@@ -543,6 +633,15 @@ function 回合结算(
   妻在场: readonly 门牌[],
   楼层: number,
 ): void {
+  if (静音会议正式运行中(snapStat)) {
+    // 隔离场只消费本轮固定事件；经济、作息、疑心、打断、入住、冷落等普通账全部暂停。
+    if (newStat.系统._待发送事件) {
+      newStat.系统._已注入事件 = { 楼层, 内容: newStat.系统._待发送事件 };
+      newStat.系统._待发送事件 = '';
+    }
+    return;
+  }
+
   // 焦点户:被触碰=惰性结算生效点
   const 现钟 = 楼层 + newStat.系统._时段偏移楼;
   let 主焦堕落增量 = 0;
@@ -617,6 +716,7 @@ export async function 执行回合(行动: string): Promise<void> {
   let 临时用户楼层: number | null = null;
   let 临时助手楼层: number | null = null;
   let 临时用户已转正 = false;
+  let 本轮静音会议 = false;
   try {
     eventEmit('人妻公寓:生成开始');
 
@@ -632,6 +732,8 @@ export async function 执行回合(行动: string): Promise<void> {
       return;
     }
     const data = Schema.parse(rawStat) as SchemaType;
+    本轮静音会议 = 静音会议正式运行中(data);
+    if (本轮静音会议) 设置静音会议手机生成中(true);
     // 生成前保存旧楼 MVU 数据。稍后会先落一层临时 user，让依赖 {{lastUserMessage}}
     // 的玩家预设读到本轮行动；变量解析仍必须以本回合开始前的 assistant 楼为基准。
     const 旧 = Mvu.getMvuData({ type: 'message', message_id: -1 });
@@ -642,10 +744,17 @@ export async function 执行回合(行动: string): Promise<void> {
     const 对话尾 = 近楼对话(行动);
     if (数据库状态().已装游戏模板) {
       eventEmit('人妻公寓:运行阶段', '数据库正在读取长期记忆');
+      // 玩家若刚结束微信私聊，给滚动摘要一个很短的收尾窗口；超时沿用上一版，不拖住正文。
+      await 等待微信摘要任务();
       // 先让全屏客户端绘制状态条，再进入可能同步阻塞的数据库导出接口。
       await new Promise<void>(resolve => setTimeout(resolve, 0));
     }
-    const { 快照, 焦点, 妻在场, 夫在场 } = 组快照注入(对话尾, data, 生成楼层);
+    const { 快照, 焦点, 妻在场, 夫在场, 尺度模式 } = 组快照注入(
+      对话尾,
+      data,
+      生成楼层,
+      回合前末楼,
+    );
 
     // 本轮行动锚(2026-07-27 玩家反馈"AI永远回应上一轮指令"):历史楼层一旦出现过一对
     // 行动/回应错位(撤回或异常回合造成),模型会在上下文里无限模仿这个错位节奏。
@@ -682,132 +791,180 @@ export async function 执行回合(行动: string): Promise<void> {
     已取消 = false;
     本回合生成id = `rqgy-${回合前末楼}-${_.random(1e9)}`;
     eventEmit('人妻公寓:运行阶段', 'AI正在生成正文');
-    const 原文 = await 等待正文生成({
-      user_input: 行动,
-      should_stream: true,
-      injects,
-      generation_id: 本回合生成id,
-    });
+    let 原文 = await 等待正文生成({ user_input: 行动, should_stream: true, injects, generation_id: 本回合生成id });
     if (已取消) {
       eventEmit('人妻公寓:回合失败', '已取消——这一轮没有发生');
       return;
     }
 
-    const 焦点妻门牌 = 焦点.find(m => 妻在场.includes(m));
-    const 焦点阶段 = 焦点妻门牌 ? (data.户[焦点妻门牌]?.妻.当前阶段 ?? null) : null;
-
-    // ── 稽查终审(提示词是劝告,脚本是法律):违规=中断卡+AI 变量不采纳+代价 ──
-    // 词表兜底只扫清洗后正文:思维链的自我提醒/选项块的情色试探条不作数(2026-07-17 误杀修复)
-    // 正戏免检接线(2026-07-26 审计 M7):脚本自己排的特殊场景/晋阶正戏自带露骨词
-    // (录像带剧情含"调教""录像"两票即熔断),不免检=玩家花钱买的戏被自己的稽查斩掉。
-    // 只认脚本导演的正戏标记,冷落/搬家等普通事件不豁免。
+    // ── 稽查前移：必须审首稿，不能等独立变量结算把临时尺度块清掉后才审 ──
+    const 焦点妻们 = 焦点.filter(m => 妻在场.includes(m));
+    const 焦点妻门牌 = 焦点妻们[0];
+    const 阶段表 = Object.fromEntries(焦点妻们.map(m => [m, data.户[m]?.妻.当前阶段 ?? 0])) as Partial<
+      Record<门牌, number>
+    >;
     const 本楼事件 = 取本轮事件文本(data, 生成楼层);
+    // 脚本自己导演的晋阶/特殊正戏已经有独立许可，不再被普通阶段上限二次拦截。
     const 正戏免检 = /【特殊场景·|【转折正戏】|【药物首夜】|【早饭桌】|【破墙】/.test(本楼事件);
-    const 稽查 = 输出稽查(原文, 焦点阶段, 正戏免检, 清洗正文(原文));
-    if (稽查.违规 && 焦点妻门牌) {
-      console.warn(`[人妻公寓·稽查] 违规拦截:${稽查.原因}`);
-      const newStat = _.cloneDeep(data); // 不采纳 AI 的任何变量更新,从快照起步
-      结算违规代价(newStat, 焦点妻门牌, 生成楼层);
-      const 反感离场 = await 结算连续反感(data, newStat, 妻在场, 生成楼层);
-      // 未遂余波下一楼注入(她怎么拒绝的由 AI 按性格补写,不给示例)
-      const 余波 = 未遂余波指引(焦点妻门牌);
-      newStat.系统._待发送事件 = newStat.系统._待发送事件 ? `${newStat.系统._待发送事件}|${余波}` : 余波;
-      const 新 = _.cloneDeep(旧);
-      _.set(新, 'stat_data', newStat);
-      const 中断正文 = 补离场正文(中断卡文案(户静态表[焦点妻门牌].妻名), 反感离场);
-      await createChatMessages([{ role: 'assistant', message: 中断正文, data: 新 }], { refresh: 'none' });
-      临时用户已转正 = true;
-      捕获保护快照(newStat);
-      void 同步整表视图(newStat);
-      insertOrAssignVariables(
-        {
-          _上次回合: { 行动, 回合前末楼, chat快照 } satisfies 上次回合记录,
-          _上次隔离回合: null,
-          _行动选项: [],
-          _地图轨迹: [],
-        },
-        { type: 'chat' },
-      );
-      await 记录数据库回合(生成楼层, newStat, 行动, 中断正文, 妻在场, 夫在场);
-      await 广播生成完成事件();
-      eventEmit('人妻公寓:回合完成');
+    let 稽查: 稽查结果 = 输出稽查(原文, 焦点妻们, 阶段表, 尺度模式, 正戏免检, 清洗正文(原文));
+
+    if (稽查.状态 === '需重写' && 焦点妻门牌) {
+      console.warn(`[人妻公寓·稽查] 首稿需静默重写：${稽查.原因}`);
+      eventEmit('人妻公寓:运行阶段', '正在校准角色反应');
+      const 校准令 =
+        `${快照}${行动锚}\n【本轮重写硬裁决】上一稿作废。脚本复核发现：${稽查.原因}。` +
+        '保持玩家原始行动不变，重写完整剧情回应；允许界线内部分自然发生，越过每位角色当前界线的部分必须由她按自身性格拒绝、停住或转开，未遂不得写成已经发生。' +
+        '不要提到稽查、等级、规则、重写或系统。仍须按上方格式输出临时尺度判定与变量更新。';
+      本回合生成id = `rqgy-audit-${回合前末楼}-${_.random(1e9)}`;
+      const 重写 = await 等待正文生成({
+        user_input: 行动,
+        should_stream: false,
+        injects: [{ role: 'system', content: 校准令, position: 'in_chat', depth: 0, should_scan: false }],
+        generation_id: 本回合生成id,
+      });
+      if (已取消) {
+        eventEmit('人妻公寓:回合失败', '已取消——这一轮没有发生');
+        return;
+      }
+      const 重写稽查 = 输出稽查(重写, 焦点妻们, 阶段表, 尺度模式, 正戏免检, 清洗正文(重写));
+      if (重写稽查.状态 === '通过') {
+        原文 = 重写;
+        稽查 = 重写稽查;
+      } else {
+        // 第二次仍不可靠：本地收束为角色拒绝。玩家输入不改、数值不罚、不会再调用模型循环。
+        console.warn(`[人妻公寓·稽查] 重写仍未通过，启用无处罚兜底：${重写稽查.原因}`);
+        原文 = 无处罚拒绝正文(焦点妻门牌);
+        稽查 = {
+          状态: '通过',
+          原因: '二次生成失败后使用无处罚拒绝兜底',
+          模式: 尺度模式,
+          角色: {},
+          最高实际等级: Math.min(Math.max(阶段表[焦点妻门牌] ?? 0, 0), 1),
+        };
+      }
+    }
+
+    let 已补结算 = false;
+    if (!本轮静音会议 && (是DeepSeek || 是Gemini) && 二次变量结算开启()) {
+      const 模型 = 是DeepSeek ? 'DeepSeek' : 'Gemini';
+      已补结算 = true;
+      try {
+        eventEmit('人妻公寓:运行阶段', '正在核对角色变量');
+        原文 = await 补模型变量结算(模型, 原文, 行动, 快照, 回合前末楼);
+      } catch (e) {
+        if (已取消 || (e instanceof Error && e.message === '__RQGY_CANCELLED__')) throw e;
+        console.warn(`[人妻公寓] ${模型} 独立变量结算失败，保留第一遍结果：`, e);
+      }
+    }
+    // 按结果兜底(2026-07-26 玩家反馈"每轮都要手点 MVU 重新处理变量"):
+    // 上面的预防性二次结算只认模型名,公益站/反代改名(DS-R1、flash别名等)一律漏网;
+    // 首遍正文里连一条可解析的变量命令都没有、且本轮确有可更新的人物在场时,
+    // 无论什么模型都补一遍独立结算——触发条件看"结果"不看"名字",总开关同一个。
+    if (
+      !本轮静音会议 &&
+      !已补结算 &&
+      二次变量结算开启() &&
+      !有可用变量命令(原文) &&
+      (妻在场.length || 夫在场.length)
+    ) {
+      console.warn('[人妻公寓] 首遍输出没有可解析的变量命令,触发通用兜底结算');
+      try {
+        eventEmit('人妻公寓:运行阶段', '正在补全角色变量');
+        原文 = await 补模型变量结算('通用兜底', 原文, 行动, 快照, 回合前末楼);
+      } catch (e) {
+        if (已取消 || (e instanceof Error && e.message === '__RQGY_CANCELLED__')) throw e;
+        console.warn('[人妻公寓] 通用兜底变量结算失败，保留第一遍结果：', e);
+      }
+    }
+    if (!本轮静音会议 && !有可用变量命令(原文) && (妻在场.length || 夫在场.length)) {
+      console.warn('[人妻公寓] 本轮最终仍无可解析的变量命令，将继续尝试 MVU 外置模型解析');
+    }
+    if (已取消) {
+      eventEmit('人妻公寓:回合失败', '已取消——这一轮没有发生');
       return;
     }
 
-    // ── 正常路径:正文变量原子落楼；缺失时才调用玩家配置的 MVU 外置模型 ──
-    // rq0.58 已由玩家实测：正文模型给出有效变量时，必须先解析，再把最终 data 随 AI 楼
-    // 一次性创建。rq0.59 的“先建楼→parseMessage→replaceMvuData”正是本次回归来源。
-    const 基础正文 = 清洗正文(原文) || '(楼道里安静了一瞬……本轮 AI 未返回正文,可换个说法再试)';
-    const 变量块 = 取变量块(原文);
-    const 可重处理楼层正文 = 变量块 ? `${基础正文}\n${变量块}` : 基础正文;
-    const 正文变量可用 = 有可用变量命令(原文);
-    let AI楼已创建 = false;
-    let 新: Record<string, unknown>;
-    if (正文变量可用) {
-      // rq0.58 原子路径：解析发生在 AI 楼创建前，结算后的完整 data 将随楼一次性落库。
-      新 = _.cloneDeep(((await Mvu.parseMessage(可重处理楼层正文, 旧)) ?? 旧) as Record<string, unknown>);
-      console.info('[人妻公寓] 正文含有效变量命令，按 rq0.58 原子路径落账');
-    } else {
-      // 外置模型只能针对已存在的 AI 楼工作。先继承玩家楼真值建楼，再调用 MVU 自己注册的
-      // “重试额外模型解析”；它会使用玩家在 MVU 中配置的模型、提示词和应答格式。
-      const 继承基准 = _.cloneDeep(
-        Mvu.getMvuData({ type: 'message', message_id: -1 }) ?? 旧,
-      ) as Record<string, unknown>;
-      await createChatMessages(
-        [{ role: 'assistant', message: 基础正文, data: _.cloneDeep(继承基准) }],
-        { refresh: 'none' },
-      );
-      临时助手楼层 = getLastMessageId();
-      AI楼已创建 = true;
-      if (临时助手楼层 !== 生成楼层) {
-        throw new Error(`AI楼层错位：预期 ${生成楼层}，实际 ${临时助手楼层}`);
-      }
-      if (外置模型补变量开启() && (妻在场.length || 夫在场.length)) {
-        console.warn('[人妻公寓] 正文无有效变量命令，调用 MVU 官方外置模型解析');
-        eventEmit('人妻公寓:运行阶段', 'MVU外置模型正在解析变量');
-        await eventEmit(getButtonEvent('重试额外模型解析'));
-        const 外置后正文 = getChatMessages(临时助手楼层).at(-1)?.message ?? '';
-        if (有可用变量命令(外置后正文)) {
-          console.info('[人妻公寓] MVU 外置模型变量解析完成');
-        } else {
-          console.warn('[人妻公寓] MVU 外置模型未产生可解析变量；请检查 MVU 更新方式、自动解析配置和日志');
-        }
+    // ── 正常路径:先落 AI 楼，再按 MVU“重新处理变量”的时序解析并明确写回该楼 ──
+    // 只保存清洗后的正文 + 规范变量块：客户端/卡内正则会隐藏变量块，但 MVU 面板以后
+    // 仍能从真实 AI 楼重新解析。思维链、摘要与外部预设格式不会因此重新进入聊天历史。
+    const 已清洗正文 = 本轮静音会议 ? 清洗静音会议正文(原文) : 清洗正文(原文);
+    if (本轮静音会议 && !已清洗正文) {
+      throw new Error('AI 没有返回有效正文——本拍未推进，请直接重试');
+    }
+    const 基础正文 = 已清洗正文 || '(楼道里安静了一瞬……本轮 AI 未返回正文,可换个说法再试)';
+    // 静音会议的变量写入全部无效，也不把变量块留给日后的“重新处理变量”重放。
+    let 变量块 = 本轮静音会议 ? '' : 取变量块(原文);
+    let 可重处理楼层正文 = 变量块 ? `${基础正文}\n${变量块}` : 基础正文;
+    let 解析基准 = _.cloneDeep(
+      Mvu.getMvuData({ type: 'message', message_id: -1 }) ?? 旧,
+    ) as Record<string, unknown>;
+    await createChatMessages([{ role: 'assistant', message: 可重处理楼层正文, data: _.cloneDeep(解析基准) }], {
+      refresh: 'none',
+    });
+    临时助手楼层 = getLastMessageId();
+    if (临时助手楼层 !== 生成楼层) {
+      throw new Error(`AI楼层错位：预期 ${生成楼层}，实际 ${临时助手楼层}`);
+    }
+
+    // MVU 的按钮事件属于独立 MVU 脚本命名空间，游戏逻辑不能直接 getButtonEvent。
+    // 先把 AI 楼落下，再通过跨脚本桥让 MVU 在自己的命名空间执行官方外置模型重试。
+    if (
+      !本轮静音会议 &&
+      !有可用变量命令(原文) &&
+      外置模型补变量开启() &&
+      (妻在场.length || 夫在场.length)
+    ) {
+      console.warn('[人妻公寓] 正文无有效变量命令，调用 MVU 官方外置模型解析');
+      eventEmit('人妻公寓:运行阶段', 'MVU外置模型正在解析变量');
+      await eventEmit('人妻公寓:MVU外置模型重试');
+      const 外置后正文 = getChatMessages(临时助手楼层).at(-1)?.message ?? 可重处理楼层正文;
+      const 外置后数据 = Mvu.getMvuData({ type: 'message', message_id: 临时助手楼层 });
+      可重处理楼层正文 = 外置后正文;
+      变量块 = 取变量块(外置后正文);
+      if (外置后数据) 解析基准 = _.cloneDeep(外置后数据) as Record<string, unknown>;
+      if (有可用变量命令(外置后正文) || !_.isEqual(解析基准, 旧)) {
+        console.info('[人妻公寓] MVU 外置模型变量解析完成');
       } else {
-        console.warn('[人妻公寓] 正文无有效变量命令，且外置模型兜底未启用或本轮没有在场人物');
+        console.warn('[人妻公寓] MVU 外置模型未产生可解析变量；请检查 MVU 更新方式、自动解析配置和日志');
       }
-      新 = _.cloneDeep(
-        Mvu.getMvuData({ type: 'message', message_id: 临时助手楼层 }),
-      ) as Record<string, unknown>;
     }
-    if (!_.has(新, 'stat_data') || _.isEmpty(_.get(新, 'stat_data'))) {
-      throw new Error('变量解析后本楼仍无有效 stat_data');
+
+    const 新 = ((await Mvu.parseMessage(可重处理楼层正文, 解析基准)) ?? 解析基准) as Record<string, unknown>;
+    // 静音会议是脚本全权管理的隔离层：即使模型仍输出隐藏变量命令，也不能让解析结果
+    // 成为本轮真值。以生成前的已验证状态为唯一基底，之后只允许回合结算消费事件、
+    // 特殊场景状态机推进，以及最终收尾时由脚本执行固定 +2。
+    const newStat = 本轮静音会议
+      ? (_.cloneDeep(data) as SchemaType)
+      : (Schema.parse(_.get(新, 'stat_data') ?? {}) as SchemaType);
+    if (!本轮静音会议) {
+      回滚保护字段(newStat, 焦点, { 妻: 妻在场, 夫: 夫在场 }, 生成楼层); // 户级焦点内再按实际在场人物分闸
     }
-    const newStat = Schema.parse(_.get(新, 'stat_data') ?? {}) as SchemaType;
-    回滚保护字段(newStat, 焦点, { 妻: 妻在场, 夫: 夫在场 }, 生成楼层); // 户级焦点内再按实际在场人物分闸
-    if (焦点妻门牌) 记违规清零(newStat); // 有焦点妻且未违规:连续违规计数断链
     回合结算(newStat, data, 焦点, 妻在场, 生成楼层);
-    const 反感离场 = await 结算连续反感(data, newStat, 妻在场, 生成楼层);
+    if (/【性癖开幕·/.test(本楼事件)) {
+      for (const 门牌号 of Object.keys(newStat.户) as 门牌[]) {
+        if (!本楼事件.includes(`对象:${户静态表[门牌号].妻名}`)) continue;
+        上报阶段线路事件(newStat, { 类型: '性癖', 门牌: 门牌号, 标识: '开幕完成', 楼层: 生成楼层 });
+      }
+    }
+    const 特殊场景id = 本楼事件.match(/【特殊场景·([^·】]+)/)?.[1];
+    const 特殊场景 = 特殊场景id ? 查特殊场景(特殊场景id) : undefined;
+    推进特殊场景(newStat, 本楼事件);
+    if (!本轮静音会议 && 特殊场景?.接入主线 === true) {
+      for (const 门牌号 of 特殊场景.参与(newStat as never)) {
+        上报阶段线路事件(newStat, { 类型: '特殊场景', 门牌: 门牌号, 标识: 特殊场景.id, 楼层: 生成楼层 });
+      }
+    }
+    if (!本轮静音会议) 上报阶段线路事件(newStat, { 类型: '时段经过', 楼层: 生成楼层 });
+    const 反感离场: 门牌[] = 本轮静音会议
+      ? []
+      : await 结算连续反感(data, newStat, 妻在场, 生成楼层);
     _.set(新, 'stat_data', newStat);
     const 正文 = 补离场正文(基础正文, 反感离场);
-    if (!AI楼已创建) {
+    if (正文 !== 基础正文) {
       const 最终楼层正文 = 变量块 ? `${正文}\n${变量块}` : 正文;
-      await createChatMessages([{ role: 'assistant', message: 最终楼层正文, data: 新 }], { refresh: 'none' });
-      临时助手楼层 = getLastMessageId();
-      if (临时助手楼层 !== 生成楼层) {
-        throw new Error(`AI楼层错位：预期 ${生成楼层}，实际 ${临时助手楼层}`);
-      }
-    } else {
-      if (正文 !== 基础正文) {
-        const 当前楼层正文 = getChatMessages(临时助手楼层).at(-1)?.message ?? 基础正文;
-        const 最终楼层正文 = 当前楼层正文.startsWith(基础正文)
-          ? 正文 + 当前楼层正文.slice(基础正文.length)
-          : 当前楼层正文;
-        await setChatMessages([{ message_id: 临时助手楼层, message: 最终楼层正文 }], { refresh: 'none' });
-      }
-      await Promise.resolve(
-        Mvu.replaceMvuData(新 as Mvu.MvuData, { type: 'message', message_id: 临时助手楼层 }),
-      );
+      await setChatMessages([{ message_id: 临时助手楼层, message: 最终楼层正文 }], { refresh: 'none' });
     }
+    await Promise.resolve(Mvu.replaceMvuData(新 as Mvu.MvuData, { type: 'message', message_id: 临时助手楼层 }));
     临时用户已转正 = true;
     捕获保护快照(newStat);
     void 同步整表视图(newStat);
@@ -839,7 +996,7 @@ export async function 执行回合(行动: string): Promise<void> {
     eventEmit('人妻公寓:CG回合信号', {
       门牌: 焦点妻门牌 ?? null,
       角色阶段: 焦点妻门牌 ? (newStat.户[焦点妻门牌]?.妻.当前阶段 ?? null) : null,
-      行为等级: 解析行为等级(原文),
+      行为等级: 稽查.最高实际等级,
       正文,
       行动,
       事件: 本楼事件,
@@ -867,6 +1024,7 @@ export async function 执行回合(行动: string): Promise<void> {
     }
     进行中 = false;
     本回合生成id = ''; // 防回档等无生成的回合被"取消"误伤
+    if (本轮静音会议) 设置静音会议手机生成中(false);
   }
 }
 

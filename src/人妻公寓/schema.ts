@@ -116,6 +116,29 @@ const 妻状态 = z
     /** 同日堕落收益账(2026-07-27 拍板C,根治"关房间刷一天直通下一阶段"):AI 涨幅当日累计,
      *  超每日上限的楼戏照演账不涨;脚本大额结算(正戏/特殊场景)不走此账。随楼层快照回滚自洽 */
     _堕落日账: z.object({ 日: floorMark(-1), 值: nonNegInt(0) }).prefault({}),
+    /** 当前阶段攻略线路：每户只保存一条活动线路，不为24条路线扩散布尔变量。完成位图低4位对应四个固定节点。 */
+    _阶段线路: z
+      .object({
+        目标阶段: z.coerce
+          .number()
+          .catch(1)
+          .transform(v => (isNaN(v) ? 1 : _.clamp(Math.floor(v), 1, 5)))
+          .prefault(1),
+        完成位图: z.coerce
+          .number()
+          .catch(0)
+          .transform(v => (isNaN(v) ? 0 : _.clamp(Math.floor(v), 0, 15)))
+          .prefault(0),
+        活跃节点: z.coerce
+          .number()
+          .catch(0)
+          .transform(v => (isNaN(v) ? 0 : _.clamp(Math.floor(v), 0, 4)))
+          .prefault(0),
+        节点起始楼: floorMark(-1),
+        预约时段: z.string().prefault(''),
+        预约地点: z.string().prefault(''),
+      })
+      .prefault({}),
     /** P5 服饰:槽→穿着中SKU id(立绘差分文件名后缀;脚本写,AI不可见) */
     _穿着SKU: z.record(z.string(), z.string()).catch({}).prefault({}),
     _要钱次数: nonNegInt(0), // P3:L4 要钱按钮累计(≥2 触发"向丈夫开口"疑心+)
@@ -207,11 +230,44 @@ export const Schema = z.object({
       _系统操作中: z.coerce.boolean().catch(false).prefault(false), // 道具使用/模式切换楼跳过轮次推进
       _难度: z.string().prefault('标准'), // 开局三档(轻松/标准/严苛),效果查 stageConfig.难度表
       _序章完成: z.coerce.boolean().catch(false).prefault(false), // 单向语义随楼层快照走(回档到0=重开序章)
+      /** 一次性特殊正戏完成表：供商店防重复与阶段路线判定共用，不为每场戏增设独立布尔值。 */
+      _已完成特殊场景: z.array(z.string()).catch([]).prefault([]),
+      /** 特殊场景通用前置记录；使用 `场景id:门牌` 短键，避免每场每人扩散布尔字段。 */
+      _特殊场景前置: z.array(z.string()).catch([]).prefault([]),
+      /** 同一时间只允许一个前置演出或正式特殊场景运行。 */
+      _特殊场景: z
+        .object({
+          id: z.string().prefault(''),
+          阶段: z.string().prefault(''),
+          地点: z.string().prefault(''),
+          参与妻: z.array(z.string()).catch([]).prefault([]),
+          演出妻: z.array(z.string()).catch([]).prefault([]),
+          演出夫: z.array(z.string()).catch([]).prefault([]),
+          启动楼层: floorMark(-1),
+          /** 多拍特殊场景中“下一待生成正文拍”；静音会议自由循环固定保持 15。 */
+          当前拍: nonNegInt(0),
+          议题: z.string().prefault(''),
+          重点妻: z.string().prefault(''),
+          峰值模式: z.string().prefault(''),
+          会后妻: z.array(z.string()).catch([]).prefault([]),
+          自由循环次数: nonNegInt(0),
+          交互: z
+            .object({
+              id: z.string().prefault(''),
+              类型: z.string().prefault(''),
+              状态: z.string().prefault(''),
+              失败次数: nonNegInt(0),
+              补偿可用: z.coerce.boolean().catch(false).prefault(false),
+            })
+            .prefault({}),
+          /** 静音会议微信旁路只向下一正文暴露低信息摘要，不把私聊原文写入正文历史。 */
+          会场私聊摘要: z.record(z.string(), z.string()).catch({}).prefault({}),
+          会场私聊摘要楼层: floorMark(-1),
+        })
+        .prefault({}),
       // 摄像头布设名单(2026-07-17 从 chat 变量迁入:与背包同一本账,重掷/撤回删楼时消耗与布设同生共死,
       // 否则"背包里的摄像头随楼层复活+chat 侧已装记录还在"=一次购买无限装)
       _摄像头布设: z.record(z.string(), z.coerce.boolean()).catch({}).prefault({}),
-      _连续违规: nonNegInt(0), // 稽查:连续越阶计数(3次→"她开始躲着你"事件)
-      _上次违规楼层: floorMark(-1), // 楼层去重旗标(防护12):同楼不重复结算惩罚
       // 杀时间(2026-07-17:管理员室"歇一会儿"静默快进一个时段)——偏移必须进 MVU 随楼层快照走,
       // 回档/同楼重roll 自洽;一切时间读数(时段/天数/作息/位置/侦探冷却)=真实楼层+此偏移
       _时段偏移楼: nonNegInt(0),

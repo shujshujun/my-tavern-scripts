@@ -85,13 +85,13 @@
               <label class="ink-pick" :class="{ on: !!正文字色 }">
                 <input
                   type="color"
-                  :value="正文字色 || (暗色 ? '#e9e6f0' : '#242126')"
+                  :value="正文字色 || (暗色 ? '#000000' : '#242126')"
                   @input="((正文字色 = ($event.target as HTMLInputElement).value), 改设置())"
                 />
                 <span>{{ 正文字色 ? '自选中' : '自选颜色' }}</span>
               </label>
             </div>
-            <p class="set-hint">「跟随主题」=日间深墨、夜间米白自动翻转;自选后固定不变,看不清就点回跟随。</p>
+            <p class="set-hint">正文始终使用白色半透明垫板；「跟随主题」在日间使用深墨、夜间使用纯黑。</p>
           </div>
 
           <div class="set-group">
@@ -229,6 +229,20 @@
                 <p>
                   请在【酒馆助手→脚本→全局脚本】中禁用或删除智脑并刷新页面，然后安装数据库插件和人妻公寓四张 RQ_ 表。
                 </p>
+                <p>
+                  建议随后在数据库设置中开启 SQLite 模式：四张表都带完整 SQL DDL，游戏会优先使用参数化 SQL
+                  精确查询与更新；普通表格模式仍可兼容运行。数据库没有公开的自动切换接口，因此需要玩家手动开启。
+                </p>
+                <p>
+                  自动填表默认把人物记忆与承诺合并为每 3 个正文 AI 楼一次，社交轨迹每 6 楼一次；剧情事件和重要社交结果由游戏脚本即时写入。没有长期变化时允许不改表，不应为了凑字数制造记录。
+                </p>
+                <p>
+                  数据库当前会把全局“AI 回复最小长度”同时用于正文门控和填表输出。建议设为 0，避免把合法的简短或空更新误报为“AI回复过短”；“填表最大重试”建议手动设为 2。微信进展摘要走独立
+                  callAI，不受这两个填表参数影响。
+                </p>
+                <p>
+                  完整微信原文仍只保存在手机；开启微信记忆后，每轮有效妻子私聊通常会额外调用一次数据库当前 AI，把当前分支的未整理增量压成结构化短进展。正文只在本人可靠判定在场时被动参考，不要求角色每轮主动提起；该功能可在手机“我”页单独关闭。
+                </p>
                 <div class="setup-db-actions">
                   <button class="btn mini" @click="刷新全部检测">重新检测</button>
                   <button
@@ -238,7 +252,31 @@
                   >
                     {{ 安装模板中 ? '安装中…' : 数据库检测.已装游戏模板 ? '更新本游戏表' : '安装本游戏表' }}
                   </button>
+                  <button class="btn mini" @click="从说明打开数据库设置">打开数据库设置</button>
+                  <button
+                    v-if="
+                      数据库检测.填表最短回复 !== null &&
+                      数据库检测.填表最短回复 > 0 &&
+                      数据库检测.可设置填表参数
+                    "
+                    class="btn mini rite"
+                    :disabled="调整填表设置中"
+                    @click="从说明应用数据库填表兼容设置"
+                  >
+                    {{ 调整填表设置中 ? '设置并验证中…' : '修复填表短回复（全局设 0）' }}
+                  </button>
                 </div>
+                <small v-if="数据库检测.已安装 && 数据库检测.填表最短回复 === 0" class="good"
+                  >✓ 自动填表防短回复已兼容：AI 回复最小长度 = 0。</small
+                >
+                <small
+                  v-else-if="数据库检测.已安装 && 数据库检测.填表最短回复 !== null"
+                  style="color: #a35f00"
+                  >! 当前 AI 回复最小长度 = {{ 数据库检测.填表最短回复 }}，建议修复；这是数据库全局项，只有你确认后游戏才会修改。</small
+                >
+                <small v-else-if="数据库检测.已安装"
+                  >· 当前数据库版本未开放填表参数读取，请在“填表工作台 → 自动更新设置 → 高级参数”中手动设为 0。</small
+                >
                 <small v-if="智脑检测.已安装">✗ 智脑仍在运行，请先禁用并刷新。</small>
                 <small v-else-if="!数据库检测.已安装">· 尚未检测到数据库插件。</small>
                 <small v-else-if="!数据库检测.已装游戏模板"
@@ -246,8 +284,8 @@
                   表。</small
                 >
                 <small v-else class="good"
-                  >✓ 数据库 {{ 数据库检测.版本 ? `v${数据库检测.版本}` : '版本未知' }}
-                  已启用，智脑已关闭，四张 RQ_ 表已就绪。</small
+                  >✓ 数据库 {{ 数据库检测.版本 ? `v${数据库检测.版本}` : '版本未知' }} 已启用，智脑已关闭，四张 RQ_
+                  表已就绪。</small
                 >
               </template>
 
@@ -430,7 +468,7 @@
             class="avatar"
             :class="项.态"
             :title="项.妻名 + '(' + 项.门牌 + ')'"
-            @click="选中门牌 = 项.门牌"
+            @click="!静音会议正式中 && (选中门牌 = 项.门牌)"
           >
             <img
               v-if="!头像失效[项.妻名]"
@@ -461,21 +499,194 @@
               'portraits-many': 立绘列表.length >= 4,
               'story-glory': !!荣耀洞图,
               'story-adult-cg': 显示成人CG,
+              'story-special-interaction': 录像带交互幕 || 静音会议交互幕,
+              'story-mute-meeting': 静音会议显示组合图,
             },
           ]"
           :style="[场景色, 场景图样式]"
         >
           <!-- 隐藏正文(2026-07-19 用户点单,gal惯例):渐隐文字层欣赏立绘;只认这颗钮,再按恢复(误触不弹回) -->
           <button
+            v-if="!录像带中 && !静音会议交互幕"
             class="story-hide-btn"
             :title="正文隐藏 ? '显示正文' : '隐藏正文,欣赏画面'"
             @click.stop="正文隐藏 = !正文隐藏"
           >
             {{ 正文隐藏 ? '👁' : '🙈' }}
           </button>
+          <div v-if="静音会议正式中 && !静音会议交互幕" class="mute-meeting-track" role="status">
+            <span>MEETING · {{ 静音会议阶段短名 }}</span>
+            <b>{{ 静音会议拍数文案 }}</b>
+            <em>{{ 静音会议场景.议题 || '楼务会议' }}</em>
+          </div>
+          <div v-if="录像带交互幕" class="special-interaction-stage">
+            <img :src="录像带当前图" alt="管理员室双显示器" draggable="false" />
+            <div class="special-interaction-status">
+              <span>{{ 录像带交互说明 }}</span>
+              <span v-if="录像带连点计数 > 0 && 录像带阶段 === '等待202'">
+                {{ 录像带连点计数 }}/{{ 录像带连点目标 }}
+              </span>
+            </div>
+          </div>
+          <Transition name="fade">
+            <div v-if="静音会议显示组合图" class="mute-meeting-visual" :class="`state-${静音会议画面状态}`">
+              <img
+                v-if="静音会议当前图地址"
+                :key="静音会议当前图地址"
+                :src="静音会议当前图地址"
+                :alt="`静音会议${静音会议画面状态}会场全景`"
+                draggable="false"
+                @load="静音会议图加载成功"
+                @error="静音会议图加载失败"
+              />
+              <div v-else class="mute-meeting-visual-fallback">
+                <span>梧桐里公寓 · 管理员室</span>
+                <b>楼务会议进行中</b>
+              </div>
+            </div>
+          </Transition>
+          <div
+            v-if="静音会议交互幕"
+            class="special-interaction-stage mute-meeting-interaction-stage"
+            @contextmenu.prevent
+          >
+            <section class="mute-interaction-panel" :class="`gate-${静音会议互动id.toLowerCase()}`">
+              <header>
+                <div>
+                  <span>CONTROL GATE {{ 静音会议互动id }}</span>
+                  <h3>{{ 静音会议互动标题 }}</h3>
+                </div>
+                <b>{{ 静音会议互动失败次数 }}/3 次失误</b>
+              </header>
+              <p class="mute-interaction-copy">{{ 静音会议互动说明 }}</p>
+
+              <div v-if="静音会议互动id === 'B' || 静音会议互动id === 'C'" class="mute-target-row">
+                <button
+                  v-for="门牌号 in 静音会议参与妻"
+                  :key="门牌号"
+                  type="button"
+                  class="mute-target"
+                  :class="{
+                    on:
+                      (静音会议互动id === 'B' && 静音会议B目标 === 门牌号) ||
+                      (静音会议互动id === 'C' && 静音会议场景.重点妻 === 门牌号),
+                    pulse: 静音会议互动id === 'C' && 静音会议连点点亮妻.includes(门牌号),
+                  }"
+                  :disabled="静音会议互动id === 'C' || !静音会议互动待操作 || !!静音会议互动结果"
+                  :aria-pressed="
+                    (静音会议互动id === 'B' && 静音会议B目标 === 门牌号) ||
+                    (静音会议互动id === 'C' && 静音会议场景.重点妻 === 门牌号)
+                  "
+                  @pointerup.stop.prevent="静音会议互动id === 'B' && 选择静音会议B目标(门牌号, $event)"
+                >
+                  <img
+                    v-if="!头像失效[户静态表[门牌号].妻名]"
+                    :src="头像图(户静态表[门牌号].妻名)"
+                    :alt="户静态表[门牌号].妻名"
+                    draggable="false"
+                    @error="头像失效[户静态表[门牌号].妻名] = true"
+                  />
+                  <span v-else>{{ 户静态表[门牌号].妻名[0] }}</span>
+                  <b>{{ 户静态表[门牌号].妻名 }}</b>
+                  <small>{{ 门牌号 }}</small>
+                </button>
+              </div>
+
+              <div v-if="静音会议互动id === 'C'" class="mute-mode-row">
+                <button
+                  v-for="模式 in ['集中', '同步'] as const"
+                  :key="模式"
+                  type="button"
+                  :class="{ on: 静音会议C模式 === 模式 }"
+                  :disabled="!静音会议互动待操作 || !!静音会议互动结果"
+                  :aria-pressed="静音会议C模式 === 模式"
+                  @pointerup.stop.prevent="选择静音会议C模式(模式, $event)"
+                >
+                  <b>{{ 模式 === '集中' ? '集中一人' : '全体同步' }}</b>
+                  <small>{{
+                    模式 === '集中'
+                      ? `沿用${静音会议重点妻名 || '第二档目标'}`
+                      : `${静音会议参与妻.length} 名妻子同时加档`
+                  }}</small>
+                </button>
+              </div>
+
+              <button
+                v-if="静音会议互动id === 'A'"
+                type="button"
+                class="mute-control-button tap"
+                :disabled="!静音会议互动待操作 || !!静音会议互动结果"
+                @pointerdown.stop.prevent="静音会议A按下"
+                @pointerup.stop.prevent="静音会议A抬起"
+                @pointercancel.stop.prevent="静音会议指针取消($event, true)"
+                @pointerleave="静音会议指针取消($event, true)"
+              >
+                <Ic n="ops" />
+                <span><b>连接全部设备</b><small>按下一次，让所有指示灯同时就绪</small></span>
+              </button>
+
+              <button
+                v-else-if="静音会议互动id === 'B'"
+                type="button"
+                class="mute-control-button hold"
+                :class="{ holding: 静音会议长按中 }"
+                :disabled="!静音会议互动待操作 || !静音会议B目标 || !!静音会议互动结果"
+                @pointerdown.stop.prevent="静音会议B按下"
+                @pointerup.stop.prevent="静音会议B抬起"
+                @pointercancel.stop.prevent="静音会议指针取消($event, true)"
+                @pointerleave="静音会议指针取消($event, true)"
+              >
+                <i class="hold-progress" />
+                <Ic n="ops" />
+                <span><b>维持第二档</b><small>选中目标后持续按住 2 秒</small></span>
+              </button>
+
+              <button
+                v-else
+                type="button"
+                class="mute-control-button rapid"
+                :disabled="!静音会议互动待操作 || !静音会议C模式 || !!静音会议互动结果"
+                @pointerdown.stop.prevent="静音会议C按下"
+                @pointerup.stop.prevent="静音会议C抬起"
+                @pointercancel.stop.prevent="静音会议指针取消($event, true)"
+                @pointerleave="静音会议指针取消($event, true)"
+              >
+                <Ic n="ops" />
+                <span
+                  ><b>连续点击加档</b
+                  ><small>{{ 静音会议连点计数 }}/{{ 静音会议连点目标 }} · 限时 6 秒</small></span
+                >
+              </button>
+
+              <div v-if="静音会议互动结果" class="mute-interaction-result" :class="静音会议互动结果.类型">
+                <b>{{ 静音会议互动结果.标题 }}</b>
+                <span>{{ 静音会议互动结果.说明 }}</span>
+              </div>
+              <button
+                v-if="静音会议等待AI重试 && !发送中"
+                type="button"
+                class="btn rite mute-interaction-assist"
+                @pointerup.stop.prevent="重试静音会议互动续拍"
+              >
+                重新生成交互后的下一拍
+              </button>
+              <button
+                v-if="静音会议互动待操作 && 静音会议互动补偿可用 && !静音会议互动结果"
+                type="button"
+                class="btn rite mute-interaction-assist"
+                :disabled="
+                  (静音会议互动id === 'B' && !静音会议B目标) ||
+                  (静音会议互动id === 'C' && !静音会议C模式)
+                "
+                @pointerup.stop.prevent="静音会议互动补偿通过"
+              >
+                使用自动通过 · 不改变剧情结果
+              </button>
+            </section>
+          </div>
           <Transition name="fade">
             <div
-              v-if="显示成人CG"
+              v-if="显示成人CG && !静音会议显示组合图"
               class="adult-cg-stage"
               :class="{ loading: 成人CG加载中 }"
               :style="{ '--adult-cg-img': `url(${当前成人CG地址})` }"
@@ -483,7 +694,7 @@
               <img :src="当前成人CG地址" alt="" draggable="false" @load="成人CG已加载" @error="成人CG加载失败" />
             </div>
           </Transition>
-          <TransitionGroup v-if="立绘显示 && !显示成人CG" name="fade">
+          <TransitionGroup v-if="立绘显示 && !显示成人CG && !静音会议显示组合图" name="fade">
             <img
               v-for="绘 in 立绘列表"
               :key="绘.src"
@@ -497,7 +708,11 @@
             />
           </TransitionGroup>
           <!-- 正文卷轴:只演当前幕,且幕跟着房间走——人走了戏就收,回来戏还在(氛围色随位置) -->
-          <section ref="卷轴容器" class="story" :class="{ 'story-veiled': 正文隐藏 }">
+          <section
+            ref="卷轴容器"
+            class="story"
+            :class="{ 'story-veiled': 正文隐藏 || 录像带交互幕 || 静音会议交互幕 }"
+          >
             <!-- 到场卡:走动后的新场景,给地点一个"开场镜头"(旧正文属于旧场景,隐去) -->
             <div v-if="!在幕中 && !发送中" class="arrive">
               <div class="ui-kicker">{{ 当前房间 ? 'ARRIVE / 到场' : 'HALLWAY / 楼道' }}</div>
@@ -589,11 +804,26 @@
             </span>
           </span>
           <span v-else class="scene-occ">{{ 当前房间 ? '此刻没有别人' : '该去敲谁的门?' }}</span>
-          <button v-if="当前房间" class="btn icon" :disabled="发送中" @click="离开房间"><Ic n="exit" />离开</button>
+          <button
+            v-if="当前房间 && !录像带中"
+            class="btn icon"
+            :disabled="发送中 || 静音会议正式中"
+            :title="静音会议正式中 ? '会议进行中，无法离开管理员室' : '离开当前房间'"
+            @click="离开房间"
+          >
+            <Ic n="exit" />离开
+          </button>
+        </div>
+        <div v-if="静音会议正式中" class="mute-meeting-lock-note" role="status">
+          <Ic n="lock" />
+          <span><b>会场已锁定</b>会议进行中，无法离开管理员室；手机会在允许的拍间保持可用。</span>
         </div>
 
         <!-- 房内动作(输入门控收紧后的补位:站在垃圾房/空户里,翻袋撬门不用开地图) -->
-        <div v-if="!发送中 && 当前房间 === '垃圾房' && 垃圾袋列表.length" class="garbage-pick">
+        <div
+          v-if="!静音会议正式中 && !发送中 && 当前房间 === '垃圾房' && 垃圾袋列表.length"
+          class="garbage-pick"
+        >
           <button class="tile risky garbage-open" @click="垃圾选择开 = true">
             <Ic n="trash" />
             <span class="act-kicker">SEARCH</span>
@@ -624,7 +854,7 @@
             </section>
           </div>
         </transition>
-        <div v-if="!发送中 && 普通房间动作.length" class="scene-acts">
+        <div v-if="!录像带中 && !静音会议正式中 && !发送中 && 普通房间动作.length" class="scene-acts">
           <button v-for="(动作, i) in 普通房间动作" :key="i" class="tile" :class="动作.类" @click="动作.做()">
             <Ic :n="动作.icon" />
             <span class="act-kicker">{{ 动作.kicker }}</span>
@@ -633,7 +863,11 @@
         </div>
 
         <!-- 偷窥余像:"你注意到了什么?"(摄像头渠道,选对收进线索板;选项走 gal 纸条样式与行动选项同款) -->
-        <div v-if="偷窥待选 && !发送中" class="peep-card" :style="{ '--opt-img': `url(${素材基址}/界面/选项条.webp)` }">
+        <div
+          v-if="!静音会议正式中 && 偷窥待选 && !发送中"
+          class="peep-card"
+          :style="{ '--opt-img': `url(${素材基址}/界面/选项条.webp)` }"
+        >
           <p class="hint">画面看完了。你注意到了什么?</p>
           <button v-for="(项, i) in 偷窥待选.选项" :key="i" class="option-chip gal" @click="选细节(i)">
             {{ 项 }}
@@ -641,9 +875,106 @@
         </div>
 
         <!-- 行动选项(AI 每轮给 4 条,点了直接发送;gal 式居中选择条,纸条底=AI 水彩件) -->
-        <div v-if="显示选项" class="option-row" :style="{ '--opt-img': `url(${素材基址}/界面/选项条.webp)` }">
+        <div
+          v-if="
+            显示选项 &&
+            !录像带中 &&
+            !静音会议交互幕 &&
+            !静音会议待散会选择 &&
+            !静音会议自由待选择
+          "
+          class="option-row"
+          :style="{ '--opt-img': `url(${素材基址}/界面/选项条.webp)` }"
+        >
           <button v-for="(项, i) in 行动选项" :key="i" class="option-chip gal" @click="点选项(项)">{{ 项 }}</button>
         </div>
+
+        <div v-if="录像带交互幕 && !发送中" class="scene-acts special-scene-acts">
+          <button
+            class="tile"
+            :class="{ frozen: 录像带阶段 !== '等待102' }"
+            :disabled="录像带阶段 !== '等待102'"
+            @click="打开102录像"
+          >
+            <Ic n="cctv" />
+            <span class="act-kicker">{{ 录像带阶段 === '等待102' ? 'SINGLE TAP' : 'PLAYED' }}</span>
+            <strong>{{ 录像带阶段 === '等待102' ? '调取102室隐藏摄像头录像' : '102室录像已播放' }}</strong>
+          </button>
+          <button
+            class="tile"
+            :class="{ frozen: 录像带阶段 !== '等待202' }"
+            :disabled="录像带阶段 !== '等待202'"
+            @click="连续点击202录像"
+          >
+            <Ic n="cctv" />
+            <span class="act-kicker">{{ 录像带阶段 === '等待202' ? 'RAPID TAP' : 'LOCKED' }}</span>
+            <strong>{{
+              录像带阶段 === '等待202'
+                ? `连续点击调取202室录像 (${录像带连点计数}/${录像带连点目标})`
+                : '202室录像 · 等待前段结束'
+            }}</strong>
+          </button>
+          <button v-if="录像带补偿可用" class="tile special-assist" @click="自动重连202">
+            <Ic n="cctv" />
+            <span class="act-kicker">RECOVERY</span>
+            <strong>让监控系统自动重连</strong>
+          </button>
+        </div>
+
+        <section v-if="静音会议待散会选择 && !发送中" class="mute-after-panel mute-dismiss-panel">
+          <div class="mute-after-heading">
+            <span>第 12 拍 · 宣布散会</span>
+            <b>丈夫离场后，留下谁？</b>
+          </div>
+          <p>选择 1 名、2 名或全部参与妻。名单会和你下面的散会总结一起提交，不会提前改写场景。</p>
+          <div class="mute-after-wives">
+            <button
+              v-for="门牌号 in 静音会议参与妻"
+              :key="门牌号"
+              type="button"
+              :class="{ on: 静音会议会后选择.includes(门牌号) }"
+              :aria-pressed="静音会议会后选择.includes(门牌号)"
+              @click="切换静音会议会后妻(门牌号)"
+            >
+              <img
+                v-if="!头像失效[户静态表[门牌号].妻名]"
+                :src="头像图(户静态表[门牌号].妻名)"
+                :alt="户静态表[门牌号].妻名"
+                @error="头像失效[户静态表[门牌号].妻名] = true"
+              />
+              <span v-else>{{ 户静态表[门牌号].妻名[0] }}</span>
+              <b>{{ 户静态表[门牌号].妻名 }}</b>
+              <small>{{ 门牌号 }}</small>
+            </button>
+          </div>
+          <div class="mute-after-count" :class="{ ready: 静音会议会后选择合法 }">
+            {{ 静音会议会后选择提示 }}
+          </div>
+        </section>
+
+        <section v-if="静音会议自由待选择 && !发送中" class="mute-after-panel mute-free-panel">
+          <div class="mute-after-heading">
+            <span>AFTER HOURS · 会后自由段</span>
+            <b>这场会由你决定何时结束</b>
+          </div>
+          <p>
+            已完成至少三拍会后活动。继续不会设置回合上限；结束会先生成最终收尾，成功后才结算并恢复日常。
+          </p>
+          <div class="mute-free-actions">
+            <button class="btn" type="button" @click="继续静音会议会后活动">继续会后活动</button>
+            <button class="btn rite" type="button" @click="请求结束静音会议">结束本次会议</button>
+          </div>
+        </section>
+        <section v-if="静音会议收尾待重试 && !发送中" class="mute-after-panel mute-free-panel">
+          <div class="mute-after-heading">
+            <span>FINAL PASS · 最终收尾</span>
+            <b>上一次收尾没有成功落地</b>
+          </div>
+          <p>临时状态、演员名单和结算都仍然保留。重新生成成功后才会真正清场并恢复日常。</p>
+          <div class="mute-free-actions single">
+            <button class="btn rite" type="button" @click="请求结束静音会议">重新生成最终收尾</button>
+          </div>
+        </section>
 
         <!-- 游戏内输入(玩家不碰酒馆输入框) -->
         <div v-if="可输入" class="quill">
@@ -656,11 +987,15 @@
             @focus="输入聚焦"
             @blur="输入失焦"
           ></textarea>
-          <button class="btn rite quill-btn" :disabled="发送中 || 由头写入中 || !输入文本.trim()" @click="发送">
-            {{ 发送中 ? '…' : '行动' }}
+          <button
+            class="btn rite quill-btn"
+            :disabled="发送中 || 由头写入中 || !当前行动可提交"
+            @click="发送"
+          >
+            {{ 发送中 ? '…' : 发送按钮文案 }}
           </button>
         </div>
-        <div v-if="可重掷 && !发送中 && 当前房间 === 回合房间" class="reroll-row">
+        <div v-if="!静音会议正式中 && 可重掷 && !发送中 && 当前房间 === 回合房间" class="reroll-row">
           <button class="btn" title="撤回本回合(你的行动与回应),重新措辞" @click="撤回">⌫ 撤回</button>
           <button class="btn" title="同样的行动重新演一遍" @click="重掷">↻ 重演</button>
         </div>
@@ -670,28 +1005,52 @@
         </div>
 
         <!-- 功能区:gal 式底部 dock(大图标按钮,与数据 HUD 分离) -->
-        <nav class="dock">
-          <button class="dock-btn primary" :disabled="发送中" @click="显示地图 = true">
+        <nav v-if="!录像带中" class="dock" :class="{ 'mute-meeting-dock': 静音会议正式中 }">
+          <button
+            class="dock-btn primary"
+            :disabled="发送中 || 静音会议正式中"
+            :title="静音会议正式中 ? '会议进行中，地图已锁定' : '打开地图'"
+            @click="显示地图 = true"
+          >
             <Ic n="map" /><span>地图</span>
           </button>
-          <button class="dock-btn" title="网购商城,次日达到管理员室" @click="显示商店 = true">
+          <button
+            class="dock-btn"
+            :disabled="静音会议正式中"
+            :title="静音会议正式中 ? '会议期间不能打开商店' : '网购商城,次日达到管理员室'"
+            @click="显示商店 = true"
+          >
             <Ic n="cart" /><span>商店</span>
           </button>
           <button
             class="dock-btn"
-            :class="{ ring: 手机来电, budge: 手机未读 }"
-            :title="手机来电 ? '有来电!' : '你的手机'"
+            :class="{
+              ring: 手机来电,
+              budge: 手机未读,
+              'meeting-live': 静音会议手机已开放,
+              'meeting-frozen': 静音会议正式中 && !静音会议手机可打开,
+            }"
+            :disabled="静音会议正式中 && !静音会议手机可打开"
+            :title="静音会议手机标题"
             @click="开手机"
           >
             <Ic n="phone" /><span>手机</span>
           </button>
-          <button class="dock-btn" :disabled="!背包列表.length" @click="显示背包 = true">
+          <button class="dock-btn" :disabled="静音会议正式中 || !背包列表.length" @click="显示背包 = true">
             <Ic n="bag" /><span>背包</span>
           </button>
-          <button v-if="监控列表.length" class="dock-btn" title="你装下的眼睛" @click="显示监控 = true">
+          <button
+            v-if="监控列表.length"
+            class="dock-btn"
+            :disabled="静音会议正式中"
+            title="你装下的眼睛"
+            @click="显示监控 = true"
+          >
             <Ic n="cctv" /><span>监控</span>
           </button>
-          <button class="dock-btn" title="完整往事与回档" @click="打开史册"><Ic n="book" /><span>往事</span></button>
+          <button class="dock-btn" :disabled="静音会议正式中" title="完整往事与回档" @click="打开史册">
+            <Ic n="book" /><span>往事</span>
+          </button>
         </nav>
       </template>
 
@@ -1054,7 +1413,25 @@
             <p class="dline crack-hint">✦ {{ 选中裂缝.对症提示 }}</p>
           </div>
 
-          <button v-if="选中可晋阶" class="btn rite" :disabled="发送中" @click="晋阶(选中档案.门牌)">✦ 跨过界线</button>
+          <button v-if="选中关系线索" class="btn relation-clue-open" type="button" @click="显示关系线索 = !显示关系线索">
+            ◇ 关系线索 {{ 选中关系线索.进度 }}/4 <span>{{ 显示关系线索 ? '收起' : '查看' }}</span>
+          </button>
+          <div v-if="显示关系线索 && 选中关系线索" class="dsec relation-clue-board">
+            <div class="dsec-title">{{ 选中关系线索.标题 }}</div>
+            <p class="relation-aside">· {{ 选中关系线索.侧写 }}</p>
+            <div v-for="(线索, i) in 选中关系线索.线索" :key="i" class="relation-clue" :class="{ done: 线索.完成 }">
+              <i>{{ 线索.完成 ? '✓' : '◇' }}</i><span>{{ 线索.文案 }}</span>
+            </div>
+            <p v-if="选中关系线索.数值已冻结" class="relation-wait">她似乎还有一件事没有想明白。</p>
+          </div>
+          <button
+            v-if="选中档案.妻.当前阶段 < 5 && 选中档案.妻.裂缝.已确认"
+            class="btn rite"
+            :disabled="发送中 || !选中可晋阶"
+            @click="晋阶(选中档案.门牌)"
+          >
+            ✦ 跨过界线
+          </button>
           <button
             v-if="选中可要钱"
             class="btn"
@@ -1139,6 +1516,17 @@
                 <button v-if="项.可读信" class="btn mini" :disabled="发送中" @click="打开信(项.信门牌!)">读</button>
                 <button v-if="项.可布设" class="btn mini" :disabled="发送中" @click="布设()">装在这个房间</button>
                 <button v-if="项.可用运作" class="btn mini" :disabled="发送中" @click="用运作(项.id)">使用</button>
+                <button v-if="项.可使用录像带" class="btn mini rite" :disabled="发送中" @click="使用录像带">
+                  在管理员室播放
+                </button>
+                <button
+                  v-if="项.可筹备静音会议"
+                  class="btn mini rite"
+                  :disabled="发送中"
+                  @click="打开静音会议筹备"
+                >
+                  筹备会议
+                </button>
                 <button
                   v-for="夫 in 项.运作对象"
                   :key="'运' + 夫.门牌"
@@ -1171,6 +1559,122 @@
             <p v-if="!背包列表.length" class="hint center">(空空如也)</p>
           </div>
         </div>
+      </div>
+
+      <!-- ═══════════ 静音会议：背包票只进入筹备；确认开始前不消耗 ═══════════ -->
+      <div v-if="静音会议筹备步骤" class="mask mute-prep-mask" @click.self="取消静音会议筹备">
+        <section class="sheet mute-prep-sheet" role="dialog" aria-modal="true" aria-label="筹备静音会议">
+          <button class="sheet-close" type="button" :disabled="静音会议筹备提交中" @click="取消静音会议筹备">✕</button>
+          <div class="ui-kicker">MUTE MEETING / 筹备会议</div>
+
+          <template v-if="静音会议筹备步骤 === '选择'">
+            <h3>亲自确定与会名单</h3>
+            <p class="mute-prep-lead">
+              选择 2—3 名妻子。对应丈夫会自动列席；灰色候选仍展示真实不合格原因，不会被系统代选。
+            </p>
+            <div class="mute-candidate-grid">
+              <button
+                v-for="候选 in 静音会议候选列表"
+                :key="候选.门牌"
+                type="button"
+                class="mute-candidate"
+                :class="{ on: 静音会议筹备妻.includes(候选.门牌), ineligible: !候选.合格 }"
+                :disabled="!候选.合格"
+                :aria-pressed="静音会议筹备妻.includes(候选.门牌)"
+                @click="切换静音会议筹备妻(候选.门牌)"
+              >
+                <span class="mute-candidate-avatar">
+                  <img
+                    v-if="!头像失效[候选.妻名]"
+                    :src="头像图(候选.妻名)"
+                    :alt="候选.妻名"
+                    @error="头像失效[候选.妻名] = true"
+                  />
+                  <b v-else>{{ 候选.妻名[0] }}</b>
+                </span>
+                <span class="mute-candidate-main">
+                  <b>{{ 候选.门牌 }} · {{ 候选.妻名 }}</b>
+                  <small>丈夫：{{ 候选.夫名 }}</small>
+                  <em :class="{ good: 候选.合格 }">{{ 候选.合格 ? '可以列席' : 候选.原因 }}</em>
+                </span>
+                <i>{{ 静音会议筹备妻.includes(候选.门牌) ? '✓' : 候选.合格 ? '＋' : '—' }}</i>
+              </button>
+            </div>
+
+            <div class="mute-topic-block">
+              <b>本次真实议题</b>
+              <div class="mute-topic-grid">
+                <button
+                  v-for="议题 in 静音会议议题列表"
+                  :key="议题"
+                  type="button"
+                  :class="{ on: 静音会议筹备议题 === 议题 }"
+                  :aria-pressed="静音会议筹备议题 === 议题"
+                  @click="静音会议筹备议题 = 议题"
+                >
+                  {{ 议题 }}
+                </button>
+              </div>
+            </div>
+
+            <footer class="mute-prep-footer">
+              <span :class="{ ready: 静音会议筹备可确认 }">
+                已选 {{ 静音会议筹备妻.length }}/3 · {{ 静音会议筹备议题 || '尚未选择议题' }}
+              </span>
+              <button class="btn rite" type="button" :disabled="!静音会议筹备可确认" @click="查看静音会议确认">
+                查看会议通知
+              </button>
+            </footer>
+          </template>
+
+          <template v-else>
+            <h3>发送前最后确认</h3>
+            <p class="mute-prep-lead">这一步仍可返回修改。只有发送通知后才重新校验、消耗场景票并冻结演员名单。</p>
+            <div class="mute-confirm-card">
+              <dl>
+                <div>
+                  <dt>参与妻</dt>
+                  <dd>{{ 静音会议筹备妻名.join('、') }}</dd>
+                </div>
+                <div>
+                  <dt>对应丈夫</dt>
+                  <dd>{{ 静音会议筹备夫名.join('、') }}</dd>
+                </div>
+                <div>
+                  <dt>地点</dt>
+                  <dd>管理员室 · 会场临时集合</dd>
+                </div>
+                <div>
+                  <dt>议题</dt>
+                  <dd>{{ 静音会议筹备议题 }}</dd>
+                </div>
+              </dl>
+              <ul>
+                <li>开场后地图、离场、普通房间动作、商店、背包与监控入口锁定。</li>
+                <li>人物只在演出层临时到场，不修改日常位置、作息、赴约或关系。</li>
+                <li>将消耗 1 张「静音会议」票；条件变化时会拒绝开场且不消耗。</li>
+              </ul>
+            </div>
+            <footer class="mute-prep-footer confirm">
+              <button
+                class="btn"
+                type="button"
+                :disabled="静音会议筹备提交中"
+                @click="静音会议筹备步骤 = '选择'"
+              >
+                返回修改
+              </button>
+              <button
+                class="btn rite"
+                type="button"
+                :disabled="静音会议筹备提交中 || !静音会议筹备可确认"
+                @click="发送静音会议通知"
+              >
+                {{ 静音会议筹备提交中 ? '正在重新校验…' : '发送会议通知并开始' }}
+              </button>
+            </footer>
+          </template>
+        </section>
       </div>
 
       <!-- ═══════════ 商店(次日达网购;礼物页签=裂缝解锁后现,商店自己就是进度条) ═══════════ -->
@@ -1368,6 +1872,13 @@ import type { FunctionalComponent } from 'vue';
 
 import type { SchemaType } from '../../schema';
 import {
+  获取静音会议回退状态序列,
+  获取静音会议素材相对路径,
+  静音会议候选门牌顺序,
+  type 静音会议候选门牌,
+  type 静音会议画面状态 as 静音会议画面状态类型,
+} from '../../静音会议配置';
+import {
   由头每日次数,
   由头工具表,
   户静态表,
@@ -1386,9 +1897,17 @@ import {
   type 门牌,
 } from '../../stageConfig';
 import { 丈夫在楼, 妻位置推算, 当前天数, 当前时段 } from '../../脚本/游戏逻辑/楼层时钟';
-import { 安装人妻公寓数据库模板, 数据库状态, 智脑状态 } from '../../脚本/游戏逻辑/数据库桥';
+import {
+  应用数据库填表兼容设置,
+  安装人妻公寓数据库模板,
+  打开数据库设置,
+  数据库状态,
+  智脑状态,
+} from '../../脚本/游戏逻辑/数据库桥';
 import { 查金币 } from '../../脚本/游戏逻辑/经济系统';
 import { 可晋阶 } from '../../脚本/游戏逻辑/结算系统';
+import { 读取关系线索 } from '../../脚本/游戏逻辑/阶段线路系统';
+import { 获取静音会议手机状态 } from '../../脚本/游戏逻辑/手机系统';
 import {
   CG条目,
   角色CG列表,
@@ -1399,6 +1918,9 @@ import {
   type 成人CG项,
 } from '../../脚本/游戏逻辑/成人CG系统';
 import { useDataStore } from './store';
+import 录像带双屏关闭图 from '../../素材/特殊场景/录像带/01_双屏关闭.png?url';
+import 录像带左屏亮起图 from '../../素材/特殊场景/录像带/02_左屏亮起.png?url';
+import 录像带双屏亮起图 from '../../素材/特殊场景/录像带/03_双屏亮起.png?url';
 
 // ── 梧桐里主题图标：统一 24×24 圆角描边，公寓门牌/钥匙孔/信件等语义贯穿全套 ──
 
@@ -1594,6 +2116,10 @@ async function 进入(房间id: string, 破门 = false, 保持地图 = false): P
   粘滞在场.value = { 位置: null, 们: [] };
   if (!保持地图) 关地图();
   await 写场景(房间id, 破门);
+  eventEmit('人妻公寓:线路到达地点', {
+    地点: 查房间(房间id)?.名称 ?? 房间id,
+    门牌: 门牌列表.includes(房间id as 门牌) ? (房间id as 门牌) : undefined,
+  });
   记待办(房间id);
   闪转场(查房间(房间id)?.名称 ?? 房间id);
   // 头像即时点亮(走到谁身边谁亮;回合结束后脚本按位置系统重算)
@@ -1702,6 +2228,29 @@ const 可用由头 = computed(() => {
 const 可输入 = computed(() => {
   const id = 当前房间.value;
   if (!id) return false;
+  if (静音会议中.value) {
+    if (!静音会议正式中.value || id !== '管理员室') return false;
+    if (
+      静音会议交互幕.value ||
+      静音会议场景.value.交互.状态 === '等待AI' ||
+      静音会议场景.value.阶段 === '收尾'
+    ) {
+      return false;
+    }
+    if (静音会议场景.value.阶段 === '正文') {
+      // 第 1 拍通常由确认按钮自动生成；若该次生成失败，保留输入框让玩家重试固定开场。
+      return [1, 2, 3, 5, 6, 7, 9, 10].includes(静音会议当前拍.value);
+    }
+    if (静音会议场景.value.阶段 === '散会选择') return 静音会议当前拍.value === 12;
+    if (静音会议场景.value.阶段 === '会后') {
+      return 静音会议当前拍.value >= 13 && 静音会议当前拍.value <= 15;
+    }
+    if (静音会议场景.value.阶段.includes('自由')) return 静音会议继续已选.value;
+    return false;
+  }
+  if (录像带中.value) {
+    return id === '管理员室' && 录像带阶段.value !== '等待102' && 录像带阶段.value !== '等待202';
+  }
   // 荣耀洞摇到真人后开放输入,让玩家亲自推进余下3~5拍；空军演完即清场,不会走到这里。
   if (id === '洗手间' && (data.value?.系统?._荣耀洞拍 ?? -1) >= 0 && data.value?.系统?._荣耀洞门牌 !== '空') {
     return true;
@@ -1963,6 +2512,10 @@ const 手机未读 = ref(false);
 let 收手机回全屏 = false;
 
 async function 开手机() {
+  if (静音会议正式中.value && !静音会议手机可打开.value) {
+    弹提示(静音会议手机标题.value);
+    return;
+  }
   // 真全屏时手机壳挂在父文档,永远被全屏元素盖死(2026-07-20 玩家实测)——先退全屏再弹
   const 文档 = document as 全屏文档;
   if (document.fullscreenElement ?? 文档.webkitFullscreenElement) {
@@ -2004,11 +2557,34 @@ const 可见门牌 = computed(() =>
 
 /** 某房间此刻有谁(妻按位置推算;夫在自家时段在家) */
 function 房内的人(房间id: string): string[] {
+  if (房间id === '管理员室' && 静音会议正式中.value) {
+    const 临时名单 = 静音会议演出妻.value.map(门牌号 => 户静态表[门牌号].妻名);
+    if (
+      静音会议当前拍.value >= 1 &&
+      静音会议当前拍.value <= 12 &&
+      !['会后', '收尾'].includes(静音会议场景.value.阶段) &&
+      !静音会议场景.value.阶段.includes('自由')
+    ) {
+      const 演出夫 = 静音会议场景.value.演出夫.length
+        ? 静音会议场景.value.演出夫.map(值 =>
+            是静音会议候选门牌(值) ? 户静态表[值].夫名 : 值,
+          )
+        : 静音会议参与妻.value.map(门牌号 => 户静态表[门牌号].夫名);
+      临时名单.push(...演出夫.filter(Boolean));
+    }
+    return [...new Set(临时名单)];
+  }
   const 名单: string[] = [];
   for (const m of 可见门牌.value) {
     if (妻现位(m, 位置种子.value) === 房间id) 名单.push(户静态表[m].妻名);
     if (m === 房间id && 丈夫在楼(data.value.户[m], m, 位置种子.value) !== '外出' && 户静态表[m].夫名) {
       名单.push(户静态表[m].夫名);
+    }
+  }
+  if (房间id === '管理员室' && data.value?.系统?._特殊场景?.id === '录像带') {
+    for (const 门牌号 of ['102', '202'] as const) {
+      const 名 = 户静态表[门牌号].妻名;
+      if (!名单.includes(名)) 名单.push(名);
     }
   }
   return 名单;
@@ -2033,6 +2609,728 @@ function 房内首字(房间id: string): string {
 }
 
 const 当前房间名 = computed(() => (当前房间.value ? (查房间(当前房间.value)?.名称 ?? 当前房间.value) : ''));
+
+// ── 特殊场景「录像带」：管理员室双屏交互 ──
+
+const 录像带阶段 = computed(() =>
+  data.value?.系统?._特殊场景?.id === '录像带' ? data.value.系统._特殊场景.阶段 : '',
+);
+const 录像带中 = computed(() => !!录像带阶段.value);
+const 录像带本地结果 = ref<'' | '102' | '202'>('');
+const 录像带连点目标 = 10;
+const 录像带连点计数 = ref(0);
+const 录像带连续失败 = ref(0);
+const 录像带补偿可用 = computed(() => 录像带阶段.value === '等待202' && 录像带连续失败.value >= 3);
+let 录像带连点开始 = 0;
+let 录像带连点timer: ReturnType<typeof setTimeout> | undefined;
+
+const 录像带交互幕 = computed(
+  () =>
+    录像带中.value &&
+    (录像带阶段.value === '等待102' ||
+      录像带阶段.value === '等待202' ||
+      !!录像带本地结果.value),
+);
+const 录像带当前图 = computed(() => {
+  if (录像带本地结果.value === '202') return 录像带双屏亮起图;
+  if (录像带本地结果.value === '102' || 录像带阶段.value === '等待202') return 录像带左屏亮起图;
+  return 录像带双屏关闭图;
+});
+const 录像带交互说明 = computed(() => {
+  if (发送中.value && 录像带本地结果.value) return '录像已经接通，正在等待她们开口……';
+  if (录像带阶段.value === '等待202') return '102室录像已结束。连续点击，让第二台显示器接通信号。';
+  return '两台显示器仍是黑的。先调取102室录像。';
+});
+
+function 使用录像带() {
+  显示背包.value = false;
+  eventEmit('人妻公寓:使用录像带');
+}
+
+function 提交录像带互动(房间: '102' | '202') {
+  if (发送中.value) return;
+  clearTimeout(录像带连点timer);
+  录像带连点计数.value = 0;
+  录像带本地结果.value = 房间;
+  发送中.value = true;
+  流式段.value = [];
+  eventEmit('人妻公寓:录像带互动', 房间);
+}
+
+function 打开102录像() {
+  if (录像带阶段.value === '等待102') 提交录像带互动('102');
+}
+
+function 记录录像带连点失败() {
+  if (录像带阶段.value !== '等待202' || 录像带连点计数.value >= 录像带连点目标) return;
+  录像带连点计数.value = 0;
+  录像带连点开始 = 0;
+  录像带连续失败.value += 1;
+}
+
+function 连续点击202录像() {
+  if (发送中.value || 录像带阶段.value !== '等待202') return;
+  const 现在 = Date.now();
+  if (!录像带连点开始) {
+    录像带连点开始 = 现在;
+    clearTimeout(录像带连点timer);
+    录像带连点timer = setTimeout(记录录像带连点失败, 5000);
+  } else if (现在 - 录像带连点开始 > 5000) {
+    记录录像带连点失败();
+    录像带连点开始 = 现在;
+    clearTimeout(录像带连点timer);
+    录像带连点timer = setTimeout(记录录像带连点失败, 5000);
+  }
+  录像带连点计数.value += 1;
+  if (录像带连点计数.value >= 录像带连点目标) 提交录像带互动('202');
+}
+
+function 自动重连202() {
+  if (录像带补偿可用.value) 提交录像带互动('202');
+}
+
+// ── 特殊场景「静音会议」：筹备、组合图、三道 Pointer 交互与会后循环 ──
+
+type 静音会议互动ID = 'A' | 'B' | 'C';
+type 静音会议峰值模式 = '集中' | '同步';
+type 静音会议筹备步骤 = '' | '选择' | '确认';
+
+interface 静音会议运行状态 {
+  id: string;
+  阶段: string;
+  地点: string;
+  参与妻: string[];
+  演出妻: string[];
+  演出夫: string[];
+  启动楼层: number;
+  当前拍: number;
+  议题: string;
+  重点妻: string;
+  峰值模式: string;
+  会后妻: string[];
+  自由循环次数: number;
+  交互: {
+    id: string;
+    类型: string;
+    状态: string;
+    失败次数: number;
+    补偿可用: boolean;
+  };
+}
+
+const 空静音会议状态: 静音会议运行状态 = {
+  id: '',
+  阶段: '',
+  地点: '',
+  参与妻: [],
+  演出妻: [],
+  演出夫: [],
+  启动楼层: -1,
+  当前拍: 0,
+  议题: '',
+  重点妻: '',
+  峰值模式: '',
+  会后妻: [],
+  自由循环次数: 0,
+  交互: { id: '', 类型: '', 状态: '', 失败次数: 0, 补偿可用: false },
+};
+
+const 静音会议场景 = computed<静音会议运行状态>(() => {
+  const 场 = data.value?.系统?._特殊场景;
+  return 场?.id === '静音会议' ? (场 as 静音会议运行状态) : 空静音会议状态;
+});
+const 静音会议中 = computed(() => 静音会议场景.value.id === '静音会议');
+const 静音会议正式中 = computed(() => 静音会议中.value && 静音会议场景.value.阶段 !== '筹备');
+const 静音会议当前拍 = computed(() => Math.max(0, Number(静音会议场景.value.当前拍) || 0));
+
+function 是静音会议候选门牌(值: string): 值 is 静音会议候选门牌 {
+  return 静音会议候选门牌顺序.includes(值 as 静音会议候选门牌);
+}
+
+function 规范静音会议妻名单(原值: readonly string[]): 静音会议候选门牌[] {
+  return [...new Set(原值.filter(是静音会议候选门牌))].sort(
+    (左, 右) => 静音会议候选门牌顺序.indexOf(左) - 静音会议候选门牌顺序.indexOf(右),
+  );
+}
+
+const 静音会议参与妻 = computed(() => 规范静音会议妻名单(静音会议场景.value.参与妻));
+const 静音会议演出妻 = computed(() => {
+  if (
+    静音会议当前拍.value > 12 ||
+    ['会后', '收尾'].includes(静音会议场景.value.阶段) ||
+    静音会议场景.value.阶段.includes('自由')
+  ) {
+    const 会后 = 规范静音会议妻名单(静音会议场景.value.会后妻);
+    if (会后.length) return 会后;
+  }
+  const 演出 = 规范静音会议妻名单(静音会议场景.value.演出妻);
+  return 演出.length ? 演出 : 静音会议参与妻.value;
+});
+const 静音会议重点妻名 = computed(() => {
+  const 门牌号 = 静音会议场景.value.重点妻;
+  return 是静音会议候选门牌(门牌号) ? 户静态表[门牌号].妻名 : '';
+});
+const 静音会议阶段短名 = computed(() => {
+  const 阶段 = 静音会议场景.value.阶段;
+  if (阶段 === '筹备') return '筹备';
+  if (阶段 === '正文') return '固定会议';
+  if (阶段 === '散会选择') return '散会';
+  if (阶段.includes('自由')) return '会后自由';
+  if (阶段 === '会后') return '门后';
+  if (阶段 === '收尾') return '最终收尾';
+  return '静音会议';
+});
+const 静音会议拍数文案 = computed(() => {
+  const 交互 = 静音会议场景.value.交互;
+  if (交互.状态 === '待操作' && ['A', 'B', 'C'].includes(交互.id)) return `交互 ${交互.id}`;
+  if (静音会议场景.value.阶段.includes('自由')) {
+    return `自由循环 ${静音会议场景.value.自由循环次数 + 1}`;
+  }
+  return 静音会议当前拍.value > 0 ? `第 ${静音会议当前拍.value} 拍` : '准备中';
+});
+
+const 静音会议筹备步骤 = ref<静音会议筹备步骤>('');
+const 静音会议筹备妻 = ref<静音会议候选门牌[]>([]);
+const 静音会议筹备议题 = ref('');
+const 静音会议筹备提交中 = ref(false);
+let 静音会议筹备timer: ReturnType<typeof setTimeout> | undefined;
+const 静音会议议题列表 = ['公共设施维修', '噪音与住户投诉', '物业费及公共账目'] as const;
+
+const 静音会议候选列表 = computed(() =>
+  静音会议候选门牌顺序.map(门牌 => {
+    const 户 = data.value?.户?.[门牌];
+    const 原因: string[] = [];
+    if (!户) 原因.push('尚未入住');
+    if (户 && 户.妻.当前阶段 < 4) 原因.push(`当前 L${户.妻.当前阶段}，需要 L4`);
+    if (户 && !户.妻.特殊.some(项 => 项.includes('遥控跳蛋'))) 原因.push('未装载遥控跳蛋');
+    return {
+      门牌,
+      妻名: 户静态表[门牌].妻名,
+      夫名: 户静态表[门牌].夫名,
+      合格: 原因.length === 0,
+      原因: 原因.join(' · '),
+    };
+  }),
+);
+const 静音会议筹备可确认 = computed(
+  () =>
+    静音会议筹备妻.value.length >= 2 &&
+    静音会议筹备妻.value.length <= 3 &&
+    !!静音会议筹备议题.value &&
+    静音会议筹备妻.value.every(门牌 => 静音会议候选列表.value.find(项 => 项.门牌 === 门牌)?.合格),
+);
+const 静音会议筹备妻名 = computed(() => 静音会议筹备妻.value.map(门牌 => 户静态表[门牌].妻名));
+const 静音会议筹备夫名 = computed(() =>
+  静音会议筹备妻.value.map(门牌 => 户静态表[门牌].夫名).filter(Boolean),
+);
+
+function 打开静音会议筹备() {
+  if (发送中.value || 静音会议中.value) return;
+  显示背包.value = false;
+  静音会议筹备妻.value = [];
+  静音会议筹备议题.value = '';
+  静音会议筹备提交中.value = false;
+  静音会议筹备步骤.value = '选择';
+  eventEmit('人妻公寓:使用静音会议');
+  clearTimeout(静音会议筹备timer);
+  静音会议筹备timer = setTimeout(() => {
+    try {
+      (store as unknown as { pull?: () => void }).pull?.();
+    } catch {
+      /* 由状态事件优先同步 */
+    }
+    nextTick(同步静音会议界面);
+  }, 800);
+}
+
+function 取消静音会议筹备() {
+  if (静音会议筹备提交中.value) return;
+  const 应通知脚本 = 静音会议场景.value.阶段 === '筹备';
+  静音会议筹备步骤.value = '';
+  clearTimeout(静音会议筹备timer);
+  静音会议筹备妻.value = [];
+  静音会议筹备议题.value = '';
+  if (应通知脚本) eventEmit('人妻公寓:取消静音会议筹备');
+}
+
+function 切换静音会议筹备妻(门牌: 静音会议候选门牌) {
+  if (!静音会议候选列表.value.find(项 => 项.门牌 === 门牌)?.合格) return;
+  if (静音会议筹备妻.value.includes(门牌)) {
+    静音会议筹备妻.value = 静音会议筹备妻.value.filter(项 => 项 !== 门牌);
+    return;
+  }
+  if (静音会议筹备妻.value.length >= 3) {
+    弹提示('静音会议最多选择 3 名妻子。');
+    return;
+  }
+  静音会议筹备妻.value = 规范静音会议妻名单([...静音会议筹备妻.value, 门牌]);
+}
+
+function 查看静音会议确认() {
+  if (静音会议筹备可确认.value) 静音会议筹备步骤.value = '确认';
+}
+
+function 发送静音会议通知() {
+  if (!静音会议筹备可确认.value || 静音会议筹备提交中.value) return;
+  静音会议筹备提交中.value = true;
+  eventEmit('人妻公寓:启动静音会议', {
+    参与妻: [...静音会议筹备妻.value],
+    议题: 静音会议筹备议题.value,
+  });
+  clearTimeout(静音会议筹备timer);
+  静音会议筹备timer = setTimeout(() => {
+    try {
+      (store as unknown as { pull?: () => void }).pull?.();
+    } catch {
+      /* 状态事件缺失时仍由本地真值解除提交锁 */
+    }
+    nextTick(() => {
+      同步静音会议界面();
+      if (静音会议场景.value.阶段 === '筹备') 静音会议筹备步骤.value = '选择';
+    });
+  }, 1200);
+}
+
+const 静音会议手机状态 = computed(() => 获取静音会议手机状态(data.value ?? null));
+const 静音会议手机已开放 = computed(
+  () => 静音会议手机状态.value.场景中 && 静音会议手机状态.value.已开放,
+);
+const 静音会议手机可打开 = computed(
+  () => !静音会议正式中.value || (!发送中.value && 静音会议手机状态.value.可打开),
+);
+const 静音会议手机标题 = computed(() => {
+  if (!静音会议正式中.value) return '打开手机';
+  if (发送中.value && 静音会议手机状态.value.已开放) return '会议正文正在生成，稍后再看微信。';
+  return 静音会议手机状态.value.可打开
+    ? '会场微信已开放'
+    : 静音会议手机状态.value.禁用原因 || '会议微信暂不可用';
+});
+
+const 静音会议互动id = computed<静音会议互动ID>(() => {
+  const id = 静音会议场景.value.交互.id;
+  return id === 'B' || id === 'C' ? id : 'A';
+});
+const 静音会议互动待操作 = computed(() => 静音会议场景.value.交互.状态 === '待操作');
+const 静音会议等待AI重试 = computed(() => 静音会议场景.value.交互.状态 === '等待AI');
+const 静音会议B目标 = ref<静音会议候选门牌 | ''>('');
+const 静音会议C模式 = ref<静音会议峰值模式 | ''>('');
+const 静音会议长按中 = ref(false);
+const 静音会议连点计数 = ref(0);
+const 静音会议本地失败次数 = ref(0);
+const 静音会议本地画面状态 = ref<静音会议画面状态类型 | ''>('');
+const 静音会议互动结果 = ref<
+  | {
+      类型: 'success' | 'failure';
+      标题: string;
+      说明: string;
+    }
+  | undefined
+>();
+const 静音会议互动失败次数 = computed(() =>
+  Math.max(静音会议本地失败次数.value, 静音会议场景.value.交互.失败次数 || 0),
+);
+const 静音会议互动补偿可用 = computed(
+  () => 静音会议场景.value.交互.补偿可用 || 静音会议互动失败次数.value >= 3,
+);
+const 静音会议交互幕 = computed(
+  () =>
+    静音会议正式中.value &&
+    (((静音会议互动待操作.value || 静音会议等待AI重试.value) &&
+      ['A', 'B', 'C'].includes(静音会议场景.value.交互.id)) ||
+      !!静音会议互动结果.value),
+);
+const 静音会议互动标题 = computed(
+  () =>
+    ({
+      A: '连接全部设备',
+      B: '维持第二档',
+      C: '执行最终加档',
+    })[静音会议互动id.value],
+);
+const 静音会议互动说明 = computed(
+  () =>
+    ({
+      A: '点按一次，令所有参会设备同时进入第一档。',
+      B: '先从参会妻子中选定一人，再持续按住控制键 2 秒。',
+      C: '先决定集中一人或全体同步，再于 6 秒内完成连续点击。',
+    })[静音会议互动id.value],
+);
+const 静音会议连点目标 = computed(() =>
+  静音会议C模式.value === '同步' ? Math.max(6, 静音会议参与妻.value.length * 3) : 6,
+);
+const 静音会议连点点亮妻 = computed(() => {
+  if (静音会议互动id.value !== 'C' || !静音会议连点计数.value) return [];
+  if (静音会议C模式.value === '集中') {
+    const 重点 = 静音会议场景.value.重点妻;
+    return 是静音会议候选门牌(重点) ? [重点] : [];
+  }
+  const 已点亮 = Math.min(静音会议参与妻.value.length, Math.floor(静音会议连点计数.value / 3));
+  return 静音会议参与妻.value.slice(0, 已点亮);
+});
+
+interface 静音会议活动指针 {
+  id: number;
+  类型: 静音会议互动ID;
+  元素: HTMLElement;
+  长按timer?: ReturnType<typeof setTimeout>;
+}
+
+let 静音会议活动指针: 静音会议活动指针 | null = null;
+let 静音会议连点timer: ReturnType<typeof setTimeout> | undefined;
+let 静音会议结果timer: ReturnType<typeof setTimeout> | undefined;
+
+function 释放静音会议指针() {
+  const 指针 = 静音会议活动指针;
+  if (!指针) return;
+  clearTimeout(指针.长按timer);
+  try {
+    if (指针.元素.hasPointerCapture(指针.id)) 指针.元素.releasePointerCapture(指针.id);
+  } catch {
+    /* 元素已离开文档时只需清本地状态 */
+  }
+  静音会议活动指针 = null;
+  静音会议长按中.value = false;
+}
+
+function 清理静音会议连点() {
+  clearTimeout(静音会议连点timer);
+  静音会议连点timer = undefined;
+  静音会议连点计数.value = 0;
+}
+
+function 清理静音会议互动现场(保留结果 = false) {
+  释放静音会议指针();
+  清理静音会议连点();
+  clearTimeout(静音会议结果timer);
+  静音会议结果timer = undefined;
+  if (!保留结果) 静音会议互动结果.value = undefined;
+}
+
+function 捕获静音会议指针(event: PointerEvent, 类型: 静音会议互动ID): boolean {
+  if (
+    !event.isPrimary ||
+    event.button !== 0 ||
+    静音会议活动指针 ||
+    !静音会议互动待操作.value ||
+    静音会议互动id.value !== 类型 ||
+    静音会议互动结果.value
+  ) {
+    return false;
+  }
+  const 元素 = event.currentTarget as HTMLElement | null;
+  if (!元素) return false;
+  try {
+    元素.setPointerCapture(event.pointerId);
+  } catch {
+    return false;
+  }
+  静音会议活动指针 = { id: event.pointerId, 类型, 元素 };
+  return true;
+}
+
+function 静音会议互动载荷(id = 静音会议互动id.value) {
+  if (id === 'B') return { id, 目标妻: 静音会议B目标.value || 静音会议场景.value.重点妻 };
+  if (id === 'C') return { id, 模式: 静音会议C模式.value || 静音会议场景.value.峰值模式 };
+  return { id };
+}
+
+function 显示静音会议互动失败(说明: string) {
+  if (!静音会议互动待操作.value || 静音会议互动结果.value) return;
+  const id = 静音会议互动id.value;
+  清理静音会议互动现场();
+  静音会议本地失败次数.value += 1;
+  静音会议互动结果.value = { 类型: 'failure', 标题: '操作未完成', 说明 };
+  eventEmit('人妻公寓:静音会议互动失败', { id });
+  静音会议结果timer = setTimeout(() => {
+    静音会议互动结果.value = undefined;
+  }, 720);
+}
+
+function 提交静音会议互动(补偿 = false) {
+  if (!静音会议互动待操作.value || 静音会议互动结果.value) return;
+  const id = 静音会议互动id.value;
+  if (id === 'B' && !静音会议B目标.value) return;
+  if (id === 'C' && !静音会议C模式.value) return;
+  清理静音会议互动现场();
+  if (id === 'A') 静音会议本地画面状态.value = 'DETAIL';
+  if (id === 'C') 静音会议本地画面状态.value = 'PEAK';
+  静音会议互动结果.value = {
+    类型: 'success',
+    标题: 补偿 ? '系统已接管操作' : '控制信号已确认',
+    说明:
+      id === 'A'
+        ? '全部设备已经连接，第一档同步启动。'
+        : id === 'B'
+          ? `${户静态表[静音会议B目标.value as 静音会议候选门牌].妻名}的第二档保持稳定。`
+          : 静音会议C模式.value === '同步'
+            ? '所有参会设备同时进入最终档。'
+            : '最终档已集中到重点目标。',
+  };
+  静音会议结果timer = setTimeout(() => {
+    发送中.value = true;
+    流式段.value = [];
+    eventEmit(
+      补偿 ? '人妻公寓:静音会议互动补偿' : '人妻公寓:静音会议互动',
+      静音会议互动载荷(id),
+    );
+  }, 520);
+}
+
+function 静音会议A按下(event: PointerEvent) {
+  捕获静音会议指针(event, 'A');
+}
+
+function 静音会议A抬起(event: PointerEvent) {
+  if (静音会议活动指针?.类型 !== 'A' || 静音会议活动指针.id !== event.pointerId) return;
+  释放静音会议指针();
+  提交静音会议互动();
+}
+
+function 选择静音会议B目标(门牌: 静音会议候选门牌, event?: PointerEvent) {
+  event?.preventDefault();
+  if (event && (!event.isPrimary || event.button !== 0)) return;
+  if (静音会议互动id.value === 'B' && 静音会议互动待操作.value && !静音会议互动结果.value) {
+    静音会议B目标.value = 门牌;
+  }
+}
+
+function 静音会议B按下(event: PointerEvent) {
+  if (!静音会议B目标.value || !捕获静音会议指针(event, 'B') || !静音会议活动指针) return;
+  静音会议长按中.value = true;
+  静音会议活动指针.长按timer = setTimeout(() => {
+    释放静音会议指针();
+    提交静音会议互动();
+  }, 2000);
+}
+
+function 静音会议B抬起(event: PointerEvent) {
+  if (静音会议活动指针?.类型 !== 'B' || 静音会议活动指针.id !== event.pointerId) return;
+  释放静音会议指针();
+  显示静音会议互动失败('需要持续按住整整 2 秒；现在可以立即重试。');
+}
+
+function 选择静音会议C模式(模式: 静音会议峰值模式, event?: PointerEvent) {
+  event?.preventDefault();
+  if (event && (!event.isPrimary || event.button !== 0)) return;
+  if (静音会议互动id.value !== 'C' || !静音会议互动待操作.value || 静音会议互动结果.value) return;
+  if (静音会议连点计数.value) 清理静音会议连点();
+  静音会议C模式.value = 模式;
+}
+
+function 静音会议C按下(event: PointerEvent) {
+  if (!静音会议C模式.value) return;
+  捕获静音会议指针(event, 'C');
+}
+
+function 静音会议C抬起(event: PointerEvent) {
+  if (静音会议活动指针?.类型 !== 'C' || 静音会议活动指针.id !== event.pointerId) return;
+  释放静音会议指针();
+  if (!静音会议连点计数.value) {
+    静音会议连点timer = setTimeout(() => {
+      显示静音会议互动失败('没有在 6 秒内完成连续点击；计数已经复位。');
+    }, 6000);
+  }
+  静音会议连点计数.value += 1;
+  if (静音会议连点计数.value >= 静音会议连点目标.value) 提交静音会议互动();
+}
+
+function 静音会议指针取消(event?: PointerEvent, 记录失败 = false) {
+  if (event && 静音会议活动指针 && 静音会议活动指针.id !== event.pointerId) return;
+  const 原类型 = 静音会议活动指针?.类型;
+  释放静音会议指针();
+  if (原类型 === 'C') 清理静音会议连点();
+  if (记录失败 && 原类型) 显示静音会议互动失败('指针离开了控制区域；捕获状态已清理，可以重试。');
+}
+
+function 静音会议窗口失焦() {
+  释放静音会议指针();
+  清理静音会议连点();
+}
+
+function 静音会议互动补偿通过() {
+  if (静音会议互动补偿可用.value) 提交静音会议互动(true);
+}
+
+function 重试静音会议互动续拍() {
+  if (!静音会议等待AI重试.value || 发送中.value) return;
+  const 载荷 = 静音会议互动载荷();
+  if (
+    (载荷.id === 'B' && !('目标妻' in 载荷 && 载荷.目标妻)) ||
+    (载荷.id === 'C' && !('模式' in 载荷 && 载荷.模式))
+  ) {
+    弹提示('交互目标状态缺失，无法重放下一拍。');
+    return;
+  }
+  发送中.value = true;
+  流式段.value = [];
+  静音会议互动结果.value = {
+    类型: 'success',
+    标题: '重新发送控制结果',
+    说明: '交互已经通过，正在重新生成后续正文。',
+  };
+  eventEmit('人妻公寓:静音会议互动', 载荷);
+}
+
+const 静音会议画面状态 = computed<静音会议画面状态类型>(() => {
+  if (静音会议本地画面状态.value) return 静音会议本地画面状态.value;
+  const 拍 = 静音会议当前拍.value;
+  const 待交互 = 静音会议互动待操作.value ? 静音会议互动id.value : '';
+  if (拍 <= 3 || 待交互 === 'A') return 'CLEAN';
+  if (拍 <= 10 || 待交互 === 'C') return 'DETAIL';
+  return 'PEAK';
+});
+const 静音会议显示组合图 = computed(
+  () =>
+    静音会议正式中.value &&
+    静音会议当前拍.value >= 1 &&
+    静音会议当前拍.value <= 12 &&
+    (静音会议参与妻.value.length === 2 || 静音会议参与妻.value.length === 3),
+);
+const 静音会议图回退序号 = ref(0);
+const 静音会议图已加载 = ref(false);
+const 静音会议图状态序列 = computed(
+  () =>
+    获取静音会议回退状态序列(静音会议画面状态.value) ??
+    ([] as readonly 静音会议画面状态类型[]),
+);
+const 静音会议当前图地址 = computed(() => {
+  if (!静音会议显示组合图.value) return '';
+  const 状态 = 静音会议图状态序列.value[静音会议图回退序号.value];
+  const 相对路径 = 状态 ? 获取静音会议素材相对路径(静音会议参与妻.value, 状态) : null;
+  return 相对路径 ? `${成人CG基址}/${相对路径}` : '';
+});
+
+function 静音会议图加载成功() {
+  静音会议图已加载.value = true;
+}
+
+function 静音会议图加载失败() {
+  静音会议图已加载.value = false;
+  if (静音会议图回退序号.value < 静音会议图状态序列.value.length) 静音会议图回退序号.value += 1;
+}
+
+watch(
+  () => `${静音会议参与妻.value.join('-')}|${静音会议画面状态.value}`,
+  () => {
+    静音会议图回退序号.value = 0;
+    静音会议图已加载.value = false;
+  },
+);
+
+watch(
+  () => `${静音会议场景.value.id}|${静音会议场景.value.交互.id}`,
+  () => {
+    清理静音会议互动现场();
+    静音会议B目标.value = '';
+    静音会议C模式.value = '';
+    静音会议本地失败次数.value = 0;
+    静音会议本地画面状态.value = '';
+  },
+);
+
+const 静音会议会后选择 = ref<静音会议候选门牌[]>([]);
+const 静音会议继续已选 = ref(false);
+const 静音会议自由行动进行中 = ref(false);
+const 静音会议待散会选择 = computed(
+  () =>
+    静音会议正式中.value &&
+    静音会议场景.value.阶段 === '散会选择' &&
+    静音会议当前拍.value === 12 &&
+    !静音会议交互幕.value,
+);
+const 静音会议会后选择合法 = computed(
+  () =>
+    静音会议会后选择.value.length >= 1 &&
+    静音会议会后选择.value.length <= 静音会议参与妻.value.length &&
+    静音会议会后选择.value.every(门牌 => 静音会议参与妻.value.includes(门牌)),
+);
+const 静音会议会后选择提示 = computed(() =>
+  静音会议会后选择合法.value
+    ? `将留下 ${静音会议会后选择.value.map(门牌 => 户静态表[门牌].妻名).join('、')}`
+    : '请至少选择 1 名妻子',
+);
+const 静音会议自由待选择 = computed(
+  () =>
+    静音会议正式中.value &&
+    静音会议场景.value.阶段.includes('自由') &&
+    静音会议当前拍.value >= 15 &&
+    !静音会议继续已选.value,
+);
+const 静音会议收尾待重试 = computed(
+  () => 静音会议正式中.value && 静音会议场景.value.阶段 === '收尾',
+);
+
+watch(
+  () => 静音会议场景.value.自由循环次数,
+  (新次数, 旧次数) => {
+    if (
+      静音会议自由行动进行中.value &&
+      静音会议场景.value.阶段.includes('自由') &&
+      新次数 > 旧次数
+    ) {
+      静音会议继续已选.value = false;
+      静音会议自由行动进行中.value = false;
+    }
+  },
+);
+
+function 切换静音会议会后妻(门牌: 静音会议候选门牌) {
+  if (!静音会议参与妻.value.includes(门牌)) return;
+  静音会议会后选择.value = 静音会议会后选择.value.includes(门牌)
+    ? 静音会议会后选择.value.filter(项 => 项 !== 门牌)
+    : 规范静音会议妻名单([...静音会议会后选择.value, 门牌]);
+}
+
+function 继续静音会议会后活动() {
+  静音会议继续已选.value = true;
+  nextTick(() => 输入框.value?.focus());
+}
+
+function 请求结束静音会议() {
+  if ((!静音会议自由待选择.value && !静音会议收尾待重试.value) || 发送中.value) return;
+  发送中.value = true;
+  流式段.value = [];
+  eventEmit('人妻公寓:结束静音会议');
+}
+
+function 同步静音会议界面() {
+  clearTimeout(静音会议筹备timer);
+  静音会议筹备timer = undefined;
+  if (!静音会议中.value) {
+    静音会议筹备步骤.value = '';
+    静音会议筹备提交中.value = false;
+    静音会议会后选择.value = [];
+    静音会议继续已选.value = false;
+    静音会议自由行动进行中.value = false;
+    清理静音会议互动现场();
+    return;
+  }
+  if (静音会议场景.value.阶段 === '筹备') {
+    if (!静音会议筹备步骤.value) 静音会议筹备步骤.value = '选择';
+    静音会议筹备提交中.value = false;
+    return;
+  }
+  静音会议筹备步骤.value = '';
+  静音会议筹备提交中.value = false;
+  当前房间.value = '管理员室';
+  幕房间.value = '管理员室';
+  显示地图.value = false;
+  显示商店.value = false;
+  显示背包.value = false;
+  显示监控.value = false;
+  显示史册.value = false;
+  选中门牌.value = null;
+  CG图库门牌.value = null;
+  CG预览.value = null;
+  房卡.value = null;
+  垃圾选择开.value = false;
+}
+
+watch(
+  () => `${静音会议场景.value.id}|${静音会议场景.value.阶段}`,
+  () => nextTick(同步静音会议界面),
+  { flush: 'post' },
+);
 
 // ── 到场卡与氛围色(移动的沉浸反馈:每个地点有自己的"开场镜头"和颜色) ──
 
@@ -2094,6 +3392,9 @@ const 场景图样式 = computed(() => ({ '--scene-img': `url(${荣耀洞图.val
 const 荣耀洞可用 = computed(() => {
   const 系 = data.value?.系统;
   if (!系 || (系._荣耀洞拍 ?? -1) >= 0) return false;
+  // 高级隔离事件不参与新手教程。四项基础走访完成前入口不出现；脚本端另有同一门禁，
+  // 防止延迟点击、旧 iframe 或手工事件绕过显示层。
+  if (!['信箱区', '101', '102', '管理员室'].every(键 => 待办勾.value[键])) return false;
   const 记 = (系._荣耀洞上次楼 ?? -999) > 钟楼号.value ? -999 : (系._荣耀洞上次楼 ?? -999); // 回档陷阱自净
   return 钟楼号.value - 记 >= 荣耀洞冷却楼; // 与脚本同一份配置(审计 低危20:此前硬编码 18 重复定义)
 });
@@ -2273,8 +3574,9 @@ const 立绘列表 = computed<立绘项[]>(() => {
   if (洞件 !== undefined) {
     return 洞件 && !立绘失效.value[洞件] ? [{ src: 洞件, style: 立绘槽(1, 0) }] : [];
   }
-  const 图 = 可见门牌.value
-    .filter(k => 妻现位(k, 位置种子.value) === 当前房间.value)
+  const 静音演员 =
+    当前房间.value === '管理员室' && 静音会议正式中.value ? 静音会议演出妻.value : undefined;
+  const 图 = (静音演员 ?? 可见门牌.value.filter(k => 妻现位(k, 位置种子.value) === 当前房间.value))
     .map(m => {
       // 立绘跟随最后换上的衣服；旧档没有 `_立绘` 时优先恢复内衣差分，再回退外装。
       const 妻名 = 户静态表[m].妻名;
@@ -2355,7 +3657,17 @@ const 头像列表 = computed(() =>
   可见门牌.value.map(m => ({
     门牌: m,
     妻名: 户静态表[m].妻名,
-    态: 在场.value.焦点.includes(m) ? 'focus' : 在场.value.在场.includes(m) ? 'ambient' : 'away',
+    态: 静音会议正式中.value
+      ? 静音会议演出妻.value.includes(m)
+        ? 静音会议场景.value.重点妻 === m || 静音会议场景.value.会后妻.includes(m)
+          ? 'focus'
+          : 'ambient'
+        : 'away'
+      : 在场.value.焦点.includes(m)
+        ? 'focus'
+        : 在场.value.在场.includes(m)
+          ? 'ambient'
+          : 'away',
   })),
 );
 
@@ -2374,6 +3686,10 @@ const 取消后自动重试 = ref(false);
 const 可重掷 = ref(false);
 const 隔离可重掷 = ref(false);
 const 键盘打开 = ref(false);
+const 当前行动可提交 = computed(
+  () => !!输入文本.value.trim() && (!静音会议待散会选择.value || 静音会议会后选择合法.value),
+);
+const 发送按钮文案 = computed(() => (静音会议待散会选择.value ? '宣布散会' : '行动'));
 const 输入框 = ref<HTMLTextAreaElement | null>(null);
 const 键盘视口们: VisualViewport[] = [];
 let 键盘定位timer: ReturnType<typeof setTimeout> | undefined;
@@ -2508,6 +3824,10 @@ function 选项移动目标(文本: string): string | null {
 }
 
 async function 点选项(文本: string) {
+  if (静音会议正式中.value) {
+    发出(文本);
+    return;
+  }
   const 目标 = 选项移动目标(文本);
   if (目标 && 目标 !== 当前房间.value) await 进入(目标);
   发出(文本);
@@ -2517,6 +3837,15 @@ async function 点选项(文本: string) {
 function 发出(文本: string) {
   文本 = 文本.trim();
   if (!文本 || 发送中.value) return;
+  if (静音会议正式中.value) {
+    if (静音会议交互幕.value || 静音会议场景.value.交互.状态 === '等待AI') return;
+    if (静音会议自由待选择.value) return;
+    if (静音会议待散会选择.value && !静音会议会后选择合法.value) {
+      弹提示('宣布散会前，请选择至少一名留下的妻子。');
+      return;
+    }
+    if (静音会议场景.value.阶段.includes('自由')) 静音会议自由行动进行中.value = true;
+  }
   发送中.value = true;
   待重试行动.value = 文本;
   失败行动.value = '';
@@ -2524,12 +3853,19 @@ function 发出(文本: string) {
   // 乐观渲染:玩家行动先上卷轴,回合完成后由楼层数据重建
   卷轴.value.push({ 谁: '玩家', 文本: [文本.replace(/\n+/g, ' ')] });
   void 滚到底();
-  eventEmit('人妻公寓:玩家行动', 文本);
+  if (静音会议待散会选择.value) {
+    eventEmit('人妻公寓:静音会议散会', {
+      行动: 文本,
+      会后妻: [...静音会议会后选择.value],
+    });
+  } else {
+    eventEmit('人妻公寓:玩家行动', 文本);
+  }
 }
 
 async function 发送() {
   let 文本 = 输入文本.value.trim();
-  if (!文本 || 发送中.value || 由头写入中.value) return;
+  if (!文本 || 发送中.value || 由头写入中.value || !当前行动可提交.value) return;
   输入文本.value = '';
   // 由头进门:工具箱每天对同一户依次提供三个不同借口，先确保记录落库再生成。
   if (需要由头.value && 可用由头.value.length) {
@@ -2773,6 +4109,16 @@ const 选中可晋阶 = computed(() => {
   return 可晋阶(data.value.户[m].妻);
 });
 
+const 显示关系线索 = ref(false);
+const 选中关系线索 = computed(() => {
+  const m = 选中门牌.value;
+  const 妻 = m ? data.value.户[m]?.妻 : undefined;
+  return m && 妻 ? 读取关系线索(data.value, m) : null;
+});
+watch(选中门牌, () => {
+  显示关系线索.value = false;
+});
+
 /** L4 要钱按钮(P3:钱的流向反转=堕落可视化;冷却与刹车全在脚本) */
 const 选中可要钱 = computed(() => {
   const m = 选中门牌.value;
@@ -2825,10 +4171,25 @@ const 背包列表 = computed(() =>
       信门牌,
       // 摄像头:须在已入住户的房内且屋里没人
       可布设: id === '针孔摄像头' && 在户内 && !房内有人在(当前房间.value!),
+      可使用录像带:
+        id === '录像带' &&
+        当前房间.value === '管理员室' &&
+        !data.value.系统._特殊场景.id &&
+        !data.value.系统._已完成特殊场景.includes('录像带'),
+      可筹备静音会议:
+        id === '静音会议' &&
+        当前房间.value === '管理员室' &&
+        !data.value.系统._特殊场景.id &&
+        !data.value.系统._已完成特殊场景.includes('静音会议'),
       // 礼物等可送出:须与她同处一室(当面);工具/运作/药物/性癖不走"送"
       // (药物=晋阶按钮自动消耗;性癖=装载;302特例:回家时可送妈东西——破妈妈墙的唯一入口,入列前也通)
       可送对象:
-        !配?.常驻 && !信门牌 && id !== '针孔摄像头' && !['运作', '工具', '药物', '性癖'].includes(配?.类别 ?? '')
+        !配?.常驻 &&
+        id !== '录像带' &&
+        id !== '静音会议' &&
+        !信门牌 &&
+        id !== '针孔摄像头' &&
+        !['运作', '工具', '药物', '性癖'].includes(配?.类别 ?? '')
           ? [
               ...可见门牌.value.filter(m => 妻在玩家身边(m)).map(m => ({ 门牌: m, 妻名: 户静态表[m].妻名 })),
               ...(当前房间.value === '302' && data.value.户['302'] ? [{ 门牌: '302' as 门牌, 妻名: '妈' }] : []),
@@ -3220,6 +4581,7 @@ function 清洗(原文: string, 流式 = false): string {
     .replace(/^\s*-{2,}>?\s*$/gm, '')
     .replace(/<options>[\s\S]*?<\/options>/g, '')
     .replace(/<行为等级>[\s\S]*?<\/行为等级>/g, '')
+    .replace(/<尺度判定\b[^>]*>[\s\S]*?<\/尺度判定>/gi, '')
     // 玩家预设夹带的整篇 HTML 组件(2026-07-18 玩家实测,同脚本侧 清洗正文):裸代码墙整体剥除
     .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*?```/gi, '')
     .replace(/<!DOCTYPE[\s\S]*?<\/html\s*>/gi, '')
@@ -3239,6 +4601,7 @@ function 清洗(原文: string, 流式 = false): string {
     .replace(/<UpdateVariable>[\s\S]*$/, '')
     .replace(/<options>[\s\S]*$/, '')
     .replace(/<行为等级>[\s\S]*$/, '')
+    .replace(/<尺度判定\b[^>]*>[\s\S]*$/i, '')
     .replace(/<tucao\b[^>]*>[\s\S]*$/i, '')
     .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*$/i, '')
     .replace(/<!DOCTYPE[\s\S]*$/i, '')
@@ -3539,6 +4902,7 @@ const 记忆方案 = ref<'数据库' | '智脑' | ''>(
   })(),
 );
 const 安装模板中 = ref(false);
+const 调整填表设置中 = ref(false);
 const 酒馆助手版本 = ref('');
 const 酒馆助手最新版本 = ref('');
 const 酒馆助手最新版本查询失败 = ref(false);
@@ -3690,6 +5054,41 @@ async function 从说明安装数据库模板() {
     宿主.alert(`数据库表安装失败：${error instanceof Error ? error.message : String(error)}`);
   } finally {
     安装模板中.value = false;
+  }
+}
+
+async function 从说明应用数据库填表兼容设置() {
+  刷新数据库检测();
+  const 当前值 = 数据库检测.value.填表最短回复;
+  if (当前值 === null || 当前值 <= 0 || !数据库检测.value.可设置填表参数) {
+    弹提示('当前状态不支持一键修改，请打开数据库设置手动确认。', 5000);
+    return;
+  }
+  const 宿主 = window.parent ?? window;
+  if (
+    !宿主.confirm(
+      `这会把数据库插件的全局“AI 回复最小长度”从 ${当前值} 设为 0，影响所有角色卡和聊天。\n\n` +
+        '数据库当前也用这个值决定短正文是否跳过自动填表；设为 0 后，其他角色卡的短正文可能增加填表请求。\n\n' +
+        '本操作只修改这一项，不修改模型、密钥、SQLite、表格、更新频率或重试次数。确定继续吗？',
+    )
+  )
+    return;
+  调整填表设置中.value = true;
+  try {
+    const result = await 应用数据库填表兼容设置();
+    刷新数据库检测();
+    宿主.alert(result.message);
+  } finally {
+    调整填表设置中.value = false;
+  }
+}
+
+async function 从说明打开数据库设置() {
+  const ok = await 打开数据库设置();
+  if (!ok) {
+    (window.parent ?? window).alert(
+      '当前数据库版本没有开放设置入口。请直接打开数据库插件；SQLite 在存储模式中开启，填表参数位于“填表工作台 → 自动更新设置 → 高级参数”。',
+    );
   }
 }
 
@@ -3875,6 +5274,7 @@ onMounted(() => {
     视口.addEventListener('resize', 让输入露出);
     视口.addEventListener('scroll', 让输入露出);
   }
+  window.addEventListener('blur', 静音会议窗口失焦);
 
   eventOn('人妻公寓:生成开始', () => {
     // 脚本侧发起的回合(查看监控等)也要锁输入+亮书写态;驻留的拾获卡顺手收掉不挡戏
@@ -3882,6 +5282,7 @@ onMounted(() => {
     运行阶段.value = '正在准备本回合';
     开始生成计时();
     拾获卡.value = '';
+    if (静音会议中.value) 同步静音会议界面();
   });
   eventOn('人妻公寓:流式', (文本: string) => {
     if (!运行阶段.value.startsWith('数据库')) 运行阶段.value = 'AI正在生成正文';
@@ -3915,6 +5316,11 @@ onMounted(() => {
     失败行动.value = '';
     取消后自动重试.value = false;
     流式段.value = [];
+    录像带本地结果.value = '';
+    clearTimeout(录像带连点timer);
+    录像带连点计数.value = 0;
+    录像带连点开始 = 0;
+    if (静音会议待散会选择.value) 静音会议会后选择.value = [];
     同步场景自变量(); // 回档把 _场景 清空后 UI 必须跟着回楼道(审计 C2)
     幕房间.value = 当前房间.value; // 本轮的戏与选项绑定产出场景,换地方即收
     // 先拉到最新楼号，再按新时钟重算作息/地图。旧顺序会让地图停在上一楼，直到玩家再点瓷砖才刷新。
@@ -3929,6 +5335,7 @@ onMounted(() => {
     } catch {
       /* store 未带 pull 时靠轮询兜底 */
     }
+    nextTick(同步静音会议界面);
   });
   eventOn('人妻公寓:隔离事件完成', async () => {
     发送中.value = false;
@@ -3952,8 +5359,25 @@ onMounted(() => {
     发送中.value = false;
     运行阶段.value = '';
     停止生成计时();
+    释放静音会议指针();
+    清理静音会议连点();
+    if (静音会议互动待操作.value) {
+      静音会议互动结果.value = undefined;
+      静音会议本地画面状态.value = '';
+    }
     同步场景自变量(); // 监控回合失败时脚本已把 _场景 回滚,画面跟着回原位(审计 C4)
     const 待重试 = 待重试行动.value.trim();
+    const 将自动重试 = 取消后自动重试.value && !!待重试;
+    if (
+      静音会议正式中.value &&
+      静音会议场景.value.阶段.includes('自由') &&
+      !将自动重试
+    ) {
+      // 自由循环失败后重新交还“继续/结束”选择权；主动“放弃并重试”则保留闩锁，
+      // 让下一个事件循环可以直接重发同一行动。
+      静音会议继续已选.value = false;
+      静音会议自由行动进行中.value = false;
+    }
     if (待重试) 失败行动.value = 待重试;
     待重试行动.value = '';
     流式段.value = [];
@@ -3962,7 +5386,7 @@ onMounted(() => {
     if (!原因.startsWith('已取消')) 弹提示(`回合失败,这一轮没有发生:${原因}`, 6000);
     void 取卷轴();
     刷新可重掷();
-    if (取消后自动重试.value && 待重试) {
+    if (将自动重试) {
       取消后自动重试.value = false;
       // 回合引擎在发出失败事件后的 finally 才释放内部锁，下一事件循环再重发。
       setTimeout(() => {
@@ -3980,6 +5404,14 @@ onMounted(() => {
   eventOn('人妻公寓:监控回合', () => {
     // 脚本侧已写好 _场景=302 并即将开偷窥回合,这里只同步画面(进入 重写同值场景,幂等)
     if (当前房间.value !== '302') 进入('302');
+  });
+  eventOn('人妻公寓:特殊场景状态', () => {
+    try {
+      (store as unknown as { pull?: () => void }).pull?.();
+    } catch {
+      /* 轮询仍会兜底 */
+    }
+    nextTick(同步静音会议界面);
   });
   eventOn('人妻公寓:手机状态', (状: { 未读?: boolean }) => {
     手机未读.value = !!状?.未读;
@@ -4003,6 +5435,14 @@ onMounted(() => {
     }
   });
   eventOn('人妻公寓:提示', (消息: string) => {
+    if (静音会议筹备提交中.value) {
+      静音会议筹备提交中.value = false;
+      if (静音会议场景.value.阶段 === '筹备') 静音会议筹备步骤.value = '选择';
+      else if (!静音会议中.value) 静音会议筹备步骤.value = '';
+    } else if (静音会议筹备步骤.value && !静音会议中.value) {
+      clearTimeout(静音会议筹备timer);
+      静音会议筹备步骤.value = '';
+    }
     // 地图行动卡开着:结果以"线索卡"翻出(动画),不走 toast
     if (显示地图.value && 房卡.value) 结果卡.value = 消息;
     // 带【】的重要提示(线索/收获)=拾获卡驻留,点击才收下(2026-07-17 用户反馈:出货不能一闪而过)
@@ -4035,6 +5475,7 @@ onMounted(() => {
     本次入房由头已用.value = false;
   }
   刷赴约();
+  同步静音会议界面();
 
   // 恢复界面偏好(主题三档/字号/垫板/省流/减动效)
   恢复设置();
@@ -4086,6 +5527,10 @@ onUnmounted(() => {
   clearTimeout(破门计时);
   clearTimeout(提示timer);
   clearTimeout(键盘定位timer);
+  clearTimeout(录像带连点timer);
+  clearTimeout(静音会议筹备timer);
+  清理静音会议互动现场();
+  window.removeEventListener('blur', 静音会议窗口失焦);
   for (const 视口 of 键盘视口们) {
     视口.removeEventListener('resize', 让输入露出);
     视口.removeEventListener('scroll', 让输入露出);
@@ -4470,6 +5915,61 @@ onUnmounted(() => {
   box-shadow: var(--card-shadow);
   backdrop-filter: blur(6px);
   transition: background 0.5s ease;
+}
+
+.story-wrap.story-special-interaction {
+  background: #0d1117;
+}
+
+.special-interaction-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: #0d1117;
+}
+
+.special-interaction-stage img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
+.special-interaction-status {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 10px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid rgba(174, 210, 238, 0.32);
+  border-radius: 9px;
+  color: #eef7ff;
+  background: rgba(5, 12, 20, 0.72);
+  backdrop-filter: blur(6px);
+  font-size: 0.78em;
+  letter-spacing: 0.03em;
+}
+
+.special-scene-acts {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.special-scene-acts .tile.frozen {
+  filter: grayscale(0.85);
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.special-scene-acts .special-assist {
+  grid-column: 1 / -1;
+  border-color: rgba(114, 170, 205, 0.6);
 }
 
 /* 成人CG：一套竖图同时服务手机与桌面。完整图 contain；桌面余白由同图模糊铺底。 */
@@ -5941,6 +7441,46 @@ onUnmounted(() => {
 }
 
 /* ═══ 档案卡 ═══ */
+.relation-clue-open {
+  width: 100%;
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
+}
+.relation-clue-open span {
+  opacity: 0.65;
+  font-size: 11px;
+}
+.relation-clue-board {
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+}
+.relation-aside {
+  margin: 5px 0 10px;
+  font-style: italic;
+  opacity: 0.75;
+}
+.relation-clue {
+  display: flex;
+  gap: 8px;
+  padding: 7px 0;
+  border-top: 1px dashed color-mix(in srgb, currentColor 16%, transparent);
+}
+.relation-clue i {
+  flex: 0 0 16px;
+  color: var(--muted);
+}
+.relation-clue.done i {
+  color: var(--accent);
+}
+.relation-wait {
+  margin: 10px 0 0;
+  color: var(--accent);
+  font-size: 12px;
+}
 
 .sheet.dossier {
   width: min(640px, 96%);
@@ -8564,19 +10104,6 @@ onUnmounted(() => {
     var(--glass);
 }
 
-/* 垫板浓度给夜间设下限:玩家把滑杆拉多低,深底也至少 0.78,浅字永远有得靠 */
-:global(html.rq-dark) .story-entry {
-  background: rgba(7, 9, 15, 0.96) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 5px 18px rgba(0, 0, 0, 0.3);
-}
-
-/* 自选字色仍优先；“跟随主题”时强制使用夜间浅白，避免父级或旧内联色残留。 */
-:global(html.rq-dark) .story-entry .narr {
-  color: var(--prose-ink, #fbfaff) !important;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
-}
-
 /* ── 省流模式:关掉重量级场景位图(背景/立面),回纯 CSS 渐变;头像/图标小,保留 ── */
 :global(html.rq-lite) .story-wrap {
   --scene-img: none !important;
@@ -9053,4 +10580,851 @@ onUnmounted(() => {
     grid-template-columns: 1fr;
   }
 }
+/* ═══ 特殊场景：静音会议 ═══ */
+
+.mute-meeting-track {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  right: 50px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  color: rgba(246, 252, 255, 0.9);
+  background: linear-gradient(90deg, rgba(6, 16, 25, 0.82), rgba(6, 16, 25, 0.5));
+  border: 1px solid rgba(161, 208, 220, 0.34);
+  border-radius: 10px;
+  backdrop-filter: blur(7px);
+  pointer-events: none;
+}
+
+.story-wrap.story-mute-meeting .story {
+  padding-top: 48px;
+}
+
+.mute-meeting-track span,
+.mute-meeting-track b {
+  flex: none;
+  font: 700 0.68em/1.2 var(--font-mono);
+  letter-spacing: 0.08em;
+}
+
+.mute-meeting-track b {
+  color: #83e0b2;
+}
+
+.mute-meeting-track em {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  font-size: 0.68em;
+  font-style: normal;
+  color: rgba(246, 252, 255, 0.7);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mute-meeting-visual {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 48%, rgba(47, 83, 91, 0.3), transparent 58%),
+    #090f14;
+}
+
+.mute-meeting-visual::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(2, 8, 12, 0.12), transparent 55%, rgba(2, 8, 12, 0.28));
+}
+
+.mute-meeting-visual.state-DETAIL {
+  background-color: #0a1218;
+}
+
+.mute-meeting-visual.state-PEAK {
+  background:
+    radial-gradient(circle at 50% 58%, rgba(122, 52, 83, 0.22), transparent 58%),
+    #100c13;
+}
+
+.mute-meeting-visual.state-DETAIL img,
+.mute-meeting-visual.state-PEAK img {
+  animation: mute-visual-turn 0.42s ease both;
+}
+
+.mute-meeting-visual img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  filter: saturate(0.96) contrast(1.02);
+}
+
+.mute-meeting-visual-fallback {
+  display: flex;
+  width: min(82%, 430px);
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  padding: 18px;
+  color: rgba(235, 246, 249, 0.72);
+  text-align: center;
+  background: rgba(19, 32, 39, 0.74);
+  border: 1px solid rgba(166, 207, 215, 0.25);
+  border-radius: 16px;
+}
+
+.mute-meeting-visual-fallback :deep(.ic) {
+  width: 34px;
+  height: 34px;
+  color: #70cfa4;
+}
+
+.mute-meeting-visual-fallback b {
+  color: #f1f8fa;
+}
+
+.mute-meeting-lock-note {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 6px 10px;
+  margin: 5px 0;
+  font: 700 0.7em/1.35 var(--font-mono);
+  color: #456b62;
+  background: rgba(105, 194, 159, 0.1);
+  border: 1px solid rgba(80, 157, 128, 0.25);
+  border-radius: 10px;
+}
+
+.mute-meeting-interaction-stage {
+  z-index: 12;
+  padding: 9px;
+  background:
+    linear-gradient(rgba(5, 12, 17, 0.86), rgba(5, 12, 17, 0.94)),
+    radial-gradient(circle at 50% 12%, rgba(66, 156, 124, 0.28), transparent 58%);
+}
+
+.mute-interaction-panel {
+  box-sizing: border-box;
+  width: min(100%, 700px);
+  max-height: calc(100% - 2px);
+  padding: 17px;
+  overflow: auto;
+  color: #eef8f5;
+  background: linear-gradient(145deg, rgba(20, 35, 40, 0.96), rgba(10, 20, 27, 0.98));
+  border: 1px solid rgba(125, 211, 173, 0.42);
+  border-radius: 18px;
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.46),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  overscroll-behavior: contain;
+}
+
+.mute-interaction-panel header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.mute-interaction-panel header span {
+  display: block;
+  margin-bottom: 3px;
+  font: 700 0.62em/1.2 var(--font-mono);
+  letter-spacing: 0.12em;
+  color: #76d8aa;
+}
+
+.mute-interaction-panel h3 {
+  margin: 0;
+  font-size: 1.16em;
+  letter-spacing: 0.04em;
+}
+
+.mute-interaction-panel header > b {
+  flex: none;
+  padding: 5px 8px;
+  font: 700 0.62em/1 var(--font-mono);
+  color: rgba(238, 248, 245, 0.7);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+}
+
+.mute-interaction-copy {
+  margin: 9px 0 12px;
+  font-size: 0.78em;
+  line-height: 1.55;
+  color: rgba(231, 245, 241, 0.72);
+}
+
+.mute-target-row {
+  display: flex;
+  justify-content: center;
+  gap: 9px;
+  margin-bottom: 11px;
+}
+
+.mute-target {
+  position: relative;
+  width: 74px;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: 7px 5px;
+  color: rgba(234, 246, 242, 0.72);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 13px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.mute-target img,
+.mute-target > span {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  object-fit: cover;
+  background: #25343a;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+}
+
+.mute-target b {
+  font-size: 0.72em;
+}
+
+.mute-target small {
+  font: 600 0.58em/1 var(--font-mono);
+  color: rgba(234, 246, 242, 0.5);
+}
+
+.mute-target.on {
+  color: #fff;
+  background: rgba(87, 196, 148, 0.14);
+  border-color: #67d5a3;
+  box-shadow: 0 0 0 2px rgba(103, 213, 163, 0.12);
+}
+
+.mute-target.on img,
+.mute-target.on > span {
+  border-color: #75e0af;
+}
+
+.mute-target.pulse {
+  animation: mute-target-pulse 0.42s ease both;
+}
+
+.mute-target:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.mute-mode-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin-bottom: 11px;
+}
+
+.mute-mode-row button {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  color: rgba(235, 247, 243, 0.75);
+  text-align: left;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.mute-mode-row button.on {
+  color: #fff;
+  background: rgba(194, 102, 151, 0.16);
+  border-color: #d47ead;
+}
+
+.mute-mode-row b {
+  font-size: 0.76em;
+}
+
+.mute-mode-row small {
+  color: inherit;
+  font-size: 0.64em;
+  opacity: 0.7;
+}
+
+.mute-control-button {
+  position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 15px 18px;
+  overflow: hidden;
+  color: #f6fffb;
+  text-align: left;
+  background: linear-gradient(135deg, #397d65, #245848);
+  border: 1px solid rgba(156, 238, 201, 0.6);
+  border-radius: 15px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.mute-control-button.rapid {
+  background: linear-gradient(135deg, #88506f, #5f3953);
+  border-color: rgba(240, 160, 201, 0.58);
+}
+
+.mute-control-button :deep(.ic) {
+  position: relative;
+  z-index: 1;
+  width: 30px;
+  height: 30px;
+  flex: none;
+}
+
+.mute-control-button span {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.mute-control-button b {
+  font-size: 0.9em;
+}
+
+.mute-control-button small {
+  color: rgba(246, 255, 251, 0.7);
+  font-size: 0.66em;
+}
+
+.mute-control-button:disabled {
+  cursor: not-allowed;
+  filter: grayscale(0.5);
+  opacity: 0.46;
+}
+
+.hold-progress {
+  position: absolute;
+  inset: auto 0 0;
+  height: 5px;
+  background: #9cf1c8;
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.mute-control-button.holding .hold-progress {
+  animation: mute-hold-progress 2s linear forwards;
+}
+
+.mute-interaction-result {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 9px 11px;
+  margin-top: 10px;
+  font-size: 0.72em;
+  border: 1px solid;
+  border-radius: 11px;
+}
+
+.mute-interaction-result.success {
+  color: #baf4d7;
+  background: rgba(64, 175, 126, 0.12);
+  border-color: rgba(105, 224, 166, 0.38);
+}
+
+.mute-interaction-result.failure {
+  color: #ffd3d3;
+  background: rgba(201, 76, 76, 0.12);
+  border-color: rgba(235, 114, 114, 0.36);
+}
+
+.mute-interaction-result span {
+  color: inherit;
+  opacity: 0.78;
+}
+
+.mute-interaction-assist {
+  width: 100%;
+  margin-top: 9px;
+}
+
+.mute-after-panel {
+  flex: none;
+  padding: 11px 13px;
+  margin: 7px 0;
+  background: linear-gradient(135deg, rgba(244, 252, 248, 0.94), rgba(238, 244, 250, 0.94));
+  border: 1px solid rgba(76, 151, 124, 0.25);
+  border-radius: 15px;
+  box-shadow: 0 5px 16px rgba(31, 54, 49, 0.08);
+}
+
+.mute-after-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 9px;
+}
+
+.mute-after-heading span {
+  font: 700 0.64em/1.2 var(--font-mono);
+  letter-spacing: 0.07em;
+  color: #4a987a;
+}
+
+.mute-after-heading b {
+  font-size: 0.84em;
+  color: var(--ink);
+}
+
+.mute-after-panel > p {
+  margin: 6px 0 9px;
+  font-size: 0.7em;
+  line-height: 1.5;
+  color: var(--ink-soft);
+}
+
+.mute-after-wives {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.mute-after-wives button {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 8px;
+  color: var(--ink-soft);
+  text-align: left;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(54, 89, 80, 0.13);
+  border-radius: 11px;
+  cursor: pointer;
+}
+
+.mute-after-wives button.on {
+  color: #296c56;
+  background: rgba(100, 210, 162, 0.14);
+  border-color: rgba(66, 166, 124, 0.5);
+}
+
+.mute-after-wives img,
+.mute-after-wives button > span {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  object-fit: cover;
+  background: #e8f0ed;
+  border-radius: 50%;
+}
+
+.mute-after-wives b {
+  overflow: hidden;
+  font-size: 0.7em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mute-after-wives small {
+  font: 600 0.58em/1 var(--font-mono);
+}
+
+.mute-after-count {
+  margin-top: 7px;
+  font-size: 0.66em;
+  color: var(--red);
+}
+
+.mute-after-count.ready {
+  color: #3b8a6d;
+}
+
+.mute-free-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mute-free-actions.single {
+  grid-template-columns: 1fr;
+}
+
+.mute-prep-mask {
+  z-index: 115;
+}
+
+.sheet.mute-prep-sheet {
+  box-sizing: border-box;
+  width: min(94%, 760px);
+  max-height: calc(100% - 24px);
+  padding: 20px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.mute-prep-sheet > h3 {
+  margin: 7px 0 3px;
+  font-size: 1.04em;
+  color: var(--ink);
+}
+
+.mute-prep-lead {
+  margin: 0 30px 12px 0;
+  font-size: 0.75em;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+
+.mute-candidate-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.mute-candidate {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr) 22px;
+  align-items: center;
+  gap: 9px;
+  padding: 9px;
+  color: var(--ink-soft);
+  text-align: left;
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(50, 66, 72, 0.12);
+  border-radius: 13px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.mute-candidate.on {
+  color: #276b55;
+  background: rgba(94, 202, 154, 0.13);
+  border-color: rgba(51, 160, 112, 0.55);
+  box-shadow: inset 3px 0 #56bc8d;
+}
+
+.mute-candidate.ineligible {
+  color: var(--ink-faint);
+  background: rgba(115, 118, 121, 0.08);
+  filter: grayscale(0.85);
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.mute-candidate-avatar,
+.mute-candidate-avatar img {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  object-fit: cover;
+  background: #e7efed;
+  border-radius: 50%;
+}
+
+.mute-candidate-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mute-candidate-main b {
+  overflow: hidden;
+  font-size: 0.76em;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mute-candidate-main small {
+  font-size: 0.64em;
+}
+
+.mute-candidate-main em {
+  font-size: 0.62em;
+  font-style: normal;
+  color: #9b5f5f;
+}
+
+.mute-candidate-main em.good {
+  color: #388262;
+}
+
+.mute-candidate > i {
+  font-size: 1em;
+  font-style: normal;
+  font-weight: 800;
+  text-align: center;
+}
+
+.mute-topic-block {
+  padding-top: 12px;
+}
+
+.mute-topic-block > b {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 0.75em;
+  color: var(--ink);
+}
+
+.mute-topic-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.mute-topic-grid button {
+  padding: 9px 7px;
+  color: var(--ink-soft);
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(50, 66, 72, 0.12);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.mute-topic-grid button.on {
+  color: #6b3f61;
+  background: rgba(210, 111, 165, 0.1);
+  border-color: rgba(194, 79, 142, 0.45);
+}
+
+.mute-prep-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 12px;
+}
+
+.mute-prep-footer > span {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.68em;
+  color: var(--ink-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mute-prep-footer > span.ready {
+  color: #398061;
+}
+
+.mute-prep-footer.confirm {
+  justify-content: flex-end;
+}
+
+.mute-confirm-card {
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(63, 87, 80, 0.14);
+  border-radius: 14px;
+}
+
+.mute-confirm-card dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.mute-confirm-card dl > div {
+  padding: 8px 9px;
+  background: rgba(235, 244, 241, 0.68);
+  border-radius: 9px;
+}
+
+.mute-confirm-card dt {
+  margin-bottom: 3px;
+  font: 700 0.6em/1 var(--font-mono);
+  color: #51816f;
+}
+
+.mute-confirm-card dd {
+  margin: 0;
+  font-size: 0.74em;
+  color: var(--ink);
+}
+
+.mute-confirm-card ul {
+  padding-left: 18px;
+  margin: 10px 0 0;
+  font-size: 0.68em;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+
+.dock.mute-meeting-dock {
+  border-color: rgba(74, 158, 124, 0.3);
+}
+
+.dock-btn.meeting-live {
+  color: #23805c;
+  background: rgba(70, 187, 133, 0.11);
+  animation: mute-phone-breathe 2.1s ease-in-out infinite;
+}
+
+.dock-btn.meeting-frozen {
+  filter: grayscale(0.75);
+}
+
+:global(html.rq-dark) .mute-after-panel,
+:global(html.rq-dark) .mute-confirm-card,
+:global(html.rq-dark) .mute-candidate,
+:global(html.rq-dark) .mute-topic-grid button {
+  background-color: rgba(24, 29, 38, 0.86);
+}
+
+:global(html.rq-dark) .mute-meeting-lock-note {
+  color: #8ac8ae;
+  background: rgba(67, 142, 112, 0.12);
+}
+
+:global(html.rq-still) .dock-btn.meeting-live,
+:global(html.rq-still) .mute-target.pulse,
+:global(html.rq-still) .mute-control-button.holding .hold-progress,
+:global(html.rq-still) .mute-meeting-visual img {
+  animation: none;
+}
+
+@keyframes mute-hold-progress {
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes mute-target-pulse {
+  50% {
+    transform: translateY(-3px) scale(1.04);
+    box-shadow: 0 0 18px rgba(108, 226, 172, 0.5);
+  }
+}
+
+@keyframes mute-phone-breathe {
+  50% {
+    color: #147048;
+    background: rgba(59, 195, 126, 0.2);
+    box-shadow: inset 0 0 0 1px rgba(57, 173, 116, 0.25);
+  }
+}
+
+@keyframes mute-visual-turn {
+  from {
+    opacity: 0.28;
+    transform: scale(1.018);
+  }
+}
+
+@media (max-width: 540px) {
+  .mute-meeting-track {
+    gap: 6px;
+    padding: 5px 8px;
+  }
+
+  .mute-meeting-track em {
+    max-width: 40%;
+  }
+
+  .mute-interaction-panel {
+    padding: 13px;
+    border-radius: 15px;
+  }
+
+  .mute-interaction-copy {
+    margin-bottom: 9px;
+  }
+
+  .mute-target-row {
+    gap: 6px;
+  }
+
+  .mute-target {
+    width: min(27%, 72px);
+    padding: 6px 3px;
+  }
+
+  .mute-target img,
+  .mute-target > span {
+    width: 38px;
+    height: 38px;
+  }
+
+  .mute-control-button {
+    padding: 13px 12px;
+  }
+
+  .mute-after-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .mute-after-wives {
+    grid-template-columns: 1fr;
+  }
+
+  .sheet.mute-prep-sheet {
+    width: calc(100% - 12px);
+    max-height: calc(100% - 12px);
+    padding: 16px 13px;
+    border-radius: 15px;
+  }
+
+  .mute-candidate-grid,
+  .mute-topic-grid,
+  .mute-confirm-card dl {
+    grid-template-columns: 1fr;
+  }
+
+  .mute-candidate {
+    padding: 7px 8px;
+  }
+
+  .mute-prep-footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .mute-prep-footer > span {
+    white-space: normal;
+  }
+
+  .mute-prep-footer .btn,
+  .mute-free-actions .btn {
+    width: 100%;
+  }
+}
+
 </style>

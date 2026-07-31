@@ -215,7 +215,7 @@ const regex_scripts = [
   {
     id: randomUUID(),
     scriptName: '[不显示]隐藏变量更新与协议标签',
-    findRegex: String.raw`/<UpdateVariable>[\s\S]*?<\/UpdateVariable>|<options>[\s\S]*?<\/options>|<行为等级>[\s\S]*?<\/行为等级>/g`,
+    findRegex: String.raw`/<UpdateVariable>[\s\S]*?<\/UpdateVariable>|<options>[\s\S]*?<\/options>|<行为等级>[\s\S]*?<\/行为等级>|<尺度判定\b[^>]*>[\s\S]*?<\/尺度判定>/g`,
     replaceString: '',
     placement: [2],
     markdownOnly: true,

@@ -1,7 +1,7 @@
 import type { SchemaType } from '../../schema';
 import { 创建户节点 } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
-import { 户静态表 } from '../../stageConfig';
+import { 户静态表, 阶段标题 } from '../../stageConfig';
 import { 镜像直写 } from './守护系统';
 import { 事件角色标记 } from './snapshotSystem';
 
@@ -33,6 +33,7 @@ const 搬家戏: Partial<Record<门牌, string>> = {
 /** 按该户静态人设创建完整初始节点；首批开局与后续入住共用，避免新局仪容/情绪变空。 */
 export function 创建配置户节点(门牌号: 门牌, 楼层: number): ReturnType<typeof 创建户节点> {
   const 节点 = 创建户节点(楼层);
+  节点.妻.阶段标题 = 阶段标题(节点.妻.当前阶段, 门牌号);
   const 初始 = 户静态表[门牌号].初始;
   if (初始?.外装) 节点.妻.外装 = 初始.外装;
   if (初始?.妆容) 节点.妻.妆容 = 初始.妆容;

@@ -85,8 +85,15 @@ function 拍事件(data: SchemaType, m: 门牌 | '空', 拍: number, 点破: boo
 }
 
 /** 点"使用荣耀洞":摇签+起场(拍0事件入队);冷却与签全用钟楼种子,重roll不换命 */
-export function 使用荣耀洞(data: SchemaType, 钟楼: number): { 提示: string; 事件?: string; 变动?: boolean } {
+export function 使用荣耀洞(
+  data: SchemaType,
+  钟楼: number,
+  新手引导完成: boolean,
+): { 提示: string; 事件?: string; 变动?: boolean } {
   const 系 = data.系统;
+  if (!新手引导完成) {
+    return { 提示: '先把父亲交代的几件正事办完。这个隔间里的异常，之后再来查看。' };
+  }
   if (系._荣耀洞拍 >= 0) return { 提示: '那边的事还没完——先把这一场走完。' };
   const 记 = 系._荣耀洞上次楼 > 钟楼 ? -999 : 系._荣耀洞上次楼; // 回档陷阱同款自净
   if (钟楼 - 记 < 荣耀洞冷却楼) return { 提示: '今天已经用过了——这种事,一天一次是隔间里不成文的规矩。' };

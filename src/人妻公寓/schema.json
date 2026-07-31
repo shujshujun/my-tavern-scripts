@@ -150,6 +150,36 @@
                   }
                 }
               },
+              "_阶段线路": {
+                "default": {},
+                "type": "object",
+                "properties": {
+                  "目标阶段": {
+                    "default": 1,
+                    "type": "number"
+                  },
+                  "完成位图": {
+                    "default": 0,
+                    "type": "number"
+                  },
+                  "活跃节点": {
+                    "default": 0,
+                    "type": "number"
+                  },
+                  "节点起始楼": {
+                    "default": -1,
+                    "type": "number"
+                  },
+                  "预约时段": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "预约地点": {
+                    "default": "",
+                    "type": "string"
+                  }
+                }
+              },
               "_穿着SKU": {
                 "default": {},
                 "type": "object",
@@ -306,6 +336,130 @@
           "default": false,
           "type": "boolean"
         },
+        "_已完成特殊场景": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "_特殊场景前置": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "_特殊场景": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "id": {
+              "default": "",
+              "type": "string"
+            },
+            "阶段": {
+              "default": "",
+              "type": "string"
+            },
+            "地点": {
+              "default": "",
+              "type": "string"
+            },
+            "参与妻": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "演出妻": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "演出夫": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "启动楼层": {
+              "default": -1,
+              "type": "number"
+            },
+            "当前拍": {
+              "default": 0,
+              "type": "number"
+            },
+            "议题": {
+              "default": "",
+              "type": "string"
+            },
+            "重点妻": {
+              "default": "",
+              "type": "string"
+            },
+            "峰值模式": {
+              "default": "",
+              "type": "string"
+            },
+            "会后妻": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "自由循环次数": {
+              "default": 0,
+              "type": "number"
+            },
+            "交互": {
+              "default": {},
+              "type": "object",
+              "properties": {
+                "id": {
+                  "default": "",
+                  "type": "string"
+                },
+                "类型": {
+                  "default": "",
+                  "type": "string"
+                },
+                "状态": {
+                  "default": "",
+                  "type": "string"
+                },
+                "失败次数": {
+                  "default": 0,
+                  "type": "number"
+                },
+                "补偿可用": {
+                  "default": false,
+                  "type": "boolean"
+                }
+              }
+            },
+            "会场私聊摘要": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "string"
+              }
+            },
+            "会场私聊摘要楼层": {
+              "default": -1,
+              "type": "number"
+            }
+          }
+        },
         "_摄像头布设": {
           "default": {},
           "type": "object",
@@ -315,14 +469,6 @@
           "additionalProperties": {
             "type": "boolean"
           }
-        },
-        "_连续违规": {
-          "default": 0,
-          "type": "number"
-        },
-        "_上次违规楼层": {
-          "default": -1,
-          "type": "number"
         },
         "_时段偏移楼": {
           "default": 0,

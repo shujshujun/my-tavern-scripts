@@ -1,6 +1,7 @@
 import type { SchemaType, 户节点Type } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
 import { 好感封顶表, 阶段标题 } from '../../stageConfig';
+import { 应冻结堕落 } from './阶段线路系统';
 import { 当前天数 } from './楼层时钟';
 
 /**
@@ -180,6 +181,24 @@ export function 回滚保护字段(
 ): void {
   if (!_protSnapshot) return;
   const snap = _protSnapshot;
+  const 本轮静音会议事件 =
+    楼层 !== undefined &&
+    snap.系统._已注入事件.楼层 === 楼层 &&
+    snap.系统._已注入事件.内容.includes('【特殊场景·静音会议·');
+  if (
+    (snap.系统._特殊场景.id === '静音会议' && snap.系统._特殊场景.阶段 !== '筹备') ||
+    本轮静音会议事件
+  ) {
+    // 静音会议是完全隔离的演出层：AI 不拥有任何持久字段写权。整份快照拍回也覆盖
+    // 手动“重新处理变量”路径；最终 +2 只会在本函数之后由特殊场景脚本结算。
+    data.户 = _.cloneDeep(snap.户);
+    data.现金 = snap.现金;
+    data.胜任度 = snap.胜任度;
+    data.风闻 = snap.风闻;
+    data.背包 = [...snap.背包];
+    data.系统 = _.cloneDeep(snap.系统);
+    return;
+  }
   // 钟日=同日堕落收益账的记账日(真实楼层+杀时间偏移;偏移取快照侧=AI 不可写的真值)。
   // 旧调用不传楼层时账不动,只有 ±3 兜底。
   const 钟日 = 楼层 === undefined ? undefined : 当前天数(楼层 + snap.系统._时段偏移楼);
@@ -205,6 +224,7 @@ export function 回滚保护字段(
       continue;
     }
     回滚户字段(
+      门牌号,
       节点,
       快照节点,
       !可写人物 || 可写人物.妻.includes(门牌号),
@@ -225,7 +245,14 @@ export function 回滚保护字段(
 }
 
 /** 焦点户:先按人物在场分闸,再对白名单做 delta cap,其余拍回 */
-function 回滚户字段(节点: 户节点Type, 快照节点: 户节点Type, 妻可写: boolean, 夫可写: boolean, 钟日?: number): void {
+function 回滚户字段(
+  门牌号: string,
+  节点: 户节点Type,
+  快照节点: 户节点Type,
+  妻可写: boolean,
+  夫可写: boolean,
+  钟日?: number,
+): void {
   if (!妻可写) {
     节点.妻 = _.cloneDeep(快照节点.妻);
   } else {
@@ -258,6 +285,9 @@ function 回滚户字段(节点: 户节点Type, 快照节点: 户节点Type, 妻
     }
     // 好感阶段封顶(阶段0"陌生邻里"接受上限封死好感,机制不靠 AI 自觉)
     妻.好感值 = Math.min(妻.好感值, 好感封顶表[_.clamp(妻快照.当前阶段, 0, 5)]);
+    // 阶段线路门：数值可涨到门前，但四个固定节点未完成时不能越过晋阶阈值。
+    const 线路封顶 = 应冻结堕落(妻);
+    if (线路封顶 !== null) 妻.堕落值 = Math.min(妻.堕落值, 线路封顶);
     // 身体开发:+3 封顶,不可衰退(负 delta 回滚);终值再吃阶段封顶(审计 M2)——
     // 封顶取 max(快照值, 表值):旧档已超表的不回抽,只拦新增长
     {
@@ -279,7 +309,7 @@ function 回滚户字段(节点: 户节点Type, 快照节点: 户节点Type, 妻
     // 文本白名单以外的妻字段全部拍回
     妻.婚姻值 = 妻快照.婚姻值;
     妻.当前阶段 = 妻快照.当前阶段;
-    妻.阶段标题 = 阶段标题(妻快照.当前阶段); // 派生字段永远脚本重算
+    妻.阶段标题 = 阶段标题(妻快照.当前阶段, 门牌号); // 派生字段永远脚本重算
     妻.裂缝 = _.cloneDeep(妻快照.裂缝);
     妻.气质描述 = 妻快照.气质描述; // 按阶段脚本改写,AI 禁写
     妻.特殊 = [...妻快照.特殊]; // 装备与永久件=脚本写

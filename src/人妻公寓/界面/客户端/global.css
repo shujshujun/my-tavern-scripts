@@ -64,7 +64,8 @@ html.rq-dark {
   --ink: #e9e6f0;
   --ink-soft: #b3aec0;
   --ink-faint: #7d798c;
-  --prose-default: #f4f2f7;
+  /* 正文始终落在不随主题变化的白色半透明垫板上，夜间也必须使用黑字。 */
+  --prose-default: #000;
   --white: #262838;
   --glass: rgba(34, 36, 50, 0.88);
   --paper-card: #262838;

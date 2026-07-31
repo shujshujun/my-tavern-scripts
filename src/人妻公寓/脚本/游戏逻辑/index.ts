@@ -4,9 +4,17 @@ import { reloadOnChatChange } from '@/util/script';
 import type { SchemaType } from '../../schema';
 import { Schema } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
-import { 户静态表, 首夜差分, 首批门牌, 阶段标题, 查道具 } from '../../stageConfig';
+import { 户静态表, 首夜差分, 首批门牌, 阶段标题, 查道具, 查特殊场景 } from '../../stageConfig';
 import { 使用运作, 催租, 接听来电, 捡金币, 空房偷窃, 经济结算, 要钱 } from './经济系统';
-import { 挂载手机, 打开手机, 刷新红点, 手机节拍, 来电已接 } from './手机系统';
+import {
+  挂载手机,
+  打开手机,
+  刷新红点,
+  手机节拍,
+  来电已接,
+  设置静音会议手机生成中,
+  静音会议私聊回复生成中,
+} from './手机系统';
 import { 夜访结算, 惰性结算户, 结算焦点疑心, 冷落检测, 请求晋阶 } from './结算系统';
 import { 捕获保护快照, 回滚保护字段, 有保护快照, 镜像直写 } from './守护系统';
 import {
@@ -30,9 +38,33 @@ import { 杀时间, 妻位置推算 } from './楼层时钟';
 import { 购买, 送礼 } from './商店系统';
 import { 同步整表视图, 读取最近有效, 读最近有效stat, 脚本写入, 脚本写入中 } from './mvuIO';
 import { 事件角色标记, 检测焦点, 读场景, 读粘滞, 读赴约, 组公寓快照, 取本轮事件文本 } from './snapshotSystem';
-import { 执行回合, 重掷回合, 重开一局, 回档至, 回合进行中, 取消本回合, 开始新游戏 } from './回合引擎';
+import {
+  执行回合,
+  清洗静音会议正文,
+  重掷回合,
+  重开一局,
+  回档至,
+  回合进行中,
+  取消本回合,
+  开始新游戏,
+} from './回合引擎';
 import { 清理数据库陈旧互斥旗 } from './数据库桥';
 import { 创建配置户节点, 同步入住世界书条目 } from './入住系统';
+import { 上报阶段线路事件, type 线路事件 } from './阶段线路系统';
+import {
+  取消静音会议筹备,
+  启动静音会议,
+  启动录像带,
+  打开静音会议筹备,
+  请求结束静音会议,
+  记录静音会议互动失败,
+  选择静音会议散会名单,
+  特殊场景玩家行动前,
+  推进特殊场景,
+  通过静音会议互动,
+  通过录像带互动,
+  静音会议正式运行中,
+} from './特殊场景系统';
 
 /**
  * 人妻公寓 - 游戏逻辑脚本(P0 工程骨架)
@@ -51,6 +83,65 @@ import { 创建配置户节点, 同步入住世界书条目 } from './入住系�
 
 // AI 生成周期标志:PROMPT_READY 设 true,写阶段末尾设 false
 let _isInAiCycle = false;
+let _静音会议原生生成中 = false;
+let _静音会议原生基底: SchemaType | null = null;
+let _静音会议原生正文写回中 = false;
+let _静音会议原生因私聊阻断 = false;
+let _静音会议原生预期助手楼层: number | null = null;
+
+function 释放静音会议原生生成锁(保留私聊阻断墓碑 = true): void {
+  const 保留墓碑 =
+    保留私聊阻断墓碑 && _静音会议原生因私聊阻断 && _静音会议原生基底 !== null;
+  if (_静音会议原生生成中) 设置静音会议手机生成中(false);
+  _静音会议原生生成中 = false;
+  if (!保留墓碑) {
+    _静音会议原生基底 = null;
+    _静音会议原生因私聊阻断 = false;
+    _静音会议原生预期助手楼层 = null;
+  }
+}
+
+function 物理写回静音会议原生正文(正文: string): void {
+  const 楼层 = 当前楼层();
+  const 消息 = SillyTavern.chat?.[楼层];
+  if (!消息 || 消息.is_user) return;
+  // 先同步修改宿主内存，再调用公开写楼 API 持久化；即使 Promise 尚未完成，手动重处理也
+  // 已经读不到 AI 的变量协议。写楼引发的嵌套变量事件由互斥旗忽略。
+  消息.mes = 正文;
+  _静音会议原生正文写回中 = true;
+  void Promise.resolve(setChatMessages([{ message_id: 楼层, message: 正文 }], { refresh: 'none' }))
+    .catch((e: unknown) => {
+      console.error('[人妻公寓] 静音会议原生 AI 楼清洗写回失败:', e);
+      eventEmit('人妻公寓:提示', '⚠ 静音会议正文协议清洗未能持久化，请勿对该楼手动重新处理变量。');
+    })
+    .finally(() => {
+      _静音会议原生正文写回中 = false;
+    });
+}
+
+function 合并静音会议可信私聊摘要(目标: SchemaType, 旧变量: object): void {
+  // 旧变量属于 AI 解析前的可信状态；若会场私聊恰在 prompt 后完成，只合并它拥有的
+  // 两个摘要字段，绝不从 AI 的新变量中取值。
+  try {
+    const 旧raw = _.get(旧变量, 'stat_data');
+    if (!旧raw || _.isEmpty(旧raw)) return;
+    const 旧data = Schema.parse(旧raw) as SchemaType;
+    const 旧场 = 旧data.系统._特殊场景;
+    const 新场 = 目标.系统._特殊场景;
+    if (
+      旧场.id === '静音会议' &&
+      新场.id === '静音会议' &&
+      旧场.启动楼层 === 新场.启动楼层 &&
+      _.isEqual(旧场.参与妻, 新场.参与妻) &&
+      旧场.会场私聊摘要楼层 >= 新场.会场私聊摘要楼层
+    ) {
+      新场.会场私聊摘要 = _.cloneDeep(旧场.会场私聊摘要);
+      新场.会场私聊摘要楼层 = 旧场.会场私聊摘要楼层;
+    }
+  } catch {
+    /* 旧值不可读时保留 PROMPT_READY 冻结基底 */
+  }
+}
 
 // 本轮焦点户(PROMPT_READY 检测,写阶段回滚用——后台户整体拍回)
 let _本轮焦点: 门牌[] = [];
@@ -292,6 +383,7 @@ function 挂载监听() {
   eventClearEvent(tavern_events.CHAT_COMPLETION_PROMPT_READY);
   eventClearEvent(Mvu.events.VARIABLE_UPDATE_ENDED);
   eventClearEvent(tavern_events.MESSAGE_RECEIVED);
+  eventClearEvent(tavern_events.GENERATION_STOPPED);
   for (const 名 of [
     '人妻公寓:玩家行动',
     '人妻公寓:重掷',
@@ -330,6 +422,17 @@ function 挂载监听() {
     '人妻公寓:对饮',
     '人妻公寓:荣耀洞',
     '人妻公寓:荣耀洞离场',
+    '人妻公寓:使用录像带',
+    '人妻公寓:录像带互动',
+    '人妻公寓:使用静音会议',
+    '人妻公寓:取消静音会议筹备',
+    '人妻公寓:启动静音会议',
+    '人妻公寓:静音会议互动',
+    '人妻公寓:静音会议互动失败',
+    '人妻公寓:静音会议互动补偿',
+    '人妻公寓:静音会议散会',
+    '人妻公寓:结束静音会议',
+    '人妻公寓:特殊场景状态',
   ]) {
     eventClearEvent(名);
   }
@@ -346,6 +449,28 @@ function 挂载监听() {
         const 文本 = 行动.trim();
         return 运行荣耀洞隔离拍(raw, data, 文本, 建隔离记录('荣耀洞继续', 文本, data));
       });
+      return;
+    }
+    if (_.get(当前 ?? {}, '系统._特殊场景.id')) {
+      安全操作(async (raw, data) => {
+        if (data.系统._特殊场景.id === '静音会议' && 静音会议私聊回复生成中()) {
+          eventEmit('人妻公寓:回合失败', '会场微信回复还在生成，请等她回完这一条。');
+          return;
+        }
+        const 阶段 = data.系统._特殊场景.阶段;
+        if (阶段 === '等待102' || 阶段 === '等待202') {
+          eventEmit('人妻公寓:回合失败', '先操作桌上的监控瓷砖。');
+          return;
+        }
+        const 结果 = 特殊场景玩家行动前(data);
+        if (!结果.成功) {
+          eventEmit('人妻公寓:回合失败', 结果.提示);
+          return;
+        }
+        await 脚本写入(raw, data);
+        捕获保护快照(data);
+        await 执行回合(行动.trim());
+      }, true);
       return;
     }
     void 执行回合(行动.trim());
@@ -415,6 +540,24 @@ function 挂载监听() {
     }
     eventEmit('人妻公寓:提示', 结果.提示);
     return true;
+  }
+
+  /** 把现有功能的成功结果接入阶段线路；不另建平行任务账。 */
+  function 接入线路<T extends { 提示: string; 事件?: string; 变动?: boolean }>(
+    结果: T,
+    data: SchemaType,
+    事件: Omit<线路事件, '楼层'>,
+  ): T {
+    if (!结果.事件 && !结果.变动 && !(结果 as T & { 碎片到手?: boolean }).碎片到手) return 结果;
+    const 新线索 = 上报阶段线路事件(data, {
+      ...事件,
+      楼层: 当前楼层() + data.系统._时段偏移楼,
+    });
+    if (新线索.length) {
+      结果.变动 = true;
+      结果.提示 = `${结果.提示}\n${新线索.join('\n')}`;
+    }
+    return 结果;
   }
 
   type 隔离入口 = '荣耀洞开始' | '荣耀洞继续' | '监控';
@@ -552,7 +695,9 @@ function 挂载监听() {
 
   // 侦探系统的"楼层"参数全是时间语义(冷却/种子/位置)——统一喂 真实楼层+杀时间偏移
   eventOn('人妻公寓:翻垃圾', (门牌号: 门牌) =>
-    安全操作((raw, data) => 落地(翻垃圾(data, 门牌号, 当前楼层() + data.系统._时段偏移楼), raw, data)),
+    安全操作((raw, data) =>
+      落地(接入线路(翻垃圾(data, 门牌号, 当前楼层() + data.系统._时段偏移楼), data, { 类型: '调查', 门牌: 门牌号, 标识: '翻垃圾' }), raw, data),
+    ),
   );
 
   // P5 性癖:装载(≥L4,3槽,首装开幕正戏/重装免正戏)/卸载(免费即时)
@@ -577,7 +722,7 @@ function 挂载监听() {
   eventOn('人妻公寓:对饮', (门牌号: 门牌) =>
     安全操作((raw, data) =>
       即时开演(
-        对饮(data, 门牌号, 当前楼层() + data.系统._时段偏移楼),
+        接入线路(对饮(data, 门牌号, 当前楼层() + data.系统._时段偏移楼), data, { 类型: '对饮', 门牌: 门牌号 }),
         raw,
         data,
         `(带着好酒当面与${户静态表[门牌号].夫名}对饮，留心他酒后说漏的家事)`,
@@ -588,9 +733,11 @@ function 挂载监听() {
   // 荣耀洞(P5+:洗手间末隔间;摇签起场三拍连场,离场即收束;时间轴统一钟楼)
   eventOn('人妻公寓:荣耀洞', () =>
     安全操作(async (raw, data) => {
+      const 待办 = (_.get(getVariables({ type: 'chat' }), '_待办') ?? {}) as Record<string, unknown>;
+      const 新手引导完成 = ['信箱区', '101', '102', '管理员室'].every(键 => 待办[键] === true);
       const 行动 = '(在公共洗手间末隔间闩上门,在荣耀洞前坐定,等候隔板另一侧的动静)';
       const 记录 = 建隔离记录('荣耀洞开始', 行动, data);
-      const 结果 = 使用荣耀洞(data, 当前楼层() + data.系统._时段偏移楼);
+      const 结果 = 使用荣耀洞(data, 当前楼层() + data.系统._时段偏移楼, 新手引导完成);
       if (!结果.事件) {
         await 落地(结果, raw, data);
         return;
@@ -610,7 +757,29 @@ function 挂载监听() {
 
   // 杀时间(管理员室"歇一会儿":静默快进一个时段,冷却与文案由 楼层时钟.杀时间 收口)
   eventOn('人妻公寓:杀时间', (方式: string) =>
-    安全操作((raw, data) => 落地(杀时间(data, String(方式 ?? ''), 当前楼层()), raw, data)),
+    安全操作((raw, data) =>
+      落地(
+        接入线路(杀时间(data, String(方式 ?? ''), 当前楼层()), data, { 类型: '时段经过', 标识: String(方式 ?? '') }),
+        raw,
+        data,
+      ),
+    ),
+  );
+
+  // 地图到达是玩家主动、脚本可控的硬信号；只推进当前活动节点，重复进出不会越过下一节点的等待门。
+  eventOn('人妻公寓:线路到达地点', (载荷: { 地点: string; 门牌?: 门牌 }) =>
+    安全操作(async (raw, data) => {
+      const 新线索 = 上报阶段线路事件(data, {
+        类型: '地点',
+        地点: String(载荷?.地点 ?? ''),
+        门牌: 载荷?.门牌,
+        楼层: 当前楼层() + data.系统._时段偏移楼,
+      });
+      if (!新线索.length) return;
+      await 脚本写入(raw, data);
+      捕获保护快照(data);
+      eventEmit('人妻公寓:提示', 新线索.join('\n'));
+    }),
   );
 
   // 偷窥回合没演成(403等):挂起的"你注意到了什么"作废,防没有正文却弹选择卡
@@ -638,7 +807,17 @@ function 挂载监听() {
     安全操作((raw, data) => 落地(空房偷窃(data, 门牌号, 当前楼层()), raw, data)),
   );
   eventOn('人妻公寓:使用运作', (载荷: { 道具id: string; 门牌?: 门牌 }) =>
-    安全操作((raw, data) => 落地(使用运作(data, String(载荷.道具id), 载荷.门牌 ?? null, 当前楼层()), raw, data)),
+    安全操作((raw, data) =>
+      落地(
+        接入线路(使用运作(data, String(载荷.道具id), 载荷.门牌 ?? null, 当前楼层()), data, {
+          类型: '运作',
+          门牌: 载荷.门牌,
+          标识: String(载荷.道具id),
+        }),
+        raw,
+        data,
+      ),
+    ),
   );
   // 接听来电(P4 手机调用):记态度分+清挂起,回传报表与分数段给手机侧生成父亲台词
   eventOn('人妻公寓:接听来电', () =>
@@ -669,7 +848,11 @@ function 挂载监听() {
     void 手机节拍();
   });
 
-  eventOn('人妻公寓:布设摄像头', (门牌号: 门牌) => 安全操作((raw, data) => 落地(布设摄像头(data, 门牌号), raw, data)));
+  eventOn('人妻公寓:布设摄像头', (门牌号: 门牌) =>
+    安全操作((raw, data) =>
+      落地(接入线路(布设摄像头(data, 门牌号), data, { 类型: '调查', 门牌: 门牌号, 标识: '安装摄像头' }), raw, data),
+    ),
+  );
 
   // 查看摄像头:排队偷窥场景事件后自动跑一回合(偷窥剧情由 AI 演出,选项卡在回合完成后弹出)
   eventOn('人妻公寓:查看摄像头', (门牌号: 门牌) =>
@@ -701,6 +884,13 @@ function 挂载监听() {
           房间: '302',
         });
         if (!正文) throw new Error('监控事件没有生成正文');
+        上报阶段线路事件(data, {
+          类型: '调查',
+          门牌: 门牌号,
+          标识: '查看摄像头',
+          楼层: 当前楼层() + data.系统._时段偏移楼,
+        });
+        await 脚本写入(raw, data);
         捕获保护快照(data);
         await 存隔离记录(记录);
         eventEmit('人妻公寓:隔离事件完成', { 类型: '监控', 门牌: 门牌号 });
@@ -732,6 +922,147 @@ function 挂载监听() {
   eventOn('人妻公寓:读信', (门牌号: 门牌) => 安全操作((raw, data) => 落地(读信揭晓(data, 门牌号), raw, data)));
 
   eventOn('人妻公寓:购买', (道具id: string) => 安全操作((raw, data) => 落地(购买(data, String(道具id)), raw, data)));
+  eventOn('人妻公寓:使用录像带', () =>
+    安全操作(async (raw, data) => {
+      if (读场景().房间id !== '管理员室') {
+        return 落地({ 提示: '只能在管理员室使用。' }, raw, data);
+      }
+      const 结果 = 启动录像带(data, 当前楼层());
+      await 落地({ ...结果, 变动: 结果.成功 }, raw, data);
+      if (结果.成功) eventEmit('人妻公寓:特殊场景状态');
+    }),
+  );
+  eventOn('人妻公寓:录像带互动', (房间: '102' | '202') =>
+    安全操作(async (raw, data) => {
+      const 结果 = 通过录像带互动(data, 房间);
+      if (!结果.成功) {
+        eventEmit('人妻公寓:回合失败', 结果.提示);
+        return;
+      }
+      await 脚本写入(raw, data);
+      捕获保护快照(data);
+      await 执行回合(`（调取${房间}室隐藏摄像头录像）`);
+    }, true),
+  );
+
+  eventOn('人妻公寓:使用静音会议', () =>
+    安全操作(async (raw, data) => {
+      const 结果 = 打开静音会议筹备(data, 读场景().房间id ?? '');
+      await 落地({ 提示: 结果.提示, 变动: 结果.成功 }, raw, data);
+      // 成功与拒绝都通知客户端，避免本地先开的筹备层留下锁。
+      eventEmit('人妻公寓:特殊场景状态');
+    }),
+  );
+
+  eventOn('人妻公寓:取消静音会议筹备', () =>
+    安全操作(async (raw, data) => {
+      const 结果 = 取消静音会议筹备(data);
+      await 落地({ 提示: 结果.提示, 变动: 结果.成功 }, raw, data);
+      eventEmit('人妻公寓:特殊场景状态');
+    }),
+  );
+
+  eventOn('人妻公寓:启动静音会议', (载荷: { 参与妻?: unknown; 议题?: unknown }) =>
+    安全操作(async (raw, data) => {
+      const 结果 = 启动静音会议(
+        data,
+        载荷?.参与妻,
+        载荷?.议题,
+        读场景().房间id ?? '',
+        当前楼层(),
+      );
+      if (!结果.成功) {
+        eventEmit('人妻公寓:提示', 结果.提示);
+        eventEmit('人妻公寓:特殊场景状态');
+        return;
+      }
+      await 脚本写入(raw, data);
+      捕获保护快照(data);
+      eventEmit('人妻公寓:提示', 结果.提示);
+      eventEmit('人妻公寓:特殊场景状态');
+      await 执行回合('（发出会议通知，主持所选夫妻入席并开始正式楼务会议）');
+    }),
+  );
+
+  const 运行静音会议互动 = (
+    载荷: { id?: unknown; 目标妻?: unknown; 模式?: unknown },
+    使用补偿: boolean,
+  ) =>
+    安全操作(async (raw, data) => {
+      if (静音会议私聊回复生成中()) {
+        eventEmit('人妻公寓:回合失败', '会场微信回复还在生成，请等她回完这一条。');
+        return;
+      }
+      const 结果 = 通过静音会议互动(data, 载荷 ?? {}, 使用补偿);
+      if (!结果.成功) {
+        eventEmit('人妻公寓:回合失败', 结果.提示);
+        return;
+      }
+      await 脚本写入(raw, data);
+      捕获保护快照(data);
+      eventEmit('人妻公寓:特殊场景状态');
+      await 执行回合(`（会议控制交互 ${String(载荷?.id ?? '')} 已通过，继续固定下一拍）`);
+    }, true);
+
+  eventOn('人妻公寓:静音会议互动', (载荷: { id?: unknown; 目标妻?: unknown; 模式?: unknown }) =>
+    运行静音会议互动(载荷, false),
+  );
+  eventOn('人妻公寓:静音会议互动补偿', (载荷: { id?: unknown; 目标妻?: unknown; 模式?: unknown }) =>
+    运行静音会议互动(载荷, true),
+  );
+  eventOn('人妻公寓:静音会议互动失败', (载荷: { id?: unknown }) =>
+    安全操作(async (raw, data) => {
+      const 结果 = 记录静音会议互动失败(data, 载荷?.id);
+      if (!结果.成功) {
+        eventEmit('人妻公寓:提示', 结果.提示);
+        return;
+      }
+      await 脚本写入(raw, data);
+      捕获保护快照(data);
+      eventEmit('人妻公寓:特殊场景状态');
+    }),
+  );
+
+  eventOn('人妻公寓:静音会议散会', (载荷: { 行动?: unknown; 会后妻?: unknown }) =>
+    安全操作(async (raw, data) => {
+      if (静音会议私聊回复生成中()) {
+        eventEmit('人妻公寓:回合失败', '会场微信回复还在生成，请等她回完这一条。');
+        return;
+      }
+      const 行动 = typeof 载荷?.行动 === 'string' ? 载荷.行动.trim() : '';
+      if (!行动) {
+        eventEmit('人妻公寓:回合失败', '请先写下你的散会总结。');
+        return;
+      }
+      const 结果 = 选择静音会议散会名单(data, 载荷?.会后妻);
+      if (!结果.成功) {
+        eventEmit('人妻公寓:回合失败', 结果.提示);
+        return;
+      }
+      await 脚本写入(raw, data);
+      捕获保护快照(data);
+      eventEmit('人妻公寓:特殊场景状态');
+      await 执行回合(行动);
+    }, true),
+  );
+
+  eventOn('人妻公寓:结束静音会议', () =>
+    安全操作(async (raw, data) => {
+      if (静音会议私聊回复生成中()) {
+        eventEmit('人妻公寓:回合失败', '会场微信回复还在生成，请等她回完这一条。');
+        return;
+      }
+      const 结果 = 请求结束静音会议(data);
+      if (!结果.成功) {
+        eventEmit('人妻公寓:回合失败', 结果.提示);
+        return;
+      }
+      await 脚本写入(raw, data);
+      捕获保护快照(data);
+      eventEmit('人妻公寓:特殊场景状态');
+      await 执行回合('（主动结束本次会议，完成最终清理与离场收尾）');
+    }, true),
+  );
 
   eventOn('人妻公寓:送礼', (载荷: { 道具id: string; 门牌: 门牌 }) =>
     安全操作(async (raw, data) => {
@@ -742,8 +1073,9 @@ function 挂载监听() {
       const 赠前阶段 = data.户[载荷.门牌].妻.当前阶段;
       const 是服饰 = !!查道具(String(载荷.道具id))?.服饰;
       const 结果 = await 送礼(data, String(载荷.道具id), 载荷.门牌);
+      接入线路(结果, data, { 类型: '送礼', 门牌: 载荷.门牌, 标识: String(载荷.道具id) });
       const 是开门礼 = 赠前阶段 === 0 && data.户[载荷.门牌].妻.当前阶段 > 0;
-      if (是服饰 || 是开门礼) {
+      if (是服饰 || 是开门礼 || String(载荷.道具id) === '男用贞操带') {
         await 即时开演(
           结果,
           raw,
@@ -804,7 +1136,14 @@ function 挂载监听() {
     tavern_events.CHAT_COMPLETION_PROMPT_READY,
     (event_data: { dryRun?: boolean; chat: SillyTavern.SendingMessage[] }) => {
       if (event_data?.dryRun) return; // 预热请求不注入
-      if (回合进行中()) return; // 主路径的注入走 generate injects,不走酒馆管道(两路互斥)
+      if (回合进行中()) {
+        // 固定 0 楼主路径已接管隔离与手机锁；销毁原生逃生路径的旧墓碑，避免回档删楼后
+        // 复用同一楼号时，把合法主路径 assistant 误认成曾被 stop 的迟到楼。
+        释放静音会议原生生成锁(false);
+        return; // 主路径的注入走 generate injects,不走酒馆管道(两路互斥)
+      }
+      // 上一个原生请求若在酒馆侧异常中止，下一次真实请求会在这里自愈遗留锁。
+      释放静音会议原生生成锁(false);
       _isInAiCycle = true;
       try {
         const 楼层 = 当前楼层() + 1; // 当前末楼是刚发出的 user，快照描述即将落位的 assistant 楼
@@ -813,9 +1152,40 @@ function 挂载监听() {
         if (!rawStat) {
           console.warn('[人妻公寓] PROMPT_READY: 近10楼均无 stat_data,跳过快照捕获与注入');
           _isInAiCycle = false;
+          释放静音会议原生生成锁();
           return;
         }
         const data = Schema.parse(rawStat) as SchemaType;
+        _静音会议原生生成中 = 静音会议正式运行中(data);
+        _静音会议原生预期助手楼层 = _静音会议原生生成中 ? 楼层 : null;
+        if (_静音会议原生生成中 && 静音会议私聊回复生成中()) {
+          // 客户端入口会直接禁发；原生酒馆输入也必须在 prompt 阶段中止，不能让正文与
+          // 会场私聊争写同一份摘要。冻结基底只是 stop 失败时的隔离兜底，不消费任何拍。
+          _静音会议原生因私聊阻断 = true;
+          _静音会议原生基底 = _.cloneDeep(data) as SchemaType;
+          设置静音会议手机生成中(true);
+          捕获保护快照(data);
+          eventEmit('人妻公寓:回合失败', '会场微信回复还在生成，请等她回完这一条。');
+          setTimeout(() => {
+            if (!_静音会议原生因私聊阻断) return;
+            try {
+              if (!SillyTavern.stopGeneration()) {
+                console.warn('[人妻公寓] 原生静音会议与私聊并发：酒馆未确认停止生成，隔离基底将拒绝推进。');
+              }
+            } catch (e) {
+              console.error('[人妻公寓] 停止原生静音会议生成失败，隔离基底将拒绝推进:', e);
+            }
+          }, 0);
+          return;
+        }
+        if (_静音会议原生生成中) {
+          // 原生酒馆输入是游戏内输入的逃生通道。许可拍必须像 UI 路径一样在生成前
+          // 编译本拍事件；这里只改内存基底，生成停止/失败不会把临时排队写入存档。
+          // 交互幕、散会选择、收尾等不许可阶段会返回失败并保持原状态。
+          特殊场景玩家行动前(data);
+        }
+        _静音会议原生基底 = _静音会议原生生成中 ? (_.cloneDeep(data) as SchemaType) : null;
+        if (_静音会议原生生成中) 设置静音会议手机生成中(true);
 
         // 捕获保护快照(含 UI 写入;镜像同步在内,防护6/9)
         捕获保护快照(data);
@@ -854,6 +1224,7 @@ function 挂载监听() {
       } catch (e) {
         console.error('[人妻公寓] PROMPT_READY 处理失败:', e);
         _isInAiCycle = false;
+        释放静音会议原生生成锁();
       }
     },
   );
@@ -862,24 +1233,68 @@ function 挂载监听() {
   // 写阶段:回滚保护 + 事件转存 + 结算推进
   // ─────────────────────────────────────────────
   eventOn(Mvu.events.VARIABLE_UPDATE_ENDED, (新变量: object, 旧变量: object) => {
-    if (脚本写入中 || 回合进行中()) return; // 主路径的解析/回滚/结算在回合引擎内完成
+    if (脚本写入中 || 回合进行中() || _静音会议原生正文写回中) return; // 主路径的解析/回滚/结算在回合引擎内完成
+    let 保留静音会议生成锁 = false;
     try {
       // 毒快照防御(防护7):stat_data 缺失时绝不 parse({}) 造默认值写回
       const rawStat = _.get(新变量, 'stat_data');
-      if (!rawStat || _.isEmpty(rawStat)) {
+      const 静音会议基底 =
+        (_静音会议原生生成中 || _静音会议原生因私聊阻断) && _静音会议原生基底
+          ? (_.cloneDeep(_静音会议原生基底) as SchemaType)
+          : null;
+      if ((!rawStat || _.isEmpty(rawStat)) && !静音会议基底) {
         console.warn('[人妻公寓] VARIABLE_UPDATE_ENDED: stat_data 缺失,跳过处理');
         return;
       }
       // 末楼 is_user 一律放行(防护14,秦璐 0.39 根因):MESSAGE_SENT 也触发本事件,
       // 用户楼变量是 MVU 刚从上一楼(含全部 UI 写入)拷贝的真值,既不该被旧快照盖回,
       // 也不该被当成 AI 楼推进引擎
-      {
-        const 末楼 = SillyTavern.chat?.[SillyTavern.chat.length - 1];
-        // 逃生舱原生发送:MESSAGE_SENT 后、prompt 组装前,用刚拷贝的真值刷一次整表视图
-        if (末楼?.is_user) {
-          void 同步整表视图(rawStat);
-          return;
-        }
+      const 末楼层 = 当前楼层();
+      const 末楼 = SillyTavern.chat?.[SillyTavern.chat.length - 1];
+      // 逃生舱原生发送:MESSAGE_SENT 后、prompt 组装前,用刚拷贝的真值刷一次整表视图
+      if (末楼?.is_user) {
+        // 极端事件时序下 PROMPT_READY 可能先于用户楼的变量事件：这仍不是 AI 成功楼，
+        // 不能提前推进，也不能释放贯穿生成期的手机互斥锁。
+        保留静音会议生成锁 = 静音会议基底 !== null;
+        if (rawStat && !_.isEmpty(rawStat)) void 同步整表视图(rawStat);
+        return;
+      }
+      const 是预期静音会议助手楼 =
+        静音会议基底 !== null &&
+        _静音会议原生预期助手楼层 !== null &&
+        末楼层 === _静音会议原生预期助手楼层;
+      if (静音会议基底 && !是预期静音会议助手楼) {
+        // 例如重生成被拦截后，手机摘要先触发变量事件，而末楼仍是既有 assistant。
+        // 它不是本次请求的新楼：不清正文、不推进，也不提前丢掉阻断墓碑。
+        保留静音会议生成锁 = true;
+        if (rawStat && !_.isEmpty(rawStat)) void 同步整表视图(rawStat);
+        return;
+      }
+      const 静音正文 = 静音会议基底 ? 清洗静音会议正文(String(末楼?.mes ?? '')) : null;
+      if (静音会议基底 && _静音会议原生因私聊阻断) {
+        // 这次原生发送已在 prompt 阶段明确拒绝；即使酒馆仍落楼，也不保留越过互斥门的正文。
+        物理写回静音会议原生正文('');
+      } else if (静音会议基底 && !静音正文) {
+        // 空响应、纯思考块或纯变量块都不算成功正文；事件保持待发送，玩家可原拍重试。
+        物理写回静音会议原生正文('');
+        _.set(新变量, 'stat_data', 静音会议基底);
+        void 同步整表视图(静音会议基底);
+        _isInAiCycle = false;
+        eventEmit('人妻公寓:回合失败', 'AI 没有返回有效正文——本拍未推进，请直接重试');
+        return;
+      } else if (静音正文 !== null) {
+        物理写回静音会议原生正文(静音正文);
+      }
+
+      if (静音会议基底 && _静音会议原生因私聊阻断 && !_isInAiCycle) {
+        // GENERATION_STOPPED 后仍迟到落下 assistant：只接回可信的手机摘要，正文已清空，
+        // 本拍不消费事件、不推进；清掉一次性墓碑，避免污染下一次合法请求。
+        合并静音会议可信私聊摘要(静音会议基底, 旧变量);
+        _.set(新变量, 'stat_data', 静音会议基底);
+        捕获保护快照(静音会议基底);
+        void 同步整表视图(静音会议基底);
+        _静音会议原生因私聊阻断 = false;
+        return;
       }
       // 手动"重新处理变量"(非生成周期):只恢复不推进(防护13)。
       // 不再从当前楼真值重捕快照(审计 低危15):当前楼是"已截过"的终值,拿它当 delta cap
@@ -897,14 +1312,31 @@ function 挂载监听() {
       }
       if (!有保护快照()) return;
 
-      const newData = Schema.parse(rawStat) as SchemaType;
+      // 原生逃生舱也不能相信 AI 解析后的任何字段，更不能靠“新状态是否仍标记静音会议”
+      // 来决定隔离。PROMPT_READY 已冻结脚本真值；这里只消费事件并推进状态机。
+      const newData = 静音会议基底 ?? (Schema.parse(rawStat) as SchemaType);
       const 楼层 = 当前楼层();
+      const 本轮静音会议 = 静音会议基底 !== null;
+
+      if (本轮静音会议) 合并静音会议可信私聊摘要(newData, 旧变量);
+
+      if (本轮静音会议 && _静音会议原生因私聊阻断) {
+        // stopGeneration 极端情况下未中止、仍落下 AI 楼：正文已物理清洗，但本拍明确
+        // 不消费事件、不推进。稍后完成的手机回复会基于这一楼继续写摘要。
+        _.set(新变量, 'stat_data', newData);
+        捕获保护快照(newData);
+        void 同步整表视图(newData);
+        _isInAiCycle = false;
+        // 已消费可能迟到的 assistant；finally 现在可以连同一次性墓碑一起清掉。
+        _静音会议原生因私聊阻断 = false;
+        return;
+      }
 
       // 1. 回滚脚本管字段(变量分工表落码;后台户整体拍回,焦点户白名单+delta cap)
-      回滚保护字段(newData, _本轮焦点, undefined, 楼层);
+      if (!本轮静音会议) 回滚保护字段(newData, _本轮焦点, undefined, 楼层);
 
       // 1.5 首批入住兜底(启动时无 stat 的全新对话在此接上)
-      确保首批入住(newData);
+      if (!本轮静音会议) 确保首批入住(newData);
 
       // 2. 一次性事件消费转存(防护10):同楼重roll不动;正常过楼转存后清空
       {
@@ -929,13 +1361,33 @@ function 挂载监听() {
         return;
       }
 
-      // 4. 派生字段重算(阶段标题永远脚本按当前阶段算)
-      for (const 节点 of Object.values(newData.户)) {
-        节点.妻.阶段标题 = 阶段标题(节点.妻.当前阶段);
+      // 4. 派生字段重算(静音会议连派生字段也全冻，只允许场景状态机写入)
+      if (!本轮静音会议) {
+        for (const [门牌号, 节点] of Object.entries(newData.户)) {
+          节点.妻.阶段标题 = 阶段标题(节点.妻.当前阶段, 门牌号);
+        }
       }
 
+      // 线路成熟按真实完成的AI楼结算；性癖必须等开幕正文演完，不能在“装载成功”时提前打勾。
+      const 已演事件 = newData.系统._已注入事件.内容;
+      if (!本轮静音会议 && /【性癖开幕·/.test(已演事件)) {
+        for (const 门牌号 of Object.keys(newData.户) as 门牌[]) {
+          if (!已演事件.includes(`对象:${户静态表[门牌号].妻名}`)) continue;
+          上报阶段线路事件(newData, { 类型: '性癖', 门牌: 门牌号, 标识: '开幕完成', 楼层 });
+        }
+      }
+      const 特殊场景id = 已演事件.match(/【特殊场景·([^·】]+)/)?.[1];
+      const 特殊场景 = 特殊场景id ? 查特殊场景(特殊场景id) : undefined;
+      推进特殊场景(newData, 已演事件);
+      if (!本轮静音会议 && 特殊场景?.接入主线 === true) {
+        for (const 门牌号 of 特殊场景.参与(newData as never)) {
+          上报阶段线路事件(newData, { 类型: '特殊场景', 门牌: 门牌号, 标识: 特殊场景.id, 楼层 });
+        }
+      }
+      if (!本轮静音会议) 上报阶段线路事件(newData, { 类型: '时段经过', 楼层 });
+
       // 5. 结算(逃生舱路径:与回合引擎同一套账——焦点户触碰+疑心主通道+冷落检测)
-      {
+      if (!本轮静音会议) {
         let oldStat: SchemaType | null = null;
         try {
           const 旧raw = _.get(旧变量, 'stat_data');
@@ -962,12 +1414,24 @@ function 挂载监听() {
 
       // 6. 写回
       _.set(新变量, 'stat_data', newData);
+      // MESSAGE_RECEIVED 可能早于 MVU 真值落楼；此处用已经推进/结算后的确定状态刷新快照，
+      // 防止随后手动“重新处理变量”把静音会议拍次或最终 +2 拍回到生成前。
+      捕获保护快照(newData);
       void 同步整表视图(newData);
       _isInAiCycle = false;
     } catch (err) {
       console.error('[人妻公寓] VARIABLE_UPDATE_ENDED 处理失败:', err);
       _isInAiCycle = false;
+    } finally {
+      if (!保留静音会议生成锁) 释放静音会议原生生成锁();
     }
+  });
+
+  // 原生酒馆生成被玩家停止时不会保证触发变量更新；明确取消信号负责释放生成互斥锁。
+  eventOn(tavern_events.GENERATION_STOPPED, () => {
+    if (回合进行中()) return; // 固定 0 楼主路径由回合引擎 finally 释放
+    _isInAiCycle = false;
+    释放静音会议原生生成锁();
   });
 
   // ─────────────────────────────────────────────

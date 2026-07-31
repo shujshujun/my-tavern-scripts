@@ -62,11 +62,11 @@
     "content": [["row_id", "人物", "主题", "记忆", "未来影响", "最后楼层", "可信度"]],
     "updateConfig": {
       "uiSentinel": -1,
-      "contextDepth": 6,
-      "updateFrequency": 2,
-      "batchSize": 2,
-      "skipFloors": -1,
-      "groupId": -1
+      "contextDepth": 12,
+      "updateFrequency": 3,
+      "batchSize": 3,
+      "skipFloors": 0,
+      "groupId": 62001
     },
     "exportConfig": {
       "enabled": false,
@@ -102,11 +102,11 @@
     "content": [["row_id", "事项", "相关人物", "内容", "状态", "最后进展", "最后楼层"]],
     "updateConfig": {
       "uiSentinel": -1,
-      "contextDepth": 8,
-      "updateFrequency": 2,
-      "batchSize": 2,
-      "skipFloors": -1,
-      "groupId": -1
+      "contextDepth": 12,
+      "updateFrequency": 3,
+      "batchSize": 3,
+      "skipFloors": 0,
+      "groupId": 62001
     },
     "exportConfig": {
       "enabled": false,
@@ -132,7 +132,7 @@
     "uid": "sheet_rq_social_history",
     "name": "RQ_社交轨迹",
     "sourceData": {
-      "note": "记录会影响社交连续性的微信、朋友圈、邀约和赠礼结果。只保留有后续意义的事件；普通寒暄和同质化动态不入表。事件键以RQP-开头的行由游戏脚本直写维护，禁止修改或删除这些行；新插入的行事件键不得使用RQP-前缀。",
+      "note": "记录会影响社交连续性的微信、朋友圈、邀约和赠礼结果。只保留有后续意义的事件；普通寒暄和同质化动态不入表。事件键以RQP-开头的行由游戏脚本直写维护，禁止修改或删除这些行；新插入的行事件键不得使用RQP-前缀。类型为“微信进展”的行是脚本按聊天分支保存的结构化摘要版本，只含派生进展、不含聊天原文；旧分支行不会自动取得正文注入资格，也不得由填表AI改写。",
       "initNode": "无重要社交事件时保持空表。",
       "deleteNode": "禁止删除；过时内容更新状态。",
       "updateNode": "同一事件产生后续时更新结果与最后楼层。",
@@ -142,11 +142,11 @@
     "content": [["row_id", "类型", "人物", "事件", "结果", "最后楼层", "事件键"]],
     "updateConfig": {
       "uiSentinel": -1,
-      "contextDepth": 6,
-      "updateFrequency": 3,
-      "batchSize": 2,
-      "skipFloors": -1,
-      "groupId": -1
+      "contextDepth": 12,
+      "updateFrequency": 6,
+      "batchSize": 6,
+      "skipFloors": 0,
+      "groupId": 62002
     },
     "exportConfig": {
       "enabled": false,
