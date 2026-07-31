@@ -1484,7 +1484,9 @@
 
       <div v-if="CG预览" class="mask cg-preview-mask" @click.self="CG预览 = null">
         <button class="sheet-close cg-preview-close" @click="CG预览 = null">✕</button>
-        <img :src="成人CG地址(CG预览)" alt="" draggable="false" />
+        <div class="cg-preview-scroller" @click.self="CG预览 = null">
+          <img :src="成人CG地址(CG预览)" alt="" draggable="false" />
+        </div>
       </div>
 
       <!-- ═══════════ 背包(道具可用:布设/送礼/读信) ═══════════ -->
@@ -1921,6 +1923,7 @@ import { useDataStore } from './store';
 import 录像带双屏关闭图 from '../../素材/特殊场景/录像带/01_双屏关闭.png?url';
 import 录像带左屏亮起图 from '../../素材/特殊场景/录像带/02_左屏亮起.png?url';
 import 录像带双屏亮起图 from '../../素材/特殊场景/录像带/03_双屏亮起.png?url';
+import { 同步画幅 } from './viewport';
 
 // ── 梧桐里主题图标：统一 24×24 圆角描边，公寓门牌/钥匙孔/信件等语义贯穿全套 ──
 
@@ -4745,18 +4748,7 @@ type 全屏文档 = Document & { webkitExitFullscreen?: () => void; webkitFullsc
 
 function 应用画幅(开: boolean) {
   document.documentElement.classList.toggle('rqgy-full', 开);
-  if (开) {
-    // 手机真全屏必须跟随动态视口；100vh 在部分 WebView 仍包含已隐藏的浏览器栏，
-    // 多出来的透明合成区会透出 Fullscreen API 的黑色 backdrop。
-    document.documentElement.style.setProperty('--frame-h', '100dvh');
-    return;
-  }
-  try {
-    const 父高 = window.parent?.innerHeight ?? 800;
-    document.documentElement.style.setProperty('--frame-h', `${Math.max(460, Math.round(父高 - 150))}px`);
-  } catch {
-    document.documentElement.style.setProperty('--frame-h', '620px');
-  }
+  同步画幅();
 }
 
 async function 进真全屏() {
@@ -7941,14 +7933,35 @@ onUnmounted(() => {
 }
 
 .cg-preview-mask {
+  position: fixed;
   z-index: 80;
-  padding: 18px;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 0;
   background: rgba(5, 4, 8, 0.94);
 }
 
-.cg-preview-mask > img {
-  width: 100%;
-  height: 100%;
+.cg-preview-scroller {
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 18px;
+  touch-action: pan-y pinch-zoom;
+}
+
+.cg-preview-scroller > img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: 100%;
+  flex: 0 0 auto;
   object-fit: contain;
 }
 
@@ -7960,6 +7973,18 @@ onUnmounted(() => {
 }
 
 @media (max-width: 720px) {
+  .cg-preview-scroller {
+    align-items: flex-start;
+    padding: max(48px, env(safe-area-inset-top)) 0 max(18px, env(safe-area-inset-bottom));
+  }
+
+  .cg-preview-scroller > img {
+    width: 100%;
+    max-width: none;
+    max-height: none;
+    margin: auto 0;
+  }
+
   .cg-library {
     width: calc(100vw - 12px);
     height: calc(100dvh - 12px);

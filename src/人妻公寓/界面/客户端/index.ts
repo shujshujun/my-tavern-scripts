@@ -1,6 +1,7 @@
 import { waitUntil } from 'async-wait-until';
 import App from './App.vue';
 import './global.css';
+import { 注册画幅监听, 同步画幅 } from './viewport';
 
 /** 全局错误横幅:根组件自身的渲染错误 onErrorCaptured 抓不到,必须挂在应用层 */
 function 显示致命错误(err: unknown, 来源: string) {
@@ -21,29 +22,8 @@ function 显示致命错误(err: unknown, 来源: string) {
 window.addEventListener('error', ev => 显示致命错误(ev.error ?? ev.message, 'window'));
 window.addEventListener('unhandledrejection', ev => 显示致命错误(ev.reason, 'promise'));
 
-/**
- * 固定游戏画幅(修道院范式):iframe 高度跟随内容,所以由客户端读酒馆窗口高度、
- * 把画幅定死成 px,面板开合再也不会把框架抻长缩短。真全屏时吃满自身视口。
- */
-function 设定画幅() {
-  if (document.documentElement.classList.contains('rqgy-full')) {
-    document.documentElement.style.setProperty('--frame-h', '100vh');
-    return;
-  }
-  try {
-    const 父高 = window.parent?.innerHeight ?? 800;
-    document.documentElement.style.setProperty('--frame-h', `${Math.max(460, Math.round(父高 - 150))}px`);
-  } catch {
-    document.documentElement.style.setProperty('--frame-h', '620px');
-  }
-}
-设定画幅();
-window.addEventListener('resize', 设定画幅);
-try {
-  window.parent?.addEventListener?.('resize', 设定画幅);
-} catch {
-  /* 跨域时退回 iframe 自身 resize */
-}
+同步画幅();
+注册画幅监听();
 
 $(async () => {
   try {

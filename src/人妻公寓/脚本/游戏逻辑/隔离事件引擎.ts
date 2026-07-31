@@ -1,4 +1,5 @@
 import { 数据库状态, 通过数据库生成 } from './数据库桥';
+import { 当前正文模型是DeepSeek } from './正文模型识别';
 import { 预设破限段 } from './预设桥';
 
 export type 隔离事件类型 = '荣耀洞' | '监控';
@@ -97,6 +98,13 @@ function 系统提示(类型: 隔离事件类型, 导演事件: string): string 
   ].join('\n');
 }
 
+/**
+ * 玩家预设的 chatHistory 后段可能以 assistant/system 角色收尾。DeepSeek 的独立请求
+ * 以真实 user 消息收尾更稳定；这样既保留预设注入，也明确要求模型现在给出最终事件正文。
+ */
+const 隔离事件收尾 = '以上设定与本拍行动均已给出。现在只输出这一拍可直接显示的中文事件正文。';
+const 普通隔离事件生成上限 = 1400;
+
 function 最近线程(线程: string): { role: 'user' | 'assistant'; content: string }[] {
   return 读库()
     .日志.filter(条 => 条.线程 === 线程)
@@ -121,23 +129,31 @@ export async function 执行隔离事件(参数: {
     // 预设破限段护航(2026-07-27):特殊场景正戏最敏感,裸发必被 Gemini 安全截断
     const { 前, 后 } = 预设破限段();
     // 核心段单列:存档日志(史册考古的"提示词"字段)只记核心,预设破限段不进 chat 变量(防存档膨胀)
-    const 核心段: ({ role: 'system' | 'user' | 'assistant'; content: string } | 'user_input')[] = [
+    const 核心段: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
       { role: 'system', content: system },
       ...history,
-      'user_input',
     ];
-    const ordered_prompts: typeof 核心段 = [...前, ...核心段, ...后];
+    const 是DeepSeek = 当前正文模型是DeepSeek();
+    const 本拍用户输入 = 是DeepSeek ? `${参数.行动}\n\n${隔离事件收尾}` : 参数.行动;
+    const ordered_prompts: ({ role: 'system' | 'user' | 'assistant'; content: string } | 'user_input')[] = [
+      ...前,
+      ...核心段,
+      ...(是DeepSeek ? [...后, 'user_input' as const] : ['user_input' as const, ...后]),
+    ];
     // generateRaw 可能返回 GenerateToolCallResult(本卡不传 tools,该分支不触发),统一按 unknown 收
     let 原文: unknown;
-    if (数据库状态().可调用AI) {
+    // 数据库代理可能使用自己的独立模型且不公开模型名，不能拿正文模型去替它做判断。
+    // 当前正文明确为 DeepSeek 时直接走正文专用路径；其余数据库请求完整维持 rq0.62。
+    if (数据库状态().可调用AI && !是DeepSeek) {
       原文 = await 通过数据库生成(
         [...前, { role: 'system', content: system }, ...history, { role: 'user', content: 参数.行动 }, ...后],
         '',
-        1400,
+        普通隔离事件生成上限,
       );
       if (!String(原文 ?? '').trim()) throw new Error('数据库 AI 返回空内容；为避免重复计费，本拍没有再次请求正文 API');
     } else {
-      原文 = await generateRaw({ ordered_prompts, user_input: 参数.行动, should_stream: false });
+      // 仅 DeepSeek 使用流式兼容路径；其余模型保持 rq0.62 的非流式行为。
+      原文 = await generateRaw({ ordered_prompts, user_input: 本拍用户输入, should_stream: 是DeepSeek });
     }
     if (已取消) throw new Error('已取消——这一拍没有发生');
     const 正文 = 净化(String(原文 ?? ''));
@@ -148,8 +164,8 @@ export async function 执行隔离事件(参数: {
     const 序起 = 库.日志.filter(条 => 条.锚楼 === 锚楼).reduce((max, 条) => Math.max(max, 条.序), -1) + 1;
     const 时间 = Date.now();
     const 基 = 参数.类型 + '-' + 时间;
-    const 提示词 = 核心段
-      .map(项 => (项 === 'user_input' ? 'USER\n' + 参数.行动 : 项.role.toUpperCase() + '\n' + 项.content))
+    const 提示词 = [...核心段, { role: 'user' as const, content: 本拍用户输入 }]
+      .map(项 => 项.role.toUpperCase() + '\n' + 项.content)
       .join('\n\n');
     库.日志.push(
       {
