@@ -17,6 +17,7 @@ import { 读取数据库记忆胶囊, 读取微信进展胶囊, 同步数据库�
 import { 上报阶段线路事件 } from './阶段线路系统';
 import { 当前微信摘要引用, 等待微信摘要任务, 设置静音会议手机生成中 } from './手机系统';
 import { 推进特殊场景, 静音会议正式运行中 } from './特殊场景系统';
+import { 读取当前正文模型线索, 模型线索指向DeepSeek } from './正文模型识别';
 
 /**
  * 回合引擎:固定 0 楼架构的主循环(修道院回合引擎直迁,本作化三处:
@@ -149,51 +150,6 @@ async function 等待正文生成(参数: Parameters<typeof generate>[0]): Promi
     return String(await Promise.race([generate(参数), 中止门]));
   } finally {
     解除生成等待 = null;
-  }
-}
-
-/**
- * 识别当前正文模型。
- *
- * 酒馆可把模型接在原厂、OpenRouter 或 OpenAI 兼容端点下，模型名会落在不同设置键里。
- * 这里只扫描“模型/API 来源”类字段，避免把聊天正文里的品牌名误判成当前模型。
- */
-function 识别正文模型(): string {
-  try {
-    const 宿主 = window.parent as any;
-    const 全局ST = 宿主?.SillyTavern ?? (globalThis as any).SillyTavern;
-    const 上下文 = 全局ST?.getContext?.() ?? 全局ST ?? SillyTavern;
-    const 候选根 = [
-      上下文?.chatCompletionSettings,
-      上下文?.textCompletionSettings,
-      上下文?.oai_settings,
-      上下文?.textgenerationwebui_settings,
-      上下文?.mainApi,
-      {
-        mainApi: 上下文?.mainApi,
-        onlineStatus: 上下文?.onlineStatus,
-        tokenizerModel: 上下文?.getTokenizerModel?.(),
-      },
-    ];
-    const 候选值: string[] = [];
-    const 收集 = (值: unknown, 深度: number, 路径 = ''): void => {
-      if (深度 > 3 || 值 == null) return;
-      if (typeof 值 === 'string') {
-        if (/(?:model|source|api|provider|status)/i.test(路径)) 候选值.push(值);
-        return;
-      }
-      if (typeof 值 !== 'object' || Array.isArray(值)) return;
-      for (const [键, 子值] of Object.entries(值 as Record<string, unknown>)) {
-        收集(子值, 深度 + 1, 路径 ? `${路径}.${键}` : 键);
-      }
-    };
-    for (const 根 of 候选根) 收集(根, 0);
-    const 命中 = 候选值.find(值 => /\b(?:gemini|deepseek)(?:[-_.:/\s]|$)/i.test(值)) ?? '';
-    if (命中) console.info(`[人妻公寓] 检测到正文模型：${命中}`);
-    return 命中;
-  } catch (e) {
-    console.warn('[人妻公寓] 正文模型检测失败，按普通模型继续：', e);
-    return '';
   }
 }
 
@@ -767,8 +723,12 @@ export async function 执行回合(行动: string): Promise<void> {
     const injects: Omit<InjectionPrompt, 'id'>[] = [
       { role: 'system', content: 快照 + 行动锚, position: 'in_chat', depth: 0, should_scan: true },
     ];
-    const 正文模型 = 识别正文模型();
-    const 是Gemini = /\bgemini(?:[-_.:/\s]|$)/i.test(正文模型);
+    const 正文模型线索 = 读取当前正文模型线索();
+    const 是DeepSeek = 模型线索指向DeepSeek(正文模型线索);
+    const 是Gemini = 正文模型线索.some(线索 => /\bgemini(?:[-_.:/\s]|$)/i.test(线索));
+    if (是DeepSeek || 是Gemini) {
+      console.info(`[人妻公寓] 检测到当前正文模型：${正文模型线索.join(' | ')}`);
+    }
     if (是Gemini) {
       injects.push({
         role: 'system',
@@ -897,7 +857,7 @@ export async function 执行回合(行动: string): Promise<void> {
     let 可重处理楼层正文 = 变量块 ? `${基础正文}\n${变量块}` : 基础正文;
     let 解析基准 = _.cloneDeep(
       Mvu.getMvuData({ type: 'message', message_id: -1 }) ?? 旧,
-    ) as Record<string, unknown>;
+    ) as Mvu.MvuData;
     await createChatMessages([{ role: 'assistant', message: 可重处理楼层正文, data: _.cloneDeep(解析基准) }], {
       refresh: 'none',
     });
@@ -921,7 +881,7 @@ export async function 执行回合(行动: string): Promise<void> {
       const 外置后数据 = Mvu.getMvuData({ type: 'message', message_id: 临时助手楼层 });
       可重处理楼层正文 = 外置后正文;
       变量块 = 取变量块(外置后正文);
-      if (外置后数据) 解析基准 = _.cloneDeep(外置后数据) as Record<string, unknown>;
+      if (外置后数据) 解析基准 = _.cloneDeep(外置后数据);
       if (有可用变量命令(外置后正文) || !_.isEqual(解析基准, 旧)) {
         console.info('[人妻公寓] MVU 外置模型变量解析完成');
       } else {
@@ -929,7 +889,7 @@ export async function 执行回合(行动: string): Promise<void> {
       }
     }
 
-    const 新 = ((await Mvu.parseMessage(可重处理楼层正文, 解析基准)) ?? 解析基准) as Record<string, unknown>;
+    const 新 = ((await Mvu.parseMessage(可重处理楼层正文, 解析基准)) ?? 解析基准) as Mvu.MvuData;
     // 静音会议是脚本全权管理的隔离层：即使模型仍输出隐藏变量命令，也不能让解析结果
     // 成为本轮真值。以生成前的已验证状态为唯一基底，之后只允许回合结算消费事件、
     // 特殊场景状态机推进，以及最终收尾时由脚本执行固定 +2。

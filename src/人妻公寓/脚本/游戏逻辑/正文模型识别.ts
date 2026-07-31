@@ -72,10 +72,20 @@ function 读取酒馆上下文(): unknown {
   return typeof getContext === 'function' ? getContext() : 酒馆;
 }
 
+/** 返回当前生效来源的模型线索，供正文与隔离生成复用同一套判定。 */
+export function 读取当前正文模型线索(): string[] {
+  try {
+    return 收集当前正文模型线索(读取酒馆上下文());
+  } catch (error) {
+    console.warn('[人妻公寓] 当前正文模型线索读取失败，按普通模型继续：', error);
+    return [];
+  }
+}
+
 /** 检测不确定时返回 false，保证所有非明确 DeepSeek 模型维持 rq0.62 行为。 */
 export function 当前正文模型是DeepSeek(): boolean {
   try {
-    const 命中 = 模型线索指向DeepSeek(收集当前正文模型线索(读取酒馆上下文()));
+    const 命中 = 模型线索指向DeepSeek(读取当前正文模型线索());
     if (命中) console.info('[人妻公寓] 监控隔离生成启用 DeepSeek 专用兼容路径');
     return 命中;
   } catch (error) {
