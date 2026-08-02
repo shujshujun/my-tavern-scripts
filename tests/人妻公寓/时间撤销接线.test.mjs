@@ -5,6 +5,7 @@ import test from 'node:test';
 
 const App源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
 const Index源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
+const 撤销源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/时间撤销系统.ts', import.meta.url), 'utf8');
 
 function 截段(源, 开始标记, 结束标记) {
   const 开始 = 源.indexOf(开始标记);
@@ -43,6 +44,8 @@ test('时间推进把撤销点与清场变量作为同笔聊天写入，失败�
   assert.match(时间段, /捕获精确聊天快照/);
   assert.match(时间段, /恢复精确聊天快照/);
   assert.match(时间段, /记录成长: false/);
+  assert.match(时间段, /时间推进写入聊天键 = 时间推进事务恢复聊天键/);
+  assert.match(推进段, /vars\[时间推进事务键\] = _.cloneDeep\(时间事务记录\)/);
   assert.match(推进段, /写时间结束场景\(vars,[\s\S]{0,180}delete vars\[时间撤销点键\]/);
   assert.match(推进段, /执行时间推进双存储提交/);
   assert.match(推进段, /const 清场后聊天基线 = 时间聊天状态指纹/);
@@ -54,11 +57,25 @@ test('时间推进把撤销点与清场变量作为同笔聊天写入，失败�
   assert.doesNotMatch(时间段, /createChatMessages|createChatMessage|\/addswipe|\/send/);
 });
 
-test('撤销恢复完整 MVU、精确聊天键并复用手机双轴裁剪，成功后销毁单槽撤销点', () => {
+test('跨聊天重载留下的时间半事务会在挂监听前按持久记录恢复', () => {
+  const 恢复段 = 截段(Index源, 'async function 恢复中断时间推进', '/**\n * 玩家角色名');
+  assert.match(恢复段, /读取时间推进事务记录/);
+  assert.match(恢复段, /await 脚本写入\(有效\.raw, _.cloneDeep\(记录\.推进前数据\)/);
+  assert.match(恢复段, /恢复精确聊天快照\(当前变量, 记录\.推进前聊天, 时间推进事务恢复聊天键\)/);
+  assert.match(恢复段, /delete 当前变量\[时间推进事务键\]/);
+
+  const 启动恢复 = Index源.indexOf('await 恢复中断时间推进()');
+  const 挂监听 = Index源.indexOf('挂载监听();', 启动恢复);
+  assert.ok(启动恢复 >= 0 && 挂监听 > 启动恢复, '半事务必须在接受新操作前恢复');
+});
+
+test('撤销恢复完整 MVU 与版本2隔离日志快照，并复用手机双轴裁剪后销毁单槽撤销点', () => {
   const 时间段 = 截段(Index源, 'type 时间推进载荷', '\n  // 地点只负责亮出 STORY 按钮');
 
+  assert.match(撤销源, /时间撤销点版本 = 2 as const/);
+  assert.match(撤销源, /时间撤销恢复聊天键 = \[[\s\S]{0,500}'_隔离事件'/);
   assert.match(时间段, /推进前数据/);
-  assert.match(时间段, /恢复精确聊天快照/);
+  assert.match(时间段, /恢复精确聊天快照\(vars, 撤销点\.推进前聊天, 时间撤销恢复聊天键\)/);
   assert.match(时间段, /裁手机时间线/);
   assert.match(时间段, /delete vars\[时间撤销点键\]/);
   assert.match(时间段, /清保护快照\(\)/);

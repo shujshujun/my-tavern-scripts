@@ -110,7 +110,7 @@ test('妻与丈夫基础作息固定，不再叠加消息楼或随机扰动', ()
   }
 });
 
-test('中央事务是唯一业务推进入口，楼层时钟不再导出绕结算的杀时间', () => {
+test('中央事务是唯一业务推进入口，例行推进直接结算且不生成待演时间票', () => {
   globalThis.getVariables = () => ({ _场景: { 房间id: '101' }, _粘滞: null, _赴约: null });
   const data = Schema.parse({ 系统: { _数据版本: 当前MVU数据版本, _绝对时段: 0 } });
   const 结果 = 执行时间推进事务(data, {
@@ -121,7 +121,7 @@ test('中央事务是唯一业务推进入口，楼层时钟不再导出绕结�
   });
   assert.equal(结果.成功, true);
   assert.equal(data.系统._绝对时段, 1);
-  assert.match(data.系统._待发送事件, /^【时间流逝】/);
+  assert.equal(data.系统._待发送事件, '');
   assert.equal(时钟模块.杀时间, undefined);
 });
 

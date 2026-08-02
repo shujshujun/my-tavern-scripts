@@ -207,6 +207,10 @@
                     "default": -1,
                     "type": "number"
                   },
+                  "预约星期": {
+                    "default": "",
+                    "type": "string"
+                  },
                   "预约时段": {
                     "default": "",
                     "type": "string"
@@ -214,6 +218,20 @@
                   "预约地点": {
                     "default": "",
                     "type": "string"
+                  },
+                  "预约绝对时段": {
+                    "default": -1,
+                    "type": "number"
+                  },
+                  "预约丈夫状态": {
+                    "default": "",
+                    "type": "string",
+                    "enum": [
+                      "",
+                      "外出",
+                      "在家",
+                      "睡眠"
+                    ]
                   }
                 }
               },

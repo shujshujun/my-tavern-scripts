@@ -40,10 +40,13 @@ test('外置路线让正文模型退出变量处理，并只走一次 MVU 官方
     /!使用MVU外置解析[\s\S]{0,160}本轮有可写演员[\s\S]{0,160}\(是DeepSeek \|\| 是Gemini\)[\s\S]{0,160}二次变量结算开启\(\)/,
   );
   assert.match(引擎, /本轮静音会议 \|\| 使用MVU外置解析 \|\| !本轮有可写演员 \? '' : 取变量块\(原文\)/);
-  assert.match(引擎, /使用MVU外置解析 &&[\s\S]*?MVU解析\.自动请求 &&[\s\S]*?await eventEmit\('人妻公寓:MVU外置模型重试'\)/);
   assert.match(
     引擎,
-    /const 新 = 使用MVU外置解析[\s\S]{0,120}\? 解析基准[\s\S]{0,120}: [\s\S]{0,20}await Mvu\.parseMessage\(可重处理楼层正文, 解析基准\)/,
+    /使用MVU外置解析 &&[\s\S]*?MVU解析\.自动请求 &&[\s\S]*?await eventEmit\('人妻公寓:MVU外置模型重试'\)/,
+  );
+  assert.match(
+    引擎,
+    /if \(!使用MVU外置解析 && !变量解析已降级\)[\s\S]{0,220}const 候选基准 = _\.cloneDeep\(解析基准\)[\s\S]{0,220}await Mvu\.parseMessage\(可重处理楼层正文, 候选基准\)/,
     '外置桥返回的数据已经由 MVU 解析，不得在终值上再应用一次 delta/add',
   );
   assert.doesNotMatch(引擎, /function 外置模型补变量开启/);

@@ -1,7 +1,15 @@
 import type { SchemaType } from '../../schema';
 import type { 时段名, 夫状态名, 门牌 } from '../../stageConfig';
 import { 户静态表 } from '../../stageConfig';
-import { 六时段列表, 到次日早晨间隔, 妻基础位置, 星期列表, 解析绝对时段, type 星期名 } from '../../周作息';
+import {
+  每周时段数,
+  六时段列表,
+  到次日早晨间隔,
+  妻基础位置,
+  星期列表,
+  解析绝对时段,
+  type 星期名,
+} from '../../周作息';
 
 export { 六时段列表, 到次日早晨间隔, 星期列表, 每周时段数, 解析绝对时段 } from '../../周作息';
 export type { 星期名 } from '../../周作息';
@@ -155,7 +163,35 @@ export function 丈夫状态推算(门牌号: 门牌, 绝对时段: number): 夫
  * 从 T 开始持续 N 时段时保存 T+N，并且只在 `[T, T+N)` 内强制外出。
  * 全系统读丈夫状态的统一口——有户节点就走这里,别裸调 丈夫状态推算。
  */
-export function 丈夫在楼(节点: { 夫: { _外出至: number } } | undefined, 门牌号: 门牌, 绝对时段: number): 夫状态名 {
+interface 阶段预约状态 {
+  预约星期?: string;
+  预约时段?: string;
+  预约地点?: string;
+  预约绝对时段?: number;
+  预约丈夫状态?: string;
+}
+
+interface 含阶段预约户 {
+  夫: { _外出至: number };
+  妻?: { _阶段线路?: 阶段预约状态 };
+}
+
+/** 首次预约及其每周复现窗口；错过不会永久丢失，也不会在别的星期或时段误激活。 */
+export function 阶段预约当前有效(状态: 阶段预约状态 | undefined, 绝对时段: number): boolean {
+  const 起点 = Number(状态?.预约绝对时段 ?? -1);
+  if (!状态?.预约地点 || !状态.预约星期 || !状态.预约时段 || 起点 < 0 || 绝对时段 < 起点) return false;
+  if ((绝对时段 - 起点) % 每周时段数 !== 0) return false;
+  const 时间 = 解析绝对时段(绝对时段);
+  return 时间.星期 === 状态.预约星期 && 时间.时段 === 状态.预约时段;
+}
+
+export function 丈夫在楼(节点: 含阶段预约户 | undefined, 门牌号: 门牌, 绝对时段: number): 夫状态名 {
+  const 预约 = 节点?.妻?._阶段线路;
+  if (阶段预约当前有效(预约, 绝对时段)) {
+    if (预约?.预约丈夫状态 === '外出' || 预约?.预约丈夫状态 === '在家' || 预约?.预约丈夫状态 === '睡眠') {
+      return 预约.预约丈夫状态;
+    }
+  }
   if (节点 && 节点.夫._外出至 > 绝对时段) return '外出';
   return 丈夫状态推算(门牌号, 绝对时段);
 }
@@ -169,6 +205,8 @@ export function 疑心冻结中(夫: { _疑心冻结至: number } | undefined, �
  * 妻基础位置由固定周作息表查询；本函数不读取消息楼、不使用随机数。
  * 特殊场景、赴约与连续对话的在场覆盖仍由上层先行处理。
  */
-export function 妻位置推算(门牌号: 门牌, 绝对时段: number): string {
+export function 妻位置推算(门牌号: 门牌, 绝对时段: number, 节点?: 含阶段预约户): string {
+  const 预约 = 节点?.妻?._阶段线路;
+  if (阶段预约当前有效(预约, 绝对时段)) return 预约!.预约地点!;
   return 妻基础位置(门牌号, 绝对时段);
 }

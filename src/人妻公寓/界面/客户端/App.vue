@@ -15,11 +15,22 @@
         </div>
       </transition>
 
-      <!-- 消息内嵌首屏：移动端必须由玩家手势触发 Fullscreen API，给一个看得见的大入口。 -->
-      <button v-if="移动端 && !真全屏中" class="mobile-fullscreen-cta" type="button" @click="打开移动端全屏">
+      <!-- 首次移动端建议：明确允许窗口模式；任一选择都会记住，不在退出全屏后反复遮挡。 -->
+      <div
+        v-if="显示移动端全屏引导"
+        class="mobile-fullscreen-cta"
+        role="dialog"
+        aria-labelledby="mobile-fullscreen-title"
+      >
         <Ic n="expand" />
-        <span><b>点击全屏打开游戏</b><small>首次进入建议先全屏，之后可在右上角随时退出</small></span>
-      </button>
+        <span class="mobile-fullscreen-copy"
+          ><b id="mobile-fullscreen-title">建议全屏打开游戏</b><small>全屏并非强制，也可以继续使用窗口模式</small></span
+        >
+        <div class="mobile-fullscreen-actions">
+          <button type="button" class="mobile-fullscreen-primary" @click="打开移动端全屏">进入全屏</button>
+          <button type="button" class="mobile-fullscreen-window" @click="继续窗口模式">继续窗口模式</button>
+        </div>
+      </div>
 
       <!-- 转场横幅(gal 式地点闪卡:走动的即时反馈) -->
       <transition name="loc-flash">
@@ -249,7 +260,7 @@
               </p>
               <p>
                 完整微信原文仍只保存在手机；开启微信记忆且 SQLite 可写时，每轮有效妻子私聊通常会额外调用一次数据库当前
-                AI，把当前分支的未整理增量压成结构化短进展。普通表格模式会暂停这次额外摘要调用。正文只在本人可靠判定在场时被动参考，不要求角色每轮主动提起；该功能可在手机“我”页单独关闭。
+                AI，把当前分支的未整理增量整理成结构化进展摘要。普通表格模式会暂停这次额外摘要调用。正文只在本人可靠判定在场时被动参考，不要求角色每轮主动提起；该功能可在手机“我”页单独关闭。
               </p>
               <div class="setup-db-actions">
                 <button class="btn mini" @click="刷新全部检测">重新检测</button>
@@ -1379,6 +1390,21 @@
           <button class="btn" title="使用刚才完全相同的行动重新请求" @click="重试失败行动">↻ 重新生成刚才行动</button>
         </div>
 
+        <button
+          v-if="!录像带中 && !静音会议正式中"
+          class="global-time-advance"
+          type="button"
+          :disabled="发送中 || 由头写入中"
+          @click="推进固定时段"
+        >
+          <Ic n="clock" />
+          <span>
+            <b>推进时间</b>
+            <small v-if="时段 === '深夜'">请回管理员室或 302 睡觉</small>
+            <small v-else>{{ 当前时段显示 }} → 推进到{{ 下一时段显示 }}</small>
+          </span>
+        </button>
+
         <!-- 功能区:gal 式底部 dock(大图标按钮,与数据 HUD 分离) -->
         <nav v-if="!录像带中" class="dock" :class="{ 'mute-meeting-dock': 静音会议正式中 }">
           <button
@@ -1812,6 +1838,7 @@
           <div v-if="显示关系线索 && 选中关系线索" class="dsec relation-clue-board">
             <div class="dsec-title">{{ 选中关系线索.标题 }}</div>
             <p class="relation-aside">· {{ 选中关系线索.侧写 }}</p>
+            <p v-if="选中关系线索.预约" class="relation-appointment">下一步 · {{ 选中关系线索.预约 }}</p>
             <div v-for="(线索, i) in 选中关系线索.线索" :key="i" class="relation-clue" :class="{ done: 线索.完成 }">
               <i>{{ 线索.完成 ? '✓' : '◇' }}</i
               ><span>{{ 线索.文案 }}</span>
@@ -1824,7 +1851,7 @@
             :disabled="发送中 || !选中可晋阶"
             @click="晋阶(选中档案.门牌)"
           >
-            {{ 选中首夜待晚上 ? '✦ 等到晚上' : '✦ 跨过界线' }}
+            {{ 选中首夜待晚上 ? '✦ 等到晚上' : 选中晋阶待现场 ? '✦ 按预约见面' : '✦ 跨过界线' }}
           </button>
           <button
             v-if="选中可要钱"
@@ -2316,8 +2343,8 @@ import {
   type 道具配置,
   type 门牌,
 } from '../../stageConfig';
-import { 妻基础位置, 解析绝对时段 } from '../../周作息';
-import { 丈夫在楼 } from '../../脚本/游戏逻辑/楼层时钟';
+import { 解析绝对时段 } from '../../周作息';
+import { 丈夫在楼, 妻位置推算 } from '../../脚本/游戏逻辑/楼层时钟';
 import {
   应用数据库填表兼容设置,
   安装人妻公寓数据库模板,
@@ -2326,7 +2353,7 @@ import {
 } from '../../脚本/游戏逻辑/数据库桥';
 import { 查金币 } from '../../脚本/游戏逻辑/经济系统';
 import { 列出地点管理任务, 管理任务选项 } from '../../脚本/游戏逻辑/管理任务系统';
-import { 可晋阶, 可启动母亲药物首夜, 普通首夜时段已满足 } from '../../脚本/游戏逻辑/结算系统';
+import { 可晋阶, 可启动母亲药物首夜, 普通首夜时段已满足, 晋阶预约现场已满足 } from '../../脚本/游戏逻辑/结算系统';
 import { 规范荣耀洞上次时段 } from '../../脚本/游戏逻辑/荣耀洞';
 import { 读取关系线索, 列出阶段线路候选详情, type 阶段线路候选 } from '../../脚本/游戏逻辑/阶段线路系统';
 import { 当前聊天ID, 获取静音会议手机状态 } from '../../脚本/游戏逻辑/手机系统';
@@ -2340,6 +2367,7 @@ import {
   行动疑似性爱,
   距离下级经验,
   玩家当前日,
+  玩家资源已满,
   资源上限,
   资源等级,
   默认失控位置,
@@ -2363,9 +2391,9 @@ import { 计算场景同步, type 场景聊天状态 } from './场景状态同�
 import { 读取录像带连点失败状态, 推进录像带连点失败 } from './录像带交互状态';
 import { 同步画幅 } from './viewport';
 
-// 0.66 位图随不可变 Tag 发布。不要通过 `?url` 把它们塞进客户端 module：
+// 0.67 位图随不可变 Tag 发布。不要通过 `?url` 把它们塞进客户端 module：
 // 三张录像带原图就会把移动端入口从约 0.65 MB 撑到 11.7 MB，并显著增加 WebView 解析失败风险。
-const 版本素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.66/src/人妻公寓/素材';
+const 版本素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.67/src/人妻公寓/素材';
 const 录像带双屏关闭图 = `${版本素材基址}/特殊场景/录像带/01_双屏关闭.png`;
 const 录像带左屏亮起图 = `${版本素材基址}/特殊场景/录像带/02_左屏亮起.png`;
 const 录像带双屏亮起图 = `${版本素材基址}/特殊场景/录像带/03_双屏亮起.png`;
@@ -2560,6 +2588,8 @@ const 时段 = computed(() => 时间信息.value.时段);
 const 天数 = computed(() => 时间信息.value.天数);
 const 周数 = computed(() => 时间信息.value.周数);
 const 星期 = computed(() => 时间信息.value.星期);
+const 当前时段显示 = computed(() => 时间信息.value.时段);
+const 下一时段显示 = computed(() => 解析绝对时段(绝对时段.value + 1).时段);
 
 // ── 玩家精力 / 体力与本场满意度 ──
 
@@ -2706,7 +2736,7 @@ function 妻现位(m: 门牌): string {
   if (静音会议正式中.value && 静音会议演出妻.value.includes(m)) return '管理员室';
   if (赴约妻.value === m) return 当前房间.value ?? '大堂';
   if (粘滞在场.value.位置 && 粘滞在场.value.们.includes(m)) return 粘滞在场.value.位置;
-  return 妻基础位置(m, 绝对时段.value);
+  return 妻位置推算(m, 绝对时段.value, data.value.户[m]);
 }
 watch(显示地图, 开 => {
   if (开) {
@@ -3075,7 +3105,8 @@ type 客户端时间方式 = '推进一时段' | '睡到次日早晨' | '小憩'
 
 function 发起时间推进(方式: 客户端时间方式): void {
   if (发送中.value) return;
-  // 时间事务不生成正文，但同样要锁住地图、输入和回档按钮，直到脚本明确回报结束。
+  // 小憩直接结算；晨跑、健身与睡眠先生成不入正文记忆的独立反馈。两条路径都要锁住
+  // 地图、输入和回档按钮，直到脚本明确回报结束。
   发送中.value = true;
   运行阶段.value =
     方式 === '睡到次日早晨'
@@ -3103,11 +3134,37 @@ function 发起时间推进(方式: 客户端时间方式): void {
   });
 }
 
+function 推进固定时段(): void {
+  if (发送中.value || 由头写入中.value) return;
+  if (时段.value === '深夜') {
+    弹提示('已经是深夜，请回管理员室或 302 睡觉。普通等待不能跨到第二天。', 4000);
+    return;
+  }
+  if (玩家资源已满(data.value)) {
+    const 确认 = window.confirm(`你在${当前时段显示.value}什么也没做，确定推进到${下一时段显示.value}吗？`);
+    if (!确认) return;
+  }
+  发起时间推进('推进一时段');
+}
+
 function 发起时间撤销(): void {
   if (发送中.value || !时间撤销可用.value) return;
   发送中.value = true;
   运行阶段.value = '正在撤销刚才的时间推进';
   eventEmit('人妻公寓:撤销时间推进');
+}
+
+/** 地图房卡允许“一键前往并执行”，但移动被玩家取消或场景写入失败时不得继续发业务事件。 */
+async function 确认已到达动作地点(地点: string): Promise<boolean> {
+  try {
+    if (当前房间.value !== 地点 && !(await 进入(地点, false, true))) return false;
+  } catch (error) {
+    // `进入` 先更新本地动效再写宿主变量；持久化失败时立刻以聊天真值纠正画面。
+    同步场景自变量();
+    弹提示(`没有成功进入目标地点：${error instanceof Error ? error.message : String(error)}`);
+    return false;
+  }
+  return 当前房间.value === 地点;
 }
 
 function 房间动作(id: string | null): 卡动作[] {
@@ -3148,7 +3205,7 @@ function 房间动作(id: string | null): 卡动作[] {
       动作.push({ kicker: 'GYM', icon: 'favor', 文案: '进入健身房', 做: () => 进入(id) });
     } else {
       const 今日 = 玩家当前日(data.value);
-      if (data.value.玩家资源._体力训练日 !== 今日) {
+      if (时段.value !== '深夜' && data.value.玩家资源._体力训练日 !== 今日) {
         动作.push({ kicker: 'TRAIN', icon: 'favor', 文案: '开始锻炼（推进一时段）', 做: () => 发起时间推进('健身') });
       }
       if (时间撤销可用.value) {
@@ -3171,7 +3228,7 @@ function 房间动作(id: string | null): 卡动作[] {
             icon: 'gift',
             文案: `请${户静态表[id as 门牌].夫名}喝一杯`,
             做: async () => {
-              if (当前房间.value !== id) await 进入(id, false, true);
+              if (!(await 确认已到达动作地点(id))) return;
               eventEmit('人妻公寓:对饮', id);
             },
           });
@@ -3183,7 +3240,7 @@ function 房间动作(id: string | null): 卡动作[] {
             icon: 'gift',
             文案: 礼物 === '香烟' ? `递${户静态表[id as 门牌].夫名}一包烟` : `送${户静态表[id as 门牌].夫名}两张球赛票`,
             做: async () => {
-              if (当前房间.value !== id) await 进入(id, false, true);
+              if (!(await 确认已到达动作地点(id))) return;
               eventEmit('人妻公寓:丈夫礼物', { 门牌: id, 道具id: 礼物 });
             },
           });
@@ -3192,7 +3249,7 @@ function 房间动作(id: string | null): 卡动作[] {
       // 催租三选(P3,天生欠租户):她在家且账上挂着欠租才摆得上台面
       if ((data.value.户[id]?._欠租笔数 ?? 0) > 0 && 妻现位(id as 门牌) === id) {
         const 催 = async (选择: '硬催' | '宽限' | '垫上') => {
-          if (当前房间.value !== id) await 进入(id, false, true);
+          if (!(await 确认已到达动作地点(id))) return;
           eventEmit('人妻公寓:催租', { 门牌: id, 选择 });
         };
         动作.push({ kicker: 'RENT', icon: 'coin', 文案: '硬催房租', 类: 'risky', 做: () => 催('硬催') });
@@ -3227,12 +3284,14 @@ function 房间动作(id: string | null): 卡动作[] {
     动作.push({ kicker: 'HOME', icon: 'home', 文案: '回家看看', 做: () => 进入(id) });
     if (当前房间.value === id) {
       添加地点线路动作(动作, id);
-      动作.push({
-        kicker: 'NAP',
-        icon: 'moon',
-        文案: '小憩（推进一时段）',
-        做: () => 发起时间推进('小憩'),
-      });
+      if (时段.value !== '深夜') {
+        动作.push({
+          kicker: 'NAP',
+          icon: 'moon',
+          文案: '小憩（推进一时段）',
+          做: () => 发起时间推进('小憩'),
+        });
+      }
       动作.push({
         kicker: 'REST',
         icon: 'moon',
@@ -3257,12 +3316,14 @@ function 房间动作(id: string | null): 卡动作[] {
     动作.push({ kicker: 'GO', icon: 'arrow', 文案: '走过去', 做: () => 进入(id) });
     添加地点线路动作(动作, id);
     if (当前房间.value === id) {
-      动作.push({
-        kicker: 'NAP',
-        icon: 'moon',
-        文案: '小憩（推进一时段）',
-        做: () => 发起时间推进('小憩'),
-      });
+      if (时段.value !== '深夜') {
+        动作.push({
+          kicker: 'NAP',
+          icon: 'moon',
+          文案: '小憩（推进一时段）',
+          做: () => 发起时间推进('小憩'),
+        });
+      }
       动作.push({
         kicker: 'REST',
         icon: 'moon',
@@ -3293,7 +3354,7 @@ function 房间动作(id: string | null): 卡动作[] {
         icon: 'chat',
         文案: `打听${户静态表[m].妻名}家`,
         做: async () => {
-          if (当前房间.value !== id) await 进入(id, false, true);
+          if (!(await 确认已到达动作地点(id))) return;
           eventEmit('人妻公寓:打听', m);
         },
       });
@@ -3318,7 +3379,7 @@ function 房间动作(id: string | null): 卡动作[] {
         icon: 'coin',
         文案: `捡起零钱(¥${零钱})`,
         做: async () => {
-          if (当前房间.value !== id) await 进入(id, false, true);
+          if (!(await 确认已到达动作地点(id))) return;
           eventEmit('人妻公寓:捡金币', id);
         },
       });
@@ -3331,7 +3392,7 @@ function 房间动作(id: string | null): 卡动作[] {
       文案: '翻垃圾',
       类: 'risky',
       做: async () => {
-        if (当前房间.value !== '垃圾房') await 进入('垃圾房', false, true);
+        if (!(await 确认已到达动作地点('垃圾房'))) return;
         房卡.value = null;
         垃圾选择开.value = true;
       },
@@ -3342,6 +3403,9 @@ function 房间动作(id: string | null): 卡动作[] {
 
 /** 每个地点只承载一个楼务任务；两个确定性选项直接铺成瓷砖，不再生调查/回访子状态。 */
 function 添加管理任务动作(动作: 卡动作[], 地点: string): void {
+  // 地图房卡和房内舞台共用 `房间动作`。楼务只能在玩家真正到达现场后出现，
+  // 地图上仅保留“楼务/逾期”角标作为导航提示，不能远程点瓷砖自动进房开工。
+  if (当前房间.value !== 地点) return;
   const 任务 = 列出地点管理任务(data.value, 地点)[0];
   if (!任务) return;
   const 剩余时段 = Math.max(0, 任务.截止时段 - 绝对时段.value);
@@ -3354,7 +3418,8 @@ function 添加管理任务动作(动作: 卡动作[], 地点: string): void {
       类: 任务.逾期已扣 ? 'risky management-task' : 'management-task',
       做: async () => {
         if (发送中.value) return;
-        if (当前房间.value !== 地点 && !(await 进入(地点, false, true))) return;
+        // 防止开着旧房卡时位置被其他异步动作改变，入口脚本还会再校验一次真实场景。
+        if (当前房间.value !== 地点) return;
         if (发送中.value) return;
         eventEmit('人妻公寓:处理管理任务', { 任务id: 任务.id, 选项id: 选项.id, 地点 });
       },
@@ -5078,7 +5143,9 @@ const 选中可晋阶 = computed(() => {
   const m = 选中门牌.value;
   if (!m || !data.value.户[m]) return false;
   return (
-    (可晋阶(data.value.户[m].妻) && 普通首夜时段已满足(data.value, m)) ||
+    (可晋阶(data.value.户[m].妻) &&
+      普通首夜时段已满足(data.value, m) &&
+      晋阶预约现场已满足(data.value, m, 当前房间.value)) ||
     (m === '302' && 可启动母亲药物首夜(data.value, 当前房间.value))
   );
 });
@@ -5087,6 +5154,18 @@ const 选中首夜待晚上 = computed(() => {
   const m = 选中门牌.value;
   const 妻 = m ? data.value.户[m]?.妻 : undefined;
   return !!m && m !== '302' && !!妻 && 妻.当前阶段 === 2 && 可晋阶(妻) && !普通首夜时段已满足(data.value, m);
+});
+
+const 选中晋阶待现场 = computed(() => {
+  const m = 选中门牌.value;
+  const 妻 = m ? data.value.户[m]?.妻 : undefined;
+  return (
+    !!m &&
+    !!妻 &&
+    可晋阶(妻) &&
+    普通首夜时段已满足(data.value, m) &&
+    !晋阶预约现场已满足(data.value, m, 当前房间.value)
+  );
 });
 
 const 显示关系线索 = ref(false);
@@ -5357,10 +5436,11 @@ const 监控列表 = computed<门牌[]>(() => {
   return 门牌列表.filter(m => 布设[m]);
 });
 
-function 看监控(门牌号: 门牌) {
+async function 看监控(门牌号: 门牌) {
   显示监控.value = false;
   // 2026-07-17 用户拍板:看监控=回302自己屋里看,再跑偷窥AI回合出正文,完成后弹选择。
-  // 移动不在这里做:成败由脚本判(没布设/冷却/她不在家=白跑),成功时脚本写场景+发"监控回合"事件
+  // 先完成真实移动；取消亲密离场或场景写入失败时，不能提前消耗监控冷却或开启演出。
+  if (!(await 确认已到达动作地点('302'))) return;
   eventEmit('人妻公寓:查看摄像头', 门牌号);
 }
 
@@ -5611,7 +5691,7 @@ function 清洗(原文: string, 流式 = false): string {
     .replace(/^\s*-{2,}>?\s*$/gm, '')
     .replace(/<options>[\s\S]*?<\/options>/g, '')
     .replace(/<行为等级>[\s\S]*?<\/行为等级>/g, '')
-    .replace(/<尺度判定\b[^>]*>[\s\S]*?<\/尺度判定>/gi, '')
+    .replace(/<尺度判定(?:\s[^>]*)?>[\s\S]*?(?:<\/尺度判定\s*>|$)/gi, '')
     // 玩家预设夹带的整篇 HTML 组件(2026-07-18 玩家实测,同脚本侧 清洗正文):裸代码墙整体剥除
     .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*?```/gi, '')
     .replace(/<!DOCTYPE[\s\S]*?<\/html\s*>/gi, '')
@@ -5631,7 +5711,7 @@ function 清洗(原文: string, 流式 = false): string {
     .replace(/<UpdateVariable>[\s\S]*$/, '')
     .replace(/<options>[\s\S]*$/, '')
     .replace(/<行为等级>[\s\S]*$/, '')
-    .replace(/<尺度判定\b[^>]*>[\s\S]*$/i, '')
+    .replace(/<尺度判定(?:\s[^>]*)?>[\s\S]*$/i, '')
     .replace(/<tucao\b[^>]*>[\s\S]*$/i, '')
     .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*$/i, '')
     .replace(/<!DOCTYPE[\s\S]*$/i, '')
@@ -5774,6 +5854,35 @@ const 全屏中 = ref(false);
 const 真全屏中 = ref(false);
 const 移动端媒体 = window.matchMedia('(max-width: 540px)');
 const 移动端 = ref(移动端媒体.matches);
+const 移动端全屏引导存储键 = 'rqgy-mobile-fullscreen-guide-v1';
+type 移动端全屏选择 = '全屏' | '窗口';
+
+function 读取移动端全屏选择(): boolean {
+  try {
+    const 选择 = localStorage.getItem(移动端全屏引导存储键);
+    return 选择 === '全屏' || 选择 === '窗口';
+  } catch {
+    return false;
+  }
+}
+
+const 移动端全屏引导已处理 = ref(读取移动端全屏选择());
+const 显示移动端全屏引导 = computed(
+  () => 移动端.value && !移动端全屏引导已处理.value && !真全屏中.value,
+);
+
+function 记住移动端全屏选择(选择: 移动端全屏选择): void {
+  移动端全屏引导已处理.value = true;
+  try {
+    localStorage.setItem(移动端全屏引导存储键, 选择);
+  } catch {
+    /* 隐私模式拒绝持久化时，本次页面仍不再遮挡。 */
+  }
+}
+
+function 继续窗口模式(): void {
+  记住移动端全屏选择('窗口');
+}
 
 function 同步移动端断点(event: MediaQueryListEvent): void {
   移动端.value = event.matches;
@@ -5795,6 +5904,7 @@ async function 进真全屏() {
 }
 
 async function 打开移动端全屏() {
+  记住移动端全屏选择('全屏');
   try {
     await 进真全屏();
   } catch (e) {
@@ -5878,6 +5988,7 @@ async function 切换全屏() {
       if (document.exitFullscreen) await document.exitFullscreen();
       else 文档.webkitExitFullscreen?.();
     } else {
+      if (移动端.value) 记住移动端全屏选择('全屏');
       await 进真全屏();
     }
   } catch (e) {
@@ -6423,9 +6534,8 @@ onMounted(() => {
     window.location.reload();
   });
   eventOn('人妻公寓:监控回合', () => {
-    // 脚本侧已写好 _场景=302 并即将开偷窥回合,这里只同步画面(进入 重写同值场景,幂等)
-    if (当前房间.value !== '302') void 进入('302');
-    else 同步场景自变量();
+    // 查看入口已经成功回到302；这里只按宿主真值同步画面，不能再发起一次未经等待的移动。
+    同步场景自变量();
   });
   eventOn('人妻公寓:特殊场景状态', () => {
     try {
@@ -6568,14 +6678,14 @@ onUnmounted(() => {
 
 @media (max-width: 540px) {
   .mobile-fullscreen-cta {
-    display: flex;
+    display: grid;
     position: fixed;
     z-index: 120;
     left: 50%;
     top: 50%;
     transform: translate(-50%, -50%);
     width: min(88vw, 360px);
-    min-height: 76px;
+    min-height: 116px;
     padding: 13px 18px;
     border: 2px solid rgba(255, 255, 255, 0.9);
     border-radius: 18px;
@@ -6584,10 +6694,9 @@ onUnmounted(() => {
     box-shadow:
       0 10px 34px rgba(21, 10, 26, 0.48),
       inset 0 1px 0 rgba(255, 255, 255, 0.22);
+    grid-template-columns: 30px minmax(0, 1fr);
     align-items: center;
-    justify-content: center;
     gap: 12px;
-    cursor: pointer;
     font-family: inherit;
   }
   .mobile-fullscreen-cta :deep(svg) {
@@ -6595,7 +6704,7 @@ onUnmounted(() => {
     height: 30px;
     flex: none;
   }
-  .mobile-fullscreen-cta span {
+  .mobile-fullscreen-copy {
     display: flex;
     min-width: 0;
     flex-direction: column;
@@ -6610,6 +6719,27 @@ onUnmounted(() => {
     font-size: 11px;
     line-height: 1.35;
     color: rgba(255, 255, 255, 0.82);
+  }
+  .mobile-fullscreen-actions {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .mobile-fullscreen-actions button {
+    min-height: 34px;
+    padding: 7px 9px;
+    border: 1px solid rgba(255, 255, 255, 0.72);
+    border-radius: 10px;
+    color: #fff;
+    font: 700 12px/1.2 inherit;
+    cursor: pointer;
+  }
+  .mobile-fullscreen-primary {
+    background: rgba(255, 255, 255, 0.2);
+  }
+  .mobile-fullscreen-window {
+    background: transparent;
   }
 }
 /* ═══════════════════════════════════════════════════════════════
@@ -8221,6 +8351,58 @@ onUnmounted(() => {
   font-size: 0.78em;
 }
 
+.global-time-advance {
+  flex: none;
+  width: 100%;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 7px;
+  padding: 8px 16px;
+  color: #fff;
+  background: linear-gradient(135deg, #ef5e9d, #ca4e90 52%, #8c5eb4);
+  border: 1px solid rgba(255, 255, 255, 0.56);
+  border-radius: 15px;
+  box-shadow: 0 7px 18px rgba(174, 62, 124, 0.24);
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.global-time-advance .ic {
+  width: 28px;
+  height: 28px;
+}
+
+.global-time-advance span {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.2;
+}
+
+.global-time-advance b {
+  font-size: 0.91em;
+  letter-spacing: 0.1em;
+}
+
+.global-time-advance small {
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.84);
+  font-size: 0.64em;
+}
+
+.global-time-advance:hover:not(:disabled) {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+
+.global-time-advance:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* ── 遮罩与玻璃面板 ── */
 
 /* gal 式遮罩(2026-07-17 用户提案重设计):斜纹绢帘+粉蓝双色晕影+中心聚焦,替代死黑蒙版 */
@@ -8360,18 +8542,25 @@ onUnmounted(() => {
 
 .toast {
   position: absolute;
+  box-sizing: border-box;
   left: 50%;
   bottom: 70px;
   transform: translateX(-50%);
   z-index: 40;
+  width: max-content;
+  max-width: calc(100% - 24px);
   background: rgba(255, 255, 255, 0.96);
   border: 1px solid rgba(255, 79, 154, 0.4);
-  border-radius: 999px;
+  border-radius: 14px;
   color: var(--ink);
   font-size: 0.8em;
   font-weight: 600;
+  line-height: 1.45;
   padding: 7px 20px;
-  white-space: nowrap;
+  text-align: left;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   box-shadow: 0 10px 26px rgba(30, 26, 38, 0.25);
   animation: toast-pop 0.25s ease;
 }
@@ -8413,6 +8602,7 @@ onUnmounted(() => {
 /* 拾获卡:线索/收获的正经展示位——驻留到点击,金边纸卡(信物感),压 toast 一层 */
 .loot-card {
   position: absolute;
+  box-sizing: border-box;
   left: 50%;
   bottom: 110px;
   transform: translateX(-50%);
@@ -8434,6 +8624,9 @@ onUnmounted(() => {
   font-size: 0.86em;
   font-weight: 600;
   line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .loot-card .loot-hint {
@@ -9076,6 +9269,9 @@ onUnmounted(() => {
   padding: 8px 11px;
   font-size: 0.8em;
   line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   color: var(--ink);
   transform-origin: top center;
 }
@@ -9175,6 +9371,16 @@ onUnmounted(() => {
   margin: 5px 0 10px;
   font-style: italic;
   opacity: 0.75;
+}
+.relation-appointment {
+  margin: -2px 0 10px;
+  padding: 7px 9px;
+  color: #8f3568;
+  background: rgba(244, 95, 158, 0.1);
+  border: 1px solid rgba(225, 78, 145, 0.18);
+  border-radius: 9px;
+  font-size: 0.73em;
+  font-weight: 700;
 }
 .relation-clue {
   display: flex;
@@ -12866,6 +13072,7 @@ button.battery:focus-visible {
 
   /* 软键盘弹起后把非输入功能收起，配合把宿主 iframe 底边滚入可视区。 */
   .keyboard-open .dock,
+  .keyboard-open .global-time-advance,
   .keyboard-open .reroll-row,
   .keyboard-open .scene-acts,
   .keyboard-open .garbage-pick,

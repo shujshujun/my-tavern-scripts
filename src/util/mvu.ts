@@ -11,7 +11,7 @@ function resolveVariableOption(option: DynamicVariableOption): VariableOption {
   return typeof option === 'function' ? option() : option;
 }
 
-export function defineMvuDataStore<T extends z.ZodObject>(
+export function defineMvuDataStore<T extends z.ZodType>(
   schema: T,
   variable_option: DynamicVariableOption,
   additional_setup?: (data: Ref<z.infer<T>>) => void,

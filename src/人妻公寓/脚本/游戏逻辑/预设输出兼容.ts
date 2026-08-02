@@ -25,6 +25,30 @@ function 截到正文结尾(正文后: string, 标签: 预设正文标签): stri
 }
 
 /**
+ * 清理乙酉等预设可能混入正文的展示标记。
+ *
+ * 这些标记只负责外部宿主的显示样式，不能把包裹的正文一起删除。唯一例外是
+ * `<po><!-- ... --></po>`：其内容明确是模块规划注释，不属于玩家可见正文。
+ */
+function 清洗正文内展示标记(原文: string): string {
+  return 原文
+    // 乙酉把输出次数放在 content 末尾的 c 块中；它是计数元数据，不是剧情正文。
+    .replace(/<c\b[^>]*>[\s\S]*?<\/c\s*>/gi, '')
+    .replace(/<c\b[^>]*>[\s\S]*$/i, '')
+    .replace(/<\/c\s*>/gi, '')
+    // 只删除内容完全为 HTML 注释的 po 规划块；紧贴标签的加粗符也属于包装。
+    .replace(/\*\*[ \t]*<po\b[^>]*>\s*<!--[\s\S]*?-->\s*<\/po\s*>[ \t]*\*\*/gi, '')
+    .replace(/<po\b[^>]*>\s*<!--[\s\S]*?-->\s*<\/po\s*>/gi, '')
+    // 普通 po 即使误包正文也只剥壳，不删除内部内容。
+    .replace(/\*\*[ \t]*<po\b[^>]*>/gi, '')
+    .replace(/<\/po\s*>[ \t]*\*\*/gi, '')
+    .replace(/<\/?po\b[^>]*>/gi, '')
+    // font 与 zv 同样只作为展示包装处理，闭合残片或漏闭合时仍保留正文。
+    .replace(/<\/?font\b[^>]*>/gi, '')
+    .replace(/<\/?zv\b[^>]*>/gi, '');
+}
+
+/**
  * 将外部 SillyTavern 预设的输出协议收敛成可显示正文。
  *
  * - 乙酉类：只取 `<content>`；
@@ -69,6 +93,8 @@ export function 清洗预设输出(原文: string, 期望正文标签: 预设正
     .replace(/<dream_delete\b[^>]*>[\s\S]*?(?:<\/dream_delete\s*>|$)/gi, '')
     .replace(/<dream_done\s*\/\s*>/gi, '')
     .replace(/<\/?(?:dream_plot|dream_body|dream_after_format|content|story_scene)\b[^>]*>/gi, '');
+
+  文本 = 清洗正文内展示标记(文本);
 
   return { 文本: 文本.trim() ? 文本 : '', 正文已开始: 正文标签 !== null };
 }

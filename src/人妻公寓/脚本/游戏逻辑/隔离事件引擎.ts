@@ -2,8 +2,12 @@ import { 数据库状态, 通过数据库生成 } from './数据库桥';
 import { 当前正文模型是DeepSeek } from './正文模型识别';
 import { 预设破限段 } from './预设桥';
 import { 清洗预设输出 } from './预设输出兼容';
+import { 严格清除协议残留 } from './严格正文清洗';
 
-export type 隔离事件类型 = '荣耀洞' | '监控';
+export type 隔离事件类型 = '荣耀洞' | '监控' | '晨跑' | '健身' | '睡眠';
+
+/** 供正文 PROMPT_READY 监听器识别脚本自己的短生成，避免误占原生正文锁。 */
+export const 隔离事件请求标记 = '<rqgy_isolated_event_request>';
 
 export interface 隔离事件日志条 {
   id: string;
@@ -20,6 +24,24 @@ export interface 隔离事件日志条 {
 
 interface 隔离事件库 {
   日志: 隔离事件日志条[];
+}
+
+export interface 隔离事件参数 {
+  类型: 隔离事件类型;
+  线程: string;
+  行动: string;
+  导演事件: string;
+  房间: string;
+}
+
+/**
+ * AI 已经生成、但尚未写入任何聊天变量的隔离事件草稿。
+ * 时间动作会把它与撤销点放进同一个 chat 更新回调，避免切换聊天时留下“演了却没结算”的幽灵日志。
+ */
+export interface 隔离事件草稿 {
+  参数: 隔离事件参数;
+  正文: string;
+  提示词: string;
 }
 
 const 最大日志条数 = 120;
@@ -39,13 +61,17 @@ export function 取消隔离事件(): boolean {
   return true;
 }
 
-function 读库(): 隔离事件库 {
-  const 原 = _.get(getVariables({ type: 'chat' }), '_隔离事件') as Partial<隔离事件库> | undefined;
+function 从变量读库(vars: unknown): 隔离事件库 {
+  const 原 = _.get(vars, '_隔离事件') as Partial<隔离事件库> | undefined;
   return { 日志: Array.isArray(原?.日志) ? 原.日志.filter(Boolean) : [] };
 }
 
-function 净化(原文: string): string {
-  const 闭合清 = 清洗预设输出(原文).文本
+function 读库(): 隔离事件库 {
+  return 从变量读库(getVariables({ type: 'chat' }));
+}
+
+export function 净化隔离事件正文(原文: string): string {
+  const 闭合清 = 严格清除协议残留(清洗预设输出(原文).文本)
     .replace(/^[\s\S]*?<content\b[^>]*>/i, '')
     .replace(/<\/content\s*>[\s\S]*$/i, '')
     .replace(/【开始思考】[\s\S]*?<\/think_fox~\s*>/gi, '')
@@ -63,7 +89,7 @@ function 净化(原文: string): string {
     .replace(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/gi, '')
     .replace(/<options>[\s\S]*?<\/options>/gi, '')
     .replace(/<行为等级>[\s\S]*?<\/行为等级>/g, '')
-    .replace(/<尺度判定\b[^>]*>[\s\S]*?<\/尺度判定>/gi, '')
+    .replace(/<尺度判定(?:\s[^>]*)?>[\s\S]*?(?:<\/尺度判定\s*>|$)/gi, '')
     .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*?```/gi, '')
     .replace(/<!DOCTYPE[\s\S]*?<\/html\s*>/gi, '')
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
@@ -79,18 +105,19 @@ function 净化(原文: string): string {
     .replace(/<UpdateVariable>[\s\S]*$/i, '')
     .replace(/<options>[\s\S]*$/i, '')
     .replace(/<行为等级>[\s\S]*$/i, '')
-    .replace(/<尺度判定\b[^>]*>[\s\S]*$/i, '')
+    .replace(/<尺度判定(?:\s[^>]*)?>[\s\S]*$/i, '')
     .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*$/i, '')
     .replace(/<!DOCTYPE[\s\S]*$/i, '')
     .replace(/<style[^>]*>[\s\S]*$/i, '')
     .replace(/<script[^>]*>[\s\S]*$/i, '')
     .replace(/<!--[\s\S]*$/, '')
     .trim();
-  return 全清 || 闭合清;
+  return 严格清除协议残留(全清);
 }
 
 function 系统提示(类型: 隔离事件类型, 导演事件: string): string {
   return [
+    隔离事件请求标记,
     '你正在为《人妻公寓》生成一段独立的' + 类型 + '事件。',
     '这是事件专用短线程，不是普通公寓正文。只承接下方显式提供的最近事件内容，不得假定看过其他聊天历史。',
     '角色只知道亲眼所见、亲耳所闻和本事件明确告知的信息；禁止反全知，禁止让事件外的人凭空知情。',
@@ -113,14 +140,9 @@ function 最近线程(线程: string): { role: 'user' | 'assistant'; content: st
     .map(条 => ({ role: 条.谁 === '玩家' ? 'user' : 'assistant', content: 条.文本 }));
 }
 
-export async function 执行隔离事件(参数: {
-  类型: 隔离事件类型;
-  线程: string;
-  行动: string;
-  导演事件: string;
-  房间: string;
-}): Promise<string> {
-  if (生成中) return '';
+/** 只调用 AI 并返回草稿；本函数成功时仍不会改动聊天变量。 */
+export async function 生成隔离事件草稿(参数: 隔离事件参数): Promise<隔离事件草稿 | null> {
+  if (生成中) return null;
   生成中 = true;
   已取消 = false;
   eventEmit('人妻公寓:生成开始');
@@ -157,52 +179,67 @@ export async function 执行隔离事件(参数: {
       原文 = await generateRaw({ ordered_prompts, user_input: 本拍用户输入, should_stream: 是DeepSeek });
     }
     if (已取消) throw new Error('已取消——这一拍没有发生');
-    const 正文 = 净化(String(原文 ?? ''));
+    const 正文 = 净化隔离事件正文(String(原文 ?? ''));
     if (!正文) throw new Error('事件 AI 没有返回可显示的正文');
 
-    const 库 = 读库();
-    const 锚楼 = getLastMessageId();
-    const 序起 = 库.日志.filter(条 => 条.锚楼 === 锚楼).reduce((max, 条) => Math.max(max, 条.序), -1) + 1;
-    const 时间 = Date.now();
-    const 基 = 参数.类型 + '-' + 时间;
     const 提示词 = [...核心段, { role: 'user' as const, content: 本拍用户输入 }]
       .map(项 => 项.role.toUpperCase() + '\n' + 项.content)
       .join('\n\n');
-    库.日志.push(
-      {
-        id: 基 + '-u',
-        类型: 参数.类型,
-        线程: 参数.线程,
-        谁: '玩家',
-        文本: 参数.行动,
-        锚楼,
-        序: 序起,
-        房间: 参数.房间,
-        时间,
-      },
-      {
-        id: 基 + '-a',
-        类型: 参数.类型,
-        线程: 参数.线程,
-        谁: '叙事',
-        文本: 正文,
-        锚楼,
-        序: 序起 + 1,
-        房间: 参数.房间,
-        提示词,
-        时间,
-      },
-    );
-    库.日志 = 库.日志.slice(-最大日志条数);
-    await updateVariablesWith(
-      vars => {
-        _.set(vars, '_隔离事件', 库);
-        return vars;
-      },
-      { type: 'chat' },
-    );
-    return 正文;
+    return { 参数: { ...参数 }, 正文, 提示词 };
   } finally {
     生成中 = false;
   }
+}
+
+/** 在调用方已经锁定并校验过的 chat 变量对象中，同步追加一份草稿。 */
+export function 写入隔离事件草稿(vars: Record<string, unknown>, 草稿: 隔离事件草稿, 锚楼: number): void {
+  if (!Number.isInteger(锚楼) || 锚楼 < 0) throw new Error('隔离事件日志锚楼无效');
+  const 库 = 从变量读库(vars);
+  const 序起 = 库.日志.filter(条 => 条.锚楼 === 锚楼).reduce((max, 条) => Math.max(max, 条.序), -1) + 1;
+  const 时间 = Date.now();
+  const 基 = 草稿.参数.类型 + '-' + 时间;
+  库.日志.push(
+    {
+      id: 基 + '-u',
+      类型: 草稿.参数.类型,
+      线程: 草稿.参数.线程,
+      谁: '玩家',
+      文本: 草稿.参数.行动,
+      锚楼,
+      序: 序起,
+      房间: 草稿.参数.房间,
+      时间,
+    },
+    {
+      id: 基 + '-a',
+      类型: 草稿.参数.类型,
+      线程: 草稿.参数.线程,
+      谁: '叙事',
+      文本: 草稿.正文,
+      锚楼,
+      序: 序起 + 1,
+      房间: 草稿.参数.房间,
+      // 荣耀洞/监控保留史册考古提示；例行训练与睡眠只保留可见反馈，避免把当天正文
+      // 素材复制进长期 chat 变量、无谓放大存档。
+      ...(草稿.参数.类型 === '荣耀洞' || 草稿.参数.类型 === '监控' ? { 提示词: 草稿.提示词 } : {}),
+      时间,
+    },
+  );
+  库.日志 = 库.日志.slice(-最大日志条数);
+  _.set(vars, '_隔离事件', 库);
+}
+
+/** 兼容荣耀洞与监控的既有单步入口；需要跨存储原子性的时间动作使用上面的两阶段 API。 */
+export async function 执行隔离事件(参数: 隔离事件参数): Promise<string> {
+  const 草稿 = await 生成隔离事件草稿(参数);
+  if (!草稿) return '';
+  const 锚楼 = getLastMessageId();
+  await updateVariablesWith(
+    vars => {
+      写入隔离事件草稿(vars, 草稿, 锚楼);
+      return vars;
+    },
+    { type: 'chat' },
+  );
+  return 草稿.正文;
 }

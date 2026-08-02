@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const 游戏逻辑源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
+const 客户端源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
 
 function 截段(源, 开始标记, 结束标记) {
   const 开始 = 源.indexOf(开始标记);
@@ -42,4 +43,23 @@ test('全屏往返使 iframe 恢复高度后，提示会通过尺寸观察自动
   assert.match(注入段, /new 宿主窗\.ResizeObserver/);
   assert.match(注入段, /尺寸观察\?\.observe\(游戏框\)/);
   assert.match(注入段, /classList\.remove\('rq-visible'\)/);
+});
+
+test('客户端全屏建议允许继续窗口模式，并持久记住任一选择', () => {
+  assert.match(客户端源, /v-if="显示移动端全屏引导"[^>]*class="mobile-fullscreen-cta"/);
+  assert.match(客户端源, />继续窗口模式</);
+  assert.match(客户端源, /const 移动端全屏引导存储键 = ['"]rqgy-mobile-fullscreen-guide-v1['"]/);
+  assert.match(客户端源, /localStorage\.getItem\(移动端全屏引导存储键\)/);
+  assert.match(客户端源, /localStorage\.setItem\(移动端全屏引导存储键,/);
+  assert.match(客户端源, /function 继续窗口模式\(\)[\s\S]{0,180}记住移动端全屏选择\('窗口'\)/);
+  assert.match(客户端源, /async function 打开移动端全屏\(\)[\s\S]{0,180}记住移动端全屏选择\('全屏'\)/);
+});
+
+test('窗口模式选择后中央建议不会随退出全屏重现，右上角入口仍保留', () => {
+  assert.match(
+    客户端源,
+    /const 显示移动端全屏引导 = computed\([\s\S]{0,220}!移动端全屏引导已处理\.value[\s\S]{0,120}!真全屏中\.value/,
+  );
+  assert.doesNotMatch(客户端源, /v-if="移动端 && !真全屏中" class="mobile-fullscreen-cta"/);
+  assert.match(客户端源, /:title="全屏中 \? '退出全屏' : '沉浸全屏'" @click="切换全屏"/);
 });

@@ -57,6 +57,23 @@ test('普通toast不会取消性爱结果卡自己的隐藏计时', () => {
   assert.match(卸载函数, /clearTimeout\(性爱结果timer\)/);
 });
 
+test('移动端点击反馈保留换行且不会横向溢出画幅', () => {
+  const toast = App源码.match(/\.toast\s*\{([^}]*)\}/)?.[1] ?? '';
+  assert.doesNotMatch(toast, /white-space:\s*nowrap/);
+  assert.match(toast, /box-sizing:\s*border-box/);
+  assert.match(toast, /max-width:\s*calc\(100%\s*-\s*24px\)/);
+  assert.match(toast, /white-space:\s*pre-wrap/);
+  assert.match(toast, /overflow-wrap:\s*anywhere/);
+
+  const clue = App源码.match(/^\.clue-card\s*\{([^}]*)\}/m)?.[1] ?? '';
+  assert.match(clue, /white-space:\s*pre-wrap/);
+  assert.match(clue, /overflow-wrap:\s*anywhere/);
+
+  const lootText = App源码.match(/\.loot-card p\s*\{([^}]*)\}/)?.[1] ?? '';
+  assert.match(lootText, /white-space:\s*pre-wrap/);
+  assert.match(lootText, /overflow-wrap:\s*anywhere/);
+});
+
 test('卷轴异步刷新只允许最新请求提交', () => {
   assert.match(App源码, /卷轴请求序号/);
   assert.match(App源码, /请求序号\s*!==\s*卷轴请求序号/);

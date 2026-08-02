@@ -167,7 +167,7 @@ for (const 组 of index.条目) {
 if (!开场白) throw new Error('未找到 [开场白] 条目');
 
 // ── 资源走 jsdelivr(手机友好；角色卡版本与正式发布 tag 同步) ──
-const TAG = 'rq0.66';
+const TAG = 'rq0.67';
 const BASE = `https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@${TAG}`;
 
 const 加载块 = url => "```\n<body>\n<script>\n$('body').load('" + url + "')\n</script>\n</body>\n```";
@@ -205,7 +205,7 @@ const regex_scripts = [
   {
     id: randomUUID(),
     scriptName: '[不发送]去除变量更新与占位符',
-    findRegex: String.raw`/<UpdateVariable>[\s\S]*?<\/UpdateVariable>|<StatusPlaceHolderImpl\/>/g`,
+    findRegex: String.raw`/<UpdateVariable>[\s\S]*?<\/UpdateVariable>|<StatusPlaceHolderImpl\/>|<尺度判定(?:\s[^>]*)?>[\s\S]*?(?:<\/尺度判定\s*>|$)/g`,
     replaceString: '',
     placement: [2],
     markdownOnly: false,
@@ -215,7 +215,17 @@ const regex_scripts = [
   {
     id: randomUUID(),
     scriptName: '[不显示]隐藏变量更新与协议标签',
-    findRegex: String.raw`/<UpdateVariable>[\s\S]*?<\/UpdateVariable>|<options>[\s\S]*?<\/options>|<行为等级>[\s\S]*?<\/行为等级>|<尺度判定\b[^>]*>[\s\S]*?<\/尺度判定>/g`,
+    findRegex: String.raw`/<UpdateVariable>[\s\S]*?<\/UpdateVariable>|<options>[\s\S]*?<\/options>|<行为等级>[\s\S]*?<\/行为等级>/g`,
+    replaceString: '',
+    placement: [2],
+    markdownOnly: true,
+    promptOnly: false,
+    ...正则骨架,
+  },
+  {
+    id: randomUUID(),
+    scriptName: '[不显示]隐藏稽查尺度判定',
+    findRegex: String.raw`/<尺度判定(?:\s[^>]*)?>[\s\S]*?(?:<\/尺度判定\s*>|$)/g`,
     replaceString: '',
     placement: [2],
     markdownOnly: true,
@@ -261,7 +271,7 @@ const tavern_helper = {
 
 // ── 卡体 ──
 const 卡名 = '人妻公寓';
-const 版本 = '0.66';
+const 版本 = '0.67';
 const data = {
   name: 卡名,
   description: '',

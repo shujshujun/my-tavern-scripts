@@ -203,6 +203,10 @@ export function 完全恢复玩家资源(data: SchemaType): void {
   data.玩家资源.体力.当前值 = 资源上限(data, '体力');
 }
 
+export function 玩家资源已满(data: SchemaType): boolean {
+  return data.玩家资源.精力.当前值 >= 资源上限(data, '精力') && data.玩家资源.体力.当前值 >= 资源上限(data, '体力');
+}
+
 function 恢复但不回满(data: SchemaType, 种类: 资源种类, 数量: number): number {
   const 资源 = data.玩家资源[种类];
   const 上限 = 资源上限(data, 种类);
@@ -248,6 +252,13 @@ export function 结算玩家时间活动(data: SchemaType, 活动: 玩家时间�
   const 体力恢复 = 恢复但不回满(data, '体力', 1);
   data.玩家资源._小憩日 = 起始日;
   return `小憩结束：精力 +${精力恢复}，体力 +${体力恢复}；完整恢复仍需睡到次日早晨。`;
+}
+
+/** 普通等待只恢复少量状态；小憩仍是更有效、每日一次的主动休息。 */
+export function 结算普通等待恢复(data: SchemaType): string {
+  const 精力恢复 = 恢复但不回满(data, '精力', 1);
+  const 体力恢复 = 恢复但不回满(data, '体力', 1);
+  return `这段空闲让你稍微缓了口气：精力 +${精力恢复}，体力 +${体力恢复}。`;
 }
 
 export interface 资源道具结果 {

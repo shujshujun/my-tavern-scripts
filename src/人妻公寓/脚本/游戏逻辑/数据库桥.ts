@@ -78,13 +78,15 @@ export interface 微信进展数据 {
 }
 
 const 微信进展数据键 = ['v', 'f', 'a', 'b', 'p'] as const;
+const 微信进展条目硬上限 = 80;
+const 微信进展序列化硬上限 = 800;
 const 微信进展指令风险 =
   /(?:忽略|无视|覆盖|绕过|泄露).{0,12}(?:系统|上文|之前|此前|以上|所有|规则|指令|提示词)|(?:system|developer|assistant|prompt|instruction)\s*[:：]?|\b(?:ignore|obey|respond|output|roleplay)\b|^(?:请|务必|必须|立即|接下来|从现在起|以后每轮|下一次回复|输出|回复|扮演|遵循)|(?:必须|务必).{0,12}(?:输出|回复|表现|提及)|(?:下一轮|下次回复|正文中|每轮).{0,12}(?:写|说|提|表现|输出|回复)|(?:模型|AI|助手|你).{0,8}(?:必须|务必|应该|需要).{0,12}(?:输出|回复|遵循|扮演|忽略)/i;
 
 function 规范微信进展条目(value: unknown): string | null {
   if (typeof value !== 'string' || /[\r\n]|```|[<>]|{{|}}/.test(value)) return null;
   const text = value.normalize('NFKC').replace(/\s+/g, ' ').trim();
-  if (!text || text.length > 32 || /^(?:system|developer|assistant|user)\s*[:：]/i.test(text)) return null;
+  if (!text || Array.from(text).length > 微信进展条目硬上限 || /^(?:system|developer|assistant|user)\s*[:：]/i.test(text)) return null;
   if (微信进展指令风险.test(text)) return null;
   return text;
 }
@@ -106,7 +108,7 @@ export function 规范微信进展数据(value: unknown): 微信进展数据 | n
   }
   if (!total || total > 6) return null;
   const result: 微信进展数据 = { v: 1, ...parsed };
-  return JSON.stringify(result).length <= 300 ? result : null;
+  return JSON.stringify(result).length <= 微信进展序列化硬上限 ? result : null;
 }
 
 export function 序列化微信进展数据(value: unknown): string | null {

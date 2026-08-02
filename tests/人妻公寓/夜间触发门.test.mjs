@@ -7,7 +7,8 @@ import test from 'node:test';
 import lodash from 'lodash';
 
 globalThis._ = lodash;
-globalThis.getVariables = () => ({});
+let 聊天变量 = {};
+globalThis.getVariables = () => 聊天变量;
 globalThis.insertOrAssignVariables = () => undefined;
 globalThis.SillyTavern = { chat: [{}] };
 
@@ -33,6 +34,8 @@ const { 购买 } = require('../../src/人妻公寓/脚本/游戏逻辑/商店系
 const { 使用运作 } = require('../../src/人妻公寓/脚本/游戏逻辑/经济系统.ts');
 const { 装载性癖 } = require('../../src/人妻公寓/脚本/游戏逻辑/性癖系统.ts');
 const { 请求晋阶 } = require('../../src/人妻公寓/脚本/游戏逻辑/结算系统.ts');
+const { 读取阶段线路审计矩阵 } = require('../../src/人妻公寓/脚本/游戏逻辑/阶段线路系统.ts');
+const { 六时段列表, 星期列表 } = require('../../src/人妻公寓/周作息.ts');
 const App源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
 
 function 建三户数据() {
@@ -52,6 +55,23 @@ function 建单户数据(门牌 = '101') {
   const data = Schema.parse({ 户: { [门牌]: 创建户节点(0) } });
   data.户[门牌].妻.当前阶段 = 4;
   return data;
+}
+
+function 写入最终预约(data, 门牌, 目标阶段) {
+  const 预约 = 读取阶段线路审计矩阵().find(
+    节点 => 节点.门牌 === 门牌 && 节点.目标阶段 === 目标阶段 && 节点.节点 === 3,
+  )?.预约;
+  assert.ok(预约, `${门牌}-P${目标阶段} 缺少最终预约`);
+  const 绝对时段 = 星期列表.indexOf(预约.星期) * 六时段列表.length + 六时段列表.indexOf(预约.时段);
+  Object.assign(data.户[门牌].妻._阶段线路, {
+    预约星期: 预约.星期,
+    预约时段: 预约.时段,
+    预约地点: 预约.地点,
+    预约绝对时段: 绝对时段,
+    预约丈夫状态: 预约.丈夫状态,
+  });
+  data.系统._绝对时段 = 绝对时段;
+  聊天变量 = { _场景: { 房间id: 预约.地点 } };
 }
 
 test('制服夜巡只允许深夜购买并即时开演，其他时段不扣款也不排事件', () => {
@@ -149,7 +169,7 @@ test('普通五户 2→3 第一夜只允许晚上请求，白天和深夜都不�
     妻.当前阶段 = 2;
     妻.堕落值 = 40;
     妻._阶段线路 = { 目标阶段: 3, 完成位图: 15, 活跃节点: 4, 节点起始楼: 0 };
-    data.系统._绝对时段 = 4 + 42;
+    写入最终预约(data, 门牌, 3);
 
     const 成功 = 请求晋阶(data, 门牌);
     assert.equal(成功.成功, true);

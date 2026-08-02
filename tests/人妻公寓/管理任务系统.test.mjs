@@ -348,7 +348,13 @@ test('粉刷补办逾期公共任务不加分且只扣一次；没有公共任�
 
   const 完成后 = structuredClone(data);
   const second = 结算粉刷公共维护任务(data);
-  assert.deepEqual(second, { 命中: false, 任务id: '', 胜任变化: 0, 逾期: false, 提示: '当前没有可由粉刷翻新完成的公共维护任务。' });
+  assert.deepEqual(second, {
+    命中: false,
+    任务id: '',
+    胜任变化: 0,
+    逾期: false,
+    提示: '当前没有可由粉刷翻新完成的公共维护任务。',
+  });
   assert.deepEqual(data, 完成后);
 });
 
@@ -593,4 +599,12 @@ test('两个楼务瓷砖都带任务名与剩余或逾期状态', () => {
   assert.match(actions, /任务\.截止时段/);
   assert.match(actions, /逾期/);
   assert.match(actions, /管理任务选项\(任务\)\.slice\(0, 2\)/);
+  const 位置门 = actions.indexOf('if (当前房间.value !== 地点) return;');
+  const 查询任务 = actions.indexOf('列出地点管理任务(data.value, 地点)');
+  assert.ok(位置门 >= 0 && 位置门 < 查询任务, '尚未进入任务地点时，地图房卡不得生成楼务处理瓷砖');
+  assert.doesNotMatch(actions, /await\s+进入\(地点/, '楼务瓷砖不得暗中替玩家进房后直接开工');
+
+  const markerStart = app.indexOf('function 管理任务角标');
+  const markerEnd = app.indexOf('/** HUD', markerStart);
+  assert.match(app.slice(markerStart, markerEnd), /'楼务'[\s\S]*'逾期'/, '地图应继续用短角标提示任务地点');
 });

@@ -6,7 +6,13 @@ import { 读取MVU解析状态 } from '../../MVU解析模式';
 // (难度表兼供撞见概率系数查表)
 import { 经济结算 } from './经济系统';
 import { 入住检测, 创建配置户节点, 构造入住登场演出态, 提交入住登场, 同步入住世界书条目 } from './入住系统';
-import { type 本轮事件冻结, 是入住登场事件, 本轮事件可提交, 识别入住登场预约 } from './入住触发门';
+import {
+  type 本轮事件冻结,
+  事件必须有正文,
+  是入住登场事件,
+  本轮事件可提交,
+  识别入住登场预约,
+} from './入住触发门';
 import { 打断检测, 换装起疑, 母亲撞见检测, 父亲来电打断 } from './打断系统';
 import { 夜访结算, 惰性结算户, 绿帽线检测, 结算焦点疑心 } from './结算系统';
 import { 荣耀洞结算 } from './荣耀洞';
@@ -70,6 +76,8 @@ import { 构造CG亲密上下文 } from './CG亲密上下文';
 import { 行动资源门槛, 结算成功现场楼 } from './玩家资源系统';
 import { 当前预设正文标签 } from './预设桥';
 import { 清洗预设输出 } from './预设输出兼容';
+import { 严格清除协议残留 } from './严格正文清洗';
+import { 选择正文生成原文 } from './正文生成完整性';
 import { 合并最新父亲通话, 排队父亲通话整表写 } from './父亲通话写租约';
 import { 当前时间线切换世代, 作废当前时间线切换世代, 登记内部删楼租约, 时间线切换协调中 } from './时间线切换协调';
 
@@ -299,11 +307,14 @@ function 读上次回合(): 上次回合记录 | undefined {
 // 流式转发:generate 的 iframe 事件转成自定义事件,客户端稳定可收。
 // 用 generation_id 只认自家生成(数据库/总结类第三方脚本自己也会调 generate)。
 let 本回合生成id = '';
+let 正文流式生成id = '';
+let 正文流式原文 = '';
 let 解除生成等待: (() => void) | null = null;
 eventClearEvent(iframe_events.STREAM_TOKEN_RECEIVED_FULLY);
 eventOn(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, (文本: string, generation_id: string) => {
   if (!进行中) return;
   if (generation_id && generation_id !== 本回合生成id) return;
+  if (generation_id && generation_id === 正文流式生成id) 正文流式原文 = typeof 文本 === 'string' ? 文本 : '';
   eventEmit('人妻公寓:流式', 文本);
 });
 
@@ -715,9 +726,7 @@ async function 记录数据库回合(
   }
 }
 
-/** 楼层落库前的清洗:思维链/变量块/选项块/临时尺度标签不进楼层文本(prompt 与卷轴双干净) */
-export function 清洗正文(原文: string): string {
-  const 协议清 = 清洗预设输出(原文, 当前预设正文标签()).文本;
+function 清洗正文核心(协议清: string): string {
   const 闭合清 = 协议清
     // 狐系等玩家预设把思考写成不配对的“【开始思考】…</think_fox~>”，但会用
     // <content> 单独圈正文。content 是可靠的正文白名单边界；闭合缺失时也保住其后剧情。
@@ -762,7 +771,7 @@ export function 清洗正文(原文: string): string {
     .replace(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/g, '')
     .replace(/<options>[\s\S]*?<\/options>/g, '')
     .replace(/<行为等级>[\s\S]*?<\/行为等级>/g, '')
-    .replace(/<尺度判定\b[^>]*>[\s\S]*?<\/尺度判定>/gi, '')
+    .replace(/<尺度判定(?:\s[^>]*)?>[\s\S]*?(?:<\/尺度判定\s*>|$)/gi, '')
     // 玩家预设夹带的整篇 HTML 组件(2026-07-18 玩家实测:破限预设让模型在正文后附"选项分支"
     // HTML 文档,原生酒馆渲染成卡,固定0楼界面=裸代码墙,还白吃上下文token)——整体剥除
     .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*?```/gi, '')
@@ -783,7 +792,7 @@ export function 清洗正文(原文: string): string {
     .replace(/<UpdateVariable>[\s\S]*$/, '')
     .replace(/<options>[\s\S]*$/, '')
     .replace(/<行为等级>[\s\S]*$/, '')
-    .replace(/<尺度判定\b[^>]*>[\s\S]*$/i, '')
+    .replace(/<尺度判定(?:\s[^>]*)?>[\s\S]*$/i, '')
     .replace(/<tucao\b[^>]*>[\s\S]*$/i, '')
     .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*$/i, '')
     .replace(/<!DOCTYPE[\s\S]*$/i, '')
@@ -800,12 +809,23 @@ export function 清洗正文(原文: string): string {
   return 全清;
 }
 
+/** 楼层落库前的清洗:思维链/变量块/选项块/临时尺度标签不进楼层文本(prompt 与卷轴双干净) */
+export function 清洗正文(原文: string): string {
+  return 清洗正文核心(清洗预设输出(原文, 当前预设正文标签()).文本);
+}
+
+/** 确定性剧情专用：纯思维链、变量协议或截断协议一律视为无正文，不采用常规回退。 */
+export function 清洗严格正文(原文: string): string {
+  const 协议清 = 清洗预设输出(原文, 当前预设正文标签()).文本;
+  return 严格清除协议残留(清洗正文核心(严格清除协议残留(协议清)));
+}
+
 /**
  * 静音会议的 AI 楼永远不允许保留任何可重放变量协议。普通清洗为防误吞正文会在“整楼只剩
  * 未闭合协议”时回退原文；隔离场必须反过来宁可判失败，也不能让旧楼日后重新处理变量。
  */
 export function 清洗静音会议正文(原文: string): string {
-  let 正文 = 清洗正文(原文)
+  let 正文 = 清洗严格正文(原文)
     .replace(/<UpdateVariable\b[^>]*>[\s\S]*?(?:<\/UpdateVariable\s*>|$)/gi, '')
     .replace(/<json_?patch\b[^>]*>[\s\S]*?(?:<\/json_?patch\s*>|$)/gi, '')
     .replace(/^\s*_\.(?:set|insert|assign|remove|unset|delete|add)\(.*\)\s*;?\s*$/gim, '')
@@ -976,6 +996,8 @@ export async function 执行回合(
     }
   };
   let 临时用户已转正 = false;
+  let 变量解析已降级 = false;
+  let 变量解析降级阶段 = '';
   let 本轮静音会议 = false;
   let chat快照: Record<string, unknown> | null = null;
   let 回合基准data: SchemaType | null = null;
@@ -1121,6 +1143,8 @@ export async function 执行回合(
     }
 
     本回合生成id = `rqgy-${回合前末楼}-${_.random(1e9)}`;
+    正文流式生成id = 本回合生成id;
+    正文流式原文 = '';
     eventEmit('人妻公寓:运行阶段', 'AI正在生成正文');
     let 原文 = await 等待正文生成({
       user_input: 行动,
@@ -1130,6 +1154,13 @@ export async function 执行回合(
       generation_id: 本回合生成id,
     });
     确认本轮事务有效();
+    const 最终返回原文 = 原文;
+    原文 = 选择正文生成原文(最终返回原文, 正文流式原文, 清洗严格正文);
+    if (原文 !== 最终返回原文) {
+      console.warn('[人妻公寓] generate 最终返回未含有效正文，采用同 generation_id 的完整流式结果');
+    }
+    正文流式生成id = '';
+    正文流式原文 = '';
 
     // ── 稽查前移：必须审首稿，不能等独立变量结算把临时尺度块清掉后才审 ──
     const 焦点妻们 = 焦点.filter(m => 妻在场.includes(m));
@@ -1234,15 +1265,15 @@ export async function 执行回合(
     // ── 正常路径:先落 AI 楼，再按 MVU“重新处理变量”的时序解析并明确写回该楼 ──
     // 只保存清洗后的正文 + 规范变量块：客户端/卡内正则会隐藏变量块，但 MVU 面板以后
     // 仍能从真实 AI 楼重新解析。思维链、摘要与外部预设格式不会因此重新进入聊天历史。
-    const 已清洗正文 = 本轮静音会议 ? 清洗静音会议正文(原文) : 清洗正文(原文);
+    const 已清洗正文 =
+      本轮静音会议 || 事件必须有正文(本楼事件) || 选项.成功结算
+        ? 清洗严格正文(原文)
+        : 清洗正文(原文);
     if (本轮静音会议 && !已清洗正文) {
       throw new Error('AI 没有返回有效正文——本拍未推进，请直接重试');
     }
-    if (是入住登场事件(本楼事件) && !已清洗正文) {
-      throw new Error('AI 没有返回有效的首次登场正文——入住预约已保留，请直接重试');
-    }
-    if (/【阶段线路剧情:\d{3}:\d+:\d+:[^】]+】/.test(本楼事件) && !已清洗正文) {
-      throw new Error('AI 没有返回有效的关系剧情正文——节点没有登记，请直接重试');
+    if (事件必须有正文(本楼事件) && !已清洗正文) {
+      throw new Error('AI 没有返回有效的剧情正文——待演事件已保留，请直接重试');
     }
     if (选项.成功结算 && !已清洗正文) {
       throw new Error('AI 没有返回有效正文——楼务任务没有提交，请重新点击任务瓷砖');
@@ -1295,6 +1326,23 @@ export async function 执行回合(
     if (临时助手楼层 !== 生成楼层) {
       throw new Error(`AI楼层错位：预期 ${生成楼层}，实际 ${临时助手楼层}`);
     }
+    // AI 变量候选只是正文之上的可降级增强。先冻结一份已经通过 Schema 校验、且包含
+    // 入住演出态/并发电话合并的可信基准；候选解析器即使原地污染参数后抛错也碰不到它。
+    const 变量失败回退基准 = _.cloneDeep(解析基准) as Mvu.MvuData;
+    const 降级AI变量解析 = async (阶段: string, 错误: unknown): Promise<void> => {
+      确认本轮事务有效();
+      变量解析已降级 = true;
+      变量解析降级阶段 = 阶段;
+      console.error(`[人妻公寓] ${阶段}变量解析失败，降级到可信解析基准，正文继续保留：`, 错误);
+      解析基准 = _.cloneDeep(变量失败回退基准) as Mvu.MvuData;
+      变量块 = '';
+      可重处理楼层正文 = 基础正文;
+      const 当前临时正文 = getChatMessages(临时助手楼层!).at(-1)?.message ?? '';
+      if (当前临时正文 !== 基础正文) {
+        await setChatMessages([{ message_id: 临时助手楼层!, message: 基础正文 }], { refresh: 'none' });
+        确认本轮事务有效();
+      }
+    };
 
     // refresh:'none' 不会发 MESSAGE_RECEIVED，因而 MVU 的自动监听不会自行运行。
     // 外置路线只在其“自动请求”开启时，通过跨脚本桥调用一次官方解析；不要再补发
@@ -1307,17 +1355,32 @@ export async function 执行回合(
     ) {
       console.info('[人妻公寓] 调用 MVU 官方外置模型解析');
       eventEmit('人妻公寓:运行阶段', 'MVU外置模型正在解析变量');
-      await eventEmit('人妻公寓:MVU外置模型重试');
-      确认本轮事务有效();
-      const 外置后正文 = getChatMessages(临时助手楼层).at(-1)?.message ?? 可重处理楼层正文;
-      const 外置后数据 = Mvu.getMvuData({ type: 'message', message_id: 临时助手楼层 });
-      可重处理楼层正文 = 外置后正文;
-      变量块 = 取变量块(外置后正文);
-      if (外置后数据) 解析基准 = _.cloneDeep(外置后数据);
-      if (有可用变量命令(外置后正文) || !_.isEqual(解析基准, 旧)) {
-        console.info('[人妻公寓] MVU 外置模型变量解析完成');
-      } else {
-        console.warn('[人妻公寓] MVU 外置模型未产生可解析变量；请检查 MVU 更新方式、自动解析配置和日志');
+      try {
+        await eventEmit('人妻公寓:MVU外置模型重试');
+        确认本轮事务有效();
+        const 外置后正文 = getChatMessages(临时助手楼层).at(-1)?.message ?? 可重处理楼层正文;
+        const 外置后数据 = Mvu.getMvuData({ type: 'message', message_id: 临时助手楼层 });
+        变量块 = 取变量块(外置后正文);
+        // 外置模型只负责变量，不拥有正文。即使插件把消息改成空串或纯变量协议，
+        // 也必须用已经验证的基础正文重新拼回，杜绝解析失败反向抹掉剧情。
+        可重处理楼层正文 = 变量块 ? `${基础正文}\n${变量块}` : 基础正文;
+        if (外置后数据) {
+          const 外置stat = _.get(外置后数据, 'stat_data');
+          if (外置stat === undefined) throw new Error('MVU 外置模型没有返回 stat_data');
+          Schema.parse(外置stat);
+          解析基准 = _.cloneDeep(外置后数据);
+        }
+        if (外置后正文 !== 可重处理楼层正文) {
+          await setChatMessages([{ message_id: 临时助手楼层, message: 可重处理楼层正文 }], { refresh: 'none' });
+          确认本轮事务有效();
+        }
+        if (有可用变量命令(外置后正文) || !_.isEqual(解析基准, 变量失败回退基准)) {
+          console.info('[人妻公寓] MVU 外置模型变量解析完成');
+        } else {
+          console.warn('[人妻公寓] MVU 外置模型未产生可解析变量；请检查 MVU 更新方式、自动解析配置和日志');
+        }
+      } catch (e) {
+        await 降级AI变量解析('MVU外置模型', e);
       }
     } else if (
       !本轮静音会议 &&
@@ -1332,22 +1395,33 @@ export async function 执行回合(
     // 相对该基准产生的原子增量三方并入，而不是用最新整表覆盖正文自己的合法结算。
     const 父亲电话正文基准 = 本轮静音会议
       ? (_.cloneDeep(data) as SchemaType)
-      : (Schema.parse(_.get(解析基准, 'stat_data') ?? {}) as SchemaType);
+      : (Schema.parse(_.get(变量失败回退基准, 'stat_data') ?? {}) as SchemaType);
     // 官方外置桥返回前已经完成“生成变量块 → parse → 写回该楼”。外置结果若再交给
     // parseMessage，delta/add 会在终值上应用第二次；只有正文随 AI 输出路线需要本地解析。
-    const 新 = 使用MVU外置解析
-      ? 解析基准
-      : (((await Mvu.parseMessage(可重处理楼层正文, 解析基准)) ?? 解析基准) as Mvu.MvuData);
-    确认本轮事务有效();
-    // 静音会议是脚本全权管理的隔离层：即使模型仍输出隐藏变量命令，也不能让解析结果
-    // 成为本轮真值。以生成前的已验证状态为唯一基底，之后只允许回合结算消费事件、
-    // 特殊场景状态机推进，以及最终收尾时由脚本执行固定 +2。
-    const newStat = 本轮静音会议
-      ? (_.cloneDeep(data) as SchemaType)
-      : (Schema.parse(_.get(新, 'stat_data') ?? {}) as SchemaType);
-    const 守护结果 = 本轮静音会议
-      ? undefined
-      : 回滚保护字段(newStat, 焦点, 变量范围, 生成楼层, _.get(新, 'stat_data')); // 提示、解析与守护共用同一精确写权限
+    let 新 = _.cloneDeep(解析基准) as Mvu.MvuData;
+    let newStat: SchemaType;
+    let 守护结果: ReturnType<typeof 回滚保护字段> | undefined;
+    if (本轮静音会议) {
+      // 静音会议是脚本全权管理的隔离层：即使模型仍输出隐藏变量命令，也不能让解析结果
+      // 成为本轮真值。以生成前的已验证状态为唯一基底，之后只允许脚本固定结算。
+      newStat = _.cloneDeep(data) as SchemaType;
+      守护结果 = undefined;
+    } else {
+      try {
+        if (!使用MVU外置解析 && !变量解析已降级) {
+          const 候选基准 = _.cloneDeep(解析基准) as Mvu.MvuData;
+          新 = ((await Mvu.parseMessage(可重处理楼层正文, 候选基准)) ?? 候选基准) as Mvu.MvuData;
+        }
+        确认本轮事务有效();
+        newStat = Schema.parse(_.get(新, 'stat_data') ?? {}) as SchemaType;
+        守护结果 = 回滚保护字段(newStat, 焦点, 变量范围, 生成楼层, _.get(新, 'stat_data'));
+      } catch (e) {
+        await 降级AI变量解析(使用MVU外置解析 ? 'MVU外置模型' : '正文模型', e);
+        新 = _.cloneDeep(变量失败回退基准) as Mvu.MvuData;
+        newStat = Schema.parse(_.get(新, 'stat_data') ?? {}) as SchemaType;
+        守护结果 = 回滚保护字段(newStat, 焦点, 变量范围, 生成楼层, _.get(新, 'stat_data'));
+      }
+    }
     const 入住预约已提交 = 回合结算(
       newStat,
       本轮结算基准,
@@ -1513,6 +1587,9 @@ export async function 执行回合(
     });
     await 广播生成完成事件(本轮事务仍有效);
     确认本轮事务有效();
+    if (变量解析已降级) {
+      eventEmit('人妻公寓:提示', `正文已保留；${变量解析降级阶段 || 'AI'}变量本轮未更新，脚本结算已正常完成。`);
+    }
     eventEmit('人妻公寓:回合完成');
     return true;
   } catch (e) {
@@ -1562,6 +1639,8 @@ export async function 执行回合(
     }
     允许取消 = false;
     本回合生成id = ''; // 防回档等无生成的回合被"取消"误伤
+    正文流式生成id = '';
+    正文流式原文 = '';
     if (本轮静音会议) 设置静音会议手机生成中(false);
     标记回合事务结束();
   }

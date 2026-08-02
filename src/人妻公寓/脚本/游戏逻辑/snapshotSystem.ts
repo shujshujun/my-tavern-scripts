@@ -172,6 +172,7 @@ export function 入住登场当前场景可用(data: SchemaType, 楼层: number,
   const 粘滞夫人数 = 粘滞有效 ? (粘滞?.夫们 ?? []).length : 0;
   const 赴约人数 = 读赴约(楼层) ? 1 : 0;
   return 入住登场场景可用({
+    房间id,
     房间类型: 房间id ? 查房间(房间id)?.类型 : undefined,
     持续人物数: 粘滞妻人数 + 粘滞夫人数 + 赴约人数 + Math.max(0, 额外持续人物数),
     特殊场景中: !!data.系统._特殊场景.id,
@@ -344,7 +345,9 @@ export function 检测焦点(
     // 离场带过期(审计 低危16):她因连续反感离场后,若玩家一直赖在她家不走,深夜按作息
     // 她"必回自己家"也被永久排除——离场标记只在最近 6 楼(两个时段)内生效
     const 已离场 = new Set(离场标记仍有效(粘态, 房间id, 楼层) ? (粘态?.离场 ?? []) : []);
-    const 妻在场 = 候选.filter(m => !已离场.has(m) && (粘.includes(m) || 妻位置推算(m, 绝对时段) === 房间id));
+    const 妻在场 = 候选.filter(
+      m => !已离场.has(m) && (粘.includes(m) || 妻位置推算(m, 绝对时段, data.户[m]) === 房间id),
+    );
     const 夫在场 = 候选.filter(m => 粘夫.includes(m) || (m === 房间id && 丈夫在楼(data.户[m], m, 绝对时段) !== '外出'));
     const 在此 = _.uniq([...妻在场, ...夫在场]);
     // 赴约妻:她的位置=玩家的位置(微信约出来的),排焦点首位
@@ -844,7 +847,9 @@ export function 组公寓快照(
       const 赴约中 = 读赴约(楼层)?.m === m;
       const 反感连续 = Number(_.get(getVariables({ type: 'chat' }), `_反感连续.${m}.次数`) ?? 0);
       const 妻位置 =
-        (房间id && 读粘滞(楼层, 房间id).includes(m)) || (房间id && 赴约中) ? 房间id : 妻位置推算(m, 绝对时段);
+        (房间id && 读粘滞(楼层, 房间id).includes(m)) || (房间id && 赴约中)
+          ? 房间id
+          : 妻位置推算(m, 绝对时段, data.户[m]);
       if (妻同场) {
         const 感知段 = [
           好感感知(妻.好感值),

@@ -11,13 +11,19 @@ const 入住源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻�
 const 快照源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/snapshotSystem.ts', import.meta.url), 'utf8');
 const 回合源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/回合引擎.ts', import.meta.url), 'utf8');
 
-test('首次登场只允许公共且没有连续人物或特殊玩法占用的场景', () => {
-  assert.equal(入住登场场景可用({ 房间类型: '公共' }), true);
-  assert.equal(入住登场场景可用({ 房间类型: '户' }), false);
+test('首次登场只允许五个公寓出入口及通道，其他公共地点也必须拒绝', () => {
+  for (const 房间id of ['公寓外部', '大堂', '信箱区', '管理员室', '楼梯间']) {
+    assert.equal(入住登场场景可用({ 房间id, 房间类型: '公共' }), true, 房间id);
+  }
+  for (const 房间id of ['晨跑公园', '健身房', '天台', '垃圾房', '公共洗手间']) {
+    assert.equal(入住登场场景可用({ 房间id, 房间类型: '公共' }), false, 房间id);
+  }
+  assert.equal(入住登场场景可用({ 房间id: '101', 房间类型: '户' }), false);
+  assert.equal(入住登场场景可用({ 房间类型: '公共' }), false, '缺少精确房间不得只凭公共类型放行');
   assert.equal(入住登场场景可用({}), false);
-  assert.equal(入住登场场景可用({ 房间类型: '公共', 持续人物数: 1 }), false);
-  assert.equal(入住登场场景可用({ 房间类型: '公共', 特殊场景中: true }), false);
-  assert.equal(入住登场场景可用({ 房间类型: '公共', 荣耀洞进行中: true }), false);
+  assert.equal(入住登场场景可用({ 房间id: '管理员室', 房间类型: '公共', 持续人物数: 1 }), false);
+  assert.equal(入住登场场景可用({ 房间id: '管理员室', 房间类型: '公共', 特殊场景中: true }), false);
+  assert.equal(入住登场场景可用({ 房间id: '管理员室', 房间类型: '公共', 荣耀洞进行中: true }), false);
 });
 
 test('普通新住户与母亲首次入列都属于可延后的登场事件', () => {

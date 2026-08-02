@@ -80,10 +80,10 @@ test('移动端断点会随 iframe 画幅变化同步，避免窄屏仍保留桌
   assert.match(App源, /移动端媒体\.removeEventListener\('change', 同步移动端断点\)/);
 });
 
-test('移动端媒体规则必须把全屏入口从基础隐藏态改为可见布局', () => {
+test('移动端媒体规则必须把全屏选择卡从基础隐藏态改为可见布局', () => {
   const 媒体开始 = App源.indexOf('@media (max-width: 540px)');
   const 规则开始 = App源.indexOf('.mobile-fullscreen-cta {', 媒体开始);
   const 规则结束 = App源.indexOf('\n  }', 规则开始);
   assert.ok(媒体开始 >= 0 && 规则开始 > 媒体开始 && 规则结束 > 规则开始);
-  assert.match(App源.slice(规则开始, 规则结束), /display:\s*flex/);
+  assert.match(App源.slice(规则开始, 规则结束), /display:\s*grid/);
 });

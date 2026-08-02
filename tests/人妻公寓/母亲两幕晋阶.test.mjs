@@ -28,6 +28,10 @@ const {
   提交母亲两幕事件,
 } = require('../../src/人妻公寓/脚本/游戏逻辑/阶段线路系统.ts');
 const { 执行时间推进事务, 是单一时间流逝事件 } = require('../../src/人妻公寓/脚本/游戏逻辑/时间推进系统.ts');
+const {
+  事件必须有正文,
+  本轮事件可提交,
+} = require('../../src/人妻公寓/脚本/游戏逻辑/入住触发门.ts');
 
 function 建待首夜数据(绝对时段 = 4) {
   const 节点 = 创建户节点(0);
@@ -165,12 +169,64 @@ test('主回合与原生逃生路径都只在冻结票据成功提交分支结�
   assert.match(原生提交分支, /提交母亲两幕事件\(newData, 本楼事件\)/);
 });
 
-test('index 复用中央事务的严格单一时间事件谓词，不能在清场前误放行混合标签', () => {
+test('早餐属于强制正文事件，空正文在固定0楼与原生逃生路径都保留票据', () => {
+  const 早餐票据 = '【事件在场妻:302】【早饭桌】第二天一早，妈把早餐摆到桌上。';
+  const 冻结票据 = {
+    楼层: 28,
+    内容: 早餐票据,
+    来源: '待发送',
+    待发送快照: 早餐票据,
+  };
+
+  assert.equal(事件必须有正文(早餐票据), true);
+  assert.equal(本轮事件可提交(冻结票据, 早餐票据, 28, false), false, '空正文不能消费早餐票据');
+  assert.equal(本轮事件可提交(冻结票据, 早餐票据, 28, true), true, '有效正文仍可正常提交早餐票据');
+
+  const 回合Source = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/回合引擎.ts', import.meta.url), 'utf8');
+  const 固定零楼空正文门 = 回合Source.slice(
+    回合Source.indexOf('const 已清洗正文 ='),
+    回合Source.indexOf('const 基础正文 ='),
+  );
+  assert.match(固定零楼空正文门, /事件必须有正文\(本楼事件\)/);
+  assert.match(固定零楼空正文门, /!已清洗正文/);
+  assert.match(固定零楼空正文门, /throw new Error/);
+
+  const indexSource = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
+  const 原生空正文门 = indexSource.slice(
+    indexSource.indexOf('const 本轮有效正文 ='),
+    indexSource.indexOf('// 手动"重新处理变量"'),
+  );
+  assert.match(原生空正文门, /事件必须有正文\(本楼事件\)/);
+  assert.match(原生空正文门, /!本轮有效正文/);
+  assert.match(原生空正文门, /const 失败基底 = _.cloneDeep\(_本轮事件基底\)/);
+  assert.match(原生空正文门, /_.set\(新变量, 'stat_data', 失败基底\)/);
+  assert.match(原生空正文门, /eventEmit\('人妻公寓:回合失败'/);
+  assert.match(原生空正文门, /return;/, '原生逃生路径必须在事件提交分支以前返回');
+});
+
+test('所有确定性正戏都要求真实正文，不能用纯标签响应消费票据', () => {
+  for (const 票据 of [
+    '【特殊场景·录像带·202-1】',
+    '【转折正戏】第一夜正式开始',
+    '【药物首夜】母亲线第一幕',
+    '【早饭桌】第二天的早餐',
+    '【破墙】母亲关系突破',
+    '【阶段线路剧情:201:3:2:阳台谈话】',
+  ]) {
+    assert.equal(事件必须有正文(票据), true, 票据);
+  }
+
+  const 回合Source = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/回合引擎.ts', import.meta.url), 'utf8');
+  assert.match(回合Source, /事件必须有正文\(本楼事件\)[\s\S]{0,120}清洗严格正文\(原文\)/);
+});
+
+test('单一时间票谓词只用于清理旧版遗留，当前时间入口不再放行任何待演票据', () => {
   assert.equal(是单一时间流逝事件('【时间流逝】旧文案'), true);
   assert.equal(是单一时间流逝事件('【时间流逝】旧文案【转折正戏】不能吞'), false);
 
   const source = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
   assert.match(source, /import \{[^}]*是单一时间流逝事件[^}]*\} from '\.\/时间推进系统'/s);
-  assert.match(source, /const 是单一时间事件 = 是单一时间流逝事件\(待演\)/);
+  assert.match(source, /const 遗留时间票 = 是单一时间流逝事件\(data\.系统\._待发送事件\)/);
+  assert.match(source, /const 待演 = data\.系统\._待发送事件\.trim\(\);\s*if \(待演\)/);
   assert.match(source, /【转折正戏】\|【药物首夜】\|【早饭桌】/, '早餐尚未提交时也必须阻止其他角色挤入晋阶正戏');
 });

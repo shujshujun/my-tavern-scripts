@@ -15,7 +15,10 @@ export function 是时间撤销地点(地点: string | null | undefined): 地点
  * Schema 增加一套永久业务状态；下一次成功推进会整值覆盖，成功撤销后立即删除。
  */
 export const 时间撤销点键 = '_时间撤销点';
-export const 时间撤销点版本 = 1 as const;
+export const 时间撤销点版本 = 2 as const;
+/** 跨聊天重载时用于恢复双存储半事务；正常提交会在同一次 chat 写入中删除。 */
+export const 时间推进事务键 = '_时间推进事务';
+export const 时间推进事务版本 = 1 as const;
 
 /** 时间推进会清空/替换的全部聊天键；推进失败与撤销时必须逐键精确恢复。 */
 export const 时间推进清场聊天键 = [
@@ -34,10 +37,19 @@ export const 时间推进清场聊天键 = [
  * 保护镜像与换装余波可能由时间事务后的异步收口改写。它们不是 MVU 字段，却会影响
  * 后续回合，所以与清场键一起保存推进前原值。
  */
-export const 时间撤销恢复聊天键 = [...时间推进清场聊天键, '_换装余波', PROMOTE_MIRROR_KEY] as const;
+export const 时间撤销恢复聊天键 = [
+  ...时间推进清场聊天键,
+  '_换装余波',
+  PROMOTE_MIRROR_KEY,
+  // 晨跑、健身和睡眠的普通反馈只保存在独立日志中；撤销时间必须连同这段反馈一起撤销。
+  '_隔离事件',
+] as const;
 
-/** 撤销会额外裁剪手机与隔离日志；失败回滚需要把这些键也原样放回。 */
-export const 时间撤销写入聊天键 = [...时间撤销恢复聊天键, '_微信', '_隔离事件', 时间撤销点键] as const;
+/** 撤销会额外裁剪手机；失败回滚需要把这些键也原样放回。 */
+export const 时间撤销写入聊天键 = [...时间撤销恢复聊天键, '_微信', 时间撤销点键] as const;
+
+/** 时间推进自身可能改写的键；中断恢复会精确还原这些键，不触碰同期无关手机消息。 */
+export const 时间推进事务恢复聊天键 = [...时间推进清场聊天键, '_隔离事件', 时间撤销点键] as const;
 
 export interface 精确聊天值 {
   存在: boolean;
@@ -64,6 +76,17 @@ export interface 时间撤销点 {
   推进后聊天指纹: string;
 }
 
+export interface 时间推进事务记录 {
+  版本: typeof 时间推进事务版本;
+  事务ID: string;
+  聊天ID: string;
+  创建时间: number;
+  推进前数据: SchemaType;
+  推进前数据指纹: string;
+  推进前聊天: 精确聊天快照;
+  推进前聊天指纹: string;
+}
+
 export interface 创建时间撤销点参数 {
   聊天ID: string;
   锚楼: number;
@@ -85,7 +108,14 @@ export interface 时间撤销校验上下文 {
 
 export type 时间撤销判定 = { 有效: true; 撤销点: 时间撤销点 } | { 有效: false; 原因: string };
 
-const 聊天指纹忽略键 = new Set<string>([时间撤销点键, '_微信', '_整表视图', '_换装余波', PROMOTE_MIRROR_KEY]);
+const 聊天指纹忽略键 = new Set<string>([
+  时间撤销点键,
+  时间推进事务键,
+  '_微信',
+  '_整表视图',
+  '_换装余波',
+  PROMOTE_MIRROR_KEY,
+]);
 
 function 是记录(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -207,6 +237,84 @@ export function 恢复精确聊天快照(
     if (记录.存在) vars[key] = 记录.值未定义 ? undefined : _.cloneDeep(记录.值);
     else delete vars[key];
   }
+}
+
+function 聊天快照包含键(value: unknown, keys: readonly string[]): value is 精确聊天快照 {
+  if (!是记录(value)) return false;
+  return keys.every(key => {
+    const item = value[key];
+    return (
+      是记录(item) &&
+      typeof item.存在 === 'boolean' &&
+      Object.prototype.hasOwnProperty.call(item, '值') &&
+      (item.值未定义 === undefined || typeof item.值未定义 === 'boolean') &&
+      (!item.值未定义 || item.存在)
+    );
+  });
+}
+
+export function 创建时间推进事务记录(参数: {
+  聊天ID: string;
+  推进前数据: SchemaType;
+  推进前聊天: 精确聊天快照;
+}): 时间推进事务记录 {
+  if (!参数.聊天ID) throw new Error('时间推进事务缺少聊天身份');
+  if (!聊天快照包含键(参数.推进前聊天, 时间推进事务恢复聊天键)) {
+    throw new Error('时间推进事务的聊天快照不完整');
+  }
+  const 推进前数据 = Schema.parse(_.cloneDeep(参数.推进前数据)) as SchemaType;
+  if (读MVU版本(推进前数据) !== 当前MVU数据版本) throw new Error('时间推进事务只能保存当前版本 MVU');
+  const 推进前聊天 = _.cloneDeep(参数.推进前聊天) as 精确聊天快照;
+  const 创建时间 = Date.now();
+  return {
+    版本: 时间推进事务版本,
+    事务ID: `${创建时间}-${时间状态指纹([参数.聊天ID, 推进前数据.系统._绝对时段]).slice(-12)}`,
+    聊天ID: 参数.聊天ID,
+    创建时间,
+    推进前数据,
+    推进前数据指纹: 时间状态指纹(推进前数据),
+    推进前聊天,
+    推进前聊天指纹: 时间状态指纹(推进前聊天),
+  };
+}
+
+/** 损坏记录返回 null；调用方必须停止玩法而非猜测恢复，避免把未知状态越修越坏。 */
+export function 读取时间推进事务记录(raw: unknown): 时间推进事务记录 | null {
+  if (
+    !是记录(raw) ||
+    raw.版本 !== 时间推进事务版本 ||
+    typeof raw.事务ID !== 'string' ||
+    !raw.事务ID ||
+    typeof raw.聊天ID !== 'string' ||
+    !raw.聊天ID ||
+    typeof raw.创建时间 !== 'number' ||
+    !Number.isFinite(raw.创建时间) ||
+    typeof raw.推进前数据指纹 !== 'string' ||
+    typeof raw.推进前聊天指纹 !== 'string' ||
+    !聊天快照包含键(raw.推进前聊天, 时间推进事务恢复聊天键)
+  ) {
+    return null;
+  }
+  const 解析 = Schema.safeParse(_.cloneDeep(raw.推进前数据));
+  if (!解析.success || 读MVU版本(解析.data) !== 当前MVU数据版本) return null;
+  const 推进前数据 = 解析.data as SchemaType;
+  const 推进前聊天 = _.cloneDeep(raw.推进前聊天) as 精确聊天快照;
+  if (
+    时间状态指纹(推进前数据) !== raw.推进前数据指纹 ||
+    时间状态指纹(推进前聊天) !== raw.推进前聊天指纹
+  ) {
+    return null;
+  }
+  return {
+    版本: 时间推进事务版本,
+    事务ID: raw.事务ID,
+    聊天ID: raw.聊天ID,
+    创建时间: raw.创建时间,
+    推进前数据,
+    推进前数据指纹: raw.推进前数据指纹,
+    推进前聊天,
+    推进前聊天指纹: raw.推进前聊天指纹,
+  };
 }
 
 export interface 时间推进双存储提交参数 {
