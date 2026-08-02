@@ -6,7 +6,9 @@ import {
   type 静音会议候选门牌,
 } from '../../静音会议配置';
 import { 取会场私聊摘要提示 } from './手机系统';
+import { 登记脚本正增长候选 } from './冷落系统';
 import { 事件角色标记 } from './snapshotSystem';
+import { 特殊场景启动亲密门 } from './特殊场景策略';
 
 type 特殊场景状态 = SchemaType['系统']['_特殊场景'];
 
@@ -37,6 +39,31 @@ export function 空特殊场景状态(): 特殊场景状态 {
 
 function 清空特殊场景(data: SchemaType): void {
   data.系统._特殊场景 = 空特殊场景状态();
+}
+
+/** `_待发送事件` 是 `|` 分隔的稳定队列；特殊场景只能替换自己的精确节拍。 */
+function 读待发送事件队列(data: SchemaType): string[] {
+  return String(data.系统._待发送事件 ?? '')
+    .split('|')
+    .filter(Boolean);
+}
+
+function 写待发送事件队列(data: SchemaType, 队列: string[]): void {
+  data.系统._待发送事件 = 队列.filter(Boolean).join('|');
+}
+
+function 移除待发送节拍(data: SchemaType, 精确标记: string): void {
+  写待发送事件队列(
+    data,
+    读待发送事件队列(data).filter(事件 => !事件.includes(精确标记)),
+  );
+}
+
+function 追加待发送节拍(data: SchemaType, 精确标记: string, 正文: string): void {
+  const 队列 = 读待发送事件队列(data);
+  if (队列.some(事件 => 事件.includes(精确标记))) return;
+  队列.push(正文);
+  写待发送事件队列(data, 队列);
 }
 
 function 是静音会议候选门牌(值: unknown): 值 is 静音会议候选门牌 {
@@ -185,23 +212,33 @@ function 静音会议拍提示(data: SchemaType): string {
 }
 
 export function 准备当前特殊场景节拍(data: SchemaType): void {
-  if (data.系统._待发送事件 || !data.系统._特殊场景.id) return;
+  if (!data.系统._特殊场景.id) return;
   const 场 = data.系统._特殊场景;
   if (场.id === '录像带前置' && /^(102|202)-[12]$/.test(场.阶段)) {
     const [, 门牌号, 拍] = 场.阶段.match(/^(102|202)-([12])$/)!;
-    data.系统._待发送事件 = 绑定妻(首送节拍(门牌号 as '102' | '202', Number(拍) as 1 | 2), [
-      门牌号 as 门牌,
-    ]);
+    const 标记 = `【特殊前置·录像带·${门牌号}·${拍}】`;
+    追加待发送节拍(
+      data,
+      标记,
+      绑定妻(首送节拍(门牌号 as '102' | '202', Number(拍) as 1 | 2), [门牌号 as 门牌]),
+    );
     return;
   }
   if (场.id === '录像带' && 正式节拍[场.阶段]) {
-    data.系统._待发送事件 = 绑定妻(正式节拍[场.阶段], ['102', '202']);
+    追加待发送节拍(data, `【特殊场景·录像带·${场.阶段}】`, 绑定妻(正式节拍[场.阶段], ['102', '202']));
     return;
   }
   if (场.id === '静音会议' && 场.阶段 !== '筹备') {
     if (场.当前拍 === 12 && !场.会后妻.length) return;
     const 提示 = 静音会议拍提示(data);
-    if (提示) data.系统._待发送事件 = `${提示}${取会场私聊摘要提示(data)}`;
+    if (提示) {
+      const 标记 = 场.阶段 === '收尾'
+        ? '【特殊场景·静音会议·收尾】'
+        : 场.阶段.includes('自由')
+          ? `【特殊场景·静音会议·自由·${场.自由循环次数 + 1}】`
+          : `【特殊场景·静音会议·${场.当前拍}】`;
+      追加待发送节拍(data, 标记, `${提示}${取会场私聊摘要提示(data)}`);
+    }
   }
 }
 
@@ -214,6 +251,8 @@ export function 打开静音会议筹备(
   data: SchemaType,
   当前地点: string,
 ): 特殊场景操作结果 {
+  const 亲密阻断 = 特殊场景启动亲密门(data);
+  if (亲密阻断) return { 成功: false, 提示: 亲密阻断 };
   if (!特殊场景空闲(data)) return { 成功: false, 提示: '眼下已有一场特殊事件正在进行。' };
   if (data.系统._待发送事件) return { 成功: false, 提示: '眼下还有一段剧情没有演完。' };
   if (当前地点 !== '管理员室') return { 成功: false, 提示: '静音会议只能在管理员室筹备。' };
@@ -250,6 +289,8 @@ export function 启动静音会议(
   当前楼层: number,
 ): 特殊场景操作结果 {
   const 场 = data.系统._特殊场景;
+  const 亲密阻断 = 特殊场景启动亲密门(data);
+  if (亲密阻断) return { 成功: false, 提示: 亲密阻断 };
   if (场.id !== '静音会议' || 场.阶段 !== '筹备') {
     return { 成功: false, 提示: '请先从背包打开静音会议筹备表。' };
   }
@@ -330,7 +371,7 @@ export function 选择静音会议散会名单(data: SchemaType, 原会后妻: u
   }
   场.会后妻 = [...会后妻];
   // 第 12 拍若上一轮生成失败，允许玩家在重试前调整名单；重编译提示以匹配新冻结值。
-  if (data.系统._待发送事件.includes('【特殊场景·静音会议·12】')) data.系统._待发送事件 = '';
+  移除待发送节拍(data, '【特殊场景·静音会议·12】');
   准备当前特殊场景节拍(data);
   return { 成功: true, 提示: `散会名单已冻结：${会后妻.map(门牌号 => 户静态表[门牌号].妻名).join('、')}。` };
 }
@@ -407,7 +448,7 @@ export function 请求结束静音会议(data: SchemaType): 特殊场景操作�
   if (data.系统._待发送事件.includes(待重试自由标记)) {
     // 自由拍生成失败后事件会保留以便原拍重试；玩家此时改选“结束”，必须撤销这条
     // 尚未成功的自由拍，否则第一次收尾请求会错误地再生成一轮会后内容。
-    data.系统._待发送事件 = '';
+    移除待发送节拍(data, 待重试自由标记);
   }
   场.阶段 = '收尾';
   场.交互 = { id: '', 类型: '', 状态: '', 失败次数: 0, 补偿可用: false };
@@ -417,6 +458,8 @@ export function 请求结束静音会议(data: SchemaType): 特殊场景操作�
 
 export function 开始录像带首送(data: SchemaType, 门牌号: '102' | '202', 楼层: number): { 成功: boolean; 提示: string } {
   const 键 = 录像带前置键(门牌号);
+  const 亲密阻断 = 特殊场景启动亲密门(data);
+  if (亲密阻断) return { 成功: false, 提示: 亲密阻断 };
   if (data.系统._特殊场景前置.includes(键)) return { 成功: false, 提示: '这件事已经答应过了。' };
   if (!特殊场景空闲(data)) return { 成功: false, 提示: '眼下已有一场特殊事件正在进行。' };
   data.系统._特殊场景 = {
@@ -433,6 +476,8 @@ export function 开始录像带首送(data: SchemaType, 门牌号: '102' | '202'
 }
 
 export function 启动录像带(data: SchemaType, 楼层: number): { 成功: boolean; 提示: string } {
+  const 亲密阻断 = 特殊场景启动亲密门(data);
+  if (亲密阻断) return { 成功: false, 提示: 亲密阻断 };
   if (!特殊场景空闲(data)) return { 成功: false, 提示: '眼下已有一场特殊事件正在进行。' };
   if (data.系统._待发送事件) return { 成功: false, 提示: '眼下还有一段剧情没有演完。' };
   if ((data.户['102']?.妻.当前阶段 ?? 0) < 4 || (data.户['202']?.妻.当前阶段 ?? 0) < 4) {
@@ -467,13 +512,19 @@ export function 通过录像带互动(data: SchemaType, 房间: '102' | '202'): 
 export function 特殊场景玩家行动前(data: SchemaType): 特殊场景操作结果 {
   const 场 = data.系统._特殊场景;
   if (场.id === '静音会议') {
+    if (场.阶段 === '筹备') return { 成功: false, 提示: '请先在筹备表里确认参会名单与议题。' };
     const 许可 = 静音会议玩家行动许可(data);
     if (!许可.成功) return 许可;
     场.地点 = '管理员室';
     准备当前特殊场景节拍(data);
     return { 成功: true, 提示: '' };
   }
-  if (场.id === '录像带' && 场.地点 !== '管理员室') 场.地点 = '管理员室';
+  if (场.id === '录像带') {
+    if (场.阶段 === '等待102' || 场.阶段 === '等待202') {
+      return { 成功: false, 提示: '先操作桌上的监控瓷砖。' };
+    }
+    if (场.地点 !== '管理员室') 场.地点 = '管理员室';
+  }
   准备当前特殊场景节拍(data);
   return { 成功: true, 提示: '' };
 }
@@ -517,7 +568,10 @@ export function 推进特殊场景(data: SchemaType, 已演事件: string): void
       const 原参与 = [...场.参与妻].filter(是静音会议候选门牌);
       for (const 门牌号 of 原参与) {
         const 妻 = data.户[门牌号]?.妻;
-        if (妻) 妻.堕落值 = Math.min(100, 妻.堕落值 + 2);
+        if (妻) {
+          登记脚本正增长候选(data, 门牌号, '堕落值');
+          妻.堕落值 = Math.min(100, 妻.堕落值 + 2);
+        }
       }
       if (!data.系统._已完成特殊场景.includes('静音会议')) {
         data.系统._已完成特殊场景.push('静音会议');
@@ -598,7 +652,9 @@ export function 推进特殊场景(data: SchemaType, 已演事件: string): void
   const 前置 = 已演事件.match(/【特殊前置·录像带·(102|202)·([12])】/);
   if (场.id === '录像带前置' && 前置) {
     const 门牌号 = 前置[1] as '102' | '202';
-    if (前置[2] === '1') {
+    const 拍 = Number(前置[2]);
+    if (场.阶段 !== `${门牌号}-${拍}`) return;
+    if (拍 === 1) {
       场.阶段 = `${门牌号}-2`;
     } else {
       const 键 = 录像带前置键(门牌号);
@@ -612,13 +668,17 @@ export function 推进特殊场景(data: SchemaType, 已演事件: string): void
   if (场.id !== '录像带' || !正式) return;
   const 房 = 正式[1] as '102' | '202';
   const 拍 = Number(正式[2]);
+  if (场.阶段 !== `${房}-${拍}`) return;
   if (房 === '102' && 拍 < 3) 场.阶段 = `102-${拍 + 1}`;
   else if (房 === '102') 场.阶段 = '等待202';
   else if (拍 < 3) 场.阶段 = `202-${拍 + 1}`;
   else {
     for (const 门牌号 of ['102', '202'] as const) {
       const 妻 = data.户[门牌号]?.妻;
-      if (妻) 妻.堕落值 = Math.min(100, 妻.堕落值 + 2);
+      if (妻) {
+        登记脚本正增长候选(data, 门牌号, '堕落值');
+        妻.堕落值 = Math.min(100, 妻.堕落值 + 2);
+      }
     }
     if (!data.系统._已完成特殊场景.includes('录像带')) data.系统._已完成特殊场景.push('录像带');
     清空特殊场景(data);

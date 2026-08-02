@@ -136,16 +136,25 @@
             <button class="toggle" :class="{ on: 减动效 }" @click="((减动效 = !减动效), 改设置())"><i /></button>
           </div>
 
-          <div class="set-group row">
+          <div class="set-group row" :class="{ 'route-locked': MVU解析.外置模式 }">
             <div>
               <div class="set-label">模型二次变量结算</div>
-              <p class="set-hint">
-                模型写完正文却没输出可解析的变量更新（DeepSeek/Gemini
-                常见）时，自动再静默请求一次只补变量块。关闭可少一次请求，但漏更变量时数值不会变，需手动点 MVU
-                的"重新处理变量"。
+              <p v-if="MVU解析.外置模式" class="set-hint route-hint">
+                MVU 外置模型已接管变量，正文二次结算已自动关闭，避免两个模型重复处理。
+                <template v-if="!MVU解析.自动请求">
+                  但 MVU 的“自动请求”目前关闭；请去 MVU 开启，否则每轮需要手动点“重试额外模型解析”。
+                </template>
+              </p>
+              <p v-else class="set-hint">
+                使用正文模型解析变量时可选，默认关闭，不打开也不影响正常游玩。只有你自己发现变量多次没有更新时，才建议打开；开启后会额外调用一次当前正文模型。
               </p>
             </div>
-            <button class="toggle" :class="{ on: 二次变量结算 }" @click="((二次变量结算 = !二次变量结算), 改设置())">
+            <button
+              class="toggle"
+              :class="{ on: 二次变量结算 }"
+              :disabled="MVU解析.外置模式"
+              @click="切换二次变量结算"
+            >
               <i />
             </button>
           </div>
@@ -178,8 +187,8 @@
         <div class="sheet setup-sheet">
           <button v-if="首次准备完成" class="sheet-close" @click="首次说明开 = false">✕</button>
           <div class="ui-kicker">FIRST RUN / 首次游玩准备</div>
-          <h3 class="setup-title">先把记忆方案选好</h3>
-          <p class="setup-lead">数据库与智脑只能二选一。两套同时运行会重复总结和注入，必须关闭其中一个。</p>
+          <h3 class="setup-title">准备数据库与运行环境</h3>
+          <p class="setup-lead">本作长期记忆只支持数据库插件。完成环境检测并安装四张 RQ_ 表后即可开始游戏。</p>
 
           <div class="setup-statuses">
             <span :class="{ on: 脚本存活 }"
@@ -189,10 +198,6 @@
             <span :class="{ on: 数据库检测.已安装 }"
               ><i>{{ 数据库检测.已安装 ? '✓' : '·' }}</i
               >数据库插件 {{ 数据库检测.已安装 ? (数据库检测.版本 ? `v${数据库检测.版本}` : '版本未知') : '' }}</span
-            >
-            <span :class="{ on: 智脑检测.已安装 }"
-              ><i>{{ 智脑检测.已安装 ? '✓' : '·' }}</i
-              >智脑插件</span
             >
             <span :class="{ on: 酒馆助手已安装 }">
               <i>{{ 酒馆助手检测中 ? '…' : !酒馆助手已安装 ? '!' : 酒馆助手为最新版 === false ? '↑' : '✓' }}</i>
@@ -208,113 +213,92 @@
                   酒馆助手检测说明
                 }}。若不是最新版，建议更新，但不会阻止开始游戏。
               </p>
+              <div class="setup-sql-reminder setup-mvu-reminder" role="note">
+                <strong>强烈建议：使用 MVU 外置模型解析变量</strong>
+                <span
+                  >在 MVU 设置中选择【额外模型解析】并开启【自动请求】，可大幅提高变量更新稳定性。启用后本游戏会自动关闭【模型二次变量结算】，正文模型只负责剧情，外置模型单独处理变量，避免重复请求和互相覆盖。这不是开局检测的强制项，但每轮会增加一次解析请求、耗时与模型费用。</span
+                >
+              </div>
             </li>
             <li class="required">
               <b><em>2</em>启用【提示词模板】插件</b>
               <p>提示词模板必须开启；如果装有【小白X】，请先关闭，避免两套注入同时工作造成正文或变量异常。</p>
             </li>
             <li class="required">
-              <b><em>3</em>长期记忆插件二选一</b>
-              <p>选择路线后先关闭另一套，再点“重新检测”。检测未通过时不要继续安装另一套。</p>
+              <b><em>3</em>安装数据库长期记忆</b>
+              <p>安装数据库插件，并把人妻公寓四张 RQ_ 表合并到当前聊天。本作不再提供其他长期记忆插件的兼容路线。</p>
+              <div class="setup-sql-reminder" role="note">
+                <strong>必须手动切换：SQLite（SQL）模式</strong>
+                <span
+                  >打开【数据库设置 →
+                  存储模式】，选择【SQLite（SQL）】。游戏无法代替你自动切换；切换后回到本页安装或更新四张 RQ_ 表。</span
+                >
+              </div>
+              <p>
+                四张表都带完整 SQL DDL，SQLite 模式下游戏会使用参数化 SQL
+                精确查询与更新。普通表格模式仍可读取完整快照，数据库插件自身的正文长期记忆/承诺也照常运行；但游戏脚本不会用可能挂到旧消息的普通行接口直写剧情事件或微信摘要。
+              </p>
+              <p>
+                自动填表默认把人物记忆与承诺合并为每 3 个正文 AI 楼一次，社交轨迹每 6 楼一次；SQLite
+                模式下，剧情事件和重要社交结果由游戏脚本即时写入。没有长期变化时允许不改表，不应为了凑字数制造记录。
+              </p>
+              <p>
+                数据库当前会把全局“AI 回复最小长度”同时用于正文门控和填表输出。建议设为
+                0，避免把合法的简短或空更新误报为“AI回复过短”；“填表最大重试”建议手动设为 2。微信进展摘要走独立
+                callAI，不受这两个填表参数影响。
+              </p>
+              <p>
+                完整微信原文仍只保存在手机；开启微信记忆且 SQLite 可写时，每轮有效妻子私聊通常会额外调用一次数据库当前
+                AI，把当前分支的未整理增量压成结构化短进展。普通表格模式会暂停这次额外摘要调用。正文只在本人可靠判定在场时被动参考，不要求角色每轮主动提起；该功能可在手机“我”页单独关闭。
+              </p>
               <div class="setup-db-actions">
-                <button class="btn mini" :class="{ rite: 记忆方案 === '数据库' }" @click="选择记忆方案('数据库')">
-                  使用数据库
+                <button class="btn mini" @click="刷新全部检测">重新检测</button>
+                <button
+                  class="btn mini rite"
+                  :disabled="!数据库检测.已安装 || 安装模板中"
+                  @click="从说明安装数据库模板"
+                >
+                  {{ 安装模板中 ? '安装中…' : 数据库检测.已装游戏模板 ? '更新本游戏表' : '安装本游戏表' }}
                 </button>
-                <button class="btn mini" :class="{ rite: 记忆方案 === '智脑' }" @click="选择记忆方案('智脑')">
-                  使用智脑
+                <button class="btn mini" @click="从说明打开数据库设置">打开数据库设置</button>
+                <button
+                  v-if="数据库检测.填表最短回复 !== null && 数据库检测.填表最短回复 > 0 && 数据库检测.可设置填表参数"
+                  class="btn mini rite"
+                  :disabled="调整填表设置中"
+                  @click="从说明应用数据库填表兼容设置"
+                >
+                  {{ 调整填表设置中 ? '设置并验证中…' : '修复填表短回复（全局设 0）' }}
                 </button>
               </div>
-
-              <template v-if="记忆方案 === '数据库'">
-                <p>
-                  请在【酒馆助手→脚本→全局脚本】中禁用或删除智脑并刷新页面，然后安装数据库插件和人妻公寓四张 RQ_ 表。
-                </p>
-                <p>
-                  建议随后在数据库设置中开启 SQLite 模式：四张表都带完整 SQL DDL，游戏会优先使用参数化 SQL
-                  精确查询与更新；普通表格模式仍可兼容运行。数据库没有公开的自动切换接口，因此需要玩家手动开启。
-                </p>
-                <p>
-                  自动填表默认把人物记忆与承诺合并为每 3 个正文 AI 楼一次，社交轨迹每 6 楼一次；剧情事件和重要社交结果由游戏脚本即时写入。没有长期变化时允许不改表，不应为了凑字数制造记录。
-                </p>
-                <p>
-                  数据库当前会把全局“AI 回复最小长度”同时用于正文门控和填表输出。建议设为 0，避免把合法的简短或空更新误报为“AI回复过短”；“填表最大重试”建议手动设为 2。微信进展摘要走独立
-                  callAI，不受这两个填表参数影响。
-                </p>
-                <p>
-                  完整微信原文仍只保存在手机；开启微信记忆后，每轮有效妻子私聊通常会额外调用一次数据库当前 AI，把当前分支的未整理增量压成结构化短进展。正文只在本人可靠判定在场时被动参考，不要求角色每轮主动提起；该功能可在手机“我”页单独关闭。
-                </p>
-                <div class="setup-db-actions">
-                  <button class="btn mini" @click="刷新全部检测">重新检测</button>
-                  <button
-                    class="btn mini rite"
-                    :disabled="智脑检测.已安装 || !数据库检测.已安装 || 安装模板中"
-                    @click="从说明安装数据库模板"
-                  >
-                    {{ 安装模板中 ? '安装中…' : 数据库检测.已装游戏模板 ? '更新本游戏表' : '安装本游戏表' }}
-                  </button>
-                  <button class="btn mini" @click="从说明打开数据库设置">打开数据库设置</button>
-                  <button
-                    v-if="
-                      数据库检测.填表最短回复 !== null &&
-                      数据库检测.填表最短回复 > 0 &&
-                      数据库检测.可设置填表参数
-                    "
-                    class="btn mini rite"
-                    :disabled="调整填表设置中"
-                    @click="从说明应用数据库填表兼容设置"
-                  >
-                    {{ 调整填表设置中 ? '设置并验证中…' : '修复填表短回复（全局设 0）' }}
-                  </button>
-                </div>
-                <small v-if="数据库检测.已安装 && 数据库检测.填表最短回复 === 0" class="good"
-                  >✓ 自动填表防短回复已兼容：AI 回复最小长度 = 0。</small
-                >
-                <small
-                  v-else-if="数据库检测.已安装 && 数据库检测.填表最短回复 !== null"
-                  style="color: #a35f00"
-                  >! 当前 AI 回复最小长度 = {{ 数据库检测.填表最短回复 }}，建议修复；这是数据库全局项，只有你确认后游戏才会修改。</small
-                >
-                <small v-else-if="数据库检测.已安装"
-                  >· 当前数据库版本未开放填表参数读取，请在“填表工作台 → 自动更新设置 → 高级参数”中手动设为 0。</small
-                >
-                <small v-if="智脑检测.已安装">✗ 智脑仍在运行，请先禁用并刷新。</small>
-                <small v-else-if="!数据库检测.已安装">· 尚未检测到数据库插件。</small>
-                <small v-else-if="!数据库检测.已装游戏模板"
-                  >· 数据库 {{ 数据库检测.版本 ? `v${数据库检测.版本}` : '版本未知' }} 已启用，还需安装四张 RQ_
-                  表。</small
-                >
-                <small v-else class="good"
-                  >✓ 数据库 {{ 数据库检测.版本 ? `v${数据库检测.版本}` : '版本未知' }} 已启用，智脑已关闭，四张 RQ_
-                  表已就绪。</small
-                >
-              </template>
-
-              <template v-else-if="记忆方案 === '智脑'">
-                <p>
-                  请禁用或删除数据库插件并刷新页面；随后把智脑 v5.0.8
-                  作为【全局脚本】安装。智脑自行捕获楼层、总结并注入记忆，不需要 RQ_ 表。
-                </p>
-                <div class="setup-db-actions">
-                  <button class="btn mini" @click="复制智脑安装代码">复制智脑安装代码</button>
-                  <button class="btn mini rite" @click="刷新全部检测">重新检测</button>
-                </div>
-                <small v-if="数据库检测.已安装">✗ 数据库插件仍在运行，请先禁用并刷新。</small>
-                <small v-else-if="!智脑检测.已安装">· 尚未检测到智脑悬浮窗。</small>
-                <small v-else class="good">✓ 智脑已启用，数据库已关闭，本路线检测完成。</small>
-              </template>
-
-              <small v-else>请先选择一种长期记忆方案。</small>
+              <small v-if="数据库检测.已安装 && 数据库检测.填表最短回复 === 0" class="good"
+                >✓ 自动填表防短回复已兼容：AI 回复最小长度 = 0。</small
+              >
+              <small v-else-if="数据库检测.已安装 && 数据库检测.填表最短回复 !== null" style="color: #a35f00"
+                >! 当前 AI 回复最小长度 =
+                {{ 数据库检测.填表最短回复 }}，建议修复；这是数据库全局项，只有你确认后游戏才会修改。</small
+              >
+              <small v-else-if="数据库检测.已安装"
+                >· 当前数据库版本未开放填表参数读取，请在“填表工作台 → 自动更新设置 → 高级参数”中手动设为 0。</small
+              >
+              <small v-if="!数据库检测.已安装">· 尚未检测到数据库插件。</small>
+              <small v-else-if="!数据库检测.已装游戏模板"
+                >· 数据库 {{ 数据库检测.版本 ? `v${数据库检测.版本}` : '版本未知' }} 已启用，还需安装四张 RQ_
+                表。</small
+              >
+              <small v-else class="good"
+                >✓ 数据库 {{ 数据库检测.版本 ? `v${数据库检测.版本}` : '版本未知' }} 已启用，四张 RQ_ 表已就绪。</small
+              >
             </li>
             <li>
               <b><em>4</em>完成检测</b>
-              <p>只有目标插件已启用、另一套已关闭时才算完成。手机专用模型仍可在【手机→我】中单独配置。</p>
+              <p>酒馆助手、数据库插件与四张游戏表全部就绪后才算完成。手机专用模型仍可在【手机→我】中单独配置。</p>
               <div class="setup-db-actions"><button class="btn mini" @click="刷新全部检测">重新检测</button></div>
               <small :class="{ good: 首次准备完成 }">{{
                 首次准备完成
                   ? '✓ 酒馆助手已启用且长期记忆检测通过，可以开始游戏。'
                   : !酒馆助手已安装
                     ? `✗ ${酒馆助手检测说明}。`
-                    : '✗ 长期记忆二选一检测尚未通过。'
+                    : '✗ 数据库插件或四张 RQ_ 表尚未就绪。'
               }}</small>
             </li>
           </ol>
@@ -342,6 +326,7 @@
         <div class="ending-body">
           <p class="ending-line">{{ data.系统._坏结局 }}</p>
           <p class="hint">父亲收回了这栋楼。你可以在往事里回到从前的某一页,重新来过。</p>
+          <button v-if="时间撤销可用" class="btn" :disabled="发送中" @click="发起时间撤销">撤销刚才的时间推进</button>
           <button class="btn" @click="打开史册">翻开往事</button>
         </div>
       </template>
@@ -423,29 +408,69 @@
         <!-- HUD:数据专属框架(时间块 + 三轴瓦片,与功能按钮分离;按钮在底部 dock) -->
         <div class="hud">
           <div class="hud-time">
-            <div class="ui-kicker">DAY {{ String(天数).padStart(2, '0') }}</div>
-            <b><Ic n="clock" />{{ 时段 }}</b>
+            <div class="ui-kicker">第 {{ 天数 }} 天 · 第 {{ 周数 }} 周</div>
+            <b><Ic n="clock" />{{ 星期 }} · {{ 时段 }}</b>
           </div>
           <div class="hud-stats">
             <div class="hstat" title="现金">
               <small>现金</small>
               <b>¥{{ data.现金 }}</b>
             </div>
+            <button
+              type="button"
+              class="battery resource energy"
+              :class="{ warn: data.玩家资源.精力.当前值 * 4 <= 精力上限, muted: 性爱进行中 }"
+              title="精力：普通现场互动楼的行动权限；点击查看成长详情"
+              @click="显示资源详情 = '精力'"
+            >
+              <small>精力 LV{{ 精力等级 }}</small>
+              <span class="cells">
+                <i v-for="n in 10" :key="n" :class="{ on: n <= 精力格数 }" />
+              </span>
+              <b>{{ data.玩家资源.精力.当前值 }}/{{ 精力上限 }}</b>
+            </button>
+            <button
+              type="button"
+              class="battery resource stamina"
+              :class="{ warn: data.玩家资源.体力.当前值 * 4 <= 体力上限, active: 性爱进行中 }"
+              title="体力：亲密场景续航；点击查看成长详情"
+              @click="显示资源详情 = '体力'"
+            >
+              <small>体力 LV{{ 体力等级 }}</small>
+              <span class="cells">
+                <i v-for="n in 10" :key="n" :class="{ on: n <= 体力格数 }" />
+              </span>
+              <b>{{ data.玩家资源.体力.当前值 }}/{{ 体力上限 }}</b>
+            </button>
             <!-- 胜任/风闻=电池条(格子随值增减,低胜任/高风闻亮红报警) -->
-            <div class="battery" title="胜任度:父亲对你管楼的评价,跌到底=考验失败" :class="{ warn: data.胜任度 <= 40 }">
-              <small>胜任</small>
+            <button
+              type="button"
+              class="battery competence"
+              :title="`胜任度：父亲对你管楼的评价；当前红线 ${胜任红线}，状态 ${胜任状态}`"
+              :aria-label="`查看胜任详情，当前 ${Math.round(data.胜任度)}，${胜任状态}`"
+              :class="{ warn: 正式通牒中 || data.胜任度 - 胜任红线 <= 9 }"
+              @click="显示胜任详情 = true"
+            >
+              <small>胜任 · {{ 胜任状态 }}</small>
               <span class="cells">
                 <i v-for="n in 10" :key="n" :class="{ on: n <= Math.round(data.胜任度 / 10) }" />
               </span>
               <b>{{ Math.round(data.胜任度) }}</b>
-            </div>
-            <div class="battery risk" title="风闻:楼里的闲话,涨满=东窗事发" :class="{ warn: data.风闻 >= 50 }">
-              <small>风闻</small>
-              <span class="cells">
-                <i v-for="n in 10" :key="n" :class="{ on: n <= Math.round(data.风闻 / 10) }" />
+            </button>
+            <button
+              type="button"
+              class="battery risk rumor"
+              :class="[`rumor-level-${风闻档位}`, { warn: 风闻档位 >= 3 }]"
+              :title="`风闻 ${Math.round(data.风闻)}，当前档位：${风闻状态}。点击查看来源与平息提示`"
+              :aria-label="`查看风闻详情，当前 ${Math.round(data.风闻)}，${风闻状态}`"
+              @click="显示风闻详情 = true"
+            >
+              <small>风闻 · {{ 风闻状态 }}</small>
+              <span class="cells rumor-cells" aria-hidden="true">
+                <i v-for="n in 4" :key="n" :class="{ on: n <= 风闻档位 }" />
               </span>
               <b>{{ Math.round(data.风闻) }}</b>
-            </div>
+            </button>
           </div>
           <div
             v-if="欠租账.length"
@@ -458,6 +483,182 @@
             >
             <i v-for="项 in 欠租账" :key="项.门牌" :title="`${项.门牌} ${项.妻名}`">{{ 项.门牌 }}</i>
           </div>
+        </div>
+
+        <div v-if="显示资源详情" class="mask resource-detail-mask" @click.self="显示资源详情 = null">
+          <section class="resource-detail-card" :class="资源详情.种类 === '精力' ? 'energy' : 'stamina'">
+            <button class="sheet-close" type="button" @click="显示资源详情 = null">✕</button>
+            <div class="ui-kicker">PLAYER CONDITION / {{ 资源详情.种类 }}</div>
+            <h3>{{ 资源详情.种类 }} LV{{ 资源详情.等级 }}</h3>
+            <div class="resource-detail-value">
+              <b>{{ 资源详情.资源.当前值 }}</b
+              ><span>/ {{ 资源详情.上限 }}</span>
+            </div>
+            <p>
+              训练经验 {{ 资源详情.当前
+              }}<template v-if="资源详情.下级门槛 !== null"> / {{ 资源详情.下级门槛 }}</template
+              ><template v-else> · 已达到最高等级</template>
+            </p>
+            <p>永久上限加成 +{{ 资源详情.资源.永久上限加成 }}</p>
+            <small v-if="资源详情.种类 === '精力'">晨跑每天最多取得 1 点训练经验；普通现场互动成功后消耗 1 点。</small>
+            <small v-else>健身与当天首次圆满亲密场景共享每日训练收益；亲密场景每个成功楼消耗 1 点。</small>
+            <em>小憩和补给无法回满；睡到次日早晨才会完全恢复。</em>
+          </section>
+        </div>
+
+        <div v-if="显示胜任详情" class="mask rumor-detail-mask" @click.self="显示胜任详情 = false">
+          <section
+            class="rumor-detail-card competence-detail-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="competence-title"
+          >
+            <button class="sheet-close" type="button" aria-label="关闭胜任详情" @click="显示胜任详情 = false">✕</button>
+            <div class="ui-kicker">MANAGEMENT REVIEW / 胜任账</div>
+            <header class="rumor-detail-head">
+              <span>
+                <small>{{ data.系统._难度 }}难度 · 红线 {{ 胜任红线 }}</small>
+                <h3 id="competence-title">{{ 胜任状态 }}</h3>
+              </span>
+              <b>{{ Math.round(data.胜任度) }}</b>
+            </header>
+            <p class="rumor-summary">
+              {{ 正式通牒中 ? `最后通牒仍在生效，必须在下次考核前恢复到 ${胜任红线 + 1} 以上。` : 胜任状态说明 }}
+            </p>
+
+            <div class="rumor-alerts">
+              <p :class="{ hot: 正式通牒中 }">
+                <b>{{ 正式通牒中 ? '最后通牒' : '考核状态' }}</b>
+                <span>{{ 正式通牒中 ? `第 ${data.系统._通牒期} 期发出` : '当前没有正式通牒' }}</span>
+              </p>
+              <p>
+                <b>下一次考核</b><span>{{ 下一次考核提示 }}</span>
+              </p>
+            </div>
+
+            <section class="rumor-events competence-tasks">
+              <h4>本期待处理</h4>
+              <div v-if="胜任待办.length" class="rumor-event-list">
+                <article v-for="任务 in 胜任待办" :key="任务.id">
+                  <header>
+                    <b>{{ 任务.地点 }} · {{ 任务.模板 }}</b
+                    ><em>{{ 任务.级别 }}</em>
+                  </header>
+                  <small>{{
+                    绝对时段 > 任务.截止时段
+                      ? `已逾期 ${绝对时段 - 任务.截止时段} 时段，可补办`
+                      : `截止时段 ${任务.截止时段}`
+                  }}</small>
+                </article>
+              </div>
+              <p v-else class="rumor-empty">本期没有待处理楼务。</p>
+            </section>
+
+            <section class="rumor-events competence-tasks">
+              <h4>本期已完成</h4>
+              <div v-if="胜任已完成.length" class="rumor-event-list">
+                <article v-for="(事项, index) in 胜任已完成" :key="`${事项.任务}:${事项.地点}:${index}`">
+                  <header>
+                    <b>{{ 事项.地点 }} · {{ 事项.任务 }}</b
+                    ><em>{{ 事项.按期 ? '按期' : '补办' }}</em>
+                  </header>
+                  <small>{{ 事项.方式 }}</small>
+                </article>
+              </div>
+              <p v-else class="rumor-empty">本期还没有完成记录。</p>
+            </section>
+
+            <section class="rumor-events competence-tasks">
+              <h4>最近记分</h4>
+              <div v-if="胜任最近记分.length" class="rumor-event-list">
+                <article v-for="条目 in 胜任最近记分" :key="条目.id">
+                  <header>
+                    <b>{{ 条目.原因 || 条目.类别 }}</b>
+                    <em :class="{ down: 条目.变动 < 0 }">{{ 条目.变动 > 0 ? '+' : '' }}{{ 条目.变动 }}</em>
+                  </header>
+                  <small>第 {{ 条目.考核期 }} 期 · {{ 条目.类别 }}</small>
+                </article>
+              </div>
+              <p v-else class="rumor-empty">还没有可追溯的胜任变化。</p>
+            </section>
+
+            <div class="rumor-guidance">
+              <p>
+                <b>本期正向</b><span>{{ data.系统._管理考核.本期正向 }} / 6</span>
+              </p>
+              <p :class="{ hot: 正式通牒中 }">
+                <b>真实失败主因</b><span>{{ data.系统._管理考核.通牒原因 || '尚未形成' }}</span>
+              </p>
+            </div>
+          </section>
+        </div>
+
+        <div v-if="显示风闻详情" class="mask rumor-detail-mask" @click.self="显示风闻详情 = false">
+          <section
+            class="rumor-detail-card"
+            :class="`rumor-level-${风闻档位}`"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="rumor-detail-title"
+          >
+            <button class="sheet-close" type="button" aria-label="关闭风闻详情" @click="显示风闻详情 = false">✕</button>
+            <div class="ui-kicker">BUILDING TALK / 风闻账</div>
+            <header class="rumor-detail-head">
+              <span>
+                <small>当前档位</small>
+                <h3 id="rumor-detail-title">{{ 风闻状态 }}</h3>
+              </span>
+              <b>{{ Math.round(data.风闻) }}</b>
+            </header>
+            <p class="rumor-summary">{{ 风闻状态说明 }}</p>
+            <p class="rumor-summary"><b>风闻趋势：</b>{{ 风闻趋势 }}</p>
+
+            <div class="rumor-thresholds" aria-label="风闻档位阈值">
+              <span v-for="项 in 风闻阈值" :key="项.值" :class="{ active: 风闻档位 >= 项.档 }">
+                <b>{{ 项.值 }}</b
+                ><small>{{ 项.名 }}</small>
+              </span>
+            </div>
+
+            <div class="rumor-alerts">
+              <p :class="{ hot: 风闻账.危机活跃 }">
+                <b>{{ 风闻账.危机活跃 ? '危机活跃' : '当前无危机' }}</b>
+                <span>{{ 风闻危机提示 }}</span>
+              </p>
+              <p :class="{ hot: 当前投诉存在 }">
+                <b>{{ 当前投诉存在 ? '投诉处理中' : '当前无投诉' }}</b>
+                <span>{{ 当前投诉提示 }}</span>
+              </p>
+            </div>
+
+            <section class="rumor-events">
+              <h4>最近来源</h4>
+              <div v-if="风闻最近事件.length" class="rumor-event-list">
+                <article v-for="事件 in 风闻最近事件" :key="事件.id">
+                  <header>
+                    <b>{{ 风闻事件安全摘要(事件) }}</b>
+                    <em :class="{ down: 事件.增量 < 0 }">{{ 事件.增量 > 0 ? '+' : '' }}{{ 事件.增量 }}</em>
+                  </header>
+                  <small>{{ 风闻事件位置(事件) }}</small>
+                  <p v-if="事件.迹象">{{ 事件.迹象 }}</p>
+                  <footer>
+                    <span>{{ 事件.状态 || '已记录' }}</span>
+                    <span v-if="事件.父亲责任 && 事件.父亲责任 !== '无'">{{ 风闻父亲责任标签(事件) }}</span>
+                  </footer>
+                </article>
+              </div>
+              <p v-else class="rumor-empty">最近没有可追溯的风闻来源。</p>
+            </section>
+
+            <div class="rumor-guidance">
+              <p>
+                <b>自然平息</b><span>{{ 风闻自然平息提示 }}</span>
+              </p>
+              <p>
+                <b>住户聚餐</b><span>{{ 风闻聚餐提示 }}</span>
+              </p>
+            </div>
+          </section>
         </div>
 
         <!-- 头像行:已入住户(焦点亮/在场半亮/离场暗);点开档案 -->
@@ -501,6 +702,7 @@
               'story-adult-cg': 显示成人CG,
               'story-special-interaction': 录像带交互幕 || 静音会议交互幕,
               'story-mute-meeting': 静音会议显示组合图,
+              'story-intimacy-open': 性爱进行中 && 亲密抽屉展开,
             },
           ]"
           :style="[场景色, 场景图样式]"
@@ -653,8 +855,7 @@
               >
                 <Ic n="ops" />
                 <span
-                  ><b>连续点击加档</b
-                  ><small>{{ 静音会议连点计数 }}/{{ 静音会议连点目标 }} · 限时 6 秒</small></span
+                  ><b>连续点击加档</b><small>{{ 静音会议连点计数 }}/{{ 静音会议连点目标 }} · 限时 6 秒</small></span
                 >
               </button>
 
@@ -674,10 +875,7 @@
                 v-if="静音会议互动待操作 && 静音会议互动补偿可用 && !静音会议互动结果"
                 type="button"
                 class="btn rite mute-interaction-assist"
-                :disabled="
-                  (静音会议互动id === 'B' && !静音会议B目标) ||
-                  (静音会议互动id === 'C' && !静音会议C模式)
-                "
+                :disabled="(静音会议互动id === 'B' && !静音会议B目标) || (静音会议互动id === 'C' && !静音会议C模式)"
                 @pointerup.stop.prevent="静音会议互动补偿通过"
               >
                 使用自动通过 · 不改变剧情结果
@@ -691,7 +889,16 @@
               :class="{ loading: 成人CG加载中 }"
               :style="{ '--adult-cg-img': `url(${当前成人CG地址})` }"
             >
-              <img :src="当前成人CG地址" alt="" draggable="false" @load="成人CG已加载" @error="成人CG加载失败" />
+              <img
+                :key="`${当前成人CG?.id}:${当前成人CG请求epoch}`"
+                :src="当前成人CG地址"
+                :data-cg-id="当前成人CG?.id"
+                :data-cg-epoch="当前成人CG请求epoch"
+                alt=""
+                draggable="false"
+                @load="成人CG已加载"
+                @error="成人CG加载失败"
+              />
             </div>
           </Transition>
           <TransitionGroup v-if="立绘显示 && !显示成人CG && !静音会议显示组合图" name="fade">
@@ -708,11 +915,7 @@
             />
           </TransitionGroup>
           <!-- 正文卷轴:只演当前幕,且幕跟着房间走——人走了戏就收,回来戏还在(氛围色随位置) -->
-          <section
-            ref="卷轴容器"
-            class="story"
-            :class="{ 'story-veiled': 正文隐藏 || 录像带交互幕 || 静音会议交互幕 }"
-          >
+          <section ref="卷轴容器" class="story" :class="{ 'story-veiled': 正文隐藏 || 录像带交互幕 || 静音会议交互幕 }">
             <!-- 到场卡:走动后的新场景,给地点一个"开场镜头"(旧正文属于旧场景,隐去) -->
             <div v-if="!在幕中 && !发送中" class="arrive">
               <div class="ui-kicker">{{ 当前房间 ? 'ARRIVE / 到场' : 'HALLWAY / 楼道' }}</div>
@@ -787,6 +990,145 @@
               </p>
             </div>
           </section>
+          <div
+            v-if="性爱进行中"
+            class="intimacy-stage-dock"
+            :class="{ open: 亲密抽屉展开, critical: data.玩家资源.体力.当前值 <= 1 }"
+            @click.self="亲密抽屉展开 = false"
+          >
+            <Transition name="intimacy-sheet">
+              <section v-if="亲密抽屉展开" class="intimacy-panel" role="region" aria-label="亲密场景详细操作">
+                <header>
+                  <span><small>PRIVATE SCENE</small><b>参与者与收尾</b></span>
+                  <button
+                    type="button"
+                    class="intimacy-collapse"
+                    aria-label="收起亲密场景详情"
+                    @click="亲密抽屉展开 = false"
+                  >
+                    收起
+                  </button>
+                </header>
+                <div class="intimacy-people">
+                  <article
+                    v-for="项 in 性爱参与者列表"
+                    :key="项.门牌"
+                    :class="{
+                      satisfied: 项.满意度 >= 项.满意目标,
+                      focused: 项.门牌 === 性爱主焦点?.门牌,
+                      disabled: 发送中 || 性爱待失控收尾,
+                    }"
+                    :role="发送中 || 性爱待失控收尾 ? undefined : 'button'"
+                    :tabindex="发送中 || 性爱待失控收尾 ? undefined : 0"
+                    :aria-label="`将${项.妻名}设为主焦点`"
+                    @click="切换亲密主焦点(项.门牌)"
+                    @keydown.enter.prevent="切换亲密主焦点(项.门牌)"
+                    @keydown.space.prevent="切换亲密主焦点(项.门牌)"
+                  >
+                    <span class="intimacy-avatar">
+                      <img
+                        v-if="!头像失效[项.妻名]"
+                        :src="头像图(项.妻名)"
+                        :alt="项.妻名"
+                        @error="头像失效[项.妻名] = true"
+                      />
+                      <b v-else>{{ 项.妻名[0] }}</b>
+                    </span>
+                    <span class="intimacy-satisfaction">
+                      <span class="intimacy-person-title">
+                        <b>{{ 项.妻名 }}</b>
+                        <em v-if="项.门牌 === 性爱主焦点?.门牌">主焦点</em>
+                        <em v-else-if="项.满意度 >= 项.满意目标" class="complete">已完成</em>
+                      </span>
+                      <span class="petals" :aria-label="`满意度 ${项.满意度}/${项.满意目标}`">
+                        <i v-for="n in 项.满意目标" :key="n" :class="{ on: n <= 项.满意度 }">◆</i>
+                      </span>
+                      <small
+                        >{{ 项.满意度 }}/{{ 项.满意目标 }} ·
+                        {{ 项.满意度 >= 项.满意目标 ? '已经满足' : '等待推进' }}</small
+                      >
+                      <small v-if="项.偏好命中.length" class="intimacy-preference hit"
+                        >偏好 +{{ 项.偏好命中.length }} · {{ 项.偏好命中.join(' / ') }}</small
+                      >
+                      <small v-else class="intimacy-preference">偏好尚未命中</small>
+                    </span>
+                  </article>
+                </div>
+                <div class="intimacy-meta">
+                  <span
+                    >主焦点 <b>{{ 性爱主焦点?.妻名 || '未指定' }}</b></span
+                  >
+                  <span
+                    >行为 <b>{{ 性爱场景.当前行为 }}</b></span
+                  >
+                  <span
+                    >部位 <b>{{ 性爱场景.当前接触部位 }}</b></span
+                  >
+                  <span
+                    >保护 <b>{{ 性爱场景.保护状态 }}</b></span
+                  >
+                </div>
+                <p v-if="性爱待失控收尾" class="intimacy-warning">
+                  体力已经耗尽。本次会按当前行为在“{{ 性爱场景.待收尾位置 || 默认失控位置(性爱场景) }}”失控收尾。
+                </p>
+                <p v-else-if="data.玩家资源.体力.当前值 === 1" class="intimacy-warning">
+                  继续一次将耗尽体力；若不主动收尾，将按当前行为失控结束。
+                </p>
+                <div class="intimacy-finishes">
+                  <button
+                    v-if="性爱待失控收尾"
+                    class="finish-tile danger"
+                    type="button"
+                    :disabled="发送中"
+                    @click="确认失控收尾"
+                  >
+                    演出失控收尾
+                  </button>
+                  <template v-else>
+                    <small class="intimacy-finish-label">射精部位</small>
+                    <button
+                      v-for="位置 in 收尾选项"
+                      :key="位置"
+                      class="finish-tile"
+                      :class="{ selected: 待确认收尾位置 === 位置 }"
+                      type="button"
+                      :disabled="发送中"
+                      @click="选择亲密收尾(位置)"
+                    >
+                      {{ 位置 }}
+                    </button>
+                    <button
+                      v-if="待确认收尾位置"
+                      class="finish-tile confirm"
+                      type="button"
+                      :disabled="发送中"
+                      @click="确认亲密收尾"
+                    >
+                      确认 · {{ 待确认收尾位置 }}
+                    </button>
+                  </template>
+                </div>
+              </section>
+            </Transition>
+            <button
+              type="button"
+              class="intimacy-summary"
+              :aria-expanded="亲密抽屉展开"
+              :disabled="发送中"
+              @click="亲密抽屉展开 = !亲密抽屉展开"
+            >
+              <span class="intimacy-summary-copy">
+                <small>亲密场景</small>
+                <b>{{ 性爱主焦点?.妻名 || '选择主焦点' }}</b>
+              </span>
+              <span class="intimacy-summary-progress">
+                <b>{{ 性爱已完成人数 }}/{{ 性爱参与者列表.length }}</b>
+                <small>已完成</small>
+              </span>
+              <span class="intimacy-summary-stamina">体力 {{ data.玩家资源.体力.当前值 }}/{{ 体力上限 }}</span>
+              <span class="intimacy-summary-action">{{ 亲密抽屉展开 ? '收起' : '管理' }}</span>
+            </button>
+          </div>
         </div>
 
         <!-- 场景条(在场者=头像徽章,一眼认人) -->
@@ -819,11 +1161,52 @@
           <span><b>会场已锁定</b>会议进行中，无法离开管理员室；手机会在允许的拍间保持可用。</span>
         </div>
 
+        <transition name="scene-result">
+          <section v-if="显示性爱结果卡 && !性爱进行中" class="scene-result-card" role="status" aria-live="polite">
+            <header>
+              <span><small>SCENE RESULT</small><b>亲密结果</b></span>
+              <em>{{ 上次性爱结果.结束方式 || '场景结束' }}</em>
+            </header>
+            <div class="scene-result-meta">
+              <span
+                >有效楼数 <b>{{ 上次性爱结果.有效楼数 }}</b></span
+              >
+              <span
+                >收尾 <b>{{ 上次性爱结果.最终位置 || '未记录' }}</b></span
+              >
+              <span
+                >保护 <b>{{ 上次性爱结果.保护状态 || '未记录' }}</b></span
+              >
+            </div>
+            <div class="scene-result-people">
+              <article v-for="项 in 性爱结果参与者列表" :key="项.门牌" :class="`duration-${项.时长评价}`">
+                <span class="intimacy-avatar">
+                  <img
+                    v-if="!头像失效[项.妻名]"
+                    :src="头像图(项.妻名)"
+                    :alt="项.妻名"
+                    @error="头像失效[项.妻名] = true"
+                  />
+                  <b v-else>{{ 项.妻名[0] }}</b>
+                </span>
+                <span class="scene-result-copy">
+                  <span
+                    ><b>{{ 项.妻名 }}</b
+                    ><strong>{{ 项.时长评价 }}</strong></span
+                  >
+                  <small>满意度 {{ 项.满意度 }}/{{ 项.满意目标 }}</small>
+                  <p>{{ 项.结局态度 }}</p>
+                  <small class="scene-result-preference"
+                    >偏好：{{ 项.偏好命中.length ? 项.偏好命中.join(' / ') : '本场未命中' }}</small
+                  >
+                </span>
+              </article>
+            </div>
+          </section>
+        </transition>
+
         <!-- 房内动作(输入门控收紧后的补位:站在垃圾房/空户里,翻袋撬门不用开地图) -->
-        <div
-          v-if="!静音会议正式中 && !发送中 && 当前房间 === '垃圾房' && 垃圾袋列表.length"
-          class="garbage-pick"
-        >
+        <div v-if="!静音会议正式中 && !发送中 && 当前房间 === '垃圾房' && 垃圾袋列表.length" class="garbage-pick">
           <button class="tile risky garbage-open" @click="垃圾选择开 = true">
             <Ic n="trash" />
             <span class="act-kicker">SEARCH</span>
@@ -876,13 +1259,7 @@
 
         <!-- 行动选项(AI 每轮给 4 条,点了直接发送;gal 式居中选择条,纸条底=AI 水彩件) -->
         <div
-          v-if="
-            显示选项 &&
-            !录像带中 &&
-            !静音会议交互幕 &&
-            !静音会议待散会选择 &&
-            !静音会议自由待选择
-          "
+          v-if="显示选项 && !录像带中 && !静音会议交互幕 && !静音会议待散会选择 && !静音会议自由待选择"
           class="option-row"
           :style="{ '--opt-img': `url(${素材基址}/界面/选项条.webp)` }"
         >
@@ -957,9 +1334,7 @@
             <span>AFTER HOURS · 会后自由段</span>
             <b>这场会由你决定何时结束</b>
           </div>
-          <p>
-            已完成至少三拍会后活动。继续不会设置回合上限；结束会先生成最终收尾，成功后才结算并恢复日常。
-          </p>
+          <p>已完成至少三拍会后活动。继续不会设置回合上限；结束会先生成最终收尾，成功后才结算并恢复日常。</p>
           <div class="mute-free-actions">
             <button class="btn" type="button" @click="继续静音会议会后活动">继续会后活动</button>
             <button class="btn rite" type="button" @click="请求结束静音会议">结束本次会议</button>
@@ -981,19 +1356,19 @@
           <textarea
             ref="输入框"
             v-model="输入文本"
+            :disabled="发送中 || 由头写入中"
             rows="2"
             placeholder="你的言行……(Enter 发送,Shift+Enter 换行)"
             @keydown.enter.exact.prevent="发送"
             @focus="输入聚焦"
             @blur="输入失焦"
           ></textarea>
-          <button
-            class="btn rite quill-btn"
-            :disabled="发送中 || 由头写入中 || !当前行动可提交"
-            @click="发送"
-          >
+          <button class="btn rite quill-btn" :disabled="发送中 || 由头写入中 || !当前行动可提交" @click="发送">
             {{ 发送中 ? '…' : 发送按钮文案 }}
           </button>
+          <small v-if="输入文本.trim() && !当前资源门槛.可行动" class="resource-lock-hint">
+            {{ 当前资源门槛.提示 }}
+          </small>
         </div>
         <div v-if="!静音会议正式中 && 可重掷 && !发送中 && 当前房间 === 回合房间" class="reroll-row">
           <button class="btn" title="撤回本回合(你的行动与回应),重新措辞" @click="撤回">⌫ 撤回</button>
@@ -1017,7 +1392,7 @@
           <button
             class="dock-btn"
             :disabled="静音会议正式中"
-            :title="静音会议正式中 ? '会议期间不能打开商店' : '网购商城,次日达到管理员室'"
+            :title="静音会议正式中 ? '会议期间不能打开商店' : '网购商城,小时达,本时段内送到管理员室'"
             @click="显示商店 = true"
           >
             <Ic n="cart" /><span>商店</span>
@@ -1071,7 +1446,8 @@
           <div class="map-banner">
             <div class="ui-kicker">WUTONGLI APARTMENT / FIELD MAP</div>
             <div class="mb-line">
-              <b>第 {{ 天数 }} 天</b><em>{{ 时段问候 }}</em>
+              <b>第 {{ 天数 }} 天 · {{ 星期 }}</b
+              ><em>{{ 时段问候 }}</em>
             </div>
           </div>
 
@@ -1096,6 +1472,12 @@
               >
                 <span class="spot-plate">{{ 点.名 }}</span>
                 <span v-if="点.空置" class="spot-note">招租</span>
+                <span
+                  v-else-if="管理任务角标(点.id)"
+                  class="spot-note duty"
+                  :class="{ overdue: 管理任务角标(点.id) === '逾期' }"
+                  >{{ 管理任务角标(点.id) }}</span
+                >
                 <span v-else-if="欠租中(点.id)" class="spot-note owe">欠租</span>
                 <span v-else-if="当前房间 === 点.id || 房内的人(点.id).length" class="spot-faces">
                   <img
@@ -1158,6 +1540,12 @@
               </div>
             </div>
           </div>
+
+          <button class="outing-launch" type="button" :disabled="发送中" @click="从地图外出">
+            <span><small>OUTING / 外出</small><b>走出公寓</b></span>
+            <em>晨跑 · 健身房 · 更多地点准备中</em>
+            <Ic n="arrow" />
+          </button>
 
           <!-- 房间弹窗(gal 式:遮罩层+居中卡;hero 色带头+瓷砖大按钮;翻垃圾/撬门都在这里) -->
           <transition name="card-pop">
@@ -1225,10 +1613,10 @@
               <span class="dossier-id">
                 <span class="dossier-role">ROOM {{ 选中档案.门牌 }} · RESIDENT FILE</span>
                 <span class="dossier-name">{{ 选中档案.妻名 }}</span>
-                <span class="hearts" :title="'阶段:' + 选中档案.妻.阶段标题">
+                <span class="hearts" :title="'阶段:' + 选中档案.阶段标题">
                   <i v-for="n in 5" :key="n" :class="{ on: n <= 选中档案.妻.当前阶段 }">♥</i>
                 </span>
-                <span class="dossier-stage" :title="选中档案.妻.阶段标题">{{ 选中档案.妻.阶段标题 }}</span>
+                <span class="dossier-stage" :title="选中档案.阶段标题">{{ 选中档案.阶段标题 }}</span>
               </span>
             </div>
             <div class="dossier-portrait" aria-hidden="true">
@@ -1260,12 +1648,12 @@
             </div>
           </div>
 
-          <template v-if="选中档案.妻.情报可见">
+          <template v-if="选中档案.妻.裂缝.已确认">
             <div class="dsec dossier-card mind-card">
               <div class="dsec-title">心 镜</div>
               <p class="dline"><b>情绪</b> {{ 选中档案.妻.当前情绪 }}</p>
               <p v-if="选中档案.妻.当前心理想法" class="dline"><b>心声</b> {{ 选中档案.妻.当前心理想法 }}</p>
-              <p v-if="选中档案.妻.气质描述" class="dline"><b>气质</b> {{ 选中档案.妻.气质描述 }}</p>
+              <p v-if="选中档案.气质描述" class="dline"><b>气质</b> {{ 选中档案.气质描述 }}</p>
             </div>
             <div class="dsec dossier-card attire-card">
               <div class="dsec-title"><span>仪 容</span><small>当前穿戴</small></div>
@@ -1413,14 +1801,20 @@
             <p class="dline crack-hint">✦ {{ 选中裂缝.对症提示 }}</p>
           </div>
 
-          <button v-if="选中关系线索" class="btn relation-clue-open" type="button" @click="显示关系线索 = !显示关系线索">
+          <button
+            v-if="选中关系线索"
+            class="btn relation-clue-open"
+            type="button"
+            @click="显示关系线索 = !显示关系线索"
+          >
             ◇ 关系线索 {{ 选中关系线索.进度 }}/4 <span>{{ 显示关系线索 ? '收起' : '查看' }}</span>
           </button>
           <div v-if="显示关系线索 && 选中关系线索" class="dsec relation-clue-board">
             <div class="dsec-title">{{ 选中关系线索.标题 }}</div>
             <p class="relation-aside">· {{ 选中关系线索.侧写 }}</p>
             <div v-for="(线索, i) in 选中关系线索.线索" :key="i" class="relation-clue" :class="{ done: 线索.完成 }">
-              <i>{{ 线索.完成 ? '✓' : '◇' }}</i><span>{{ 线索.文案 }}</span>
+              <i>{{ 线索.完成 ? '✓' : '◇' }}</i
+              ><span>{{ 线索.文案 }}</span>
             </div>
             <p v-if="选中关系线索.数值已冻结" class="relation-wait">她似乎还有一件事没有想明白。</p>
           </div>
@@ -1430,7 +1824,7 @@
             :disabled="发送中 || !选中可晋阶"
             @click="晋阶(选中档案.门牌)"
           >
-            ✦ 跨过界线
+            {{ 选中首夜待晚上 ? '✦ 等到晚上' : '✦ 跨过界线' }}
           </button>
           <button
             v-if="选中可要钱"
@@ -1517,26 +1911,40 @@
               <span class="ware-acts">
                 <button v-if="项.可读信" class="btn mini" :disabled="发送中" @click="打开信(项.信门牌!)">读</button>
                 <button v-if="项.可布设" class="btn mini" :disabled="发送中" @click="布设()">装在这个房间</button>
-                <button v-if="项.可用运作" class="btn mini" :disabled="发送中" @click="用运作(项.id)">使用</button>
+                <button v-if="项.可用资源" class="btn mini rite" :disabled="发送中" @click="用资源道具(项.id)">
+                  使用
+                </button>
+                <button
+                  v-if="项.可用运作"
+                  class="btn mini"
+                  :disabled="发送中"
+                  @click="用运作(项.id, 项.全局线路候选?.门牌, 项.全局线路候选)"
+                >
+                  {{ 项.全局线路候选 ? `用于${户静态表[项.全局线路候选.门牌].妻名}的线索` : '使用' }}
+                </button>
                 <button v-if="项.可使用录像带" class="btn mini rite" :disabled="发送中" @click="使用录像带">
                   在管理员室播放
                 </button>
-                <button
-                  v-if="项.可筹备静音会议"
-                  class="btn mini rite"
-                  :disabled="发送中"
-                  @click="打开静音会议筹备"
-                >
+                <button v-if="项.可筹备静音会议" class="btn mini rite" :disabled="发送中" @click="打开静音会议筹备">
                   筹备会议
                 </button>
                 <button
                   v-for="夫 in 项.运作对象"
                   :key="'运' + 夫.门牌"
                   class="btn mini"
-                  :disabled="发送中"
+                  :disabled="发送中 || !夫.时段可用"
                   @click="用运作(项.id, 夫.门牌)"
                 >
-                  给{{ 夫.夫名 }}
+                  {{ 夫.时段可用 ? `给${夫.夫名}` : `晚上再给${夫.夫名}` }}
+                </button>
+                <button
+                  v-for="候选 in 项.全局运作对象"
+                  :key="'线运' + 项.id + 候选.门牌"
+                  class="btn mini"
+                  :disabled="发送中"
+                  @click="用运作(项.id, 候选.门牌, 候选)"
+                >
+                  用于{{ 户静态表[候选.门牌].妻名 }}的线索
                 </button>
                 <button
                   v-for="妻 in 项.可送对象"
@@ -1551,10 +1959,11 @@
                   v-for="妻 in 项.可装载对象"
                   :key="'载' + 妻.门牌"
                   class="btn mini"
-                  :disabled="发送中"
+                  :disabled="发送中 || !妻.时段可用"
+                  :title="妻.时段提示"
                   @click="装载(项.id, 妻.门牌)"
                 >
-                  装载给{{ 妻.妻名 }}
+                  {{ 妻.时段可用 ? `装载给${妻.妻名}` : `${妻.时段提示}再装载` }}
                 </button>
               </span>
             </div>
@@ -1658,12 +2067,7 @@
               </ul>
             </div>
             <footer class="mute-prep-footer confirm">
-              <button
-                class="btn"
-                type="button"
-                :disabled="静音会议筹备提交中"
-                @click="静音会议筹备步骤 = '选择'"
-              >
+              <button class="btn" type="button" :disabled="静音会议筹备提交中" @click="静音会议筹备步骤 = '选择'">
                 返回修改
               </button>
               <button
@@ -1679,14 +2083,14 @@
         </section>
       </div>
 
-      <!-- ═══════════ 商店(次日达网购;礼物页签=裂缝解锁后现,商店自己就是进度条) ═══════════ -->
+      <!-- ═══════════ 商店(小时达网购;购买成功立即入包;礼物页签=裂缝解锁后现) ═══════════ -->
       <div v-if="显示商店" class="mask" @click.self="显示商店 = false">
         <div class="sheet shop">
           <button class="sheet-close" @click="显示商店 = false">✕</button>
           <div class="shop-hero">
             <div class="ui-kicker light">WUTONGLI MALL / 网购商城</div>
             <b>商 店</b>
-            <em>次日达 · 送到管理员室</em>
+            <em>小时达 · 本时段内送到管理员室</em>
             <span class="shop-cash">¥ {{ data.现金 }}</span>
           </div>
           <div class="shop-tabs">
@@ -1701,7 +2105,12 @@
             </button>
           </div>
           <div class="sheet-body shop-grid">
-            <div v-for="项 in 当前货架" :key="项.id" class="ware-card" :class="'ware-' + 道具视觉信息(项).类">
+            <div
+              v-for="项 in 当前货架"
+              :key="项.id"
+              class="ware-card"
+              :class="['ware-' + 道具视觉信息(项).类, { locked: 商品锁定原因(项).length }]"
+            >
               <span class="ware-pic">
                 <img
                   v-if="!道具图失效[项.id]"
@@ -1720,9 +2129,14 @@
                   <em class="ware-price">¥{{ 项.价格 }}</em></b
                 >
                 <span class="ware-desc">{{ 项.描述 }}</span>
+                <span v-if="商品锁定原因(项).length" class="ware-lock">尚缺：{{ 商品锁定原因(项).join('；') }}</span>
               </span>
-              <button class="btn rite ware-buy" :disabled="发送中 || data.现金 < (项.价格 ?? 0)" @click="买(项.id)">
-                {{ data.现金 < (项.价格 ?? 0) ? '钱不够' : '买下' }}
+              <button
+                class="btn rite ware-buy"
+                :disabled="发送中 || data.现金 < (项.价格 ?? 0) || 商品锁定原因(项).length > 0"
+                @click="买(项.id)"
+              >
+                {{ 商品锁定原因(项).length ? '未解锁' : data.现金 < (项.价格 ?? 0) ? '钱不够' : 商品购买文案(项) }}
               </button>
             </div>
             <p v-if="!当前货架.length" class="hint center">{{ 当前空文案 }}</p>
@@ -1872,6 +2286,7 @@
 import { compare } from 'compare-versions';
 import type { FunctionalComponent } from 'vue';
 
+import { 读取MVU解析状态, type MVU解析状态 } from '../../MVU解析模式';
 import type { SchemaType } from '../../schema';
 import {
   获取静音会议回退状态序列,
@@ -1891,38 +2306,74 @@ import {
   查特殊场景,
   查裂缝,
   查道具,
-  荣耀洞冷却楼,
+  经济配置,
+  荣耀洞冷却时段,
+  特殊场景锁定状态,
+  阶段标题,
   道具表,
   门牌列表,
   难度表,
   type 道具配置,
   type 门牌,
 } from '../../stageConfig';
-import { 丈夫在楼, 妻位置推算, 当前天数, 当前时段 } from '../../脚本/游戏逻辑/楼层时钟';
+import { 妻基础位置, 解析绝对时段 } from '../../周作息';
+import { 丈夫在楼 } from '../../脚本/游戏逻辑/楼层时钟';
 import {
   应用数据库填表兼容设置,
   安装人妻公寓数据库模板,
   打开数据库设置,
   数据库状态,
-  智脑状态,
 } from '../../脚本/游戏逻辑/数据库桥';
 import { 查金币 } from '../../脚本/游戏逻辑/经济系统';
-import { 可晋阶 } from '../../脚本/游戏逻辑/结算系统';
-import { 读取关系线索 } from '../../脚本/游戏逻辑/阶段线路系统';
-import { 获取静音会议手机状态 } from '../../脚本/游戏逻辑/手机系统';
+import { 列出地点管理任务, 管理任务选项 } from '../../脚本/游戏逻辑/管理任务系统';
+import { 可晋阶, 可启动母亲药物首夜, 普通首夜时段已满足 } from '../../脚本/游戏逻辑/结算系统';
+import { 规范荣耀洞上次时段 } from '../../脚本/游戏逻辑/荣耀洞';
+import { 读取关系线索, 列出阶段线路候选详情, type 阶段线路候选 } from '../../脚本/游戏逻辑/阶段线路系统';
+import { 当前聊天ID, 获取静音会议手机状态 } from '../../脚本/游戏逻辑/手机系统';
+import { 手机锚消息签名 } from '../../脚本/游戏逻辑/手机时间线租约';
+import { 判定时间撤销点, 是时间撤销地点, 时间撤销点键 } from '../../脚本/游戏逻辑/时间撤销系统';
+import { 风闻事件安全摘要 } from '../../脚本/游戏逻辑/风闻系统';
+import { 当前预设正文标签 as 读取当前预设正文标签 } from '../../脚本/游戏逻辑/预设桥';
+import { 清洗预设输出, type 预设正文标签 } from '../../脚本/游戏逻辑/预设输出兼容';
+import {
+  行动资源门槛,
+  行动疑似性爱,
+  距离下级经验,
+  玩家当前日,
+  资源上限,
+  资源等级,
+  默认失控位置,
+  亲密收尾选项 as 构造亲密收尾选项,
+} from '../../脚本/游戏逻辑/玩家资源系统';
 import {
   CG条目,
+  判定CG部位,
+  判定CG阶段,
   角色CG列表,
   角色CG总数,
+  应保留成人CG,
   选择成人CG,
   type CG回合信号,
   type CG阶段,
   type 成人CG项,
 } from '../../脚本/游戏逻辑/成人CG系统';
 import { useDataStore } from './store';
+import { CG加载事件属于当前请求 } from './cgLoadState';
+import { 计算场景同步, type 场景聊天状态 } from './场景状态同步';
+import { 读取录像带连点失败状态, 推进录像带连点失败 } from './录像带交互状态';
 import 录像带双屏关闭图 from '../../素材/特殊场景/录像带/01_双屏关闭.png?url';
 import 录像带左屏亮起图 from '../../素材/特殊场景/录像带/02_左屏亮起.png?url';
 import 录像带双屏亮起图 from '../../素材/特殊场景/录像带/03_双屏亮起.png?url';
+import 公寓外部背景图 from '../../素材/背景/公寓外部.webp?url';
+import 晨跑公园背景图 from '../../素材/背景/晨跑公园.webp?url';
+import 健身房背景图 from '../../素材/背景/健身房.webp?url';
+import 清醒咖啡道具图 from '../../素材/道具/清醒咖啡.webp?url';
+import 集中胶囊道具图 from '../../素材/道具/集中胶囊.webp?url';
+import 运动饮料道具图 from '../../素材/道具/运动饮料.webp?url';
+import 强效营养剂道具图 from '../../素材/道具/强效营养剂.webp?url';
+import 安全套道具图 from '../../素材/道具/安全套.webp?url';
+import 专注训练手册道具图 from '../../素材/道具/专注训练手册.webp?url';
+import 蛋白粉道具图 from '../../素材/道具/蛋白粉.webp?url';
 import { 同步画幅 } from './viewport';
 
 // ── 梧桐里主题图标：统一 24×24 圆角描边，公寓门牌/钥匙孔/信件等语义贯穿全套 ──
@@ -1982,6 +2433,109 @@ Ic.props = ['n'];
 const store = useDataStore();
 // defineMvuDataStore 的 Pinia 泛型在 SFC 里推断失败(已知误报,见 ShopPanel 先例),显式标回
 const data = computed(() => (store as unknown as { data: SchemaType }).data);
+const 胜任红线 = computed(() => 难度表[data.value.系统._难度]?.胜任度红线 ?? 难度表.标准.胜任度红线);
+const 正式通牒中 = computed(() => data.value.系统._通牒期 >= 0);
+const 胜任状态 = computed(() => {
+  if (正式通牒中.value) return '通牒';
+  const 距离 = data.value.胜任度 - 胜任红线.value;
+  return 距离 <= 9 ? '危险' : 距离 <= 19 ? '不满' : 距离 <= 29 ? '平淡' : '满意';
+});
+const 胜任状态说明 = computed(() => {
+  const 距离 = Math.round(data.value.胜任度 - 胜任红线.value);
+  if (距离 <= 0) return `当前比红线低 ${Math.abs(距离)} 点；正式通牒只在考核结算后发出。`;
+  if (距离 <= 9) return `距离红线只剩 ${距离} 点，优先完成楼务并接听父亲来电。`;
+  return `当前高于红线 ${距离} 点；按期处理楼务可以继续稳定评价。`;
+});
+const 显示胜任详情 = ref(false);
+const 下一次考核提示 = computed(() => {
+  const 期长 = 经济配置.收租周期时段;
+  const 下一期界 = (Math.floor(绝对时段.value / 期长) + 1) * 期长;
+  return `时段 ${下一期界}，尚余 ${Math.max(0, 下一期界 - 绝对时段.value)} 时段`;
+});
+const 胜任待办 = computed(() =>
+  [...data.value.系统._管理考核.活跃任务].sort(
+    (a, b) => Number(a.逾期已扣) - Number(b.逾期已扣) || a.截止时段 - b.截止时段 || a.id.localeCompare(b.id),
+  ),
+);
+const 胜任已完成 = computed(() => [...data.value.系统._管理考核.本期完成摘要].slice(-3).reverse());
+const 胜任最近记分 = computed(() =>
+  [...data.value.系统._管理考核.记分条目].sort((a, b) => b.时段 - a.时段 || b.考核期 - a.考核期).slice(0, 5),
+);
+
+type 风闻账视图 = SchemaType['系统']['_风闻账'];
+type 风闻事件视图 = 风闻账视图['最近事件'][number];
+
+const 风闻阈值 = [
+  { 档: 1, 值: 25, 名: '留意' },
+  { 档: 2, 值: 50, 名: '议论' },
+  { 档: 3, 值: 75, 名: '盯防' },
+  { 档: 4, 值: 100, 名: '危机' },
+] as const;
+const 显示风闻详情 = ref(false);
+const 风闻档位 = computed(() => {
+  const 值 = Math.max(0, Math.min(100, Math.round(Number(data.value.风闻) || 0)));
+  return 值 >= 100 ? 4 : 值 >= 75 ? 3 : 值 >= 50 ? 2 : 值 >= 25 ? 1 : 0;
+});
+const 风闻状态 = computed(() => ['平静', '留意', '议论', '盯防', '危机'][风闻档位.value] ?? '平静');
+const 风闻状态说明 = computed(
+  () =>
+    [
+      '楼内没有形成可追溯的议论。',
+      '有人开始留意异常，但还没有集中讨论。',
+      '楼里的公开议论已经形成，新的来源会继续推高风闻。',
+      '住户开始盯防异常，正式投诉可能随时出现。',
+      '风闻已经形成危机，当前投诉需要优先处置。',
+    ][风闻档位.value] ?? '楼内没有形成可追溯的议论。',
+);
+const 风闻账 = computed<风闻账视图>(() => data.value.系统._风闻账);
+const 风闻趋势 = computed(() => {
+  const 当前日 = Math.floor(绝对时段.value / 6);
+  if (风闻账.value.最后新增日 === 当前日) return '本日出现了新的公开来源，暂不会自然平息。';
+  const 下限 = 风闻账.value.危机活跃 ? 50 : 风闻账.value.当前投诉事件.trim() ? 25 : 0;
+  if (data.value.风闻 <= 下限 && 下限 > 0) return `受未处理事件限制，当前维持在 ${下限} 点下限。`;
+  if (data.value.风闻 <= 0) return '平稳。';
+  return '下降中；完整一天没有新增来源时会继续自然平息。';
+});
+const 风闻最近事件 = computed(() =>
+  [...风闻账.value.最近事件].sort((左, 右) => Number(右.时段) - Number(左.时段)).slice(0, 3),
+);
+const 当前投诉记录 = computed<风闻事件视图 | null>(() => {
+  const id = 风闻账.value.当前投诉事件.trim();
+  return id ? (风闻账.value.最近事件.find(事件 => 事件.id === id) ?? null) : null;
+});
+const 当前投诉存在 = computed(() => Boolean(风闻账.value.当前投诉事件.trim()));
+const 当前投诉提示 = computed(() => {
+  const 当前 = 风闻账.value.当前投诉事件.trim();
+  if (!当前) return '没有住户投诉正在等待处理。';
+  return 当前投诉记录.value ? 风闻事件安全摘要(当前投诉记录.value) : `事件 ${当前} 正在等待处理。`;
+});
+const 风闻危机提示 = computed(() =>
+  风闻账.value.危机活跃 ? '先处理当前危机投诉；未处理期间风闻不得低于 50。' : '目前没有需要立即处置的风闻危机。',
+);
+const 风闻自然平息提示 = computed(() => {
+  if (data.value.风闻 <= 0) return '当前无需平息，避免制造新的公开来源。';
+  const 每日降低 = data.value.风闻 < 50 ? 4 : data.value.风闻 < 75 ? 2 : 1;
+  const 下限 = 风闻账.value.危机活跃 ? 50 : 当前投诉存在.value ? 25 : 0;
+  return `完整一天没有新增来源时降低 ${每日降低} 点${下限 > 0 ? `；当前事件未处理前不得低于 ${下限}` : ''}。`;
+});
+const 风闻聚餐提示 = computed(() => {
+  const 冷却至 = 风闻账.value.聚餐冷却至;
+  if (冷却至 < 0 || 绝对时段.value >= 冷却至) return '聚餐调节已经可用，触发入口以地图或事件提示为准。';
+  const 信息 = 解析绝对时段(冷却至);
+  return `仍在冷却，第 ${信息.天数} 天 ${信息.星期} ${信息.时段} 后可再次安排。`;
+});
+
+function 风闻事件位置(事件: 风闻事件视图): string {
+  const 信息 = 解析绝对时段(Math.max(0, Number(事件.时段) || 0));
+  const 位置 = [事件.门牌 ? `${事件.门牌}室` : '', 事件.地点].filter(Boolean).join(' / ');
+  return `第 ${信息.天数} 天 ${信息.时段}${位置 ? ` / ${位置}` : ''}`;
+}
+
+function 风闻父亲责任标签(事件: 风闻事件视图): string {
+  if (事件.父亲责任 === '母亲已圆场') return '母亲已圆场';
+  if (事件.父亲责任 === '已计责') return '父亲已计责';
+  return '尚未传给父亲';
+}
 
 /** 数据就绪守卫:store 兜底为 {} 时不裸渲染 */
 const 就绪 = computed(() => Boolean(data.value?.系统 && data.value?.户));
@@ -1991,35 +2545,133 @@ const 就绪 = computed(() => Boolean(data.value?.系统 && data.value?.户));
 const 脚本存活 = ref(true);
 let 心跳timer: ReturnType<typeof setInterval> | undefined;
 
-// ── 楼层时钟 ──
+// ── 世界周历与消息历史 ──
 
 const 末楼号 = ref(0);
-/** 杀时间偏移(MVU 持久,与脚本同一本账):一切时间读数=真实楼层+偏移 */
-const 偏移楼 = computed(() => data.value?.系统?._时段偏移楼 ?? 0);
-const 钟楼号 = computed(() => 末楼号.value + 偏移楼.value);
-const 时段 = computed(() => 当前时段(钟楼号.value));
-const 天数 = computed(() => 当前天数(钟楼号.value));
+const 时间信息 = computed(() =>
+  解析绝对时段(Number((data.value?.系统 as { _绝对时段?: number } | undefined)?._绝对时段 ?? 0)),
+);
+const 绝对时段 = computed(() => 时间信息.value.绝对时段);
+const 时段 = computed(() => 时间信息.value.时段);
+const 天数 = computed(() => 时间信息.value.天数);
+const 周数 = computed(() => 时间信息.value.周数);
+const 星期 = computed(() => 时间信息.value.星期);
+
+// ── 玩家精力 / 体力与本场满意度 ──
+
+const 显示资源详情 = ref<'精力' | '体力' | null>(null);
+const 精力上限 = computed(() => 资源上限(data.value, '精力'));
+const 体力上限 = computed(() => 资源上限(data.value, '体力'));
+const 精力等级 = computed(() => 资源等级(data.value.玩家资源.精力.训练经验));
+const 体力等级 = computed(() => 资源等级(data.value.玩家资源.体力.训练经验));
+const 精力格数 = computed(() => Math.round((data.value.玩家资源.精力.当前值 / Math.max(1, 精力上限.value)) * 10));
+const 体力格数 = computed(() => Math.round((data.value.玩家资源.体力.当前值 / Math.max(1, 体力上限.value)) * 10));
+const 性爱场景 = computed(() => data.value.系统._性爱场景);
+const 上次性爱结果 = computed(() => data.value.系统._上次性爱结果);
+const 性爱进行中 = computed(() => 性爱场景.value.状态 !== '空闲');
+const 性爱待失控收尾 = computed(() => 性爱场景.value.状态 === '收尾中');
+const 待确认收尾位置 = ref('');
+const 亲密抽屉展开 = ref(false);
+const 显示性爱结果卡 = ref(false);
+let 性爱结果timer: ReturnType<typeof setTimeout> | undefined;
+watch(
+  () => [
+    性爱场景.value.场次标识,
+    性爱场景.value.状态,
+    性爱场景.value.有效楼数,
+    性爱场景.value.当前行为,
+    性爱场景.value.保护状态,
+  ],
+  (新值, 旧值) => {
+    待确认收尾位置.value = '';
+    if (新值[0] !== 旧值?.[0]) 亲密抽屉展开.value = false;
+  },
+);
+watch(
+  () => 上次性爱结果.value.场次标识,
+  (新标识, 旧标识) => {
+    if (!新标识 || 新标识 === 旧标识) return;
+    clearTimeout(性爱结果timer);
+    显示性爱结果卡.value = true;
+    性爱结果timer = setTimeout(() => (显示性爱结果卡.value = false), 8000);
+  },
+  { flush: 'post' },
+);
+const 性爱参与者列表 = computed(() =>
+  Object.entries(性爱场景.value.参与者).map(([门牌号, 项]) => ({
+    门牌: 门牌号 as 门牌,
+    妻名: 户静态表[门牌号 as 门牌]?.妻名 ?? 门牌号,
+    ...项,
+  })),
+);
+const 性爱主焦点 = computed(
+  () =>
+    性爱参与者列表.value.find(项 => 项.门牌 === 性爱场景.value.主焦点门牌) ??
+    性爱参与者列表.value.find(项 => 项.满意度 < 项.满意目标) ??
+    性爱参与者列表.value[0],
+);
+const 性爱已完成人数 = computed(() => 性爱参与者列表.value.filter(项 => 项.满意度 >= 项.满意目标).length);
+const 性爱结果参与者列表 = computed(() =>
+  Object.entries(上次性爱结果.value.参与者).map(([门牌号, 项]) => ({
+    门牌: 门牌号 as 门牌,
+    妻名: 户静态表[门牌号 as 门牌]?.妻名 ?? 门牌号,
+    ...项,
+  })),
+);
+const 收尾选项 = computed(() => 构造亲密收尾选项(性爱场景.value));
+const 资源详情 = computed(() => {
+  const 种类 = 显示资源详情.value ?? '精力';
+  const 资源 = data.value.玩家资源[种类];
+  const 进度 = 距离下级经验(资源.训练经验);
+  return { 种类, 资源, 上限: 资源上限(data.value, 种类), ...进度 };
+});
 
 // ── 场景与移动(走动零成本纯UI;_场景 与脚本快照共用) ──
 
 const 当前房间 = ref<string | null>(null);
 const 显示地图 = ref(false);
-/** 进房那一刻的末楼号(随 _场景 持久;只供脚本确认这次碰面,地图始终看当前钟楼) */
+/** chat 变量不是 Pinia 数据；手机写入时显式拨动它，让撤销按钮立即重算而不只依赖后端兜底。 */
+const 时间撤销刷新版本 = ref(0);
+
+/** 这里只负责藏/显按钮；点击后脚本会用最新 MVU、chat、聊天 ID 与消息锚重新完整校验。 */
+const 时间撤销可用 = computed(() => {
+  const 房间 = 当前房间.value;
+  // 明确订阅时钟与末楼刷新；时间事务完成后的 store.pull/卷轴刷新会重新计算撤销资格。
+  void 绝对时段.value;
+  void 末楼号.value;
+  void 时间撤销刷新版本.value;
+  if (!是时间撤销地点(房间) || !data.value?.系统) return false;
+  try {
+    const vars = getVariables({ type: 'chat' });
+    let 当前楼 = 末楼号.value;
+    try {
+      当前楼 = getLastMessageId();
+    } catch {
+      /* 使用最近一次卷轴水位 */
+    }
+    return 判定时间撤销点(vars[时间撤销点键], {
+      当前数据: data.value,
+      当前聊天变量: vars,
+      当前聊天ID: 当前聊天ID(),
+      当前楼,
+      当前锚消息签名: 手机锚消息签名(SillyTavern.chat?.[当前楼]),
+    }).有效;
+  } catch {
+    return false;
+  }
+});
+/** 进房那一刻的消息楼号(随 _场景 持久，只供场景快照与历史定位；不参与世界时间)。 */
 const 进房末楼 = ref(0);
 /** 工具由头只在这一次“从门外进房”的首轮结算一次；留在房内续聊不能再次算检修。 */
 const 本次入房由头已用 = ref(false);
 interface 无耗时拜访记录 {
   房间id: string;
-  钟楼号: number;
+  绝对时段: number;
   进房末楼: number;
   由头已用: boolean;
+  非法进入: boolean;
 }
-/** 位置推算种子:进房期间冻结在 进房末楼(审计 C1)。脚本侧全部读者都这么冻
- * (楼层时钟.妻位置推算 的强制要求),客户端旧版始终用当前钟楼——差 1 楼就是独立抽签,
- * 会把脚本认定不在场的人"抽"进当前房间:立绘/头像/送礼按钮全亮,脚本却拒绝操作。 */
-const 位置种子 = computed(() => (当前房间.value ? 进房末楼.value + 偏移楼.value : 钟楼号.value));
-
-/** 正在与玩家对话的人只固定在当前场景；其余住户在地图上按最新钟楼移动。 */
+/** 正在与玩家对话的人固定在当前场景；其余住户按绝对时段对应的固定周作息显示。 */
 const 粘滞在场 = ref<{ 位置: string | null; 们: 门牌[] }>({ 位置: null, 们: [] });
 
 function 刷粘滞() {
@@ -2045,11 +2697,12 @@ function 刷赴约() {
     赴约妻.value = null;
   }
 }
-/** 妻位置(显示层统一口:赴约中=跟着玩家走,其余走作息推算) */
-function 妻现位(m: 门牌, 楼: number): string {
+/** 妻位置显示统一口：特殊场景、赴约、连续对话优先，最后才读取固定周作息。 */
+function 妻现位(m: 门牌): string {
+  if (静音会议正式中.value && 静音会议演出妻.value.includes(m)) return '管理员室';
   if (赴约妻.value === m) return 当前房间.value ?? '大堂';
   if (粘滞在场.value.位置 && 粘滞在场.value.们.includes(m)) return 粘滞在场.value.位置;
-  return 妻位置推算(m, 楼);
+  return 妻基础位置(m, 绝对时段.value);
 }
 watch(显示地图, 开 => {
   if (开) {
@@ -2060,8 +2713,7 @@ watch(显示地图, 开 => {
 
 async function 写场景(房间id: string | null, 破门 = false): Promise<void> {
   const 变量 = getVariables({ type: 'chat' });
-  const 旧场景 =
-    (_.get(变量, '_场景') as { 房间id?: string; 进房末楼?: number; 由头已用?: boolean } | null | undefined) ?? null;
+  const 旧场景 = (_.get(变量, '_场景') as 场景聊天状态 | null | undefined) ?? null;
   const 旧房间 = 旧场景?.房间id ?? null;
   if (旧房间 !== 房间id) {
     当前成人CG.value = null;
@@ -2072,19 +2724,28 @@ async function 写场景(房间id: string | null, 破门 = false): Promise<void>
   const 到 = 房间id ? (查房间(房间id)?.名称 ?? 房间id) : '楼道';
   const 新轨迹 = 旧房间 === 房间id ? 旧轨迹 : [...旧轨迹, `从${从}走到${到}`].slice(-8);
   let 无耗时拜访 = (_.get(变量, '_无耗时拜访') as 无耗时拜访记录 | null | undefined) ?? null;
-  // 临时离开住户场景去翻垃圾/查工具再回来，只要钟楼没有变化，就仍是同一次拜访。
+  // 临时离开住户场景去翻垃圾/查工具再回来，只要世界时段没有变化，就仍是同一次拜访。
   // 记录放 chat 变量而不是模块变量，iframe 刷新后也不会重新索要已经用过的由头。
   if (旧房间 && 旧房间 !== 房间id && 查房间(旧房间)?.类型 === '户' && 旧房间 !== '302') {
     无耗时拜访 = {
       房间id: 旧房间,
-      钟楼号: 钟楼号.value,
+      绝对时段: 绝对时段.value,
       进房末楼: 旧场景?.进房末楼 ?? 进房末楼.value,
       由头已用: 旧场景?.由头已用 ?? 本次入房由头已用.value,
+      非法进入: !!(旧场景?.非法进入 || 已破门进入.value),
     };
   }
   await insertOrAssignVariables(
     {
-      _场景: 房间id ? { 房间id, 破门, 进房末楼: 进房末楼.value, 由头已用: 本次入房由头已用.value } : null,
+      _场景: 房间id
+        ? {
+            房间id,
+            破门,
+            非法进入: 已破门进入.value,
+            进房末楼: 进房末楼.value,
+            由头已用: 本次入房由头已用.value,
+          }
+        : null,
       _无耗时拜访: 无耗时拜访,
       _粘滞: null, // 玩家一走动就解除旧对话固定；重回同一房间也不能把已经离开的人“复活”
       _地图轨迹: 新轨迹,
@@ -2093,17 +2754,58 @@ async function 写场景(房间id: string | null, 破门 = false): Promise<void>
   );
 }
 
-async function 进入(房间id: string, 破门 = false, 保持地图 = false): Promise<void> {
+function 启动阶段线路剧情(房间id: string, 候选: 阶段线路候选): void {
+  if (发送中.value || 当前房间.value !== 房间id) return;
+  发送中.value = true;
+  const 行动 = `(在${查房间(房间id)?.名称 ?? 房间id}处理${户静态表[候选.门牌].妻名}的关系线索)`;
+  待重试行动.value = 行动;
+  失败行动.value = '';
+  流式段.value = [];
+  卷轴.value.push({ 谁: '玩家', 文本: [行动] });
+  void 滚到底();
+  eventEmit('人妻公寓:线路启动剧情', {
+    地点: 房间id,
+    门牌: 候选.门牌,
+    时段: 时段.value,
+    预期目标阶段: 候选.目标阶段,
+    预期节点: 候选.节点,
+  });
+}
+
+let 亲密离场处理中: Promise<boolean> | null = null;
+
+async function 确认亲密离场(): Promise<boolean> {
+  if (!性爱进行中.value) return true;
+  if (亲密离场处理中) {
+    await 亲密离场处理中;
+    return false;
+  }
+  const 任务 = (async () => {
+    const 确认 = window.confirm('亲密场景还没有收尾。现在离开会让参与角色的好感与堕落下降，仍要离开吗？');
+    if (!确认) return false;
+    await Promise.resolve(eventEmit('人妻公寓:性爱突然离场'));
+    return true;
+  })();
+  亲密离场处理中 = 任务;
+  try {
+    return await 任务;
+  } finally {
+    亲密离场处理中 = null;
+  }
+}
+
+async function 进入(房间id: string, 破门 = false, 保持地图 = false): Promise<boolean> {
   // 地图上重复点当前房间只是“确认留在这里”：不算重新进门，也不能刷新检修借口/进房楼戳。
   if (房间id === 当前房间.value) {
     if (!保持地图) 关地图();
     闪转场(查房间(房间id)?.名称 ?? 房间id);
-    return;
+    return true;
   }
+  if (!(await 确认亲密离场())) return false;
   const 无耗时拜访 =
     (_.get(getVariables({ type: 'chat' }), '_无耗时拜访') as 无耗时拜访记录 | null | undefined) ?? null;
   const 续接同次拜访 =
-    无耗时拜访?.房间id === 房间id && 无耗时拜访.钟楼号 === 钟楼号.value && 查房间(房间id)?.类型 === '户';
+    无耗时拜访?.房间id === 房间id && 无耗时拜访.绝对时段 === 绝对时段.value && 查房间(房间id)?.类型 === '户';
   if (续接同次拜访) {
     进房末楼.value = 无耗时拜访.进房末楼;
   } else {
@@ -2115,21 +2817,19 @@ async function 进入(房间id: string, 破门 = false, 保持地图 = false): P
   }
   当前房间.value = 房间id;
   本次入房由头已用.value = 续接同次拜访 ? 无耗时拜访.由头已用 : false;
-  已破门进入.value = 破门;
+  已破门进入.value = 破门 || (续接同次拜访 && !!无耗时拜访?.非法进入);
   粘滞在场.value = { 位置: null, 们: [] };
   if (!保持地图) 关地图();
   await 写场景(房间id, 破门);
-  eventEmit('人妻公寓:线路到达地点', {
-    地点: 查房间(房间id)?.名称 ?? 房间id,
-    门牌: 门牌列表.includes(房间id as 门牌) ? (房间id as 门牌) : undefined,
-  });
   记待办(房间id);
   闪转场(查房间(房间id)?.名称 ?? 房间id);
   // 头像即时点亮(走到谁身边谁亮;回合结束后脚本按位置系统重算)
-  在场.value = { 焦点: 可见门牌.value.filter(m => 妻现位(m, 位置种子.value) === 房间id), 在场: [] };
+  在场.value = { 焦点: 可见门牌.value.filter(m => 妻现位(m) === 房间id), 在场: [] };
+  return true;
 }
 
 async function 离开房间(): Promise<void> {
+  if (!(await 确认亲密离场())) return;
   当前房间.value = null;
   本次入房由头已用.value = false;
   粘滞在场.value = { 位置: null, 们: [] };
@@ -2148,23 +2848,28 @@ async function 离开房间(): Promise<void> {
  */
 function 同步场景自变量() {
   try {
-    const 场景 = _.get(getVariables({ type: 'chat' }), '_场景') as {
-      房间id?: string;
-      破门?: boolean;
-      进房末楼?: number;
-      由头已用?: boolean;
-    } | null;
-    const 目标房 = 场景?.房间id ?? null;
-    if (目标房 === 当前房间.value) return; // 场景没变(绝大多数回合),别动进房楼戳
-    当前房间.value = 目标房;
-    已破门进入.value = !!场景?.破门;
-    本次入房由头已用.value = !!场景?.由头已用;
-    粘滞在场.value = { 位置: null, 们: [] };
+    const 场景 = _.get(getVariables({ type: 'chat' }), '_场景') as 场景聊天状态 | null;
+    let 缺省末楼 = 末楼号.value;
     try {
-      进房末楼.value = 场景?.进房末楼 ?? getLastMessageId();
+      缺省末楼 = getLastMessageId();
     } catch {
-      进房末楼.value = 末楼号.value;
+      /* 使用界面最后一次拉取的末楼 */
     }
+    const 下一状态 = 计算场景同步(
+      {
+        房间id: 当前房间.value,
+        非法进入: 已破门进入.value,
+        进房末楼: 进房末楼.value,
+        由头已用: 本次入房由头已用.value,
+      },
+      场景,
+      缺省末楼,
+    );
+    当前房间.value = 下一状态.房间id;
+    已破门进入.value = 下一状态.非法进入;
+    本次入房由头已用.value = 下一状态.由头已用;
+    进房末楼.value = 下一状态.进房末楼;
+    if (下一状态.房间变化) 粘滞在场.value = { 位置: null, 们: [] };
   } catch (e) {
     console.error('[人妻公寓客户端] 场景同步失败:', e);
   }
@@ -2217,7 +2922,7 @@ const 可用由头 = computed(() => {
   const id = 当前房间.value ?? '';
   const 包 = data.value?.背包 ?? [];
   if (!包.includes('工具箱')) return [];
-  const 今日 = Math.floor(Math.max(0, 钟楼号.value) / 18);
+  const 今日 = 天数.value - 1;
   const 记 = 工具由头记录.value[id];
   const 已用 = 记?.日 === 今日 && Array.isArray(记.已用) ? 记.已用 : [];
   // 每日上限按"今天已用次数"扣减(审计 低危12):旧版 slice 在过滤之后,上限实际=工具表大小,
@@ -2233,11 +2938,7 @@ const 可输入 = computed(() => {
   if (!id) return false;
   if (静音会议中.value) {
     if (!静音会议正式中.value || id !== '管理员室') return false;
-    if (
-      静音会议交互幕.value ||
-      静音会议场景.value.交互.状态 === '等待AI' ||
-      静音会议场景.value.阶段 === '收尾'
-    ) {
+    if (静音会议交互幕.value || 静音会议场景.value.交互.状态 === '等待AI' || 静音会议场景.value.阶段 === '收尾') {
       return false;
     }
     if (静音会议场景.value.阶段 === '正文') {
@@ -2302,6 +3003,11 @@ function 关地图() {
   结果卡.value = '';
 }
 
+async function 从地图外出(): Promise<void> {
+  房卡.value = null;
+  await 进入('公寓外部');
+}
+
 const 房卡名称 = computed(() => (房卡.value ? (查房间(房卡.value)?.名称 ?? 房卡.value) : ''));
 const 房卡kicker = computed(() => {
   const id = 房卡.value;
@@ -2361,32 +3067,126 @@ const 当前房间动作 = computed<卡动作[]>(() =>
 /** 垃圾袋由一个紧凑选择器承载，避免住户增多后 SEARCH 瓷砖占满正文下半屏。 */
 const 普通房间动作 = computed(() => 当前房间动作.value.filter(a => a.kicker !== 'SEARCH'));
 
+type 客户端时间方式 = '推进一时段' | '睡到次日早晨' | '小憩' | '晨跑' | '健身';
+
+function 发起时间推进(方式: 客户端时间方式): void {
+  if (发送中.value) return;
+  // 时间事务不生成正文，但同样要锁住地图、输入和回档按钮，直到脚本明确回报结束。
+  发送中.value = true;
+  运行阶段.value =
+    方式 === '睡到次日早晨'
+      ? '正在休息到次日早晨'
+      : 方式 === '晨跑'
+        ? '正在进行晨跑训练'
+        : 方式 === '健身'
+          ? '正在进行体力训练'
+          : 方式 === '小憩'
+            ? '正在小憩'
+            : '正在推进世界时间';
+  const 事件名 =
+    方式 === '睡到次日早晨'
+      ? '人妻公寓:睡到次日早晨'
+      : 方式 === '晨跑'
+        ? '人妻公寓:晨跑'
+        : 方式 === '健身'
+          ? '人妻公寓:健身'
+          : 方式 === '小憩'
+            ? '人妻公寓:小憩'
+            : '人妻公寓:推进时段';
+  eventEmit(事件名, {
+    方式,
+    预期绝对时段: 绝对时段.value,
+  });
+}
+
+function 发起时间撤销(): void {
+  if (发送中.value || !时间撤销可用.value) return;
+  发送中.value = true;
+  运行阶段.value = '正在撤销刚才的时间推进';
+  eventEmit('人妻公寓:撤销时间推进');
+}
+
 function 房间动作(id: string | null): 卡动作[] {
   if (!id) return [];
   const 房 = 查房间(id);
   const 动作: 卡动作[] = [];
+  添加管理任务动作(动作, id);
+
+  if (id === '公寓外部') {
+    if (当前房间.value !== id) {
+      动作.push({ kicker: 'OUTING', icon: 'sun', 文案: '走出公寓', 做: () => 进入(id) });
+    } else {
+      动作.push({ kicker: 'RUN', icon: 'sun', 文案: '去河畔晨跑', 做: () => 进入('晨跑公园') });
+      动作.push({ kicker: 'GYM', icon: 'favor', 文案: '去公寓健身房', 做: () => 进入('健身房') });
+      动作.push({ kicker: 'RETURN', icon: 'home', 文案: '返回公寓大堂', 做: () => 进入('大堂') });
+    }
+    return 动作;
+  }
+
+  if (id === '晨跑公园') {
+    if (当前房间.value !== id) {
+      动作.push({ kicker: 'RUN', icon: 'sun', 文案: '走到河畔公园', 做: () => 进入(id) });
+    } else {
+      const 今日 = 玩家当前日(data.value);
+      if (时段.value === '早上' && data.value.玩家资源._晨跑训练日 !== 今日) {
+        动作.push({ kicker: 'TRAIN', icon: 'sun', 文案: '开始晨跑（推进一时段）', 做: () => 发起时间推进('晨跑') });
+      }
+      if (时间撤销可用.value) {
+        动作.push({ kicker: 'UNDO', icon: 'rewind', 文案: '撤销刚才的时间推进', 做: 发起时间撤销 });
+      }
+      动作.push({ kicker: 'RETURN', icon: 'arrow', 文案: '回到公寓外', 做: () => 进入('公寓外部') });
+    }
+    return 动作;
+  }
+
+  if (id === '健身房') {
+    if (当前房间.value !== id) {
+      动作.push({ kicker: 'GYM', icon: 'favor', 文案: '进入健身房', 做: () => 进入(id) });
+    } else {
+      const 今日 = 玩家当前日(data.value);
+      if (data.value.玩家资源._体力训练日 !== 今日) {
+        动作.push({ kicker: 'TRAIN', icon: 'favor', 文案: '开始锻炼（推进一时段）', 做: () => 发起时间推进('健身') });
+      }
+      if (时间撤销可用.value) {
+        动作.push({ kicker: 'UNDO', icon: 'rewind', 文案: '撤销刚才的时间推进', 做: 发起时间撤销 });
+      }
+      动作.push({ kicker: 'RETURN', icon: 'arrow', 文案: '回到公寓外', 做: () => 进入('公寓外部') });
+    }
+    return 动作;
+  }
 
   if (房?.类型 === '户' && id !== '302') {
     if (!data.value.户[id]) return []; // 招租中,没有可做的事
     if (房内有人在(id)) {
       动作.push({ kicker: 'VISIT', icon: 'door', 文案: '过去串门', 做: () => 进入(id) });
-      // 对饮(P5 丈夫渠道兼信任资源轴):他在家+背包有好酒才摆得上台面
-      if (
-        丈夫在楼(data.value.户[id], id as 门牌, 位置种子.value) === '在家' &&
-        (data.value?.背包 ?? []).includes('好酒')
-      ) {
-        动作.push({
-          kicker: 'DRINK',
-          icon: 'gift',
-          文案: `请${户静态表[id as 门牌].夫名}喝一杯`,
-          做: async () => {
-            if (当前房间.value !== id) await 进入(id, false, true);
-            eventEmit('人妻公寓:对饮', id);
-          },
-        });
+      // 丈夫关系道具：好酒走专属对饮调查；香烟与球赛票经营不同幅度的信任轴。
+      if (丈夫在楼(data.value.户[id], id as 门牌, 绝对时段.value) === '在家') {
+        if ((data.value?.背包 ?? []).includes('好酒')) {
+          动作.push({
+            kicker: 'DRINK',
+            icon: 'gift',
+            文案: `请${户静态表[id as 门牌].夫名}喝一杯`,
+            做: async () => {
+              if (当前房间.value !== id) await 进入(id, false, true);
+              eventEmit('人妻公寓:对饮', id);
+            },
+          });
+        }
+        for (const 礼物 of ['香烟', '球赛票'] as const) {
+          if (!(data.value?.背包 ?? []).includes(礼物)) continue;
+          动作.push({
+            kicker: 'GIFT',
+            icon: 'gift',
+            文案: 礼物 === '香烟' ? `递${户静态表[id as 门牌].夫名}一包烟` : `送${户静态表[id as 门牌].夫名}两张球赛票`,
+            做: async () => {
+              if (当前房间.value !== id) await 进入(id, false, true);
+              eventEmit('人妻公寓:丈夫礼物', { 门牌: id, 道具id: 礼物 });
+            },
+          });
+        }
       }
       // 催租三选(P3,天生欠租户):她在家且账上挂着欠租才摆得上台面
-      if ((data.value.户[id]?._欠租笔数 ?? 0) > 0 && 妻现位(id as 门牌, 位置种子.value) === id) {
+      if ((data.value.户[id]?._欠租笔数 ?? 0) > 0 && 妻现位(id as 门牌) === id) {
         const 催 = async (选择: '硬催' | '宽限' | '垫上') => {
           if (当前房间.value !== id) await 进入(id, false, true);
           eventEmit('人妻公寓:催租', { 门牌: id, 选择 });
@@ -2415,28 +3215,71 @@ function 房间动作(id: string | null): 卡动作[] {
         });
       }
     }
+    if (当前房间.value === id) 添加地点线路动作(动作, id);
     return 动作;
   }
 
   if (id === '302') {
     动作.push({ kicker: 'HOME', icon: 'home', 文案: '回家看看', 做: () => 进入(id) });
+    if (当前房间.value === id) {
+      添加地点线路动作(动作, id);
+      动作.push({
+        kicker: 'NAP',
+        icon: 'moon',
+        文案: '小憩（推进一时段）',
+        做: () => 发起时间推进('小憩'),
+      });
+      动作.push({
+        kicker: 'REST',
+        icon: 'moon',
+        文案: '睡到次日早晨',
+        做: () => 发起时间推进('睡到次日早晨'),
+      });
+      if (时间撤销可用.value) {
+        动作.push({
+          kicker: 'UNDO',
+          icon: 'rewind',
+          文案: '撤销刚才的时间推进',
+          做: 发起时间撤销,
+        });
+      }
+    }
     return 动作;
   }
 
-  // 管理员室:杀时间(2026-07-17 拍板)——静默快进一个时段,不产楼不耗token;
-  // 瓷砖只在人已经走进屋里才出现(同日用户拍板:菜单归正文框架,地图房卡上只有"走过去");
-  // 冷却=每真实楼层一次,冷却中 tile 直接不出现(极简,不摆灰按钮)
+  // 管理员室世界时间：只保留有明确休息含义的小憩／睡眠，普通聊天不再改变日期或时段。
+  // 两个事件都带预期水位，后端以乐观校验拒绝双击产生的第二次陈旧推进。
   if (id === '管理员室') {
     动作.push({ kicker: 'GO', icon: 'arrow', 文案: '走过去', 做: () => 进入(id) });
-    if (当前房间.value === id && (data.value?.系统?._上次杀时间楼层 ?? -1) < 末楼号.value) {
-      动作.push({ kicker: 'IDLE', icon: 'moon', 文案: '眯一觉', 做: () => eventEmit('人妻公寓:杀时间', '休息') });
-      动作.push({ kicker: 'IDLE', icon: 'tv', 文案: '看会儿电视', 做: () => eventEmit('人妻公寓:杀时间', '看电视') });
+    添加地点线路动作(动作, id);
+    if (当前房间.value === id) {
+      动作.push({
+        kicker: 'NAP',
+        icon: 'moon',
+        文案: '小憩（推进一时段）',
+        做: () => 发起时间推进('小憩'),
+      });
+      动作.push({
+        kicker: 'REST',
+        icon: 'moon',
+        文案: '睡到次日早晨',
+        做: () => 发起时间推进('睡到次日早晨'),
+      });
+      if (时间撤销可用.value) {
+        动作.push({
+          kicker: 'UNDO',
+          icon: 'rewind',
+          文案: '撤销刚才的时间推进',
+          做: 发起时间撤销,
+        });
+      }
     }
     return 动作;
   }
 
   // 公共区
   动作.push({ kicker: 'GO', icon: 'arrow', 文案: '走过去', 做: () => 进入(id) });
+  添加地点线路动作(动作, id);
   // 出门打听(P5:201渠道;从大堂出门找街坊,伴手礼盒当弹药)
   if (id === '大堂' && (data.value?.背包 ?? []).includes('伴手礼盒')) {
     for (const m of 门牌列表) {
@@ -2464,7 +3307,7 @@ function 房间动作(id: string | null): 卡动作[] {
   }
   // 公共区零钱(P3:路过的小惊喜;种子+期号与脚本同一真值,拾没拾过看 chat 计数)
   {
-    const 零钱 = 查金币(id, 钟楼号.value);
+    const 零钱 = 查金币(id, 绝对时段.value);
     if (零钱 > 0) {
       动作.push({
         kicker: 'PICK',
@@ -2493,9 +3336,59 @@ function 房间动作(id: string | null): 卡动作[] {
   return 动作;
 }
 
+/** 每个地点只承载一个楼务任务；两个确定性选项直接铺成瓷砖，不再生调查/回访子状态。 */
+function 添加管理任务动作(动作: 卡动作[], 地点: string): void {
+  const 任务 = 列出地点管理任务(data.value, 地点)[0];
+  if (!任务) return;
+  const 剩余时段 = Math.max(0, 任务.截止时段 - 绝对时段.value);
+  const 状态文案 = 任务.逾期已扣 ? '逾期补办' : `剩${剩余时段}时段`;
+  for (const 选项 of 管理任务选项(任务).slice(0, 2)) {
+    动作.push({
+      kicker: 任务.逾期已扣 ? 'OVERDUE' : 'DUTY',
+      icon: 任务.类型 === '投诉' ? 'ops' : 'tool',
+      文案: `${任务.模板} · ${状态文案}｜${选项.文案}`,
+      类: 任务.逾期已扣 ? 'risky management-task' : 'management-task',
+      做: async () => {
+        if (发送中.value) return;
+        if (当前房间.value !== 地点 && !(await 进入(地点, false, true))) return;
+        if (发送中.value) return;
+        eventEmit('人妻公寓:处理管理任务', { 任务id: 任务.id, 选项id: 选项.id, 地点 });
+      },
+    });
+  }
+}
+
+function 添加地点线路动作(动作: 卡动作[], 地点: string): void {
+  const 户门牌 = 门牌列表.includes(地点 as 门牌) ? (地点 as 门牌) : undefined;
+  const 候选们 = 列出阶段线路候选详情(data.value, {
+    类型: '地点',
+    门牌: 户门牌,
+    地点,
+    时段: 时段.value,
+    楼层: 绝对时段.value,
+  });
+  for (const 候选 of 候选们) {
+    动作.push({
+      kicker: 'STORY',
+      icon: 'search',
+      文案:
+        当前房间.value === 地点
+          ? `展开${户静态表[候选.门牌].妻名}的关系剧情`
+          : `前往${户静态表[候选.门牌].妻名}的线索地点`,
+      做: () => (当前房间.value === 地点 ? 启动阶段线路剧情(地点, 候选) : 进入(地点)),
+    });
+  }
+}
+
 /** 欠租门牌(P3:地图挂"欠租"角标=催租入口可视化) */
 function 欠租中(id: string): boolean {
   return (data.value?.户[id]?._欠租笔数 ?? 0) > 0;
+}
+
+/** 立面只挂一个短角标；逾期高亮，具体两种处理方式留在房卡动作里。 */
+function 管理任务角标(id: string): '' | '楼务' | '逾期' {
+  const 任务 = 列出地点管理任务(data.value, id)[0];
+  return 任务 ? (任务.逾期已扣 ? '逾期' : '楼务') : '';
 }
 
 /** HUD 账夹：只把已有欠租状态图形化，不新增经济数值或玩法判定。 */
@@ -2569,9 +3462,7 @@ function 房内的人(房间id: string): string[] {
       !静音会议场景.value.阶段.includes('自由')
     ) {
       const 演出夫 = 静音会议场景.value.演出夫.length
-        ? 静音会议场景.value.演出夫.map(值 =>
-            是静音会议候选门牌(值) ? 户静态表[值].夫名 : 值,
-          )
+        ? 静音会议场景.value.演出夫.map(值 => (是静音会议候选门牌(值) ? 户静态表[值].夫名 : 值))
         : 静音会议参与妻.value.map(门牌号 => 户静态表[门牌号].夫名);
       临时名单.push(...演出夫.filter(Boolean));
     }
@@ -2579,8 +3470,8 @@ function 房内的人(房间id: string): string[] {
   }
   const 名单: string[] = [];
   for (const m of 可见门牌.value) {
-    if (妻现位(m, 位置种子.value) === 房间id) 名单.push(户静态表[m].妻名);
-    if (m === 房间id && 丈夫在楼(data.value.户[m], m, 位置种子.value) !== '外出' && 户静态表[m].夫名) {
+    if (妻现位(m) === 房间id) 名单.push(户静态表[m].妻名);
+    if (m === 房间id && 丈夫在楼(data.value.户[m], m, 绝对时段.value) !== '外出' && 户静态表[m].夫名) {
       名单.push(户静态表[m].夫名);
     }
   }
@@ -2602,7 +3493,7 @@ function 妻在玩家身边(m: 门牌): boolean {
   const 房 = 当前房间.value;
   if (!房) return false;
   if (m === '302' && 房 === '302' && data.value.户['302']) return true;
-  return 妻现位(m, 位置种子.value) === 房;
+  return 妻现位(m) === 房;
 }
 
 function 房内首字(房间id: string): string {
@@ -2615,24 +3506,18 @@ const 当前房间名 = computed(() => (当前房间.value ? (查房间(当前�
 
 // ── 特殊场景「录像带」：管理员室双屏交互 ──
 
-const 录像带阶段 = computed(() =>
-  data.value?.系统?._特殊场景?.id === '录像带' ? data.value.系统._特殊场景.阶段 : '',
-);
+const 录像带阶段 = computed(() => (data.value?.系统?._特殊场景?.id === '录像带' ? data.value.系统._特殊场景.阶段 : ''));
 const 录像带中 = computed(() => !!录像带阶段.value);
 const 录像带本地结果 = ref<'' | '102' | '202'>('');
 const 录像带连点目标 = 10;
 const 录像带连点计数 = ref(0);
-const 录像带连续失败 = ref(0);
-const 录像带补偿可用 = computed(() => 录像带阶段.value === '等待202' && 录像带连续失败.value >= 3);
+const 录像带失败状态 = computed(() => 读取录像带连点失败状态(data.value?.系统?._特殊场景));
+const 录像带补偿可用 = computed(() => 录像带失败状态.value.补偿可用);
 let 录像带连点开始 = 0;
 let 录像带连点timer: ReturnType<typeof setTimeout> | undefined;
 
 const 录像带交互幕 = computed(
-  () =>
-    录像带中.value &&
-    (录像带阶段.value === '等待102' ||
-      录像带阶段.value === '等待202' ||
-      !!录像带本地结果.value),
+  () => 录像带中.value && (录像带阶段.value === '等待102' || 录像带阶段.value === '等待202' || !!录像带本地结果.value),
 );
 const 录像带当前图 = computed(() => {
   if (录像带本地结果.value === '202') return 录像带双屏亮起图;
@@ -2668,7 +3553,10 @@ function 记录录像带连点失败() {
   if (录像带阶段.value !== '等待202' || 录像带连点计数.value >= 录像带连点目标) return;
   录像带连点计数.value = 0;
   录像带连点开始 = 0;
-  录像带连续失败.value += 1;
+  const 新交互 = 推进录像带连点失败(data.value?.系统?._特殊场景);
+  if (!新交互) return;
+  data.value.系统._特殊场景.交互 = 新交互;
+  (store as unknown as { flush?: () => void }).flush?.();
 }
 
 function 连续点击202录像() {
@@ -2823,9 +3711,7 @@ const 静音会议筹备可确认 = computed(
     静音会议筹备妻.value.every(门牌 => 静音会议候选列表.value.find(项 => 项.门牌 === 门牌)?.合格),
 );
 const 静音会议筹备妻名 = computed(() => 静音会议筹备妻.value.map(门牌 => 户静态表[门牌].妻名));
-const 静音会议筹备夫名 = computed(() =>
-  静音会议筹备妻.value.map(门牌 => 户静态表[门牌].夫名).filter(Boolean),
-);
+const 静音会议筹备夫名 = computed(() => 静音会议筹备妻.value.map(门牌 => 户静态表[门牌].夫名).filter(Boolean));
 
 function 打开静音会议筹备() {
   if (发送中.value || 静音会议中.value) return;
@@ -2895,18 +3781,12 @@ function 发送静音会议通知() {
 }
 
 const 静音会议手机状态 = computed(() => 获取静音会议手机状态(data.value ?? null));
-const 静音会议手机已开放 = computed(
-  () => 静音会议手机状态.value.场景中 && 静音会议手机状态.value.已开放,
-);
-const 静音会议手机可打开 = computed(
-  () => !静音会议正式中.value || (!发送中.value && 静音会议手机状态.value.可打开),
-);
+const 静音会议手机已开放 = computed(() => 静音会议手机状态.value.场景中 && 静音会议手机状态.value.已开放);
+const 静音会议手机可打开 = computed(() => !静音会议正式中.value || (!发送中.value && 静音会议手机状态.value.可打开));
 const 静音会议手机标题 = computed(() => {
   if (!静音会议正式中.value) return '打开手机';
   if (发送中.value && 静音会议手机状态.value.已开放) return '会议正文正在生成，稍后再看微信。';
-  return 静音会议手机状态.value.可打开
-    ? '会场微信已开放'
-    : 静音会议手机状态.value.禁用原因 || '会议微信暂不可用';
+  return 静音会议手机状态.value.可打开 ? '会场微信已开放' : 静音会议手机状态.value.禁用原因 || '会议微信暂不可用';
 });
 
 const 静音会议互动id = computed<静音会议互动ID>(() => {
@@ -2932,14 +3812,11 @@ const 静音会议互动结果 = ref<
 const 静音会议互动失败次数 = computed(() =>
   Math.max(静音会议本地失败次数.value, 静音会议场景.value.交互.失败次数 || 0),
 );
-const 静音会议互动补偿可用 = computed(
-  () => 静音会议场景.value.交互.补偿可用 || 静音会议互动失败次数.value >= 3,
-);
+const 静音会议互动补偿可用 = computed(() => 静音会议场景.value.交互.补偿可用 || 静音会议互动失败次数.value >= 3);
 const 静音会议交互幕 = computed(
   () =>
     静音会议正式中.value &&
-    (((静音会议互动待操作.value || 静音会议等待AI重试.value) &&
-      ['A', 'B', 'C'].includes(静音会议场景.value.交互.id)) ||
+    (((静音会议互动待操作.value || 静音会议等待AI重试.value) && ['A', 'B', 'C'].includes(静音会议场景.value.交互.id)) ||
       !!静音会议互动结果.value),
 );
 const 静音会议互动标题 = computed(
@@ -3072,10 +3949,7 @@ function 提交静音会议互动(补偿 = false) {
   静音会议结果timer = setTimeout(() => {
     发送中.value = true;
     流式段.value = [];
-    eventEmit(
-      补偿 ? '人妻公寓:静音会议互动补偿' : '人妻公寓:静音会议互动',
-      静音会议互动载荷(id),
-    );
+    eventEmit(补偿 ? '人妻公寓:静音会议互动补偿' : '人妻公寓:静音会议互动', 静音会议互动载荷(id));
   }, 520);
 }
 
@@ -3157,10 +4031,7 @@ function 静音会议互动补偿通过() {
 function 重试静音会议互动续拍() {
   if (!静音会议等待AI重试.value || 发送中.value) return;
   const 载荷 = 静音会议互动载荷();
-  if (
-    (载荷.id === 'B' && !('目标妻' in 载荷 && 载荷.目标妻)) ||
-    (载荷.id === 'C' && !('模式' in 载荷 && 载荷.模式))
-  ) {
+  if ((载荷.id === 'B' && !('目标妻' in 载荷 && 载荷.目标妻)) || (载荷.id === 'C' && !('模式' in 载荷 && 载荷.模式))) {
     弹提示('交互目标状态缺失，无法重放下一拍。');
     return;
   }
@@ -3192,9 +4063,7 @@ const 静音会议显示组合图 = computed(
 const 静音会议图回退序号 = ref(0);
 const 静音会议图已加载 = ref(false);
 const 静音会议图状态序列 = computed(
-  () =>
-    获取静音会议回退状态序列(静音会议画面状态.value) ??
-    ([] as readonly 静音会议画面状态类型[]),
+  () => 获取静音会议回退状态序列(静音会议画面状态.value) ?? ([] as readonly 静音会议画面状态类型[]),
 );
 const 静音会议当前图地址 = computed(() => {
   if (!静音会议显示组合图.value) return '';
@@ -3259,18 +4128,12 @@ const 静音会议自由待选择 = computed(
     静音会议当前拍.value >= 15 &&
     !静音会议继续已选.value,
 );
-const 静音会议收尾待重试 = computed(
-  () => 静音会议正式中.value && 静音会议场景.value.阶段 === '收尾',
-);
+const 静音会议收尾待重试 = computed(() => 静音会议正式中.value && 静音会议场景.value.阶段 === '收尾');
 
 watch(
   () => 静音会议场景.value.自由循环次数,
   (新次数, 旧次数) => {
-    if (
-      静音会议自由行动进行中.value &&
-      静音会议场景.value.阶段.includes('自由') &&
-      新次数 > 旧次数
-    ) {
+    if (静音会议自由行动进行中.value && 静音会议场景.value.阶段.includes('自由') && 新次数 > 旧次数) {
       静音会议继续已选.value = false;
       静音会议自由行动进行中.value = false;
     }
@@ -3380,6 +4243,9 @@ const 房间色: Record<string, [string, string]> = {
   天台: ['110, 190, 235', '175, 220, 245'], // 天的颜色
   垃圾房: ['145, 165, 125', '185, 195, 160'],
   洗手间: ['150, 185, 180', '195, 220, 210'], // 消毒水的青瓷色
+  公寓外部: ['132, 168, 196', '232, 194, 142'],
+  晨跑公园: ['105, 168, 132', '230, 196, 128'],
+  健身房: ['116, 108, 102', '214, 172, 126'],
 };
 
 const 场景色 = computed(() => {
@@ -3398,8 +4264,8 @@ const 荣耀洞可用 = computed(() => {
   // 高级隔离事件不参与新手教程。四项基础走访完成前入口不出现；脚本端另有同一门禁，
   // 防止延迟点击、旧 iframe 或手工事件绕过显示层。
   if (!['信箱区', '101', '102', '管理员室'].every(键 => 待办勾.value[键])) return false;
-  const 记 = (系._荣耀洞上次楼 ?? -999) > 钟楼号.value ? -999 : (系._荣耀洞上次楼 ?? -999); // 回档陷阱自净
-  return 钟楼号.value - 记 >= 荣耀洞冷却楼; // 与脚本同一份配置(审计 低危20:此前硬编码 18 重复定义)
+  const 记 = 规范荣耀洞上次时段(系._荣耀洞上次时段, 绝对时段.value);
+  return 绝对时段.value - 记 >= 荣耀洞冷却时段;
 });
 
 // 2026-07-19 用户纠偏:视觉件=抠图透明立绘叠加(素材在 立绘/荣耀洞_*),背景恒定隔间图;环境版CG作废
@@ -3470,6 +4336,8 @@ const 成人CG加载中 = ref(false);
 const 成人CG本次失效 = new Set<string>();
 const 已解锁CG = ref<Set<string>>(new Set());
 let 最近CG信号: CG回合信号 | null = null;
+let 当前成人CG展示键 = '';
+const 当前成人CG请求epoch = ref(0);
 
 function 成人CG地址(项: 成人CG项): string {
   return `${成人CG基址}/${项.path}`;
@@ -3486,29 +4354,61 @@ function 读取CG解锁(): void {
   }
 }
 
-function 处理CG回合信号(信号: CG回合信号): void {
+function 处理CG回合信号(信号: CG回合信号, 是加载重试 = false): void {
+  if (!是加载重试) {
+    // 这里只屏蔽同一信号内已经失败的候选；新回合应重新尝试，避免一次瞬时断网永久封图。
+    成人CG本次失效.clear();
+  }
   最近CG信号 = 信号;
-  const 排除 = new Set([...已解锁CG.value, ...成人CG本次失效]);
-  当前成人CG.value = 选择成人CG(信号, 排除);
-  成人CG加载中.value = Boolean(当前成人CG.value);
+  const 阶段 = 判定CG阶段(信号);
+  const 部位 = 判定CG部位(`${信号.行动}\n${信号.正文}`, 信号.亲密);
+  const 展示键 = 阶段 && 信号.门牌 ? `${信号.门牌}:${阶段}:${部位 ?? 'any'}` : '';
+  if (当前成人CG.value && 应保留成人CG(信号) && 展示键 && 展示键 === 当前成人CG展示键) {
+    成人CG加载中.value = false;
+    return;
+  }
+  const 下一张 = 选择成人CG(信号, 已解锁CG.value, 成人CG本次失效);
+  if (下一张) {
+    当前成人CG请求epoch.value += 1;
+    当前成人CG.value = 下一张;
+    当前成人CG展示键 = 展示键;
+    成人CG加载中.value = true;
+  } else if (!应保留成人CG(信号)) {
+    当前成人CG.value = null;
+    当前成人CG展示键 = '';
+    成人CG加载中.value = false;
+  } else {
+    // 场内的委婉/对话楼没有新候选时沿用当前 CG，不能掉回普通立绘。
+    成人CG加载中.value = false;
+  }
 }
 
-function 成人CG已加载(): void {
+function 成人CG已加载(事件: Event): void {
+  const 图片 = 事件.currentTarget as HTMLImageElement | null;
+  const 事件id = 图片?.dataset.cgId;
+  if (!CG加载事件属于当前请求(当前成人CG.value?.id, 当前成人CG请求epoch.value, 事件id, 图片?.dataset.cgEpoch)) return;
   成人CG加载中.value = false;
-  const id = 当前成人CG.value?.id;
+  const id = 事件id;
   if (!id || 已解锁CG.value.has(id)) return;
   const next = new Set(已解锁CG.value);
   next.add(id);
   已解锁CG.value = next;
-  localStorage.setItem(CG解锁存储键, JSON.stringify([...next]));
+  try {
+    localStorage.setItem(CG解锁存储键, JSON.stringify([...next]));
+  } catch (e) {
+    console.warn('[人妻公寓] CG 已在本次页面解锁，但浏览器拒绝写入收藏存储:', e);
+  }
 }
 
-function 成人CG加载失败(): void {
-  const id = 当前成人CG.value?.id;
-  if (id) 成人CG本次失效.add(id);
+function 成人CG加载失败(事件: Event): void {
+  const 图片 = 事件.currentTarget as HTMLImageElement | null;
+  const id = 图片?.dataset.cgId;
+  if (!CG加载事件属于当前请求(当前成人CG.value?.id, 当前成人CG请求epoch.value, id, 图片?.dataset.cgEpoch)) return;
+  成人CG本次失效.add(id!);
   当前成人CG.value = null;
   成人CG加载中.value = false;
-  if (最近CG信号 && 成人CG本次失效.size < 12) 处理CG回合信号(最近CG信号);
+  // 失败集合保证每张图只尝试一次；选择器返回 null 即候选池真正耗尽，无需固定次数上限。
+  if (最近CG信号) 处理CG回合信号(最近CG信号, true);
 }
 
 function 头像图(名: string): string {
@@ -3519,8 +4419,17 @@ function 头像图(名: string): string {
 const 头像失效 = ref<Record<string, boolean>>({});
 
 /** 商店道具图(rq0.12 生图入库;挂了回退首字) */
+const 本地道具图: Partial<Record<string, string>> = {
+  清醒咖啡: 清醒咖啡道具图,
+  集中胶囊: 集中胶囊道具图,
+  运动饮料: 运动饮料道具图,
+  强效营养剂: 强效营养剂道具图,
+  安全套: 安全套道具图,
+  专注训练手册: 专注训练手册道具图,
+  蛋白粉: 蛋白粉道具图,
+};
 function 道具图(id: string): string {
-  return `${素材基址}/道具/${id}.webp`;
+  return 本地道具图[id] ?? `${素材基址}/道具/${id}.webp`;
 }
 
 const 道具图失效 = ref<Record<string, boolean>>({});
@@ -3577,11 +4486,10 @@ const 立绘列表 = computed<立绘项[]>(() => {
   if (洞件 !== undefined) {
     return 洞件 && !立绘失效.value[洞件] ? [{ src: 洞件, style: 立绘槽(1, 0) }] : [];
   }
-  const 静音演员 =
-    当前房间.value === '管理员室' && 静音会议正式中.value ? 静音会议演出妻.value : undefined;
-  const 图 = (静音演员 ?? 可见门牌.value.filter(k => 妻现位(k, 位置种子.value) === 当前房间.value))
+  const 静音演员 = 当前房间.value === '管理员室' && 静音会议正式中.value ? 静音会议演出妻.value : undefined;
+  const 图 = (静音演员 ?? 可见门牌.value.filter(k => 妻现位(k) === 当前房间.value))
     .map(m => {
-      // 立绘跟随最后换上的衣服；旧档没有 `_立绘` 时优先恢复内衣差分，再回退外装。
+      // 立绘跟随最后换上的衣服；尚未生成 `_立绘` 时优先恢复内衣差分，再回退外装。
       const 妻名 = 户静态表[m].妻名;
       const 穿着 = data.value.户[m]?.妻._穿着SKU;
       const sku = 穿着?._立绘 ?? 穿着?.内衣 ?? 穿着?.外装;
@@ -3595,6 +4503,12 @@ const 立绘列表 = computed<立绘项[]>(() => {
 });
 
 function 背景图(房间id: string | null): string {
+  const 本地背景: Partial<Record<string, string>> = {
+    公寓外部: 公寓外部背景图,
+    晨跑公园: 晨跑公园背景图,
+    健身房: 健身房背景图,
+  };
+  if (房间id && 本地背景[房间id]) return 本地背景[房间id]!;
   // 楼道没有专属图,借楼梯间的(同一栋楼的筒子间气质)
   return `${素材基址}/背景/${房间id && 房间色[房间id] ? 房间id : '楼梯间'}.webp`;
 }
@@ -3678,6 +4592,9 @@ const 头像列表 = computed(() =>
 
 const 输入文本 = ref('');
 const 发送中 = ref(false);
+watch(发送中, 正在生成 => {
+  if (正在生成) 亲密抽屉展开.value = false;
+});
 const 由头写入中 = ref(false);
 const 流式段 = ref<string[]>([]);
 const 运行阶段 = ref('');
@@ -3689,10 +4606,19 @@ const 取消后自动重试 = ref(false);
 const 可重掷 = ref(false);
 const 隔离可重掷 = ref(false);
 const 键盘打开 = ref(false);
+const 当前资源门槛 = computed(() => {
+  const 文本 = 输入文本.value.trim();
+  const 系统 = data.value.系统;
+  const 免资源 = Boolean(系统._待发送事件 || 系统._特殊场景.id || 静音会议正式中.value);
+  return 免资源 || !文本 ? { 可行动: true, 种类: '精力' as const, 提示: '' } : 行动资源门槛(data.value, 文本);
+});
 const 当前行动可提交 = computed(
-  () => !!输入文本.value.trim() && (!静音会议待散会选择.value || 静音会议会后选择合法.value),
+  () =>
+    !!输入文本.value.trim() && 当前资源门槛.value.可行动 && (!静音会议待散会选择.value || 静音会议会后选择合法.value),
 );
-const 发送按钮文案 = computed(() => (静音会议待散会选择.value ? '宣布散会' : '行动'));
+const 发送按钮文案 = computed(() =>
+  静音会议待散会选择.value ? '宣布散会' : 性爱待失控收尾.value ? '演出收尾' : '行动',
+);
 const 输入框 = ref<HTMLTextAreaElement | null>(null);
 const 键盘视口们: VisualViewport[] = [];
 let 键盘定位timer: ReturnType<typeof setTimeout> | undefined;
@@ -3794,10 +4720,11 @@ const 回合房间 = ref<string | null>(null);
 
 function 刷新可重掷() {
   const 变量 = getVariables({ type: 'chat' });
-  const 记录 = _.get(变量, '_上次回合') as { chat快照?: { _场景?: { 房间id?: string } | null } } | undefined;
+  const 记录 = _.get(变量, '_上次回合') as
+    { chat快照?: { _场景?: { 房间id?: string } | null }; 可重掷?: boolean } | undefined;
   const 隔离记录 = _.get(变量, '_上次隔离回合') as { 房间?: string } | undefined;
   隔离可重掷.value = Boolean(隔离记录);
-  可重掷.value = Boolean(隔离记录 ?? 记录);
+  可重掷.value = Boolean(隔离记录 || (记录 && 记录?.可重掷 !== false));
   // 回合开始前的 chat 快照才是“这轮发生在哪”的凭据。不能读当前 _场景：
   // 它既是对象而非房间名，又会在玩家走动后改变，曾导致对象与字符串永远不等、两钮全局消失。
   回合房间.value = 隔离记录?.房间 ?? 记录?.chat快照?._场景?.房间id ?? null;
@@ -3820,7 +4747,7 @@ function 选项移动目标(文本: string): string | null {
   if (房) return 房.id;
   const 牌 = 可见门牌.value.find(m => 试(户静态表[m].妻名));
   if (牌) {
-    const 位 = 妻现位(牌, 钟楼号.value);
+    const 位 = 妻现位(牌);
     if (查房间(位)) return 位;
   }
   return null;
@@ -3832,14 +4759,48 @@ async function 点选项(文本: string) {
     return;
   }
   const 目标 = 选项移动目标(文本);
-  if (目标 && 目标 !== 当前房间.value) await 进入(目标);
+  if (目标 && 目标 !== 当前房间.value && !(await 进入(目标))) return;
   发出(文本);
+}
+
+function 选择亲密收尾(位置: string): void {
+  if (发送中.value || !性爱进行中.value || 性爱待失控收尾.value) return;
+  待确认收尾位置.value = 待确认收尾位置.value === 位置 ? '' : 位置;
+}
+
+function 切换亲密主焦点(门牌号: 门牌): void {
+  if (发送中.value || 性爱待失控收尾.value || 性爱主焦点.value?.门牌 === 门牌号) return;
+  eventEmit('人妻公寓:切换性爱主焦点', 门牌号);
+}
+
+function 确认亲密收尾(): void {
+  const 位置 = 待确认收尾位置.value;
+  if (!位置 || 发送中.value || !性爱进行中.value || 性爱待失控收尾.value) return;
+  if (!收尾选项.value.includes(位置)) {
+    待确认收尾位置.value = '';
+    return;
+  }
+  发出(`【亲密收尾:${位置}】主动选择在${位置}收束本场亲密互动。`);
+}
+
+function 确认失控收尾(): void {
+  if (发送中.value || !性爱待失控收尾.value) return;
+  const 位置 = 性爱场景.value.待收尾位置 || 默认失控位置(性爱场景.value);
+  发出(`【失控收尾】体力耗尽，按当前行为在${位置}失控结束。`);
 }
 
 /** 发出一条行动(输入框与行动选项按钮共用) */
 function 发出(文本: string) {
   文本 = 文本.trim();
   if (!文本 || 发送中.value) return;
+  const 系统 = data.value.系统;
+  if (!系统._待发送事件 && !系统._特殊场景.id && !静音会议正式中.value) {
+    const 门槛 = 行动资源门槛(data.value, 文本);
+    if (!门槛.可行动) {
+      弹提示(门槛.提示);
+      return;
+    }
+  }
   if (静音会议正式中.value) {
     if (静音会议交互幕.value || 静音会议场景.value.交互.状态 === '等待AI') return;
     if (静音会议自由待选择.value) return;
@@ -3874,7 +4835,7 @@ async function 发送() {
   if (需要由头.value && 可用由头.value.length) {
     const 用 = 可用由头.value[0];
     const 门牌号 = 当前房间.value!;
-    const 今日 = Math.floor(Math.max(0, 钟楼号.value) / 18);
+    const 今日 = 天数.value - 1;
     const 旧 = 工具由头记录.value[门牌号];
     const 已用 = 旧?.日 === 今日 && Array.isArray(旧.已用) ? [...旧.已用] : [];
     const 新记录 = { 日: 今日, 已用: [...new Set([...已用, 用])] };
@@ -3883,7 +4844,8 @@ async function 发送() {
       const 更新 = _.set({}, `_工具由头.${门牌号}`, 新记录);
       _.set(更新, '_场景', {
         房间id: 门牌号,
-        破门: 已破门进入.value,
+        破门: false,
+        非法进入: 已破门进入.value,
         进房末楼: 进房末楼.value,
         由头已用: true,
       });
@@ -4064,7 +5026,9 @@ const 选中档案 = computed(() => {
     门牌: m,
     妻名: 户静态表[m].妻名,
     夫名: 户静态表[m].夫名 || '她丈夫',
-    夫状态: 丈夫在楼(data.value.户[m], m, 位置种子.value),
+    夫状态: 丈夫在楼(data.value.户[m], m, 绝对时段.value),
+    阶段标题: 阶段标题(妻.当前阶段, m),
+    气质描述: 户静态表[m].初始?.气质描述 ?? '',
     基础立绘,
     立绘图: 当前立绘SKU ? `${素材基址}/立绘/${户静态表[m].妻名}_${当前立绘SKU}.webp` : 基础立绘,
     妻,
@@ -4109,7 +5073,16 @@ const 选中档案 = computed(() => {
 const 选中可晋阶 = computed(() => {
   const m = 选中门牌.value;
   if (!m || !data.value.户[m]) return false;
-  return 可晋阶(data.value.户[m].妻);
+  return (
+    (可晋阶(data.value.户[m].妻) && 普通首夜时段已满足(data.value, m)) ||
+    (m === '302' && 可启动母亲药物首夜(data.value, 当前房间.value))
+  );
+});
+
+const 选中首夜待晚上 = computed(() => {
+  const m = 选中门牌.value;
+  const 妻 = m ? data.value.户[m]?.妻 : undefined;
+  return !!m && m !== '302' && !!妻 && 妻.当前阶段 === 2 && 可晋阶(妻) && !普通首夜时段已满足(data.value, m);
 });
 
 const 显示关系线索 = ref(false);
@@ -4154,16 +5127,23 @@ type 道具视觉类型 = 'product' | 'evidence' | 'scene' | 'action';
 function 道具视觉信息(配?: 道具配置, 可读信 = false): { 类: 道具视觉类型; 标: string; 图: string } {
   if (可读信) return { 类: 'evidence', 标: '证物', 图: 'letter' };
   if (配?.类别 === '特殊场景') return { 类: 'scene', 标: '场景票', 图: 'scene' };
-  if (配 && ['工具', '运作', '药物', '性癖'].includes(配.类别)) return { 类: 'action', 标: '操作', 图: 'tool' };
+  if (配 && ['工具', '补给', '运作', '药物', '性癖'].includes(配.类别)) return { 类: 'action', 标: '操作', 图: 'tool' };
   return { 类: 'product', 标: '物品', 图: 配?.类别 === '服饰' ? 'dress' : 'gift' };
 }
 
 const 背包列表 = computed(() =>
   (data.value?.背包 ?? []).map(id => {
     const 配 = 查道具(id);
+    const 性 = 配?.类别 === '性癖' ? 查性癖(id) : undefined;
     const 信门牌 = 信物门牌(id);
     const 房 = 当前房间.value ? 查房间(当前房间.value) : undefined;
     const 在户内 = !!房 && 房.类型 === '户' && 房.id !== '302' && Boolean(data.value.户[房.id]);
+    const 是户向运作 = 配?.类别 === '运作' && ['钓鱼团购券', '夜班内推', '外地项目介绍', '代订惊喜'].includes(id);
+    const 全局运作候选 =
+      配?.类别 === '运作' && !是户向运作
+        ? 列出阶段线路候选详情(data.value, { 类型: '运作', 标识: id, 楼层: 绝对时段.value })
+        : [];
+    const 全局线路候选 = 全局运作候选.length === 1 ? 全局运作候选[0] : undefined;
     return {
       id,
       名称: 配?.名称 ?? id,
@@ -4184,6 +5164,8 @@ const 背包列表 = computed(() =>
         当前房间.value === '管理员室' &&
         !data.value.系统._特殊场景.id &&
         !data.value.系统._已完成特殊场景.includes('静音会议'),
+      // 安全套只允许在空闲时为下一场准备；进行中不展示一个注定会被后端拒绝的按钮。
+      可用资源: !!配?.资源效果 && !(id === '安全套' && 性爱进行中.value),
       // 礼物等可送出:须与她同处一室(当面);工具/运作/药物/性癖不走"送"
       // (药物=晋阶按钮自动消耗;性癖=装载;302特例:回家时可送妈东西——破妈妈墙的唯一入口,入列前也通)
       可送对象:
@@ -4192,7 +5174,7 @@ const 背包列表 = computed(() =>
         id !== '静音会议' &&
         !信门牌 &&
         id !== '针孔摄像头' &&
-        !['运作', '工具', '药物', '性癖'].includes(配?.类别 ?? '')
+        !['补给', '运作', '工具', '药物', '性癖'].includes(配?.类别 ?? '')
           ? [
               ...可见门牌.value.filter(m => 妻在玩家身边(m)).map(m => ({ 门牌: m, 妻名: 户静态表[m].妻名 })),
               ...(当前房间.value === '302' && data.value.户['302'] ? [{ 门牌: '302' as 门牌, 妻名: '妈' }] : []),
@@ -4203,27 +5185,59 @@ const 背包列表 = computed(() =>
         配?.类别 === '性癖'
           ? 可见门牌.value
               .filter(m => {
-                const 性 = 查性癖(id);
                 const 妻 = data.value.户[m]?.妻;
                 if (!性 || !妻) return false;
                 if (性.限定户 && !性.限定户.includes(m)) return false;
-                return 妻.当前阶段 >= (性.档 === 5 ? 5 : 4) && 妻.性癖装载.length < 3 && !妻.性癖装载.includes(id);
+                const 母亲终局开幕窗口 =
+                  m === '302' &&
+                  id === 户静态表['302'].招牌性癖 &&
+                  妻.当前阶段 === 4 &&
+                  妻._阶段线路.目标阶段 === 5 &&
+                  妻._阶段线路.活跃节点 === 1;
+                return (
+                  (妻.当前阶段 >= (性.档 === 5 ? 5 : 4) || 母亲终局开幕窗口) &&
+                  妻.性癖装载.length < 3 &&
+                  !妻.性癖装载.includes(id)
+                );
               })
-              .map(m => ({ 门牌: m, 妻名: 户静态表[m].妻名 }))
+              .map(m => {
+                const 妻 = data.value.户[m]!.妻;
+                const 时段可用 =
+                  妻.曾开发性癖.includes(id) || !性?.开幕允许时段 || 性.开幕允许时段.includes(时段.value);
+                return {
+                  门牌: m,
+                  妻名: 户静态表[m].妻名,
+                  时段可用,
+                  时段提示: 时段可用 ? '' : 性!.开幕允许时段!.join('或'),
+                };
+              })
           : [],
       // 运作道具(P3):全局四件直接"使用";户向四件按丈夫点名(须该户已入住且有夫)
-      可用运作: 配?.类别 === '运作' && !['钓鱼团购券', '夜班内推', '外地项目介绍', '代订惊喜'].includes(id),
-      运作对象:
-        配?.类别 === '运作' && ['钓鱼团购券', '夜班内推', '外地项目介绍', '代订惊喜'].includes(id)
-          ? 可见门牌.value.filter(m => 户静态表[m].夫名).map(m => ({ 门牌: m, 夫名: 户静态表[m].夫名 }))
-          : [],
+      可用运作: 配?.类别 === '运作' && !是户向运作 && 全局运作候选.length <= 1,
+      全局线路候选,
+      全局运作对象: 全局运作候选.length > 1 ? 全局运作候选 : [],
+      运作对象: 是户向运作
+        ? 可见门牌.value
+            .filter(m => 户静态表[m].夫名)
+            .map(m => ({ 门牌: m, 夫名: 户静态表[m].夫名, 时段可用: id !== '夜班内推' || 时段.value === '晚上' }))
+        : [],
     };
   }),
 );
 
-function 用运作(道具id: string, 门牌号?: 门牌) {
+function 用运作(道具id: string, 门牌号?: 门牌, 候选?: 阶段线路候选) {
   显示背包.value = false;
-  eventEmit('人妻公寓:使用运作', { 道具id, 门牌: 门牌号 });
+  eventEmit('人妻公寓:使用运作', {
+    道具id,
+    门牌: 门牌号,
+    预期目标阶段: 候选?.目标阶段,
+    预期节点: 候选?.节点,
+  });
+}
+
+function 用资源道具(道具id: string) {
+  显示背包.value = false;
+  eventEmit('人妻公寓:使用资源道具', 道具id);
 }
 
 function 装载(道具id: string, 门牌号: 门牌) {
@@ -4247,6 +5261,7 @@ const 货架 = computed(() => {
   const 最高阶段 = 户们.reduce((高, 节点) => Math.max(高, 节点.妻.当前阶段), 0);
   const 架: { 页签: string; 商品: 道具配置[]; 空文案?: string }[] = [
     { 页签: '工具', 商品: 按类('工具') },
+    { 页签: '补给', 商品: 按类('补给') },
     { 页签: '人情', 商品: 按类('人情') },
     { 页签: '运作', 商品: 按类('运作') },
   ];
@@ -4259,19 +5274,11 @@ const 货架 = computed(() => {
       商品: 按类('服饰').filter(d => (d.服饰?.档 ?? 9) <= Math.min(5, 最高阶段 + 1)),
       空文案: '新一季衣装正在打包发货——很快上架。',
     });
-  // 特殊场景(P5):只上前置满足的条目——买不到的戏不摆出来吊人;男用贞操带等无场景配置的常驻
+  // 特殊场景：九场始终可见，前置不足显示锁定条件；男用贞操带等无场景配置商品常驻。
   if (最高阶段 >= 3)
     架.push({
       页签: '特殊场景',
-      商品: 按类('特殊场景').filter(d => {
-        const 场 = 查特殊场景(d.id);
-        if (!场) return true;
-        try {
-          return 场.前置(data.value as never);
-        } catch {
-          return false;
-        }
-      }),
+      商品: 按类('特殊场景'),
       空文案: '有些节目要等合适的人到齐才开演。',
     });
   if (最高阶段 >= 4) 架.push({ 页签: '性癖', 商品: 按类('性癖'), 空文案: '这一栏的货,认人。到货会通知你。' });
@@ -4284,6 +5291,20 @@ const 货架 = computed(() => {
 
 const 当前货架 = computed(() => 货架.value.find(页 => 页.页签 === 商店页签.value)?.商品 ?? []);
 const 当前空文案 = computed(() => 货架.value.find(页 => 页.页签 === 商店页签.value)?.空文案 ?? '(暂时没货)');
+
+function 商品锁定原因(商品: 道具配置): string[] {
+  const 场景 = 查特殊场景(商品.id);
+  if (!场景) return [];
+  const 前置 = 特殊场景锁定状态(data.value as never, 商品.id);
+  const 缺少 = [...前置.缺少];
+  if (场景.允许时段 && !场景.允许时段.includes(时段.value)) 缺少.push(`须在${场景.允许时段.join('或')}开演`);
+  return 缺少;
+}
+
+function 商品购买文案(商品: 道具配置): string {
+  const 允许 = 查特殊场景(商品.id)?.允许时段;
+  return 允许 && !允许.includes(时段.value) ? `${允许.join('或')}开演` : '买下';
+}
 
 function 买(道具id: string) {
   eventEmit('人妻公寓:购买', 道具id);
@@ -4325,17 +5346,11 @@ const 显示监控 = ref(false);
 /**
  * 监控列表改响应式(2026-07-17 用户反馈:装完摄像头按钮不立刻弹):手动刷新的 ref 会在
  * store 拉回新账之前读到旧数据,之后又无人再刷;computed 跟着 store 走,数据一到位自动弹。
- * 布设名单主账在 stat(与背包同生共死);旧局 chat 变量 `_摄像头` 只读兼容。
+ * 布设名单只读 stat 主账，与背包在同一个楼层快照中同生共死。
  */
 const 监控列表 = computed<门牌[]>(() => {
   const 布设 = (data.value?.系统 as { _摄像头布设?: Record<string, boolean> } | undefined)?._摄像头布设 ?? {};
-  let legacy: Record<string, boolean> = {};
-  try {
-    legacy = (_.get(getVariables({ type: 'chat' }), '_摄像头') ?? {}) as Record<string, boolean>;
-  } catch {
-    /* chat 变量读取失败只影响旧局兼容 */
-  }
-  return 门牌列表.filter(m => 布设[m] || legacy[m]);
+  return 门牌列表.filter(m => 布设[m]);
 });
 
 function 看监控(门牌号: 门牌) {
@@ -4538,8 +5553,16 @@ function 过酒馆正则(文本: string, 来源: 'ai_output' | 'user_input', 深
   return 文本;
 }
 
+let 当前预设正文标签: 预设正文标签 | null = null;
+
+function 刷新当前预设正文标签(): void {
+  当前预设正文标签 = 读取当前预设正文标签();
+}
+
 function 清洗(原文: string, 流式 = false): string {
-  const 闭合清 = 原文
+  const 协议清 = 清洗预设输出(原文, 流式 ? 当前预设正文标签 : null);
+  if (流式 && 当前预设正文标签 && !协议清.正文已开始) return '';
+  const 闭合清 = 协议清.文本
     // content 包裹型预设：正文边界明确时只显示 content，兼容思考标签开闭名称不一致。
     // 未闭合 content 也只裁掉前缀，保留其后的正文；流式生成时同样不会露出思考区。
     .replace(/^[\s\S]*?<content\b[^>]*>/i, '')
@@ -4590,10 +5613,10 @@ function 清洗(原文: string, 流式 = false): string {
     .replace(/<!DOCTYPE[\s\S]*?<\/html\s*>/gi, '')
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-    // 兼容玩家预设用作换行但没有闭合的裸 <p>；旧档里已经落下的同类标签也在显示时修复。
+    // 兼容玩家预设用作换行但没有闭合的裸 <p>。
     .replace(/<\/?p(?:\s[^>]*)?>/gi, '\n')
     // 玩家预设夹带的包装 div(2026-07-19,同脚本侧):konata-thinking-wrapper/tucao-w 等
-    // 空壳或漏闭合裸 div 剥壳(内容保留;对旧档已污染楼层同样生效)
+    // 空壳或漏闭合裸 div 剥壳，保留其中正文。
     .replace(/<\/?div[^>]*>/gi, '');
   const 全清 = 闭合清
     // 未闭合块也吞掉:流式=防半截标记块闪现;完整楼层=防截断残块
@@ -4630,12 +5653,16 @@ async function 滚到底() {
   if (卷轴容器.value) 卷轴容器.value.scrollTop = 卷轴容器.value.scrollHeight;
 }
 
+let 卷轴请求序号 = 0;
+
 async function 取卷轴() {
+  const 请求序号 = ++卷轴请求序号;
   try {
     刷新玩家正则();
     const 末楼 = getLastMessageId();
-    末楼号.value = 末楼;
     const 消息组 = (await getChatMessages(`0-${末楼}`)) ?? [];
+    if (请求序号 !== 卷轴请求序号) return;
+    末楼号.value = 末楼;
     const 条目: 卷轴条[] = [];
     for (const 消息 of 消息组) {
       const 是玩家 = 消息.role === 'user';
@@ -4741,7 +5768,12 @@ async function 存编辑() {
 
 const 全屏中 = ref(false);
 const 真全屏中 = ref(false);
-const 移动端 = ref(window.matchMedia('(max-width: 540px)').matches);
+const 移动端媒体 = window.matchMedia('(max-width: 540px)');
+const 移动端 = ref(移动端媒体.matches);
+
+function 同步移动端断点(event: MediaQueryListEvent): void {
+  移动端.value = event.matches;
+}
 
 type 全屏根 = HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void };
 type 全屏文档 = Document & { webkitExitFullscreen?: () => void; webkitFullscreenElement?: Element | null };
@@ -4872,27 +5904,14 @@ function 切换主题() {
 const 设置开 = ref(false);
 const 设置存储键 = '人妻公寓_界面偏好';
 
-// 首次进入序章时主动说明安装顺序；按版本换键，让旧玩家升级后也能看到记忆插件二选一。
+// 首次进入序章时主动说明安装顺序；按版本换键，让旧玩家升级后也能看到数据库单路线说明。
 const 首次说明开 = ref(false);
-const 首次说明存储键 = '人妻公寓_首次游玩说明_rq037';
+const 首次说明存储键 = '人妻公寓_首次游玩说明_database_sql_mode_20260803';
 const 酒馆助手版本清单地址 = [
   'https://raw.githubusercontent.com/N0VI028/JS-Slash-Runner/main/manifest.json',
   'https://fastly.jsdelivr.net/gh/N0VI028/JS-Slash-Runner@main/manifest.json',
 ];
-const 记忆方案存储键 = '人妻公寓_记忆方案';
-const 智脑安装代码 = "import 'https://cdn.jsdelivr.net/gh/sillytavner-jpg/zhino-script@v5.0.8/dist/index.js'";
 const 数据库检测 = ref(数据库状态());
-const 智脑检测 = ref(智脑状态());
-const 记忆方案 = ref<'数据库' | '智脑' | ''>(
-  (() => {
-    try {
-      const saved = localStorage.getItem(记忆方案存储键);
-      return saved === '数据库' || saved === '智脑' ? saved : '';
-    } catch {
-      return '';
-    }
-  })(),
-);
 const 安装模板中 = ref(false);
 const 调整填表设置中 = ref(false);
 const 酒馆助手版本 = ref('');
@@ -4921,14 +5940,8 @@ const 酒馆助手检测说明 = computed(() =>
           : `检测到 ${酒馆助手版本.value}；官方最新版本为 ${酒馆助手最新版本.value}，建议更新（不影响开始游戏）`,
 );
 
-const 记忆方案完成 = computed(() =>
-  记忆方案.value === '数据库'
-    ? 数据库检测.value.已安装 && 数据库检测.value.已装游戏模板 && !智脑检测.value.已安装
-    : 记忆方案.value === '智脑'
-      ? 智脑检测.value.已安装 && !数据库检测.value.已安装
-      : false,
-);
-const 首次准备完成 = computed(() => 酒馆助手已安装.value && 记忆方案完成.value);
+const 数据库准备完成 = computed(() => 数据库检测.value.已安装 && 数据库检测.value.已装游戏模板);
+const 首次准备完成 = computed(() => 酒馆助手已安装.value && 数据库准备完成.value);
 
 async function 查询酒馆助手最新版本() {
   let 最后错误: unknown;
@@ -4970,11 +5983,6 @@ async function 刷新酒馆助手检测() {
 
 function 刷新数据库检测() {
   数据库检测.value = 数据库状态();
-  智脑检测.value = 智脑状态();
-  if (!记忆方案.value) {
-    if (数据库检测.value.已安装 && !智脑检测.value.已安装) 记忆方案.value = '数据库';
-    else if (智脑检测.value.已安装 && !数据库检测.value.已安装) 记忆方案.value = '智脑';
-  }
 }
 
 function 刷新全部检测() {
@@ -4982,32 +5990,7 @@ function 刷新全部检测() {
   void 刷新酒馆助手检测();
 }
 
-function 选择记忆方案(value: '数据库' | '智脑') {
-  记忆方案.value = value;
-  try {
-    localStorage.setItem(记忆方案存储键, value);
-  } catch {
-    /* 隐私模式下只保留本次选择。 */
-  }
-  刷新数据库检测();
-}
-
-async function 复制智脑安装代码() {
-  try {
-    await navigator.clipboard.writeText(智脑安装代码);
-    弹提示('智脑 v5.0.8 安装代码已复制。', 3000);
-  } catch {
-    (window.parent ?? window).prompt('复制下面这行安装代码：', 智脑安装代码);
-  }
-}
-
 function 打开首次说明() {
-  try {
-    const saved = localStorage.getItem(记忆方案存储键);
-    if (saved === '数据库' || saved === '智脑') 记忆方案.value = saved;
-  } catch {
-    /* ignore */
-  }
   刷新全部检测();
   首次说明开.value = true;
 }
@@ -5023,14 +6006,6 @@ function 完成首次说明() {
 
 async function 从说明安装数据库模板() {
   刷新数据库检测();
-  if (记忆方案.value !== '数据库') {
-    弹提示('请先选择“数据库”路线。', 4000);
-    return;
-  }
-  if (智脑检测.value.已安装) {
-    弹提示('检测到智脑仍在运行。请先在酒馆助手的全局脚本中禁用智脑并刷新页面。', 6000);
-    return;
-  }
   if (!数据库检测.value.已安装) {
     弹提示('未检测到数据库插件。安装并刷新酒馆后，再回来重新检测。', 5000);
     return;
@@ -5101,15 +6076,17 @@ const 垫板浓度 = ref(0.66);
 const 省流 = ref(false);
 /** 减少动效 */
 const 减动效 = ref(false);
-/** DeepSeek / Gemini 正文完成后，是否追加一次只输出变量块的静默结算。 */
-const 二次变量结算 = ref(true);
+/** 未使用 MVU 外置解析时，是否让当前正文模型追加一次只输出变量块的静默结算。 */
+const 二次变量结算 = ref(false);
+const MVU解析 = ref<MVU解析状态>(读取MVU解析状态());
+let MVU解析刷新timer: ReturnType<typeof setInterval> | undefined;
 
 const 字号档表: Record<'小' | '中' | '大', string> = { 小: '0.82em', 中: '0.9em', 大: '1.02em' };
 
 /** 主题「跟随」时按游戏时段推日夜(晚上/深夜=暗) */
 const 时段偏暗 = computed(() => 时段.value === '晚上' || 时段.value === '深夜');
 
-// 主题结算全响应式(2026-07-17 跟随时段黑字修复):挂载恢复/切档/楼层推进换时段/回合完成,
+// 主题结算全响应式：挂载恢复、切档或显式世界时段更新后，跟随模式同步日夜配色。
 // 任何一路动到依赖都立刻重算,不再依赖手工调用点的时序
 watchEffect(() => {
   const 该暗 = 主题模式.value === '跟随' ? 时段偏暗.value : 主题模式.value === '夜间';
@@ -5128,6 +6105,9 @@ function 应用界面偏好() {
 }
 
 function 持久化设置() {
+  const 最新MVU解析 = 读取MVU解析状态();
+  MVU解析.value = 最新MVU解析;
+  if (最新MVU解析.外置模式) 二次变量结算.value = false;
   try {
     localStorage.setItem(主题存储键, 暗色.value ? '1' : '0'); // 兼容旧键
     localStorage.setItem(
@@ -5154,6 +6134,26 @@ function 改设置() {
   持久化设置();
 }
 
+/** 设置页与回合引擎都以 MVU 的真实更新方式为准，不允许两条变量路线同时开启。 */
+function 刷新MVU解析状态() {
+  const 最新 = 读取MVU解析状态();
+  MVU解析.value = 最新;
+  if (!最新.外置模式 || !二次变量结算.value) return;
+  二次变量结算.value = false;
+  持久化设置();
+}
+
+function 切换二次变量结算() {
+  刷新MVU解析状态();
+  if (MVU解析.value.外置模式) {
+    二次变量结算.value = false;
+    持久化设置();
+    return;
+  }
+  二次变量结算.value = !二次变量结算.value;
+  改设置();
+}
+
 function 恢复设置() {
   try {
     const raw = localStorage.getItem(设置存储键);
@@ -5174,6 +6174,7 @@ function 恢复设置() {
   } catch {
     /* 读不到就用默认 */
   }
+  刷新MVU解析状态();
   应用界面偏好();
 }
 
@@ -5183,7 +6184,15 @@ const 重开确认 = ref(false);
 
 // 弹窗一关就撤销"待确认"武装态,防下次误触
 watch(设置开, 开 => {
-  if (!开) 重开确认.value = false;
+  clearInterval(MVU解析刷新timer);
+  MVU解析刷新timer = undefined;
+  if (开) {
+    刷新MVU解析状态();
+    // MVU 没有公开设置变更事件；仅在设置页可见时轻量刷新，关闭后不常驻轮询。
+    MVU解析刷新timer = setInterval(刷新MVU解析状态, 1500);
+  } else {
+    重开确认.value = false;
+  }
 });
 
 function 点重开() {
@@ -5208,13 +6217,14 @@ function 重置偏好() {
   省流.value = false;
   减动效.value = false;
   立绘显示.value = true;
-  二次变量结算.value = true;
+  二次变量结算.value = false;
   try {
     localStorage.removeItem(设置存储键);
     localStorage.removeItem(主题存储键);
   } catch {
     /* ignore */
   }
+  刷新MVU解析状态();
   应用界面偏好();
 }
 
@@ -5243,6 +6253,8 @@ onErrorCaptured(err => {
 // ── 挂载:事件接线 + 状态恢复 ──
 
 onMounted(() => {
+  移动端媒体.addEventListener('change', 同步移动端断点);
+  eventOn('global_Mvu_initialized', 刷新MVU解析状态);
   读取CG解锁();
   void 刷新酒馆助手检测();
   void 取卷轴();
@@ -5270,6 +6282,7 @@ onMounted(() => {
 
   eventOn('人妻公寓:生成开始', () => {
     // 脚本侧发起的回合(查看监控等)也要锁输入+亮书写态;驻留的拾获卡顺手收掉不挡戏
+    刷新当前预设正文标签();
     发送中.value = true;
     运行阶段.value = '正在准备本回合';
     开始生成计时();
@@ -5291,6 +6304,18 @@ onMounted(() => {
   eventOn('人妻公寓:运行阶段', (阶段: string) => {
     运行阶段.value = typeof 阶段 === 'string' ? 阶段 : '';
   });
+  eventOn('人妻公寓:时间推进结束', (成功: boolean) => {
+    时间撤销刷新版本.value += 1;
+    if (成功) return; // 成功路径由“回合完成”统一拉取新时钟和地图。
+    发送中.value = false;
+    运行阶段.value = '';
+    同步场景自变量();
+    try {
+      (store as unknown as { pull?: () => void }).pull?.();
+    } catch {
+      /* store 未带 pull 时靠轮询兜底 */
+    }
+  });
   eventOn('人妻公寓:CG回合信号', (信号: CG回合信号) => {
     // 荣耀洞拥有独立三拍画面；这里仍可接收事件，但渲染层与解锁层均不采用普通CG。
     if (荣耀洞图.value) {
@@ -5301,33 +6326,37 @@ onMounted(() => {
     处理CG回合信号(信号);
   });
   eventOn('人妻公寓:回合完成', async () => {
-    发送中.value = false;
-    运行阶段.value = '';
     停止生成计时();
-    待重试行动.value = '';
-    失败行动.value = '';
-    取消后自动重试.value = false;
-    流式段.value = [];
-    录像带本地结果.value = '';
-    clearTimeout(录像带连点timer);
-    录像带连点计数.value = 0;
-    录像带连点开始 = 0;
-    if (静音会议待散会选择.value) 静音会议会后选择.value = [];
-    同步场景自变量(); // 回档把 _场景 清空后 UI 必须跟着回楼道(审计 C2)
-    幕房间.value = 当前房间.value; // 本轮的戏与选项绑定产出场景,换地方即收
-    // 先拉到最新楼号，再按新时钟重算作息/地图。旧顺序会让地图停在上一楼，直到玩家再点瓷砖才刷新。
-    await 取卷轴();
-    刷新可重掷();
-    刷赴约();
-    刷新在场();
-    刷新行动选项();
-    刷新偷窥待选();
     try {
-      (store as unknown as { pull?: () => void }).pull?.();
-    } catch {
-      /* store 未带 pull 时靠轮询兜底 */
+      待重试行动.value = '';
+      失败行动.value = '';
+      取消后自动重试.value = false;
+      流式段.value = [];
+      录像带本地结果.value = '';
+      clearTimeout(录像带连点timer);
+      录像带连点计数.value = 0;
+      录像带连点开始 = 0;
+      if (静音会议待散会选择.value) 静音会议会后选择.value = [];
+      同步场景自变量(); // 回档把 _场景 清空后 UI 必须跟着回楼道(审计 C2)
+      幕房间.value = 当前房间.value; // 本轮的戏与选项绑定产出场景,换地方即收
+      // 先同步消息历史，再刷新 MVU；时间事务必须等新时钟真正 pull 完成后才能重新点按钮。
+      await 取卷轴();
+      刷新可重掷();
+      刷赴约();
+      刷新在场();
+      刷新行动选项();
+      刷新偷窥待选();
+      try {
+        await Promise.resolve((store as unknown as { pull?: () => void | Promise<void> }).pull?.());
+      } catch {
+        /* store 未带 pull 时靠轮询兜底 */
+      }
+      await nextTick();
+      同步静音会议界面();
+    } finally {
+      发送中.value = false;
+      运行阶段.value = '';
     }
-    nextTick(同步静音会议界面);
   });
   eventOn('人妻公寓:隔离事件完成', async () => {
     发送中.value = false;
@@ -5360,11 +6389,7 @@ onMounted(() => {
     同步场景自变量(); // 监控回合失败时脚本已把 _场景 回滚,画面跟着回原位(审计 C4)
     const 待重试 = 待重试行动.value.trim();
     const 将自动重试 = 取消后自动重试.value && !!待重试;
-    if (
-      静音会议正式中.value &&
-      静音会议场景.value.阶段.includes('自由') &&
-      !将自动重试
-    ) {
+    if (静音会议正式中.value && 静音会议场景.value.阶段.includes('自由') && !将自动重试) {
       // 自由循环失败后重新交还“继续/结束”选择权；主动“放弃并重试”则保留闩锁，
       // 让下一个事件循环可以直接重发同一行动。
       静音会议继续已选.value = false;
@@ -5395,7 +6420,8 @@ onMounted(() => {
   });
   eventOn('人妻公寓:监控回合', () => {
     // 脚本侧已写好 _场景=302 并即将开偷窥回合,这里只同步画面(进入 重写同值场景,幂等)
-    if (当前房间.value !== '302') 进入('302');
+    if (当前房间.value !== '302') void 进入('302');
+    else 同步场景自变量();
   });
   eventOn('人妻公寓:特殊场景状态', () => {
     try {
@@ -5406,6 +6432,7 @@ onMounted(() => {
     nextTick(同步静音会议界面);
   });
   eventOn('人妻公寓:手机状态', (状: { 未读?: boolean }) => {
+    时间撤销刷新版本.value += 1;
     手机未读.value = !!状?.未读;
     刷赴约(); // 约出来是纯手机操作不产楼,靠这条通知让地图位置即时跟上
     if (当前房间.value) {
@@ -5416,6 +6443,7 @@ onMounted(() => {
     }
   });
   eventOn('人妻公寓:手机收起', async () => {
+    时间撤销刷新版本.value += 1;
     // 开手机时替玩家退过真全屏,收起就送回去;收起点按=用户手势,同源iframe吃得到激活态
     if (!收手机回全屏) return;
     收手机回全屏 = false;
@@ -5449,15 +6477,10 @@ onMounted(() => {
     }
   });
 
-  // 恢复场景(刷新页面/重开酒馆后仍在原房间,位置种子一并恢复)
-  const 场景 = _.get(getVariables({ type: 'chat' }), '_场景') as {
-    房间id?: string;
-    破门?: boolean;
-    进房末楼?: number;
-    由头已用?: boolean;
-  } | null;
+  // 恢复场景(刷新页面/重开酒馆后仍在原房间)
+  const 场景 = _.get(getVariables({ type: 'chat' }), '_场景') as 场景聊天状态 | null;
   当前房间.value = 场景?.房间id ?? null;
-  已破门进入.value = !!场景?.破门;
+  已破门进入.value = !!场景?.非法进入;
   本次入房由头已用.value = !!场景?.由头已用;
   幕房间.value = 当前房间.value; // 刷新恢复:已有正文与选项视为当前场景的
   try {
@@ -5514,10 +6537,13 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  移动端媒体.removeEventListener('change', 同步移动端断点);
+  clearInterval(MVU解析刷新timer);
   clearInterval(心跳timer);
   clearInterval(生成等待timer);
   clearTimeout(破门计时);
   clearTimeout(提示timer);
+  clearTimeout(性爱结果timer);
   clearTimeout(键盘定位timer);
   clearTimeout(录像带连点timer);
   clearTimeout(静音会议筹备timer);
@@ -5538,6 +6564,7 @@ onUnmounted(() => {
 
 @media (max-width: 540px) {
   .mobile-fullscreen-cta {
+    display: flex;
     position: fixed;
     z-index: 120;
     left: 50%;
@@ -6426,6 +7453,619 @@ onUnmounted(() => {
   padding: 6px 2px 0;
 }
 
+/* 亲密场景占用正文舞台：平时只露出底栏，管理时从舞台底边向上展开。 */
+.intimacy-stage-dock {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  pointer-events: none;
+  transition: background 0.24s ease;
+}
+
+.intimacy-stage-dock.open {
+  pointer-events: auto;
+  background: rgba(37, 25, 39, 0.28);
+  backdrop-filter: blur(2px);
+}
+
+.intimacy-summary {
+  position: relative;
+  z-index: 2;
+  flex: none;
+  min-height: 48px;
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) auto auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  color: var(--ink);
+  background: linear-gradient(110deg, rgba(255, 230, 239, 0.96), rgba(247, 242, 253, 0.96)), var(--glass);
+  border: 0;
+  border-top: 1px solid rgba(222, 91, 142, 0.42);
+  border-radius: 0 0 calc(var(--radius) - 1px) calc(var(--radius) - 1px);
+  box-shadow: 0 -5px 18px rgba(85, 46, 75, 0.14);
+  cursor: pointer;
+  pointer-events: auto;
+  text-align: left;
+}
+
+.intimacy-summary:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.intimacy-summary:focus-visible,
+.intimacy-people article:focus-visible,
+.intimacy-collapse:focus-visible {
+  outline: 2px solid #bf3f72;
+  outline-offset: -3px;
+}
+
+.intimacy-summary-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.intimacy-summary-copy small,
+.intimacy-summary-progress small {
+  color: var(--ink-faint);
+  font-size: 0.58em;
+}
+
+.intimacy-summary-copy b {
+  overflow: hidden;
+  color: #a83261;
+  font-size: 0.78em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.intimacy-summary-progress {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.intimacy-summary-progress b {
+  color: #b43768;
+  font: 900 0.74em/1 var(--font-mono);
+}
+
+.intimacy-summary-stamina,
+.intimacy-summary-action {
+  padding: 4px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  font-size: 0.64em;
+  font-weight: 800;
+}
+
+.intimacy-summary-stamina {
+  color: #a83261;
+  background: rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(222, 91, 142, 0.22);
+}
+
+.intimacy-summary-action {
+  color: #fff;
+  background: #b93e70;
+}
+
+.intimacy-stage-dock.critical .intimacy-summary {
+  border-top-color: rgba(194, 47, 65, 0.62);
+}
+
+.intimacy-stage-dock.critical .intimacy-summary-stamina {
+  color: #a6273a;
+  background: rgba(255, 220, 224, 0.84);
+}
+
+.intimacy-panel {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-height: calc(100% - 48px);
+  overflow-y: auto;
+  padding: 10px 12px 9px;
+  color: var(--ink);
+  background:
+    linear-gradient(120deg, rgba(255, 228, 238, 0.98), rgba(244, 239, 251, 0.98) 58%, rgba(255, 252, 247, 0.98)),
+    var(--glass);
+  border: 1px solid rgba(222, 91, 142, 0.3);
+  border-bottom: 0;
+  border-radius: 15px 15px 0 0;
+  box-shadow:
+    inset 3px 0 0 rgba(239, 79, 121, 0.56),
+    0 -12px 32px rgba(66, 45, 76, 0.2);
+  scrollbar-width: thin;
+}
+
+.intimacy-stage-dock.critical .intimacy-panel {
+  border-color: rgba(211, 61, 75, 0.5);
+  box-shadow:
+    inset 3px 0 0 var(--red),
+    0 5px 18px rgba(211, 61, 75, 0.13);
+}
+
+.intimacy-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+
+.intimacy-collapse {
+  padding: 4px 9px;
+  color: #9d315c;
+  background: rgba(255, 255, 255, 0.64);
+  border: 1px solid rgba(190, 61, 112, 0.28);
+  border-radius: 999px;
+  font-size: 0.64em;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.intimacy-panel > header span {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.intimacy-panel > header small {
+  color: #c94779;
+  font: 800 7px/1 var(--font-mono);
+  letter-spacing: 0.16em;
+}
+
+.intimacy-panel > header b {
+  font-size: 0.84em;
+  letter-spacing: 0.08em;
+}
+
+.intimacy-panel > header em {
+  padding: 3px 8px;
+  color: #c94779;
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(222, 91, 142, 0.24);
+  border-radius: 999px;
+  font: 800 0.68em/1.2 var(--font-display);
+  font-style: normal;
+}
+
+.intimacy-people {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.intimacy-people article {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 7px;
+  background: rgba(255, 255, 255, 0.56);
+  border: 1px solid rgba(102, 83, 122, 0.12);
+  border-radius: 10px;
+  cursor: pointer;
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.intimacy-people article:hover:not(.disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(203, 58, 113, 0.38);
+}
+
+.intimacy-people article.focused {
+  border-color: #c53f74;
+  box-shadow:
+    inset 0 0 0 1px rgba(197, 63, 116, 0.2),
+    0 4px 12px rgba(135, 53, 95, 0.12);
+}
+
+.intimacy-people article.disabled {
+  cursor: default;
+}
+
+.intimacy-people article.satisfied {
+  border-color: rgba(230, 153, 45, 0.44);
+  background: linear-gradient(110deg, rgba(255, 231, 166, 0.62), rgba(255, 255, 255, 0.55));
+}
+
+.intimacy-avatar,
+.intimacy-avatar img {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  border-radius: 50%;
+}
+
+.intimacy-avatar {
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: #fff;
+  background: linear-gradient(145deg, #ef6e9d, #8b72ca);
+  border: 2px solid rgba(255, 255, 255, 0.78);
+}
+
+.intimacy-avatar img {
+  object-fit: cover;
+}
+
+.intimacy-satisfaction {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.intimacy-satisfaction > b {
+  font-size: 0.72em;
+}
+
+.intimacy-person-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.intimacy-person-title > b {
+  font-size: 0.72em;
+}
+
+.intimacy-person-title > em {
+  padding: 1px 5px;
+  color: #fff;
+  background: #bd3d70;
+  border-radius: 999px;
+  font-size: 0.5em;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.intimacy-person-title > em.complete {
+  color: #795114;
+  background: rgba(238, 188, 79, 0.35);
+}
+
+.intimacy-satisfaction > small {
+  color: var(--ink-faint);
+  font-size: 0.58em;
+}
+
+.intimacy-satisfaction > small.intimacy-preference {
+  max-width: 190px;
+  overflow: hidden;
+  color: var(--ink-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.intimacy-satisfaction > small.intimacy-preference.hit {
+  color: #bd4975;
+  font-weight: 800;
+}
+
+.petals {
+  display: flex;
+  gap: 2px;
+  font-size: 0.58em;
+  line-height: 1;
+}
+
+.petals i {
+  color: rgba(55, 46, 65, 0.14);
+  font-style: normal;
+}
+
+.petals i.on {
+  color: #ef5d91;
+  text-shadow: 0 0 5px rgba(239, 93, 145, 0.35);
+}
+
+.intimacy-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.intimacy-meta span {
+  padding: 2px 7px;
+  color: var(--ink-faint);
+  background: rgba(255, 255, 255, 0.48);
+  border-radius: 999px;
+  font-size: 0.58em;
+}
+
+.intimacy-meta b {
+  color: var(--ink-soft);
+}
+
+.intimacy-warning {
+  margin: 6px 0 0;
+  padding: 5px 7px;
+  color: #a83144;
+  background: rgba(255, 220, 224, 0.66);
+  border-left: 3px solid var(--red);
+  border-radius: 6px;
+  font-size: 0.65em;
+  line-height: 1.4;
+}
+
+.intimacy-finishes {
+  position: sticky;
+  bottom: -9px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 7px -4px 0;
+  padding: 7px 4px 1px;
+  background: linear-gradient(180deg, rgba(250, 244, 250, 0), rgba(250, 244, 250, 0.96) 22%);
+}
+
+.intimacy-sheet-enter-active,
+.intimacy-sheet-leave-active {
+  transition:
+    transform 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.2s ease;
+}
+
+.intimacy-sheet-enter-from,
+.intimacy-sheet-leave-to {
+  opacity: 0;
+  transform: translateY(22px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .intimacy-stage-dock,
+  .intimacy-sheet-enter-active,
+  .intimacy-sheet-leave-active,
+  .intimacy-people article {
+    transition: none;
+  }
+}
+
+.intimacy-finish-label {
+  flex: 0 0 100%;
+  color: var(--ink-faint);
+  font-size: 0.56em;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.finish-tile {
+  min-height: 27px;
+  padding: 4px 10px;
+  color: #a33461;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 226, 237, 0.84));
+  border: 1px solid rgba(222, 91, 142, 0.32);
+  border-radius: 8px;
+  font: 800 0.65em/1.2 inherit;
+  cursor: pointer;
+}
+
+.finish-tile:hover:not(:disabled) {
+  color: #fff;
+  background: linear-gradient(180deg, #f26f9e, #df4f83);
+  transform: translateY(-1px);
+}
+
+.finish-tile.selected {
+  color: #fff;
+  background: linear-gradient(180deg, #e96a99, #cd3f76);
+  border-color: #b63065;
+  box-shadow: 0 0 0 2px rgba(222, 79, 132, 0.15);
+}
+
+.finish-tile.confirm {
+  margin-left: auto;
+  color: #fff;
+  background: linear-gradient(180deg, #8f77cf, #7159b2);
+  border-color: #654caa;
+}
+
+.finish-tile.danger {
+  color: #fff;
+  background: linear-gradient(180deg, #e86573, #bb3547);
+  border-color: #a93243;
+}
+
+.finish-tile:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.scene-result-card {
+  flex: none;
+  margin-top: 6px;
+  padding: 9px 10px 10px;
+  color: var(--ink);
+  background:
+    linear-gradient(125deg, rgba(255, 227, 157, 0.2), rgba(255, 252, 247, 0.78) 45%, rgba(230, 218, 255, 0.2)),
+    var(--glass);
+  border: 1px solid rgba(199, 144, 54, 0.34);
+  border-radius: 15px;
+  box-shadow:
+    inset 3px 0 0 rgba(219, 159, 61, 0.68),
+    0 5px 16px rgba(66, 45, 76, 0.08);
+  backdrop-filter: blur(8px);
+}
+
+.scene-result-card > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.scene-result-card > header span {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.scene-result-card > header small {
+  color: #b17727;
+  font: 800 7px/1 var(--font-mono);
+  letter-spacing: 0.16em;
+}
+
+.scene-result-card > header b {
+  font-size: 0.84em;
+  letter-spacing: 0.08em;
+}
+
+.scene-result-card > header em {
+  padding: 3px 8px;
+  color: #97621c;
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(199, 144, 54, 0.24);
+  border-radius: 999px;
+  font: 800 0.68em/1.2 var(--font-display);
+  font-style: normal;
+}
+
+.scene-result-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
+}
+
+.scene-result-meta span {
+  padding: 2px 7px;
+  color: var(--ink-faint);
+  background: rgba(255, 255, 255, 0.48);
+  border-radius: 999px;
+  font-size: 0.58em;
+}
+
+.scene-result-meta b {
+  color: var(--ink-soft);
+}
+
+.scene-result-people {
+  display: grid;
+  grid-auto-columns: minmax(210px, 1fr);
+  grid-auto-flow: column;
+  gap: 6px;
+  margin-top: 7px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.scene-result-people article {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 6px 8px;
+  background: rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(102, 83, 122, 0.12);
+  border-left: 3px solid #d09a3f;
+  border-radius: 10px;
+}
+
+.scene-result-people article.duration-太短 {
+  border-left-color: #8d78c8;
+}
+
+.scene-result-people article.duration-过久 {
+  border-left-color: #d64678;
+  background: rgba(255, 232, 240, 0.68);
+}
+
+.scene-result-people article.duration-失控 {
+  border-left-color: var(--red);
+  background: rgba(255, 228, 231, 0.62);
+}
+
+.scene-result-copy {
+  min-width: 0;
+  display: grid;
+  flex: 1;
+  gap: 2px;
+}
+
+.scene-result-copy > span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+}
+
+.scene-result-copy > span > b {
+  font-size: 0.72em;
+}
+
+.scene-result-copy strong {
+  flex: none;
+  padding: 2px 6px;
+  color: #9b6921;
+  background: rgba(255, 235, 184, 0.72);
+  border-radius: 999px;
+  font-size: 0.58em;
+}
+
+.duration-太短 .scene-result-copy strong {
+  color: #6d56a9;
+  background: rgba(231, 225, 255, 0.76);
+}
+
+.duration-过久 .scene-result-copy strong {
+  color: #ad2d62;
+  background: rgba(255, 216, 231, 0.8);
+}
+
+.duration-失控 .scene-result-copy strong {
+  color: #a83144;
+  background: rgba(255, 210, 217, 0.78);
+}
+
+.scene-result-copy > small {
+  color: var(--ink-faint);
+  font-size: 0.58em;
+}
+
+.scene-result-copy p {
+  margin: 1px 0;
+  color: var(--ink-soft);
+  font-size: 0.63em;
+  line-height: 1.4;
+}
+
+.scene-result-copy > small.scene-result-preference {
+  overflow: hidden;
+  color: #b44a75;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scene-result-enter-active,
+.scene-result-leave-active {
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease;
+}
+
+.scene-result-enter-from,
+.scene-result-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
 .scene-name {
   color: #fff;
   white-space: nowrap;
@@ -6526,6 +8166,7 @@ onUnmounted(() => {
 .quill {
   flex: none;
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   margin-top: 6px;
 }
@@ -6552,6 +8193,14 @@ onUnmounted(() => {
 
 .quill-btn {
   align-self: stretch;
+}
+
+.resource-lock-hint {
+  flex-basis: 100%;
+  margin: -1px 4px 0;
+  color: var(--red);
+  font-size: 0.66em;
+  line-height: 1.35;
 }
 
 .reroll-row {
@@ -6807,6 +8456,74 @@ onUnmounted(() => {
 
 .map-mask {
   padding: 0;
+}
+
+.outing-launch {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  width: min(500px, calc(100% - 30px));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 13px;
+  color: #493f4e;
+  text-align: left;
+  background: linear-gradient(90deg, rgba(255, 248, 237, 0.95), rgba(239, 249, 255, 0.94)), var(--paper-card);
+  border: 1px solid rgba(98, 129, 169, 0.34);
+  border-radius: 14px;
+  box-shadow:
+    0 9px 26px rgba(35, 38, 58, 0.22),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.68);
+  transform: translateX(-50%);
+  cursor: pointer;
+  backdrop-filter: blur(9px);
+  transition:
+    transform 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.outing-launch span {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+}
+
+.outing-launch small {
+  color: #5b84ac;
+  font: 800 7px/1.2 var(--font-mono);
+  letter-spacing: 0.14em;
+}
+
+.outing-launch b {
+  font-size: 0.88em;
+  letter-spacing: 0.06em;
+}
+
+.outing-launch em {
+  flex: 1;
+  color: var(--ink-faint);
+  font-size: 0.66em;
+  font-style: normal;
+}
+
+.outing-launch .ic {
+  width: 23px;
+  height: 23px;
+  color: #4f86b6;
+}
+
+.outing-launch:hover:not(:disabled) {
+  transform: translate(-50%, -3px);
+  box-shadow:
+    0 13px 32px rgba(35, 38, 58, 0.29),
+    0 0 0 2px rgba(82, 149, 206, 0.12);
+}
+
+.outing-launch:disabled {
+  opacity: 0.46;
+  cursor: default;
 }
 
 /* rq0.12 全屏化:地图铺满画幅,立面画布定比呈现,徽章钉在画上 */
@@ -8086,7 +9803,6 @@ onUnmounted(() => {
   opacity: 0.66;
 }
 
-.attire-grid,
 .dev-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -8094,6 +9810,13 @@ onUnmounted(() => {
 }
 
 /* 仪容图鉴：穿戴 SKU 直接显示商店道具卡，不再拿穿着描述误查图片。 */
+.attire-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 84px);
+  justify-content: start;
+  gap: 8px;
+}
+
 .a-cell {
   position: relative;
   display: block;
@@ -8331,6 +10054,46 @@ onUnmounted(() => {
   line-height: 1.55;
 }
 
+.setup-sql-reminder {
+  margin: 8px 0 5px;
+  padding: 9px 10px;
+  border: 1px solid rgba(219, 112, 52, 0.38);
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(255, 237, 202, 0.88), rgba(255, 222, 224, 0.72));
+  box-shadow: inset 3px 0 0 #e97f48;
+}
+
+.setup-sql-reminder strong {
+  display: block;
+  color: #9b3f24;
+  font-size: 0.75em;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+
+.setup-sql-reminder span {
+  display: block;
+  margin-top: 3px;
+  color: #70453a;
+  font-size: 0.68em;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+.setup-mvu-reminder {
+  border-color: rgba(61, 128, 169, 0.36);
+  background: linear-gradient(135deg, rgba(220, 242, 255, 0.86), rgba(232, 226, 255, 0.74));
+  box-shadow: inset 3px 0 0 #5f8fc5;
+}
+
+.setup-mvu-reminder strong {
+  color: #315f91;
+}
+
+.setup-mvu-reminder span {
+  color: #40566f;
+}
+
 .setup-steps small {
   display: block;
   margin-top: 6px;
@@ -8438,6 +10201,22 @@ onUnmounted(() => {
 
 .toggle.on i {
   transform: translateX(19px);
+}
+
+.toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.set-group.route-locked .set-label::after {
+  content: ' · MVU 已接管';
+  color: var(--pink);
+  font-size: 0.72em;
+  font-weight: 700;
+}
+
+.route-hint {
+  color: var(--ink);
 }
 
 .set-danger {
@@ -8901,6 +10680,18 @@ onUnmounted(() => {
   color: var(--ink-soft);
 }
 
+.ware-card.locked {
+  opacity: 0.78;
+}
+
+.ware-lock {
+  display: block;
+  margin-top: 4px;
+  color: #9a5d50;
+  font-size: 0.72em;
+  line-height: 1.35;
+}
+
 .ware-buy {
   flex: none;
   align-self: center;
@@ -9274,7 +11065,7 @@ onUnmounted(() => {
   gap: 0;
   padding-right: 12px;
   border-right: 1px dashed var(--line-soft);
-  min-width: 74px;
+  min-width: 138px;
 }
 
 .hud-time b {
@@ -9295,7 +11086,7 @@ onUnmounted(() => {
 .hud-stats {
   flex: 1;
   display: grid;
-  grid-template-columns: 0.7fr 1fr 1fr;
+  grid-template-columns: 0.68fr repeat(4, minmax(64px, 1fr));
   gap: 8px;
 }
 
@@ -9305,9 +11096,54 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 2px;
   padding: 3px 9px;
+  font: inherit;
+  color: inherit;
+  text-align: left;
   background: #fff;
   border: 1px solid var(--line-soft);
   border-radius: 10px;
+}
+
+button.battery {
+  appearance: none;
+  cursor: pointer;
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    opacity 0.16s ease;
+}
+
+button.battery:hover {
+  transform: translateY(-1px);
+  border-color: rgba(86, 112, 142, 0.42);
+  box-shadow: 0 4px 12px rgba(57, 55, 76, 0.1);
+}
+
+button.battery:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--blue) 70%, white);
+  outline-offset: 2px;
+}
+
+.battery.resource.energy .cells i.on {
+  background: linear-gradient(180deg, #63c8ff, #477bea);
+}
+
+.battery.resource.stamina .cells i.on {
+  background: linear-gradient(180deg, #ff87ae, #ef4f79);
+}
+
+.battery.resource.active {
+  border-color: rgba(239, 79, 121, 0.58);
+  box-shadow: 0 0 0 2px rgba(239, 79, 121, 0.11);
+}
+
+.battery.resource.muted {
+  opacity: 0.62;
+}
+
+.battery.resource.warn .cells i.on {
+  background: var(--red);
 }
 
 .battery small {
@@ -9343,7 +11179,7 @@ onUnmounted(() => {
   background: var(--yellow);
 }
 
-/* 报警态(胜任≤40 / 风闻≥50):亮格转红+末格呼吸 */
+/* 报警态（胜任进入当前难度危险段／风闻达到既有风险线）：亮格转红+末格呼吸 */
 .battery.warn .cells i.on {
   background: var(--red);
 }
@@ -9371,6 +11207,364 @@ onUnmounted(() => {
 
 .battery.warn b {
   color: var(--red);
+}
+
+.battery.rumor.rumor-level-0 b {
+  color: var(--ink-faint);
+}
+
+.battery.rumor.rumor-level-1 .cells i.on,
+.battery.rumor.rumor-level-1 b {
+  color: #9a6b12;
+  background-color: #d9ad43;
+}
+
+.battery.rumor.rumor-level-2 .cells i.on,
+.battery.rumor.rumor-level-2 b {
+  color: #b45722;
+  background-color: #df7a3d;
+}
+
+.battery.rumor.rumor-level-3 .cells i.on,
+.battery.rumor.rumor-level-3 b {
+  color: #bb3f54;
+  background-color: #d45468;
+}
+
+.battery.rumor.rumor-level-4 .cells i.on,
+.battery.rumor.rumor-level-4 b {
+  color: #842b4b;
+  background-color: #9e3658;
+}
+
+.battery.rumor b {
+  background: none !important;
+}
+
+.rumor-cells {
+  gap: 3px !important;
+}
+
+/* 玩家状态详情：沿用日式 gal 的暖纸卡与双色状态墨水。 */
+.resource-detail-mask {
+  z-index: 76;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.resource-detail-card {
+  --resource-accent: #477bea;
+  position: relative;
+  width: min(390px, 92vw);
+  box-sizing: border-box;
+  padding: 24px 24px 22px;
+  overflow: hidden;
+  color: var(--ink);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--resource-accent) 9%, transparent), transparent 48%),
+    var(--paper-card);
+  border: 1px solid color-mix(in srgb, var(--resource-accent) 36%, var(--line));
+  border-radius: 20px;
+  box-shadow: 0 22px 60px rgba(28, 25, 39, 0.28);
+}
+
+.resource-detail-card.stamina {
+  --resource-accent: #ef4f79;
+}
+
+.resource-detail-card::after {
+  content: '';
+  position: absolute;
+  left: 22px;
+  right: 22px;
+  bottom: 10px;
+  height: 3px;
+  background: linear-gradient(90deg, var(--resource-accent), transparent);
+  border-radius: 999px;
+  opacity: 0.72;
+}
+
+.resource-detail-card h3 {
+  margin: 7px 0 3px;
+  color: var(--resource-accent);
+  font: 900 1.2em/1.2 var(--font-display);
+  letter-spacing: 0.08em;
+}
+
+.resource-detail-value {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  margin: 3px 0 12px;
+}
+
+.resource-detail-value b {
+  color: var(--resource-accent);
+  font: 900 2.8em/1 var(--font-display);
+}
+
+.resource-detail-value span {
+  color: var(--ink-faint);
+  font: 800 1em/1 var(--font-display);
+}
+
+.resource-detail-card p {
+  margin: 6px 0;
+  color: var(--ink-soft);
+  font-size: 0.8em;
+}
+
+.resource-detail-card > small,
+.resource-detail-card > em {
+  display: block;
+  margin-top: 10px;
+  color: var(--ink-faint);
+  font-size: 0.7em;
+  line-height: 1.55;
+}
+
+.resource-detail-card > em {
+  color: var(--resource-accent);
+  font-style: normal;
+  font-weight: 800;
+}
+
+/* 风闻账详情：四档颜色与 HUD 保持一致，列表只显示最近三条来源。 */
+.rumor-detail-mask {
+  z-index: 77;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.rumor-detail-card {
+  --rumor-accent: #74808d;
+  position: relative;
+  width: min(520px, 94vw);
+  max-height: min(720px, calc(100dvh - 36px));
+  box-sizing: border-box;
+  padding: 23px;
+  overflow-y: auto;
+  color: var(--ink);
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--rumor-accent) 9%, transparent), transparent 42%), var(--paper-card);
+  border: 1px solid color-mix(in srgb, var(--rumor-accent) 42%, var(--line));
+  border-radius: 20px;
+  box-shadow: 0 22px 60px rgba(28, 25, 39, 0.3);
+}
+
+.rumor-detail-card.rumor-level-1 {
+  --rumor-accent: #b28324;
+}
+
+.rumor-detail-card.rumor-level-2 {
+  --rumor-accent: #cb652c;
+}
+
+.rumor-detail-card.rumor-level-3 {
+  --rumor-accent: #c3465b;
+}
+
+.rumor-detail-card.rumor-level-4 {
+  --rumor-accent: #922f50;
+}
+
+.rumor-detail-card.competence-detail-card {
+  --rumor-accent: #318b62;
+}
+
+.competence-detail-card .rumor-guidance p.hot {
+  background: color-mix(in srgb, var(--red) 9%, transparent);
+  border-color: color-mix(in srgb, var(--red) 36%, var(--line-soft));
+}
+
+.competence-detail-card .rumor-event-list em.down {
+  color: var(--red);
+}
+
+.rumor-detail-head {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 7px 0 2px;
+}
+
+.rumor-detail-head span {
+  display: grid;
+  gap: 1px;
+}
+
+.rumor-detail-head small,
+.rumor-events h4 {
+  color: var(--ink-faint);
+  font-size: 0.68em;
+  font-weight: 800;
+}
+
+.rumor-detail-head h3 {
+  margin: 0;
+  color: var(--rumor-accent);
+  font: 900 1.35em/1.1 var(--font-display);
+  letter-spacing: 0.08em;
+}
+
+.rumor-detail-head > b {
+  color: var(--rumor-accent);
+  font: 900 2.6em/0.9 var(--font-display);
+}
+
+.rumor-summary {
+  margin: 7px 0 13px;
+  color: var(--ink-soft);
+  font-size: 0.78em;
+}
+
+.rumor-thresholds {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 5px;
+  margin-bottom: 12px;
+}
+
+.rumor-thresholds span {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 5px 3px;
+  color: var(--ink-faint);
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+}
+
+.rumor-thresholds span.active {
+  color: var(--rumor-accent);
+  background: color-mix(in srgb, var(--rumor-accent) 10%, transparent);
+  border-color: color-mix(in srgb, var(--rumor-accent) 42%, var(--line-soft));
+}
+
+.rumor-thresholds b {
+  font: 900 0.82em/1 var(--font-display);
+}
+
+.rumor-thresholds small {
+  overflow: hidden;
+  font-size: 0.62em;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rumor-alerts,
+.rumor-guidance {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.rumor-alerts p,
+.rumor-guidance p {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 8px 9px;
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+}
+
+.rumor-alerts p.hot {
+  background: color-mix(in srgb, var(--rumor-accent) 10%, transparent);
+  border-color: color-mix(in srgb, var(--rumor-accent) 40%, var(--line-soft));
+}
+
+.rumor-alerts b,
+.rumor-guidance b {
+  color: var(--rumor-accent);
+  font-size: 0.72em;
+}
+
+.rumor-alerts span,
+.rumor-guidance span {
+  font-size: 0.68em;
+  line-height: 1.45;
+}
+
+.rumor-events {
+  margin: 14px 0 12px;
+}
+
+.rumor-events h4 {
+  margin: 0 0 6px;
+}
+
+.rumor-event-list {
+  display: grid;
+  gap: 6px;
+}
+
+.rumor-event-list article {
+  padding: 8px 10px;
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
+  border-left: 3px solid color-mix(in srgb, var(--rumor-accent) 72%, transparent);
+  border-radius: 4px 10px 10px 4px;
+}
+
+.rumor-event-list article > header,
+.rumor-event-list article > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.rumor-event-list article > header b {
+  overflow: hidden;
+  font-size: 0.76em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rumor-event-list article > header em {
+  flex: none;
+  color: var(--rumor-accent);
+  font: 900 0.78em/1 var(--font-display);
+  font-style: normal;
+}
+
+.rumor-event-list article > header em.down {
+  color: var(--green);
+}
+
+.rumor-event-list article > small,
+.rumor-event-list article > footer,
+.rumor-empty {
+  color: var(--ink-faint);
+  font-size: 0.62em;
+}
+
+.rumor-event-list article > p {
+  margin: 4px 0;
+  color: var(--ink-soft);
+  font-size: 0.7em;
+  line-height: 1.4;
+}
+
+.rumor-event-list article > footer {
+  justify-content: flex-start;
+}
+
+.rumor-empty {
+  margin: 0;
+  padding: 10px;
+  text-align: center;
+  border: 1px dashed var(--line-soft);
+  border-radius: 10px;
 }
 
 .hstat {
@@ -9951,6 +12145,18 @@ onUnmounted(() => {
   font-weight: 700;
 }
 
+.spot-note.duty {
+  background: rgba(42, 111, 151, 0.92);
+  color: #fff;
+  border-radius: 6px;
+  padding: 1px 5px;
+  font-weight: 700;
+}
+
+.spot-note.duty.overdue {
+  background: rgba(192, 57, 43, 0.94);
+}
+
 .spot-faces {
   display: inline-flex;
   align-items: center;
@@ -10070,6 +12276,59 @@ onUnmounted(() => {
 :global(html.rq-dark) .battery,
 :global(html.rq-dark) .tile {
   background: #2c2e40;
+}
+
+:global(html.rq-dark) .resource-detail-card,
+:global(html.rq-dark) .rumor-detail-card,
+:global(html.rq-dark) .intimacy-panel,
+:global(html.rq-dark) .scene-result-card {
+  background: linear-gradient(130deg, rgba(239, 79, 121, 0.12), rgba(71, 123, 234, 0.07) 56%, transparent), #292b3b;
+}
+
+:global(html.rq-dark) .intimacy-summary {
+  color: var(--ink);
+  background: linear-gradient(110deg, rgba(65, 39, 55, 0.98), rgba(43, 42, 61, 0.98));
+  border-top-color: rgba(239, 79, 121, 0.42);
+}
+
+:global(html.rq-dark) .intimacy-summary-stamina,
+:global(html.rq-dark) .intimacy-collapse {
+  color: #f09aba;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+:global(html.rq-dark) .intimacy-finishes {
+  background: linear-gradient(180deg, rgba(41, 43, 59, 0), rgba(41, 43, 59, 0.98) 22%);
+}
+
+:global(html.rq-dark) .rumor-thresholds span,
+:global(html.rq-dark) .rumor-alerts p,
+:global(html.rq-dark) .rumor-guidance p,
+:global(html.rq-dark) .rumor-event-list article {
+  background-color: rgba(255, 255, 255, 0.055);
+  border-color: rgba(255, 255, 255, 0.09);
+}
+
+:global(html.rq-dark) .rumor-thresholds span.active,
+:global(html.rq-dark) .rumor-alerts p.hot {
+  background-color: color-mix(in srgb, var(--rumor-accent) 16%, transparent);
+  border-color: color-mix(in srgb, var(--rumor-accent) 50%, rgba(255, 255, 255, 0.09));
+}
+
+:global(html.rq-dark) .intimacy-people article,
+:global(html.rq-dark) .intimacy-panel > header em,
+:global(html.rq-dark) .intimacy-meta span,
+:global(html.rq-dark) .scene-result-card > header em,
+:global(html.rq-dark) .scene-result-meta span,
+:global(html.rq-dark) .scene-result-people article {
+  background: rgba(255, 255, 255, 0.07);
+}
+
+:global(html.rq-dark) .outing-launch {
+  color: #f4edf2;
+  background: linear-gradient(90deg, rgba(48, 44, 55, 0.95), rgba(39, 47, 61, 0.95));
+  border-color: rgba(142, 177, 209, 0.34);
 }
 
 :global(html.rq-dark) .seg {
@@ -10400,14 +12659,19 @@ onUnmounted(() => {
 
   /* 数据 HUD:半高 */
   .hud {
+    flex-direction: column;
     gap: 6px;
     padding: 4px 8px;
     margin-bottom: 4px;
   }
 
   .hud-time {
-    min-width: 54px;
-    padding-right: 8px;
+    min-width: 0;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding-right: 0;
+    border-right: 0;
   }
 
   .hud-time b {
@@ -10419,11 +12683,36 @@ onUnmounted(() => {
   }
 
   .battery {
-    padding: 2px 6px;
+    min-width: 0;
+    padding: 2px 4px;
   }
 
   .battery .cells {
     height: 7px;
+  }
+
+  .hud-stats {
+    width: 100%;
+    grid-template-columns: 0.72fr repeat(4, minmax(0, 1fr));
+    gap: 3px;
+  }
+
+  .battery small,
+  .hstat small {
+    overflow: hidden;
+    font-size: 0.55em;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .battery b,
+  .hstat b {
+    font-size: 0.68em;
+  }
+
+  .hstat {
+    min-width: 0;
+    padding: 2px 4px;
   }
 
   .rent-ledger {
@@ -10462,6 +12751,99 @@ onUnmounted(() => {
     gap: 6px;
     font-size: 0.74em;
     padding: 4px 2px 0;
+  }
+
+  .intimacy-panel,
+  .scene-result-card {
+    margin-top: 3px;
+    padding: 6px 7px;
+    border-radius: 11px;
+  }
+
+  .intimacy-stage-dock .intimacy-panel {
+    max-height: calc(100% - 46px);
+    margin-top: 0;
+    padding: 7px 8px 6px;
+    border-radius: 11px 11px 0 0;
+  }
+
+  .intimacy-summary {
+    min-height: 46px;
+    grid-template-columns: minmax(78px, 1fr) auto auto auto;
+    gap: 5px;
+    padding: 6px 7px;
+  }
+
+  .intimacy-summary-stamina,
+  .intimacy-summary-action {
+    padding: 3px 6px;
+  }
+
+  .intimacy-people {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .intimacy-panel > header,
+  .scene-result-card > header {
+    margin-bottom: 4px;
+  }
+
+  .intimacy-people article {
+    min-width: 0;
+    padding: 3px 5px;
+  }
+
+  .intimacy-avatar,
+  .intimacy-avatar img {
+    width: 27px;
+    height: 27px;
+  }
+
+  .intimacy-meta,
+  .intimacy-finishes,
+  .scene-result-meta,
+  .scene-result-people {
+    margin-top: 4px;
+  }
+
+  .scene-result-people {
+    grid-auto-columns: minmax(190px, 86%);
+  }
+
+  .finish-tile {
+    min-height: 24px;
+    padding: 3px 8px;
+  }
+
+  .resource-detail-mask,
+  .rumor-detail-mask {
+    padding: 9px;
+  }
+
+  .resource-detail-card,
+  .rumor-detail-card {
+    width: 100%;
+    padding: 20px 18px 19px;
+  }
+
+  .rumor-detail-card {
+    max-height: calc(100dvh - 18px);
+  }
+
+  .rumor-alerts,
+  .rumor-guidance {
+    grid-template-columns: 1fr;
+  }
+
+  .outing-launch {
+    bottom: max(7px, env(safe-area-inset-bottom));
+    width: calc(100% - 16px);
+    gap: 7px;
+    padding: 7px 9px;
+  }
+
+  .outing-launch em {
+    font-size: 0.58em;
   }
 
   .option-chip {
@@ -10588,10 +12970,6 @@ onUnmounted(() => {
     padding: 9px;
   }
 
-  .attire-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   .a-cell {
     min-height: 0;
   }
@@ -10658,9 +13036,7 @@ onUnmounted(() => {
   display: grid;
   place-items: center;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 50% 48%, rgba(47, 83, 91, 0.3), transparent 58%),
-    #090f14;
+  background: radial-gradient(circle at 50% 48%, rgba(47, 83, 91, 0.3), transparent 58%), #090f14;
 }
 
 .mute-meeting-visual::after {
@@ -10676,9 +13052,7 @@ onUnmounted(() => {
 }
 
 .mute-meeting-visual.state-PEAK {
-  background:
-    radial-gradient(circle at 50% 58%, rgba(122, 52, 83, 0.22), transparent 58%),
-    #100c13;
+  background: radial-gradient(circle at 50% 58%, rgba(122, 52, 83, 0.22), transparent 58%), #100c13;
 }
 
 .mute-meeting-visual.state-DETAIL img,
@@ -11451,5 +13825,4 @@ onUnmounted(() => {
     width: 100%;
   }
 }
-
 </style>

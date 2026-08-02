@@ -166,8 +166,8 @@ for (const 组 of index.条目) {
 
 if (!开场白) throw new Error('未找到 [开场白] 条目');
 
-// ── 资源走 jsdelivr(手机友好;〔待用户拍板〕首个内测 tag 名,推送后此处生效) ──
-const TAG = 'rq0.62';
+// ── 资源走 jsdelivr(手机友好；角色卡版本与正式发布 tag 同步) ──
+const TAG = 'rq0.65';
 const BASE = `https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@${TAG}`;
 
 const 加载块 = url => "```\n<body>\n<script>\n$('body').load('" + url + "')\n</script>\n</body>\n```";
@@ -261,7 +261,7 @@ const tavern_helper = {
 
 // ── 卡体 ──
 const 卡名 = '人妻公寓';
-const 版本 = '0.62';
+const 版本 = '0.65';
 const data = {
   name: 卡名,
   description: '',
@@ -269,7 +269,7 @@ const data = {
   scenario: '',
   first_mes: '<StatusPlaceHolderImpl/>',
   mes_example: '',
-  creator_notes: `人妻公寓 v${版本} 测试版。需安装最新版酒馆助手，并启用卡内 MVU 与提示词模板。首次进入须在数据库与智脑 v5.0.8 中二选一作为长期记忆方案；数据库玩家按引导安装四张 RQ_ 表。开局：0楼进入游戏界面，选难度→接父亲电话进入到任首日；输入走游戏内。`,
+  creator_notes: `人妻公寓 v${版本} 测试版。不兼容旧存档，请新建聊天。需安装最新版酒馆助手、MVU 与数据库插件，并把数据库模式设为 SQLite；首次进入按引导安装四张 RQ_ 表。推荐在 MVU 开启“额外模型解析”和“自动请求”以提高变量稳定性；启用外置解析后，正文二次结算会自动关闭。本作不再兼容智脑。开局：0楼进入游戏界面，选难度→接父亲电话进入到任首日；输入使用游戏内输入框。`,
   system_prompt: '',
   post_history_instructions: '',
   tags: ['人妻公寓'],

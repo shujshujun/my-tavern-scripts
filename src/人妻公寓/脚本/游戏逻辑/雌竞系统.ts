@@ -57,6 +57,8 @@ export function 雌竞演出块(竞者: 门牌[], data: SchemaType, 楼层: numb
 // ============================================
 
 export interface 换装余波 {
+  /** 新事件的持久唯一身份；用于区分字段完全相同但先后发生的两次余波。 */
+  事件ID?: string;
   门牌: 门牌;
   起楼: number;
   物: string; // 外显/私密外显 感知语
@@ -70,11 +72,61 @@ export interface 换装余波 {
 /** 〔调参〕余波缓冲与过期(真实楼层;街坊的眼睛需要时间,旧闻没人提) */
 export const 余波缓冲楼 = 3;
 export const 余波过期楼 = 18;
+let 换装余波事件序号 = 0;
+
+/** 为每次新余波创建不可复用的持久 nonce；序号保证同一毫秒、随机源异常时仍不重复。 */
+export function 创建换装余波事件ID(): string {
+  换装余波事件序号 += 1;
+  try {
+    const uuid = globalThis.crypto?.randomUUID?.();
+    if (uuid) return `rqp-aftereffect-${uuid}`;
+  } catch {
+    /* 旧 WebView 无 randomUUID 时走下方兼容路径 */
+  }
+  return `rqp-aftereffect-${Date.now().toString(36)}-${换装余波事件序号.toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 10)}`;
+}
+
+/**
+ * 余波 CAS 身份比较。任一侧带新 ID 时必须两侧 ID 完全相同；只有双方都是旧存档记录时，
+ * 才回退到原有字段身份，以兼容升级前尚未消费完的余波。
+ */
+export function 同一换装余波事件(
+  a: Partial<换装余波> | null | undefined,
+  b: Partial<换装余波> | null | undefined,
+): boolean {
+  if (!a || !b) return false;
+  const aID = typeof a.事件ID === 'string' ? a.事件ID.trim() : '';
+  const bID = typeof b.事件ID === 'string' ? b.事件ID.trim() : '';
+  if (aID || bID) return !!aID && aID === bID;
+  return a.门牌 === b.门牌 && a.起楼 === b.起楼 && a.物 === b.物 && !!a.私密 === !!b.私密;
+}
+
+/** 所有余波消费口共用同一发酵边界，避免朋友圈、丈夫起疑各自漂移。 */
+export function 余波已发酵(当前楼: number, 起楼: number): boolean {
+  return 当前楼 - 起楼 >= 余波缓冲楼;
+}
 
 export async function 记余波(门牌号: 门牌, 物: string, 私密?: boolean): Promise<void> {
   const 楼 = getLastMessageId();
-  await insertOrAssignVariables(
-    { _换装余波: { 门牌: 门牌号, 起楼: 楼, 物, 私密: !!私密 } satisfies 换装余波 },
+  const 新余波 = {
+    事件ID: 创建换装余波事件ID(),
+    门牌: 门牌号,
+    起楼: 楼,
+    物,
+    私密: !!私密,
+    群议: false,
+    探针: false,
+    圈晒: false,
+    疑记: false,
+  } satisfies 换装余波;
+  await updateVariablesWith(
+    vars => {
+      // 整值替换，避免 insertOrAssign 的深合并把上一事件的“已消费”标记带进新事件。
+      _.set(vars, '_换装余波', 新余波);
+      return vars;
+    },
     { type: 'chat' },
   );
 }
@@ -82,7 +134,7 @@ export async function 记余波(门牌号: 门牌, 物: string, 私密?: boolean
 /** 读余波:回档(起楼>当前楼)或过期自动作废 */
 export function 读余波(当前楼: number): 换装余波 | null {
   const p = (_.get(getVariables({ type: 'chat' }), '_换装余波') ?? null) as 换装余波 | null;
-  if (!p?.门牌 || p.起楼 > 当前楼 || 当前楼 - p.起楼 > 余波过期楼) return null;
+  if (!p?.门牌 || p.起楼 > 当前楼 || 当前楼 - p.起楼 >= 余波过期楼) return null;
   return p;
 }
 
@@ -90,7 +142,22 @@ export function 读余波(当前楼: number): 换装余波 | null {
 export function 标余波(补: Partial<换装余波>): void {
   const p = (_.get(getVariables({ type: 'chat' }), '_换装余波') ?? null) as 换装余波 | null;
   if (!p) return;
-  void Promise.resolve(insertOrAssignVariables({ _换装余波: { ...p, ...补 } }, { type: 'chat' })).catch((e: unknown) =>
-    console.error('[人妻公寓·雌竞] 余波标记失败', e),
-  );
+  const 预期: Partial<换装余波> = {
+    事件ID: p.事件ID,
+    门牌: p.门牌,
+    起楼: p.起楼,
+    物: p.物,
+    私密: !!p.私密,
+  };
+  void Promise.resolve(
+    updateVariablesWith(
+      vars => {
+        const 当前 = (_.get(vars, '_换装余波') ?? null) as 换装余波 | null;
+        if (!同一换装余波事件(预期, 当前)) return vars;
+        _.set(vars, '_换装余波', { ...当前, ...补, 事件ID: 当前?.事件ID });
+        return vars;
+      },
+      { type: 'chat' },
+    ),
+  ).catch((e: unknown) => console.error('[人妻公寓·雌竞] 余波标记失败', e));
 }

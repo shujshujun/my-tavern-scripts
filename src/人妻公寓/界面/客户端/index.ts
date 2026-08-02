@@ -1,7 +1,7 @@
 import { waitUntil } from 'async-wait-until';
 import App from './App.vue';
 import './global.css';
-import { 注册画幅监听, 同步画幅 } from './viewport';
+import { 注册画幅页面生命周期, 同步画幅 } from './viewport';
 
 /** 全局错误横幅:根组件自身的渲染错误 onErrorCaptured 抓不到,必须挂在应用层 */
 function 显示致命错误(err: unknown, 来源: string) {
@@ -23,7 +23,7 @@ window.addEventListener('error', ev => 显示致命错误(ev.error ?? ev.message
 window.addEventListener('unhandledrejection', ev => 显示致命错误(ev.reason, 'promise'));
 
 同步画幅();
-注册画幅监听();
+注册画幅页面生命周期();
 
 $(async () => {
   try {

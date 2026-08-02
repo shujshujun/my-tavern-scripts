@@ -1,6 +1,7 @@
 import type { SchemaType } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
 import { 户静态表, 查性癖 } from '../../stageConfig';
+import { 当前时段 } from './楼层时钟';
 import { 事件角色标记 } from './snapshotSystem';
 
 /**
@@ -29,15 +30,25 @@ export function 装载性癖(data: SchemaType, 道具id: string, 门牌号: 门�
   if (配.限定户 && !配.限定户.includes(门牌号)) {
     return { 成功: false, 提示: `这一件……不是为${妻名}准备的。` };
   }
-  if (妻.当前阶段 < (配.档 === 5 ? 5 : 4)) {
+  const 母亲终局开幕窗口 =
+    门牌号 === '302' &&
+    道具id === 户静态表['302'].招牌性癖 &&
+    妻.当前阶段 === 4 &&
+    妻._阶段线路.目标阶段 === 5 &&
+    妻._阶段线路.活跃节点 === 1;
+  if (妻.当前阶段 < (配.档 === 5 ? 5 : 4) && !母亲终局开幕窗口) {
     return { 成功: false, 提示: `${妻名}还没到能接住它的时候(需要${配.档 === 5 ? '「归属」' : '「沉沦」'})。` };
   }
   if (妻.性癖装载.includes(道具id)) return { 成功: false, 提示: '她身上已经带着这一件了。' };
   if (妻.性癖装载.length >= 3) return { 成功: false, 提示: '她身上已经满了——先卸下一件。' };
 
+  const 重装 = 妻.曾开发性癖.includes(道具id);
+  if (!重装 && 配.开幕允许时段 && !配.开幕允许时段.includes(当前时段(data))) {
+    return { 成功: false, 提示: `「${配.名称}」的第一次开幕只能在${配.开幕允许时段.join('或')}。` };
+  }
+
   data.背包.splice(i, 1);
   妻.性癖装载.push(道具id);
-  const 重装 = 妻.曾开发性癖.includes(道具id);
   if (!重装) 妻.曾开发性癖.push(道具id);
 
   if (重装) {
@@ -51,7 +62,7 @@ export function 装载性癖(data: SchemaType, 道具id: string, 门牌号: 门�
   }
   return {
     成功: true,
-    提示: `「${配.名称}」装载给了${妻名}——今晚,开幕。`,
+    提示: `「${配.名称}」装载给了${妻名}——第一次开幕。`,
     事件: `${事件角色标记({ 在场妻: [门牌号] })}【性癖开幕·${配.名称}】对象:${妻名}。${配.开幕}。这场戏按她的性格与你们的关系走完整幕,堕落可小步上涨;完幕后这份性癖将常驻她身上`,
     变动: true,
   };

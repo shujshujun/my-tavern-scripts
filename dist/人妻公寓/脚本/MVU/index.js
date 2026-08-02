@@ -1,1 +1,2 @@
-import'https://testingcf.jsdelivr.net/gh/MagicalAstrogy/MagVarUpdate/artifact/bundle.js';
+import'https://testingcf.jsdelivr.net/gh/MagicalAstrogy/MagVarUpdate/artifact/bundle.js';$(()=>{eventOn('人妻公寓:MVU外置模型重试',async()=>{await eventEmit(getButtonEvent('重试额外模型解析'))})});
+//# sourceMappingURL=index.js.map

@@ -32,10 +32,6 @@
                 "default": 0,
                 "type": "number"
               },
-              "阶段标题": {
-                "default": "陌生邻里",
-                "type": "string"
-              },
               "裂缝": {
                 "default": {},
                 "type": "object",
@@ -56,10 +52,6 @@
               },
               "当前情绪": {
                 "default": "平静",
-                "type": "string"
-              },
-              "气质描述": {
-                "default": "",
                 "type": "string"
               },
               "外装": {
@@ -124,10 +116,6 @@
                   "type": "string"
                 }
               },
-              "情报可见": {
-                "default": false,
-                "type": "boolean"
-              },
               "上次互动楼层": {
                 "default": 0,
                 "type": "number"
@@ -135,6 +123,55 @@
               "_上次结算楼层": {
                 "default": -1,
                 "type": "number"
+              },
+              "_成长账": {
+                "default": {},
+                "type": "object",
+                "properties": {
+                  "上次有效成长钟楼": {
+                    "default": -1,
+                    "type": "number"
+                  },
+                  "成长轮次": {
+                    "default": 0,
+                    "type": "number"
+                  },
+                  "已结算冷落日": {
+                    "default": 0,
+                    "type": "number"
+                  }
+                }
+              },
+              "_冷落余波": {
+                "default": {},
+                "type": "object",
+                "properties": {
+                  "状态": {
+                    "default": "无",
+                    "type": "string",
+                    "enum": [
+                      "无",
+                      "待诉苦",
+                      "安抚中"
+                    ]
+                  },
+                  "触发钟楼": {
+                    "default": -1,
+                    "type": "number"
+                  },
+                  "需安抚楼": {
+                    "default": 0,
+                    "type": "number"
+                  },
+                  "已安抚楼": {
+                    "default": 0,
+                    "type": "number"
+                  },
+                  "上次安抚正文楼": {
+                    "default": -1,
+                    "type": "number"
+                  }
+                }
               },
               "_堕落日账": {
                 "default": {},
@@ -246,7 +283,7 @@
               }
             }
           },
-          "_入住楼层": {
+          "_入住时段": {
             "default": 0,
             "type": "number"
           },
@@ -273,6 +310,71 @@
       "default": 0,
       "type": "number"
     },
+    "玩家资源": {
+      "default": {},
+      "type": "object",
+      "properties": {
+        "精力": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "当前值": {
+              "default": 8,
+              "type": "number"
+            },
+            "训练经验": {
+              "default": 0,
+              "type": "number"
+            },
+            "永久上限加成": {
+              "default": 0,
+              "type": "number"
+            }
+          }
+        },
+        "体力": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "当前值": {
+              "default": 5,
+              "type": "number"
+            },
+            "训练经验": {
+              "default": 0,
+              "type": "number"
+            },
+            "永久上限加成": {
+              "default": 0,
+              "type": "number"
+            }
+          }
+        },
+        "保护准备": {
+          "default": false,
+          "type": "boolean"
+        },
+        "_晨跑训练日": {
+          "default": -1,
+          "type": "number"
+        },
+        "_体力训练日": {
+          "default": -1,
+          "type": "number"
+        },
+        "_小憩日": {
+          "default": -1,
+          "type": "number"
+        },
+        "_已使用永久道具": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "背包": {
       "default": [],
       "type": "array",
@@ -284,6 +386,11 @@
       "default": {},
       "type": "object",
       "properties": {
+        "_数据版本": {
+          "default": 7,
+          "type": "number",
+          "const": 7
+        },
         "_坏结局": {
           "default": "",
           "type": "string"
@@ -323,10 +430,6 @@
           "type": "integer",
           "minimum": -9007199254740991,
           "maximum": 9007199254740991
-        },
-        "_系统操作中": {
-          "default": false,
-          "type": "boolean"
         },
         "_难度": {
           "default": "标准",
@@ -470,13 +573,211 @@
             "type": "boolean"
           }
         },
-        "_时段偏移楼": {
+        "_绝对时段": {
           "default": 0,
           "type": "number"
         },
-        "_上次杀时间楼层": {
-          "default": -1,
-          "type": "number"
+        "_提示刷新态": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "版本": {
+              "default": 1,
+              "type": "number",
+              "const": 1
+            },
+            "场景签名": {
+              "default": "",
+              "type": "string"
+            },
+            "焦点签名": {
+              "default": "",
+              "type": "string"
+            },
+            "角色签名": {
+              "default": "",
+              "type": "string"
+            },
+            "距完整楼数": {
+              "default": 2,
+              "type": "number"
+            }
+          }
+        },
+        "_性爱场景": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "状态": {
+              "default": "空闲",
+              "type": "string",
+              "enum": [
+                "空闲",
+                "进行中",
+                "收尾中"
+              ]
+            },
+            "场次标识": {
+              "default": "",
+              "type": "string"
+            },
+            "开始楼层": {
+              "default": -1,
+              "type": "number"
+            },
+            "有效楼数": {
+              "default": 0,
+              "type": "number"
+            },
+            "本场等级加成": {
+              "default": 0,
+              "type": "number"
+            },
+            "当前接触部位": {
+              "default": "无",
+              "type": "string",
+              "enum": [
+                "无",
+                "嘴",
+                "胸部",
+                "小屄",
+                "屁穴",
+                "其他"
+              ]
+            },
+            "当前行为": {
+              "default": "无插入",
+              "type": "string",
+              "enum": [
+                "无插入",
+                "口交",
+                "乳交",
+                "阴道插入",
+                "肛门插入",
+                "玩具",
+                "其他"
+              ]
+            },
+            "保护状态": {
+              "default": "未使用",
+              "type": "string",
+              "enum": [
+                "未使用",
+                "安全套",
+                "其他"
+              ]
+            },
+            "待收尾位置": {
+              "default": "",
+              "type": "string"
+            },
+            "主焦点门牌": {
+              "default": "",
+              "type": "string"
+            },
+            "参与者": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "满意度": {
+                    "default": 0,
+                    "type": "number"
+                  },
+                  "满意目标": {
+                    "default": 3,
+                    "type": "number"
+                  },
+                  "偏好命中": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "等级加成已用": {
+                    "default": false,
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "_上次性爱结果": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "场次标识": {
+              "default": "",
+              "type": "string"
+            },
+            "结束方式": {
+              "default": "",
+              "type": "string"
+            },
+            "最终位置": {
+              "default": "",
+              "type": "string"
+            },
+            "保护状态": {
+              "default": "",
+              "type": "string"
+            },
+            "当前行为": {
+              "default": "",
+              "type": "string"
+            },
+            "有效楼数": {
+              "default": 0,
+              "type": "number"
+            },
+            "参与者": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "满意度": {
+                    "default": 0,
+                    "type": "number"
+                  },
+                  "满意目标": {
+                    "default": 0,
+                    "type": "number"
+                  },
+                  "偏好命中": {
+                    "default": [],
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "时长评价": {
+                    "default": "太短",
+                    "type": "string",
+                    "enum": [
+                      "太短",
+                      "合适",
+                      "过久",
+                      "失控"
+                    ]
+                  },
+                  "结局态度": {
+                    "default": "",
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
         },
         "_上次上交期": {
           "default": -1,
@@ -486,7 +787,424 @@
           "default": -1,
           "type": "number"
         },
-        "_荣耀洞上次楼": {
+        "_管理考核": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "上次生成期": {
+              "default": -1,
+              "type": "number"
+            },
+            "活跃任务": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "default": {
+                  "id": "",
+                  "模板": "",
+                  "类型": "公共",
+                  "级别": "日常",
+                  "地点": "",
+                  "门牌": "",
+                  "创建时段": 0,
+                  "截止时段": 0,
+                  "逾期已扣": false,
+                  "来源事件": "",
+                  "公开摘要": ""
+                },
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "模板": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "类型": {
+                    "default": "公共",
+                    "type": "string",
+                    "enum": [
+                      "公共",
+                      "报修",
+                      "投诉"
+                    ]
+                  },
+                  "级别": {
+                    "default": "日常",
+                    "type": "string",
+                    "enum": [
+                      "日常",
+                      "重要",
+                      "紧急"
+                    ]
+                  },
+                  "地点": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "门牌": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "创建时段": {
+                    "default": 0,
+                    "type": "number"
+                  },
+                  "截止时段": {
+                    "default": 0,
+                    "type": "number"
+                  },
+                  "逾期已扣": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "来源事件": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "公开摘要": {
+                    "default": "",
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "完成票据": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "本期完成摘要": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "default": {
+                  "任务": "",
+                  "类型": "公共",
+                  "级别": "日常",
+                  "地点": "",
+                  "门牌": "",
+                  "按期": false,
+                  "方式": ""
+                },
+                "type": "object",
+                "properties": {
+                  "任务": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "类型": {
+                    "default": "公共",
+                    "type": "string",
+                    "enum": [
+                      "公共",
+                      "报修",
+                      "投诉"
+                    ]
+                  },
+                  "级别": {
+                    "default": "日常",
+                    "type": "string",
+                    "enum": [
+                      "日常",
+                      "重要",
+                      "紧急"
+                    ]
+                  },
+                  "地点": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "门牌": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "按期": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "方式": {
+                    "default": "",
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "类型冷却": {
+              "default": {},
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {
+                "default": -1,
+                "type": "number"
+              }
+            },
+            "本期新增应收": {
+              "default": 0,
+              "type": "number"
+            },
+            "本期实收": {
+              "default": 0,
+              "type": "number"
+            },
+            "本期应上交": {
+              "default": 0,
+              "type": "number"
+            },
+            "本期实际上交": {
+              "default": 0,
+              "type": "number"
+            },
+            "本期正向": {
+              "default": 0,
+              "type": "number"
+            },
+            "记分条目": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "default": {
+                  "id": "",
+                  "考核期": 0,
+                  "时段": 0,
+                  "类别": "综合失职",
+                  "变动": 0,
+                  "原因": ""
+                },
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "考核期": {
+                    "default": 0,
+                    "type": "number"
+                  },
+                  "时段": {
+                    "default": 0,
+                    "type": "number"
+                  },
+                  "类别": {
+                    "default": "综合失职",
+                    "type": "string",
+                    "enum": [
+                      "账目亏空",
+                      "楼务失职",
+                      "失联抗命",
+                      "公开丑闻",
+                      "母亲事发",
+                      "综合失职",
+                      "正向经营"
+                    ]
+                  },
+                  "变动": {
+                    "default": 0,
+                    "type": "number"
+                  },
+                  "原因": {
+                    "default": "",
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "粉刷冷却至期": {
+              "default": -1,
+              "type": "number"
+            },
+            "通牒主因": {
+              "default": "",
+              "type": "string",
+              "enum": [
+                "",
+                "账目亏空",
+                "楼务失职",
+                "失联抗命",
+                "公开丑闻",
+                "母亲事发",
+                "综合失职"
+              ]
+            },
+            "通牒原因": {
+              "default": "",
+              "type": "string"
+            },
+            "母亲圆场": {
+              "default": {},
+              "type": "object",
+              "properties": {
+                "危险轮次起期": {
+                  "default": -1,
+                  "type": "number"
+                },
+                "上次使用期": {
+                  "default": -1,
+                  "type": "number"
+                },
+                "事件ID": {
+                  "default": "",
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "_风闻账": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "上次日结日": {
+              "default": -1,
+              "type": "number"
+            },
+            "最后新增日": {
+              "default": -1,
+              "type": "number"
+            },
+            "聚餐冷却至": {
+              "default": -1,
+              "type": "number"
+            },
+            "攻略计数时段": {
+              "default": -1,
+              "type": "number"
+            },
+            "攻略计数": {
+              "default": 0,
+              "type": "number"
+            },
+            "投诉跨线锁": {
+              "default": false,
+              "type": "boolean"
+            },
+            "危机跨线锁": {
+              "default": false,
+              "type": "boolean"
+            },
+            "当前投诉事件": {
+              "default": "",
+              "type": "string"
+            },
+            "待转投诉事件": {
+              "default": "",
+              "type": "string"
+            },
+            "危机活跃": {
+              "default": false,
+              "type": "boolean"
+            },
+            "去重票据": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "最近事件": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "default": {
+                  "id": "",
+                  "类型": "",
+                  "时段": 0,
+                  "日": 0,
+                  "门牌": "",
+                  "地点": "",
+                  "摘要": "",
+                  "目标增量": 0,
+                  "增量": 0,
+                  "迹象": "关系异样",
+                  "状态": "自然平息",
+                  "父亲责任": "无",
+                  "胜任责任": 0
+                },
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "类型": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "时段": {
+                    "default": 0,
+                    "type": "number"
+                  },
+                  "日": {
+                    "default": 0,
+                    "type": "number"
+                  },
+                  "门牌": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "地点": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "摘要": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "目标增量": {
+                    "default": 0,
+                    "type": "number"
+                  },
+                  "增量": {
+                    "default": 0,
+                    "type": "number"
+                  },
+                  "迹象": {
+                    "default": "关系异样",
+                    "type": "string",
+                    "enum": [
+                      "关系异样",
+                      "可疑痕迹",
+                      "单人目击",
+                      "多人目击",
+                      "硬证据",
+                      "正式投诉"
+                    ]
+                  },
+                  "状态": {
+                    "default": "活跃",
+                    "type": "string",
+                    "enum": [
+                      "活跃",
+                      "已处理",
+                      "自然平息"
+                    ]
+                  },
+                  "父亲责任": {
+                    "default": "无",
+                    "type": "string",
+                    "enum": [
+                      "无",
+                      "未传",
+                      "母亲已圆场",
+                      "已计责"
+                    ]
+                  },
+                  "胜任责任": {
+                    "default": 0,
+                    "type": "number"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "_荣耀洞上次时段": {
           "default": -999,
           "type": "number"
         },
@@ -500,7 +1218,7 @@
           "minimum": -9007199254740991,
           "maximum": 9007199254740991
         },
-        "_荣耀洞起楼": {
+        "_荣耀洞起时段": {
           "default": -1,
           "type": "number"
         },
@@ -516,7 +1234,7 @@
           "default": "",
           "type": "string"
         },
-        "_荣耀洞动态楼": {
+        "_荣耀洞动态时段": {
           "default": -1,
           "type": "number"
         },
@@ -539,6 +1257,135 @@
             "通牒": {
               "default": false,
               "type": "boolean"
+            },
+            "紧急": {
+              "default": false,
+              "type": "boolean"
+            },
+            "母亲圆场": {
+              "default": {},
+              "type": "object",
+              "properties": {
+                "触发": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "事件ID": {
+                  "default": "",
+                  "type": "string"
+                },
+                "摘要": {
+                  "default": "",
+                  "type": "string"
+                },
+                "仅剧情": {
+                  "default": false,
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        },
+        "_父亲通话": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "标识": {
+              "default": "",
+              "type": "string"
+            },
+            "状态": {
+              "default": "",
+              "type": "string"
+            },
+            "期": {
+              "default": -1,
+              "type": "number"
+            },
+            "分数段": {
+              "default": "",
+              "type": "string"
+            },
+            "报表": {
+              "default": "",
+              "type": "string"
+            },
+            "通牒": {
+              "default": false,
+              "type": "boolean"
+            },
+            "紧急": {
+              "default": false,
+              "type": "boolean"
+            },
+            "母亲圆场": {
+              "default": {},
+              "type": "object",
+              "properties": {
+                "触发": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "事件ID": {
+                  "default": "",
+                  "type": "string"
+                },
+                "摘要": {
+                  "default": "",
+                  "type": "string"
+                },
+                "仅剧情": {
+                  "default": false,
+                  "type": "boolean"
+                }
+              }
+            },
+            "主题": {
+              "default": "",
+              "type": "string"
+            },
+            "记录": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "谁": {
+                    "default": "父",
+                    "type": "string",
+                    "enum": [
+                      "我",
+                      "父"
+                    ]
+                  },
+                  "文": {
+                    "default": "",
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "待回复": {
+              "default": {},
+              "type": "object",
+              "properties": {
+                "序号": {
+                  "default": 0,
+                  "type": "number"
+                },
+                "玩家说": {
+                  "default": "",
+                  "type": "string"
+                }
+              }
+            },
+            "下次回复序号": {
+              "default": 1,
+              "type": "number"
+            },
+            "挂断楼层": {
+              "default": -1,
+              "type": "number"
             }
           }
         }

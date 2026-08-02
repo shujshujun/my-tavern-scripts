@@ -2,22 +2,19 @@
 变量输出格式:
   rule:
     - you must output the update analysis and the actual update commands at once in the end of the next reply
-    - 'the update commands must strictly follow the **JSON Patch (RFC 6902)** standard, but can only use the following operations: `replace` (replace the value of existing paths), `add` (insert new items into an object or array, "value" should be the result value instead of the delta value), `remove`; that is, the output must be a valid JSON array containing operation objects'
+    - 'the update commands must strictly follow the **JSON Patch (RFC 6902)** standard and may only use `replace` on writable existing paths; the value must be the final value, not a delta'
+    - 'only paths actually present under <status_current_variable> are writable in this turn; if its 户 object is empty, output an empty JSON Patch array'
     - don't update field names starts with `_` as they are readonly, such as `_变量`
   format: |-
 
     <UpdateVariable>
     <Analysis>$(IN ENGLISH, no more than 80 words)
-    - ${calculate time passed: ...}
-    - ${decide whether dramatic updates are allowed as it's in a special case or the time passed is more than usual: yes/no}
-    - ${analyze every variable based on its corresponding `check`, according only to current reply instead of previous plots: ...}
+    - ${check only the writable variables for characters explicitly present in the current reply}
+    - ${briefly explain each actual change from current-reply evidence; do not infer elapsed time or authorize milestone changes}
     </Analysis>
     <JSONPatch>
     [
-      { "op": "replace", "path": "${/path/to/variable}", "value": "${new_value}" },
-      { "op": "add", "path": "${/path/to/object/new_key}", "value": "${new_value}" }
-      { "op": "remove", "path": "${/path/to/array/0}" },
-      ...
+      { "op": "replace", "path": "${/户/真实门牌/妻/允许字段}", "value": "${new_value}" }
     ]
     </JSONPatch>
     </UpdateVariable>

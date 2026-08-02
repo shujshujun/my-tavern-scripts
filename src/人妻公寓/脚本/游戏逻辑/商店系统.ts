@@ -1,15 +1,18 @@
 import type { SchemaType } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
-import { 户静态表, 查特殊场景, 查裂缝, 查道具, 道具表, 阶段标题 } from '../../stageConfig';
+import { 户静态表, 查特殊场景, 查裂缝, 查道具, 道具表, 特殊场景锁定状态 } from '../../stageConfig';
 import { 镜像直写 } from './守护系统';
+import { 登记脚本正增长候选 } from './冷落系统';
 import { 记余波 } from './雌竞系统';
 import { 请求晋阶 } from './结算系统';
 import { 同步社交轨迹 } from './数据库桥';
 import { 事件角色标记 } from './snapshotSystem';
 import { 开始录像带首送, 录像带前置键 } from './特殊场景系统';
+import { 母亲药物窗口已开启 } from './阶段线路系统';
+import { 当前时段 } from './楼层时钟';
 
 /**
- * 商店系统(P2:工具+礼物两页签起步;八页签全量框架/次日达快递箱归 P3)
+ * 商店系统(P2:工具+礼物两页签起步;八页签全量框架；小时达按本时段内送达展示)
  *
  * 裂缝三拍的第②③拍在这里:信是题目,货架是选择题——
  * 礼物页签在任一裂缝解锁后出现,一大排里只有对症几件有效,错误项全是"似是而非";
@@ -41,6 +44,7 @@ export function 取货架(data: SchemaType): { 页签: string; 商品: (typeof �
   const 全部 = Object.values(道具表).filter(d => (d.价格 ?? 0) > 0);
   const 架: { 页签: string; 商品: (typeof 道具表)[string][] }[] = [
     { 页签: '工具', 商品: 全部.filter(d => d.类别 === '工具') },
+    { 页签: '补给', 商品: 全部.filter(d => d.类别 === '补给') },
     { 页签: '人情', 商品: 全部.filter(d => d.类别 === '人情') },
     { 页签: '运作', 商品: 全部.filter(d => d.类别 === '运作') },
   ];
@@ -58,29 +62,21 @@ export function 取货架(data: SchemaType): { 页签: string; 商品: (typeof �
   if (最高 >= 3) {
     架.push({
       页签: '特殊场景',
-      商品: 全部.filter(d => {
-        if (d.类别 !== '特殊场景') return false;
-        const 场景 = 查特殊场景(d.id);
-        if (!场景) return true;
-        try {
-          return 场景.前置(data as never);
-        } catch {
-          return false;
-        }
-      }),
+      // 九场始终可见；前置不足由锁定状态与购买硬门说明，不再从货架消失。
+      商品: 全部.filter(d => d.类别 === '特殊场景'),
     });
   }
   if (最高 >= 4) {
     架.push({ 页签: '性癖', 商品: 全部.filter(d => d.类别 === '性癖') });
   }
-  if (data.系统._母亲入列 && (data.户['302']?.妻.当前阶段 ?? 0) >= 2) {
+  if (母亲药物窗口已开启(data)) {
     架.push({ 页签: '药物', 商品: 全部.filter(d => d.类别 === '药物') });
   }
   return 架;
 }
 
 // ============================================
-// 购买(P2 即时入包;P3 升级"次日达"快递箱=楼层时钟到货)
+// 购买（小时达：本时段内送达；购买成功立即入包，不设置配送队列）
 // ============================================
 
 export function 购买(data: SchemaType, 道具id: string): 商店结果 {
@@ -91,6 +87,9 @@ export function 购买(data: SchemaType, 道具id: string): 商店结果 {
   const 当前在架 = 取货架(data).some(页 => 页.商品.some(商品 => 商品.id === 道具id));
   if (!当前在架) return { 成功: false, 提示: '这个柜台还没开，或者这件商品尚未上架。' };
   if (配.常驻 && data.背包.includes(道具id)) return { 成功: false, 提示: `「${配.名称}」已经在背包里。` };
+  if (配.资源效果?.唯一 && (data.背包.includes(道具id) || data.玩家资源._已使用永久道具.includes(道具id))) {
+    return { 成功: false, 提示: `「${配.名称}」每局只能完成一次。` };
+  }
   if (道具id === '男用贞操带') {
     const 未完成数 = (['102', '202'] as const).filter(
       门牌号 => !data.系统._特殊场景前置.includes(录像带前置键(门牌号)),
@@ -103,7 +102,11 @@ export function 购买(data: SchemaType, 道具id: string): 商店结果 {
   // 特殊场景(P5):配置为“背包使用”的先买票、到指定地点二次确认；其余旧场景仍买下即开演。
   const 场景 = 查特殊场景(道具id);
   if (场景) {
-    if (!场景.前置(data as never)) return { 成功: false, 提示: '这场戏的人还没到齐。' };
+    const 锁定 = 特殊场景锁定状态(data as never, 道具id);
+    if (!锁定.已解锁) return { 成功: false, 提示: `「${配.名称}」尚未解锁：${锁定.缺少.join('；')}。` };
+    if (场景.允许时段 && !场景.允许时段.includes(当前时段(data))) {
+      return { 成功: false, 提示: `「${配.名称}」只能在${场景.允许时段.join('或')}开演。` };
+    }
     if (data.背包.includes(道具id) || data.系统._已完成特殊场景.includes(道具id)) {
       return { 成功: false, 提示: `「${配.名称}」已经买过了。` };
     }
@@ -128,7 +131,10 @@ export function 购买(data: SchemaType, 道具id: string): 商店结果 {
     // 结算:参与妻堕落+2(spec:自洽小戏,不触疑心/摊牌,不影响正文其他进展)
     for (const m of 参与妻) {
       const 妻 = data.户[m]?.妻;
-      if (妻) 妻.堕落值 = _.clamp(妻.堕落值 + 2, 0, 100);
+      if (妻) {
+        登记脚本正增长候选(data, m, '堕落值');
+        妻.堕落值 = _.clamp(妻.堕落值 + 2, 0, 100);
+      }
     }
     return { 成功: true, 提示: `「${配.名称}」——开演。`, 变动: true };
   }
@@ -142,7 +148,12 @@ export function 购买(data: SchemaType, 道具id: string): 商店结果 {
 // 送礼(须当面;对症判定→开门正戏/似是而非→礼貌收下/开门后→普通赠礼)
 // ============================================
 
-export async function 送礼(data: SchemaType, 道具id: string, 门牌号: 门牌): Promise<商店结果> {
+export async function 送礼(
+  data: SchemaType,
+  道具id: string,
+  门牌号: 门牌,
+  提交校验: () => boolean = () => true,
+): Promise<商店结果> {
   const 配 = 查道具(道具id);
   const 节点 = data.户[门牌号];
   if (!配 || !节点) return { 成功: false, 提示: '送不出去。' };
@@ -153,14 +164,17 @@ export async function 送礼(data: SchemaType, 道具id: string, 门牌号: 门�
   const 裂缝 = 查裂缝(门牌号);
   // 长期记忆直写(fire-and-forget;措辞固定模板,无数据库时静默跳过)
   const 记赠礼 = (结果: string) =>
-    void 同步社交轨迹({
-      类型: '赠礼',
-      人物: 妻名,
-      事件: `当面送出「${配.名称}」`,
-      结果,
-      楼层: getLastMessageId(),
-      事件键: `RQP-礼-${门牌号}-${道具id}-${getLastMessageId()}`,
-    });
+    void 同步社交轨迹(
+      {
+        类型: '赠礼',
+        人物: 妻名,
+        事件: `当面送出「${配.名称}」`,
+        结果,
+        楼层: getLastMessageId(),
+        事件键: `RQP-礼-${门牌号}-${道具id}-${getLastMessageId()}`,
+      },
+      提交校验,
+    );
 
   if (道具id === '男用贞操带') {
     if (门牌号 !== '102' && 门牌号 !== '202') return { 成功: false, 提示: '这件东西不是为她准备的。' };
@@ -204,13 +218,13 @@ export async function 送礼(data: SchemaType, 道具id: string, 门牌号: 门�
               ? '她哭的时候多说了一句话——那句话让你意识到,楼里的那些事,她其实早就知道了'
               : '';
         妻.当前阶段 = 1;
-        妻.阶段标题 = 阶段标题(1, 门牌号);
         镜像直写(门牌号, { 阶段: 1 });
-        data.系统._待发送事件 =
+        const 破墙事件 =
           `${事件角色标记({ 在场妻: [门牌号] })}【破墙】{{user}}把「${配.名称}」递给了妈——不是保健品,不是按摩仪,是一件给"女人"买的东西。` +
           `她第一反应是笑着骂"这是买给哪个小姑娘的",笑到一半停住了——她反应过来这是买给她的。二十年了,` +
           `第一次有人把她当女人而不是当妈看。演出她从错愕到眼眶失守的完整过程,她转过身去很久没说话。${差分}。` +
           `这是那堵叫"妈妈"的墙裂开的一楼,张力给足,不要一笔带过`;
+        data.系统._待发送事件 = data.系统._待发送事件 ? `${data.系统._待发送事件}|${破墙事件}` : 破墙事件;
         记赠礼('这件礼物让她愣住落泪——第一次有人把她当女人看');
         return { 成功: true, 提示: '妈半天没说话。有什么东西,不一样了。', 变动: true };
       }

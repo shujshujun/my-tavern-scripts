@@ -50,7 +50,7 @@ export function 同步画幅(): void {
   }
 }
 
-export function 注册画幅监听(): void {
+export function 注册画幅监听(): () => void {
   const 候选: Window[] = [window];
   try {
     if (window.parent && !候选.includes(window.parent)) 候选.push(window.parent);
@@ -72,4 +72,47 @@ export function 注册画幅监听(): void {
       /* 某一层不可监听不影响其余层 */
     }
   }
+
+  return () => {
+    for (const 窗口 of 候选) {
+      try {
+        窗口.removeEventListener('resize', 同步画幅);
+        窗口.visualViewport?.removeEventListener('resize', 同步画幅);
+        窗口.visualViewport?.removeEventListener('scroll', 同步画幅);
+      } catch {
+        /* 某一层已经销毁或跨域变化时继续清其余层 */
+      }
+    }
+  };
+}
+
+/**
+ * BFCache 会在 pagehide 时冻结当前文档，并在 pageshow 时复用同一份 JS 状态。
+ * 冻结时暂时释放跨窗口监听，恢复时重新注册并立即校正画幅；普通销毁则只执行释放。
+ */
+export function 注册画幅页面生命周期(
+  页面: Pick<EventTarget, 'addEventListener' | 'removeEventListener'> = window,
+  注册监听: () => () => void = 注册画幅监听,
+  同步: () => void = 同步画幅,
+): () => void {
+  let 注销监听: (() => void) | undefined = 注册监听();
+  const 停止监听 = () => {
+    if (!注销监听) return;
+    注销监听();
+    注销监听 = undefined;
+  };
+  const 页面隐藏 = () => 停止监听();
+  const 页面显示 = (事件: Event) => {
+    if (!(事件 as PageTransitionEvent).persisted || 注销监听) return;
+    同步();
+    注销监听 = 注册监听();
+  };
+
+  页面.addEventListener('pagehide', 页面隐藏);
+  页面.addEventListener('pageshow', 页面显示);
+  return () => {
+    页面.removeEventListener('pagehide', 页面隐藏);
+    页面.removeEventListener('pageshow', 页面显示);
+    停止监听();
+  };
 }

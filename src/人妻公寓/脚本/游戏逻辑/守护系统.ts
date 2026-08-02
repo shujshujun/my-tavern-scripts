@@ -1,17 +1,19 @@
 import type { SchemaType, 户节点Type } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
-import { 好感封顶表, 阶段标题 } from '../../stageConfig';
+import { 好感封顶表 } from '../../stageConfig';
 import { 应冻结堕落 } from './阶段线路系统';
 import { 当前天数 } from './楼层时钟';
+import { 计算阶段堕落底线 } from './冷落成长核心';
+import { 规范AI表现文本 } from './AI表现文本安全';
 
 /**
  * 守护系统:代码防护体系 A/B 层的通用机械(设计spec「代码防护体系」27条的出厂配置)
  *
  * - 保护快照:PROMPT_READY 从最新楼捕获(含 UI 写入),作回滚基准(防护6)
  * - 逐字段回滚:变量分工表落码——AI 只碰表现层白名单,其余一律拍回(防护2)
- * - delta cap:AI 可写数值 ±3 硬截(防护3;对症放宽±5 归 P2)
- * - 单向锁:情报可见/裂缝已确认/坏结局 新=base||旧||新(防护4)
- * - chat 级镜像取大(防护9):玩家手点的单调状态(阶段/堕落/裂缝确认/入住楼层)
+ * - delta cap:堕落值超 ±3 整项回滚；其他 AI 可写数值按既有规则裁剪
+ * - 脚本权限:情报显示直接从可信裂缝确认状态派生，不再保存第二份布尔副本(防护4)
+ * - chat 级镜像取大(防护9):玩家手点的单调状态(阶段/裂缝确认/入住时段)
  *   入镜像,重roll/毒快照路径盖不回;回档作废由 回合引擎.回档至 显式清镜像宣告
  *   (2026-07-26 审计 H2/M12:楼层比较无法区分重掷与回档,不再自行推断)
  */
@@ -22,7 +24,7 @@ import { 当前天数 } from './楼层时钟';
 
 /** 妻:AI 可写纯文本表现字段 */
 const 妻文本白名单 = ['当前心理想法', '当前情绪', '外装', '内衣', '妆容'] as const;
-/** 妻:AI 可写数值(单轮 delta cap;〔P2〕对症放宽±5) */
+/** 妻:AI 可写数值；任何阶段、任何剧情条件下单轮 delta 都不超过 ±3。 */
 const 妻数值白名单 = { 好感值: 3, 堕落值: 3 } as const;
 /** 身体开发四槽:仅 +3,不可衰退(负 delta 回滚,云霜凝范式) */
 const 开发单轮上限 = 3;
@@ -43,10 +45,14 @@ let _protSnapshot: SchemaType | null = null;
 
 export const 有保护快照 = () => _protSnapshot !== null;
 
-/** 捕获保护快照(整份深拷贝——分工表按字段区分在回滚侧做,捕获侧不挑字段更稳) */
-export function 捕获保护快照(data: SchemaType): void {
+/**
+ * 捕获保护快照(整份深拷贝——分工表按字段区分在回滚侧做,捕获侧不挑字段更稳)。
+ * 入住首演会用尚未持久化的演出态做一次临时守护基准；该次严禁提前写镜像。
+ */
+export function 捕获保护快照(data: SchemaType, 写入镜像 = true): void {
   _protSnapshot = _.cloneDeep(data);
-  同步镜像();
+  // 即使本次禁止写镜像，也必须读取并合并既有单向真；否则首演临时基准会把晋阶打回旧值。
+  同步镜像(写入镜像);
 }
 
 /** 重开一局清场:内存快照置空(chat 镜像由回合引擎连同过程变量一起清,此处只管模块态) */
@@ -55,27 +61,95 @@ export function 清保护快照(): void {
 }
 
 // ============================================
-// chat 级镜像(防护9:单调状态取大;回档到镜像楼层之前则作废)
+// chat 级镜像(防护9:单调状态取大；回档时由入口显式作废)
 // ============================================
 
 export const PROMOTE_MIRROR_KEY = '人妻公寓_晋阶镜像';
 
 interface 户镜像 {
   阶段: number;
-  堕落: number;
   碎片: number; // 裂缝碎片进度(玩家侦探操作,单调;旧镜像无此键 ?? 0 兜底)
   裂缝确认: boolean;
-  情报可见: boolean;
-  入住楼层: number;
+  入住时段: number;
 }
 interface 镜像结构 {
-  楼层: number;
   户: Record<string, 户镜像>;
 }
 
-/** 末楼号(与 index/手机系统/mvuIO 同轴;审计 低危19:旧版用 chat.length=末楼+1,与全项目差 1) */
-function 当前楼层(): number {
-  return Math.max(0, (SillyTavern.chat?.length ?? 1) - 1);
+/**
+ * 镜像写必须与回档清场共用一条串行链。世代先同步递增，已经起跑但尚未提交的旧写
+ * 会在 updater 内再次验世代；清场排在所有旧写之后，新时间线写又排在清场之后。
+ */
+let _镜像时间线世代 = 0;
+let _镜像写链: Promise<void> = Promise.resolve();
+
+function 排队晋阶镜像任务(任务: () => Promise<void>): Promise<void> {
+  const 本次 = _镜像写链.catch(() => undefined).then(任务);
+  _镜像写链 = 本次.catch((e: unknown) => console.error('[人妻公寓] 晋阶镜像串行任务失败', e));
+  return 本次;
+}
+
+function 合并户镜像(现有: 户镜像 | undefined, 抬升: Partial<户镜像>): 户镜像 {
+  const 基底 = 现有 ?? { 阶段: 0, 碎片: 0, 裂缝确认: false, 入住时段: 0 };
+  return {
+    阶段: Math.max(基底.阶段 ?? 0, 抬升.阶段 ?? 0),
+    碎片: Math.max(基底.碎片 ?? 0, 抬升.碎片 ?? 0),
+    裂缝确认: !!基底.裂缝确认 || !!抬升.裂缝确认,
+    入住时段: Math.max(基底.入住时段 ?? 0, 抬升.入住时段 ?? 0),
+  };
+}
+
+function 排队合并晋阶镜像(抬升表: Record<string, Partial<户镜像>>): void {
+  const 世代 = _镜像时间线世代;
+  const 安全抬升 = _.cloneDeep(抬升表);
+  void 排队晋阶镜像任务(async () => {
+    if (世代 !== _镜像时间线世代) return;
+    if (typeof updateVariablesWith === 'function') {
+      await updateVariablesWith(
+        vars => {
+          if (世代 !== _镜像时间线世代) return vars;
+          const 当前 = (_.cloneDeep(_.get(vars, PROMOTE_MIRROR_KEY)) as 镜像结构 | undefined) ?? { 户: {} };
+          for (const [门牌号, 抬升] of Object.entries(安全抬升)) {
+            当前.户[门牌号] = 合并户镜像(当前.户[门牌号], 抬升);
+          }
+          _.set(vars, PROMOTE_MIRROR_KEY, 当前);
+          return vars;
+        },
+        { type: 'chat' },
+      );
+      return;
+    }
+    // 仅供不具备 updateVariablesWith 的旧宿主/Node 单测；生产路径始终走上面的原子 updater。
+    if (世代 !== _镜像时间线世代) return;
+    const 当前 = (_.cloneDeep(_.get(getVariables({ type: 'chat' }), PROMOTE_MIRROR_KEY)) as 镜像结构 | undefined) ?? {
+      户: {},
+    };
+    for (const [门牌号, 抬升] of Object.entries(安全抬升)) {
+      当前.户[门牌号] = 合并户镜像(当前.户[门牌号], 抬升);
+    }
+    await Promise.resolve(insertOrAssignVariables({ [PROMOTE_MIRROR_KEY]: 当前 }, { type: 'chat' }));
+  });
+}
+
+/** 回档、原生删楼和重开统一调用；返回时旧世代迟到写与清场都已经落定。 */
+export function 作废晋阶镜像时间线(): Promise<void> {
+  _镜像时间线世代 += 1;
+  const 世代 = _镜像时间线世代;
+  return 排队晋阶镜像任务(async () => {
+    if (世代 !== _镜像时间线世代) return;
+    await updateVariablesWith(
+      vars => {
+        if (世代 === _镜像时间线世代) _.set(vars, PROMOTE_MIRROR_KEY, null);
+        return vars;
+      },
+      { type: 'chat' },
+    );
+  });
+}
+
+/** 测试与事务收口使用；业务入口不应靠任意延时猜测镜像是否已经写完。 */
+export async function 等待晋阶镜像写入(): Promise<void> {
+  await _镜像写链;
 }
 
 /**
@@ -85,42 +159,34 @@ function 当前楼层(): number {
  * 作废语义重做(2026-07-26 审计 H2/M12):楼层比较无法区分"重掷/删楼(数据随楼消失,
  * 镜像该救回来)"与"回档到更早时间线(镜像该作废)"——旧版单一 `>` 比较两头都错:
  * 回档后镜像直写把旧镜像洗白复活(H2),晋阶后重掷走作废分支把抬升丢光(M12)。
- * 现在作废只由显式入口宣告(回合引擎.回档至/重开一局 清 PROMOTE_MIRROR_KEY),
+ * 现在作废只由显式入口宣告，并与所有镜像写共用世代化串行队列；
  * 此处一律取大并入——镜像回到它的本职:防打回的正字。
  */
-function 同步镜像(): void {
+function 同步镜像(写入 = true): void {
   if (!_protSnapshot) return;
   try {
-    const floor = 当前楼层();
     const mirror = _.get(getVariables({ type: 'chat' }), PROMOTE_MIRROR_KEY) as 镜像结构 | undefined;
     if (mirror) {
       for (const [门牌号, m] of Object.entries(mirror.户 ?? {})) {
         const 节点 = _protSnapshot.户[门牌号];
         if (!节点) continue; // 回档到入住前:MVU 按楼恢复天然无此户,回档重演免费成立
         节点.妻.当前阶段 = Math.max(节点.妻.当前阶段, m.阶段 ?? 0);
-        节点.妻.堕落值 = Math.max(节点.妻.堕落值, m.堕落 ?? 0);
         节点.妻.裂缝.碎片进度 = Math.max(节点.妻.裂缝.碎片进度, m.碎片 ?? 0);
         节点.妻.裂缝.已确认 = 节点.妻.裂缝.已确认 || !!m.裂缝确认;
-        节点.妻.情报可见 = 节点.妻.情报可见 || !!m.情报可见;
-        // 入住楼层回读(审计 低危17:旧版只写不读,注释宣称的保护不存在)
-        节点._入住楼层 = Math.max(节点._入住楼层, m.入住楼层 ?? 0);
+        节点._入住时段 = Math.max(节点._入住时段, m.入住时段 ?? 0);
       }
     }
-    const 新镜像: 镜像结构 = { 楼层: floor, 户: {} };
+    if (!写入) return;
+    const 新镜像: Record<string, Partial<户镜像>> = {};
     for (const [门牌号, 节点] of Object.entries(_protSnapshot.户)) {
-      新镜像.户[门牌号] = {
+      新镜像[门牌号] = {
         阶段: 节点.妻.当前阶段,
-        堕落: 节点.妻.堕落值,
         碎片: 节点.妻.裂缝.碎片进度,
         裂缝确认: 节点.妻.裂缝.已确认,
-        情报可见: 节点.妻.情报可见,
-        入住楼层: 节点._入住楼层,
+        入住时段: 节点._入住时段,
       };
     }
-    // Promise.resolve 包一层:insertOrAssignVariables 部分版本同步返回 undefined,裸链 .catch 会炸
-    void Promise.resolve(insertOrAssignVariables({ [PROMOTE_MIRROR_KEY]: 新镜像 }, { type: 'chat' })).catch(
-      (e: unknown) => console.error('[人妻公寓] 镜像写入失败', e),
-    );
+    排队合并晋阶镜像(新镜像);
   } catch (e) {
     console.error('[人妻公寓] 镜像同步失败', e);
   }
@@ -133,31 +199,7 @@ function 同步镜像(): void {
  */
 export function 镜像直写(门牌号: string, 抬升: Partial<户镜像>): void {
   try {
-    const floor = 当前楼层();
-    const mirror = (_.get(getVariables({ type: 'chat' }), PROMOTE_MIRROR_KEY) as 镜像结构 | undefined) ?? {
-      楼层: floor,
-      户: {},
-    };
-    const m = mirror.户[门牌号] ?? {
-      阶段: 0,
-      堕落: 0,
-      碎片: 0,
-      裂缝确认: false,
-      情报可见: false,
-      入住楼层: 0,
-    };
-    mirror.户[门牌号] = {
-      阶段: Math.max(m.阶段, 抬升.阶段 ?? 0),
-      堕落: Math.max(m.堕落, 抬升.堕落 ?? 0),
-      碎片: Math.max(m.碎片 ?? 0, 抬升.碎片 ?? 0),
-      裂缝确认: m.裂缝确认 || !!抬升.裂缝确认,
-      情报可见: m.情报可见 || !!抬升.情报可见,
-      入住楼层: Math.max(m.入住楼层, 抬升.入住楼层 ?? 0),
-    };
-    mirror.楼层 = floor;
-    void Promise.resolve(insertOrAssignVariables({ [PROMOTE_MIRROR_KEY]: mirror }, { type: 'chat' })).catch(
-      (e: unknown) => console.error('[人妻公寓] 镜像直写失败', e),
-    );
+    排队合并晋阶镜像({ [门牌号]: 抬升 });
   } catch (e) {
     console.error('[人妻公寓] 镜像直写失败', e);
   }
@@ -167,41 +209,96 @@ export function 镜像直写(门牌号: string, 抬升: Partial<户镜像>): voi
 // 回滚 + 裁剪(写阶段主闸;数据驱动吃统一结构 户.{妻,夫},加户=加配置代码零改)
 // ============================================
 
+export type 合法成长候选来源 = '好感值' | '堕落值' | '身体开发';
+
+export interface 守护结果 {
+  /** 供冷落成长系统精确判定；同一来源每户最多出现一次。 */
+  合法正候选: Partial<Record<门牌, 合法成长候选来源[]>>;
+  /** 来源映射的便捷索引，兼容只关心“哪几户成长过”的调用方。 */
+  合法正候选门牌: 门牌[];
+}
+
+interface 原始数值候选 {
+  提供: boolean;
+  有效: boolean;
+  值: number;
+}
+
+function 空守护结果(): 守护结果 {
+  return { 合法正候选: {}, 合法正候选门牌: [] };
+}
+
+function 记录合法正候选(结果: 守护结果, 门牌号: string, 来源: 合法成长候选来源): void {
+  const 门牌号值 = 门牌号 as 门牌;
+  const 现有 = 结果.合法正候选[门牌号值];
+  if (现有) {
+    if (!现有.includes(来源)) 现有.push(来源);
+    return;
+  }
+  结果.合法正候选[门牌号值] = [来源];
+  结果.合法正候选门牌.push(门牌号值);
+}
+
+/**
+ * raw候选可以是原始 stat_data，也可以是包含 stat_data 的外层对象。Zod 会先把 999
+ * 夹成 100；只有保留原值，守护才能识别它并非合法的 +1。
+ */
+function 读取原始数值候选(raw候选: unknown, 路径: readonly string[]): 原始数值候选 {
+  if (raw候选 === undefined) return { 提供: false, 有效: false, 值: 0 };
+  const statData = _.get(raw候选, 'stat_data') ?? _.get(raw候选, 'data.stat_data');
+  const 根 = statData ?? raw候选;
+  if (!_.has(根, 路径)) return { 提供: false, 有效: false, 值: 0 };
+  const 值 = Number(_.get(根, 路径));
+  return { 提供: true, 有效: Number.isFinite(值), 值 };
+}
+
+function 候选差值(
+  raw候选: unknown,
+  路径: readonly string[],
+  解析后值: number,
+  快照值: number,
+): { 有效: boolean; 差值: number } {
+  const 原始 = 读取原始数值候选(raw候选, 路径);
+  if (原始.提供) return { 有效: 原始.有效, 差值: 原始.值 - 快照值 };
+  return { 有效: Number.isFinite(解析后值), 差值: 解析后值 - 快照值 };
+}
+
 /**
  * 回滚脚本专属字段 + AI 可写字段 delta cap。
  * @param 焦点户 本轮焦点(三态机):名单外的户=后台,整体拍回快照(轻逻辑红利);
  *   不传 = 无焦点信息(保守起见全按焦点规则逐字段处理)
- * @param 可写人物 同一焦点户内仍按实际在场者分闸；未在场的一方整段拍回
+ * @param 可写人物 同一焦点户内仍按实际在场者分闸；未在场的一方整段拍回。
+ *   妻不在 `亲密妻` 时，堕落与身体开发也必须拍回，不能只依赖提示层隐藏路径。
  */
 export function 回滚保护字段(
   data: SchemaType,
   焦点户?: readonly string[],
-  可写人物?: { 妻: readonly string[]; 夫: readonly string[] },
+  可写人物?: { 妻: readonly string[]; 夫: readonly string[]; 亲密妻?: readonly string[] },
   楼层?: number,
-): void {
-  if (!_protSnapshot) return;
+  raw候选?: unknown,
+): 守护结果 {
+  const 结果 = 空守护结果();
+  if (!_protSnapshot) return 结果;
   const snap = _protSnapshot;
   const 本轮静音会议事件 =
     楼层 !== undefined &&
     snap.系统._已注入事件.楼层 === 楼层 &&
     snap.系统._已注入事件.内容.includes('【特殊场景·静音会议·');
-  if (
-    (snap.系统._特殊场景.id === '静音会议' && snap.系统._特殊场景.阶段 !== '筹备') ||
-    本轮静音会议事件
-  ) {
+  if ((snap.系统._特殊场景.id === '静音会议' && snap.系统._特殊场景.阶段 !== '筹备') || 本轮静音会议事件) {
     // 静音会议是完全隔离的演出层：AI 不拥有任何持久字段写权。整份快照拍回也覆盖
     // 手动“重新处理变量”路径；最终 +2 只会在本函数之后由特殊场景脚本结算。
     data.户 = _.cloneDeep(snap.户);
     data.现金 = snap.现金;
     data.胜任度 = snap.胜任度;
     data.风闻 = snap.风闻;
+    data.玩家资源 = _.cloneDeep(snap.玩家资源);
     data.背包 = [...snap.背包];
     data.系统 = _.cloneDeep(snap.系统);
-    return;
+    return 结果;
   }
-  // 钟日=同日堕落收益账的记账日(真实楼层+杀时间偏移;偏移取快照侧=AI 不可写的真值)。
-  // 旧调用不传楼层时账不动,只有 ±3 兜底。
-  const 钟日 = 楼层 === undefined ? undefined : 当前天数(楼层 + snap.系统._时段偏移楼);
+  // 同日堕落收益账按快照侧绝对时段记日；真实消息楼只决定本次是否属于正式正文处理。
+  // 旧调用不传消息楼时账不动,只有 ±3 兜底。
+  const 钟日 = 楼层 === undefined ? undefined : 当前天数(snap);
 
   // ── 户级 ──
   // AI 私造户节点 = 泄底(入住只走脚本事件)→ 直接删除
@@ -229,7 +326,10 @@ export function 回滚保护字段(
       快照节点,
       !可写人物 || 可写人物.妻.includes(门牌号),
       !可写人物 || 可写人物.夫.includes(门牌号),
+      !可写人物 || !可写人物.亲密妻 || 可写人物.亲密妻.includes(门牌号),
       钟日,
+      raw候选,
+      结果,
     );
   }
 
@@ -237,11 +337,13 @@ export function 回滚保护字段(
   data.现金 = snap.现金;
   data.胜任度 = snap.胜任度;
   data.风闻 = snap.风闻;
+  data.玩家资源 = _.cloneDeep(snap.玩家资源);
   data.背包 = [...snap.背包];
   // 坏结局不再采纳 AI 侧值(2026-07-26 审计 低危14):它此前是回滚白名单里唯一的直通口,
   // 整表注入会把该字段发给 AI,幻觉写入=引擎全停只能重开。脚本自己的坏结局判定
   // (经济结算)发生在回滚之后、直写 stat,下一楼必进 snap——快照侧单向锁足以保真。
   data.系统 = _.cloneDeep(snap.系统);
+  return 结果;
 }
 
 /** 焦点户:先按人物在场分闸,再对白名单做 delta cap,其余拍回 */
@@ -251,7 +353,10 @@ function 回滚户字段(
   快照节点: 户节点Type,
   妻可写: boolean,
   夫可写: boolean,
+  亲密可写: boolean,
   钟日?: number,
+  raw候选?: unknown,
+  守护结果值?: 守护结果,
 ): void {
   if (!妻可写) {
     节点.妻 = _.cloneDeep(快照节点.妻);
@@ -259,21 +364,34 @@ function 回滚户字段(
     const 妻 = 节点.妻;
     const 妻快照 = 快照节点.妻;
 
-    // AI 可写数值:±3 硬截(安检之外的脚本兜底,防护3);
-    // 对症放宽:开门后(阶段≥1,裂缝三拍走完)好感 cap 升到 ±5——踩中隐痛方向的涨速红利
+    // AI 可写数值保护。raw候选优先于 Zod 后数值，避免 999→100 后伪装成合法小差值；
+    // 堕落超限必须整项拍回，好感沿用既有的边界裁剪；裂缝确认也不放宽单轮上限。
     for (const [轴, 基础cap] of Object.entries(妻数值白名单) as ['好感值' | '堕落值', number][]) {
-      const cap = 轴 === '好感值' && 妻快照.当前阶段 >= 1 && 妻快照.裂缝.已确认 ? 5 : 基础cap;
-      const delta = 妻[轴] - 妻快照[轴];
-      if (Math.abs(delta) > cap) {
-        妻[轴] = _.clamp(妻快照[轴] + Math.sign(delta) * cap, 0, 100);
+      if (轴 === '堕落值' && !亲密可写) {
+        妻.堕落值 = 妻快照.堕落值;
+        continue;
       }
+      const cap = 基础cap;
+      const 候选 = 候选差值(raw候选, ['户', 门牌号, '妻', 轴], 妻[轴], 妻快照[轴]);
+      const 余波冻结堕落 = 轴 === '堕落值' && 妻快照._冷落余波.状态 !== '无';
+      if (轴 === '堕落值') {
+        if (余波冻结堕落 || !候选.有效 || Math.abs(候选.差值) > cap) 妻[轴] = 妻快照[轴];
+      } else if (!候选.有效) {
+        妻[轴] = 妻快照[轴];
+      } else if (Math.abs(候选.差值) > cap) {
+        妻[轴] = _.clamp(妻快照[轴] + Math.sign(候选.差值) * cap, 0, 100);
+      }
+      if (守护结果值 && 候选.有效 && 候选.差值 > 0 && 候选.差值 <= cap && !余波冻结堕落)
+        记录合法正候选(守护结果值, 门牌号, 轴);
     }
     // 同日堕落收益递减(2026-07-27 拍板C):±3 截完再过当日账——同一天已涨满 每日堕落上限 后,
     // 后续楼戏照演账不涨。跌不入账;跨天(钟日变)账自动清零重计。
     {
       const 涨 = 妻.堕落值 - 妻快照.堕落值;
       const 账 = 妻快照._堕落日账.日 === 钟日 ? 妻快照._堕落日账.值 : 0;
-      if (钟日 !== undefined && 涨 > 0) {
+      if (!亲密可写) {
+        妻._堕落日账 = _.cloneDeep(妻快照._堕落日账);
+      } else if (钟日 !== undefined && 涨 > 0) {
         const 允许 = Math.min(涨, Math.max(0, 每日堕落上限 - 账));
         if (允许 < 涨)
           console.info(`[人妻公寓·守护] 同日堕落收益已达上限(${账}/${每日堕落上限}),本楼 +${涨} 截为 +${允许}`);
@@ -286,16 +404,27 @@ function 回滚户字段(
     // 好感阶段封顶(阶段0"陌生邻里"接受上限封死好感,机制不靠 AI 自觉)
     妻.好感值 = Math.min(妻.好感值, 好感封顶表[_.clamp(妻快照.当前阶段, 0, 5)]);
     // 阶段线路门：数值可涨到门前，但四个固定节点未完成时不能越过晋阶阈值。
-    const 线路封顶 = 应冻结堕落(妻);
+    // 冻结门必须只读可信快照。若读取 AI 候选，伪造当前阶段=5 或完成位图=15
+    // 都能在同一轮先绕过门槛，随后即使字段被拍回，越线堕落值也已经留下。
+    const 线路封顶 = 应冻结堕落(妻快照);
     if (线路封顶 !== null) 妻.堕落值 = Math.min(妻.堕落值, 线路封顶);
+    // AI 的合法负变化同样不能把当前阶段的数值轴压回上一阶段；输入已异常低于线时
+    // 保持原值而不反向抬高，交给后续正常成长自行修复。
+    妻.堕落值 = Math.max(妻.堕落值, Math.min(妻快照.堕落值, 计算阶段堕落底线(妻快照.当前阶段)));
     // 身体开发:+3 封顶,不可衰退(负 delta 回滚);终值再吃阶段封顶(审计 M2)——
-    // 封顶取 max(快照值, 表值):旧档已超表的不回抽,只拦新增长
+    // 封顶取 max(快照值, 表值):已有异常超表值不回抽,只拦新增长
     {
       const 开发封顶 = 开发封顶表[_.clamp(妻快照.当前阶段, 0, 5)];
       for (const 槽 of ['小嘴', '胸部', '小屄', '屁穴'] as const) {
-        const delta = 妻.身体开发[槽] - 妻快照.身体开发[槽];
-        if (delta < 0) 妻.身体开发[槽] = 妻快照.身体开发[槽];
-        else if (delta > 开发单轮上限) 妻.身体开发[槽] = _.clamp(妻快照.身体开发[槽] + 开发单轮上限, 0, 100);
+        if (!亲密可写) {
+          妻.身体开发[槽] = 妻快照.身体开发[槽];
+          continue;
+        }
+        const 候选 = 候选差值(raw候选, ['户', 门牌号, '妻', '身体开发', 槽], 妻.身体开发[槽], 妻快照.身体开发[槽]);
+        if (守护结果值 && 候选.有效 && 候选.差值 > 0 && 候选.差值 <= 开发单轮上限)
+          记录合法正候选(守护结果值, 门牌号, '身体开发');
+        if (!候选.有效 || 候选.差值 < 0) 妻.身体开发[槽] = 妻快照.身体开发[槽];
+        else if (候选.差值 > 开发单轮上限) 妻.身体开发[槽] = _.clamp(妻快照.身体开发[槽] + 开发单轮上限, 0, 100);
         妻.身体开发[槽] = Math.min(妻.身体开发[槽], Math.max(妻快照.身体开发[槽], 开发封顶));
       }
     }
@@ -303,22 +432,23 @@ function 回滚户字段(
     for (const 槽 of ['外装', '内衣', '妆容'] as const) {
       if (妻快照._穿戴锁.includes(槽)) 妻[槽] = 妻快照[槽];
     }
+    for (const 字段 of 妻文本白名单) 妻[字段] = 规范AI表现文本(妻[字段]);
     妻._穿戴锁 = [...妻快照._穿戴锁];
     妻._穿着SKU = { ...妻快照._穿着SKU };
+    妻._阶段线路 = _.cloneDeep(妻快照._阶段线路);
 
     // 文本白名单以外的妻字段全部拍回
     妻.婚姻值 = 妻快照.婚姻值;
     妻.当前阶段 = 妻快照.当前阶段;
-    妻.阶段标题 = 阶段标题(妻快照.当前阶段, 门牌号); // 派生字段永远脚本重算
     妻.裂缝 = _.cloneDeep(妻快照.裂缝);
-    妻.气质描述 = 妻快照.气质描述; // 按阶段脚本改写,AI 禁写
     妻.特殊 = [...妻快照.特殊]; // 装备与永久件=脚本写
     妻.性癖装载 = [...妻快照.性癖装载];
     妻.曾开发性癖 = [...妻快照.曾开发性癖];
-    // 单向锁:情报可见
-    妻.情报可见 = 妻快照.情报可见 || 妻.情报可见;
+    // 完整档案权限由脚本确认的裂缝状态派生；绝不采纳 AI 候选值。
     妻.上次互动楼层 = 妻快照.上次互动楼层;
     妻._上次结算楼层 = 妻快照._上次结算楼层;
+    妻._成长账 = _.cloneDeep(妻快照._成长账);
+    妻._冷落余波 = _.cloneDeep(妻快照._冷落余波);
     妻._要钱次数 = 妻快照._要钱次数;
     妻._上次要钱楼层 = 妻快照._上次要钱楼层;
     void 妻文本白名单; // 文本字段 AI 自由写,无需处理(列表仅作分工表文档锚)
@@ -330,6 +460,8 @@ function 回滚户字段(
   if (!夫可写) {
     夫.当前心理想法 = 夫快照.当前心理想法;
     夫.当前情绪 = 夫快照.当前情绪;
+  } else {
+    for (const 字段 of 夫文本白名单) 夫[字段] = 规范AI表现文本(夫[字段]);
   }
   夫.疑心值 = 夫快照.疑心值;
   夫.信任值 = 夫快照.信任值;
@@ -342,7 +474,7 @@ function 回滚户字段(
   夫._上次打断档 = 夫快照._上次打断档;
   void 夫文本白名单;
 
-  节点._入住楼层 = 快照节点._入住楼层;
+  节点._入住时段 = 快照节点._入住时段;
   节点._上次收租期 = 快照节点._上次收租期;
   节点._欠租笔数 = 快照节点._欠租笔数;
 }

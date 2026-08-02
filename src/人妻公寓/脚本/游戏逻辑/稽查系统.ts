@@ -77,7 +77,6 @@ export interface 稽查结果 {
 }
 
 const 尺度块正则 = /<尺度判定(?:\s+模式=["']?(简|详)["']?)?\s*>([\s\S]*?)<\/尺度判定>/gi;
-const 旧等级正则 = /<行为等级>\s*(\d)\s*<\/行为等级>/g;
 
 function 合法等级(值: unknown): number | null {
   const 数 = typeof 值 === 'number' ? 值 : typeof 值 === 'string' && 值.trim() !== '' ? Number(值) : NaN;
@@ -121,19 +120,6 @@ export function 解析尺度判定(原文: string): { 模式: 尺度模式; 角�
   } catch {
     return null;
   }
-}
-
-/** 兼容旧 CG 接口；新协议优先，旧标签只供旧存档/外部调用。 */
-export function 解析行为等级(原文: string): number | null {
-  const 新 = 解析尺度判定(原文);
-  if (新) {
-    const 等级 = Object.values(新.角色)
-      .map(x => x?.实际)
-      .filter((x): x is number => typeof x === 'number');
-    return 等级.length ? Math.max(...等级) : null;
-  }
-  const 匹配 = [...原文.matchAll(旧等级正则)].at(-1);
-  return 匹配 ? 合法等级(匹配[1]) : null;
 }
 
 function 关键词命中(正文: string, 最低阶段: number): string[] {

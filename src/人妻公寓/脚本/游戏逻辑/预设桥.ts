@@ -10,9 +10,39 @@
  * 词条内容过一遍宏替换({{user}}/{{char}});读取失败或预设为空=返回空段,行为退回裸发。
  */
 
+import type { 预设正文标签 } from './预设输出兼容';
+
 export interface 预设消息 {
   role: 'system' | 'user' | 'assistant';
   content: string;
+}
+
+interface 可识别预设词条 {
+  enabled?: boolean;
+  content?: string;
+}
+
+/** 只认启用项中的强协议特征，避免普通设定偶然提到某个 XML 标签就误开流式门。 */
+export function 识别预设正文标签(词条们: readonly 可识别预设词条[]): 预设正文标签 | null {
+  const 协议文 = 词条们
+    .filter(词条 => 词条?.enabled && typeof 词条.content === 'string')
+    .map(词条 => 词条.content)
+    .join('\n');
+  if (/(?:DREAM_PLOT_OUTPUT|<dream_plot\b)/i.test(协议文) && /<dream_body\b/i.test(协议文)) return 'dream_body';
+  if (/<output-template\b/i.test(协议文) && /<content\b/i.test(协议文) && /<think(?:ing)?\b/i.test(协议文)) {
+    return 'content';
+  }
+  if (/<story_scene\b/i.test(协议文) && /<think(?:ing)?\b/i.test(协议文)) return 'story_scene';
+  return null;
+}
+
+export function 当前预设正文标签(): 预设正文标签 | null {
+  try {
+    return 识别预设正文标签(getPreset('in_use')?.prompts ?? []);
+  } catch (e) {
+    console.warn('[人妻公寓·预设桥] 识别当前预设输出协议失败:', e);
+    return null;
+  }
 }
 
 export function 预设破限段(): { 前: 预设消息[]; 后: 预设消息[] } {

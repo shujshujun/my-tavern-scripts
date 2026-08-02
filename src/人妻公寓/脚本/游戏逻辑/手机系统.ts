@@ -1,12 +1,23 @@
 import type { SchemaType } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
 import { 户静态表, 查考古, 门牌列表 } from '../../stageConfig';
-import { 丈夫在楼, 妻位置推算, 当前时段, seededRandom } from './楼层时钟';
-import { 读取最近有效, 读最近有效stat, 脚本写入 } from './mvuIO';
+import { 列出阶段线路候选详情 } from './阶段线路系统';
+import { seededRandom, 丈夫在楼, 取绝对时段, 妻位置推算, 当前时段, 旧钟楼跨度转时段 } from './楼层时钟';
+import { 登记MVU提交校验, 排队MVU操作, 读取最近有效, 读最近有效stat, 脚本写入 } from './mvuIO';
 import { 妻状态包 } from './snapshotSystem';
 import { 捕获保护快照 } from './守护系统';
-import { 姐妹群成员, 雌竞火气, 雌竞资格, 读余波, 标余波, 余波缓冲楼 } from './雌竞系统';
+import {
+  同一换装余波事件,
+  姐妹群成员,
+  雌竞火气,
+  雌竞资格,
+  读余波,
+  余波缓冲楼,
+  余波已发酵,
+  type 换装余波,
+} from './雌竞系统';
 import { Schema } from '../../schema';
+import { 当前时间线切换世代 } from './时间线切换协调';
 import {
   同步社交轨迹,
   应用数据库填表兼容设置,
@@ -22,6 +33,44 @@ import {
   type 微信进展引用,
 } from './数据库桥';
 import { 私聊图库清单, type 私聊图库项 } from './私聊图库清单';
+import { 建私聊图库地址索引, 重建已发私聊图, type 私聊图片消息记录, type 已发私聊图缓存 } from './私聊图片轮换';
+import {
+  创建手机时间线租约,
+  读取当前手机时间线租约世代,
+  手机时间线租约仍有效,
+  type 手机时间线租约,
+} from './手机时间线租约';
+import { 附手机分支锚, 裁同楼切分支记录, 手机记录属于当前分支 } from './手机分支隔离';
+import { 安全父亲台词, 群聊安全回退, 验收群聊隐私, type 群聊隐私模式 } from './手机输出安全';
+import { 排队父亲通话整表写 } from './父亲通话写租约';
+import { 清洗预设输出 } from './预设输出兼容';
+import {
+  创建手机已读时锚,
+  较晚手机已读时锚,
+  手机分支变更后已读时锚,
+  手机记录晚于已读,
+  手机记录在当前时间线,
+  规范手机已读时锚,
+  type 手机已读时锚,
+} from './手机已读水位';
+import { 手机记录时间字, 手机消息时间组键 } from './手机时间显示';
+import { 仅你可见触发参数 } from './手机触发参数';
+import { 编译近期微信胶囊, 楼务微信消息仍有效 } from './微信正文承接';
+import { 计算妻冷落消息档, 冷落私聊方向, 冷落语义指纹 } from './冷落系统';
+import {
+  创建微信撤回定位,
+  合并微信撤回状态,
+  撤回微信玩家消息,
+  type 微信消息记录,
+  type 微信撤回定位,
+} from './微信消息撤回';
+
+const 私聊图库地址索引 = 建私聊图库地址索引(私聊图库清单);
+
+/** 统一供手机读库与回合回档裁剪使用，避免两处各自猜测图片轮换语义。 */
+export function 按消息重建已发私聊图(消息: readonly 私聊图片消息记录[], 截止楼: number): 已发私聊图缓存 {
+  return 重建已发私聊图(消息, 截止楼, 私聊图库地址索引);
+}
 
 /**
  * 手机系统(P4:手机开机即微信,2026-07-18 用户拍板——不做主屏与独立App,
@@ -44,25 +93,21 @@ import { 私聊图库清单, type 私聊图库项 } from './私聊图库清单';
 // 数据(chat 变量 _微信)
 // ============================================
 
-export interface 微信消息 {
-  楼: number; // 楼层戳(真实楼层;渲染按 ≤当前末楼 过滤=回档跟随)
-  会话: string; // 门牌 | '父亲' | '群'
-  发: '我' | '对方' | '系统';
-  文: string;
-  类?: '文本' | '照片' | '撤回' | '通话';
-  /** 私聊随消息发送的配图；普通路径相对 `素材/微信圈/`，`@adult/` 路径来自独立成人素材仓。 */
-  图?: string;
-}
+export type 微信消息 = 微信消息记录;
 
 export interface 朋友圈条 {
   楼: number;
+  /** 发布时的绝对时段；真实消息楼只负责回档裁剪。 */
+  时: number;
+  /** 创建时所在酒馆消息分支的签名；同楼 swipe 后旧分支动态不得继续可见。 */
+  锚签名?: string;
   谁: string; // 妻名 | '附近的人'
   文: string;
   评: { 谁: string; 文: string }[];
   /** 配图(2026-07-19 用户拍板):`{妻名}/{类}_{n}` → 素材基址/微信圈/…webp;
    *  AI 只用 [图:类] marker 选类型,选哪张归脚本;图不存在 onerror 自净=图库可后补 */
   图?: string;
-  /** 脚本预选主题，用于跨角色/跨回合去重；旧存档没有该字段时可从图片路径推断。 */
+  /** 脚本预选主题，用于跨角色/跨回合去重；无显式主题的纯文本动态可从图片路径推断。 */
   题?: 朋友圈主题;
   /** 仅你可见(P5;spec:L4解锁低频,公开流永远贤妻——这条只有玩家刷得到);
    *  图走独立池 素材基址/微信圈/仅你可见/{角色}_{n}.webp(档位=堕落分档,母亲最厚1~5) */
@@ -73,17 +118,145 @@ interface 微信库 {
   消息: 微信消息[];
   圈: 朋友圈条[];
   读到: Record<string, number>; // 会话 → 已读到的楼层戳
+  /** 同楼跨绝对时段的复合已读锚；数字 `读到` 供回档裁剪楼层分支。 */
+  读时: Record<string, 手机已读时锚>;
   圈读到: number;
+  /** 朋友圈与 `圈读到` 配对的绝对时段锚。 */
+  圈读时: 手机已读时锚;
   节拍: Record<string, number>; // 内容引擎水位线(`圈:${门牌}`/`私:${门牌}`/`群`)
-  /** 每户已经实际发送成功的共享图库ID；只存短ID，不把图片或描述塞进存档。 */
+  /** 每户当前轮的共享图库ID缓存；业务读取始终从带楼层消息重建，避免回档残留。 */
   已发私聊图: Partial<Record<门牌, string[]>>;
+}
+
+interface 手机余波身份 {
+  事件ID?: string;
+  门牌: 门牌;
+  起楼: number;
+  物: string;
+  私密: boolean;
+}
+
+type 手机余波标记 = Partial<Pick<换装余波, '圈晒' | '群议' | '探针'>>;
+
+interface 手机余波消费 {
+  预期: 手机余波身份;
+  标记: 手机余波标记;
+}
+
+interface 手机赴约提交 {
+  m: 门牌;
+  起楼: number;
+  至楼: number;
+}
+
+function 取余波身份(余波: 换装余波): 手机余波身份 {
+  return { 事件ID: 余波.事件ID, 门牌: 余波.门牌, 起楼: 余波.起楼, 物: 余波.物, 私密: !!余波.私密 };
+}
+
+function 余波身份相同(a: 手机余波身份 | 换装余波 | null, b: 手机余波身份 | 换装余波): boolean {
+  return 同一换装余波事件(a, b);
+}
+
+/**
+ * 在首次读取与回档裁剪后，依存活记录修正复合锚的楼号和时段。
+ * 写库增量必须在追加新内容前调用，否则同楼新时段内容可能被误标已读。
+ */
+function 规范已读水位(库: 微信库, 当前绝对时段: number): void {
+  const 会话集 = new Set([...Object.keys(库.读到), ...Object.keys(库.读时)]);
+  for (const 会话 of 会话集) {
+    const 锚 = 规范手机已读时锚(
+      库.读到[会话],
+      库.读时[会话],
+      库.消息.filter(m => m.会话 === 会话 && m.发 === '对方'),
+      当前绝对时段,
+    );
+    库.读到[会话] = 锚.楼;
+    库.读时[会话] = 锚;
+  }
+  const 圈锚 = 规范手机已读时锚(库.圈读到, 库.圈读时, 库.圈, 当前绝对时段);
+  库.圈读到 = 圈锚.楼;
+  库.圈读时 = 圈锚;
+}
+
+function 会话消息未读(库: 微信库, 消息: 微信消息, 当前楼: number, 当前绝对时段: number): boolean {
+  if (消息.发 !== '对方' || !手机记录在当前时间线(消息, 当前楼, 当前绝对时段)) return false;
+  const 已读楼 = 库.读到[消息.会话] ?? -1;
+  const 已读时锚 = 库.读时[消息.会话] ?? 创建手机已读时锚(已读楼, -1);
+  return 手机记录晚于已读(消息, 已读楼, 已读时锚);
+}
+
+function 会话有未读(库: 微信库, 会话: string | undefined, 当前楼: number, 当前绝对时段: number): boolean {
+  return 库.消息.some(
+    消息 => (会话 === undefined || 消息.会话 === 会话) && 会话消息未读(库, 消息, 当前楼, 当前绝对时段),
+  );
+}
+
+function 朋友圈有未读(库: 微信库, 当前楼: number, 当前绝对时段: number): boolean {
+  return 库.圈.some(c => 手机记录在当前时间线(c, 当前楼, 当前绝对时段) && 手机记录晚于已读(c, 库.圈读到, 库.圈读时));
+}
+
+function 筛当前手机时间线<T extends { 楼: number; 时: number }>(
+  记录们: readonly T[],
+  当前楼: number,
+  当前绝对时段: number,
+): T[] {
+  // 存档尚未就绪时不能把已有手机历史当成未来数据删掉。
+  if (当前绝对时段 < 0) return [...记录们];
+  return 记录们.filter(
+    记录 => 手机记录在当前时间线(记录, 当前楼, 当前绝对时段) && 手机记录属于当前分支(记录, SillyTavern.chat ?? []),
+  );
+}
+
+function 带当前手机分支锚<T extends { 楼: number; 锚签名?: string }>(记录: T): T {
+  return 附手机分支锚(记录, SillyTavern.chat ?? []);
+}
+
+/** 宿主明确报告删楼/swipe 后物理裁枝，避免旧分支稳定键在下一次写库时被合并复活。 */
+export async function 隔离当前手机分支(切分支楼 = 末楼()): Promise<void> {
+  await updateVariablesWith(
+    vars => {
+      const v = (_.get(vars, '_微信') ?? {}) as Partial<微信库>;
+      const 聊天 = SillyTavern.chat ?? [];
+      v.消息 = 裁同楼切分支记录(v.消息 ?? [], 切分支楼, 聊天);
+      // 朋友圈没有玩家手动输入例外；无锚同楼动态按隐私优先一律裁掉。
+      v.圈 = 裁同楼切分支记录(v.圈 ?? [], 切分支楼, 聊天);
+      const 当前楼 = 末楼();
+      const 当前绝对时段 = 当前手机绝对时段();
+      const 读到 = { ...(v.读到 ?? {}) };
+      const 读时 = { ...(v.读时 ?? {}) };
+      for (const 会话 of new Set([...Object.keys(读到), ...Object.keys(读时)])) {
+        const 锚 = 手机分支变更后已读时锚(
+          读到[会话],
+          读时[会话],
+          v.消息.filter(消息 => 消息.会话 === 会话 && 消息.发 === '对方'),
+          当前绝对时段,
+          切分支楼,
+          当前楼,
+        );
+        读到[会话] = 锚.楼;
+        读时[会话] = 锚;
+      }
+      v.读到 = 读到;
+      v.读时 = 读时;
+      const 圈锚 = 手机分支变更后已读时锚(v.圈读到, v.圈读时, v.圈, 当前绝对时段, 切分支楼, 当前楼);
+      v.圈读到 = 圈锚.楼;
+      v.圈读时 = 圈锚;
+      _.set(vars, '_微信', v);
+      return vars;
+    },
+    { type: 'chat' },
+  );
+  刷新红点();
 }
 
 function 读库(): 微信库 {
   const v = (_.get(getVariables({ type: 'chat' }), '_微信') ?? {}) as Partial<微信库>;
+  const 当前楼 = 末楼();
+  const 当前绝对时段 = 当前手机绝对时段();
   const 合法群成员 = new Set(门牌列表.map(m => 户静态表[m].妻名));
-  const 消息 = (v.消息 ?? []).filter(
+  const 消息 = 筛当前手机时间线(v.消息 ?? [], 当前楼, 当前绝对时段).filter(
     m =>
+      m.类 === '撤回' ||
       m.发 !== '对方' ||
       (m.会话 === '群'
         ? 验收单条群消息(m.文, 合法群成员, 35) !== null
@@ -91,71 +264,139 @@ function 读库(): 微信库 {
           ? 验收单条群消息(m.文, 合法群成员, 30) !== null
           : 验收短文本(m.文, 60) !== null),
   );
-  const 圈 = (v.圈 ?? [])
+  const 圈 = 筛当前手机时间线(v.圈 ?? [], 当前楼, 当前绝对时段)
     .filter(x => 验收短文本(x.文, 60) !== null)
     .map(x => ({ ...x, 评: x.评.filter(p => 验收短文本(p.文, 20) !== null) }));
-  return {
+  const 库: 微信库 = {
     消息,
     圈,
-    读到: v.读到 ?? {},
+    读到: { ...(v.读到 ?? {}) },
+    读时: { ...(v.读时 ?? {}) },
     圈读到: v.圈读到 ?? -1,
+    // 尚无辅助锚时使用失配哨兵，下方会从当前时间线的朋友圈记录重建。
+    圈读时: v.圈读时 ?? 创建手机已读时锚(-1, -1),
     节拍: v.节拍 ?? {},
-    已发私聊图: v.已发私聊图 ?? {},
+    已发私聊图: 按消息重建已发私聊图(消息, 当前楼),
   };
-}
-
-async function 写库(库: 微信库): Promise<void> {
-  // 整值替换(2026-07-26 审计 M3):insertOrAssignVariables 是深合并,数组按下标并——
-  // 并发窗口里两份错位的 消息/圈 数组会把不同条目的字段搅在一起,不只是丢失
-  await updateVariablesWith(
-    vars => {
-      _.set(vars, '_微信', 库);
-      return vars;
-    },
-    { type: 'chat' },
-  );
+  规范已读水位(库, 当前绝对时段);
+  return 库;
 }
 
 /**
- * 增量落库(审计 M3):手机节拍一拍横跨 6+ 次 AI 小生成(可达几十秒),期间玩家发消息/已读
- * 标记都会写库——拍结束时把"拍开头快照"整包写回会吞掉窗口期的全部写入。
- * 改为只带走本拍新增的条目与节拍水位变化,落库前重读新鲜库再合并。
+ * 手机的唯一持久写入口。调用方只提交本次新增记录与单调水位，回调内重读最新库后合并；
+ * 玩家发送、已读、AI 回复和自动节拍因此不会再用陈旧快照覆盖另一条并发操作。
  */
-async function 写库增量(增: {
-  新圈: 朋友圈条[];
-  新消息: 微信消息[];
-  节拍改: Record<string, number>;
-  已发私聊图改?: Partial<Record<门牌, string[]>>;
-}): Promise<void> {
+async function 写库增量(
+  增: {
+    新圈: 朋友圈条[];
+    新消息: 微信消息[];
+    节拍改: Record<string, number>;
+    已发私聊图改?: Partial<Record<门牌, string[]>>;
+    读到改?: Record<string, 手机已读时锚>;
+    圈读到改?: 手机已读时锚;
+    余波消费?: 手机余波消费;
+    /** 与接受回复在同一个 chat 变量回调里提交的单例赴约 CAS。 */
+    赴约提交?: 手机赴约提交;
+  },
+  允许写入: () => boolean = () => true,
+): Promise<boolean> {
+  let 已写 = false;
   await updateVariablesWith(
     vars => {
+      // AI 生成结束到变量回调真正执行之间仍可能发生回档/切聊；在离提交最近的位置
+      // 再验一次时间线租约，不能只依赖调用写库前的那次检查。
+      if (!允许写入()) return vars;
+      const 当前楼 = 末楼();
+      if (增.赴约提交) {
+        const 当前赴约 = (_.get(vars, '_赴约') ?? null) as Partial<手机赴约提交> | null;
+        // 接受回复与单例赴约必须同成同败。已有仍活动的赴约时整次回调不写微信，
+        // 调用方会改落固定拒绝回复，绝不留下“两个都说好”但状态只认一人的分裂结果。
+        if (赴约仍活动(当前赴约, 当前楼)) return vars;
+      }
+      const 当前余波 = (_.get(vars, '_换装余波') ?? null) as 换装余波 | null;
+      if (增.余波消费) {
+        if (!余波身份相同(当前余波, 增.余波消费.预期)) return vars;
+        if (Object.keys(增.余波消费.标记).some(键 => !!当前余波?.[键 as keyof 换装余波])) return vars;
+      }
       const v = (_.get(vars, '_微信') ?? {}) as Partial<微信库>;
+      const 当前绝对时段 = 当前手机绝对时段();
       const 新鲜: 微信库 = {
-        消息: v.消息 ?? [],
-        圈: v.圈 ?? [],
-        读到: v.读到 ?? {},
+        消息: 筛当前手机时间线(v.消息 ?? [], 当前楼, 当前绝对时段),
+        圈: 筛当前手机时间线(v.圈 ?? [], 当前楼, 当前绝对时段),
+        读到: { ...(v.读到 ?? {}) },
+        读时: { ...(v.读时 ?? {}) },
         圈读到: v.圈读到 ?? -1,
+        圈读时: v.圈读时 ?? 创建手机已读时锚(-1, -1),
         节拍: v.节拍 ?? {},
         已发私聊图: v.已发私聊图 ?? {},
       };
-      新鲜.圈.unshift(...增.新圈);
-      新鲜.消息.push(...增.新消息);
+      // 只能用本次增量到来前已存在的记录校准已读时锚。
+      规范已读水位(新鲜, 当前绝对时段);
+      const 新圈 = 增.新圈.map(条 => 带当前手机分支锚(条));
+      新鲜.圈.unshift(...新圈);
+      // 脚本事件键是分支内幂等真值。只认当前楼仍存活的键：未裁的未来消息
+      // 不能阻止回档后同一事件重演。
+      const 活消息键 = new Set(新鲜.消息.filter(消息 => 消息.楼 <= 当前楼 && 消息.键).map(消息 => 消息.键 as string));
+      // 玩家消息用稳定标识精确去重。若它已被并发撤回，当前库里保留的是同标识墓碑，
+      // 本次迟到增量会直接跳过旧原文，不能把撤回内容复活。
+      const 活玩家标识 = new Set(
+        新鲜.消息.filter(消息 => 消息.发 === '我' && 消息.标识).map(消息 => 消息.标识 as string),
+      );
+      const 新消息 = 合并微信撤回状态(
+        增.新消息.map(消息 => 带当前手机分支锚(消息)),
+        新鲜.消息,
+      );
+      for (const 消息 of 新消息) {
+        if (消息.键 && 活消息键.has(消息.键)) continue;
+        if (消息.标识 && 活玩家标识.has(消息.标识)) continue;
+        新鲜.消息.push(消息);
+        if (消息.键) 活消息键.add(消息.键);
+        if (消息.发 === '我' && 消息.标识) 活玩家标识.add(消息.标识);
+      }
       Object.assign(新鲜.节拍, 增.节拍改);
       if (增.已发私聊图改) Object.assign(新鲜.已发私聊图, 增.已发私聊图改);
+      for (const [会话, 读到锚] of Object.entries(增.读到改 ?? {})) {
+        const 已有锚 = 新鲜.读时[会话] ?? 创建手机已读时锚(新鲜.读到[会话] ?? -1, -1);
+        const 合并锚 = 较晚手机已读时锚(已有锚, 读到锚);
+        新鲜.读到[会话] = 合并锚.楼;
+        新鲜.读时[会话] = 合并锚;
+      }
+      if (增.圈读到改) {
+        const 合并锚 = 较晚手机已读时锚(新鲜.圈读时, 增.圈读到改);
+        新鲜.圈读到 = 合并锚.楼;
+        新鲜.圈读时 = 合并锚;
+      }
       _.set(vars, '_微信', 新鲜);
+      if (增.余波消费 && 当前余波) {
+        _.set(vars, '_换装余波', { ...当前余波, ...增.余波消费.标记 });
+      }
+      if (增.赴约提交) _.set(vars, '_赴约', { ...增.赴约提交 });
+      已写 = true;
       return vars;
     },
     { type: 'chat' },
   );
+  return 已写;
 }
 
-const 末楼 = () => {
+function 赴约仍活动(赴约: Partial<手机赴约提交> | null, 当前楼: number): boolean {
+  return (
+    !!赴约?.m &&
+    门牌列表.includes(赴约.m as 门牌) &&
+    Number.isFinite(赴约.起楼) &&
+    Number.isFinite(赴约.至楼) &&
+    Math.round(赴约.起楼!) <= 当前楼 &&
+    Math.round(赴约.至楼!) >= 当前楼
+  );
+}
+
+function 末楼(): number {
   try {
     return getLastMessageId();
   } catch {
     return Math.max(0, (SillyTavern.chat?.length ?? 1) - 1);
   }
-};
+}
 
 // ============================================
 // 静音会议微信旁路
@@ -195,6 +436,11 @@ function 当前手机数据(): SchemaType | null {
   } catch {
     return null;
   }
+}
+
+function 当前手机绝对时段(): number {
+  const data = 当前手机数据();
+  return data ? 取绝对时段(data) : -1;
 }
 
 function 规范会议参与妻(data: SchemaType): 门牌[] {
@@ -418,6 +664,39 @@ export function 取静音会议正文记忆(data: SchemaType): 静音会议正�
 const 会场私聊气口 = ['收到消息', '克制紧张', '试探犹疑', '亲近默契'] as const;
 type 会场私聊气口 = (typeof 会场私聊气口)[number];
 
+interface 会场私聊摘要租约 {
+  聊天ID: string;
+  启动楼层: number;
+  会议签名: string;
+  时间线世代: number;
+}
+
+function 会场私聊摘要租约匹配(a: 会场私聊摘要租约 | null, b: 会场私聊摘要租约 | null): boolean {
+  return (
+    !!a &&
+    !!b &&
+    a.聊天ID === b.聊天ID &&
+    a.启动楼层 === b.启动楼层 &&
+    a.会议签名 === b.会议签名 &&
+    a.时间线世代 === b.时间线世代
+  );
+}
+
+function 创建会场私聊摘要租约(data: SchemaType | null, 聊天ID = 当前聊天ID()): 会场私聊摘要租约 | null {
+  if (!data || !聊天ID) return null;
+  const 场 = data.系统._特殊场景;
+  if (场.id !== '静音会议' || 场.阶段 === '收尾' || 场.当前拍 < 4) return null;
+  const 启动楼层 = Number.isFinite(场.启动楼层) ? Math.max(0, Math.round(场.启动楼层)) : -1;
+  if (启动楼层 < 0) return null;
+  const 参与妻 = 规范会议参与妻(data).join(',');
+  return {
+    聊天ID,
+    启动楼层,
+    会议签名: `${场.id}|${启动楼层}|${参与妻}|${String(场.议题 ?? '')}`,
+    时间线世代: 当前时间线切换世代(),
+  };
+}
+
 function 判会场私聊气口(回复?: string): 会场私聊气口 {
   if (!回复) return '收到消息';
   if (/[？?]|怎么|能不能|要不要|是不是|真的/.test(回复)) return '试探犹疑';
@@ -434,32 +713,43 @@ function 气口可用(值: string): 值 is 会场私聊气口 {
  * 只保存固定枚举气口，不保存玩家或妻子的任何原句。第一条玩家消息先记“收到消息”，
  * 妻回复成功后再覆盖成粗粒度语气；同妻同正文楼永远只有一条。
  */
-async function 写会场私聊摘要(门牌号: 门牌, 回复?: string): Promise<void> {
-  const 有效 = 读取最近有效();
-  if (!有效) return;
-  const { raw, data } = 有效;
-  const 场 = data.系统._特殊场景;
-  if (
-    场.id !== '静音会议' ||
-    场.阶段 === '收尾' ||
-    场.当前拍 < 4 ||
-    !规范会议参与妻(data).includes(门牌号)
-  )
-    return;
-  const 记忆 = 取静音会议正文记忆(data);
-  if (!记忆 || 记忆.最新完成AI楼层 < 场.启动楼层) return;
+async function 写会场私聊摘要(门牌号: 门牌, 回复?: string, 固定请求租约?: 会场私聊摘要租约 | null): Promise<void> {
+  const 气口 = 判会场私聊气口(回复);
+  // 请求入队前冻结聊天与本场会议身份；排队期间切档、重开会议或同档开启新场时，
+  // 旧请求即使稍后取得全局 MVU 租约，也不能把气口写入新的目标。
+  const 请求租约 = 固定请求租约 === undefined ? 创建会场私聊摘要租约(当前手机数据()) : 固定请求租约;
+  if (!请求租约) return;
+  await 排队MVU操作(async () => {
+    const 请求仍在原时间线 = () => 请求租约.时间线世代 === 当前时间线切换世代();
+    const 取消提交校验 = 登记MVU提交校验(请求仍在原时间线);
+    try {
+      // 获得与正文安全操作共享的租约后才重读。A 写完后 B 以 A 的最新结果为基准，
+      // 不会各拿一份旧整表再让后完成者覆盖前一位妻子的摘要；`脚本写入` 不会重入取锁。
+      if (!请求仍在原时间线() || 当前聊天ID() !== 请求租约.聊天ID) return;
+      const 有效 = 读取最近有效();
+      if (!有效) return;
+      const { raw, data } = 有效;
+      if (!会场私聊摘要租约匹配(请求租约, 创建会场私聊摘要租约(data, 当前聊天ID()))) return;
+      const 场 = data.系统._特殊场景;
+      if (场.id !== '静音会议' || 场.阶段 === '收尾' || 场.当前拍 < 4 || !规范会议参与妻(data).includes(门牌号)) return;
+      const 记忆 = 取静音会议正文记忆(data);
+      if (!记忆 || 记忆.最新完成AI楼层 < 场.启动楼层) return;
 
-  if (场.会场私聊摘要楼层 !== 记忆.最新完成AI楼层) {
-    场.会场私聊摘要 = {};
-    场.会场私聊摘要楼层 = 记忆.最新完成AI楼层;
-  }
-  场.会场私聊摘要[门牌号] = 判会场私聊气口(回复);
-  await 脚本写入(raw, data);
-  捕获保护快照(data);
+      if (场.会场私聊摘要楼层 !== 记忆.最新完成AI楼层) {
+        场.会场私聊摘要 = {};
+        场.会场私聊摘要楼层 = 记忆.最新完成AI楼层;
+      }
+      场.会场私聊摘要[门牌号] = 气口;
+      await 脚本写入(raw, data);
+      捕获保护快照(data);
+    } finally {
+      取消提交校验();
+    }
+  });
 }
 
 /**
- * 给下一正文节拍的唯一微信回流。这里把持久字段重新编译成固定低信息提示，即使旧档
+ * 给下一正文节拍的唯一微信回流。这里把持久字段重新编译成固定低信息提示，即使记录
  * 或异常模型污染了字符串，也绝不把字段原文注入正文。
  */
 export function 取会场私聊摘要提示(data: SchemaType): string {
@@ -503,6 +793,7 @@ export function 取会场私聊摘要提示(data: SchemaType): string {
  * 手机侧不吃任何协议,一律剥干净只留人话。
  */
 function 净化消息(原: string): string {
+  原 = 清洗预设输出(原).文本;
   // 兼容 rq0.62 曾使用的 <微信> 包，以及仍会按该协议返回内容的上游接口。
   const 微信包 = 原.match(/<微信>([\s\S]*?)(?:<\/微信>|$)/i);
   if (微信包?.[1]?.trim()) 原 = 微信包[1];
@@ -655,11 +946,7 @@ async function 正文API生成(系统提示: string, 用户提示: string): Prom
     const 原 = await generateRaw({
       // 手机是独立的短文本生成通道，不加载正文预设条目。角色状态、事件语境和
       // 输出格式均由手机自己的提示提供，避免叙事预设把微信回复拉成长文或改写格式。
-      ordered_prompts: [
-        ...手机系统消息(系统提示),
-        'user_input',
-        { role: 'system', content: 手机尾部破限 },
-      ],
+      ordered_prompts: [...手机系统消息(系统提示), 'user_input', { role: 'system', content: 手机尾部破限 }],
       user_input: 用户提示,
       should_stream: false,
     });
@@ -771,16 +1058,22 @@ async function 微信群文本(
   最大字数: number,
   最多条数: number,
   语境: string,
+  隐私模式?: 群聊隐私模式,
 ): Promise<string[]> {
   const 取合法 = (文本: string) =>
     文本
       .split(/\r?\n/)
       .map(行 => 验收单条群消息(行, 合法发言人, 最大字数))
       .filter((行): 行 is string => Boolean(行))
+      .filter(行 => !隐私模式 || 验收群聊隐私(行, 隐私模式))
       .slice(0, 最多条数);
   const 直接 = 取合法(净化消息(原));
   if (直接.length) return 直接;
-  if (原.trim() && 合法发言人.size) console.warn(`[人妻公寓·手机] ${语境}重生成后仍不合规，本拍放弃`);
+  if (原.trim() && 合法发言人.size) console.warn(`[人妻公寓·手机] ${语境}输出未通过格式/隐私验收，使用安全回退`);
+  if (隐私模式) {
+    const 回退 = 群聊安全回退([...合法发言人], 隐私模式);
+    return 回退 ? [回退] : [];
+  }
   return [];
 }
 
@@ -805,14 +1098,90 @@ interface 微信摘要快照 {
 }
 
 const 微信摘要任务 = new Map<string, Promise<void>>();
+const 微信摘要SQLite复检间隔 = 60_000;
+let 微信摘要SQLite能力: { 可用: boolean; 检测时间: number } | null = null;
+let 微信摘要SQLite检测任务: { 代次: number; promise: Promise<boolean> } | null = null;
+let 微信摘要SQLite检测代次 = 0;
 
-function 当前聊天ID(): string {
+function 重置微信摘要SQLite能力(): void {
+  微信摘要SQLite检测代次 += 1;
+  微信摘要SQLite能力 = null;
+  微信摘要SQLite检测任务 = null;
+  刷新SQLite能力缓存();
+}
+
+function 标记微信摘要SQLite不可用(): void {
+  微信摘要SQLite检测代次 += 1;
+  微信摘要SQLite能力 = { 可用: false, 检测时间: Date.now() };
+  微信摘要SQLite检测任务 = null;
+}
+
+function 微信摘要SQLite近期不可用(): boolean {
+  return 微信摘要SQLite能力?.可用 === false && Date.now() - 微信摘要SQLite能力.检测时间 < 微信摘要SQLite复检间隔;
+}
+
+async function 确认微信摘要SQLite可写(): Promise<boolean> {
+  if (微信摘要SQLite能力 && Date.now() - 微信摘要SQLite能力.检测时间 < 微信摘要SQLite复检间隔) {
+    return 微信摘要SQLite能力.可用;
+  }
+  const 代次 = 微信摘要SQLite检测代次;
+  if (微信摘要SQLite检测任务?.代次 === 代次) return 微信摘要SQLite检测任务.promise;
+  const entry = { 代次, promise: Promise.resolve(false) };
+  entry.promise = 探测数据库SQLite模式().then(
+    可用 => {
+      if (微信摘要SQLite检测代次 !== 代次) return false;
+      微信摘要SQLite能力 = { 可用, 检测时间: Date.now() };
+      if (微信摘要SQLite检测任务 === entry) 微信摘要SQLite检测任务 = null;
+      return 可用;
+    },
+    () => {
+      if (微信摘要SQLite检测代次 === 代次) {
+        微信摘要SQLite能力 = { 可用: false, 检测时间: Date.now() };
+        if (微信摘要SQLite检测任务 === entry) 微信摘要SQLite检测任务 = null;
+      }
+      return false;
+    },
+  );
+  微信摘要SQLite检测任务 = entry;
+  return entry.promise;
+}
+const 手机聊天身份宿主键 = '__RQP_PHONE_CHAT_IDENTITY_V1__';
+
+interface 手机聊天身份宿主状态 {
+  对象令牌: WeakMap<object, string>;
+  序号: number;
+}
+
+function 取手机聊天身份宿主状态(): 手机聊天身份宿主状态 {
+  const host = (window.parent ?? window) as unknown as Record<string, unknown>;
+  const existing = host[手机聊天身份宿主键] as Partial<手机聊天身份宿主状态> | undefined;
+  if (existing?.对象令牌 && typeof existing.序号 === 'number') return existing as 手机聊天身份宿主状态;
+  const created: 手机聊天身份宿主状态 = { 对象令牌: new WeakMap<object, string>(), 序号: 0 };
+  host[手机聊天身份宿主键] = created;
+  return created;
+}
+
+export function 当前聊天ID(): string {
   try {
-    const id = (SillyTavern as unknown as { getCurrentChatId?: () => string | number | null }).getCurrentChatId?.();
-    return id === null || id === undefined ? '' : String(id);
+    const st = SillyTavern as unknown as { getCurrentChatId?: () => string | number | null; chat?: unknown };
+    const id = st.getCurrentChatId?.();
+    if (id !== null && id !== undefined && String(id)) return String(id);
+    if (st.chat && typeof st.chat === 'object') {
+      const 身份 = 取手机聊天身份宿主状态();
+      const existing = 身份.对象令牌.get(st.chat);
+      if (existing) return existing;
+      const created = `object:${++身份.序号}`;
+      身份.对象令牌.set(st.chat, created);
+      return created;
+    }
+    return '';
   } catch {
     return '';
   }
+}
+
+function 仍是预期聊天(预期聊天ID: string): boolean {
+  return !!预期聊天ID && 当前聊天ID() === 预期聊天ID;
 }
 
 function 推进摘要哈希(hash: number, text: string): number {
@@ -823,11 +1192,17 @@ function 推进摘要哈希(hash: number, text: string): number {
   return hash >>> 0;
 }
 
+/** 活跃任务（包括已扣分但仍可补办者）继续进入短期聊天、SQLite 摘要与本人正文承接。 */
+function 有效楼务任务id集合(data: SchemaType | null = 当前手机数据()): Set<string> {
+  if (!data) return new Set();
+  return new Set(data.系统._管理考核.活跃任务.map(任务 => 任务.id).filter(Boolean));
+}
+
 /**
  * 事件键由“当前聊天 + 当前仍存活的私聊前缀”导出。回档、改写或切档后旧键不会再获授权；
  * 相同楼号重掷出不同内容也会得到新键，不依赖数据库自行理解酒馆分支。
  */
-function 取微信摘要快照(门牌号: 门牌, 截止楼 = 末楼()): 微信摘要快照 | null {
+function 取微信摘要快照(门牌号: 门牌, 截止楼 = 末楼(), 有效楼务任务id = 有效楼务任务id集合()): 微信摘要快照 | null {
   const 聊天ID = 当前聊天ID();
   if (!聊天ID) return null;
   const 消息 = 读库()
@@ -837,22 +1212,23 @@ function 取微信摘要快照(门牌号: 门牌, 截止楼 = 末楼()): 微信�
         item.楼 <= 截止楼 &&
         item.类 !== '撤回' &&
         (item.发 === '我' || item.发 === '对方') &&
+        楼务微信消息仍有效(item, 有效楼务任务id) &&
         item.文.trim(),
     )
-    .map(
-      (item): 微信摘要消息 => ({
-        楼: item.楼,
-        发: item.发 as '我' | '对方',
-        文: item.文.trim(),
-        类: item.类 ?? '文本',
-        图: item.图 ?? '',
-      }),
-    );
+    .map((item): 微信摘要消息 => ({
+      楼: item.楼,
+      发: item.发 as '我' | '对方',
+      文: item.文.trim(),
+      类: item.类 ?? '文本',
+      图: item.图 ?? '',
+    }));
   let hashA = 推进摘要哈希(2166136261, `${聊天ID}\u0000${门牌号}`);
   let hashB = 推进摘要哈希(2246822507, `${门牌号}\u0000${聊天ID}`);
   let 有待回复玩家消息 = false;
   const 点: 微信摘要点[] = [];
   消息.forEach((item, index) => {
+    // 楼务键只负责在映射前筛除失效消息，不进入既有摘要指纹；普通聊天和仍有效任务
+    // 因而继续沿用升级前的事件键，只有任务失效、对应消息被移除时才自然换键。
     const token = JSON.stringify([item.楼, item.发, item.文, item.类, item.图]);
     hashA = 推进摘要哈希(hashA, token);
     hashB = 推进摘要哈希(hashB, `${token.length}:${token}`);
@@ -886,6 +1262,22 @@ export function 当前微信摘要引用(门牌号们: readonly 门牌[], 截止
     .filter(item => item.人物 && item.有效事件键.length);
 }
 
+/**
+ * 数据库摘要是可选的长期层；当面正文还需直接承接当前分支最近私聊，避免未开 SQLite、
+ * 摘要失败或刚聊完立即见面时本人失忆。这里只接收焦点检测授予的可靠在场妻名单。
+ */
+export function 读取近期微信胶囊(
+  门牌号们: readonly 门牌[],
+  截止楼: number,
+  截止时段: number,
+  有效楼务任务id们: readonly string[] = [],
+): string {
+  const 人物 = _.uniq(门牌号们)
+    .map(门牌 => ({ 门牌, 人物: 户静态表[门牌]?.妻名 ?? '' }))
+    .filter(item => item.人物);
+  return 编译近期微信胶囊(读库().消息, 人物, 截止楼, 截止时段, 有效楼务任务id们);
+}
+
 function 解析微信摘要响应(raw: string): { changed: boolean; payload: string | null } | null {
   const 包 = raw.match(/<回复>([\s\S]*?)(?:<\/回复>|$)/i)?.[1] ?? raw;
   const start = 包.indexOf('{');
@@ -894,7 +1286,12 @@ function 解析微信摘要响应(raw: string): { changed: boolean; payload: str
   try {
     const value = JSON.parse(包.slice(start, end + 1)) as Record<string, unknown>;
     const keys = ['changed', 'confirmed', 'agreements', 'boundaries', 'pending'];
-    if (!value || typeof value !== 'object' || Array.isArray(value) || !_.isEqual(Object.keys(value).sort(), keys.sort()))
+    if (
+      !value ||
+      typeof value !== 'object' ||
+      Array.isArray(value) ||
+      !_.isEqual(Object.keys(value).sort(), keys.sort())
+    )
       return null;
     if (typeof value.changed !== 'boolean') return null;
     for (const key of ['confirmed', 'agreements', 'boundaries', 'pending']) {
@@ -918,18 +1315,38 @@ function 解析微信摘要响应(raw: string): { changed: boolean; payload: str
   }
 }
 
-function 微信摘要快照仍有效(门牌号: 门牌, 聊天ID: string, 事件键: string): boolean {
+function 微信摘要快照仍有效(
+  门牌号: 门牌,
+  聊天ID: string,
+  事件键: string,
+  时间线世代: number,
+  手机租约世代: number,
+): boolean {
   const 当前 = 取微信摘要快照(门牌号);
-  return 当前?.聊天ID === 聊天ID && 当前.点.at(-1)?.事件键 === 事件键;
+  return (
+    时间线世代 === 当前时间线切换世代() &&
+    手机租约世代 === 读取当前手机时间线租约世代() &&
+    当前?.聊天ID === 聊天ID &&
+    当前.点.at(-1)?.事件键 === 事件键
+  );
 }
 
-async function 刷新微信进展摘要(门牌号: 门牌, 聊天ID: string, 事件键: string): Promise<void> {
+async function 刷新微信进展摘要(
+  门牌号: 门牌,
+  聊天ID: string,
+  事件键: string,
+  时间线世代: number,
+  手机租约世代: number,
+): Promise<void> {
+  const 微信摘要请求仍有效 = () => 微信摘要快照仍有效(门牌号, 聊天ID, 事件键, 时间线世代, 手机租约世代);
   if (!读配置().微信进展摘要) return;
   const 快照 = 取微信摘要快照(门牌号);
   const 当前点 = 快照?.点.at(-1);
   if (!快照 || 快照.聊天ID !== 聊天ID || 当前点?.事件键 !== 事件键) return;
   const db = 数据库状态();
   if (!db.可调用AI || !db.可写表格 || !db.已装游戏模板) return;
+  // 普通行 API 不能保证写到当前分支最新 AI 消息；先判 SQLite，禁止先花一次摘要 AI 再注定写失败。
+  if (!(await 确认微信摘要SQLite可写()) || !微信摘要请求仍有效()) return;
   const 妻名 = 户静态表[门牌号]?.妻名;
   if (!妻名) return;
   const 活动键 = 快照.点
@@ -970,20 +1387,26 @@ async function 刷新微信进展摘要(门牌号: 门牌, 聊天ID: string, 事
       320,
     );
     const parsed = 解析微信摘要响应(String(原 ?? ''));
-    if (!parsed || !微信摘要快照仍有效(门牌号, 聊天ID, 事件键)) return;
-    const 结果 = parsed.changed ? parsed.payload : 旧记录?.摘要 ?? null;
+    if (!parsed || !微信摘要请求仍有效()) return;
+    const 结果 = parsed.changed ? parsed.payload : (旧记录?.摘要 ?? null);
     // 尚无持久进展的寒暄无需占表；下次会连同后续有效对话重新判断。
     if (!结果) return;
-    const 已写入 = await 同步社交轨迹({
-      类型: '微信进展',
-      人物: 妻名,
-      事件: '与管理员的微信沟通进展（当前分支摘要版本）',
-      结果,
-      楼层: 当前点.楼,
-      事件键,
-    });
+    const 已写入 = await 同步社交轨迹(
+      {
+        类型: '微信进展',
+        人物: 妻名,
+        事件: '与管理员的微信沟通进展（当前分支摘要版本）',
+        结果,
+        楼层: 当前点.楼,
+        事件键,
+      },
+      微信摘要请求仍有效,
+    );
     if (!已写入) {
-      console.warn(`[人妻公寓·手机] ${妻名}的微信进展未写入；下次有效对话会从上一成功版本补齐增量。`);
+      if (微信摘要请求仍有效()) {
+        标记微信摘要SQLite不可用();
+        console.warn(`[人妻公寓·手机] ${妻名}的微信进展未写入；脚本摘要已暂停，SQLite 恢复后再从上一成功版本补齐。`);
+      }
     }
   } catch (error) {
     console.warn(`[人妻公寓·手机] ${妻名}的微信进展整理失败，不影响本次私聊:`, error);
@@ -992,14 +1415,19 @@ async function 刷新微信进展摘要(门牌号: 门牌, 聊天ID: string, 事
 
 function 排队刷新微信进展摘要(门牌号: 门牌): void {
   if (!读配置().微信进展摘要) return;
+  if (微信摘要SQLite近期不可用()) return;
+  const db = 数据库状态();
+  if (!db.可调用AI || !db.可写表格 || !db.已装游戏模板) return;
   const 快照 = 取微信摘要快照(门牌号);
   const 当前点 = 快照?.点.at(-1);
   if (!快照 || !当前点) return;
-  const 队列键 = `${快照.聊天ID}\n${门牌号}`;
+  const 时间线世代 = 当前时间线切换世代();
+  const 手机租约世代 = 读取当前手机时间线租约世代();
+  const 队列键 = `${快照.聊天ID}\n${时间线世代}\n${手机租约世代}\n${门牌号}`;
   const 前序 = 微信摘要任务.get(队列键) ?? Promise.resolve();
   const 任务 = 前序
     .catch(() => undefined)
-    .then(() => 刷新微信进展摘要(门牌号, 快照.聊天ID, 当前点.事件键));
+    .then(() => 刷新微信进展摘要(门牌号, 快照.聊天ID, 当前点.事件键, 时间线世代, 手机租约世代));
   微信摘要任务.set(队列键, 任务);
   const 清理 = () => {
     if (微信摘要任务.get(队列键) === 任务) 微信摘要任务.delete(队列键);
@@ -1010,9 +1438,10 @@ function 排队刷新微信进展摘要(门牌号: 门牌): void {
 /** 正文若紧接在手机回复之后开始，只等待当前聊天的任务；超时沿用上一成功版本。 */
 export async function 等待微信摘要任务(最长等待毫秒 = 5000): Promise<void> {
   const 聊天ID = 当前聊天ID();
-  const 任务们 = [...微信摘要任务.entries()]
-    .filter(([key]) => key.startsWith(`${聊天ID}\n`))
-    .map(([, task]) => task);
+  const 时间线世代 = 当前时间线切换世代();
+  const 手机租约世代 = 读取当前手机时间线租约世代();
+  const 当前队列前缀 = `${聊天ID}\n${时间线世代}\n${手机租约世代}\n`;
+  const 任务们 = [...微信摘要任务.entries()].filter(([key]) => key.startsWith(当前队列前缀)).map(([, task]) => task);
   if (!任务们.length) return;
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -1031,13 +1460,36 @@ export async function 等待微信摘要任务(最长等待毫秒 = 5000): Promi
 // 好友表(联系方式=挣来的剧情资产:妻 阶段≥1 才互加;父亲/楼群常驻)
 // ============================================
 
+/** 未读楼务硬通知本身就是临时联系方式；读完且任务已结时才允许阶段0联系人退场。 */
+function 未读楼务联系人(data: SchemaType): Set<门牌> {
+  const 库 = 读库();
+  const 当前楼 = 末楼();
+  const 当前绝对时段 = 取绝对时段(data);
+  return new Set(
+    库.消息
+      .filter(
+        消息 =>
+          消息.键?.startsWith('楼务:') &&
+          门牌列表.includes(消息.会话 as 门牌) &&
+          !!data.户[消息.会话] &&
+          会话消息未读(库, 消息, 当前楼, 当前绝对时段),
+      )
+      .map(消息 => 消息.会话 as 门牌),
+  );
+}
+
 export function 微信好友(data: SchemaType): { id: string; 名: string; 类: '妻' | '父亲' | '群' }[] {
   const 友: { id: string; 名: string; 类: '妻' | '父亲' | '群' }[] = [{ id: '父亲', 名: '爸', 类: '父亲' }];
+  const 楼务联系人 = 活跃楼务联系人(data);
+  const 未读楼务 = 未读楼务联系人(data);
   for (const m of 门牌列表) {
     const 节点 = data.户[m];
     const 配 = 户静态表[m];
-    if (!节点 || (配.隐身 && !data.系统._母亲入列)) continue;
-    if (节点.妻.当前阶段 >= 1) 友.push({ id: m, 名: 配.妻名, 类: '妻' });
+    const 有正式楼务 = 楼务联系人.has(m);
+    const 有未读楼务 = 未读楼务.has(m);
+    if (!节点 || (配.隐身 && !data.系统._母亲入列 && !有正式楼务 && !有未读楼务)) continue;
+    // 正式任务与其未读通知都构成临时联系方式；任务结案且消息读完后恢复阶段门。
+    if (节点.妻.当前阶段 >= 1 || 有正式楼务 || 有未读楼务) 友.push({ id: m, 名: 配.妻名, 类: '妻' });
   }
   // 姐妹茶话会(2026-07-19 用户拍板):阶段3+的太太≥2人自动成群并把{{user}}拉进去;
   // 没有丈夫没有外人=骂战/拌嘴/攀比都在这;楼务群永远和睦(贤妻公开流)
@@ -1053,6 +1505,94 @@ export function 微信好友(data: SchemaType): { id: string; 名: string; 类: 
 // ============================================
 
 const 频率倍率: Record<手机配置['频率'], number> = { 勤: 0.6, 普通: 1, 静: 2, 关: Infinity };
+
+type 管理任务 = SchemaType['系统']['_管理考核']['活跃任务'][number];
+type 风闻事件 = SchemaType['系统']['_风闻账']['最近事件'][number];
+
+/**
+ * 楼务群只得到所有住户都可能观察到的模糊议题。原始事件摘要可能带具体门牌、亲属身份或
+ * 私下关系线索，严禁直接进入群聊提示词。
+ */
+export function 编译楼务群公开风闻摘要(data: SchemaType): string {
+  const 事件 = [...data.系统._风闻账.最近事件]
+    .filter(item => item.状态 === '活跃')
+    .sort((a, b) => b.时段 - a.时段 || a.id.localeCompare(b.id))[0] as 风闻事件 | undefined;
+  if (!事件) return '楼里最近对管理员的出入和楼务处理有些议论';
+  if (/偷窃|失窃|门禁|安保/.test(`${事件.类型}`)) return '有住户反映家中物品异常，楼里开始议论门禁和管理';
+  if (/夜访|深夜/.test(`${事件.类型}`)) return '有住户留意到管理员夜间出入频繁';
+  if (/报修|设施|维修/.test(`${事件.类型}`)) return '有住户议论公共设施和报修处理不够及时';
+  return '有住户议论管理员与个别住户往来过于频繁';
+}
+
+function 是管理通知任务(任务: 管理任务): boolean {
+  return (任务.类型 === '报修' || 任务.类型 === '投诉') && !!任务.id && 门牌列表.includes(任务.门牌 as 门牌);
+}
+
+function 活跃楼务联系人(data: SchemaType): Set<门牌> {
+  return new Set(
+    data.系统._管理考核.活跃任务
+      .filter(是管理通知任务)
+      .map(任务 => 任务.门牌 as 门牌)
+      // 户节点存在就是已入住；不能让尚未入住的静态角色因脏任务提前露出。
+      .filter(门牌号 => !!data.户[门牌号]),
+  );
+}
+
+/** 硬通知只展示脚本任务的短标签，不把任务字段当提示词或富文本解释。 */
+function 管理任务显示文本(原: string, 兜底: string, 最大长度 = 12): string {
+  const 文 = String(原 ?? '')
+    .replace(/^(?:公共|报修|投诉)[_：:\-\s]*/u, '')
+    .replace(/[<>{}()`$#*\\/|]+|\[|\]/g, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 最大长度);
+  return 文 || 兜底;
+}
+
+function 管理任务期限(截止时段: number): string {
+  const 时 = Math.max(0, Math.floor(Number(截止时段) || 0));
+  return `第${Math.floor(时 / 6) + 1}天${当前时段(时)}`;
+}
+
+/**
+ * 报修/投诉的微信只是由 MVU 活跃任务编译出的幂等通知；原始任务始终是唯一真相。
+ * 不调用 AI、不排队摘要，也不反向解析气泡来修改任务。
+ */
+export function 编译管理任务微信通知(data: SchemaType, 楼: number, 时: number): 微信消息[] {
+  return data.系统._管理考核.活跃任务.flatMap(任务 => {
+    if (!是管理通知任务(任务)) return [];
+    const 门牌号 = 任务.门牌 as 门牌;
+    if (!data.户[门牌号]) return [];
+    const 地点 = 管理任务显示文本(任务.地点, `${门牌号}室`, 10);
+    const 期限 = 管理任务期限(任务.截止时段);
+    const 事项原文 = 任务.类型 === '投诉' ? 任务.公开摘要 || 任务.模板 : 任务.模板;
+    const 事项 = 管理任务显示文本(事项原文, 任务.类型 === '报修' ? '房内设施故障' : '住户问题');
+    const 文 =
+      任务.类型 === '报修'
+        ? `管理员，${地点}的${事项}需要报修，请在${期限}前来处理。`
+        : `管理员，我已把“${事项}”投诉提交到管理员室，地点是${地点}，请在${期限}前处理。`;
+    return [{ 楼, 时, 会话: 门牌号, 发: '对方' as const, 文, 类: '文本' as const, 键: `楼务:${任务.id}` }];
+  });
+}
+
+export async function 同步管理任务微信(data: SchemaType): Promise<boolean> {
+  const 楼 = 末楼();
+  const 时 = 取绝对时段(data);
+  const 时间线租约 = 创建手机时间线租约(当前聊天ID(), 楼, SillyTavern.chat ?? [], 时);
+  if (!时间线租约) return false;
+  const 库 = 读库();
+  const 已有键 = new Set(库.消息.flatMap(消息 => (消息.键 ? [消息.键] : [])));
+  const 新消息 = 编译管理任务微信通知(data, 楼, 时).filter(消息 => !已有键.has(消息.键 as string));
+  if (!新消息.length) return false;
+  const 时间线仍有效 = () => 手机时间线租约仍有效(时间线租约, 当前聊天ID(), SillyTavern.chat ?? [], 当前手机绝对时段());
+  const 已写 = await 写库增量({ 新圈: [], 新消息, 节拍改: {} }, 时间线仍有效);
+  if (已写) {
+    刷新红点();
+    渲染();
+  }
+  return 已写;
+}
 
 /** 〔调参〕朋友圈图库每类张数(命名约定 素材/微信圈/{妻名}/{类}_{1..N}.webp) */
 const 圈图每类张数 = 3;
@@ -1330,11 +1870,14 @@ function 档位标签(阶段: number, 好感: number, 堕落: number): string {
 }
 
 /** 回合完成后驱动一拍(fire-and-forget;每类内容独立水位线,种子错开相位)。
- * in-flight 闸(审计 M3):回档也 emit 回合完成,"回合刚完成就回档"会让两拍并发,
- * 后写者整包覆盖前写者——一拍在跑时后来的直接跳过(内容引擎是锦上添花,漏一拍无害)。 */
+ * in-flight 闸保证不并发；忙时的多次触发合并为一次最新补跑，防止时段快速推进时旧拍失效、新拍又被吞。 */
 let 节拍进行中 = false;
+let 节拍待补 = false;
 export async function 手机节拍(): Promise<void> {
-  if (节拍进行中) return;
+  if (节拍进行中) {
+    节拍待补 = true;
+    return;
+  }
   节拍进行中 = true;
   try {
     const rawStat = 读最近有效stat();
@@ -1344,24 +1887,49 @@ export async function 手机节拍(): Promise<void> {
     // 正式特殊场景是隔离演出：朋友圈、主动私聊、父亲/群聊等后台内容都不能插队。
     // 静音会议开放的只是玩家主动发起的参与妻私聊旁路，不是自动内容节拍。
     if (data.系统._特殊场景.id) return;
+    const 楼 = 末楼();
+    const 钟 = 取绝对时段(data);
+    const 时间线租约 = 创建手机时间线租约(当前聊天ID(), 楼, SillyTavern.chat ?? [], 钟);
+    if (!时间线租约) return;
+    let 已报告时间线失效 = false;
+    const 时间线仍有效 = (): boolean => {
+      const 有效 = 手机时间线租约仍有效(时间线租约, 当前聊天ID(), SillyTavern.chat ?? [], 当前手机绝对时段());
+      if (!有效 && !已报告时间线失效) {
+        已报告时间线失效 = true;
+        console.info('[人妻公寓·手机] 自动内容生成期间时间线已回档、重掷或切换，已丢弃迟到结果。');
+      }
+      return 有效;
+    };
+    // 确定性楼务必须先落库；后面的冷落预警可能等待 AI，不能反向阻塞报修/投诉通知。
+    await 同步管理任务微信(data);
+    if (!时间线仍有效()) return;
+    // 冷落预警同样独立于普通内容频率，但它属于 AI 内容，必须排在确定性楼务之后。
+    await 冷落预警节拍();
+    if (!时间线仍有效()) return;
     const 倍 = 频率倍率[读配置().频率];
     if (!Number.isFinite(倍)) return;
-    const 楼 = 末楼();
-    const 钟 = 楼 + data.系统._时段偏移楼;
     const 库 = 读库();
+    const 冷落中门牌 = 扫描冷落私聊(data, 库, 楼, 钟).冷落中门牌;
     // 增量记账基线:拍内所有代码照旧改 库,收尾按差量合并进新鲜库(见 写库增量)
     const 原圈数 = 库.圈.length;
     const 原消息数 = 库.消息.length;
     const 原节拍 = { ...库.节拍 };
     const 原已发私聊图 = JSON.stringify(库.已发私聊图);
     let 有新 = false;
+    let 待提交余波: 手机余波消费 | undefined;
+    const 登记待提交余波 = (余波: 换装余波, 标记: 手机余波标记): boolean => {
+      if (待提交余波 && !余波身份相同(待提交余波.预期, 余波)) return false;
+      待提交余波 ??= { 预期: 取余波身份(余波), 标记: {} };
+      Object.assign(待提交余波.标记, 标记);
+      return true;
+    };
 
     // ── 荣耀洞完成后的专属暗示动态(真人完整服务才由荣耀洞.ts 留钩；无固定文案) ──
     const 荣耀门牌 = data.系统._荣耀洞动态门牌 as 门牌;
-    const 荣耀楼 = data.系统._荣耀洞动态楼;
+    const 荣耀楼 = data.系统._荣耀洞动态时段;
     if (门牌列表.includes(荣耀门牌) && 荣耀楼 >= 0) {
       const 荣耀键 = `荣耀洞动态:${荣耀门牌}:${荣耀楼}`;
-      if (!库.节拍[荣耀键]) {
+      if (!Object.prototype.hasOwnProperty.call(库.节拍, 荣耀键)) {
         const 节点 = data.户[荣耀门牌];
         const 配 = 户静态表[荣耀门牌];
         const 原文 = await 小生成(
@@ -1372,11 +1940,13 @@ export async function 手机节拍(): Promise<void> {
             '她刚完整参与过那场隔墙服务，身体和情绪的余韵还在。生成一句只有玩家知道真正含义、其他人只会当成普通日常的动态。',
         );
         const 文 = 校验朋友圈文案((await 微信短文本(原文, 50, `${配.妻名}的朋友圈文案`)) ?? '', 配.妻名, 荣耀门牌);
+        if (!时间线仍有效()) return;
         const 泄底 = /荣耀洞|洗手间|隔板|口交|阴茎|精液|管理员/.test(文);
         if (节点 && 文 && !泄底) {
           const 图序 = 1 + Math.floor(seededRandom(荣耀楼, 荣耀门牌, '荣耀洞动态配图') * 3);
           库.圈.unshift({
             楼,
+            时: 钟,
             谁: 配.妻名,
             文,
             评: [],
@@ -1386,17 +1956,17 @@ export async function 手机节拍(): Promise<void> {
           有新 = true;
         }
         // AI 异常时本次跳过，不用固定文案冒充角色；事件仍去重，避免每回合重复计费。
-        库.节拍[荣耀键] = 钟 || 1;
+        库.节拍[荣耀键] = 钟;
       }
     }
 
-    // ── 朋友圈近期流(每户 8~15 楼一条;一拍最多一条普通动态,避免同一时刻集体晒同类内容) ──
+    // ── 朋友圈近期流(旧 8~15 钟楼向上换算为绝对时段；一拍最多一条普通动态) ──
     const 普通到期 = 门牌列表.filter(m => {
       const 节点 = data.户[m];
       const 配 = 户静态表[m];
       if (!节点 || (配.隐身 && !data.系统._母亲入列)) return false;
       const 上次 = 库.节拍[`圈:${m}`] ?? -999;
-      const 间隔 = Math.round((8 + Math.floor(seededRandom(m, '圈相位') * 8)) * 倍);
+      const 间隔 = 旧钟楼跨度转时段((8 + Math.floor(seededRandom(m, '圈相位') * 8)) * 倍);
       return 钟 - 上次 >= 间隔;
     });
     const 本拍普通门牌 = 普通到期.length
@@ -1409,7 +1979,7 @@ export async function 手机节拍(): Promise<void> {
       const 键 = `圈:${m}`;
       // 晒装拍(换装余波·2026-07-19):她得了外显新东西,缓冲后忍不住发圈晒(不点名);私密件不走公开流
       const 波 = 读余波(楼);
-      const 晒装 = !!波 && 波.门牌 === m && !波.私密 && !波.圈晒 && 楼 - 波.起楼 >= 2 && 节点.妻.当前阶段 >= 3;
+      const 晒装 = !!波 && 波.门牌 === m && !波.私密 && !波.圈晒 && 余波已发酵(楼, 波.起楼) && 节点.妻.当前阶段 >= 3;
       if (!晒装 && m !== 本拍普通门牌) continue;
       const 妻 = 节点.妻;
       const 题 = 选发圈主题(库, m, 钟, 晒装);
@@ -1427,6 +1997,7 @@ export async function 手机节拍(): Promise<void> {
       );
       // 主题与配图类型都由脚本决定，AI 只写文字；追剧/楼务保留纯文字，打散图片密度。
       const 合法文 = await 微信短文本(原文, 60, `${配.妻名}的朋友圈文案`);
+      if (!时间线仍有效()) return;
       const 文 =
         校验朋友圈文案(合法文 ?? '', 配.妻名, m) ||
         (裂缝确认 && 妻.当前阶段 >= 1 ? 取攻略兜底(m, 妻.当前阶段) : 取朋友圈兜底(题, 钟, m, 晒装));
@@ -1443,13 +2014,12 @@ export async function 手机节拍(): Promise<void> {
           库.节拍[键2] = 选;
           图 = `${配.妻名}/${类}_${选}`;
         }
-        const 条 = { 楼, 谁: 配.妻名, 文, 题, 评: [] as { 谁: string; 文: string }[], ...(图 ? { 图 } : {}) };
+        const 条 = { 楼, 时: 钟, 谁: 配.妻名, 文, 题, 评: [] as { 谁: string; 文: string }[], ...(图 ? { 图 } : {}) };
         库.圈.unshift(条);
         库.节拍[键] = 钟;
         有新 = true;
         // 晒装的评论区=阴阳怪气主战场(换装余波扩展4):其他够格太太来1~2条表面客气的酸话
         if (晒装) {
-          标余波({ 圈晒: true });
           const 评者 = (Object.keys(data.户) as 门牌[]).filter(x => x !== m && 雌竞资格(x, data.户[x]));
           if (评者.length) {
             const 评原 = await 小生成(
@@ -1457,11 +2027,14 @@ export async function 手机节拍(): Promise<void> {
               `动态(${配.妻名}发的):${文}\n可评论的人与各自路数:\n${评者.map(x => `${户静态表[x].妻名}(${户静态表[x].雌竞})`).join('\n')}`,
             );
             const 名集 = new Set(评者.map(x => 户静态表[x].妻名));
-            for (const 行 of await 微信群文本(评原 ?? '', 名集, 20, 2, '朋友圈评论')) {
+            const 评论行 = await 微信群文本(评原 ?? '', 名集, 20, 2, '朋友圈评论');
+            if (!时间线仍有效()) return;
+            for (const 行 of 评论行) {
               const mm = 行.match(/^([^:]+):(.+)$/);
               if (mm) 条.评.push({ 谁: mm[1], 文: mm[2] });
             }
           }
+          if (!登记待提交余波(波!, { 圈晒: true })) return;
         }
       }
     }
@@ -1471,18 +2044,20 @@ export async function 手机节拍(): Promise<void> {
       const 节点 = data.户[m];
       const 配 = 户静态表[m];
       if (!节点 || (配.隐身 && !data.系统._母亲入列) || 节点.妻.当前阶段 < 1) continue;
+      // 冷落期只有脚本挑定的预警方向，不能再混入普通攻略私聊、照片或撤回。
+      if (冷落中门牌.has(m)) continue;
       const 键 = `私:${m}`;
       const 上次 = 库.节拍[键] ?? -999;
       const 阶段 = 节点.妻.当前阶段;
-      const 基础间隔 = 阶段 >= 5 ? 6 : 阶段 >= 4 ? 8 : 阶段 >= 3 ? 12 : 20;
-      if (钟 - 上次 < Math.round(基础间隔 * 倍)) continue;
+      const 基础间隔旧钟楼 = 阶段 >= 5 ? 6 : 阶段 >= 4 ? 8 : 阶段 >= 3 ? 12 : 20;
+      if (钟 - 上次 < 旧钟楼跨度转时段(基础间隔旧钟楼 * 倍)) continue;
       const 主动率 = 阶段 >= 5 ? 0.8 : 阶段 >= 4 ? 0.65 : 阶段 >= 3 ? 0.45 : 0.3;
       if (seededRandom(钟, m, '主动消息') > 主动率) continue;
       const 时段名 = 当前时段(钟);
       const 深夜档 = 阶段 === 3 && (时段名 === '晚上' || 时段名 === '深夜');
       const 撤回 = 深夜档 && seededRandom(钟, m, '撤回') < 0.4;
       if (撤回) {
-        库.消息.push({ 楼, 会话: m, 发: '对方', 文: '', 类: '撤回' });
+        库.消息.push({ 楼, 时: 钟, 会话: m, 发: '对方', 文: '', 类: '撤回' });
         库.节拍[键] = 钟;
         有新 = true;
       } else {
@@ -1495,14 +2070,13 @@ export async function 手机节拍(): Promise<void> {
         const 文 = await 小生成(
           '你替一款都市题材游戏生成一条中国已婚女性发给公寓管理员的微信私聊。只输出消息文本(口语,可含emoji),不超过40个汉字,不要引号。关系变化必须循序渐进，不能把低阶段写成高阶段。',
           `人物:${配.妻名},${配.初始?.气质描述 ?? ''}。${家庭事实(m)}${妻状态包(m, data)}${await 人设段(m)}时段:${时段名}。消息方向:${方向}。${
-            附图
-              ? `她会随消息发送一张照片。${附图.提示}消息必须直接围绕照片说话，不能写成无关的泛泛问候。`
-              : ''
+            附图 ? `她会随消息发送一张照片。${附图.提示}消息必须直接围绕照片说话，不能写成无关的泛泛问候。` : ''
           }${称呼纪律()}${口吻纪律}`,
         );
         const 合法私聊 = await 微信短文本(文, 40, `${配.妻名}发给管理员的私聊`);
+        if (!时间线仍有效()) return;
         if (合法私聊) {
-          库.消息.push({ 楼, 会话: m, 发: '对方', 文: 合法私聊, 图: 附图?.图 });
+          库.消息.push({ 楼, 时: 钟, 会话: m, 发: '对方', 文: 合法私聊, 图: 附图?.图 });
           if (附图) {
             const 本轮 = 附图.新一轮 ? [] : [...(库.已发私聊图[m] ?? [])];
             if (!本轮.includes(附图.id)) 本轮.push(附图.id);
@@ -1517,15 +2091,17 @@ export async function 手机节拍(): Promise<void> {
     // ── 群聊 v1(安静是常态;风闻到档=含沙射影;换装余波=和睦探针) ──
     {
       const 上次 = 库.节拍['群'] ?? -999;
-      const 间隔 = Math.round(30 * 倍);
+      const 间隔 = 旧钟楼跨度转时段(30 * 倍);
       // 探针(换装余波扩展3):表面夸奖实则探路——丈夫们看着是邻里客气;私密件不走这口
       const 波2 = 读余波(楼);
       const 探针到点 = !!波2 && !波2.私密 && !波2.探针 && 楼 - 波2.起楼 >= 余波缓冲楼;
       if (钟 - 上次 >= 间隔 && (探针到点 || seededRandom(钟, '群聊') < (data.风闻 >= 50 ? 0.6 : 0.25))) {
         const 在群 = 微信好友(data).filter(f => f.类 === '妻');
         const 谁 = 在群.length ? 在群[Math.floor(seededRandom(钟, '群谁') * 在群.length)].名 : '';
+        const 公开风闻 = data.风闻 >= 50 ? 编译楼务群公开风闻摘要(data) : '';
         const 文 = await 小生成(
-          '你替一款都市题材游戏生成一条老公寓楼务微信群里的群聊消息。只输出"发言人:内容"一行,内容不超过30个汉字。',
+          '你替一款都市题材游戏生成一条老公寓楼务微信群里的群聊消息。只输出"发言人:内容"一行,内容不超过30个汉字。' +
+            '楼务群只允许谈住户共同可见的公开现象；不得引用、猜测或暗示私人微信、私下场景、亲密行为、婚姻隐私或具体当事人。',
           (探针到点
             ? `群成员:${在群.map(f => f.名).join('、') || '楼里太太们'}。最近${波2!.物},生成一条表面夸奖实则探来路的群消息("真好看,新买的呀?"这个方向,但别照抄),发言人从${
                 波2!.门牌
@@ -1536,7 +2112,7 @@ export async function 手机节拍(): Promise<void> {
                   : '太太们'
               }里选。`
             : data.风闻 >= 50
-              ? `群成员:${在群.map(f => f.名).join('、') || '楼里太太们'}。楼里最近闲话多(有人留意管理员的行踪),生成一条含沙射影但不点名的群消息${谁 ? `,发言人=${谁}` : ''}。`
+              ? `群成员:${在群.map(f => f.名).join('、') || '楼里太太们'}。当前唯一可用的公开议题:${公开风闻}。只围绕这句生成一条含沙射影但不点名、不补充细节的群消息${谁 ? `,发言人=${谁}` : ''}。`
               : `群成员:${在群.map(f => f.名).join('、') || '楼里太太们'}。生成一条最寻常的楼务群消息(报修/取快递/天气),发言人任选${谁 ? `(建议${谁})` : ''}。`) +
             称呼纪律() +
             `夫妻名册(提到谁家丈夫只能用这些名字):${门牌列表
@@ -1544,16 +2120,11 @@ export async function 手机节拍(): Promise<void> {
               .map(m => `${户静态表[m].妻名}的丈夫=${户静态表[m].夫名}`)
               .join(',')}。`,
         );
-        const [合法群消息] = await 微信群文本(
-          文,
-          new Set(在群.map(f => f.名)),
-          30,
-          1,
-          '公寓楼务群消息',
-        );
+        const [合法群消息] = await 微信群文本(文, new Set(在群.map(f => f.名)), 30, 1, '公寓楼务群消息', '楼务');
+        if (!时间线仍有效()) return;
         if (合法群消息) {
-          if (探针到点) 标余波({ 探针: true });
-          库.消息.push({ 楼, 会话: '群', 发: '对方', 文: 合法群消息 });
+          if (探针到点 && !登记待提交余波(波2!, { 探针: true })) return;
+          库.消息.push({ 楼, 时: 钟, 会话: '群', 发: '对方', 文: 合法群消息 });
           库.节拍['群'] = 钟;
           有新 = true;
         } else if (文) {
@@ -1569,8 +2140,9 @@ export async function 手机节拍(): Promise<void> {
       if (!节点 || (配.隐身 && !data.系统._母亲入列) || 节点.妻.当前阶段 < 4) continue;
       const 键 = `私见:${m}`;
       const 上次 = 库.节拍[键] ?? -999;
-      if (钟 - 上次 < Math.round(28 * 倍)) continue;
-      if (seededRandom(钟, m, '仅你可见') > 0.3) continue;
+      const 私见节奏 = 仅你可见触发参数(节点.妻.当前阶段);
+      if (钟 - 上次 < Math.ceil(私见节奏.冷却时段 * 倍)) continue;
+      if (seededRandom(钟, m, '仅你可见') > 私见节奏.概率) continue;
       const 妻 = 节点.妻;
       // 档位=堕落分档(五妻1~3;母亲1~5=最终boss奖励最厚)
       const 上限 = m === '302' ? 5 : 3;
@@ -1582,15 +2154,16 @@ export async function 手机节拍(): Promise<void> {
         `人物:${配.妻名},${配.初始?.气质描述 ?? ''}。${妻状态包(m, data)}${await 人设段(m)}生成这条只给他看的动态。`,
       );
       const 合法私密动态 = await 微信短文本(文, 40, `${配.妻名}发布的仅你可见朋友圈`);
+      if (!时间线仍有效()) return;
       if (合法私密动态) {
-        库.圈.unshift({ 楼, 谁: 配.妻名, 文: 合法私密动态, 评: [], 私: { 图序 } });
+        库.圈.unshift({ 楼, 时: 钟, 谁: 配.妻名, 文: 合法私密动态, 评: [], 私: { 图序 } });
         库.节拍[键] = 钟;
         有新 = true;
         if (首条) eventEmit('人妻公寓:提示', `📱 ${配.妻名}发了一条「仅你可见」的动态`);
       }
     }
 
-    // ── 姐妹群主动拍(阶段3+小群;2026-07-19 用户拍板提频:8楼×倍率65%;骂战拌嘴带记忆) ──
+    // ── 姐妹群主动拍(阶段3+小群;旧8钟楼折算为3时段×倍率65%;骂战拌嘴带记忆) ──
     {
       const 上次 = 库.节拍['姐妹群'] ?? -999;
       // 换装余波议论(缓冲后必聊一轮,不受频率门):私密件走"藏不住的春光"路线
@@ -1601,13 +2174,17 @@ export async function 手机节拍(): Promise<void> {
         const 起因 = 波3!.私密
           ? `${妻名}最近那种藏不住的春光,大家都看在眼里——没人知道具体是什么,但女人的直觉不会错`
           : `${波3!.物},楼里都看见了——来路没人说得清`;
-        if (await 姐妹群一拍(data, 库, 楼, 起因)) {
-          标余波({ 群议: true });
+        const 已生成 = await 姐妹群一拍(data, 库, 楼, 起因);
+        if (!时间线仍有效()) return;
+        if (已生成) {
+          if (!登记待提交余波(波3!, { 群议: true })) return;
           库.节拍['姐妹群'] = 钟;
           有新 = true;
         }
-      } else if (钟 - 上次 >= Math.round(8 * 倍) && seededRandom(钟, '姐妹群拍') < 0.65) {
-        if (await 姐妹群一拍(data, 库, 楼)) {
+      } else if (钟 - 上次 >= 旧钟楼跨度转时段(8 * 倍) && seededRandom(钟, '姐妹群拍') < 0.65) {
+        const 已生成 = await 姐妹群一拍(data, 库, 楼);
+        if (!时间线仍有效()) return;
+        if (已生成) {
           库.节拍['姐妹群'] = 钟;
           有新 = true;
         }
@@ -1621,12 +2198,18 @@ export async function 手机节拍(): Promise<void> {
     }
     const 已发私聊图改 = JSON.stringify(库.已发私聊图) === 原已发私聊图 ? undefined : 库.已发私聊图;
     if (有新 || Object.keys(节拍改).length || 已发私聊图改) {
-      await 写库增量({
-        新圈: 库.圈.slice(0, 库.圈.length - 原圈数),
-        新消息: 库.消息.slice(原消息数),
-        节拍改,
-        已发私聊图改,
-      });
+      if (!时间线仍有效()) return;
+      const 已写 = await 写库增量(
+        {
+          新圈: 库.圈.slice(0, 库.圈.length - 原圈数),
+          新消息: 库.消息.slice(原消息数),
+          节拍改,
+          已发私聊图改,
+          余波消费: 待提交余波,
+        },
+        时间线仍有效,
+      );
+      if (!已写) return;
       刷新红点();
       渲染();
     }
@@ -1634,6 +2217,164 @@ export async function 手机节拍(): Promise<void> {
     console.error('[人妻公寓·手机] 节拍失败:', e);
   } finally {
     节拍进行中 = false;
+    if (节拍待补) {
+      节拍待补 = false;
+      void 手机节拍();
+    }
+  }
+}
+
+type 冷落指纹 = NonNullable<ReturnType<typeof 冷落语义指纹>>;
+type 冷落档 = Exclude<ReturnType<typeof 计算妻冷落消息档>, 0>;
+
+interface 冷落预警候选 {
+  门牌: 门牌;
+  档: 冷落档;
+  冷落钟楼数: number;
+  指纹: 冷落指纹;
+  键: string;
+}
+
+function 取指纹冷落钟楼数(data: SchemaType, 门牌号: 门牌, 钟: number, 指纹: 冷落指纹): number {
+  // 冷落系统新版可直接把跨度带在指纹上；旧签名则集中在这里回读成长账，
+  // 手机其余代码不猜 schema 路径。
+  const API跨度 = Number((指纹 as 冷落指纹 & { 冷落钟楼数?: number }).冷落钟楼数);
+  if (Number.isFinite(API跨度)) return Math.max(0, Math.floor(API跨度));
+  const 上次成长钟楼 = Number(_.get(data.户[门牌号], '妻._成长账.上次有效成长钟楼'));
+  return Number.isFinite(上次成长钟楼) ? Math.max(0, Math.floor(钟 - 上次成长钟楼)) : 0;
+}
+
+function 冷落指纹相同(a: 冷落指纹, b: 冷落指纹): boolean {
+  return a.成长轮次 === b.成长轮次 && a.当前档 === b.当前档 && a.余波状态 === b.余波状态;
+}
+
+function 扫描冷落私聊(
+  data: SchemaType,
+  库: 微信库,
+  楼: number,
+  钟: number,
+): {
+  冷落中门牌: Set<门牌>;
+  待发候选: 冷落预警候选[];
+} {
+  const 冷落中门牌 = new Set<门牌>();
+  const 待发候选: 冷落预警候选[] = [];
+  const 妻好友 = new Set(
+    微信好友(data)
+      .filter(好友 => 好友.类 === '妻')
+      .map(好友 => 好友.id),
+  );
+
+  for (const 门牌号 of 门牌列表) {
+    const 节点 = data.户[门牌号];
+    const 配 = 户静态表[门牌号];
+    if (!节点 || !妻好友.has(门牌号) || (配.隐身 && !data.系统._母亲入列)) continue;
+    const 档 = 计算妻冷落消息档(data, 门牌号);
+    // 安抚中不再发催促预警，但关系仍未恢复，普通暧昧/热络主动私聊必须继续压住。
+    if (档 === 0) {
+      if (节点.妻._冷落余波.状态 !== '无') 冷落中门牌.add(门牌号);
+      continue;
+    }
+    冷落中门牌.add(门牌号);
+
+    const 指纹 = 冷落语义指纹(data, 门牌号);
+    if (!指纹) continue;
+    const 键 = `冷落:${门牌号}:${指纹.成长轮次}:${档}`;
+    const 已发 = 库.消息.some(消息 => 消息.键 === 键 && 消息.楼 <= 楼);
+    if (已发) continue;
+    待发候选.push({
+      门牌: 门牌号,
+      档,
+      冷落钟楼数: 取指纹冷落钟楼数(data, 门牌号, 钟, 指纹),
+      指纹,
+      键,
+    });
+  }
+
+  待发候选.sort((a, b) => b.档 - a.档 || b.冷落钟楼数 - a.冷落钟楼数 || a.门牌.localeCompare(b.门牌));
+  return { 冷落中门牌, 待发候选 };
+}
+
+function 当前冷落指纹(门牌号: 门牌): 冷落指纹 | null {
+  const rawStat = 读最近有效stat();
+  if (!rawStat) return null;
+  try {
+    const data = Schema.parse(rawStat) as SchemaType;
+    if (!data.户[门牌号]) return null;
+    return 冷落语义指纹(data, 门牌号);
+  } catch {
+    return null;
+  }
+}
+
+let 冷落预警进行中 = false;
+let 冷落预警待补 = false;
+
+/**
+ * 冷落预警是玩法预示，不受普通手机内容频率总闸影响。它只写 chat 级微信库，
+ * 不修改 MVU 成长或安抚进度；一拍最多选一户。
+ */
+export async function 冷落预警节拍(): Promise<void> {
+  if (冷落预警进行中) {
+    冷落预警待补 = true;
+    return;
+  }
+  冷落预警进行中 = true;
+  try {
+    const rawStat = 读最近有效stat();
+    if (!rawStat) return;
+    const data = Schema.parse(rawStat) as SchemaType;
+    if (data.系统._坏结局 || data.系统._特殊场景.id) return;
+
+    const 楼 = 末楼();
+    const 钟 = 取绝对时段(data);
+    const 时间线租约 = 创建手机时间线租约(当前聊天ID(), 楼, SillyTavern.chat ?? [], 钟);
+    if (!时间线租约) return;
+    const 时间线仍有效 = () =>
+      手机时间线租约仍有效(时间线租约, 当前聊天ID(), SillyTavern.chat ?? [], 当前手机绝对时段());
+    const 库 = 读库();
+    const 候选 = 扫描冷落私聊(data, 库, 楼, 钟).待发候选[0];
+    if (!候选) return;
+
+    const { 门牌: 门牌号, 档, 指纹, 键 } = 候选;
+    const 配 = 户静态表[门牌号];
+    const 唯一方向 = 冷落私聊方向(门牌号, 档);
+    const 冷落语义仍有效 = (): boolean => {
+      if (!时间线仍有效()) return false;
+      const 当前指纹 = 当前冷落指纹(门牌号);
+      return !!当前指纹 && 冷落指纹相同(指纹, 当前指纹);
+    };
+
+    const 原文 = await 小生成(
+      '你替一款都市题材游戏生成一条中国已婚女性发给公寓管理员的微信私聊。只输出消息文本(口语,可含emoji),不超过40个汉字,不要引号。' +
+        '这是一条关系受冷的预警：只执行本次给出的唯一方向，不得自选其他情绪阶段。禁止照片，禁止撤回，不提数值、天数、下降、档位或系统规则，不得声称对方已经回复或当面解释。',
+      `人物:${配.妻名},${配.初始?.气质描述 ?? ''}。${家庭事实(门牌号)}${妻状态包(门牌号, data)}${await 人设段(门牌号)}` +
+        `时段:${当前时段(钟)}。本条唯一消息方向:${唯一方向}。${称呼纪律()}${口吻纪律}`,
+    );
+    const 合法私聊 = await 微信短文本(原文, 40, `${配.妻名}的冷落预警私聊`);
+    // 第一道语义租约：AI返回时已经当面成长、升档或进入安抚，旧消息立即丢弃。
+    if (!合法私聊 || !冷落语义仍有效()) return;
+
+    const 已写 = await 写库增量(
+      {
+        新圈: [],
+        新消息: [{ 楼, 时: 钟, 会话: 门牌号, 发: '对方', 文: 合法私聊, 键 }],
+        节拍改: { [`私:${门牌号}`]: 钟 },
+      },
+      // 第二道语义租约：在 updateVariablesWith 真正提交回调内再读一次 MVU。
+      冷落语义仍有效,
+    );
+    if (!已写) return;
+    刷新红点();
+    渲染();
+  } catch (e) {
+    console.error('[人妻公寓·手机] 冷落预警节拍失败:', e);
+  } finally {
+    冷落预警进行中 = false;
+    if (冷落预警待补) {
+      冷落预警待补 = false;
+      void 冷落预警节拍();
+    }
   }
 }
 
@@ -1669,9 +2410,13 @@ let 当前页: {
   题?: string; // moments:展开中的"哪里不对劲?"(`门牌:序`)
   滚动?: number; // moments:题目展开/作答触发整页重绘时恢复当前位置
 } = { 名: 'chats' };
-let 通话记录: { 谁: string; 文: string }[] = [];
-let 通话上下文: { 分数段: string; 报表: string; 通牒: boolean } | null = null;
-let 本通父亲主题 = '';
+type 父亲通话状态 = SchemaType['系统']['_父亲通话'];
+let 父亲回复生成键 = '';
+
+function 活动父亲通话(data: SchemaType | null = 当前手机数据()): 父亲通话状态 | null {
+  const 通话 = data?.系统._父亲通话;
+  return 通话?.标识 && 通话.期 >= 0 ? 通话 : null;
+}
 
 function 根文档(): Document {
   return (window.parent ?? window).document;
@@ -1682,6 +2427,92 @@ function el(tag: string, cls: string, html?: string): HTMLElement {
   if (cls) e.className = cls;
   if (html !== undefined) e.innerHTML = html;
   return e;
+}
+
+const 微信撤回长按毫秒 = 520;
+let 玩家微信消息序号 = 0;
+
+function 新玩家微信消息标识(会话: string, 楼: number): string {
+  玩家微信消息序号 += 1;
+  return `玩家:${会话}:${楼}:${Date.now().toString(36)}:${玩家微信消息序号.toString(36)}`;
+}
+
+async function 持久化玩家微信撤回(定位: 微信撤回定位): Promise<void> {
+  let 已撤回 = false;
+  await updateVariablesWith(
+    vars => {
+      const 原 = (_.get(vars, '_微信.消息') ?? []) as 微信消息[];
+      const 结果 = 撤回微信玩家消息(原, 定位);
+      if (!结果.已撤回) return vars;
+      _.set(vars, '_微信.消息', 结果.消息);
+      已撤回 = true;
+      return vars;
+    },
+    { type: 'chat' },
+  );
+  if (!已撤回) {
+    eventEmit('人妻公寓:提示', '这条消息已经撤回，或不在当前时间线上。');
+    return;
+  }
+  渲染();
+  刷新红点();
+}
+
+function 打开微信撤回菜单(屏: HTMLElement, clientX: number, clientY: number, 定位: 微信撤回定位): void {
+  屏.querySelector('.rqp-msg-menu-layer')?.remove();
+  const 层 = el('div', 'rqp-msg-menu-layer');
+  const 菜单 = el('div', 'rqp-msg-menu');
+  const 撤回钮 = el('button', '', '撤回') as HTMLButtonElement;
+  菜单.appendChild(撤回钮);
+  层.appendChild(菜单);
+  屏.appendChild(层);
+
+  const 屏框 = 屏.getBoundingClientRect();
+  const 横缩放 = 屏.offsetWidth / Math.max(1, 屏框.width);
+  const 纵缩放 = 屏.offsetHeight / Math.max(1, 屏框.height);
+  const x = (clientX - 屏框.left) * 横缩放;
+  const y = (clientY - 屏框.top) * 纵缩放;
+  菜单.style.left = `${Math.max(8, Math.min(屏.offsetWidth - 76, x - 34))}px`;
+  菜单.style.top = `${Math.max(42, Math.min(屏.offsetHeight - 48, y - 46))}px`;
+
+  层.addEventListener('pointerdown', ev => {
+    if (ev.target === 层) 层.remove();
+  });
+  撤回钮.addEventListener('click', async ev => {
+    ev.stopPropagation();
+    层.remove();
+    await 持久化玩家微信撤回(定位);
+  });
+}
+
+function 绑定玩家微信撤回(气泡: HTMLElement, 屏: HTMLElement, 定位: 微信撤回定位): void {
+  let 长按计时: ReturnType<typeof setTimeout> | null = null;
+  let 起点X = 0;
+  let 起点Y = 0;
+  const 取消长按 = (): void => {
+    if (长按计时 !== null) clearTimeout(长按计时);
+    长按计时 = null;
+  };
+  气泡.addEventListener('pointerdown', ev => {
+    if (ev.pointerType === 'mouse' && ev.button !== 0) return;
+    取消长按();
+    起点X = ev.clientX;
+    起点Y = ev.clientY;
+    长按计时 = setTimeout(() => {
+      长按计时 = null;
+      打开微信撤回菜单(屏, 起点X, 起点Y, 定位);
+    }, 微信撤回长按毫秒);
+  });
+  气泡.addEventListener('pointermove', ev => {
+    if (Math.hypot(ev.clientX - 起点X, ev.clientY - 起点Y) > 9) 取消长按();
+  });
+  for (const 事件 of ['pointerup', 'pointercancel', 'pointerleave'] as const) 气泡.addEventListener(事件, 取消长按);
+  气泡.addEventListener('contextmenu', ev => {
+    ev.preventDefault();
+    ev.stopPropagation();
+    取消长按();
+    打开微信撤回菜单(屏, ev.clientX, ev.clientY, 定位);
+  });
 }
 
 const 手机图标路径: Record<string, string> = {
@@ -1791,10 +2622,15 @@ const 手机CSS = `
 #${ROOT_ID} .rqp-line .rqp-ava{width:38px;height:38px;border-radius:4px;font-size:15px;}
 #${ROOT_ID} .rqp-b{position:relative;max-width:72%;padding:8px 11px;border-radius:5px;font-size:13.5px;line-height:1.5;color:#111;word-break:break-word;}
 #${ROOT_ID} .rqp-b.me{background:#95ec69;}
+#${ROOT_ID} .rqp-b.me.recallable{cursor:context-menu;touch-action:pan-y;user-select:none;-webkit-user-select:none;}
 #${ROOT_ID} .rqp-b.me::after{content:'';position:absolute;top:13px;right:-5px;border-style:solid;border-width:5px 0 5px 6px;border-color:transparent transparent transparent #95ec69;}
 #${ROOT_ID} .rqp-b.ta{background:#fff;}
 #${ROOT_ID} .rqp-b.ta::before{content:'';position:absolute;top:13px;left:-5px;border-style:solid;border-width:5px 6px 5px 0;border-color:transparent #fff transparent transparent;}
 #${ROOT_ID} .rqp-b.sys{align-self:center;background:none;color:#a8a8a8;font-size:11px;max-width:90%;}
+#${ROOT_ID} .rqp-msg-menu-layer{position:absolute;inset:0;z-index:90;}
+#${ROOT_ID} .rqp-msg-menu{position:absolute;width:68px;padding:4px;background:#303136;border-radius:6px;box-shadow:0 5px 16px rgba(0,0,0,.28);}
+#${ROOT_ID} .rqp-msg-menu button{width:100%;border:none;background:transparent;color:#fff;padding:7px 5px;font-size:13px;line-height:1;cursor:pointer;font-family:inherit;}
+#${ROOT_ID} .rqp-msg-menu button:hover{background:rgba(255,255,255,.1);}
 #${ROOT_ID} .rqp-chat-photo{display:block;width:min(176px,100%);max-height:230px;object-fit:cover;border-radius:4px;margin-top:7px;background:#eee;}
 #${ROOT_ID} .rqp-typing{display:flex;gap:4px;align-items:center;min-height:20px;}
 #${ROOT_ID} .rqp-typing i{width:6px;height:6px;border-radius:50%;background:#b0b0b0;animation:rqp-tp 1.2s infinite;}
@@ -1904,24 +2740,43 @@ function 群消息头像名(会话: string, 文: string, 默认名: string): str
   return 合法名.has(发言人) ? 发言人 : 默认名;
 }
 
-function 时段字(楼戳: number, 偏移: number): string {
-  return `第${Math.floor(Math.max(0, 楼戳 + 偏移) / 18) + 1}天 ${当前时段(楼戳 + 偏移)}`;
-}
-
 let 挂好 = false;
 /** 手机壳拉回视口(悬浮钮被拖到屏幕边缘后,弹开的壳可能在视口外;挂载时闭包赋值) */
 let 拉回视口: () => void = () => {};
 /** 首次操作教程由挂载闭包赋值，游戏内 Dock 打开手机时也能调用。 */
 let 显示手机教程: () => void = () => {};
-/** 正在输入(2026-07-18 用户提案:微信同款)——她生成回复期间,该会话顶栏+气泡显示打字中 */
-let 正在输入: string | null = null;
+/** 各会话独立计数；A/B 并发完成时只释放自己的租约，不会把另一会话误解锁。 */
+const 正在输入会话 = new Map<string, number>();
+
+interface 会话输入租约 {
+  键: string;
+}
+
+function 会话输入键(会话: string, 聊天ID: string, 手机租约世代 = 读取当前手机时间线租约世代()): string {
+  return `${聊天ID}\u0000${手机租约世代}\u0000${会话}`;
+}
+
+function 开始会话输入(会话: string, 聊天ID = 当前聊天ID(), 手机租约世代 = 读取当前手机时间线租约世代()): 会话输入租约 {
+  const 键 = 会话输入键(会话, 聊天ID, 手机租约世代);
+  正在输入会话.set(键, (正在输入会话.get(键) ?? 0) + 1);
+  return { 键 };
+}
+
+function 结束会话输入(租约: 会话输入租约): void {
+  const 剩余 = (正在输入会话.get(租约.键) ?? 0) - 1;
+  if (剩余 > 0) 正在输入会话.set(租约.键, 剩余);
+  else 正在输入会话.delete(租约.键);
+}
+
+function 会话正在输入(会话: string, 聊天ID = 当前聊天ID(), 手机租约世代 = 读取当前手机时间线租约世代()): boolean {
+  return (正在输入会话.get(会话输入键(会话, 聊天ID, 手机租约世代)) ?? 0) > 0;
+}
 let 上次会议手机渲染键 = '';
 
 /** 主正文/交互入口的并发硬门：会议微信回复尚未落库时，不允许另一条正文同时起跑。 */
 export function 静音会议私聊回复生成中(): boolean {
-  if (!正在输入) return false;
   const 状态 = 获取静音会议手机状态();
-  return 状态.场景中 && 状态.参与妻.includes(正在输入 as 门牌);
+  return 状态.场景中 && 状态.参与妻.some(会话 => 会话正在输入(会话));
 }
 
 function 会议手机渲染键(状态: 静音会议手机状态): string {
@@ -2188,14 +3043,17 @@ export function 挂载手机(): void {
     }
     root.classList.toggle('open');
     if (root.classList.contains('open')) {
-      // 有来电先接来电,否则开机即微信(2026-07-18 用户拍板:不做主屏,手机=微信)
+      // 已接起的持久通话优先恢复，其次才是尚未接听的来电。
       当前页 =
-        !会议手机.场景中 && 有来电()
-          ? { 名: 'call' }
-          : 会议手机.场景中 || 当前页.名 === 'call' || 当前页.名 === 'talk'
-            ? { 名: 'chats' }
-            : 当前页;
+        !会议手机.场景中 && 活动父亲通话()
+          ? { 名: 'talk' }
+          : !会议手机.场景中 && 有来电()
+            ? { 名: 'call' }
+            : 会议手机.场景中 || 当前页.名 === 'call' || 当前页.名 === 'talk'
+              ? { 名: 'chats' }
+              : 当前页;
       渲染();
+      void 恢复父亲通话();
       拉回视口();
       显示手机教程();
     } else {
@@ -2205,6 +3063,7 @@ export function 挂载手机(): void {
   挂好 = true;
   刷新红点();
   渲染();
+  void 恢复父亲通话();
   console.info('[人妻公寓] 手机已挂载(页面层;形态致谢:玉子手机·柚月)');
 }
 
@@ -2224,12 +3083,13 @@ export function 刷新红点(): void {
   if (!root) return;
   const 库 = 读库();
   const 楼 = 末楼();
+  const 当前绝对时段 = 当前手机绝对时段();
   const 会议手机 = 获取静音会议手机状态();
   const 新会议手机渲染键 = 会议手机渲染键(会议手机);
   const 会议手机状态已变化 = 新会议手机渲染键 !== 上次会议手机渲染键;
   上次会议手机渲染键 = 新会议手机渲染键;
-  const 未读 = 库.消息.some(m => m.楼 <= 楼 && m.发 === '对方' && m.楼 > (库.读到[m.会话] ?? -1));
-  const 圈新 = 库.圈.some(c => c.楼 <= 楼 && c.楼 > 库.圈读到);
+  const 未读 = 会话有未读(库, undefined, 楼, 当前绝对时段);
+  const 圈新 = 朋友圈有未读(库, 楼, 当前绝对时段);
   const 可呈现来电 = 有来电() && !会议手机.场景中;
   root.classList.toggle('has-unread', 未读 || 圈新);
   root.classList.toggle('ringing', 可呈现来电);
@@ -2240,7 +3100,7 @@ export function 刷新红点(): void {
     来电: 可呈现来电,
     静音会议: 会议手机,
   });
-  if (会议手机状态已变化 && root.classList.contains('open')) 渲染();
+  if ((会议手机状态已变化 || 当前页.名 === 'talk') && root.classList.contains('open')) 渲染();
 }
 
 /** 游戏界面点了来电指示/手机按钮(再点一下=收起,2026-07-18 用户拍板;来电直达不收) */
@@ -2262,8 +3122,10 @@ export function 打开手机(直达来电 = false): void {
   }
   root.classList.add('open');
   if (会议手机.场景中) 当前页 = { 名: 'chats' };
+  else if (活动父亲通话()) 当前页 = { 名: 'talk' };
   else if (直达来电 && 有来电()) 当前页 = { 名: 'call' };
   渲染();
+  void 恢复父亲通话();
   拉回视口();
   显示手机教程();
 }
@@ -2295,14 +3157,18 @@ function 渲染(): void {
   }
   const 库 = 读库();
   const 楼 = 末楼();
-  const 偏移 = data?.系统._时段偏移楼 ?? 0;
+  const 当前绝对时段 = data ? 取绝对时段(data) : 0;
   const 会议手机 = 获取静音会议手机状态(data);
+  const 父亲通话 = 活动父亲通话(data);
+  if (!会议手机.场景中) {
+    if (当前页.名 === 'talk' && !父亲通话) 当前页 = { 名: 'chats' };
+    if (当前页.名 === 'call' && (data?.系统._待接来电.期 ?? -1) < 0) {
+      当前页 = 父亲通话 ? { 名: 'talk' } : { 名: 'chats' };
+    }
+  }
   上次会议手机渲染键 = 会议手机渲染键(会议手机);
   if (会议手机.场景中 && 会议手机.可打开) {
-    const 是允许私聊 =
-      当前页.名 === 'chat' &&
-      Boolean(当前页.会话) &&
-      会议手机.参与妻.includes(当前页.会话 as 门牌);
+    const 是允许私聊 = 当前页.名 === 'chat' && Boolean(当前页.会话) && 会议手机.参与妻.includes(当前页.会话 as 门牌);
     if (当前页.名 !== 'chats' && !是允许私聊) 当前页 = { 名: 'chats' };
   }
 
@@ -2334,11 +3200,7 @@ function 渲染(): void {
     const 体 = el('div', 'rqp-body');
     体.style.display = 'flex';
     体.appendChild(
-      el(
-        'div',
-        'rqp-meeting-lock',
-        `<b>会场微信暂时锁定</b>${_.escape(会议手机.禁用原因 || '请稍后再试。')}`,
-      ),
+      el('div', 'rqp-meeting-lock', `<b>会场微信暂时锁定</b>${_.escape(会议手机.禁用原因 || '请稍后再试。')}`),
     );
     屏.appendChild(体);
     return;
@@ -2347,8 +3209,8 @@ function 渲染(): void {
   // 微信底部三签(2026-07-18 用户拍板:不做主屏与独立App,手机开机即微信;
   // 动态集成朋友圈混排,API设置藏"我"页签)
   const 底栏 = (当前: 'chats' | 'moments' | 'settings') => {
-    const 未读 = 库.消息.some(m => m.楼 <= 楼 && m.发 === '对方' && m.楼 > (库.读到[m.会话] ?? -1));
-    const 圈新 = 库.圈.some(c => c.楼 <= 楼 && c.楼 > 库.圈读到);
+    const 未读 = 会话有未读(库, undefined, 楼, 当前绝对时段);
+    const 圈新 = 朋友圈有未读(库, 楼, 当前绝对时段);
     const 栏 = el('div', 'rqp-tabs');
     const 签 = (
       键: 'chats' | 'moments' | 'settings',
@@ -2376,9 +3238,12 @@ function 渲染(): void {
       圈新,
       async () => {
         当前页 = { 名: 'moments' };
-        const 库2 = 读库();
-        库2.圈读到 = 楼;
-        await 写库(库2);
+        await 写库增量({
+          新圈: [],
+          新消息: [],
+          节拍改: {},
+          圈读到改: 创建手机已读时锚(楼, 当前绝对时段),
+        });
         渲染();
         刷新红点();
       },
@@ -2412,15 +3277,15 @@ function 渲染(): void {
     }
     const 友们 = data ? 微信好友(data) : [{ id: '父亲', 名: '爸', 类: '父亲' as const }];
     for (const 友 of 友们) {
-      const 条 = 库.消息.filter(m => m.会话 === 友.id && m.楼 <= 楼);
+      const 条 = 库.消息.filter(m => m.会话 === 友.id && 手机记录在当前时间线(m, 楼, 当前绝对时段));
       const 尾 = 条[条.length - 1];
-      const 未读 = 条.some(m => m.发 === '对方' && m.楼 > (库.读到[友.id] ?? -1));
+      const 未读 = 会话有未读(库, 友.id, 楼, 当前绝对时段);
       const 禁用原因 = 获取会议会话禁用原因(data, 友.id);
       const 会议参与 = 会议手机.场景中 && !禁用原因;
       const r = el(
         'div',
         `rqp-row${会议参与 ? ' meeting-participant' : 禁用原因 ? ' meeting-frozen' : ''}`,
-        `${头像块(友.类 === '群' ? (友.id === '姐妹群' ? '姐妹群' : '群') : 友.类 === '父亲' ? '父亲' : 友.名)}<span class="mid"><b>${友.名}</b><i>${尾 ? (尾.类 === '撤回' ? '[她撤回了一条消息]' : 尾.类 === '通话' ? '[语音通话]' : _.escape(尾.文.slice(0, 24))) : ''}</i></span>${未读 ? '<span class="dot"></span>' : ''}`,
+        `${头像块(友.类 === '群' ? (友.id === '姐妹群' ? '姐妹群' : '群') : 友.类 === '父亲' ? '父亲' : 友.名)}<span class="mid"><b>${友.名}</b><i>${尾 ? (尾.类 === '撤回' ? (尾.发 === '我' ? '[你撤回了一条消息]' : '[她撤回了一条消息]') : 尾.类 === '通话' ? '[语音通话]' : _.escape(尾.文.slice(0, 24))) : ''}</i></span>${未读 ? '<span class="dot"></span>' : ''}`,
       );
       if (禁用原因) r.title = 禁用原因;
       r.addEventListener('click', async () => {
@@ -2429,9 +3294,12 @@ function 渲染(): void {
           return;
         }
         当前页 = { 名: 'chat', 会话: 友.id };
-        const 库2 = 读库();
-        库2.读到[友.id] = 楼;
-        await 写库(库2);
+        await 写库增量({
+          新圈: [],
+          新消息: [],
+          节拍改: {},
+          读到改: { [友.id]: 创建手机已读时锚(楼, 当前绝对时段) },
+        });
         渲染();
         刷新红点();
       });
@@ -2452,13 +3320,13 @@ function 渲染(): void {
           : 会话 === '姐妹群'
             ? '姐妹茶话会'
             : (户静态表[会话 as 门牌]?.妻名 ?? 会话);
-    头(正在输入 === 会话 ? (会话 === '群' || 会话 === '姐妹群' ? '群成员正在输入…' : '对方正在输入…') : 名, () => {
+    头(会话正在输入(会话) ? (会话 === '群' || 会话 === '姐妹群' ? '群成员正在输入…' : '对方正在输入…') : 名, () => {
       当前页 = { 名: 'chats' };
       渲染();
     });
     const 体 = el('div', 'rqp-body');
     const 泡区 = el('div', 'rqp-bubbles');
-    // 真微信排版:气泡带双侧头像+小尾巴;换楼即插一条居中的灰色时间字(微信的时间分组)
+    // 真微信排版:气泡带双侧头像+小尾巴;正文楼或发布时段变化都插入时间分组。
     const 对方头像名 =
       会话 === '父亲'
         ? '父亲'
@@ -2467,34 +3335,41 @@ function 渲染(): void {
           : 会话 === '群'
             ? '群'
             : (户静态表[会话 as 门牌]?.妻名 ?? 会话);
-    let 上楼 = -1;
-    for (const m of 库.消息.filter(x => x.会话 === 会话 && x.楼 <= 楼)) {
-      if (m.楼 !== 上楼) {
-        泡区.appendChild(el('div', 'rqp-b sys', 时段字(m.楼, 偏移)));
-        上楼 = m.楼;
+    let 上时间组 = '';
+    for (const [消息索引, m] of 库.消息.entries()) {
+      if (m.会话 !== 会话 || !手机记录在当前时间线(m, 楼, 当前绝对时段)) continue;
+      const 时间组 = 手机消息时间组键(m.楼, m.时);
+      if (时间组 !== 上时间组) {
+        泡区.appendChild(el('div', 'rqp-b sys', 手机记录时间字(m.时)));
+        上时间组 = 时间组;
       }
       if (m.类 === '撤回') {
-        泡区.appendChild(el('div', 'rqp-b sys', '她撤回了一条消息'));
+        泡区.appendChild(el('div', 'rqp-b sys', m.发 === '我' ? '你撤回了一条消息' : '她撤回了一条消息'));
       } else if (m.类 === '通话') {
         泡区.appendChild(el('div', 'rqp-b sys', `[语音通话] ${_.escape(m.文)}`));
       } else {
         const 我方 = m.发 === '我';
         const 消息头像 = 我方 ? '主角' : 群消息头像名(会话, m.文, 对方头像名);
-        泡区.appendChild(
-          el(
-            'div',
-            `rqp-line ${我方 ? 'me' : 'ta'}`,
-            `${头像块(消息头像)}<div class="rqp-b ${我方 ? 'me' : 'ta'}">${_.escape(m.文)}${
-              m.图
-                ? `<img class="rqp-chat-photo" src="${私聊图片地址(m.图)}" loading="lazy" onerror="this.remove()"/>`
-                : ''
-            }</div>`,
-          ),
+        const 消息行 = el(
+          'div',
+          `rqp-line ${我方 ? 'me' : 'ta'}`,
+          `${头像块(消息头像)}<div class="rqp-b ${我方 ? 'me' : 'ta'}">${_.escape(m.文)}${
+            m.图
+              ? `<img class="rqp-chat-photo" src="${私聊图片地址(m.图)}" loading="lazy" onerror="this.remove()"/>`
+              : ''
+          }</div>`,
         );
+        const 撤回定位 = 创建微信撤回定位(库.消息, 消息索引);
+        const 我方气泡 = 消息行.querySelector('.rqp-b.me') as HTMLElement | null;
+        if (撤回定位 && 我方气泡) {
+          我方气泡.classList.add('recallable');
+          绑定玩家微信撤回(我方气泡, 屏, 撤回定位);
+        }
+        泡区.appendChild(消息行);
       }
     }
     // 正在输入气泡(微信同款三点跳动;她的回复生成完自动消失)
-    if (正在输入 === 会话) {
+    if (会话正在输入(会话)) {
       泡区.appendChild(
         el(
           'div',
@@ -2527,7 +3402,7 @@ function 渲染(): void {
             ? '插一句…'
             : '发消息…';
       const 发钮 = el('button', '', '发送') as HTMLButtonElement;
-      发钮.disabled = 正在输入 === 会话;
+      发钮.disabled = 会话正在输入(会话);
       发钮.addEventListener('click', () => {
         const 文 = ta.value.trim();
         if (!文) return;
@@ -2538,9 +3413,7 @@ function 渲染(): void {
       行.appendChild(发钮);
       屏.appendChild(行);
       if (是妻 && 当前页.加 && !会议手机.场景中) {
-        const 偏 = data?.系统._时段偏移楼 ?? 0;
-        const 钟 = 楼 + 偏;
-        const 冷 = 钟 - (库.节拍[`约:${会话}`] ?? -999) < 8;
+        const 冷 = 当前绝对时段 - (库.节拍[`约:${会话}`] ?? -999) < 旧钟楼跨度转时段(8);
         const 已约 = !!读赴约条(楼);
         const 面 = el('div', 'rqp-plus');
         const b = el('button', '', `<i>📍</i>约出来${已约 ? '·已在身边' : 冷 ? '·刚约过' : ''}`) as HTMLButtonElement;
@@ -2567,7 +3440,7 @@ function 渲染(): void {
     const 体 = el('div', 'rqp-body rqw-feed');
     const 我名 = (SillyTavern as unknown as { name1?: string })?.name1 || '我';
     体.appendChild(el('div', 'rqm-cover', `<b>${_.escape(我名)}</b>${头像块('主角')}`));
-    const 圈们 = 库.圈.filter(c => c.楼 <= 楼);
+    const 圈们 = 库.圈.filter(c => 手机记录在当前时间线(c, 楼, 当前绝对时段));
     if (!圈们.length)
       体.appendChild(
         el('div', 'rqw-post', '<div class="rqw-r"><p class="rqw-text" style="color:#999">朋友圈还静悄悄的。</p></div>'),
@@ -2590,7 +3463,7 @@ function 渲染(): void {
             : c.图
               ? `<span class="rqw-photo current"><img class="rqw-img" src="${素材基址}/微信圈/${c.图}.webp" loading="lazy" onerror="this.parentElement.remove()"/></span>`
               : '') +
-          `<div class="rqw-foot"><span class="rqw-time">${时段字(c.楼, 偏移)}</span><span class="rqw-dots">••</span></div>` +
+          `<div class="rqw-foot"><span class="rqw-time">${手机记录时间字(c.时)}</span><span class="rqw-dots">••</span></div>` +
           盒 +
           `</div>`,
       );
@@ -2621,6 +3494,13 @@ function 渲染(): void {
       // rq0.50 曾只判断“条目是否关键”，导致开局即可点开 301 的“哪里不对劲？”
       // （后台虽会拒绝发碎片，UI 仍然提前泄题）。母亲还需服从系统级入列门。
       const 可调查关键 = Boolean(条.关键 && data?.户[m]) && (m !== '302' || Boolean(data?.系统._母亲入列));
+      const 线路候选 = data
+        ? 列出阶段线路候选详情(data, {
+            类型: '调查',
+            门牌: m,
+            标识: `旧动态复盘:${序}`,
+          })[0]
+        : undefined;
       const 图块 = 条.图
         ? `<span class="rqw-photo history"><img class="rqw-img" src="${素材基址}/微信圈/${条.图}.webp" loading="lazy" onerror="this.parentElement.remove()"/></span>`
         : '';
@@ -2652,6 +3532,19 @@ function 渲染(): void {
           (卡.querySelector('.rqw-r') as HTMLElement).appendChild(题区);
         }
       }
+      if (条.关键 && 线路候选) {
+        const 复盘 = el('button', 'rqw-more', '沿着这条旧动态复盘');
+        复盘.addEventListener('click', ev => {
+          ev.stopPropagation();
+          eventEmit('人妻公寓:查看旧动态', {
+            门牌: m,
+            序,
+            预期目标阶段: 线路候选.目标阶段,
+            预期节点: 线路候选.节点,
+          });
+        });
+        (卡.querySelector('.rqw-r') as HTMLElement).appendChild(复盘);
+      }
       体.appendChild(卡);
     }
     const 更 = el('button', 'rqw-more', '翻到底了');
@@ -2664,48 +3557,80 @@ function 渲染(): void {
   }
 
   if (当前页.名 === 'call') {
+    if (!data) {
+      当前页 = { 名: 'chats' };
+      渲染();
+      return;
+    }
     // 微信语音来电(父亲;跳动指示→点开手机→此屏接听)
     头('微信语音');
     const 区 = el('div', 'rqp-call');
-    区.innerHTML = `${头像块('父亲')}<b>爸</b><i>邀请你进行语音通话…</i><div class="acts"><button class="no" title="挂断">${手机图标('no')}</button><button class="ok" title="接听">${手机图标('ok')}</button></div>`;
+    const 来电说明 = [
+      data.系统._待接来电.通牒 ? '父亲已经发出最后通牒' : '',
+      data.系统._待接来电.紧急 ? '楼内风闻危机，父亲紧急来电' : '',
+      母亲圆场手机提示(data.系统._待接来电.母亲圆场),
+    ]
+      .filter(Boolean)
+      .join('；');
+    区.innerHTML = `${头像块('父亲')}<b>爸</b><i>${_.escape(来电说明 || '邀请你进行语音通话…')}</i><div class="acts"><button class="no" title="挂断">${手机图标('no')}</button><button class="ok" title="接听">${手机图标('ok')}</button></div>`;
     (区.querySelector('.no') as HTMLButtonElement).addEventListener('click', () => {
       // 挂断=未接红点继续挂着,下一期被覆盖时照扣(经济系统规则)
       当前页 = { 名: 'chats' };
       渲染();
     });
     (区.querySelector('.ok') as HTMLButtonElement).addEventListener('click', () => {
-      eventEmit('人妻公寓:接听来电');
+      eventEmit('人妻公寓:接听来电', 当前聊天ID());
     });
     屏.appendChild(区);
     return;
   }
 
   if (当前页.名 === 'talk') {
-    头('通话中 · 爸');
+    if (!父亲通话) {
+      当前页 = { 名: 'chats' };
+      渲染();
+      return;
+    }
+    头(父亲通话.状态 === '收尾中' ? '正在结束通话 · 爸' : '通话中 · 爸');
     const 体 = el('div', 'rqp-body');
     const 泡区 = el('div', 'rqp-bubbles');
-    for (const t of 通话记录) {
-      泡区.appendChild(el('div', `rqp-b ${t.谁 === '我' ? 'me' : 'ta'}`, _.escape(t.文)));
+    const 圆场说明 = 母亲圆场手机提示(父亲通话.母亲圆场);
+    if (圆场说明) 泡区.appendChild(el('div', 'rqp-b sys', 圆场说明));
+    for (const t of 父亲通话.记录) {
+      const 我方 = t.谁 === '我';
+      const 行 = el('div', `rqp-line ${我方 ? 'me' : 'ta'}`);
+      行.appendChild(el('div', `rqp-b ${我方 ? 'me' : 'ta'}`, _.escape(t.文)));
+      泡区.appendChild(行);
+    }
+    if (父亲通话.状态 === '收尾中') {
+      泡区.appendChild(el('div', 'rqp-b sys', '正在保存通话结果…'));
+    } else if (父亲通话.待回复.序号 > 0) {
+      泡区.appendChild(el('div', 'rqp-b sys', '爸正在说…'));
     }
     体.appendChild(泡区);
     屏.appendChild(体);
-    const 行 = el('div', 'rqp-input');
-    const ta = el('textarea', '') as HTMLTextAreaElement;
-    ta.placeholder = '你开口说…';
-    const 发钮 = el('button', '', '说') as HTMLButtonElement;
-    发钮.addEventListener('click', () => {
-      const 文 = ta.value.trim();
-      if (!文) return;
-      ta.value = '';
-      void 通话应答(文);
-    });
-    const 挂 = el('button', '', '挂断') as HTMLButtonElement;
-    挂.style.background = '#fa5151';
-    挂.addEventListener('click', () => void 结束通话());
-    行.appendChild(ta);
-    行.appendChild(发钮);
-    行.appendChild(挂);
-    屏.appendChild(行);
+    if (父亲通话.状态 !== '收尾中') {
+      const 行 = el('div', 'rqp-input');
+      const ta = el('textarea', '') as HTMLTextAreaElement;
+      const 等回复 = 父亲通话.待回复.序号 > 0;
+      ta.placeholder = 等回复 ? '等待父亲回应…' : '你开口说…';
+      ta.disabled = 等回复;
+      const 发钮 = el('button', '', 等回复 ? '等' : '说') as HTMLButtonElement;
+      发钮.disabled = 等回复;
+      发钮.addEventListener('click', () => {
+        const 文 = ta.value.trim();
+        if (!文) return;
+        ta.value = '';
+        void 通话应答(文);
+      });
+      const 挂 = el('button', '', '挂断') as HTMLButtonElement;
+      挂.style.background = '#fa5151';
+      挂.addEventListener('click', () => void 结束通话());
+      行.appendChild(ta);
+      行.appendChild(发钮);
+      行.appendChild(挂);
+      屏.appendChild(行);
+    }
     体.scrollTop = 体.scrollHeight;
     return;
   }
@@ -2715,7 +3640,7 @@ function 渲染(): void {
       当前页 = { 名: 'chats' };
       渲染();
     });
-    刷新SQLite能力缓存();
+    重置微信摘要SQLite能力();
     const c = 读配置();
     const db = 数据库状态();
     const 填表兼容颜色 =
@@ -2732,8 +3657,7 @@ function 渲染(): void {
       : db.填表最大尝试 === null
         ? '插件未开放读取；建议在高级参数中把“填表最大重试”手动设为 2（表示总共尝试两次）'
         : `当前总尝试次数 = ${db.填表最大尝试}${db.填表最大尝试 === 2 ? '，已是建议值' : '，建议改为 2'}`;
-    const 可一键修复填表 =
-      db.填表最短回复 !== null && db.填表最短回复 > 0 && db.可设置填表参数;
+    const 可一键修复填表 = db.填表最短回复 !== null && db.填表最短回复 > 0 && db.可设置填表参数;
     const 区 = el('div', 'rqp-set');
     区.innerHTML = `
       <label>手机内容 API<select class="i-source">
@@ -2763,20 +3687,20 @@ function 渲染(): void {
           !c.微信进展摘要
             ? '已由玩家关闭'
             : !db.已安装
-            ? '不可用'
-            : !db.已装游戏模板
-              ? '需先安装/更新四张表'
-              : !db.可调用AI || !db.可写表格
-                ? '表可读，但无法自动整理'
-                : '已启用（按当前聊天分支保存结构化进展版本）'
+              ? '不可用'
+              : !db.已装游戏模板
+                ? '需先安装/更新四张表'
+                : !db.可调用AI || !db.可写表格
+                  ? '表可读，但无法自动整理'
+                  : '正在检测 SQLite 写入能力…'
         }</p>
         <p style="color:#666;font-size:11px;margin:0 0 6px">数据库模式沿用数据库当前配置，不在这里读取或修改数据库密钥与模型。需要给手机单独选模型，请展开下方“手机专用模型”，填写API后读取模型列表。</p>
-        <p style="color:#666;font-size:11px;margin:0 0 6px">建议开启 SQLite 模式：已安装的四张 RQ_ 表会优先使用参数化 SQL 精确查询与更新；未开启时自动回退普通表格模式。</p>
+        <p style="color:#666;font-size:11px;margin:0 0 6px">建议开启 SQLite 模式：记忆读取仍可回退完整表格快照；剧情事件和微信摘要的脚本直写仅在 SQLite 模式运行，普通表格模式不会用可能挂到旧消息的行接口冒险写入。数据库插件自身对正文回复的自动长期记忆与承诺仍照常运行。</p>
         <p style="color:#666;font-size:11px;margin:0 0 6px">“AI 回复最小长度”是数据库全局项，且当前同时控制短正文是否跳过填表与填表模型输出长度。本游戏只检测，不会在安装或启动时自动修改；微信回复与微信进展摘要走独立 callAI，不受这项填表门槛影响。</p>
-        <p style="color:#666;font-size:11px;margin:0 0 6px">开启微信记忆后，每次妻子有效回复通常会在原回复请求之外，再调用一次数据库当前 AI。它会接收上一版结构化进展和最多24条尚未整理的私聊来补齐失败增量；原文不会写入数据库，正文只在本人可靠判定在场时被动参考结构化摘要，不要求每轮主动提起。</p>
+        <p style="color:#666;font-size:11px;margin:0 0 6px">仅在检测到 SQLite 可写时，开启微信记忆才会在妻子有效回复之外再调用一次数据库当前 AI；普通表格模式会暂停这条额外摘要请求，不会反复调用或重试。SQLite 模式下它会接收上一版结构化进展和最多24条尚未整理的私聊；原文不会写入数据库。</p>
         <label style="display:flex;align-items:center;gap:8px"><input class="i-wechat-summary" type="checkbox" style="width:auto"${
           c.微信进展摘要 ? ' checked' : ''
-        }/>让数据库整理微信进展（推荐，可单独关闭）</label>
+        }/>让数据库整理微信进展（仅 SQLite 模式，可单独关闭）</label>
         <label style="display:flex;align-items:center;gap:8px"><input class="i-db-fallback" type="checkbox" style="width:auto"${
           c.数据库失败回退 ? ' checked' : ''
         }/>数据库请求报错时再尝试正文 API（可能造成双请求）</label>
@@ -2820,13 +3744,24 @@ function 渲染(): void {
     });
     刷新API分区();
     const SQL状态 = 区.querySelector('.sql-status') as HTMLElement;
+    const 微信记忆状态 = 区.querySelector('.wechat-memory-status') as HTMLElement;
     if (db.已安装 && db.有SQL接口) {
-      void 探测数据库SQLite模式().then(已启用 => {
+      void 确认微信摘要SQLite可写().then(已启用 => {
         SQL状态.style.color = 已启用 ? '#287a50' : '#9a6420';
         SQL状态.textContent = 已启用
           ? `SQLite SQL：查询接口已就绪${db.已装游戏模板 ? '，已安装的 RQ_ 表会优先走 SQL' : ''}`
           : 'SQLite SQL：尚未开启；建议点下方按钮，在数据库设置中切换';
+        if (c.微信进展摘要 && db.已装游戏模板 && db.可调用AI && db.可写表格) {
+          微信记忆状态.style.color = 已启用 ? '#287a50' : '#9a6420';
+          微信记忆状态.textContent = 已启用
+            ? '微信记忆：已启用（按当前聊天分支保存结构化进展版本）'
+            : '微信记忆：脚本摘要已暂停（仅 SQLite 可写）；数据库插件自身的正文长期记忆/承诺仍运行';
+        }
       });
+    } else if (c.微信进展摘要 && db.已装游戏模板 && db.可调用AI && db.可写表格) {
+      微信记忆状态.style.color = '#9a6420';
+      微信记忆状态.textContent =
+        '微信记忆：脚本摘要已暂停（没有 SQLite 写入接口）；数据库插件自身的正文长期记忆/承诺仍运行';
     }
     (区.querySelector('.install-db') as HTMLButtonElement).addEventListener('click', () => {
       const 宿主 = window.parent ?? window;
@@ -2844,6 +3779,7 @@ function 渲染(): void {
       按钮.disabled = true;
       按钮.textContent = '安装中…';
       void 安装人妻公寓数据库模板().then(result => {
+        重置微信摘要SQLite能力();
         宿主.alert(result.message || (result.success ? '安装完成' : '安装失败'));
         渲染();
       });
@@ -2874,6 +3810,7 @@ function 渲染(): void {
     });
     (区.querySelector('.open-sql-settings') as HTMLButtonElement).addEventListener('click', () => {
       收起手机以显示数据库();
+      重置微信摘要SQLite能力();
       void 打开数据库设置().then(ok => {
         if (!ok) {
           (window.parent ?? window).alert(
@@ -2953,8 +3890,27 @@ function 渲染(): void {
 }
 
 // ── 约出来(2026-07-18 用户提案:微信"+"菜单;应约与否由脚本按 阶段/好感/时段/丈夫在否 裁定,
-//    AI 只照结果写回复;应约=写 _赴约(2楼跟随窗口),期间她的位置=玩家的位置；
+//    AI 只照结果写回复;应约=写 _赴约(2个正文楼跟随窗口),期间她的位置=玩家的位置；
 //    窗口内若继续聊天则由普通对话粘滞接管，未继续聊天则到期离开) ──
+
+/** 同一聊天内所有妻子的邀约共用一条队列；不同存档互不等待，也不会共享单例判断。 */
+const 手机邀约队列 = new Map<string, Promise<void>>();
+
+function 排队手机邀约<T>(聊天ID: string, 手机租约世代: number, 任务: () => Promise<T>): Promise<T> {
+  const 队列键 = `${聊天ID}\u0000${手机租约世代}`;
+  const 前序 = 手机邀约队列.get(队列键) ?? Promise.resolve();
+  const 本次 = 前序.catch(() => undefined).then(任务);
+  const 尾项 = 本次.then(
+    () => undefined,
+    () => undefined,
+  );
+  手机邀约队列.set(队列键, 尾项);
+  const 清理 = () => {
+    if (手机邀约队列.get(队列键) === 尾项) 手机邀约队列.delete(队列键);
+  };
+  void 尾项.then(清理, 清理);
+  return 本次;
+}
 
 function 读赴约条(楼: number): { m: 门牌 } | null {
   const p = (_.get(getVariables({ type: 'chat' }), '_赴约') ?? null) as {
@@ -2972,83 +3928,127 @@ async function 约出来(m: 门牌): Promise<void> {
     eventEmit('人妻公寓:提示', 会议手机.可打开 ? '会议期间不能发起离场邀约。' : 会议手机.禁用原因);
     return;
   }
+  const 邀约聊天ID = 当前聊天ID();
+  if (!邀约聊天ID) return;
   const 楼 = 末楼();
-  const 库 = 读库();
-  const 邀约消息 = '在忙吗?想见你一面——我就在楼里,出来陪我走走?';
-  库.消息.push({ 楼, 会话: m, 发: '我', 文: 邀约消息 });
-  await 写库(库);
-  正在输入 = m;
-  渲染();
+  const rawStat = 读最近有效stat();
+  if (!rawStat) return;
+  const 入口data = Schema.parse(rawStat) as SchemaType;
+  const 入口节点 = 入口data.户[m];
+  const 配 = 户静态表[m];
+  if (!入口节点 || !配) return;
+  const 入口钟 = 取绝对时段(入口data);
+  const 邀约租约 = 创建手机时间线租约(邀约聊天ID, 楼, SillyTavern.chat ?? [], 入口钟);
+  if (!邀约租约) return;
+  const 邀约仍有效 = () => 手机时间线租约仍有效(邀约租约, 当前聊天ID(), SillyTavern.chat ?? [], 当前手机绝对时段());
+  if (会话正在输入(m, 邀约聊天ID, 邀约租约.世代)) {
+    eventEmit('人妻公寓:提示', '对方正在输入，请等这一条回复完成。');
+    return;
+  }
+  // 邀约也会先写玩家消息再异步生成回复；必须在第一次 await 前占住会话，避免双击
+  // 或与普通发送同时起跑，产生两份互相看不见的回复上下文。
+  const 输入租约 = 开始会话输入(m, 邀约聊天ID, 邀约租约.世代);
   try {
-    const rawStat = 读最近有效stat();
-    if (!rawStat) return;
-    const data = Schema.parse(rawStat) as SchemaType;
-    const 节点 = data.户[m];
-    const 配 = 户静态表[m];
-    if (!节点 || !配) return;
-    const 钟 = 楼 + data.系统._时段偏移楼;
-    const 时段名 = 当前时段(钟);
-    const 阶段 = 节点.妻.当前阶段;
-    // 应约率〔调参〕:阶段定底,好感加成,晚间低阶段打折,丈夫在家打折(L5=随叫随到基本必来)
-    let 率 = [0.35, 0.55, 0.75, 0.9, 0.98][Math.max(0, 阶段 - 1)] ?? 0.35;
-    if (节点.妻.好感值 >= 70) 率 += 0.1;
-    if ((时段名 === '深夜' || 时段名 === '晚上') && 阶段 < 4) 率 *= 时段名 === '深夜' ? 0.15 : 0.6;
-    if (丈夫在楼(节点, m, 钟) !== '外出' && 阶段 < 5) 率 *= 0.6;
-    const 应 = seededRandom(楼, m, '赴约') < 率;
-    {
-      const 库2 = 读库();
-      库2.节拍[`约:${m}`] = 钟;
-      await 写库(库2);
-    }
-    const 尾 = 最近正文();
-    const 回 = await 微信短文本(
-      await 小生成(
-        '你在扮演一款都市题材游戏中的已婚女性,刚收到公寓管理员发来的微信邀约。结果已由系统裁定,你只负责照结果写她的回复(口语,不超过40个汉字,可含emoji,不要引号,不要旁白,不要任何标签)。' +
-          口吻纪律,
-        `人物:${配.妻名},${配.初始?.气质描述 ?? ''}。${家庭事实(m)}${妻状态包(m, data)}${await 人设段(m)}时段:${时段名}。${称呼纪律()}${尾 ? `\n刚刚现实里发生的事(正文节选,回复要接得上这口气):${尾}` : ''}\n裁定结果:${
-          应
-            ? '她答应出来见面(按她此刻的真实状态拿捏语气:关系浅=犹豫着答应,关系深=藏不住的高兴)'
-            : '她婉拒了(给个合乎生活的理由:在做饭/家里有人/不太方便;按她此刻的真实状态拿捏惋惜程度)'
-        }。生成她的回复。`,
-      ),
-      40,
-      `${配.妻名}对管理员邀约的私聊回复`,
-    );
-    {
-      const 库3 = 读库();
-      const 邀约回复 = 回 || (应 ? '好呀,等我几分钟,我出来找你。' : '今天不太方便呢…改天好不好?');
-      库3.消息.push({
-        楼: 末楼(),
-        会话: m,
-        发: '对方',
-        文: 邀约回复,
-      });
-      库3.读到[m] = 末楼();
-      await 写库(库3);
-      排队刷新微信进展摘要(m);
-    }
-    // 长期记忆直写(措辞固定,不带聊天原文;无数据库时静默返回 false 不影响流程)
-    void 同步社交轨迹({
-      类型: '邀约',
-      人物: 配.妻名,
-      事件: '微信约她出来见面',
-      结果: 应 ? '她答应出来见面了' : '她婉拒了,没出来',
-      楼层: 楼,
-      事件键: `RQP-约-${m}-${楼}`,
-    });
-    if (应) {
-      // 必须等赴约状态真正落库后再广播位置刷新；旧写法 fire-and-forget，客户端先读到旧值，
-      // 要等后续几个回合的其他刷新才看见她到场。
-      // 赴约本身只跟随 2 楼：玩家若在窗口内继续聊天，回合快照会把她写入普通对话粘滞，
-      // 之后即使赴约到期也继续留场；若玩家没有继续聊天，2楼后便回归作息。
-      await Promise.resolve(insertOrAssignVariables({ _赴约: { m, 起楼: 楼, 至楼: 楼 + 2 } }, { type: 'chat' }));
-    }
     渲染();
-    刷新红点(); // 顺带发"手机状态"事件,游戏界面借它即时刷新赴约位置(约出来不产楼)
+    await 排队手机邀约(邀约聊天ID, 邀约租约.世代, async () => {
+      // 请求在旧聊天里排队时，切档后的同门牌既不应被旧输入锁阻塞，也绝不能收到旧回复。
+      if (!邀约仍有效()) return;
+      const 最新rawStat = 读最近有效stat();
+      if (!最新rawStat || !邀约仍有效()) return;
+      const data = Schema.parse(最新rawStat) as SchemaType;
+      const 节点 = data.户[m];
+      if (!节点) return;
+      const 钟 = 取绝对时段(data);
+      const 邀约消息 = '在忙吗?想见你一面——我就在楼里,出来陪我走走?';
+      const 玩家邀约 = 带当前手机分支锚({
+        楼,
+        时: 钟,
+        会话: m,
+        发: '我' as const,
+        文: 邀约消息,
+        标识: 新玩家微信消息标识(m, 楼),
+      });
+      if (!(await 写库增量({ 新圈: [], 新消息: [玩家邀约], 节拍改: {} }, 邀约仍有效))) return;
+      const 时段名 = 当前时段(钟);
+      const 阶段 = 节点.妻.当前阶段;
+      // 应约率〔调参〕:阶段定底,好感加成,晚间低阶段打折,丈夫在家打折(L5=随叫随到基本必来)
+      let 率 = [0.35, 0.55, 0.75, 0.9, 0.98][Math.max(0, 阶段 - 1)] ?? 0.35;
+      if (节点.妻.好感值 >= 70) 率 += 0.1;
+      if ((时段名 === '深夜' || 时段名 === '晚上') && 阶段 < 4) 率 *= 时段名 === '深夜' ? 0.15 : 0.6;
+      if (丈夫在楼(节点, m, 钟) !== '外出' && 阶段 < 5) 率 *= 0.6;
+      // 队列内读取单例赴约；另一位妻已接受时，本次直接按拒绝生成。最终回调仍会 CAS，
+      // 防住队列之外的旧版本 iframe 或其它入口在生成期间抢先写入。
+      const 应 = !读赴约条(楼) && seededRandom(钟, m, '赴约') < 率;
+      const 尾 = 最近正文();
+      const 回 = await 微信短文本(
+        await 小生成(
+          '你在扮演一款都市题材游戏中的已婚女性,刚收到公寓管理员发来的微信邀约。结果已由系统裁定,你只负责照结果写她的回复(口语,不超过40个汉字,可含emoji,不要引号,不要旁白,不要任何标签)。' +
+            口吻纪律,
+          `人物:${配.妻名},${配.初始?.气质描述 ?? ''}。${家庭事实(m)}${妻状态包(m, data)}${await 人设段(m)}时段:${时段名}。${称呼纪律()}${尾 ? `\n刚刚现实里发生的事(正文节选,回复要接得上这口气):${尾}` : ''}\n裁定结果:${
+            应
+              ? '她答应出来见面(按她此刻的真实状态拿捏语气:关系浅=犹豫着答应,关系深=藏不住的高兴)'
+              : '她婉拒了(给个合乎生活的理由:在做饭/家里有人/不太方便;按她此刻的真实状态拿捏惋惜程度)'
+          }。生成她的回复。`,
+        ),
+        40,
+        `${配.妻名}对管理员邀约的私聊回复`,
+      );
+      if (!邀约仍有效()) return;
+      let 实际应 = 应;
+      const 回复楼 = 末楼();
+      const 建回复消息 = (文: string): 微信消息 =>
+        带当前手机分支锚({
+          楼: 回复楼,
+          时: 钟,
+          会话: m,
+          发: '对方' as const,
+          文,
+        });
+      const 写回复 = (回复消息: 微信消息, 接受: boolean) =>
+        写库增量(
+          {
+            新圈: [],
+            新消息: [回复消息],
+            节拍改: { [`约:${m}`]: 钟 },
+            读到改: { [m]: 创建手机已读时锚(回复楼, 钟) },
+            ...(接受 ? { 赴约提交: { m, 起楼: 回复楼, 至楼: 回复楼 + 2 } satisfies 手机赴约提交 } : {}),
+          },
+          邀约仍有效,
+        );
+      let 已提交 = await 写回复(
+        建回复消息(回 || (应 ? '好呀,等我几分钟,我出来找你。' : '今天不太方便呢…改天好不好?')),
+        应,
+      );
+      if (!已提交) {
+        // 仅接受分支可能因单例 CAS 冲突失败；时间线失效则直接丢弃，仍有效时改落拒绝，
+        // 保证任何存档中都不会出现“她说好”但 `_赴约` 属于另一人的结果。
+        if (!应 || !邀约仍有效()) return;
+        实际应 = false;
+        已提交 = await 写回复(建回复消息('刚刚临时有点事，今天恐怕出不去了…改天好吗？'), false);
+        if (!已提交) return;
+      }
+      if (!邀约仍有效()) return;
+      排队刷新微信进展摘要(m);
+      // 长期记忆直写(措辞固定,不带聊天原文;无数据库时静默返回 false 不影响流程)
+      await 同步社交轨迹(
+        {
+          类型: '邀约',
+          人物: 配.妻名,
+          事件: '微信约她出来见面',
+          结果: 实际应 ? '她答应出来见面了' : '她婉拒了,没出来',
+          楼层: 楼,
+          事件键: `RQP-约-${m}-${楼}`,
+        },
+        邀约仍有效,
+      );
+      if (!邀约仍有效()) return;
+      渲染();
+      刷新红点(); // 顺带发"手机状态"事件,游戏界面借它即时刷新赴约位置(约出来不产楼)
+    });
   } catch (e) {
     console.error('[人妻公寓·手机] 约出来失败:', e);
   } finally {
-    正在输入 = null;
+    结束会话输入(输入租约);
     渲染();
   }
 }
@@ -3058,8 +4058,9 @@ async function 约出来(m: 门牌): Promise<void> {
 async function 姐妹群一拍(data: SchemaType, 库: 微信库, 楼: number, 起因?: string): Promise<boolean> {
   const 成员 = 姐妹群成员(data);
   if (成员.length < 2) return false;
+  const 时 = 取绝对时段(data);
   const 近况 = 库.消息
-    .filter(m => m.会话 === '姐妹群')
+    .filter(m => m.会话 === '姐妹群' && m.类 !== '撤回')
     .slice(-12)
     .map(m => (m.发 === '我' ? `${玩家名()}:${m.文}` : m.文))
     .join('\n');
@@ -3078,8 +4079,8 @@ async function 姐妹群一拍(data: SchemaType, 库: 微信库, 楼: number, �
   );
   const 妻名集 = new Set(成员.map(m => 户静态表[m].妻名));
   let 有 = false;
-  for (const 合法消息 of await 微信群文本(原, 妻名集, 30, 4, '姐妹茶话会群聊')) {
-    库.消息.push({ 楼, 会话: '姐妹群', 发: '对方', 文: 合法消息 });
+  for (const 合法消息 of await 微信群文本(原, 妻名集, 30, 4, '姐妹茶话会群聊', '姐妹')) {
+    库.消息.push({ 楼, 时, 会话: '姐妹群', 发: '对方', 文: 合法消息 });
     有 = true;
   }
   return 有;
@@ -3093,6 +4094,7 @@ async function 楼务群一拍(data: SchemaType, 库: 微信库, 楼: number, �
     return Boolean(data.户[m]) && (!配.隐身 || data.系统._母亲入列);
   });
   if (!成员.length) return false;
+  const 时 = 取绝对时段(data);
   const 名单 = 成员.map(m => `${户静态表[m].妻名}(${m}室住户)`).join('、');
   const 近况 = 库.消息
     .filter(m => m.会话 === '群' && m.类 !== '撤回')
@@ -3102,22 +4104,75 @@ async function 楼务群一拍(data: SchemaType, 库: 微信库, 楼: number, �
   const 原 = await 小生成(
     '你为都市公寓游戏生成一小段和睦、真实的楼务微信群回复。只允许当前已入住的住户妻子发言；她们把管理员当物业联系人。' +
       '回复应针对管理员刚发的通知，可以是确认收到、补充实际情况、提出一个简短问题或报告同类楼务问题。' +
-      '只谈公共可见的物业与邻里事项，严禁暧昧、隐私、婚姻秘密、游戏机制，也严禁虚构名单外住户。' +
+      '只谈公共可见的物业与邻里事项，严禁引用或猜测私人微信、私下场景、暧昧、亲密行为、婚姻秘密、游戏机制，也严禁虚构名单外住户。' +
       '输出1~3行，每行严格为“发言人:内容”，每条不超过35个汉字，不要旁白、引号或解释；发言人只能从给定名单选择。',
     `当前可发言住户:${名单}\n管理员:${玩家名()}\n最近楼务群记录:\n${近况 || '暂无'}\n刚刚:${起因}\n请让最相关的一至三人自然接话。`,
   );
   const 合法名 = new Set(成员.map(m => 户静态表[m].妻名));
   let 有 = false;
-  for (const 合法消息 of await 微信群文本(原, 合法名, 35, 3, '公寓楼务群回复')) {
-    库.消息.push({ 楼, 会话: '群', 发: '对方', 文: 合法消息 });
+  for (const 合法消息 of await 微信群文本(原, 合法名, 35, 3, '公寓楼务群回复', '楼务')) {
+    库.消息.push({ 楼, 时, 会话: '群', 发: '对方', 文: 合法消息 });
     有 = true;
   }
   return 有;
 }
 
+interface 手机发送租约 {
+  聊天ID: string;
+  时间线租约: 手机时间线租约;
+  数据: SchemaType;
+  楼: number;
+  绝对时段: number;
+  会场摘要租约: 会场私聊摘要租约 | null;
+}
+
+function 手机发送租约仍有效(租约: 手机发送租约): boolean {
+  const 当前ID = 当前聊天ID();
+  return (
+    当前ID === 租约.聊天ID && 手机时间线租约仍有效(租约.时间线租约, 当前ID, SillyTavern.chat ?? [], 当前手机绝对时段())
+  );
+}
+
+/** 玩家手动群消息的 AI 接话：复用发送入口冻结的租约，任何 await 后都不得重新捕获当前聊天。 */
+async function 手动群接话(会话: '群' | '姐妹群', 起因: string, 发送租约: 手机发送租约): Promise<boolean> {
+  if (!手机发送租约仍有效(发送租约)) return false;
+  const rawStat = 读最近有效stat();
+  if (!rawStat) return false;
+  if (!手机发送租约仍有效(发送租约)) return false;
+  const data = Schema.parse(rawStat) as SchemaType;
+  const 楼 = 末楼();
+  const 钟 = 发送租约.绝对时段;
+  let 已报告失效 = false;
+  const 时间线仍有效 = (): boolean => {
+    const 有效 = 手机发送租约仍有效(发送租约);
+    if (!有效 && !已报告失效) {
+      已报告失效 = true;
+      console.info('[人妻公寓·手机] 群聊接话期间时间线已变更，已丢弃迟到回复。');
+    }
+    return 有效;
+  };
+
+  const 库 = 读库();
+  const 原消息数 = 库.消息.length;
+  const 已生成 = 会话 === '群' ? await 楼务群一拍(data, 库, 楼, 起因) : await 姐妹群一拍(data, 库, 楼, 起因);
+  if (!已生成 || !时间线仍有效()) return false;
+
+  return 写库增量(
+    {
+      新圈: [],
+      新消息: 库.消息.slice(原消息数),
+      节拍改: {},
+      读到改: { [会话]: 创建手机已读时锚(楼, 钟) },
+    },
+    // 最后一道校验在 updateVariablesWith 回调内，失效时连已读水位也不写。
+    时间线仍有效,
+  );
+}
+
 // ── 单聊/群聊发送(玩家侧;她的回复走独立API,不占楼) ──
 
 async function 发消息(会话: string, 文: string): Promise<void> {
+  const 发送聊天ID = 当前聊天ID();
   const 发送前数据 = 当前手机数据();
   const 冻结原因 = 获取会议会话禁用原因(发送前数据, 会话);
   if (冻结原因) {
@@ -3125,110 +4180,157 @@ async function 发消息(会话: string, 文: string): Promise<void> {
     渲染();
     return;
   }
-  if (正在输入 === 会话) {
+  if (!发送聊天ID || !发送前数据) {
+    eventEmit('人妻公寓:提示', '变量还没就绪，请稍等两秒再发送。');
+    return;
+  }
+  const 发送楼 = 末楼();
+  const 发送绝对时段 = 取绝对时段(发送前数据);
+  const 时间线租约 = 创建手机时间线租约(发送聊天ID, 发送楼, SillyTavern.chat ?? [], 发送绝对时段);
+  if (!时间线租约) {
+    eventEmit('人妻公寓:提示', '当前聊天时间线还没就绪，请稍后重试。');
+    return;
+  }
+  const 发送租约: 手机发送租约 = {
+    聊天ID: 发送聊天ID,
+    时间线租约,
+    数据: 发送前数据,
+    楼: 发送楼,
+    绝对时段: 发送绝对时段,
+    会场摘要租约: 创建会场私聊摘要租约(发送前数据, 发送聊天ID),
+  };
+  if (会话正在输入(会话, 发送聊天ID, 时间线租约.世代)) {
     eventEmit('人妻公寓:提示', '对方正在输入，请等这一条回复完成。');
     return;
   }
+  // 在第一条异步持久写之前占住会话。会议正文硬门因此覆盖“玩家消息已发出、妻回复尚未落库”
+  // 的整个窗口；不同会话各自计数，任何一个完成都只能释放自己的租约。
+  const 输入租约 = 开始会话输入(会话, 发送聊天ID, 时间线租约.世代);
+  try {
+    渲染();
+    await 执行发消息(会话, 文, 发送租约);
+  } catch (e) {
+    console.error('[人妻公寓·手机] 消息发送失败:', e);
+  } finally {
+    结束会话输入(输入租约);
+    渲染();
+  }
+}
+
+async function 执行发消息(会话: string, 文: string, 发送租约: 手机发送租约): Promise<void> {
+  const 发送前数据 = 发送租约.数据;
   const 是会场参与妻 =
-    Boolean(发送前数据) &&
-    获取静音会议手机状态(发送前数据).场景中 &&
-    获取静音会议手机状态(发送前数据).参与妻.includes(会话 as 门牌);
-  const 楼 = 末楼();
-  const 库 = 读库();
-  库.消息.push({ 楼, 会话, 发: '我', 文 });
-  await 写库(库);
+    获取静音会议手机状态(发送前数据).场景中 && 获取静音会议手机状态(发送前数据).参与妻.includes(会话 as 门牌);
+  const 楼 = 发送租约.楼;
+  if (!手机发送租约仍有效(发送租约)) return;
+  const 玩家消息 = 带当前手机分支锚({
+    楼,
+    时: 发送租约.绝对时段,
+    会话,
+    发: '我' as const,
+    文,
+    标识: 新玩家微信消息标识(会话, 楼),
+  });
+  if (!(await 写库增量({ 新圈: [], 新消息: [玩家消息], 节拍改: {} }, () => 手机发送租约仍有效(发送租约)))) return;
+  if (!手机发送租约仍有效(发送租约)) return;
   // 玩家原句只写微信库；MVU 只得到固定枚举“收到消息”，供下一正文保留低信息余波。
-  if (是会场参与妻) await 写会场私聊摘要(会话 as 门牌);
+  if (是会场参与妻) {
+    await 写会场私聊摘要(会话 as 门牌, undefined, 发送租约.会场摘要租约);
+    if (!手机发送租约仍有效(发送租约)) return;
+  }
   渲染();
   if (会话 === '群') {
-    正在输入 = 会话;
-    渲染();
     try {
-      const rawStat = 读最近有效stat();
-      if (rawStat) {
-        const data = Schema.parse(rawStat) as SchemaType;
-        const 库2 = 读库();
-        if (await 楼务群一拍(data, 库2, 末楼(), `${玩家名()}发布通知：“${文}”`)) {
-          库2.读到['群'] = 末楼();
-          await 写库(库2);
-        }
-      }
+      await 手动群接话('群', `${玩家名()}发布通知：“${文}”`, 发送租约);
+      if (!手机发送租约仍有效(发送租约)) return;
     } catch (e) {
       console.error('[人妻公寓·手机] 楼务群接话失败:', e);
-    } finally {
-      正在输入 = null;
-      渲染();
     }
     return;
   }
   if (会话 === '姐妹群') {
     // 玩家插话=太太们接话一轮(带群记忆)
-    正在输入 = 会话;
-    渲染();
     try {
-      const rawStat = 读最近有效stat();
-      if (rawStat) {
-        const data = Schema.parse(rawStat) as SchemaType;
-        const 库2 = 读库();
-        if (await 姐妹群一拍(data, 库2, 末楼(), `${玩家名()}在群里说:"${文}"`)) {
-          库2.读到['姐妹群'] = 末楼();
-          await 写库(库2);
-        }
-      }
+      await 手动群接话('姐妹群', `${玩家名()}在群里说:"${文}"`, 发送租约);
+      if (!手机发送租约仍有效(发送租约)) return;
     } catch (e) {
       console.error('[人妻公寓·手机] 姐妹群接话失败:', e);
-    } finally {
-      正在输入 = null;
-      渲染();
     }
     return;
   }
-  正在输入 = 会话;
-  渲染();
   try {
+    if (!手机发送租约仍有效(发送租约)) return;
     const rawStat = 读最近有效stat();
     if (!rawStat) return;
+    if (!手机发送租约仍有效(发送租约)) return;
     const data = Schema.parse(rawStat) as SchemaType;
-    const 节点 = data.户[会话 as 门牌];
-    const 配 = 户静态表[会话 as 门牌];
+    const 门牌号 = 会话 as 门牌;
+    const 节点 = data.户[门牌号];
+    const 配 = 户静态表[门牌号];
     if (!节点 || !配) return;
+    const 回复聊天ID = 发送租约.聊天ID;
+    const 回复钟 = 发送租约.绝对时段;
+    const 库 = 读库();
+    const 有效楼务任务id = 有效楼务任务id集合(data);
     const 近况 = 库.消息
-      .filter(m => m.会话 === 会话 && m.类 !== '撤回')
+      .filter(m => m.会话 === 会话 && m.类 !== '撤回' && 楼务微信消息仍有效(m, 有效楼务任务id))
       .slice(-12)
       .map(m => `${m.发 === '我' ? 玩家名() : 配.妻名}:${m.文}`)
       .join('\n');
     const 会议状态 = 获取静音会议手机状态(data);
-    const 会场私聊 = 会议状态.场景中 && 会议状态.参与妻.includes(会话 as 门牌);
+    const 会场私聊 = 会议状态.场景中 && 会议状态.参与妻.includes(门牌号);
     const 会议记忆 = 会场私聊 ? 取静音会议正文记忆(data) : null;
     const 会后阶段 =
-      会场私聊 &&
-      (data.系统._特殊场景.当前拍 >= 13 ||
-        ['会后', '自由', '收尾'].includes(data.系统._特殊场景.阶段));
+      会场私聊 && (data.系统._特殊场景.当前拍 >= 13 || ['会后', '自由', '收尾'].includes(data.系统._特殊场景.阶段));
     const 会后仍在场 = 会后阶段 && data.系统._特殊场景.会后妻.includes(会话);
     const 会场位置纪律 = !会后阶段
       ? '她仍在管理员室的正式会议桌旁，丈夫们也在场。'
       : 会后仍在场
         ? '正式会议已经散会，丈夫们已经离开；她是被玩家留下、仍在管理员室的妻子之一。'
         : '正式会议已经散会，她已经随丈夫离开管理员室；散会后管理员室内发生的私密内容不属于她亲眼所见或已知事实。';
+    const 回复冷落档 = 计算妻冷落消息档(data, 门牌号);
+    const 回复冷落指纹 = 冷落语义指纹(data, 门牌号);
+    if (!回复冷落指纹) return;
+    // 特殊场景只改变她所处的位置与可知事实，不能让秘密手机私聊绕过冷落/安抚语义。
+    const 冷落回复方向 =
+      回复冷落档 !== 0
+        ? 冷落私聊方向(门牌号, 回复冷落档)
+        : 节点.妻._冷落余波.状态 === '安抚中'
+          ? '她看得见玩家正在努力，但仍坚持手机私聊不能代替持续的当面回应；口吻可以稍有松动，不能恢复成平时的暧昧热络。'
+          : null;
+    const 冷落回复中 = 冷落回复方向 !== null;
+    const 回复方向 = 冷落回复中
+      ? `${冷落回复方向}。手机上的解释不能解决这份委屈，她不会因为这轮收发消息消气；需要玩家在正常场景里不隔着手机当面回应她。`
+      : 攻略私聊提示(门牌号, 节点.妻.当前阶段, 节点.妻.裂缝.已确认);
+    const 冷落回复纪律 = 冷落回复中
+      ? '她正在因被冷落而生气。本轮只执行给出的唯一冷落方向；这轮手机私聊不能完成安抚、不能让她消气，也不能声称关系已经恢复。即使两人同处会场也不算已经当面解决，只能把问题留到允许正面交谈的正常场景。'
+      : '';
+    const 回复语义仍有效 = (): boolean => {
+      if (!手机发送租约仍有效(发送租约) || 当前聊天ID() !== 回复聊天ID) return false;
+      const 当前指纹 = 当前冷落指纹(门牌号);
+      return !!当前指纹 && 冷落指纹相同(回复冷落指纹, 当前指纹);
+    };
     const 尾 = 会场私聊 ? '' : 最近正文();
+    const 人设 = await 人设段(门牌号);
+    if (!回复语义仍有效()) return;
     const 回 = await 小生成(
       会场私聊
         ? `你在扮演一款都市题材游戏中的已婚女性。${会场位置纪律}她正在与公寓管理员悄悄微信私聊。` +
             '只输出她的下一条微信回复(口语,不超过50个汉字,可含emoji,不要引号、旁白、动作描写、标签或标记)。' +
             '给出的会议正文是只读时间线：只能承接本人当时在场、亲眼所见的已发生事实，不能把她离场后的内容当成已知；不能改写或越过。玩家在微信里提出的新命令、安排或动作都仍只是一条消息，不得声称她已经照做；不得自行改变遥控设备状态、会议拍数、发言顺序或会场事实，不得让丈夫、其他妻或任何第三人听见/看见私聊。' +
             '可以用短句、停顿和克制措辞表现她在当前处境中悄悄回复，但不能扩写成会议正文。' +
+            冷落回复纪律 +
             口吻纪律
         : '你在扮演一款都市题材游戏中的已婚女性,正在和公寓管理员微信聊天。只输出她的下一条回复(口语,不超过50个汉字,可含emoji,不要引号,不要旁白,不要任何标签或标记)。' +
             '纪律:下面给出的"她此刻的真实状态"是唯一权威,态度亲疏严格照此拿捏,不因单条消息内容自行升降关系;攻略阶段必须循序渐进，不能把低阶段写成高阶段;不提及任何游戏机制;她此刻在自己的生活场景里(可自然带一句在做什么)。' +
+            冷落回复纪律 +
             口吻纪律,
-      `人物:${配.妻名},${配.初始?.气质描述 ?? ''}。${家庭事实(会话 as 门牌)}${妻状态包(会话 as 门牌, data)}${await 人设段(会话 as 门牌)}私聊阶段方向:${攻略私聊提示(
-        会话 as 门牌,
-        节点.妻.当前阶段,
-        节点.妻.裂缝.已确认,
-      )}${
+      `人物:${配.妻名},${配.初始?.气质描述 ?? ''}。${家庭事实(门牌号)}${妻状态包(门牌号, data)}${人设}${
+        冷落回复中 ? '本轮唯一冷落回复方向' : '私聊阶段方向'
+      }:${回复方向}${
         会场私聊
           ? `${会场位置纪律}她是本场冻结参与者之一。会议真实议题:${data.系统._特殊场景.议题 || '楼务会议'}。`
-          : `她此刻大致在:${妻位置推算(会话 as 门牌, 楼 + data.系统._时段偏移楼)}。`
+          : `她此刻大致在:${妻位置推算(门牌号, 回复钟)}。`
       }${称呼纪律()}${
         会场私聊
           ? `\n从本场启动到最新成功AI楼的只读正文记忆(完整承接这些已发生内容，不得把微信新消息反写成正文事实):\n${
@@ -3239,34 +4341,71 @@ async function 发消息(会话: string, 文: string): Promise<void> {
             : ''
       }\n最近聊天:\n${近况}\n生成她的回复。`,
     );
+    if (!回复语义仍有效()) return;
     const 合法回复 = await 微信短文本(回, 50, `${配.妻名}回复管理员的微信私聊`);
-    if (合法回复) {
-      const 库2 = 读库();
-      库2.消息.push({ 楼: 末楼(), 会话, 发: '对方', 文: 合法回复 });
-      库2.读到[会话] = 末楼();
-      await 写库(库2);
-      if (会场私聊) await 写会场私聊摘要(会话 as 门牌, 合法回复);
-      排队刷新微信进展摘要(会话 as 门牌);
+    if (!回复语义仍有效()) return;
+    // AI 返回与最终变量提交各验一次时间线 + 冷落语义，迟到的旧口吻不得落库。
+    if (合法回复 && 回复语义仍有效()) {
+      const 回复楼 = 末楼();
+      const 回复消息 = 带当前手机分支锚({ 楼: 回复楼, 时: 回复钟, 会话, 发: '对方' as const, 文: 合法回复 });
+      const 已写 = await 写库增量(
+        {
+          新圈: [],
+          新消息: [回复消息],
+          节拍改: {},
+          读到改: { [会话]: 创建手机已读时锚(回复楼, 回复钟) },
+        },
+        回复语义仍有效,
+      );
+      if (!已写) return;
+      if (会场私聊) {
+        await 写会场私聊摘要(门牌号, 合法回复, 发送租约.会场摘要租约);
+        if (!回复语义仍有效()) return;
+      }
+      排队刷新微信进展摘要(门牌号);
       渲染();
     }
   } catch (e) {
     console.error('[人妻公寓·手机] 回复生成失败:', e);
-  } finally {
-    正在输入 = null;
-    渲染();
   }
 }
 
-// ── 父亲来电(三段式第三段:接听→通话→挂断回流) ──
+// ── 父亲来电(接听→持久通话→幂等挂断回流) ──
 
-export function 来电已接(载荷: { 分数段: string; 报表: string; 通牒: boolean }): void {
-  const 会议手机 = 获取静音会议手机状态();
-  if (会议手机.场景中) {
-    eventEmit('人妻公寓:提示', 会议手机.可打开 ? '会议期间父亲来电暂时冻结。' : 会议手机.禁用原因);
-    return;
+interface 父亲通话写结果 {
+  状态: 父亲通话状态 | null;
+  已写: boolean;
+}
+
+let 父亲收尾提交键 = '';
+
+function 父亲请求仍在原时间线(预期聊天ID: string, 预期时间线世代: number): boolean {
+  return 仍是预期聊天(预期聊天ID) && 预期时间线世代 === 当前时间线切换世代();
+}
+
+type 母亲圆场快照 = SchemaType['系统']['_父亲通话']['母亲圆场'];
+
+/** 只展示冻结在本通来电里的事实；母亲不是通话参与者，不创建第三种消息气泡。 */
+function 母亲圆场手机提示(圆场: 母亲圆场快照): string {
+  if (!圆场.触发) return '';
+  if (圆场.仅剧情) return '你妈已经先替你缓了几句，爸仍要亲自问账';
+  return `你妈已经替你解释“${圆场.摘要 || '楼里的事'}”，爸仍要亲自问账`;
+}
+
+/** 父亲只能以自己的口吻承认圆场；不得让模型生成母亲台词、旁白或第三说话人。 */
+function 母亲圆场父亲事实(通话: 父亲通话状态): string {
+  const 圆场 = 通话.母亲圆场;
+  if (!圆场.触发) return '本通没有母亲圆场记录。';
+  if (圆场.仅剧情) {
+    return '冻结事实:母亲此前只替儿子缓和过语气，没有免除具体责任。父亲可以说“你妈替你说了几句”，随后仍按报表问账。';
   }
-  通话上下文 = 载荷;
-  通话记录 = [];
+  return `冻结事实:母亲此前已经替儿子解释“${圆场.摘要 || '楼里的事'}”，对应风闻责任本次已免除。父亲可以承认她替儿子说过话，但不得把该事项再次说成已计责；其余报表仍可追问。`;
+}
+
+function 父亲通话主题(通话: 父亲通话状态): string {
+  if (通话.紧急 && /风闻|严重投诉|危机/.test(通话.报表)) {
+    return '楼内风闻危机、严重投诉以及必须立刻完成的补救';
+  }
   const 已有通话数 = 读库().消息.filter(x => x.会话 === '父亲' && x.类 === '通话').length;
   const 轮换主题 = [
     '这期账本是否逐笔对得上',
@@ -3276,106 +4415,350 @@ export function 来电已接(载荷: { 分数段: string; 报表: string; 通牒
     '儿子能不能独立把这栋楼管住，别只报喜不报忧',
     '家里近况；可以顺带问一次母亲，但不能把每通电话都变成询问母亲',
   ];
-  const 报表重点 = /上交缺口/.test(载荷.报表)
-    ? '本期上交为什么出现缺口，以及准备怎么补齐'
-    : /旧欠租/.test(载荷.报表)
-      ? '旧欠租为什么还没处理，以及催收进展'
-      : /风声/.test(载荷.报表)
-        ? '楼里的投诉和闲话从哪里来，管理上出了什么问题'
-        : /一直没接/.test(载荷.报表)
-          ? '上次为什么一直不接电话，以及是否还在认真管楼'
-          : '';
-  本通父亲主题 = 载荷.通牒
+  const 报表重点 = /已逾期/.test(通话.报表)
+    ? '先逐件追问报表里已经逾期的楼务，要求说明为何没处理以及准备何时补办'
+    : /尚余\d+时段/.test(通话.报表)
+      ? '追问报表里仍未完成的重要楼务进度，但未到期的事项不得说成已经失职'
+      : /本期应交.+实交/.test(通话.报表)
+        ? '本期上交为什么出现缺口，以及准备怎么补齐'
+        : /旧欠租/.test(通话.报表)
+          ? '旧欠租为什么还没处理，以及催收进展'
+          : /一直没接/.test(通话.报表)
+            ? '上次为什么一直不接电话，以及是否还在认真管楼'
+            : '';
+  return 通话.通牒
     ? '最后通牒与下一期必须补救的事项'
     : [报表重点, 轮换主题[已有通话数 % 轮换主题.length]].filter(Boolean).join('；顺带问');
+}
+
+/**
+ * 所有活动通话修改都在写入前重读最新 MVU，并在本 iframe 内串行。
+ * 修改器返回 false 表示令牌/状态已变化，本次不覆盖新状态。
+ */
+async function 持久修改父亲通话(
+  通话标识: string,
+  修改: (通话: 父亲通话状态) => boolean,
+  预期聊天ID = 当前聊天ID(),
+  预期时间线世代 = 当前时间线切换世代(),
+): Promise<父亲通话写结果> {
+  const 请求仍在原时间线 = () => 父亲请求仍在原时间线(预期聊天ID, 预期时间线世代);
+  if (!请求仍在原时间线()) return { 状态: null, 已写: false };
+  return 排队MVU操作(async () => {
+    const 取消提交校验 = 登记MVU提交校验(请求仍在原时间线);
+    try {
+      return await 排队父亲通话整表写(async () => {
+        // 全项目双锁顺序固定为“全局 MVU → 父亲通话”，拿到内锁后再读最新整表。
+        if (!请求仍在原时间线()) return { 状态: null, 已写: false };
+        const 有效 = 读取最近有效();
+        if (!有效) return { 状态: null, 已写: false };
+        const { raw, data } = 有效;
+        const 通话 = 活动父亲通话(data);
+        if (!通话 || 通话.标识 !== 通话标识) return { 状态: 通话 ? _.cloneDeep(通话) : null, 已写: false };
+        if (!修改(通话)) return { 状态: _.cloneDeep(通话), 已写: false };
+        if (!请求仍在原时间线()) return { 状态: null, 已写: false };
+        await 脚本写入(raw, data);
+        捕获保护快照(data);
+        return { 状态: _.cloneDeep(data.系统._父亲通话), 已写: true };
+      });
+    } finally {
+      取消提交校验();
+    }
+  });
+}
+
+export function 来电已接(通话标识: string, 预期聊天ID = 当前聊天ID()): void {
+  const 预期时间线世代 = 当前时间线切换世代();
+  if (!仍是预期聊天(预期聊天ID)) return;
+  const 通话 = 活动父亲通话();
+  if (!通话 || !通话标识 || 通话.标识 !== 通话标识) return;
+  const 会议手机 = 获取静音会议手机状态();
+  if (会议手机.场景中) {
+    eventEmit('人妻公寓:提示', 会议手机.可打开 ? '会议期间父亲通话暂时冻结。' : 会议手机.禁用原因);
+    return;
+  }
   当前页 = { 名: 'talk' };
   刷新红点();
   渲染();
-  void (async () => {
-    const 开场 = await 父亲台词('(通话接通,父亲先开口)');
-    if (开场) {
-      通话记录.push({ 谁: '父', 文: 开场 });
-      渲染();
-    }
-  })();
+  void 恢复父亲通话(预期聊天ID, 预期时间线世代);
 }
 
-async function 父亲台词(玩家说: string): Promise<string> {
-  const 上 = 通话上下文;
-  const 段 = 上?.通牒
+async function 恢复父亲通话(预期聊天ID = 当前聊天ID(), 预期时间线世代 = 当前时间线切换世代()): Promise<void> {
+  try {
+    if (!父亲请求仍在原时间线(预期聊天ID, 预期时间线世代)) return;
+    let 通话 = 活动父亲通话();
+    if (!通话) return;
+    if (通话.状态 === '收尾中') {
+      if (通话.挂断楼层 < 0) {
+        const 结果 = await 持久修改父亲通话(
+          通话.标识,
+          最新 => {
+            if (最新.状态 !== '收尾中' || 最新.挂断楼层 >= 0) return false;
+            最新.挂断楼层 = 末楼();
+            return true;
+          },
+          预期聊天ID,
+          预期时间线世代,
+        );
+        通话 = 结果.状态;
+      }
+      if (!父亲请求仍在原时间线(预期聊天ID, 预期时间线世代)) return;
+      if (通话?.状态 === '收尾中') await 完成父亲通话(通话, 预期聊天ID, 预期时间线世代);
+      return;
+    }
+    if (获取静音会议手机状态().场景中) return;
+    if (!通话.主题) {
+      const 主题 = 父亲通话主题(通话);
+      const 结果 = await 持久修改父亲通话(
+        通话.标识,
+        最新 => {
+          if (最新.状态 !== '通话中' || 最新.主题) return false;
+          最新.主题 = 主题;
+          return true;
+        },
+        预期聊天ID,
+        预期时间线世代,
+      );
+      if (!结果.状态) return;
+      通话 = 结果.状态;
+    }
+    if (!父亲请求仍在原时间线(预期聊天ID, 预期时间线世代)) return;
+    if (当前页.名 === 'talk') 渲染();
+    await 推进父亲回复(预期聊天ID, 预期时间线世代);
+  } catch (e) {
+    console.error('[人妻公寓·手机] 恢复父亲通话失败:', e);
+  }
+}
+
+async function 父亲台词(通话: 父亲通话状态, 玩家说: string): Promise<string> {
+  const 段 = 通话.通牒
     ? '最后通牒:他动了真火,把话挑明——"下个收租季还这样,你就收拾东西滚去打工,楼我另请人管"'
-    : 上?.分数段 === '满意'
+    : 通话.分数段 === '满意'
       ? '满意:话不多,嗯两声,问候你妈,末了提一句"账目清楚就好"'
-      : 上?.分数段 === '平淡'
+      : 通话.分数段 === '平淡'
         ? '平淡:例行公事地过一遍账,敲打一两句,让你多上心'
-        : '不满:语气沉,逐条问账,话里带刺("这楼交给你是让你练手,不是让你练胆")';
-  const 记录 = 通话记录.map(t => `${t.谁 === '我' ? '儿子' : '父亲'}:${t.文}`).join('\n');
-  return (
+        : 通话.分数段 === '危险'
+          ? '危险:已经接近红线。他压着火逐项追问具体补救期限，明确警告再拖就会发最后通牒，但本通还不是最终通牒'
+          : '不满:语气沉,逐条问账,话里带刺("这楼交给你是让你练手,不是让你练胆")';
+  const 记录 = 通话.记录.map(t => `${t.谁 === '我' ? '儿子' : '父亲'}:${t.文}`).join('\n');
+  const 圆场事实 = 母亲圆场父亲事实(通话);
+  const 是父亲首句 = !通话.记录.some(t => t.谁 === '父');
+  const 圆场首句要求 =
+    是父亲首句 && 通话.母亲圆场.触发
+      ? '首句要求：本句必须由父亲转述“你妈已经替你说过话”，再接本通主题；不得生成母亲原话。'
+      : '';
+  const 候选 =
     (await 微信短文本(
       await 小生成(
-        '你在扮演一位常年在海外做生意的中国父亲,正和管理公寓的儿子微信语音通话。只输出父亲的下一句话(口语,不超过60个汉字,不要引号,不要旁白)。他务实、寡言、看重账目,爱藏在训话里。每通电话应有不同的具体事务，严禁机械地总问“你妈怎么样”。只有本通主题涉及家里或儿子主动提到母亲时，才自然谈母亲。',
-        `儿子名叫"${玩家名()}"(直呼其名或"你",不要用别的称呼)。本期情况:${上?.报表 || '账目平平'}。谈话基调=${段}。本通主题=${本通父亲主题 || '楼务近况'}。第一次开口先谈本通主题；之后紧接儿子的回答，不要突然换题。\n通话记录:\n${记录 || '(刚接通)'}\n儿子刚说:${玩家说}\n父亲接话。`,
+        '你在扮演一位常年在海外做生意的中国父亲,正和管理公寓的儿子微信语音通话。只输出父亲的下一句话(口语,不超过60个汉字,不要引号,不要旁白)。' +
+          '唯一允许输出的说话者是父亲。提到母亲时也只能由父亲转述，严禁输出母亲台词、母亲消息、母亲旁白或任何第三说话人。' +
+          '他务实、寡言、看重账目,爱藏在训话里。每通电话应有不同的具体事务，严禁机械地总问“你妈怎么样”。只有本通主题涉及家里、冻结的圆场事实或儿子主动提到母亲时，才自然谈母亲。',
+        `儿子名叫"${玩家名()}"(直呼其名或"你",不要用别的称呼)。本期情况:${通话.报表 || '账目平平'}。${圆场事实}${圆场首句要求}谈话基调=${段}。本通主题=${通话.主题 || '楼务近况'}。首次开口服从圆场首句要求，否则先谈本通主题；之后紧接儿子的回答，不要突然换题。\n通话记录:\n${记录 || '(刚接通)'}\n儿子刚说:${玩家说}\n父亲接话。`,
       ),
       60,
       '父亲在微信语音通话中的一句话',
-    )) ?? ''
-  );
+    )) ?? '';
+  return 安全父亲台词(候选, 是父亲首句 && 通话.母亲圆场.触发);
+}
+
+/**
+ * `待回复.序号` 是持久幂等令牌：生成可在刷新后重试，但提交前必须再次核对同一令牌。
+ * 即便两个旧/新 iframe 都收到结果，也只会留下该序号的一条父亲回复。
+ */
+async function 推进父亲回复(预期聊天ID = 当前聊天ID(), 回复请求时间线世代 = 当前时间线切换世代()): Promise<void> {
+  if (!父亲请求仍在原时间线(预期聊天ID, 回复请求时间线世代)) return;
+  const 通话 = 活动父亲通话();
+  if (!通话 || 通话.状态 !== '通话中' || 通话.待回复.序号 <= 0 || 获取静音会议手机状态().场景中) return;
+  const 序号 = 通话.待回复.序号;
+  const 玩家说 = 通话.待回复.玩家说;
+  const 生成键 = `${预期聊天ID}|${回复请求时间线世代}|${通话.标识}:${序号}`;
+  if (父亲回复生成键 === 生成键) return;
+  父亲回复生成键 = 生成键;
+  if (当前页.名 === 'talk') 渲染();
+  try {
+    const 回 = await 父亲台词(_.cloneDeep(通话), 玩家说);
+    if (!父亲请求仍在原时间线(预期聊天ID, 回复请求时间线世代)) return;
+    if (!回) {
+      eventEmit('人妻公寓:提示', '父亲那边信号断了一下；重新打开手机会继续这句。');
+      return;
+    }
+    await 持久修改父亲通话(
+      通话.标识,
+      最新 => {
+        if (最新.状态 !== '通话中' || 最新.待回复.序号 !== 序号 || 最新.待回复.玩家说 !== 玩家说) return false;
+        最新.记录.push({ 谁: '父', 文: 回 });
+        最新.待回复 = { 序号: 0, 玩家说: '' };
+        return true;
+      },
+      预期聊天ID,
+      回复请求时间线世代,
+    );
+  } catch (e) {
+    console.error('[人妻公寓·手机] 父亲回复生成失败:', e);
+    eventEmit('人妻公寓:提示', '父亲那边信号断了一下；重新打开手机会继续这句。');
+  } finally {
+    if (父亲回复生成键 === 生成键) 父亲回复生成键 = '';
+    if (当前页.名 === 'talk') 渲染();
+  }
 }
 
 async function 通话应答(文: string): Promise<void> {
-  通话记录.push({ 谁: '我', 文 });
-  渲染();
-  const 回 = await 父亲台词(文);
-  if (回) {
-    通话记录.push({ 谁: '父', 文: 回 });
+  const 预期聊天ID = 当前聊天ID();
+  const 预期时间线世代 = 当前时间线切换世代();
+  if (!父亲请求仍在原时间线(预期聊天ID, 预期时间线世代)) return;
+  const 通话 = 活动父亲通话();
+  if (!通话 || 通话.状态 !== '通话中') return;
+  try {
+    const 结果 = await 持久修改父亲通话(
+      通话.标识,
+      最新 => {
+        if (最新.状态 !== '通话中' || 最新.待回复.序号 > 0) return false;
+        最新.记录.push({ 谁: '我', 文 });
+        最新.待回复 = { 序号: 最新.下次回复序号, 玩家说: 文 };
+        最新.下次回复序号 += 1;
+        return true;
+      },
+      预期聊天ID,
+      预期时间线世代,
+    );
+    if (!结果.已写) return;
+    if (!父亲请求仍在原时间线(预期聊天ID, 预期时间线世代)) return;
     渲染();
+    await 推进父亲回复(预期聊天ID, 预期时间线世代);
+  } catch (e) {
+    console.error('[人妻公寓·手机] 通话应答保存失败:', e);
+    eventEmit('人妻公寓:提示', '这句话没能保存，请再说一次。');
+  }
+}
+
+async function 确保父亲通话完成消息(通话: 父亲通话状态, 预期聊天ID: string, 预期时间线世代: number): Promise<boolean> {
+  if (!父亲请求仍在原时间线(预期聊天ID, 预期时间线世代)) return false;
+  const 消息键 = `父亲通话:${通话.标识}`;
+  const 楼 = 通话.挂断楼层 >= 0 ? 通话.挂断楼层 : 末楼();
+  await updateVariablesWith(
+    vars => {
+      if (!父亲请求仍在原时间线(预期聊天ID, 预期时间线世代)) {
+        throw new Error('父亲通话收尾时消息时间线已切换');
+      }
+      const 原 = (_.get(vars, '_微信.消息') ?? []) as 微信消息[];
+      if (!原.some(消息 => 消息.键 === 消息键)) {
+        原.push(
+          带当前手机分支锚({
+            楼,
+            时: Math.max(0, 当前手机绝对时段()),
+            会话: '父亲',
+            发: '系统',
+            文: `通话结束(${通话.记录.length}句)`,
+            类: '通话',
+            键: 消息键,
+          }),
+        );
+      }
+      _.set(vars, '_微信.消息', 原);
+      return vars;
+    },
+    { type: 'chat' },
+  );
+  return 父亲请求仍在原时间线(预期聊天ID, 预期时间线世代);
+}
+
+function 父亲通话结论(通话: 父亲通话状态): string {
+  return 通话.通牒
+    ? '父亲撂下狠话:再管不好这栋楼,就换人来管'
+    : 通话.分数段 === '满意'
+      ? '父亲对近期楼务还算满意'
+      : 通话.分数段 === '平淡'
+        ? '父亲例行过账,敲打了几句'
+        : 通话.分数段 === '危险'
+          ? '父亲认为管理已经接近红线，要求立即补救'
+          : '父亲很不满,逐条问了账';
+}
+
+async function 完成父亲通话(
+  通话: 父亲通话状态,
+  预期聊天ID = 当前聊天ID(),
+  预期时间线世代 = 当前时间线切换世代(),
+): Promise<void> {
+  if (!父亲请求仍在原时间线(预期聊天ID, 预期时间线世代)) return;
+  const 本次收尾提交键 = `${预期聊天ID}|${预期时间线世代}|${通话.标识}`;
+  if (通话.状态 !== '收尾中' || 父亲收尾提交键 === 本次收尾提交键) return;
+  父亲收尾提交键 = 本次收尾提交键;
+  try {
+    let 最新 = 活动父亲通话();
+    if (!最新 || 最新.标识 !== 通话.标识 || 最新.状态 !== '收尾中') return;
+    if (!(await 确保父亲通话完成消息(最新, 预期聊天ID, 预期时间线世代))) return;
+
+    if (!父亲请求仍在原时间线(预期聊天ID, 预期时间线世代)) return;
+    最新 = 活动父亲通话();
+    if (!最新 || 最新.标识 !== 通话.标识 || 最新.状态 !== '收尾中') return;
+    const 已写长期记忆 = await 同步社交轨迹(
+      {
+        类型: '来电',
+        人物: '父亲',
+        事件: '父亲来电问账',
+        结果: 父亲通话结论(最新),
+        楼层: 最新.挂断楼层 >= 0 ? 最新.挂断楼层 : 末楼(),
+        事件键: `RQP-来电-${最新.标识}`,
+      },
+      () => 父亲请求仍在原时间线(预期聊天ID, 预期时间线世代),
+    );
+    if (!父亲请求仍在原时间线(预期聊天ID, 预期时间线世代)) return;
+    if (!已写长期记忆) console.info('[人妻公寓·手机] 父亲来电长期记忆暂不可用，不阻塞通话收尾。');
+
+    if (!父亲请求仍在原时间线(预期聊天ID, 预期时间线世代)) return;
+    最新 = 活动父亲通话();
+    if (!最新 || 最新.标识 !== 通话.标识 || 最新.状态 !== '收尾中') return;
+    eventEmit('人妻公寓:父亲通话结束', 通话.标识, 预期聊天ID);
+  } catch (e) {
+    console.error('[人妻公寓·手机] 父亲通话收尾失败:', e);
+    eventEmit('人妻公寓:提示', '通话结果暂时没保存完整；重新打开手机会自动重试。');
+  } finally {
+    if (父亲收尾提交键 === 本次收尾提交键) 父亲收尾提交键 = '';
   }
 }
 
 async function 结束通话(): Promise<void> {
-  const 摘要 = 通话记录
-    .slice(0, 4)
-    .map(t => t.文)
-    .join(' / ');
-  const 楼 = 末楼();
-  const 库 = 读库();
-  库.消息.push({ 楼, 会话: '父亲', 发: '系统', 文: `通话结束(${通话记录.length}句)`, 类: '通话' });
-  await 写库(库);
-  // 长期记忆直写:只记结论档位的固定措辞,通话原文一个字不进表
-  if (通话上下文) {
-    void 同步社交轨迹({
-      类型: '来电',
-      人物: '父亲',
-      事件: '父亲来电问账',
-      结果: 通话上下文.通牒
-        ? '父亲撂下狠话:再管不好这栋楼,就换人来管'
-        : 通话上下文.分数段 === '满意'
-          ? '父亲对近期楼务还算满意'
-          : 通话上下文.分数段 === '平淡'
-            ? '父亲例行过账,敲打了几句'
-            : '父亲很不满,逐条问了账',
-      楼层: 楼,
-      事件键: `RQP-来电-${楼}`,
-    });
-  }
-  // 回流正文一句(排队事件,下一楼注入;通话内容本体只存在于手机里)
+  const 预期聊天ID = 当前聊天ID();
+  const 预期时间线世代 = 当前时间线切换世代();
+  if (!父亲请求仍在原时间线(预期聊天ID, 预期时间线世代)) return;
+  const 通话 = 活动父亲通话();
+  if (!通话) return;
   try {
-    const 有效 = 读取最近有效();
-    if (有效) {
-      const { raw, data } = 有效;
-      const 事件 = `【来电回流】{{user}}刚跟父亲通了个微信语音(内容大意:${摘要 || '例行问账'})。正文只按"刚挂了爸的电话"的程度带过他此刻的心绪,不要复述通话内容`;
-      data.系统._待发送事件 = data.系统._待发送事件 ? `${data.系统._待发送事件}|${事件}` : 事件;
-      await 脚本写入(raw, data);
-      捕获保护快照(data);
-    }
+    const 结果 = await 持久修改父亲通话(
+      通话.标识,
+      最新 => {
+        if (最新.状态 !== '通话中' && 最新.状态 !== '收尾中') return false;
+        let 有修改 = false;
+        if (最新.状态 !== '收尾中') {
+          最新.状态 = '收尾中';
+          最新.待回复 = { 序号: 0, 玩家说: '' };
+          有修改 = true;
+        }
+        if (最新.挂断楼层 < 0) {
+          最新.挂断楼层 = 末楼();
+          有修改 = true;
+        }
+        return 有修改;
+      },
+      预期聊天ID,
+      预期时间线世代,
+    );
+    if (!结果.状态 || 结果.状态.状态 !== '收尾中') return;
+    if (!父亲请求仍在原时间线(预期聊天ID, 预期时间线世代)) return;
+    渲染();
+    await 完成父亲通话(结果.状态, 预期聊天ID, 预期时间线世代);
   } catch (e) {
-    console.error('[人妻公寓·手机] 通话回流失败:', e);
+    console.error('[人妻公寓·手机] 挂断状态保存失败:', e);
+    eventEmit('人妻公寓:提示', '挂断没有保存成功，请再试一次。');
   }
-  通话上下文 = null;
-  通话记录 = [];
-  本通父亲主题 = '';
+}
+
+export function 父亲通话已清理(通话标识: string, 预期聊天ID = 当前聊天ID()): void {
+  if (!仍是预期聊天(预期聊天ID)) return;
+  const 仍在通话 = 活动父亲通话();
+  if (仍在通话 && 仍在通话.标识 !== 通话标识) return;
+  父亲回复生成键 = '';
+  父亲收尾提交键 = '';
   当前页 = { 名: 'chats' };
   渲染();
   刷新红点();
-  eventEmit('人妻公寓:父亲通话结束');
 }

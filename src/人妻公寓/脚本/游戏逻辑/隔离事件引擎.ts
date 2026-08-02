@@ -1,6 +1,7 @@
 import { 数据库状态, 通过数据库生成 } from './数据库桥';
 import { 当前正文模型是DeepSeek } from './正文模型识别';
 import { 预设破限段 } from './预设桥';
+import { 清洗预设输出 } from './预设输出兼容';
 
 export type 隔离事件类型 = '荣耀洞' | '监控';
 
@@ -44,7 +45,7 @@ function 读库(): 隔离事件库 {
 }
 
 function 净化(原文: string): string {
-  const 闭合清 = 原文
+  const 闭合清 = 清洗预设输出(原文).文本
     .replace(/^[\s\S]*?<content\b[^>]*>/i, '')
     .replace(/<\/content\s*>[\s\S]*$/i, '')
     .replace(/【开始思考】[\s\S]*?<\/think_fox~\s*>/gi, '')
