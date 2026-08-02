@@ -104,6 +104,27 @@ html.rq-dark body {
   min-height: 100px;
 }
 
+.client-boot-fallback {
+  box-sizing: border-box;
+  min-height: 100px;
+  display: grid;
+  place-content: center;
+  gap: 5px;
+  padding: 18px;
+  color: var(--ink-soft);
+  text-align: center;
+  font-size: 13px;
+}
+
+.client-boot-fallback b {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+.client-boot-fallback small {
+  color: var(--ink-faint);
+}
+
 /*
  * Fullscreen API 会在全屏元素背后创建 UA ::backdrop。部分 Android WebView 会把
  * 透明的根合成层错误混入黑色 backdrop，并在底部做成渐变。真全屏时把整条根链

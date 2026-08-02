@@ -9,6 +9,24 @@ process.env.TS_NODE_COMPILER_OPTIONS = JSON.stringify({ module: 'CommonJS', modu
 require('ts-node/register/transpile-only');
 
 const App源码 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
+const 客户端模板 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/index.html', import.meta.url), 'utf8');
+const 客户端产物 = readFileSync(new URL('../../dist/人妻公寓/界面/客户端/index.html', import.meta.url), 'utf8');
+
+test('客户端生产包不含未声明的 webpack CJS 拼接运行时', () => {
+  assert.doesNotMatch(
+    客户端产物,
+    /__webpack_require__\.cjs\s*=/,
+    '该残留会在模块入口同步触发 ReferenceError，使 Vue 尚未挂载就只剩渐变背景',
+  );
+});
+
+test('客户端启动前有可见占位，生产包不再内嵌大幅场景位图', () => {
+  assert.match(客户端模板, /<meta\s+charset=["']utf-8["']/i);
+  assert.match(客户端模板, /id=["']app["'][^>]*>[\s\S]*?游戏界面加载中/);
+  assert.doesNotMatch(App源码, /(?:png|webp)\?url/);
+  assert.doesNotMatch(客户端产物, /data:image\/(?:png|webp);base64,/);
+  assert.ok(Buffer.byteLength(客户端产物, 'utf8') < 2_000_000, '移动端入口应保持在 2 MB 内');
+});
 
 test('新CG回合重置临时坏图集合，加载回调携带实际图片身份', () => {
   assert.match(App源码, /if \(!是加载重试\)[\s\S]{0,160}成人CG本次失效\.clear\(\)/);

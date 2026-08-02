@@ -2361,20 +2361,24 @@ import { useDataStore } from './store';
 import { CG加载事件属于当前请求 } from './cgLoadState';
 import { 计算场景同步, type 场景聊天状态 } from './场景状态同步';
 import { 读取录像带连点失败状态, 推进录像带连点失败 } from './录像带交互状态';
-import 录像带双屏关闭图 from '../../素材/特殊场景/录像带/01_双屏关闭.png?url';
-import 录像带左屏亮起图 from '../../素材/特殊场景/录像带/02_左屏亮起.png?url';
-import 录像带双屏亮起图 from '../../素材/特殊场景/录像带/03_双屏亮起.png?url';
-import 公寓外部背景图 from '../../素材/背景/公寓外部.webp?url';
-import 晨跑公园背景图 from '../../素材/背景/晨跑公园.webp?url';
-import 健身房背景图 from '../../素材/背景/健身房.webp?url';
-import 清醒咖啡道具图 from '../../素材/道具/清醒咖啡.webp?url';
-import 集中胶囊道具图 from '../../素材/道具/集中胶囊.webp?url';
-import 运动饮料道具图 from '../../素材/道具/运动饮料.webp?url';
-import 强效营养剂道具图 from '../../素材/道具/强效营养剂.webp?url';
-import 安全套道具图 from '../../素材/道具/安全套.webp?url';
-import 专注训练手册道具图 from '../../素材/道具/专注训练手册.webp?url';
-import 蛋白粉道具图 from '../../素材/道具/蛋白粉.webp?url';
 import { 同步画幅 } from './viewport';
+
+// 0.66 位图随不可变 Tag 发布。不要通过 `?url` 把它们塞进客户端 module：
+// 三张录像带原图就会把移动端入口从约 0.65 MB 撑到 11.7 MB，并显著增加 WebView 解析失败风险。
+const 版本素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.66/src/人妻公寓/素材';
+const 录像带双屏关闭图 = `${版本素材基址}/特殊场景/录像带/01_双屏关闭.png`;
+const 录像带左屏亮起图 = `${版本素材基址}/特殊场景/录像带/02_左屏亮起.png`;
+const 录像带双屏亮起图 = `${版本素材基址}/特殊场景/录像带/03_双屏亮起.png`;
+const 公寓外部背景图 = `${版本素材基址}/背景/公寓外部.webp`;
+const 晨跑公园背景图 = `${版本素材基址}/背景/晨跑公园.webp`;
+const 健身房背景图 = `${版本素材基址}/背景/健身房.webp`;
+const 清醒咖啡道具图 = `${版本素材基址}/道具/清醒咖啡.webp`;
+const 集中胶囊道具图 = `${版本素材基址}/道具/集中胶囊.webp`;
+const 运动饮料道具图 = `${版本素材基址}/道具/运动饮料.webp`;
+const 强效营养剂道具图 = `${版本素材基址}/道具/强效营养剂.webp`;
+const 安全套道具图 = `${版本素材基址}/道具/安全套.webp`;
+const 专注训练手册道具图 = `${版本素材基址}/道具/专注训练手册.webp`;
+const 蛋白粉道具图 = `${版本素材基址}/道具/蛋白粉.webp`;
 
 // ── 梧桐里主题图标：统一 24×24 圆角描边，公寓门牌/钥匙孔/信件等语义贯穿全套 ──
 

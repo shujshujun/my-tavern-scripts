@@ -179,6 +179,8 @@ function parse_configuration(entry: Entry): (_env: any, argv: any) => webpack.Co
     .readFileSync(path.join(import.meta.dirname, entry.script), 'utf-8')
     .includes('@obfuscate');
   const script_filepath = path.parse(entry.script);
+  const should_disable_module_concatenation =
+    path.normalize(entry.script) === path.normalize('src/人妻公寓/界面/客户端/index.ts');
 
   return (_env, argv) => ({
     experiments: {
@@ -474,6 +476,10 @@ function parse_configuration(entry: Entry): (_env: any, argv: any) => webpack.Co
           : [],
       ),
     optimization: {
+      // Webpack 5.109 的 ESM 输出与 vue-loader CJS helper 在模块拼接时会错误生成
+      // `__webpack_require__.cjs(...)`，但单文件 module 产物没有声明该 runtime。
+      // 浏览器会在入口第一行同步崩溃，只剩已解析的 CSS 背景。
+      concatenateModules: should_disable_module_concatenation ? false : undefined,
       minimize: true,
       minimizer: [
         argv.mode === 'production'
