@@ -346,12 +346,29 @@ async function 执行SQLite写入(
   ]);
   if (timer !== undefined) clearTimeout(timer);
   if (settled.kind === 'timeout') {
-    // 超时不会取消事务：让底层在后台完成，但本轮绝不再走 CRUD，既不双写也不拖死回合。
+    // 超时不会取消事务：让底层在后台完成，本轮不再走 CRUD 拖死回合。但迟到结果失败时
+    // 不能只留一条告警就丢数据——现有调用方的 SQL 全是按主键 upsert(幂等)，且重试只在
+    // 原 mutation 结算之后串行发起，不存在双写窗口；补一次仍失败才放弃(2026-08-03 审计 M6)。
+    const 后台补写一次 = async (原因: string): Promise<void> => {
+      if (!仍是同一聊天(预期聊天标识) || 取数据库API() !== api || !额外提交校验()) {
+        console.warn(`[人妻公寓·数据库] SQLite后台写入${原因}，且时间线已变化，放弃补写。`);
+        return;
+      }
+      try {
+        const 重试结果 = await Promise.resolve(api.executeSqlMutation?.(sql, params) ?? null);
+        if (!SQL写入已确认(重试结果)) {
+          console.warn(`[人妻公寓·数据库] SQLite后台写入${原因}，补写一次仍未确认，本条记录可能缺失。`);
+        }
+      } catch (e) {
+        console.warn(`[人妻公寓·数据库] SQLite后台写入${原因}，补写一次仍失败:`, e);
+      }
+    };
     void mutation.then(
-      result => {
-        if (!SQL写入已确认(result)) console.warn('[人妻公寓·数据库] SQLite后台写入结算结果未获确认。');
+      result => (SQL写入已确认(result) ? undefined : 后台补写一次('结算结果未获确认')),
+      error => {
+        console.warn('[人妻公寓·数据库] SQLite后台写入最终失败:', error);
+        return 后台补写一次('最终失败');
       },
-      error => console.warn('[人妻公寓·数据库] SQLite后台写入最终失败:', error),
     );
     return '已提交待定';
   }
@@ -917,7 +934,9 @@ export async function 清理数据库陈旧互斥旗(): Promise<void> {
 export async function 通过数据库生成(
   messages: 数据库消息[],
   presetName: string,
-  maxTokens = 600,
+  // 默认值也按"推理模型思考计入 max_tokens"留足余量(2026-08-04);正文长度由提示词管。
+  // 8192 是全模型安全上限:再高 DeepSeek chat(输出上限8192)等模型会 400 拒绝请求。
+  maxTokens = 8192,
 ): Promise<string | null> {
   const api = 取数据库API();
   if (typeof api?.callAI !== 'function') return null;
@@ -1208,9 +1227,15 @@ function 行转文本(
     .slice(1)
     .map((row, index) => ({ row, index }))
     .filter(({ row }) => {
-      const text = row.map(String).join('|');
       const 命中人物 = 精确命中人物(row);
-      const 未结 = !只要未结 || (!text.includes('已兑现') && !text.includes('已作废'));
+      // 结清与否按状态列精确判;内容/最后进展里出现"已兑现"字样(如"定金已兑现,尾款还欠着")
+      // 不该把整条未结承诺误滤掉(2026-08-03 审计 L7)。无状态列的表退回全文子串旧行为。
+      const 状态列 = headers.indexOf('状态');
+      const 已结清 =
+        状态列 >= 0
+          ? ['已兑现', '已作废'].includes(String(row[状态列] ?? '').trim())
+          : /已兑现|已作废/.test(row.map(String).join('|'));
+      const 未结 = !只要未结 || !已结清;
       const 非微信摘要 = !排除微信进展 || 类型列 < 0 || String(row[类型列] ?? '') !== '微信进展';
       // 数据库表不随酒馆回档自动回滚。未来楼层记录属于已删除时间线，绝不能重新注入当前剧情。
       // 缺少/损坏楼层的旧数据保守放行，避免升级后整张长期记忆表突然失效。

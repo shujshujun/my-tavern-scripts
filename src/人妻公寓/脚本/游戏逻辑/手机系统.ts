@@ -82,8 +82,14 @@ const 私聊图库地址索引 = 建私聊图库地址索引(私聊图库清单)
 const 手机可见单条硬上限 = 150;
 const 手机可见内容长度纪律 =
   `完整表达优先，不设最低字数，也不要为了凑长度扩写；每条硬性不超过${手机可见单条硬上限}个汉字。`;
-/** 群聊最多四条，预算需容纳四条上限内容和回复封套；这是生成容量，不是最低输出量。 */
-const 手机可见生成上限 = 1200;
+/**
+ * 请求侧 max_tokens 与"可见150字"解耦(2026-08-04):推理模型的思考 token 也计入
+ * max_tokens,旧值1200会被 reasoning 烧光,以 length 截断、正文为空(玩家日志实证:
+ * deepseek-v4-flash reasoning_tokens=1200/content="")。正文长度纪律仍由提示词管,
+ * 非推理模型写满四条封套后自然停,不会真用完这个预算。
+ * 8192 是全模型安全上限:再高 DeepSeek chat(输出上限8192)等模型会 400 拒绝请求。
+ */
+const 手机请求token上限 = 8192;
 /** 记忆输入按代码单元设安全门，给150汉字及其标点、emoji留出完整空间。 */
 const 手机可见记忆输入上限 = 手机可见单条硬上限 * 2;
 
@@ -891,9 +897,24 @@ function 净化消息(原: string): string {
   return 全清 || 闭合清;
 }
 
-/** 单气泡允许模型的无害排版折行与自己的中英文冒号标签；合并后再执行硬上限。 */
+/** 单气泡允许模型的无害排版折行与自己的中英文冒号标签；合并后再执行硬上限。
+ * 名册上其他人的"人名:"行=模型混入第二说话人,整条拒收——否则别人的台词会并进
+ * 当前角色的气泡里冒充她说的话(2026-08-03 审计 M4);自己的首标签照旧可剥。 */
 function 验收短文本(原: string, 最大字数: number, 可剥首标签: readonly string[] = []): string | null {
-  return 规范手机单气泡(原, { 最大汉字: 最大字数, 可剥首标签 });
+  const 自称 = new Set(可剥首标签.map(名 => 名.trim()).filter(Boolean));
+  const 他人 = new Set<string>();
+  for (const m of Object.keys(户静态表) as 门牌[]) {
+    const 配 = 户静态表[m];
+    for (const 名 of [配?.妻名, 配?.夫名]) if (名 && !自称.has(名)) 他人.add(名);
+  }
+  const 玩家 = 玩家名().trim();
+  if (玩家 && !自称.has(玩家)) 他人.add(玩家);
+  return 规范手机单气泡(原, {
+    最大汉字: 最大字数,
+    可剥首标签,
+    已知说话人: [...他人],
+    禁止多说话人: true,
+  });
 }
 
 function 有单条超过汉字上限(文本: string, 上限: number, 忽略发言人前缀 = false): boolean {
@@ -1026,7 +1047,7 @@ async function 自定义API生成(
         apiurl: c.base.trim().replace(/\/+$/, ''),
         key: c.key,
         model: c.model,
-        max_tokens: 手机可见生成上限,
+        max_tokens: 手机请求token上限,
         temperature: 0.9,
         source: 'openai',
       },
@@ -1062,7 +1083,7 @@ async function 小生成(系统提示: string, 用户提示: string, 控制?: �
             { role: 'system', content: 手机尾部破限 },
           ],
           '',
-          手机可见生成上限,
+          手机请求token上限,
         );
         if (!手机小生成仍有效(控制)) return 空手机小生成结果();
         const 结果 = 解析手机小生成原文(原);
@@ -1150,7 +1171,9 @@ async function 微信群文本(
       `[人妻公寓·手机] ${语境}未识别到合规的“发言人:内容”（每条不超过${最大字数}汉字），${处理}。`,
     );
   }
-  if (隐私模式) {
+  if (隐私模式 && 原.trim()) {
+    // 罐头回退只兜"AI 有输出但全被隐私验收拒绝"的场合;生成本身失败(原为空)时
+    // 不得伪造一条"收到"式回复冒充群聊成功,让失败如实表现为无人接话(2026-08-03 审计 M3)
     const 回退 = 群聊安全回退([...合法发言人], 隐私模式);
     return 回退 ? [回退] : [];
   }
@@ -3609,6 +3632,15 @@ function 渲染(): void {
           更新批次状态展示();
         }, 80);
       });
+      // 回车直发(2026-08-03 用户提案:仿微信,Enter=发送,Shift+Enter=换行)。输入法选词的
+      // 确认回车带着 isComposing/组合标记,不会误发;红灯期按钮语义是"停止",回车不代点。
+      ta.addEventListener('keydown', ev => {
+        if (ev.key !== 'Enter' || ev.shiftKey || ev.isComposing || 输入法组合中) return;
+        ev.preventDefault();
+        if (ta.disabled || 发钮.disabled || 手机聊天批次.状态(批次键).灯 === '红') return;
+        if (!ta.value.trim()) return;
+        发钮.click();
+      });
       发钮.addEventListener('click', () => {
         if (输入法组合中) return;
         const 状态 = 手机聊天批次.状态(批次键);
@@ -3861,6 +3893,12 @@ function 渲染(): void {
         if (!文) return;
         ta.value = '';
         void 通话应答(文);
+      });
+      // 与微信聊天同一手感:Enter=开口,Shift+Enter=换行,输入法确认回车不误发。
+      ta.addEventListener('keydown', ev => {
+        if (ev.key !== 'Enter' || ev.shiftKey || ev.isComposing) return;
+        ev.preventDefault();
+        if (!发钮.disabled && ta.value.trim()) 发钮.click();
       });
       const 挂 = el('button', '', '挂断') as HTMLButtonElement;
       挂.style.background = '#fa5151';
@@ -4577,7 +4615,14 @@ async function 执行待回复批次(请求: 手机聊天批次请求): Promise<
         )
         .filter((消息): 消息 is 微信消息 => !!消息);
       const 批次文 = 批次消息.map(m => m.文.trim()).filter(Boolean).join('\n');
-      if (!批次文) return;
+      if (!批次文) {
+        // stat 瞬时不可读(绝对时段=-1)等情况下时间线过滤会滤空整批消息;此前直接 return,
+        // 收口仍按"已消费"结掉批次,玩家的消息永远等不到回复也没有任何提示(2026-08-03 审计 L6)
+        if (请求.消息标识.length && 批次仍在红灯(上下文, 请求.请求序号)) {
+          eventEmit('人妻公寓:提示', '这次手机回复没有生成成功。你发出的消息仍保留；重新发一条即可继续聊天。');
+        }
+        return;
+      }
 
       const 控制: 手机小生成控制 = {
         生成ID: 上下文.活动生成ID,

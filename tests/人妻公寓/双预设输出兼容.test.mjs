@@ -23,8 +23,14 @@ test('乙酉的 thinking/content 协议只留下正文，截断思考绝不回�
   assert.equal(清洗预设输出('<thinking>被截断的私有创作分析').文本, '');
   assert.equal(清洗预设输出('<content>正文即使漏了闭合标签也要保留').文本.trim(), '正文即使漏了闭合标签也要保留');
 
+  // 2026-08-04:期望标签缺失不再整篇清空——文本按通用清洗保留，流式安全门(正文已开始)仍关闭。
   const 正文前流式 = 清洗预设输出('预填充后的私有分析仍在生成', 'content');
-  assert.deepEqual(正文前流式, { 文本: '', 正文已开始: false });
+  assert.deepEqual(正文前流式, { 文本: '预填充后的私有分析仍在生成', 正文已开始: false });
+  assert.equal(清洗预设输出('<thinking>被截断的私有创作分析', 'content').文本, '', '未闭合思考在回退清洗下仍整段丢弃');
+  assert.deepEqual(清洗预设输出('<story_scene>混用其他预设的正文</story_scene>', 'content'), {
+    文本: '混用其他预设的正文',
+    正文已开始: true,
+  });
 });
 
 test('乙酉正文内的font与po只剥标签，规划注释和zv残标签不进入正文', () => {
@@ -66,7 +72,7 @@ test('梦鲸的 dream_body 是唯一正文，完整或漏闭合都不显示 thin
   const 预填充省略开标签 = '预填充后的私有分析</think>\n<dream_body>正文已经开始';
   assert.equal(清洗预设输出(预填充省略开标签).文本.trim(), '正文已经开始');
   assert.deepEqual(清洗预设输出('预填充后的私有分析仍在生成', 'dream_body'), {
-    文本: '',
+    文本: '预填充后的私有分析仍在生成',
     正文已开始: false,
   });
 });

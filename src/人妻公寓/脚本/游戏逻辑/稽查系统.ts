@@ -122,10 +122,18 @@ export function 解析尺度判定(原文: string): { 模式: 尺度模式; 角�
   }
 }
 
-function 关键词命中(正文: string, 最低阶段: number): string[] {
+/**
+ * 301(招牌性癖"镜头高潮",拍摄题材)与102(裂缝渠道=摄像头)的主线正文在低阶段就自然
+ * 出现拍摄类词;这些词对这两户不算越界硬信号,否则模型偶发漏报尺度块时正常剧情会被
+ * 静默重写(2026-08-03 审计 L5)。其余词与其余户照计。
+ */
+const 拍摄题材词: readonly string[] = ['录像', '录下', '摄像头前', '镜头前'];
+const 拍摄题材户: readonly 门牌[] = ['301', '102'];
+
+function 关键词命中(正文: string, 最低阶段: number, 免计词: ReadonlySet<string>): string[] {
   const 命中: string[] = [];
   if (最低阶段 < 3) 命中.push(...性行为词表.filter(词 => 正文.includes(词)));
-  if (最低阶段 < 4) 命中.push(...进阶花样词表.filter(词 => 正文.includes(词)));
+  if (最低阶段 < 4) 命中.push(...进阶花样词表.filter(词 => !免计词.has(词) && 正文.includes(词)));
   return [...new Set(命中)];
 }
 
@@ -174,7 +182,8 @@ export function 输出稽查(
   }
 
   const 最低阶段 = Math.min(...待检角色.map(m => Math.floor(阶段表[m] ?? 0)));
-  const 命中 = 关键词命中(检词文本, 最低阶段);
+  const 免计词 = new Set(待检角色.some(m => 拍摄题材户.includes(m)) ? 拍摄题材词 : []);
+  const 命中 = 关键词命中(检词文本, 最低阶段, 免计词);
   const 缺角色 = 待检角色.filter(m => !角色[m]);
   const 模式不符 = 判定 && 判定.模式 !== 期望模式;
   if ((!判定 || 缺角色.length || 模式不符) && 命中.length >= 2) {

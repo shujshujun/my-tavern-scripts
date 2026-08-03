@@ -33,7 +33,7 @@ import {
 // ── 软计数(chat 变量) ──
 
 interface 经济计数 {
-  拾取: Record<string, boolean>; // `${房间}:${period}` → 已拾取
+  拾取: Record<string, number | boolean>; // `${房间}:${period}` → 拾取时的绝对时段(旧存档为 true)
   偷窃上次: Record<string, number>; // 门牌 → 上次翻找绝对时段(冷却)
 }
 
@@ -576,7 +576,10 @@ export function 查金币(房间id: string, 绝对时段: number): number {
   if (!金币房间.includes(房间id)) return 0;
   const 期 = Math.floor(绝对时段 / 经济配置.金币刷新时段);
   if (seededRandom(期, 房间id, '金币') >= 经济配置.金币概率) return 0;
-  if (读计数().拾取[`${房间id}:${期}`]) return 0;
+  // 标记与偷窃冷却同规:数字戳停在"未来"=回档遗留(钱已随 stat 回滚,标记却留在 chat 变量),
+  // 作废掉让这枚金币能重捡;旧格式 true 无法判龄,保守视为已拾(2026-08-03 审计 L1)
+  const 拾取记录 = 读计数().拾取[`${房间id}:${期}`];
+  if (拾取记录 === true || (typeof 拾取记录 === 'number' && 拾取记录 <= 绝对时段)) return 0;
   const 幅 = 经济配置.金币上限 - 经济配置.金币下限;
   return 经济配置.金币下限 + Math.floor(seededRandom(期, 房间id, '金币额') * (幅 + 1));
 }
@@ -586,7 +589,7 @@ export function 捡金币(data: SchemaType, 房间id: string, _消息楼层?: nu
   const 数额 = 查金币(房间id, 现钟);
   if (!数额) return { 提示: '地上什么都没有。' };
   const c = 读计数();
-  c.拾取[`${房间id}:${Math.floor(现钟 / 经济配置.金币刷新时段)}`] = true;
+  c.拾取[`${房间id}:${Math.floor(现钟 / 经济配置.金币刷新时段)}`] = 现钟;
   写计数(c);
   data.现金 += 数额;
   return { 提示: `【拾获】${查房间名(房间id)}角落里捡到 ¥${数额}——谁掉的零钱,进了管理员的口袋。`, 变动: true };

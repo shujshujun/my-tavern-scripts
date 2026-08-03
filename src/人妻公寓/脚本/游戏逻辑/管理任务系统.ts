@@ -1,6 +1,6 @@
 import type { SchemaType } from '../../schema';
 import { 户静态表, type 门牌 } from '../../stageConfig';
-import { 结算风闻投诉完成, 尝试转入风闻投诉 } from './风闻系统';
+import { 结算风闻投诉完成, 尝试转入风闻投诉, 风闻事件已即时计责 } from './风闻系统';
 import { 登记胜任变动 } from './胜任系统';
 
 export type 管理任务类型 = '公共' | '报修' | '投诉';
@@ -222,6 +222,12 @@ export function 结算管理任务逾期(data: SchemaType, 原当前时段: numb
     const task = 原任务 as 管理任务;
     if (task.逾期已扣 || 当前时段 <= task.截止时段) continue;
     task.逾期已扣 = true;
+    // 危机事件触发瞬间已当场扣过公开丑闻责任,这张衍生投诉逾期不再叠扣,
+    // 任务照常转补办瓷砖(2026-08-04 拍板:危机不双重扣罚)
+    if (task.来源事件 && 风闻事件已即时计责(data, task.来源事件)) {
+      逾期任务.push(task.id);
+      continue;
+    }
     const 本项扣分 = 逾期扣分(task);
     const 实际扣分 = -登记胜任变动(data, {
       id: `楼务逾期:${task.id}`,

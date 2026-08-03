@@ -34,7 +34,7 @@ test('负值哨兵代表从未使用，绝对时段 0 不应被误判为冷却�
     },
   });
 
-  const result = 使用荣耀洞(data, 0, true);
+  const result = 使用荣耀洞(data, 0);
 
   assert.equal(result.变动, true);
   assert.doesNotMatch(result.提示, /今天已经用过/);

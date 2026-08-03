@@ -161,8 +161,10 @@ const 回合变量键 = [
   '_反感连续',
 ] as const;
 
-/** 主动回档或宿主原生删楼后不能继续沿用的未来时间线过程态。 */
-const 时间线清场变量键 = [...回合变量键, '_上次回合', '_上次隔离回合', '_隔离事件', '_时间撤销点'] as const;
+/** 主动回档或宿主原生删楼后不能继续沿用的未来时间线过程态。
+ * `_隔离事件`不入此表:它是带锚楼的历史日志,由紧随其后的裁手机时间线按锚楼裁掉未来条目,
+ * 整体置空会连过去时间线的晨跑/健身/睡眠/荣耀洞反馈一并抹掉(2026-08-03 审计 M1)。 */
+const 时间线清场变量键 = [...回合变量键, '_上次回合', '_上次隔离回合', '_时间撤销点'] as const;
 
 /** 失败/取消回合必须把 prompt 构造期间写入的在场、粘滞等整值还原。 */
 async function 恢复回合变量快照(chat快照: Record<string, unknown>): Promise<void> {
@@ -391,15 +393,30 @@ const 二次变量结算令 = [
   '好感变化必须有正文依据，允许正数、负数或不变；不得为了更新而机械加分。遵守变量规则与单轮上限，不在场人物及系统管理字段绝对不动。',
 ].join('\n');
 
-function 清除变量禁区(文本: string): string {
-  return 文本
+function 清除变量禁区(文本: string, 吞未闭合尾段 = true): string {
+  let 清 = 文本
     .replace(/<think(?:ing)?\b[^>]*>[\s\S]*?<\/think(?:ing)?\s*>/gi, '')
     .replace(/<reason(?:ing)?\b[^>]*>[\s\S]*?<\/reason(?:ing)?\s*>/gi, '')
     .replace(/<尺度判定(?:\s[^>]*)?>[\s\S]*?<\/尺度判定\s*>/gi, '')
-    .replace(/<(?:think(?:ing)?|reason(?:ing)?)\b[^>]*>[\s\S]*$/i, '')
-    .replace(/<尺度判定(?:\s[^>]*)?>[\s\S]*$/i, '')
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<!--[\s\S]*$/, '');
+    .replace(/<!--[\s\S]*?-->/g, '');
+  if (吞未闭合尾段) {
+    清 = 清
+      .replace(/<(?:think(?:ing)?|reason(?:ing)?)\b[^>]*>[\s\S]*$/i, '')
+      .replace(/<尺度判定(?:\s[^>]*)?>[\s\S]*$/i, '')
+      .replace(/<!--[\s\S]*$/, '');
+  }
+  return 清;
+}
+
+/**
+ * 防过删兜底(2026-08-04 玩家反馈"变量不更新"):预设思考标签未闭合时,严格禁区清洗会从
+ * 该标签一路删到结尾,把其后的真变量块一并杀死。退一步只清已闭合禁区,且仅认完整的
+ * <UpdateVariable> 块——半截块/裸补丁仍不认,避免把思维链里的草稿当真。
+ */
+function 宽松提取完整变量块(文本: string, 严格可解析文本: string): string | null {
+  const 宽松文本 = 清除变量禁区(文本, false);
+  if (宽松文本 === 严格可解析文本) return null;
+  return [...宽松文本.matchAll(/<UpdateVariable\b[^>]*>[\s\S]*?<\/UpdateVariable\s*>/gi)].at(-1)?.[0] ?? null;
 }
 
 function 取变量块(文本: string): string | null {
@@ -426,6 +443,12 @@ function 取变量块(文本: string): string | null {
   // 兜底③:_.set 老格式命令行(MVU 全文扫描也认,但包起来便于清洗与落账一致)
   const 命令行 = 可解析文本.split('\n').filter(行 => /_\.(?:set|insert|assign|remove|unset|delete|add)\(/.test(行));
   if (命令行.length) return `<UpdateVariable>\n${命令行.join('\n')}\n</UpdateVariable>`;
+  // 兜底④:变量块被未闭合思考段连坐吞掉时,退回只清已闭合禁区再取完整块
+  const 宽松完整 = 宽松提取完整变量块(文本, 可解析文本);
+  if (宽松完整) {
+    console.warn('[人妻公寓] 变量块位于未闭合思考段之后,已启用防过删兜底提取');
+    return 宽松完整;
+  }
   return null;
 }
 
@@ -434,13 +457,23 @@ function 取尺度判定块(文本: string): string | null {
 }
 
 /**
- * 首遍正文里是否已带 MVU 可解析的变量命令(2026-07-26 玩家反馈修复):
+ * 首遍正文里是否已带 MVU 可解析的、且真的会改变量的命令(2026-07-26 玩家反馈修复):
  * - `_.set(...)` 老格式:MVU 全文扫描,存在即可用;
- * - `<JSONPatch>` 标签块:内容必须真能 JSON.parse 成数组(空数组=模型判定无变化,也算可用;
- *   Gemini 爱写尾逗号/注释,解析不动的畸形块=等于没写,须触发兜底重算)。
+ * - `<JSONPatch>` 标签块:内容必须真能 JSON.parse 成【非空】数组。
+ *   空数组曾被算作"模型判定无变化,也可用",但世界书要求"户为空时必须输出 []",
+ *   宏渲染失败或模型偷懒时每轮都是 [],兜底二次结算被完全短路=变量永不更新
+ *   (2026-08-04 玩家反馈"开了二次结算按钮也没用"的直接根因)。空补丁一律视为没写;
+ *   Gemini 爱写尾逗号/注释,解析不动的畸形块=等于没写,须触发兜底重算。
  */
 function 有可用变量命令(文本: string): boolean {
   const 可解析文本 = 清除变量禁区(文本);
+  if (含可改变量命令(可解析文本)) return true;
+  // 与 取变量块 的防过删兜底保持一致:那边会采纳的块,这边不能报"没有"而触发多余重算
+  const 宽松完整 = 宽松提取完整变量块(文本, 可解析文本);
+  return 宽松完整 !== null && 含可改变量命令(宽松完整);
+}
+
+function 含可改变量命令(可解析文本: string): boolean {
   if (/_\.(?:set|insert|assign|remove|unset|delete|add)\(/.test(可解析文本)) return true;
   for (const m of 可解析文本.matchAll(/<(json_?patch)\b[^>]*>([\s\S]*?)<\/\1\s*>/gi)) {
     const 体 = m[2]
@@ -448,15 +481,22 @@ function 有可用变量命令(文本: string): boolean {
       .replace(/```\s*$/, '')
       .trim();
     try {
-      if (Array.isArray(JSON.parse(体))) return true;
+      const 值 = JSON.parse(体) as unknown;
+      if (Array.isArray(值) && 值.length > 0) return true;
     } catch {
       /* 畸形块,继续看下一个 */
     }
   }
-  if (
-    提取末尾裸JSON补丁(可解析文本.replace(/(?:<\/(?:UpdateVariable|json_?patch)\s*>\s*)+$/gi, '')) !== null
-  ) {
-    return true;
+  const 裸补丁 = 提取末尾裸JSON补丁(
+    可解析文本.replace(/(?:<\/(?:UpdateVariable|json_?patch)\s*>\s*)+$/gi, ''),
+  );
+  if (裸补丁 !== null) {
+    try {
+      const 值 = JSON.parse(裸补丁) as unknown;
+      if (Array.isArray(值) && 值.length > 0) return true;
+    } catch {
+      /* 裸补丁畸形,同样视为没写 */
+    }
   }
   return false;
 }
@@ -465,6 +505,16 @@ function 有可用变量命令(文本: string): boolean {
  * DeepSeek / Gemini 可能完成正文却漏掉记账，因此可使用独立的静默结算通道。
  * 正文仍采用第一遍结果；第二遍只生成变量块，并以它替换正文中可能存在但不稳定的旧变量块。
  */
+// 二次结算是静默非流式生成,玩家看不到任何进度;部分中转/公益站会让底层请求长期悬空,
+// 此前没有超时,玩家以为卡死只能手动取消→整回合回滚删楼=刚看完的正文被清屏
+// (2026-08-04 玩家反馈"开二次结算反而无法正常输出"的清屏侧根因)。变量块输出量小,
+// 预算给足推理模型思考也用不了三分钟;超时只放弃结算保留第一遍结果,绝不作废回合。
+const 二次结算超时毫秒 = 180_000;
+
+// MVU 外置解析同样是玩家不可见的后台生成:跨脚本桥返回不代表解析完成,完成信号靠轮询
+// 楼层变量;超过此时限仍无结果就按"未产生可解析变量"继续走,保正文不作废回合。
+const 外置解析等待毫秒 = 120_000;
+
 async function 补模型变量结算(
   模型: string,
   原文: string,
@@ -474,23 +524,51 @@ async function 补模型变量结算(
 ): Promise<{ 原文: string; 已生成变量块: boolean }> {
   const 正文 = 清洗正文(原文);
   本回合生成id = `rqgy-vars-${回合前末楼}-${_.random(1e9)}`;
-  const 结算原文 = await 等待正文生成({
-    user_input: `【本轮玩家行动】\n${行动}\n\n【本轮已完成正文】\n${正文}`,
-    should_stream: false,
-    should_silence: true,
-    injects: [
-      { role: 'system', content: 快照, position: 'in_chat', depth: 0, should_scan: true },
-      { role: 'system', content: 二次变量结算令, position: 'in_chat', depth: 0, should_scan: false },
-    ],
-    generation_id: 本回合生成id,
+  const 生成id = 本回合生成id;
+  let 超时句柄: ReturnType<typeof setTimeout> | undefined;
+  const 超时门 = new Promise<never>((_resolve, reject) => {
+    超时句柄 = setTimeout(() => {
+      try {
+        stopGenerationById(生成id);
+      } catch (e) {
+        console.error('[人妻公寓] 停止超时的二次结算生成失败:', e);
+      }
+      reject(new Error('__RQGY_VARS_TIMEOUT__'));
+    }, 二次结算超时毫秒);
   });
+  let 结算原文: string;
+  try {
+    结算原文 = await Promise.race([
+      等待正文生成({
+        user_input: `【本轮玩家行动】\n${行动}\n\n【本轮已完成正文】\n${正文 || 原文}`,
+        should_stream: false,
+        should_silence: true,
+        injects: [
+          { role: 'system', content: 快照, position: 'in_chat', depth: 0, should_scan: true },
+          { role: 'system', content: 二次变量结算令, position: 'in_chat', depth: 0, should_scan: false },
+        ],
+        generation_id: 生成id,
+      }),
+      超时门,
+    ]);
+  } catch (e) {
+    if (e instanceof Error && e.message === '__RQGY_VARS_TIMEOUT__') {
+      console.warn(`[人妻公寓] ${模型} 独立变量结算超过 ${二次结算超时毫秒 / 1000} 秒未返回，保留第一遍结果`);
+      return { 原文, 已生成变量块: false };
+    }
+    throw e;
+  } finally {
+    clearTimeout(超时句柄);
+  }
   const 变量块 = 取变量块(结算原文);
   if (!变量块) {
     console.warn(`[人妻公寓] ${模型} 独立变量结算未返回完整 UpdateVariable 块，保留第一遍结果`);
     return { 原文, 已生成变量块: false };
   }
   console.info(`[人妻公寓] ${模型} 独立变量结算完成`);
-  return { 原文: `${正文}\n${变量块}`, 已生成变量块: true };
+  // 清洗结果为空时以原始返回为拼接基底,决不让二次结算把空正文固化进楼层;
+  // 落楼前的统一清洗仍会处理残留协议(2026-08-04 防"结算成功反而吞正文")。
+  return { 原文: `${正文 || 原文}\n${变量块}`, 已生成变量块: true };
 }
 
 /** 正文模型的可选二次结算；未设置时默认关闭。 */
@@ -1417,8 +1495,23 @@ export async function 执行回合(
       try {
         await eventEmit('人妻公寓:MVU外置模型重试');
         确认本轮事务有效();
-        const 外置后正文 = getChatMessages(临时助手楼层).at(-1)?.message ?? 可重处理楼层正文;
-        const 外置后数据 = Mvu.getMvuData({ type: 'message', message_id: 临时助手楼层 });
+        // 跨脚本事件桥不保证等到 MVU 外置生成真正完成(2026-08-04 玩家实测:自动解析后
+        // 好感值没更新,手动点"重试额外模型解析"才生效——引擎读楼读早了,拿着回合前
+        // 数据提交,MVU 迟到的结果被覆盖)。以"楼层变量相对回退基准发生变化"或"楼层
+        // 正文出现变量命令"为完成信号轮询等待;超时按未产生结果处理,保正文不作废回合。
+        const 外置解析截止 = Date.now() + 外置解析等待毫秒;
+        let 外置后正文 = getChatMessages(临时助手楼层).at(-1)?.message ?? 可重处理楼层正文;
+        let 外置后数据 = Mvu.getMvuData({ type: 'message', message_id: 临时助手楼层 });
+        while (
+          Date.now() < 外置解析截止 &&
+          !有可用变量命令(外置后正文) &&
+          (!外置后数据 || _.isEqual(外置后数据, 变量失败回退基准))
+        ) {
+          await new Promise(resolve => setTimeout(resolve, 500));
+          确认本轮事务有效();
+          外置后正文 = getChatMessages(临时助手楼层).at(-1)?.message ?? 可重处理楼层正文;
+          外置后数据 = Mvu.getMvuData({ type: 'message', message_id: 临时助手楼层 });
+        }
         变量块 = 取变量块(外置后正文);
         // 外置模型只负责变量，不拥有正文。即使插件把消息改成空串或纯变量协议，
         // 也必须用已经验证的基础正文重新拼回，杜绝解析失败反向抹掉剧情。
@@ -1546,7 +1639,8 @@ export async function 执行回合(
       实际尺度: Object.fromEntries(
         Object.entries(稽查.角色).flatMap(([门牌号, 项]) => (项 ? [[门牌号, 项.实际]] : [])),
       ) as Partial<Record<门牌, number>>,
-      资源计费: 本轮资源计费,
+      // 无效正文只落占位楼,不算"有效正文成功落楼",不得扣玩家资源(2026-08-03 审计 M2)
+      资源计费: 本轮资源计费 && Boolean(已清洗正文),
     });
     // 正文请求结束后仍可能停在 MVU/外置变量解析阶段；取消按钮在整个生成态都可用，
     // 因此一次性脚本事务提交紧前必须再看取消旗，不能只依赖前面的生成等待门。
@@ -1630,8 +1724,11 @@ export async function 执行回合(
     );
     确认本轮事务有效();
 
-    await 记录数据库回合(生成楼层, newStat, 行动, 正文, 妻在场, 夫在场, 本轮事务仍有效);
-    确认本轮事务有效();
+    // 占位楼没有真实剧情,写入数据库会让长期记忆记住"楼道里安静了一瞬"这类假事件(M2)
+    if (已清洗正文) {
+      await 记录数据库回合(生成楼层, newStat, 行动, 正文, 妻在场, 夫在场, 本轮事务仍有效);
+      确认本轮事务有效();
+    }
     const CG亲密 = 构造CG亲密上下文(本轮结算基准, newStat, 资源结算.性爱结束);
     const CG门牌 = CG亲密.主焦点门牌 ?? 焦点妻门牌 ?? null;
     eventEmit('人妻公寓:CG回合信号', {
@@ -1708,7 +1805,7 @@ export async function 执行回合(
 /**
  * 重掷本回合:删掉上一回合创建的楼层(每楼自带 stat_data 快照,变量随楼自动回滚——
  * 固定 0 楼架构红利;晋阶镜像不还原=取大防打回的正字),chat 变量按回合前快照整值恢复,
- * 然后用原行动重新执行一回合。
+ * 然后按行动楼的现文本重新执行一回合(玩家可能已用羽笔改写过输入,2026-08-04)。
  */
 export async function 重掷回合(): Promise<void> {
   if (回合进行中()) {
@@ -1736,9 +1833,21 @@ export async function 重掷回合(): Promise<void> {
   进行中 = true;
   let 已发生物理删楼 = false;
   let 已完成重掷准备 = false;
+  // 羽笔改写后的重掷必须按改后的输入重演(2026-08-04 玩家实测):行动楼的现文本才是玩家
+  // 当前意图,记录.行动 只是落库时的原稿。必须在物理删楼前读取;纯脚本回合没有玩家楼,
+  // 或读取失败时,仍按原稿重演。
+  let 重演行动 = 记录.行动;
   try {
     await 排队MVU操作(async () => {
       确认重掷仍有效();
+      try {
+        const 回合楼层 = getChatMessages(`${记录.回合前末楼 + 1}-${末楼}`) ?? [];
+        const 行动楼 = 回合楼层.find(消息 => 消息.role === 'user');
+        const 现行动 = typeof 行动楼?.message === 'string' ? 行动楼.message.trim() : '';
+        if (现行动) 重演行动 = 现行动;
+      } catch (e) {
+        console.error('[人妻公寓] 读取重掷行动楼失败,按原行动重演:', e);
+      }
       标记数据库时间线将变更(记录.回合前末楼, '重掷回合');
       await 内部删除聊天消息(_.range(记录.回合前末楼 + 1, 末楼 + 1));
       已发生物理删楼 = true;
@@ -1782,12 +1891,15 @@ export async function 重掷回合(): Promise<void> {
     标记回合事务结束();
   }
   if (!已完成重掷准备 || !重掷仍有效()) return;
-  await 执行回合(记录.行动);
+  await 执行回合(重演行动);
 }
 
 /**
  * 回档:删掉指定楼层之后的一切。
- * 变量随楼回滚;回合类 chat 变量一律清空(排队于被删时间线,保守清掉最安全);
+ * 变量随楼回滚;回合类 chat 变量默认清空(排队于被删时间线,保守清掉最安全);
+ * 唯一例外是撤回——目标楼恰为上次成功回合的回合前末楼时,该楼的场景过程态是已知的,
+ * 按 _上次回合.chat快照 原位恢复(2026-08-04):否则玩家人还站在垃圾房,_场景 却被清成 null,
+ * 舞台残留的旧楼层(如102)记录会显示成"没有识别房间"的错场景;
  * 晋阶镜像在此显式作废(2026-07-26 审计 H2/M12):守护系统的楼层比较无法区分
  * "重掷删楼(镜像该保)"和"回档到更早时间线(镜像该废)",作废语义只能由本入口自己宣告——
  * 否则回档后任意一次 UI 抬升(镜像直写)会把整份旧局镜像重新盖上当前楼戳,旧阶段全数复活。
@@ -1815,10 +1927,19 @@ export async function 回档至(楼层: number): Promise<void> {
     await 排队MVU操作(async () => {
       确认回档仍有效();
       标记数据库时间线将变更(楼层, `回档至${楼层}楼`);
+      // 撤回快照必须在删楼前读取:目标楼一旦对不上就退回保守清场,不能拿旧快照冒充。
+      const 上次回合 = 读上次回合();
+      const 撤回快照 = 上次回合 && 上次回合.回合前末楼 === 楼层 ? 上次回合.chat快照 : undefined;
       await 内部删除聊天消息(_.range(楼层 + 1, 末楼 + 1));
       已发生物理删楼 = true;
       确认回档仍有效();
-      await 协调已删时间线(楼层, { 作废晋阶镜像: true }, 回档仍有效);
+      // 撤回是单回合撤销,回到的场景是记录在案的回合起点;晋阶镜像仍作废(回合被整体撤销,
+      // 不像重掷那样会原地重演),旧记录同时消费掉,防止已删除回合再被重掷成可执行事务。
+      await 协调已删时间线(
+        楼层,
+        撤回快照 ? { 恢复回合变量: 撤回快照, 清上次回合: true, 作废晋阶镜像: true } : { 作废晋阶镜像: true },
+        回档仍有效,
+      );
       确认回档仍有效();
       console.info(`[人妻公寓] 回档至 ${楼层} 楼`);
       eventEmit('人妻公寓:回合完成');

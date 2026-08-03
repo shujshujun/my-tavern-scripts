@@ -268,6 +268,26 @@ function 规范风闻账(data: SchemaType): void {
   ];
 }
 
+/**
+ * 票据 id 全部内嵌登记时段或登记日，跨过当天后同一 id 不可能再被提交，重领与升级
+ * 基线都失去意义；回档/撤销恢复的是整份旧 stat（含当时的票据表），也不依赖现票据。
+ * 无未结责任、不再在账、且隔日的票据只剩死重量，按日裁掉，让去重票据从整局无界
+ * 增长收敛为“当天事件 + 未结责任”的有界集合(2026-08-03 审计 M11)。
+ * 旧格式票据无法判龄，保守保留；它们不再新增，总量有界。
+ */
+function 裁剪过期票据(data: SchemaType): void {
+  const 账 = data.系统._风闻账;
+  const 今天 = 当前日(data);
+  const 在账id = new Set(账.最近事件.map(event => event.id));
+  账.去重票据 = 账.去重票据.filter(raw => {
+    const 票据 = 解析持久票据(raw);
+    if (!票据) return true;
+    if (在账id.has(票据.id)) return true;
+    if (票据.父亲责任 === '未传' || (票据.状态 === '活跃' && 票据.胜任责任 > 0)) return true;
+    return 票据.日 >= 今天;
+  });
+}
+
 function 保留最近事件(data: SchemaType): void {
   规范风闻账(data);
   const 账 = data.系统._风闻账;
@@ -280,12 +300,24 @@ function 保留最近事件(data: SchemaType): void {
   账.最近事件 = [...受保护, ...普通]
     .filter((event, index, all) => all.findIndex(item => item.id === event.id) === index)
     .sort(事件排序);
-  // 轻历史可以裁剪，稳定ID票据不能裁剪；否则旧事件会重新领风闻或失去升级基线。
+  // 轻历史可以裁剪，当天与未结责任的稳定ID票据不能裁剪；否则旧事件会重新领风闻或失去升级基线。
   规范风闻账(data);
+  裁剪过期票据(data);
 }
 
 function 找事件(data: SchemaType, id: string): 风闻事件 | undefined {
   return data.系统._风闻账.最近事件.find(event => event.id === id);
+}
+
+/**
+ * 危机在触发瞬间已按"公开丑闻/母亲事发"当场登记过胜任责任(触发危机:-8)的事件。
+ * 其衍生的紧急投诉任务再逾期属同一件事,不得按"楼务失职"二次叠扣——与普通投诉
+ * "已由逾期计责→父亲报表扣0"的去重方向对齐(2026-08-04 拍板:危机不双重扣罚)。
+ */
+export function 风闻事件已即时计责(data: SchemaType, 事件ID: string): boolean {
+  if (!事件ID) return false;
+  const 责任 = 找事件(data, 事件ID)?.父亲责任 ?? 查持久票据(data, 事件ID).票据?.父亲责任;
+  return 责任 === '已计责';
 }
 
 function 取投诉事件(data: SchemaType): 风闻事件 | undefined {

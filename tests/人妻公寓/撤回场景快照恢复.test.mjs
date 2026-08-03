@@ -1,0 +1,37 @@
+/* eslint-disable import-x/no-nodejs-modules -- Node-only regression test */
+// 2026-08-04 玩家实测:在垃圾房按撤回后,舞台显示上一楼(102)的旧记录且"没有识别房间"。
+// 根因:撤回复用通用回档路径,协调已删时间线 在无 恢复回合变量 时把 _场景/_在场 等全部清 null,
+// 客户端 同步场景自变量 读到 _场景=null → 当前房间丢失。撤回是单回合撤销,回到的场景
+// 记录在 _上次回合.chat快照 中,必须原位恢复;任意史册回档(目标楼未知)仍保守清场。
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import test from 'node:test';
+
+const 回合源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/回合引擎.ts', import.meta.url), 'utf8');
+
+test('撤回(回档到上次回合前末楼)必须按回合快照恢复场景过程态', () => {
+  assert.match(
+    回合源码,
+    /const 撤回快照 = 上次回合 && 上次回合\.回合前末楼 === 楼层 \? 上次回合\.chat快照 : undefined;/,
+    '只有目标楼恰为上次成功回合的回合前末楼才算撤回,对不上一律退回保守清场',
+  );
+  assert.match(
+    回合源码,
+    /const 撤回快照 = [^;]{0,120};[\s\S]{0,200}内部删除聊天消息\(_\.range\(楼层 \+ 1, 末楼 \+ 1\)\)/,
+    '快照判定必须先于物理删楼读取,不得在删楼后拿旧变量冒充',
+  );
+  assert.match(
+    回合源码,
+    /撤回快照 \? \{ 恢复回合变量: 撤回快照, 清上次回合: true, 作废晋阶镜像: true \} : \{ 作废晋阶镜像: true \}/,
+    '撤回按快照恢复并消费旧记录;晋阶镜像两条路径都必须作废(撤回不重演,与重掷不同)',
+  );
+});
+
+test('协调已删时间线的恢复分支要能消费上次回合记录,通用分支仍整体清场', () => {
+  assert.match(回合源码, /if \(选项\.清上次回合\) _\.set\(vars, '_上次回合', null\);/);
+  assert.match(
+    回合源码,
+    /\} else \{\s*for \(const 键 of 时间线清场变量键\) _\.set\(vars, 键, null\);/,
+    '史册任意楼回档与原生删楼的保守清场语义不得被撤回修复改掉',
+  );
+});

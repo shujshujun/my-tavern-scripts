@@ -2395,7 +2395,7 @@ import { 同步画幅 } from './viewport';
 
 // 0.69 位图随不可变 Tag 发布。不要通过 `?url` 把它们塞进客户端 module：
 // 三张录像带原图就会把移动端入口从约 0.65 MB 撑到 11.7 MB，并显著增加 WebView 解析失败风险。
-const 版本素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.69/src/人妻公寓/素材';
+const 版本素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.70/src/人妻公寓/素材';
 const 录像带双屏关闭图 = `${版本素材基址}/特殊场景/录像带/01_双屏关闭.png`;
 const 录像带左屏亮起图 = `${版本素材基址}/特殊场景/录像带/02_左屏亮起.png`;
 const 录像带双屏亮起图 = `${版本素材基址}/特殊场景/录像带/03_双屏亮起.png`;
@@ -2424,6 +2424,7 @@ const 图标库: Record<string, string> = {
   sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
   moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/>',
   phone: '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M11 18h2"/>',
+  chat: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/><path class="ic-gem" d="M8.5 10.5h7M8.5 14h5"/>',
   door: '<rect x="5" y="2" width="14" height="20" rx="1"/><circle cx="15" cy="12" r="1"/>',
   bell: '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/><path d="M10 21h4"/>',
   lock: '<rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>',
@@ -2698,7 +2699,7 @@ const 时间撤销可用 = computed(() => {
 });
 /** 进房那一刻的消息楼号(随 _场景 持久，只供场景快照与历史定位；不参与世界时间)。 */
 const 进房末楼 = ref(0);
-/** 工具由头只在这一次“从门外进房”的首轮结算一次；留在房内续聊不能再次算检修。 */
+/** 工具由头只在这一次“从门外进房”的首轮静默扣一次配额；留在房内续聊不再重复扣。 */
 const 本次入房由头已用 = ref(false);
 interface 无耗时拜访记录 {
   房间id: string;
@@ -2831,7 +2832,7 @@ async function 确认亲密离场(): Promise<boolean> {
 }
 
 async function 进入(房间id: string, 破门 = false, 保持地图 = false): Promise<boolean> {
-  // 地图上重复点当前房间只是“确认留在这里”：不算重新进门，也不能刷新检修借口/进房楼戳。
+  // 地图上重复点当前房间只是“确认留在这里”：不算重新进门，也不能刷新由头配额/进房楼戳。
   if (房间id === 当前房间.value) {
     if (!保持地图) 关地图();
     闪转场(查房间(房间id)?.名称 ?? 房间id);
@@ -2931,6 +2932,8 @@ const 已破门进入 = ref(false);
  * 公共区该干的事全在行动卡上(翻垃圾/查信箱);豁免你自己的地盘:302(你家)与管理员室。
  */
 // ── 工具由头门(2026-07-20 用户拍板):裂缝未确认的户,得有拿得出手的由头才张得开嘴 ──
+// 2026-08-04 用户拍板改静默:借口不再显示、不再注入正文(修理叙事让位给楼务系统),
+// 但门槛与配额原样保留——工具箱在包才开输入框,每户每天3次在后台照扣。
 
 interface 由头日记录 {
   日: number;
@@ -2997,7 +3000,7 @@ const 可输入 = computed(() => {
   }
   if (id === '302' || id === '管理员室') return true;
   if (房内有人在(id)) {
-    // 由头门:低阶段户必须持有工具箱，且该户今日仍有未用过的检修借口。
+    // 由头门:低阶段户必须持有工具箱，且该户今日的后台登门配额还没用完。
     if (需要由头.value && !可用由头.value.length) return false;
     return true;
   }
@@ -3223,7 +3226,8 @@ function 房间动作(id: string | null): 卡动作[] {
     if (房内有人在(id)) {
       动作.push({ kicker: 'VISIT', icon: 'door', 文案: '过去串门', 做: () => 进入(id) });
       // 丈夫关系道具：好酒走专属对饮调查；香烟与球赛票经营不同幅度的信任轴。
-      if (丈夫在楼(data.value.户[id], id as 门牌, 绝对时段.value) === '在家') {
+      // 当面动作只在玩家真正站在这户里时出现(2026-08-03 用户拍板:地图远程操作影响体验还产生 BUG)。
+      if (当前房间.value === id && 丈夫在楼(data.value.户[id], id as 门牌, 绝对时段.value) === '在家') {
         if ((data.value?.背包 ?? []).includes('好酒')) {
           动作.push({
             kicker: 'DRINK',
@@ -3248,8 +3252,8 @@ function 房间动作(id: string | null): 卡动作[] {
           });
         }
       }
-      // 催租三选(P3,天生欠租户):她在家且账上挂着欠租才摆得上台面
-      if ((data.value.户[id]?._欠租笔数 ?? 0) > 0 && 妻现位(id as 门牌) === id) {
+      // 催租三选(P3,天生欠租户):人到她家、她在家且账上挂着欠租才摆得上台面
+      if (当前房间.value === id && (data.value.户[id]?._欠租笔数 ?? 0) > 0 && 妻现位(id as 门牌) === id) {
         const 催 = async (选择: '硬催' | '宽限' | '垫上') => {
           if (!(await 确认已到达动作地点(id))) return;
           eventEmit('人妻公寓:催租', { 门牌: id, 选择 });
@@ -3347,8 +3351,8 @@ function 房间动作(id: string | null): 卡动作[] {
   // 公共区
   动作.push({ kicker: 'GO', icon: 'arrow', 文案: '走过去', 做: () => 进入(id) });
   添加地点线路动作(动作, id);
-  // 出门打听(P5:201渠道;从大堂出门找街坊,伴手礼盒当弹药)
-  if (id === '大堂' && (data.value?.背包 ?? []).includes('伴手礼盒')) {
+  // 出门打听(P5:201渠道;人先到大堂,再提着伴手礼盒出门找街坊)
+  if (id === '大堂' && 当前房间.value === id && (data.value?.背包 ?? []).includes('伴手礼盒')) {
     for (const m of 门牌列表) {
       if (!data.value.户[m] || 户静态表[m].隐身) continue;
       动作.push({
@@ -3372,8 +3376,8 @@ function 房间动作(id: string | null): 卡动作[] {
       做: () => eventEmit('人妻公寓:荣耀洞'),
     });
   }
-  // 公共区零钱(P3:路过的小惊喜;种子+期号与脚本同一真值,拾没拾过看 chat 计数)
-  {
+  // 公共区零钱(P3:路过的小惊喜;人到现场才捡得着;种子+期号与脚本同一真值,拾没拾过看 chat 计数)
+  if (当前房间.value === id) {
     const 零钱 = 查金币(id, 绝对时段.value);
     if (零钱 > 0) {
       动作.push({
@@ -3387,19 +3391,8 @@ function 房间动作(id: string | null): 卡动作[] {
       });
     }
   }
-  if (id === '垃圾房') {
-    动作.push({
-      kicker: 'SEARCH',
-      icon: 'trash',
-      文案: '翻垃圾',
-      类: 'risky',
-      做: async () => {
-        if (!(await 确认已到达动作地点('垃圾房'))) return;
-        房卡.value = null;
-        垃圾选择开.value = true;
-      },
-    });
-  }
+  // 翻垃圾不再上地图房卡(2026-08-03 用户拍板:远程一键翻袋排下的强制事件让玩家找不到
+  // "要处理的事情"，时间和楼务全锁死)。人到垃圾房后由房内 garbage-pick 直显按钮承载。
   return 动作;
 }
 
@@ -4139,8 +4132,10 @@ const 静音会议图状态序列 = computed(
 const 静音会议当前图地址 = computed(() => {
   if (!静音会议显示组合图.value) return '';
   const 状态 = 静音会议图状态序列.value[静音会议图回退序号.value];
+  // 组合图在主仓库随 0.69 Tag 发布,不走 qgy-assets 成人CG仓(那里从未上传过
+  // mute-meeting 目录,全部 404)(2026-08-04 M9)
   const 相对路径 = 状态 ? 获取静音会议素材相对路径(静音会议参与妻.value, 状态) : null;
-  return 相对路径 ? `${成人CG基址}/${相对路径}` : '';
+  return 相对路径 ? `${版本素材基址}/${相对路径}` : '';
 });
 
 function 静音会议图加载成功() {
@@ -4293,8 +4288,8 @@ const 到场提示 = computed(() => {
   if (需要由头.value && 房内有人在(id)) {
     const 有箱 = (data.value?.背包 ?? []).includes('工具箱');
     return 有箱
-      ? '这户今天的三个检修借口都用过了，明天再来。'
-      : '没个由头,你在人家门口站不住脚——去商店「工具」页签买一只工具箱。';
+      ? '今天已经上过三次门，再敲就惹人嫌了——明天再来。'
+      : '空着手你在人家门口站不住脚——去商店「工具」页签买一只工具箱，带着家伙什才像来办正事的。';
   }
   return '要么改天再来,要么……对着门连点几下。';
 });
@@ -4332,9 +4327,7 @@ const 场景图样式 = computed(() => ({ '--scene-img': `url(${荣耀洞图.val
 const 荣耀洞可用 = computed(() => {
   const 系 = data.value?.系统;
   if (!系 || (系._荣耀洞拍 ?? -1) >= 0) return false;
-  // 高级隔离事件不参与新手教程。四项基础走访完成前入口不出现；脚本端另有同一门禁，
-  // 防止延迟点击、旧 iframe 或手工事件绕过显示层。
-  if (!['信箱区', '101', '102', '管理员室'].every(键 => 待办勾.value[键])) return false;
+  // 设计spec:入口只有地点门+冷却+摇签阶段门槛;待办是软引导不硬锁,不作为前置
   const 记 = 规范荣耀洞上次时段(系._荣耀洞上次时段, 绝对时段.value);
   return 绝对时段.value - 记 >= 荣耀洞冷却时段;
 });
@@ -4452,6 +4445,16 @@ function 处理CG回合信号(信号: CG回合信号, 是加载重试 = false): 
     // 场内的委婉/对话楼没有新候选时沿用当前 CG，不能掉回普通立绘。
     成人CG加载中.value = false;
   }
+}
+
+/** 回档/撤回把产生 CG 的楼层删掉后，画面不能继续停留在被抹去的成人场景上(2026-08-03 审计 M10)。
+ * 正常回合的 CG 信号楼层 ≤ 末楼，此检查恒为无害幂等。 */
+function 清理越界成人CG(): void {
+  if (!最近CG信号 || 最近CG信号.楼层 <= getLastMessageId()) return;
+  当前成人CG.value = null;
+  当前成人CG展示键 = '';
+  成人CG加载中.value = false;
+  最近CG信号 = null;
 }
 
 function 成人CG已加载(事件: Event): void {
@@ -4902,7 +4905,10 @@ async function 发送() {
   let 文本 = 输入文本.value.trim();
   if (!文本 || 发送中.value || 由头写入中.value || !当前行动可提交.value) return;
   输入文本.value = '';
-  // 由头进门:工具箱每天对同一户依次提供三个不同借口，先确保记录落库再生成。
+  // 静默由头(2026-08-04 用户拍板):进未攻破户不再显示、不再表演修理借口——修理叙事
+  // 已由楼务系统承担,借口戏只会让玩家整天都在修水管。次数照旧在后台限制(工具箱在包
+  // +每户每天3次),记录沿用 _工具由头 的 {日,已用[]} 形状:工具名退化为内部计数令牌,
+  // 回档按日期作废的语义不变。仍先确保记录落库再生成。
   if (需要由头.value && 可用由头.value.length) {
     const 用 = 可用由头.value[0];
     const 门牌号 = 当前房间.value!;
@@ -4930,7 +4936,8 @@ async function 发送() {
     } finally {
       由头写入中.value = false;
     }
-    文本 = `(${用}在手,以${由头工具表[用]}为由敲开了门；这是今天对这户的第${新记录.已用.length}次检修)${文本}`;
+    // 不再点名工具、不再框定"检修":只告诉AI这是管理员的一次正当登门,剧情由玩家输入自己带。
+    文本 = `(你以公寓管理员的身份敲开了这户的门)${文本}`;
   }
   发出(文本);
 }
@@ -5003,7 +5010,9 @@ function 开始考验() {
 
 const 待办定义 = [
   { 键: '信箱区', 文字: '去信箱看看租约单子' },
-  { 键: '101', 文字: '去 101 修水管' },
+  // 到场即打勾的软引导,文字不能许诺"修好"(2026-08-03 玩家实测:写"修水管"会误以为到场就算修过;
+  // 真正动工要在房内点楼务瓷砖,由脚本结算)。
+  { 键: '101', 文字: '去 101 看看水管报修' },
   { 键: '102', 文字: '去 102 登门认识住户' },
   { 键: '管理员室', 文字: '回管理员室' },
 ] as const;
@@ -5942,6 +5951,9 @@ async function 读取酒馆原生提示词模块(宿主窗口: Window): Promise<
 }
 
 /** 复用酒馆每条消息「… → Prompt」的原生入口；传入楼号，只打开这一回合。 */
+// 关闭监测轮询提到模块级:原生窗口最长挂 5 分钟,期间界面若被销毁必须能在 onUnmounted 收掉(2026-08-03 审计 L10)
+let 原生弹窗轮询: number | undefined;
+
 async function 打开楼层提示词(楼: number) {
   const 同源窗口们: Window[] = [];
   try {
@@ -6025,12 +6037,14 @@ async function 打开楼层提示词(楼: number) {
   if (原本全屏) {
     let 看见窗口 = false;
     let 次数 = 0;
-    const 轮询 = window.setInterval(() => {
+    window.clearInterval(原生弹窗轮询);
+    原生弹窗轮询 = window.setInterval(() => {
       次数++;
       const 有窗口 = Boolean(弹窗文档.querySelector('dialog[open], [role="dialog"], .popup[open]'));
       看见窗口 ||= 有窗口;
       if ((看见窗口 && !有窗口) || 次数 > 1200) {
-        clearInterval(轮询);
+        window.clearInterval(原生弹窗轮询);
+        原生弹窗轮询 = undefined;
         if (看见窗口) void 进真全屏().catch(e => console.warn('[人妻公寓客户端] 原生提示词关闭后恢复全屏失败:', e));
       }
     }, 250);
@@ -6512,6 +6526,7 @@ onMounted(() => {
       录像带连点开始 = 0;
       if (静音会议待散会选择.value) 静音会议会后选择.value = [];
       同步场景自变量(); // 回档把 _场景 清空后 UI 必须跟着回楼道(审计 C2)
+      清理越界成人CG(); // 回档也走本事件收口,被抹掉楼层上的成人画面一并退场(审计 M10)
       幕房间.value = 当前房间.value; // 本轮的戏与选项绑定产出场景,换地方即收
       // 先同步消息历史，再刷新 MVU；时间事务必须等新时钟真正 pull 完成后才能重新点按钮。
       await 取卷轴();
@@ -6538,6 +6553,7 @@ onMounted(() => {
     停止生成计时();
     流式段.value = [];
     同步场景自变量(); // 隔离撤回会把 _场景 恢复成事件前旧值(审计 C2)
+    清理越界成人CG(); // 撤回删楼后同样不得残留成人画面(审计 M10)
     幕房间.value = 当前房间.value;
     await 取卷轴();
     刷新可重掷();
@@ -6714,6 +6730,8 @@ onUnmounted(() => {
   clearInterval(MVU解析刷新timer);
   clearInterval(心跳timer);
   clearInterval(生成等待timer);
+  window.clearInterval(原生弹窗轮询);
+  clearTimeout(转场计时);
   clearTimeout(破门计时);
   clearTimeout(提示timer);
   clearTimeout(性爱结果timer);

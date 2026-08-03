@@ -21,7 +21,7 @@ require('ts-node/register/transpile-only');
 const { 阶段行为基调, 阶段接受上限 } = require('../../src/人妻公寓/stageConfig.ts');
 const { Schema, 创建户节点 } = require('../../src/人妻公寓/schema.ts');
 const { 组公寓快照 } = require('../../src/人妻公寓/脚本/游戏逻辑/snapshotSystem.ts');
-const { 角色成人表现提示 } = require('../../src/人妻公寓/脚本/游戏逻辑/角色表现系统.ts');
+const { 角色人格锚提示, 角色成人表现提示 } = require('../../src/人妻公寓/脚本/游戏逻辑/角色表现系统.ts');
 const 快照源码 = readFileSync(
   fileURLToPath(new URL('../../src/人妻公寓/脚本/游戏逻辑/snapshotSystem.ts', import.meta.url)),
   'utf8',
@@ -56,13 +56,14 @@ test('L0-L2 读取人格档案时只获得角色化边界，不会被错写成 L
   assert.doesNotMatch(提示, /越界后|允许发生/);
 });
 
-test('五名角色的成人表现差分会实际进入亲密快照', () => {
+test('六户角色的成人表现差分会实际进入亲密快照', () => {
   const 角色 = {
     101: ['夏乔', '热闹'],
     102: ['沈静仪', '秩序'],
     201: ['许曼君', '谈判'],
     202: ['周小满', '被看见'],
     301: ['安若妍', '镜头'],
+    302: ['母亲', '掐断'],
   };
 
   for (const [门牌号, [姓名, 差分词]] of Object.entries(角色)) {
@@ -92,4 +93,23 @@ test('五名角色的成人表现差分会实际进入亲密快照', () => {
     assert.match(快照, new RegExp(差分词));
     assert.match(快照, /外部预设只可调整叙述强度与文字风格/);
   }
+});
+
+test('日常完整快照注入轻量人格锚，且不携带成人加固块与尺度词(2026-08-04 拍板:差分贯穿人设)', () => {
+  const data = Schema.parse({ 户: { 101: 创建户节点(2) } });
+  聊天变量 = {
+    _场景: { 房间id: '101', 进房末楼: 0 },
+    _粘滞: { 位置: '101', 楼: 0, 们: ['101'] },
+  };
+
+  const 快照 = 组公寓快照([{ role: 'user', content: '和夏乔聊聊今天的楼务。' }], data, 0);
+  assert.match(快照, /【人格锚·夏乔】/);
+  assert.match(快照, /【本轮性质·日常】/);
+  assert.doesNotMatch(快照, /【角色成人表现/, '日常场景不得加载完整成人差分');
+  assert.doesNotMatch(快照, /【夏乔的界线】/, '日常场景不得注入尺度上限');
+
+  const 锚 = 角色人格锚提示('302', '母亲');
+  assert.match(锚, /【人格锚·母亲】/);
+  assert.match(锚, /唠叨/);
+  assert.doesNotMatch(锚, /高潮|阶段差分|禁止坍缩/, '人格锚只含非性向骨架');
 });

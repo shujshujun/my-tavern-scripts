@@ -10,7 +10,7 @@ export type 静音会议画面状态 = 'CLEAN' | 'DETAIL' | 'PEAK';
 
 export type 静音会议组合键 = `SM-${2 | 3}-${string}`;
 
-export type 静音会议素材相对路径 = `scenes/mute-meeting/${静音会议组合键}/${静音会议画面状态}.webp`;
+export type 静音会议素材相对路径 = `特殊场景/静音会议/组合/${静音会议组合键}/${静音会议画面状态}.png`;
 
 /** 同时作为组合键的唯一合法门牌集和固定排序依据。 */
 export const 静音会议候选门牌顺序 = Object.freeze([
@@ -65,12 +65,16 @@ export function 生成静音会议组合键(原始门牌: unknown): 静音会议
   return `SM-${规范门牌.length}-${规范门牌.join('-')}` as 静音会议组合键;
 }
 
-/** 返回成人素材仓库中的 ASCII 相对路径；任一参数无效时返回 null。 */
+/**
+ * 返回主素材仓库(随发布 Tag)中的相对路径；任一参数无效时返回 null。
+ * 组合图已随 rq0.69 入库,只有 CLEAN 档;DETAIL/PEAK 尚未生成,由回退序列
+ * 自动落回 CLEAN,补图入库后无需改代码(2026-08-04 M9:弃用从未上传的 qgy-assets 仓)。
+ */
 export function 获取静音会议素材相对路径(原始门牌: unknown, 状态: unknown): 静音会议素材相对路径 | null {
   const 组合键 = 生成静音会议组合键(原始门牌);
   if (组合键 === null || !是静音会议画面状态(状态)) return null;
 
-  return `scenes/mute-meeting/${组合键}/${状态}.webp`;
+  return `特殊场景/静音会议/组合/${组合键}/${状态}.png`;
 }
 
 /** 获取指定画面状态的尝试顺序；无效状态返回 null。 */
