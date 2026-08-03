@@ -117,6 +117,40 @@ test('无 generation_id 的兼容流只在当前主正文请求窗口内接纳',
   assert.equal(是当前正文流事件('main-1', 'main-1', 'other-1'), false);
 });
 
+test('完整流监听位于事件队首时，异步前置插件不能让缓存晚于 generate 返回', async () => {
+  const 模拟一次 = async 放队首 => {
+    const 监听们 = [];
+    let 放行前置;
+    let 缓存 = '';
+    let 分发完成;
+    const 前置异步插件 = () => new Promise(resolve => (放行前置 = resolve));
+    const 本卡监听 = 文本 => {
+      缓存 = 文本;
+    };
+    监听们.push(前置异步插件);
+    (放队首 ? 监听们.unshift.bind(监听们) : 监听们.push.bind(监听们))(本卡监听);
+
+    const generate = async () => {
+      分发完成 = (async () => {
+        for (const 监听 of 监听们) await 监听('已经显示过的完整正文');
+      })();
+      return '<JSONPatch>[]</JSONPatch>';
+    };
+
+    const 最终返回 = await generate();
+    const 返回时缓存 = 缓存;
+    放行前置?.();
+    await 分发完成;
+    return { 最终返回, 返回时缓存 };
+  };
+
+  assert.deepEqual(await 模拟一次(false), { 最终返回: '<JSONPatch>[]</JSONPatch>', 返回时缓存: '' });
+  assert.deepEqual(await 模拟一次(true), {
+    最终返回: '<JSONPatch>[]</JSONPatch>',
+    返回时缓存: '已经显示过的完整正文',
+  });
+});
+
 test('普通正文与旧楼层末尾的裸 RFC6902 补丁会被剥离', () => {
   const 正文 = '夏乔把工具收好。';
   const 裸补丁 = '[{"op":"replace","path":"/户/101/妻/好感值","value":1}]';
@@ -129,6 +163,13 @@ test('普通正文与旧楼层末尾的裸 RFC6902 补丁会被剥离', () => {
 test('回合只缓存正文请求流，并在正文清洗前完成流式兜底', () => {
   assert.match(回合源码, /正文流式生成id/);
   assert.match(回合源码, /正文流式原文/);
+  assert.match(
+    回合源码,
+    /eventMakeFirst\(iframe_events\.STREAM_TOKEN_RECEIVED_FULLY,\s*\(文本: string, generation_id: string\) =>/,
+    '完整流监听必须位于宿主事件队首；否则前置异步监听会让 generate 先返回并清空缓存',
+  );
+  assert.doesNotMatch(回合源码, /eventOn\(iframe_events\.STREAM_TOKEN_RECEIVED_FULLY/);
+  assert.match(回合源码, /generation_id && generation_id !== 本回合生成id/);
   assert.match(回合源码, /更新有效流式正文\(正文流式原文,\s*文本,\s*清洗严格正文\)/);
   assert.match(回合源码, /提取纯控制协议尾段\(最终返回原文\)/);
   assert.match(回合源码, /流式兜底变量块 \?\? 取变量块\(原文\)/);
@@ -150,7 +191,14 @@ test('回合只缓存正文请求流，并在正文清洗前完成流式兜底',
   const 生成开始 = 回合源码.indexOf('本回合生成id = `rqgy-');
   const 清洗开始 = 回合源码.indexOf('const 已清洗正文', 生成开始);
   const 选择位置 = 回合源码.indexOf('选择正文生成原文(', 生成开始);
+  const 尾段位置 = 回合源码.indexOf('提取纯控制协议尾段(最终返回原文)', 选择位置);
+  const 清生成id位置 = 回合源码.indexOf("正文流式生成id = '';", 选择位置);
+  const 清原文位置 = 回合源码.indexOf("正文流式原文 = '';", 清生成id位置);
   assert.ok(选择位置 > 生成开始 && 选择位置 < 清洗开始);
+  assert.ok(
+    选择位置 < 尾段位置 && 尾段位置 < 清生成id位置 && 清生成id位置 < 清原文位置 && 清原文位置 < 清洗开始,
+    '必须先选取流式正文并提取最终控制尾段，之后才能清空本次正文缓存',
+  );
 });
 
 test('AI变量解析异常降级到可信基准并保留正文，最终整表写入失败仍不得伪装成功', () => {

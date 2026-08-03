@@ -321,7 +321,10 @@ let 正文流式生成id = '';
 let 正文流式原文 = '';
 let 解除生成等待: (() => void) | null = null;
 eventClearEvent(iframe_events.STREAM_TOKEN_RECEIVED_FULLY);
-eventOn(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, (文本: string, generation_id: string) => {
+// Tavern Helper 的完整流事件没有等待宿主 EventEmitter 分发完毕就可能让 generate() 返回。
+// 若前面挂着异步插件监听，普通 eventOn 会在本回合已经选文、清缓存之后才收到最终流。
+// 放到队首后缓存写入在 emit() 的首个同步段完成，界面仍可照常异步转发。
+eventMakeFirst(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, (文本: string, generation_id: string) => {
   if (!进行中) return;
   if (generation_id && generation_id !== 本回合生成id) return;
   if (是当前正文流事件(正文流式生成id, 本回合生成id, generation_id)) {

@@ -9,7 +9,9 @@ process.env.TS_NODE_COMPILER_OPTIONS = JSON.stringify({ module: 'CommonJS', modu
 require('ts-node/register/transpile-only');
 
 const { 编译近期微信胶囊, 楼务微信消息仍有效 } = require('../../src/人妻公寓/脚本/游戏逻辑/微信正文承接.ts');
+const { 已入住微信妻友门牌 } = require('../../src/人妻公寓/脚本/游戏逻辑/微信好友规则.ts');
 const 手机源 = readFileSync('src/人妻公寓/脚本/游戏逻辑/手机系统.ts', 'utf8');
+const 快照源 = readFileSync('src/人妻公寓/脚本/游戏逻辑/snapshotSystem.ts', 'utf8');
 const 入口源 = readFileSync('src/人妻公寓/脚本/游戏逻辑/index.ts', 'utf8');
 
 test('楼务硬通知先于任何可能等待AI的冷落预警，同时仍服从坏结局与特殊场景门', () => {
@@ -26,14 +28,28 @@ test('楼务硬通知先于任何可能等待AI的冷落预警，同时仍服从
   assert.ok(频率门 > 冷落预警, '关闭普通自动内容时仍须保留两类硬通知');
 });
 
-test('阶段0联系人会因未读楼务来源消息保留，好友与全局红点共用同一未读判据', () => {
-  const 好友段 = 手机源.slice(手机源.indexOf('export function 微信好友'), 手机源.indexOf('// 快照侧联系方式行'));
-  const 未读段 = 手机源.slice(手机源.indexOf('function 未读楼务联系人'), 手机源.indexOf('export function 微信好友'));
+test('已入住角色从阶段0起就是稳定好友，楼务创建、结案与已读状态都不改变联系人资格', () => {
+  const 建数据 = ({ 有任务 = false, 母亲入列 = false } = {}) => ({
+    户: {
+      101: { 妻: { 当前阶段: 0 } },
+      102: { 妻: { 当前阶段: 0 } },
+      302: { 妻: { 当前阶段: 0 } },
+    },
+    系统: {
+      _母亲入列: 母亲入列,
+      _管理考核: { 活跃任务: 有任务 ? [{ id: 'repair', 类型: '报修', 门牌: '101' }] : [] },
+    },
+  });
 
-  assert.match(手机源, /function 未读楼务联系人/);
-  assert.match(未读段, /会话消息未读/);
-  assert.match(好友段, /未读楼务联系人/);
-  assert.match(好友段, /有正式楼务\s*\|\|\s*有未读楼务/);
+  assert.deepEqual(已入住微信妻友门牌(建数据()), ['101', '102']);
+  assert.deepEqual(已入住微信妻友门牌(建数据({ 有任务: true })), ['101', '102']);
+  assert.deepEqual(已入住微信妻友门牌(建数据({ 母亲入列: true })), ['101', '102', '302']);
+
+  const 好友段 = 手机源.slice(手机源.indexOf('export function 微信好友'), 手机源.indexOf('// 快照侧联系方式行'));
+  assert.match(好友段, /已入住微信妻友门牌\(data\)/);
+  assert.doesNotMatch(好友段, /当前阶段|楼务联系人|未读楼务/);
+  assert.doesNotMatch(手机源, /function 未读楼务联系人/);
+  assert.match(快照源, /已入住微信妻友门牌\(data\)/, 'AI 通讯范围必须与手机联系人共用同一判据');
   assert.match(手机源, /function 会话有未读[\s\S]*会话消息未读/);
 });
 
@@ -44,10 +60,7 @@ test('完成任务退出正文；逾期但仍可补办的楼务请求继续由�
     { 楼: 8, 时: 4, 会话: '101', 发: '对方', 文: '逾期任务请看任务板。', 键: '楼务:repair-overdue' },
     { 楼: 8, 时: 4, 会话: '101', 发: '对方', 文: '晚上记得关窗。' },
   ];
-  const 胶囊 = 编译近期微信胶囊(消息, [{ 门牌: '101', 人物: '夏乔' }], 8, 4, [
-    'repair-active',
-    'repair-overdue',
-  ]);
+  const 胶囊 = 编译近期微信胶囊(消息, [{ 门牌: '101', 人物: '夏乔' }], 8, 4, ['repair-active', 'repair-overdue']);
 
   assert.match(胶囊, /水龙头还漏着/);
   assert.match(胶囊, /逾期任务请看任务板/);
@@ -61,7 +74,7 @@ test('同一楼务有效性判据同时覆盖SQLite摘要和微信内继续私�
   assert.equal(楼务微信消息仍有效({ 键: '楼务:repair-done' }, 有效任务), false);
   assert.equal(楼务微信消息仍有效({ 文: '普通私聊' }, 有效任务), true);
 
-  const 摘要段 = 手机源.slice(手机源.indexOf('interface 微信摘要消息'), 手机源.indexOf('function 解析微信摘要响应'));
+  const 摘要段 = 手机源.slice(手机源.indexOf('interface 微信摘要消息'), 手机源.indexOf('function 微信摘要快照仍有效'));
   const 私聊段 = 手机源.slice(
     手机源.indexOf('const 近况 ='),
     手机源.indexOf('const 会议状态 =', 手机源.indexOf('const 近况 =')),

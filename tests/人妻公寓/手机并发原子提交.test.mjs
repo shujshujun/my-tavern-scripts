@@ -69,7 +69,7 @@ test('正在输入使用逐会话引用计数，任一会议参与妻未完成�
   const 硬门 = 截源('export function 静音会议私聊回复生成中', 'function 会议手机渲染键');
   assert.match(硬门, /状态\.参与妻\.some\([^)]*会话正在输入/);
 
-  const 计数片段 = 截源('const 正在输入会话', 'let 上次会议手机渲染键');
+  const 计数片段 = 截源('const 正在输入会话', 'interface 会话待回复上下文');
   const { 开始会话输入, 结束会话输入, 会话正在输入 } = 执行TS片段(计数片段, [
     '开始会话输入',
     '结束会话输入',
@@ -132,28 +132,55 @@ test('会场摘要冻结聊天与会议身份，排队期间切档或换场后�
   );
 });
 
-test('发送与邀约的首次渲染都在获锁后的 try/finally 内', () => {
-  for (const 段 of [
-    截源('async function 约出来(', '// ── 姐妹群一拍'),
-    截源('async function 发消息(', 'async function 执行发消息'),
-  ]) {
-    const 获锁 = 段.indexOf('开始会话输入');
-    const try位 = 段.indexOf('try', 获锁);
-    const 首次渲染 = 段.indexOf('渲染()', 获锁);
-    const finally位 = 段.indexOf('finally', try位);
-    const 解锁 = 段.indexOf('结束会话输入', finally位);
-    assert.ok(获锁 >= 0 && try位 > 获锁 && 首次渲染 > try位 && finally位 > 首次渲染 && 解锁 > finally位);
-  }
+test('邀约首次渲染仍在获锁后的 try/finally 内', () => {
+  const 邀约段 = 截源('async function 约出来(', '// ── 姐妹群一拍');
+  const 获锁 = 邀约段.indexOf('开始会话输入');
+  const try位 = 邀约段.indexOf('try', 获锁);
+  const 首次渲染 = 邀约段.indexOf('渲染()', 获锁);
+  const finally位 = 邀约段.indexOf('finally', try位);
+  const 解锁 = 邀约段.indexOf('结束会话输入', finally位);
+  assert.ok(获锁 >= 0 && try位 > 获锁 && 首次渲染 > try位 && finally位 > 首次渲染 && 解锁 > finally位);
+});
+
+test('玩家发送在首次写库前预留消息 ID，批次结束才释放会话锁', () => {
+  const 发送段 = 截源('async function 发消息(', 'async function 执行待回复批次(');
+  const 获锁 = 发送段.indexOf('开始会话输入');
+  const 预留消息ID = 发送段.indexOf('const 玩家消息标识 = 新玩家微信消息标识');
+  const 开始写入 = 发送段.indexOf('手机聊天批次.开始写入(键, 玩家消息标识)');
+  const 首次异步写 = 发送段.indexOf('await 写库增量');
+  assert.ok(获锁 >= 0 && 预留消息ID > 获锁 && 开始写入 > 预留消息ID && 首次异步写 > 开始写入);
+
+  const finally位 = 发送段.indexOf('finally', 首次异步写);
+  const 完成写入 = 发送段.indexOf('手机聊天批次.完成写入(键, 玩家消息标识, 已成功落库)', finally位);
+  assert.ok(finally位 > 首次异步写 && 完成写入 > finally位, '玩家消息无论成功失败都必须结束写入预留');
+
+  const 批次段 = 截源('async function 执行待回复批次(', 'async function 执行批次聊天回复(');
+  const 生命周期入口 = 批次段.indexOf('await 执行手机聊天批次任务(');
+  const 完成请求 = 批次段.indexOf('手机聊天批次.完成请求(请求.键, 请求.请求序号, true)', 生命周期入口);
+  const 上下文身份校验 = 批次段.indexOf('会话待回复.get(请求.键) === 本次上下文', 完成请求);
+  const 释放待回复 = 批次段.indexOf('释放会话待回复(请求.键)', 上下文身份校验);
+  assert.ok(
+    生命周期入口 >= 0 && 完成请求 > 生命周期入口 && 上下文身份校验 > 完成请求 && 释放待回复 > 上下文身份校验,
+    '批次必须交给无拒绝生命周期收口，并在完成请求后只释放同一批次持有的会话锁',
+  );
+
+  const 释放段 = 截源('function 释放会话待回复(', 'const 手机聊天批次');
+  assert.match(释放段, /if \(!上下文\.已释放\)[\s\S]*结束会话输入\(上下文\.输入租约\)[\s\S]*会话待回复\.delete\(键\)/);
 });
 
 test('发送入口冻结聊天ID与原时间线，切档后不得重捕获新档继续回复', () => {
-  const 发送段 = 截源('async function 发消息(', '// ── 父亲来电');
+  const 发送段 = 截源('async function 发消息(', 'async function 执行待回复批次(');
+  const 群接话段 = 截源('async function 手动群接话(', '// ── 单聊/群聊发送');
+  const 批次回复段 = 截源('async function 执行批次聊天回复(', '// ── 父亲来电');
   assert.match(发送段, /const 发送聊天ID\s*=\s*当前聊天ID\(\)/);
   assert.match(发送段, /创建手机时间线租约\(发送聊天ID/);
-  assert.match(发送段, /写库增量\([\s\S]*手机发送租约仍有效\(发送租约\)/);
-  assert.match(发送段, /手动群接话\('群',[\s\S]*发送租约\)/);
+  assert.match(发送段, /const 已写 = await 写库增量\([\s\S]*?\(\) => 手机发送租约仍有效\(发送租约\),\s*\);/);
   assert.match(发送段, /写会场私聊摘要\([\s\S]*发送租约\.会场摘要租约/);
-  assert.doesNotMatch(发送段, /const 回复聊天ID\s*=\s*当前聊天ID\(\)/);
+  assert.match(群接话段, /const 有效 = 手机发送租约仍有效\(发送租约\) && 手机小生成仍有效\(控制\)/);
+  assert.match(批次回复段, /手动群接话\('群', [^\r\n]+, 发送租约, 控制\)/);
+  assert.match(批次回复段, /手动群接话\('姐妹群', [^\r\n]+, 发送租约, 控制\)/);
+  assert.match(批次回复段, /const 回复聊天ID\s*=\s*发送租约\.聊天ID/);
+  assert.doesNotMatch(批次回复段, /const 回复聊天ID\s*=\s*当前聊天ID\(\)/);
 
   const { 创建手机时间线租约, 手机时间线租约仍有效 } = require('../../src/人妻公寓/脚本/游戏逻辑/手机时间线租约.ts');
   const 原消息 = [{ mes: '同样外观', is_user: false, swipe_id: 0 }];

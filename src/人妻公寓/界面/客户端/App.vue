@@ -2393,9 +2393,9 @@ import { 计算场景同步, type 场景聊天状态 } from './场景状态同�
 import { 读取录像带连点失败状态, 推进录像带连点失败 } from './录像带交互状态';
 import { 同步画幅 } from './viewport';
 
-// 0.68 位图随不可变 Tag 发布。不要通过 `?url` 把它们塞进客户端 module：
+// 0.69 位图随不可变 Tag 发布。不要通过 `?url` 把它们塞进客户端 module：
 // 三张录像带原图就会把移动端入口从约 0.65 MB 撑到 11.7 MB，并显著增加 WebView 解析失败风险。
-const 版本素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.68/src/人妻公寓/素材';
+const 版本素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.69/src/人妻公寓/素材';
 const 录像带双屏关闭图 = `${版本素材基址}/特殊场景/录像带/01_双屏关闭.png`;
 const 录像带左屏亮起图 = `${版本素材基址}/特殊场景/录像带/02_左屏亮起.png`;
 const 录像带双屏亮起图 = `${版本素材基址}/特殊场景/录像带/03_双屏亮起.png`;
@@ -5924,19 +5924,41 @@ async function 打开移动端全屏() {
   }
 }
 
+type 酒馆原生提示词模块 = {
+  promptItemize: (提示词: unknown[], 楼号: number) => Promise<unknown> | unknown;
+  itemizedPrompts: unknown[];
+};
+
+async function 读取酒馆原生提示词模块(宿主窗口: Window): Promise<酒馆原生提示词模块 | null> {
+  try {
+    // 固定路径只在已验证可读的同源宿主窗口执行，确保复用酒馆正在运行的模块实例及其内存状态。
+    const 候选 = (await 宿主窗口.eval('import("/script.js")')) as Partial<酒馆原生提示词模块> | null;
+    if (typeof 候选?.promptItemize !== 'function' || !Array.isArray(候选.itemizedPrompts)) return null;
+    return 候选 as 酒馆原生提示词模块;
+  } catch (e) {
+    console.warn('[人妻公寓客户端] 无法导入酒馆原生提示词模块，退回消息按钮:', e);
+    return null;
+  }
+}
+
 /** 复用酒馆每条消息「… → Prompt」的原生入口；传入楼号，只打开这一回合。 */
 async function 打开楼层提示词(楼: number) {
-  const 文档们: Document[] = [];
+  const 同源窗口们: Window[] = [];
   try {
     let 窗: Window = window;
     for (let i = 0; i < 8; i++) {
-      if (!文档们.includes(窗.document)) 文档们.push(窗.document);
+      // 读取 document 本身就是同源校验；一旦遇到跨域祖先，catch 会保留此前收集结果。
+      void 窗.document;
+      if (!同源窗口们.includes(窗)) 同源窗口们.push(窗);
       if (窗.parent === 窗) break;
       窗 = 窗.parent;
     }
   } catch {
-    // 跨域祖先不可读时，仍保留已经收集到的同源文档。
+    // 跨域祖先不可读时，仍保留已经收集到的同源窗口。
   }
+  const 文档们 = 同源窗口们.map(窗 => 窗.document);
+  const 宿主窗口 = 同源窗口们.find(窗 => Boolean(窗.document.querySelector('#chat'))) ?? 同源窗口们.at(-1) ?? window;
+  const 宿主文档 = 宿主窗口.document;
   const 楼号 = Math.trunc(楼);
   let 入口: HTMLElement | null = null;
   let 入口文档: Document = document;
@@ -5950,14 +5972,26 @@ async function 打开楼层提示词(楼: number) {
       break;
     }
   }
-  if (!入口) {
-    弹提示('酒馆当前没有渲染这一回合的原生消息；若是很早的往事，先在酒馆加载到该楼再点。', 5000);
-    return;
-  }
-  const 样式 = 入口文档.defaultView?.getComputedStyle(入口) ?? getComputedStyle(入口);
-  if (样式.display === 'none') {
-    弹提示('这一回合没有保存可查看的提示词。', 4000);
-    return;
+
+  const 原生模块 = await 读取酒馆原生提示词模块(宿主窗口);
+  if (原生模块) {
+    const 有这一回合 = 原生模块.itemizedPrompts.some(
+      item => Number((item as { mesId?: unknown } | null)?.mesId) === 楼号,
+    );
+    if (!有这一回合) {
+      弹提示('这一回合没有保存可查看的提示词。', 4000);
+      return;
+    }
+  } else {
+    if (!入口) {
+      弹提示('暂时无法调用酒馆原生提示词入口，请在酒馆消息菜单中重试。', 5000);
+      return;
+    }
+    const 样式 = 入口文档.defaultView?.getComputedStyle(入口) ?? getComputedStyle(入口);
+    if (样式.display === 'none') {
+      弹提示('这一回合没有保存可查看的提示词。', 4000);
+      return;
+    }
   }
 
   const 文档 = document as 全屏文档;
@@ -5970,9 +6004,22 @@ async function 打开楼层提示词(楼: number) {
       /* 即使退出失败也尝试唤起原生窗口 */
     }
   }
-  // 酒馆原生监听的是 pointerup，不是 click。
-  const Pointer事件 = 入口文档.defaultView?.PointerEvent ?? PointerEvent;
-  入口.dispatchEvent(new Pointer事件('pointerup', { bubbles: true, cancelable: true }));
+
+  let 弹窗文档 = 宿主文档;
+  if (原生模块) {
+    // promptItemize 会等弹窗关闭才 resolve，不能 await，否则会错过下方的关闭监测。
+    const 原生调用 = 原生模块.promptItemize(原生模块.itemizedPrompts, 楼号);
+    void Promise.resolve(原生调用).catch(e => {
+      console.warn('[人妻公寓客户端] 打开酒馆原生提示词窗口失败:', e);
+      弹提示('酒馆原生提示词窗口打开失败，请稍后重试。', 4000);
+    });
+  } else {
+    if (!入口) return;
+    弹窗文档 = 入口文档;
+    // 兼容无法动态导入模块的酒馆版本；原生监听的是 pointerup，不是 click。
+    const Pointer事件 = 入口文档.defaultView?.PointerEvent ?? PointerEvent;
+    入口.dispatchEvent(new Pointer事件('pointerup', { bubbles: true, cancelable: true }));
+  }
 
   // 原生窗口挂在父文档；若本按钮替玩家退出了全屏，等原生窗口真正关闭后再恢复。
   if (原本全屏) {
@@ -5980,7 +6027,7 @@ async function 打开楼层提示词(楼: number) {
     let 次数 = 0;
     const 轮询 = window.setInterval(() => {
       次数++;
-      const 有窗口 = Boolean(入口文档.querySelector('dialog[open], [role="dialog"], .popup[open]'));
+      const 有窗口 = Boolean(弹窗文档.querySelector('dialog[open], [role="dialog"], .popup[open]'));
       看见窗口 ||= 有窗口;
       if ((看见窗口 && !有窗口) || 次数 > 1200) {
         clearInterval(轮询);
