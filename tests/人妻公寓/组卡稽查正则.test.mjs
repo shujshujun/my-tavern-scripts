@@ -42,3 +42,40 @@ test('稽查 v2 的尺度判定以独立命名正则随角色卡发布', () => {
     assert.equal(样本[3].replace(正则, '').trim(), '正文');
   }
 });
+
+test('角色卡发送层与显示层都隐藏裸 JSONPatch 和孤立变量闭标签', () => {
+  const 不发送 = 构造角色卡正则(读取正则项('[不发送]去除变量更新与占位符'));
+  const 不显示 = 构造角色卡正则(读取正则项('[不显示]隐藏变量更新与协议标签'));
+  const 样本 = `正文
+<JSONPatch>
+[{"op":"replace","path":"/户/101/妻/好感值","value":1}]
+</JSONPatch>
+</UpdateVariable>`;
+
+  assert.equal(样本.replace(不发送, '').trim(), '正文');
+  assert.equal(样本.replace(不显示, '').trim(), '正文');
+
+  const 裸数组 = `正文
+[{"op":"replace","path":"/户/101/妻/好感值","value":1}]`;
+  assert.equal(裸数组.replace(不发送, '').trim(), '正文');
+  assert.equal(裸数组.replace(不显示, '').trim(), '正文');
+
+  const 空补丁 = `正文
+[]`;
+  assert.equal(空补丁.replace(不发送, '').trim(), '正文');
+  assert.equal(空补丁.replace(不显示, '').trim(), '正文');
+
+  const 前置普通数组 = `正文
+[{"name":"普通清单"}]
+中间正文
+[{"op":"replace","path":"/户/101/妻/好感值","value":1}]`;
+  assert.equal(前置普通数组.replace(不发送, '').trim(), '正文\n[{"name":"普通清单"}]\n中间正文');
+  assert.equal(前置普通数组.replace(不显示, '').trim(), '正文\n[{"name":"普通清单"}]\n中间正文');
+
+  const 漏闭合但有剧情 = '<UpdateVariable>标签后的剧情不能被整楼吞掉';
+  assert.equal(漏闭合但有剧情.replace(不发送, ''), '标签后的剧情不能被整楼吞掉');
+  assert.equal(漏闭合但有剧情.replace(不显示, ''), '标签后的剧情不能被整楼吞掉');
+  const 裸补丁漏闭合但有剧情 = '<JSONPatch>这里是在正文里提到 JSONPatch，不应吞掉剧情';
+  assert.equal(裸补丁漏闭合但有剧情.replace(不发送, ''), '这里是在正文里提到 JSONPatch，不应吞掉剧情');
+  assert.equal(裸补丁漏闭合但有剧情.replace(不显示, ''), '这里是在正文里提到 JSONPatch，不应吞掉剧情');
+});

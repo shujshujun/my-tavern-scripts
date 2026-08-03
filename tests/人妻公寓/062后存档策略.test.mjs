@@ -145,7 +145,7 @@ test('旧单值行为等级解析已由多角色尺度结果完整承接', () =>
   assert.match(稽查源码, /export function 解析尺度判定/);
   assert.match(回合源码, /稽查\.角色\[CG门牌\]\?\.实际 \?\? 稽查\.最高实际等级/);
   assert.match(回合源码, /Object\.entries\(稽查\.角色\)/);
-  assert.match(回合源码, /replace\(\/<行为等级>/);
+  assert.match(回合源码, /replace\(\/<行为等级\(\?:\\s\[\^>\]\*\)\?>/);
 });
 
 test('rq0.62 后正在完善的资源与特殊场景字段不得按旧兼容空壳删除', () => {

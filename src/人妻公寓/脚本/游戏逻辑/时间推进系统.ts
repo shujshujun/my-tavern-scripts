@@ -41,6 +41,34 @@ export interface 时间推进事务结果 {
   资源提示: string[];
 }
 
+const 可略过来电事件标记 = ['【来电回流】', '【母亲裂缝·父亲来电】'] as const;
+
+function 读取待发送事件队列(事件: string): string[] {
+  return String(事件 ?? '')
+    .split('|')
+    .map(项 => 项.trim())
+    .filter(Boolean);
+}
+
+function 是可略过来电事件(事件: string): boolean {
+  const 标签 = 事件.match(/【[^】]+】/g) ?? [];
+  return 标签.length === 1 && 可略过来电事件标记.some(标记 => 标签[0] === 标记 && 事件.startsWith(标记));
+}
+
+/** 电话已在手机线程完整演完；这些只供下一段正文参考，不得伪装成必须先演的强剧情。 */
+export function 取阻塞时间的待发送事件(事件: string): string {
+  return 读取待发送事件队列(事件)
+    .filter(项 => !是可略过来电事件(项))
+    .join('|');
+}
+
+/** 玩家选择晨跑、健身或睡眠时，可把刚结束的电话余波降格为独立演出的心境素材。 */
+export function 取可略过来电事件(事件: string): string {
+  return 读取待发送事件队列(事件)
+    .filter(是可略过来电事件)
+    .join('|');
+}
+
 function 构造母亲早饭桌事件(地点: 时间推进地点): string {
   const 地点开场 =
     地点 === '302'
@@ -96,7 +124,9 @@ export function 预检时间推进(data: SchemaType, 请求: 时间推进请求)
     return 失败('世界时间已经变化，请刷新当前状态后重试。', 起始时间);
   }
   if (data.系统._坏结局) return 失败('结局已经锁定，世界时间不能再推进。', 起始时间);
-  if (data.系统._待发送事件.trim()) return 失败('还有尚未演出的强制事件，请先完成这一幕。', 起始时间);
+  if (取阻塞时间的待发送事件(data.系统._待发送事件)) {
+    return 失败('还有尚未演出的强制事件，请先完成这一幕。', 起始时间);
+  }
 
   if (!['推进一时段', '睡到次日早晨', '小憩', '晨跑', '健身'].includes(请求.方式)) {
     return 失败('无法识别这次时间推进方式。', 起始时间);
@@ -150,6 +180,8 @@ export function 执行时间推进事务(data: SchemaType, 请求: 时间推进�
 
   try {
     const 候选 = _.cloneDeep(data) as SchemaType;
+    // 电话已经在手机里演完。若玩家直接让时间流逝，余波提示随动作消费；任何同队列强剧情仍由预检阻断。
+    候选.系统._待发送事件 = 取阻塞时间的待发送事件(候选.系统._待发送事件);
     const 推进结果 = 推进候选(候选, 请求.方式);
     const 结束时间 = 推进结果.新时间;
     const 资源提示: string[] = [];

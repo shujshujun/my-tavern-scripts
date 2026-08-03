@@ -220,13 +220,13 @@ test('所有确定性正戏都要求真实正文，不能用纯标签响应消�
   assert.match(回合Source, /事件必须有正文\(本楼事件\)[\s\S]{0,120}清洗严格正文\(原文\)/);
 });
 
-test('单一时间票谓词只用于清理旧版遗留，当前时间入口不再放行任何待演票据', () => {
+test('单一时间票谓词只用于清理旧版遗留，当前时间入口只放行已演完的来电余波', () => {
   assert.equal(是单一时间流逝事件('【时间流逝】旧文案'), true);
   assert.equal(是单一时间流逝事件('【时间流逝】旧文案【转折正戏】不能吞'), false);
 
   const source = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
   assert.match(source, /import \{[^}]*是单一时间流逝事件[^}]*\} from '\.\/时间推进系统'/s);
   assert.match(source, /const 遗留时间票 = 是单一时间流逝事件\(data\.系统\._待发送事件\)/);
-  assert.match(source, /const 待演 = data\.系统\._待发送事件\.trim\(\);\s*if \(待演\)/);
+  assert.match(source, /const 待演 = 取阻塞时间的待发送事件\(data\.系统\._待发送事件\);\s*if \(待演\)/);
   assert.match(source, /【转折正戏】\|【药物首夜】\|【早饭桌】/, '早餐尚未提交时也必须阻止其他角色挤入晋阶正戏');
 });

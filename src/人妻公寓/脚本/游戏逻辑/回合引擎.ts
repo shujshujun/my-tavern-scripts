@@ -76,8 +76,18 @@ import { 构造CG亲密上下文 } from './CG亲密上下文';
 import { 行动资源门槛, 结算成功现场楼 } from './玩家资源系统';
 import { 当前预设正文标签 } from './预设桥';
 import { 清洗预设输出 } from './预设输出兼容';
-import { 严格清除协议残留 } from './严格正文清洗';
-import { 选择正文生成原文 } from './正文生成完整性';
+import {
+  严格清除协议残留,
+  清除末尾残缺协议标签,
+  清除末尾裸JSON补丁,
+  提取末尾裸JSON补丁,
+} from './严格正文清洗';
+import {
+  提取纯控制协议尾段,
+  是当前正文流事件,
+  选择正文生成原文,
+  更新有效流式正文,
+} from './正文生成完整性';
 import { 合并最新父亲通话, 排队父亲通话整表写 } from './父亲通话写租约';
 import { 当前时间线切换世代, 作废当前时间线切换世代, 登记内部删楼租约, 时间线切换协调中 } from './时间线切换协调';
 
@@ -314,7 +324,9 @@ eventClearEvent(iframe_events.STREAM_TOKEN_RECEIVED_FULLY);
 eventOn(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, (文本: string, generation_id: string) => {
   if (!进行中) return;
   if (generation_id && generation_id !== 本回合生成id) return;
-  if (generation_id && generation_id === 正文流式生成id) 正文流式原文 = typeof 文本 === 'string' ? 文本 : '';
+  if (是当前正文流事件(正文流式生成id, 本回合生成id, generation_id)) {
+    正文流式原文 = 更新有效流式正文(正文流式原文, 文本, 清洗严格正文);
+  }
   eventEmit('人妻公寓:流式', 文本);
 });
 
@@ -376,15 +388,29 @@ const 二次变量结算令 = [
   '好感变化必须有正文依据，允许正数、负数或不变；不得为了更新而机械加分。遵守变量规则与单轮上限，不在场人物及系统管理字段绝对不动。',
 ].join('\n');
 
+function 清除变量禁区(文本: string): string {
+  return 文本
+    .replace(/<think(?:ing)?\b[^>]*>[\s\S]*?<\/think(?:ing)?\s*>/gi, '')
+    .replace(/<reason(?:ing)?\b[^>]*>[\s\S]*?<\/reason(?:ing)?\s*>/gi, '')
+    .replace(/<尺度判定(?:\s[^>]*)?>[\s\S]*?<\/尺度判定\s*>/gi, '')
+    .replace(/<(?:think(?:ing)?|reason(?:ing)?)\b[^>]*>[\s\S]*$/i, '')
+    .replace(/<尺度判定(?:\s[^>]*)?>[\s\S]*$/i, '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<!--[\s\S]*$/, '');
+}
+
 function 取变量块(文本: string): string | null {
+  const 可解析文本 = 清除变量禁区(文本);
   // 标准形:完整 <UpdateVariable> 块
-  const 完整 = 文本.match(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/i)?.[0];
+  const 完整 = [...可解析文本.matchAll(/<UpdateVariable\b[^>]*>[\s\S]*?<\/UpdateVariable\s*>/gi)].at(-1)?.[0];
   if (完整) return 完整;
   // 兜底①(2026-07-26 玩家反馈"变量不更新"):模型漏了外层包装,只输出 <JSONPatch> 块
-  const 裸补丁 = 文本.match(/<json_?patch>[\s\S]*?<\/json_?patch>/i)?.[0];
+  const 裸补丁 = [...可解析文本.matchAll(/<json_?patch\b[^>]*>[\s\S]*?<\/json_?patch\s*>/gi)].at(-1)?.[0];
   if (裸补丁) return `<UpdateVariable>\n${裸补丁}\n</UpdateVariable>`;
   // 兜底②:连标签都没有,只输出了裸 JSON Patch 数组(可能带代码围栏)
-  const 数组 = 文本.match(/\[\s*\{[\s\S]*?"op"\s*:[\s\S]*?\}\s*\]/)?.[0];
+  const 数组 = 提取末尾裸JSON补丁(
+    可解析文本.replace(/(?:<\/(?:UpdateVariable|json_?patch)\s*>\s*)+$/gi, ''),
+  );
   if (数组) {
     try {
       if (Array.isArray(JSON.parse(数组))) {
@@ -395,9 +421,13 @@ function 取变量块(文本: string): string | null {
     }
   }
   // 兜底③:_.set 老格式命令行(MVU 全文扫描也认,但包起来便于清洗与落账一致)
-  const 命令行 = 文本.split('\n').filter(行 => /_\.(?:set|insert|assign|remove|unset|delete|add)\(/.test(行));
+  const 命令行 = 可解析文本.split('\n').filter(行 => /_\.(?:set|insert|assign|remove|unset|delete|add)\(/.test(行));
   if (命令行.length) return `<UpdateVariable>\n${命令行.join('\n')}\n</UpdateVariable>`;
   return null;
+}
+
+function 取尺度判定块(文本: string): string | null {
+  return [...文本.matchAll(/<尺度判定(?:\s[^>]*)?>[\s\S]*?<\/尺度判定\s*>/gi)].at(-1)?.[0] ?? null;
 }
 
 /**
@@ -407,8 +437,9 @@ function 取变量块(文本: string): string | null {
  *   Gemini 爱写尾逗号/注释,解析不动的畸形块=等于没写,须触发兜底重算)。
  */
 function 有可用变量命令(文本: string): boolean {
-  if (/_\.(?:set|insert|assign|remove|unset|delete|add)\(/.test(文本)) return true;
-  for (const m of 文本.matchAll(/<(json_?patch)>([\s\S]*?)<\/\1>/gi)) {
+  const 可解析文本 = 清除变量禁区(文本);
+  if (/_\.(?:set|insert|assign|remove|unset|delete|add)\(/.test(可解析文本)) return true;
+  for (const m of 可解析文本.matchAll(/<(json_?patch)\b[^>]*>([\s\S]*?)<\/\1\s*>/gi)) {
     const 体 = m[2]
       .replace(/^\s*```[a-z]*\s*/i, '')
       .replace(/```\s*$/, '')
@@ -418,6 +449,11 @@ function 有可用变量命令(文本: string): boolean {
     } catch {
       /* 畸形块,继续看下一个 */
     }
+  }
+  if (
+    提取末尾裸JSON补丁(可解析文本.replace(/(?:<\/(?:UpdateVariable|json_?patch)\s*>\s*)+$/gi, '')) !== null
+  ) {
+    return true;
   }
   return false;
 }
@@ -432,7 +468,7 @@ async function 补模型变量结算(
   行动: string,
   快照: string,
   回合前末楼: number,
-): Promise<string> {
+): Promise<{ 原文: string; 已生成变量块: boolean }> {
   const 正文 = 清洗正文(原文);
   本回合生成id = `rqgy-vars-${回合前末楼}-${_.random(1e9)}`;
   const 结算原文 = await 等待正文生成({
@@ -448,10 +484,10 @@ async function 补模型变量结算(
   const 变量块 = 取变量块(结算原文);
   if (!变量块) {
     console.warn(`[人妻公寓] ${模型} 独立变量结算未返回完整 UpdateVariable 块，保留第一遍结果`);
-    return 原文;
+    return { 原文, 已生成变量块: false };
   }
   console.info(`[人妻公寓] ${模型} 独立变量结算完成`);
-  return `${正文}\n${变量块}`;
+  return { 原文: `${正文}\n${变量块}`, 已生成变量块: true };
 }
 
 /** 正文模型的可选二次结算；未设置时默认关闭。 */
@@ -768,10 +804,12 @@ function 清洗正文核心(协议清: string): string {
     .replace(/<reason(?:ing)?>[\s\S]*?<\/reason(?:ing)?>/gi, '')
     .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/^\s*-{2,}>?\s*$/gm, '')
-    .replace(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/g, '')
-    .replace(/<options>[\s\S]*?<\/options>/g, '')
-    .replace(/<行为等级>[\s\S]*?<\/行为等级>/g, '')
+    .replace(/<UpdateVariable\b[^>]*>[\s\S]*?<\/UpdateVariable\s*>/gi, '')
+    .replace(/<json_?patch\b[^>]*>[\s\S]*?<\/json_?patch\s*>/gi, '')
+    .replace(/<options\b[^>]*>[\s\S]*?<\/options\s*>/gi, '')
+    .replace(/<行为等级(?:\s[^>]*)?>[\s\S]*?<\/行为等级\s*>/gi, '')
     .replace(/<尺度判定(?:\s[^>]*)?>[\s\S]*?(?:<\/尺度判定\s*>|$)/gi, '')
+    .replace(/<\/(?:UpdateVariable|json_?patch|options|行为等级|尺度判定)\s*>/gi, '')
     // 玩家预设夹带的整篇 HTML 组件(2026-07-18 玩家实测:破限预设让模型在正文后附"选项分支"
     // HTML 文档,原生酒馆渲染成卡,固定0楼界面=裸代码墙,还白吃上下文token)——整体剥除
     .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*?```/gi, '')
@@ -789,9 +827,10 @@ function 清洗正文核心(协议清: string): string {
     // 生成被截断时的未闭合块也吞掉,否则半截标记块会永久留在楼层原文里
     .replace(/<think(?:ing)?>[\s\S]*$/i, '')
     .replace(/<reason(?:ing)?>[\s\S]*$/i, '')
-    .replace(/<UpdateVariable>[\s\S]*$/, '')
-    .replace(/<options>[\s\S]*$/, '')
-    .replace(/<行为等级>[\s\S]*$/, '')
+    .replace(/<UpdateVariable\b[^>]*>[\s\S]*$/i, '')
+    .replace(/<json_?patch\b[^>]*>[\s\S]*$/i, '')
+    .replace(/<options\b[^>]*>[\s\S]*$/i, '')
+    .replace(/<行为等级(?:\s[^>]*)?>[\s\S]*$/i, '')
     .replace(/<尺度判定(?:\s[^>]*)?>[\s\S]*$/i, '')
     .replace(/<tucao\b[^>]*>[\s\S]*$/i, '')
     .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*$/i, '')
@@ -811,7 +850,9 @@ function 清洗正文核心(协议清: string): string {
 
 /** 楼层落库前的清洗:思维链/变量块/选项块/临时尺度标签不进楼层文本(prompt 与卷轴双干净) */
 export function 清洗正文(原文: string): string {
-  return 清洗正文核心(清洗预设输出(原文, 当前预设正文标签()).文本);
+  return 清除末尾裸JSON补丁(
+    清除末尾残缺协议标签(清洗正文核心(清洗预设输出(原文, 当前预设正文标签()).文本)),
+  );
 }
 
 /** 确定性剧情专用：纯思维链、变量协议或截断协议一律视为无正文，不采用常规回退。 */
@@ -1156,7 +1197,13 @@ export async function 执行回合(
     确认本轮事务有效();
     const 最终返回原文 = 原文;
     原文 = 选择正文生成原文(最终返回原文, 正文流式原文, 清洗严格正文);
-    if (原文 !== 最终返回原文) {
+    const 采用流式正文 = 原文 !== 最终返回原文;
+    let 流式兜底变量块: string | null = null;
+    if (采用流式正文) {
+      const 最终控制尾段 = 提取纯控制协议尾段(最终返回原文);
+      const 最终尺度块 = 取尺度判定块(最终控制尾段);
+      if (最终尺度块 && !原文.includes(最终尺度块)) 原文 = `${原文}\n${最终尺度块}`;
+      流式兜底变量块 = 取变量块(最终控制尾段);
       console.warn('[人妻公寓] generate 最终返回未含有效正文，采用同 generation_id 的完整流式结果');
     }
     正文流式生成id = '';
@@ -1173,6 +1220,8 @@ export async function 执行回合(
     let 稽查: 稽查结果 = 输出稽查(原文, 焦点妻们, 阶段表, 尺度模式, 正戏免检, 清洗正文(原文));
 
     if (稽查.状态 === '需重写' && 焦点妻门牌) {
+      // 首稿已经作废，其最终变量尾段也不能跨到重写稿继续生效。
+      流式兜底变量块 = null;
       console.warn(`[人妻公寓·稽查] 首稿需静默重写：${稽查.原因}`);
       eventEmit('人妻公寓:运行阶段', '正在校准角色反应');
       const 校准令 =
@@ -1223,7 +1272,9 @@ export async function 执行回合(
       已补结算 = true;
       try {
         eventEmit('人妻公寓:运行阶段', '正在核对角色变量');
-        原文 = await 补模型变量结算(模型, 原文, 行动, 快照, 回合前末楼);
+        const 补结算 = await 补模型变量结算(模型, 原文, 行动, 快照, 回合前末楼);
+        原文 = 补结算.原文;
+        if (补结算.已生成变量块) 流式兜底变量块 = null;
       } catch (e) {
         if (已取消 || (e instanceof Error && e.message === '__RQGY_CANCELLED__')) throw e;
         console.warn(`[人妻公寓] ${模型} 独立变量结算失败，保留第一遍结果：`, e);
@@ -1239,13 +1290,15 @@ export async function 执行回合(
       !使用MVU外置解析 &&
       !已补结算 &&
       二次变量结算开启() &&
-      !有可用变量命令(原文) &&
+      !有可用变量命令(流式兜底变量块 ?? 原文) &&
       本轮有可写演员
     ) {
       console.warn('[人妻公寓] 首遍输出没有可解析的变量命令,触发通用兜底结算');
       try {
         eventEmit('人妻公寓:运行阶段', '正在补全角色变量');
-        原文 = await 补模型变量结算('通用兜底', 原文, 行动, 快照, 回合前末楼);
+        const 补结算 = await 补模型变量结算('通用兜底', 原文, 行动, 快照, 回合前末楼);
+        原文 = 补结算.原文;
+        if (补结算.已生成变量块) 流式兜底变量块 = null;
       } catch (e) {
         if (已取消 || (e instanceof Error && e.message === '__RQGY_CANCELLED__')) throw e;
         console.warn('[人妻公寓] 通用兜底变量结算失败，保留第一遍结果：', e);
@@ -1255,7 +1308,7 @@ export async function 执行回合(
     if (
       !本轮静音会议 &&
       !使用MVU外置解析 &&
-      !有可用变量命令(原文) &&
+      !有可用变量命令(流式兜底变量块 ?? 原文) &&
       本轮有可写演员
     ) {
       console.warn('[人妻公寓] 正文模型变量路线最终仍无可解析的变量命令');
@@ -1281,7 +1334,10 @@ export async function 执行回合(
     const 基础正文 = 已清洗正文 || '(楼道里安静了一瞬……本轮 AI 未返回正文,可换个说法再试)';
     // 静音会议的变量写入全部无效；MVU 外置路线也只落正文，绝不采纳正文模型
     // 偶然输出的变量块，随后由外置模型生成唯一有效的变量命令。
-    let 变量块 = 本轮静音会议 || 使用MVU外置解析 || !本轮有可写演员 ? '' : 取变量块(原文);
+    let 变量块 =
+      本轮静音会议 || 使用MVU外置解析 || !本轮有可写演员
+        ? ''
+        : (流式兜底变量块 ?? 取变量块(原文));
     let 可重处理楼层正文 = 变量块 ? `${基础正文}\n${变量块}` : 基础正文;
     let 解析基准 = _.cloneDeep(Mvu.getMvuData({ type: 'message', message_id: -1 }) ?? 旧) as Mvu.MvuData;
     const 入住预约 = 识别入住登场预约(本楼事件);

@@ -2360,8 +2360,10 @@ import { 当前聊天ID, 获取静音会议手机状态 } from '../../脚本/游
 import { 手机锚消息签名 } from '../../脚本/游戏逻辑/手机时间线租约';
 import { 判定时间撤销点, 是时间撤销地点, 时间撤销点键 } from '../../脚本/游戏逻辑/时间撤销系统';
 import { 风闻事件安全摘要 } from '../../脚本/游戏逻辑/风闻系统';
+import { 清除末尾残缺协议标签, 清除末尾裸JSON补丁 } from '../../脚本/游戏逻辑/严格正文清洗';
 import { 当前预设正文标签 as 读取当前预设正文标签 } from '../../脚本/游戏逻辑/预设桥';
 import { 清洗预设输出, type 预设正文标签 } from '../../脚本/游戏逻辑/预设输出兼容';
+import { 更新有效流式正文 } from '../../脚本/游戏逻辑/正文生成完整性';
 import {
   行动资源门槛,
   行动疑似性爱,
@@ -2391,9 +2393,9 @@ import { 计算场景同步, type 场景聊天状态 } from './场景状态同�
 import { 读取录像带连点失败状态, 推进录像带连点失败 } from './录像带交互状态';
 import { 同步画幅 } from './viewport';
 
-// 0.67 位图随不可变 Tag 发布。不要通过 `?url` 把它们塞进客户端 module：
+// 0.68 位图随不可变 Tag 发布。不要通过 `?url` 把它们塞进客户端 module：
 // 三张录像带原图就会把移动端入口从约 0.65 MB 撑到 11.7 MB，并显著增加 WebView 解析失败风险。
-const 版本素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.67/src/人妻公寓/素材';
+const 版本素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.68/src/人妻公寓/素材';
 const 录像带双屏关闭图 = `${版本素材基址}/特殊场景/录像带/01_双屏关闭.png`;
 const 录像带左屏亮起图 = `${版本素材基址}/特殊场景/录像带/02_左屏亮起.png`;
 const 录像带双屏亮起图 = `${版本素材基址}/特殊场景/录像带/03_双屏亮起.png`;
@@ -5681,7 +5683,8 @@ function 清洗(原文: string, 流式 = false): string {
     .replace(/<bginfor\b[^>]*>[\s\S]*?<\/bginfor\s*>/gi, '')
     .replace(/<CEstuff\b[^>]*>[\s\S]*?<\/CEstuff\s*>/gi, '')
     .replace(/<\/?(?:draft_notes|bginfor|CEstuff)\b[^>]*>/gi, '')
-    .replace(/<UpdateVariable>[\s\S]*?<\/UpdateVariable>/g, '')
+    .replace(/<UpdateVariable\b[^>]*>[\s\S]*?<\/UpdateVariable\s*>/gi, '')
+    .replace(/<json_?patch\b[^>]*>[\s\S]*?<\/json_?patch\s*>/gi, '')
     .replace(/<StatusPlaceHolderImpl\/>/g, '')
     // 预设的摘要/折叠块(<details>)只藏不删:楼层原文保留给 AI 与预设当记忆,显示层吞掉
     .replace(/<details[^>]*>[\s\S]*?<\/details>/gi, '')
@@ -5689,9 +5692,10 @@ function 清洗(原文: string, 流式 = false): string {
     .replace(/<reason(?:ing)?>[\s\S]*?<\/reason(?:ing)?>/gi, '')
     .replace(/<!--[\s\S]*?-->/g, '')
     .replace(/^\s*-{2,}>?\s*$/gm, '')
-    .replace(/<options>[\s\S]*?<\/options>/g, '')
-    .replace(/<行为等级>[\s\S]*?<\/行为等级>/g, '')
+    .replace(/<options\b[^>]*>[\s\S]*?<\/options\s*>/gi, '')
+    .replace(/<行为等级(?:\s[^>]*)?>[\s\S]*?<\/行为等级\s*>/gi, '')
     .replace(/<尺度判定(?:\s[^>]*)?>[\s\S]*?(?:<\/尺度判定\s*>|$)/gi, '')
+    .replace(/<\/(?:UpdateVariable|json_?patch|options|行为等级|尺度判定)\s*>/gi, '')
     // 玩家预设夹带的整篇 HTML 组件(2026-07-18 玩家实测,同脚本侧 清洗正文):裸代码墙整体剥除
     .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*?```/gi, '')
     .replace(/<!DOCTYPE[\s\S]*?<\/html\s*>/gi, '')
@@ -5708,9 +5712,10 @@ function 清洗(原文: string, 流式 = false): string {
     .replace(/<think(?:ing)?>[\s\S]*$/i, '')
     .replace(/<reason(?:ing)?>[\s\S]*$/i, '')
     .replace(/<!--[\s\S]*$/, '')
-    .replace(/<UpdateVariable>[\s\S]*$/, '')
-    .replace(/<options>[\s\S]*$/, '')
-    .replace(/<行为等级>[\s\S]*$/, '')
+    .replace(/<UpdateVariable\b[^>]*>[\s\S]*$/i, '')
+    .replace(/<json_?patch\b[^>]*>[\s\S]*$/i, '')
+    .replace(/<options\b[^>]*>[\s\S]*$/i, '')
+    .replace(/<行为等级(?:\s[^>]*)?>[\s\S]*$/i, '')
     .replace(/<尺度判定(?:\s[^>]*)?>[\s\S]*$/i, '')
     .replace(/<tucao\b[^>]*>[\s\S]*$/i, '')
     .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*$/i, '')
@@ -5722,14 +5727,18 @@ function 清洗(原文: string, 流式 = false): string {
   // 吞尾会把整楼显示成空白——完整楼层回退只清闭合块,顺手剥掉裸标记词;流式期间不回退
   if (!流式 && !全清 && 闭合清.trim()) {
     console.warn('[人妻公寓客户端] 显示层吞尾把楼层吞成了空白,回退只清闭合块');
-    return 闭合清
-      .replace(
-        /<\/?(?:think(?:ing)?|reason(?:ing)?|UpdateVariable|options|行为等级|details[^>]*|konatan_planning~|tucao|now_plot|SexualScene|VariableCheck|Disclaimer|w2g|meow_FM|branches|parallel_world|historic_events|htm1fenge)>/gi,
-        '',
-      )
-      .trim();
+    return 清除末尾裸JSON补丁(
+      清除末尾残缺协议标签(
+        闭合清
+          .replace(
+            /<\/?(?:think(?:ing)?|reason(?:ing)?|UpdateVariable|json_?patch|options|行为等级|尺度判定|details[^>]*|konatan_planning~|tucao|now_plot|SexualScene|VariableCheck|Disclaimer|w2g|meow_FM|branches|parallel_world|historic_events|htm1fenge)>/gi,
+            '',
+          )
+          .trim(),
+      ),
+    );
   }
-  return 全清;
+  return 清除末尾裸JSON补丁(清除末尾残缺协议标签(全清));
 }
 
 async function 滚到底() {
@@ -6398,6 +6407,8 @@ onMounted(() => {
   eventOn('人妻公寓:生成开始', () => {
     // 脚本侧发起的回合(查看监控等)也要锁输入+亮书写态;驻留的拾获卡顺手收掉不挡戏
     刷新当前预设正文标签();
+    // “保留最后有效流”只能发生在同一次生成内，绝不把上一回合正文带进新 generation。
+    流式段.value = [];
     发送中.value = true;
     运行阶段.value = '正在准备本回合';
     开始生成计时();
@@ -6407,7 +6418,8 @@ onMounted(() => {
   eventOn('人妻公寓:流式', (文本: string) => {
     if (!运行阶段.value.startsWith('数据库')) 运行阶段.value = 'AI正在生成正文';
     // 流式半截文本只走本卡清洗,不过玩家正则(闭合标记未到会整段吞空)
-    const 净文 = 清洗(文本, true);
+    const 当前净文 = 流式段.value.join('\n');
+    const 净文 = 更新有效流式正文(当前净文, 清洗(文本, true), 内容 => 内容);
     流式段.value = 净文
       ? 净文
           .split(/\n+/)
