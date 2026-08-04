@@ -167,7 +167,7 @@ for (const 组 of index.条目) {
 if (!开场白) throw new Error('未找到 [开场白] 条目');
 
 // ── 资源走 jsdelivr(手机友好；角色卡版本与正式发布 tag 同步) ──
-const TAG = 'rq0.71';
+const TAG = 'rq0.72';
 const BASE = `https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@${TAG}`;
 
 const 加载块 = url => "```\n<body>\n<script>\n$('body').load('" + url + "')\n</script>\n</body>\n```";
@@ -252,7 +252,7 @@ const tavern_helper = {
         { name: '重试额外模型解析', visible: false },
         { name: '清除旧楼层变量', visible: false },
       ]),
-      content: readFileSync(path.join(项目, '脚本/MVU/index.ts'), 'utf8').trim(),
+      content: readFileSync(path.join(产物, '脚本/MVU/index.js'), 'utf8').replace(/\/\/# sourceMappingURL=.*$/m, '').trim(),
       data: {},
     },
     {
@@ -271,7 +271,7 @@ const tavern_helper = {
 
 // ── 卡体 ──
 const 卡名 = '人妻公寓';
-const 版本 = '0.71';
+const 版本 = '0.72';
 const data = {
   name: 卡名,
   description: '',
