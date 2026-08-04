@@ -1,7 +1,7 @@
 import { registerMvuSchema } from 'https://testingcf.jsdelivr.net/gh/StageDog/tavern_resource/dist/util/mvu_zod.js';
 
 import { reloadOnChatChange } from '@/util/script';
-import { 读取MVU解析状态 } from '../../MVU解析模式';
+import { 确保MVU默认外置解析, 自动代关MVU自动请求, 读取MVU解析状态 } from '../../MVU解析模式';
 import { Schema, type SchemaType, 验证当前MVU存档版本 } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
 import { 户静态表, 首夜差分, 首批门牌, 阶段标题, 查道具, 查房间, 查特殊场景 } from '../../stageConfig';
@@ -763,6 +763,32 @@ $(() => {
 
       // 安检机第一道:挂载 zod schema
       registerMvuSchema(Schema);
+
+      // 一次性初始化:本卡默认 MVU 更新方式=额外模型解析,玩家装好 MVU 什么都不用设;
+      // 初始化过后完全尊重玩家在游戏设置页的选择,不再强改。
+      try {
+        if (确保MVU默认外置解析()) {
+          console.info('[人妻公寓] 首次启动:已把 MVU 更新方式默认为「额外模型解析」');
+        }
+      } catch (e) {
+        console.error('[人妻公寓] 初始化 MVU 默认外置解析失败(不阻塞启动):', e);
+      }
+
+      // 启动自检(每次启动都跑,自愈):内置变量解析开着时,MVU 的"自动请求"必须关,
+      // 否则同一楼会被内置流程和官方外置各解析一次。运行时 Pinia 副本改不动,只改
+      // 持久层等页面刷新生效;被 MVU 内存副本覆盖回去,下次启动会再次代关。
+      try {
+        if (自动代关MVU自动请求()) {
+          _top.toastr?.info?.(
+            '内置变量解析已接管外置请求，已代为关闭 MVU 的「自动请求」；刷新页面后完全生效。',
+            '人妻公寓',
+            { timeOut: 10000 },
+          );
+          console.info('[人妻公寓] 已代关 MVU 额外模型解析的自动请求(等页面刷新完全生效)');
+        }
+      } catch (e) {
+        console.error('[人妻公寓] 代关 MVU 自动请求失败(不阻塞启动):', e);
+      }
 
       // 必须先于监听与 UI 操作恢复；否则玩家可能在“stat 已推进、chat 尚未提交”的半状态上继续行动。
       await 恢复中断时间推进();

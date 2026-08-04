@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>rq0.69 手机批次预览</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      [hidden] { display: none !important; }
+      body {
+        min-height: 100vh;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 18% 14%, rgba(255,255,255,.22), transparent 28%),
+          linear-gradient(150deg, #354a46, #213a3d 52%, #16272b);
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "HarmonyOS Sans", "Segoe UI", "Noto Sans SC", sans-serif;
+      }
+      .caption { position: fixed; top: 18px; left: 0; right: 0; text-align: center; color: #e9f3ef; font-size: 12px; letter-spacing: .08em; opacity: .82; }
+      #rq-phone-root { position: fixed; inset: 0; display: grid; place-items: center; color: #111; color-scheme: light; }
+      #rq-phone-root * { -webkit-text-fill-color: currentColor; }
+      .rqp-shell { position: relative; width: min(320px, 92vw); height: min(692px, 80vh); background: #1a1a1a; border-radius: 40px; padding: 4px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.14), 0 15px 50px rgba(0,0,0,.42), 0 5px 20px rgba(0,0,0,.3); }
+      .rqp-close { display: flex; position: absolute; left: -14px; top: -14px; width: 40px; height: 40px; border: 2px solid #fff; border-radius: 50%; background: #20242d; color: #fff; font-size: 24px; align-items: center; justify-content: center; z-index: 80; box-shadow: 0 5px 16px rgba(0,0,0,.38); }
+      .rqp-punch { position: absolute; top: 12px; left: 25px; width: 44px; height: 15px; background: #000; border-radius: 9px; z-index: 60; }
+      .rqp-punch::before { content: ''; position: absolute; top: 50%; left: 6px; transform: translateY(-50%); width: 8px; height: 8px; border-radius: 50%; background: radial-gradient(circle,#1a3a52 0%,#0a1a2a 50%,#000 100%); }
+      .rqp-status { position: absolute; top: 8px; left: 8px; right: 8px; height: 26px; display: flex; justify-content: space-between; align-items: center; padding: 0 8px; z-index: 55; font-weight: 600; }
+      .rqp-status .tm { margin-left: 66px; font-size: 11px; color: #000; }
+      .rt { display: flex; align-items: center; gap: 6px; margin-right: 6px; font-size: 11px; }
+      .rqp-batt { width: 12px; height: 18px; border: 1.5px solid #333; border-radius: 3px; display: flex; align-items: flex-end; overflow: hidden; }
+      .rqp-batt i { width: 100%; height: 78%; background: #4cd964; }
+      .rqp-screen { width: 100%; height: 100%; background: #ededed; border-radius: 36px; overflow: hidden; display: flex; flex-direction: column; position: relative; padding-top: 34px; }
+      .rqp-head { flex: none; background: #ededed; padding: 12px 14px 9px; display: flex; align-items: center; gap: 8px; border-bottom: .5px solid #d9d9d9; }
+      .rqp-back { border: 0; background: none; font-size: 18px; width: 24px; color: #111; }
+      .rqp-head b { font-size: 16px; font-weight: 600; flex: 1; text-align: center; }
+      .rqp-chat-title { display: flex; align-items: center; justify-content: center; gap: 6px; }
+      .rqp-chat-state { display: inline-flex; align-items: center; gap: 3px; flex: none; font-size: 9.5px; font-weight: 500; color: #777; }
+      .rqp-chat-state i { display: block; width: 7px; height: 7px; border-radius: 50%; background: #17b86a; box-shadow: 0 0 0 2px rgba(23,184,106,.13); }
+      .rqp-chat-state.yellow i { background: #e7a313; box-shadow: 0 0 0 2px rgba(231,163,19,.16); }
+      .rqp-chat-state.red i { background: #eb4d4d; box-shadow: 0 0 0 2px rgba(235,77,77,.15); }
+      .rqp-body { flex: 1; overflow: hidden; }
+      .rqp-bubbles { padding: 18px 10px; display: flex; flex-direction: column; gap: 12px; }
+      .rqp-line { display: flex; gap: 9px; align-items: flex-start; }
+      .rqp-line.me { flex-direction: row-reverse; }
+      .rqp-ava { width: 38px; height: 38px; border-radius: 4px; background: linear-gradient(145deg,#f2c7ae,#9e6c59); border: 1px solid rgba(93,67,48,.22); display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 14px; flex: none; }
+      .rqp-ava.her { background: linear-gradient(145deg,#f5d8a8,#d48e57); }
+      .rqp-b { position: relative; max-width: 72%; padding: 8px 11px; border-radius: 5px; font-size: 13.5px; line-height: 1.5; color: #111; word-break: break-word; }
+      .rqp-b.me { background: #95ec69; }
+      .rqp-b.me::after { content: ''; position: absolute; top: 13px; right: -5px; border-style: solid; border-width: 5px 0 5px 6px; border-color: transparent transparent transparent #95ec69; }
+      .rqp-b.ta { background: #fff; }
+      .rqp-b.ta::before { content: ''; position: absolute; top: 13px; left: -5px; border-style: solid; border-width: 5px 6px 5px 0; border-color: transparent #fff transparent transparent; }
+      .rqp-typing { display: flex; gap: 4px; align-items: center; min-height: 20px; }
+      .rqp-typing i { width: 6px; height: 6px; border-radius: 50%; background: #b0b0b0; }
+      .rqp-input { flex: none; display: flex; gap: 8px; padding: 8px 10px 18px; background: #f7f7f7; border-top: .5px solid #d9d9d9; align-items: flex-end; }
+      .rqp-input textarea { flex: 1; resize: none; border: none; border-radius: 4px; padding: 8px 9px; font-size: 13.5px; height: 38px; font-family: inherit; background: #fff; color: #111; }
+      .rqp-input button { border: none; border-radius: 4px; background: #07c160; color: #fff; padding: 8px 14px; font-size: 13px; font-weight: 500; }
+      .rqp-input button.waiting { background: #d99a19; }
+      .rqp-input button.stop { background: #e64b4b; min-width: 56px; }
+      .hint { align-self: center; color: #a5a5a5; font-size: 10px; margin-top: 2px; }
+    </style>
+  </head>
+  <body>
+    <div class="caption">RQ 0.69 · 一次请求，多气泡回复</div>
+    <div id="rq-phone-root">
+      <div class="rqp-shell">
+        <button class="rqp-close">×</button><div class="rqp-punch"></div>
+        <div class="rqp-status"><span class="tm">09:41</span><span class="rt">▮▮▮ <span class="rqp-batt"><i></i></span></span></div>
+        <div class="rqp-screen">
+          <div class="rqp-head"><button class="rqp-back">‹</button><b class="rqp-chat-title"><span>夏乔</span><span id="state" class="rqp-chat-state yellow"><i></i><span>等待回复 4s</span></span></b><span style="width:24px"></span></div>
+          <div class="rqp-body"><div class="rqp-bubbles">
+            <div class="rqp-line ta"><div class="rqp-ava her">夏</div><div class="rqp-b ta">管理员，水池这边好像又有点慢了。</div></div>
+            <div class="rqp-line me"><div class="rqp-ava">我</div><div class="rqp-b me">我晚点过去看看。</div></div>
+            <div class="rqp-line me"><div class="rqp-ava">我</div><div class="rqp-b me">先别往里面倒水，等我十分钟。</div></div>
+            <div id="typing" class="rqp-line ta" hidden><div class="rqp-ava her">夏</div><div class="rqp-b ta"><span class="rqp-typing"><i></i><i></i><i></i></span></div></div>
+            <div class="hint" id="hint">重新点输入框可继续补充，倒计时不会重复调用 AI</div>
+          </div></div>
+          <div class="rqp-input"><textarea placeholder="发消息…"></textarea><button id="send" class="waiting">立即回复</button></div>
+        </div>
+      </div>
+    </div>
+    <script>
+      if (new URLSearchParams(location.search).get('state') === 'red') {
+        state.className = 'rqp-chat-state red'; state.lastElementChild.textContent = '正在回复';
+        typing.hidden = false; hint.textContent = '停止只终止本批手机回复，不会中断正文';
+        send.className = 'stop'; send.textContent = '停止'; document.querySelector('textarea').disabled = true;
+      }
+    </script>
+  </body>
+</html>

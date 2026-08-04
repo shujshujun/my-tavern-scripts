@@ -1,0 +1,150 @@
+- generic [ref=e1]:
+  - generic [ref=e5]:
+    - generic [ref=e6]:
+      - button "" [ref=e48] [cursor=pointer]
+      - text:                                        + No items                         ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☑ ☰ ☑ ☰ ☑ ☰ ☑ ☰ ☑ ☰ ☑ ☰ ☐ ☰ ☐ ☰ ☐ ☰                                  + No items      ☰ ☰ ☰ ☰ ☰ ☰ ☰  ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰  ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰  ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰                   +     No items   X     *    *    *    *    *    *        *       *       *    *             *       *       *    *    *      *    *      *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *       *    *    *    *      
+    - generic [ref=e9]:
+      - button "" [ref=e49] [cursor=pointer]
+      - text:                                                                           
+    - generic [ref=e12]:
+      - button "" [ref=e50] [cursor=pointer]
+      - text:                                               
+    - generic [ref=e15]:
+      - button "" [ref=e51] [cursor=pointer]
+      - text:                +     
+    - generic [ref=e18]:
+      - button "" [ref=e52] [cursor=pointer]
+      - text:                                   
+    - generic [ref=e21]:
+      - generic "更改背景图片" [ref=e53]:
+        - button "" [ref=e54] [cursor=pointer]
+      - text:       +                             
+    - generic [ref=e24]:
+      - button "" [ref=e55] [cursor=pointer]
+      - text: "        +                                                                       +                                                           渲染被```包裹的html、!DOCTYPE、script的代码块内容为交互式界面 提供STscript(command)异步函数执行酒馆命令: await STscript('/echo 你好世界！') 控制代码块转换为iframe渲染的功能 关闭后将清理所有已渲染的iframe 大型html适用 按需在 iframe 中注入 Wrapperiframe.js 流式多楼层动态渲染  每条消息添加图标，点击可看到发送给时AI的记录 在聊天框显示图标，点击可拦截将发送给AI的消息并显示 重构界面布局与细节优化 使用 NovelAI 为 AI 回复自动或手动生成配图，需在酒馆设置中配置 NovelAI Key  AI回复渲染后自动朗读。需要先在 config.yaml 开启 enableCorsProxy: true 并重启。所有请求通过 ST 内置代理，不经过第三方。  自动执行设定好的斜杠命令 输入/xbqte {{任务名称}}可以手动激活任务 导出/入角色卡时, 角色任务会随角色卡一起导出/入   No tasks found No tasks found No tasks found 突破第四面墙，与角色进行元对话交流。悬浮按钮位于页面右侧中间。 在消息楼层添加总结按钮，点击可打开剧情总结面板，AI分析生成关键词云、时间线、人物关系、角色弧光 在X按钮区域添加地图图标，点击可打开可视化剧情地图编辑器                                                                                                                    +   + +  +     +        +        +        +        +        +        +        +        +        +        +        +        +        +        +        +        +        +        +        +                                                                                                                                                                                                                 "
+    - generic [ref=e27]:
+      - button "" [ref=e56] [cursor=pointer]
+      - text:                    
+    - generic [ref=e30]:
+      - button "" [active] [ref=e57] [cursor=pointer]
+      - text:                                                      群聊暂无成员。          无可用角色                                                            
+  - generic:                      +                                                                                +    + +                  
+  - generic:                  
+  - generic [ref=e33]:
+    - text: 
+    - generic [ref=e547]:
+      - generic [ref=e548]: "#0"
+      - button "" [ref=e552] [cursor=pointer]
+      - generic [ref=e553]:
+        - generic [ref=e554]:
+          - generic [ref=e556]:
+            - generic [ref=e557]: 人妻公寓
+            - text: 
+            - generic [ref=e558]: 2026年7月29日 07:57
+          - generic [ref=e559]:
+            - button "" [ref=e560] [cursor=pointer]
+            - text:              
+            - button "" [ref=e561] [cursor=pointer]
+            - generic [ref=e562] [cursor=pointer]:
+              - generic:
+                - generic: X
+                - generic: X
+                - generic: X
+                - generic: X
+              - text: 
+          - text:       
+        - text:       
+        - generic [ref=e563]:
+          - generic:
+            - text: 
+            - iframe [ref=e565]:
+              - generic [ref=f12e86]:
+                - button "点击全屏打开游戏 首次进入建议先全屏，之后可在右上角随时退出" [ref=f12e87] [cursor=pointer]:
+                  - generic [ref=f12e94]:
+                    - generic [ref=f12e95]: 点击全屏打开游戏
+                    - generic [ref=f12e96]: 首次进入建议先全屏，之后可在右上角随时退出
+                - generic [ref=f12e97]:
+                  - button "退出全屏" [ref=f12e98] [cursor=pointer]
+                  - button "设置" [ref=f12e105] [cursor=pointer]
+                - banner [ref=f12e180]: 人 妻 公 寓
+                - generic [ref=f12e181]:
+                  - generic [ref=f12e182]:
+                    - generic [ref=f12e183]: 第 1 天 · 第 1 周
+                    - generic [ref=f12e184]: 星期一 · 早上
+                  - generic [ref=f12e189]:
+                    - generic "现金" [ref=f12e190]: ¥500
+                    - button "精力 LV1 8/8" [ref=f12e193] [cursor=pointer]:
+                      - generic [ref=f12e194]: 精力 LV1
+                      - generic [ref=f12e206]: 8/8
+                    - button "体力 LV1 5/5" [ref=f12e207] [cursor=pointer]:
+                      - generic [ref=f12e208]: 体力 LV1
+                      - generic [ref=f12e220]: 5/5
+                    - button "查看胜任详情，当前 80，满意" [ref=f12e221] [cursor=pointer]:
+                      - generic [ref=f12e222]: 胜任 · 满意
+                      - generic [ref=f12e234]: "80"
+                    - button "查看风闻详情，当前 0，平静" [ref=f12e235] [cursor=pointer]:
+                      - generic [ref=f12e236]: 风闻 · 平静
+                      - generic [ref=f12e242]: "0"
+                - generic [ref=f12e243]:
+                  - generic "夏乔(101)" [ref=f12e244] [cursor=pointer]:
+                    - img "夏乔" [ref=f12e245]
+                    - generic [ref=f12e246]: 夏乔
+                  - generic "沈静仪(102)" [ref=f12e247] [cursor=pointer]:
+                    - img "沈静仪" [ref=f12e248]
+                    - generic [ref=f12e249]: 沈静仪
+                  - generic "许曼君(201)" [ref=f12e250] [cursor=pointer]:
+                    - img "许曼君" [ref=f12e251]
+                    - generic [ref=f12e252]: 许曼君
+                  - generic "周小满(202)" [ref=f12e253] [cursor=pointer]:
+                    - img "周小满" [ref=f12e254]
+                    - generic [ref=f12e255]: 周小满
+                  - generic "安若妍(301)" [ref=f12e256] [cursor=pointer]:
+                    - img "安若妍" [ref=f12e257]
+                    - generic [ref=f12e258]: 安若妍
+                - generic [ref=f12e259]:
+                  - generic [ref=f12e260]: · 去信箱看看租约单子
+                  - generic [ref=f12e261]: · 去 101 修水管
+                  - generic [ref=f12e262]: · 去 102 登门认识住户
+                  - generic [ref=f12e263]: · 回管理员室
+                  - button "✕" [ref=f12e264] [cursor=pointer]
+                - button "🙈" [ref=f12e266] [cursor=pointer]
+                - generic [ref=f12e268]:
+                  - generic [ref=f12e269]: 楼道里
+                  - generic [ref=f12e270]: 该去敲谁的门?
+                - navigation [ref=f12e271]:
+                  - button "地图" [ref=f12e272] [cursor=pointer]
+                  - button "商店" [ref=f12e277] [cursor=pointer]
+                  - button "手机" [ref=f12e284] [cursor=pointer]
+                  - button "背包" [disabled] [ref=f12e289]
+                  - button "往事" [ref=f12e295] [cursor=pointer]
+      - generic:
+        - button "" [ref=e566] [cursor=pointer]
+        - button "1/2" [ref=e567] [cursor=pointer]
+    - generic [ref=e36]:
+      - generic: 
+      - text:  
+      - generic [ref=e37]:
+        - generic [ref=e38]:
+          - generic [ref=e39] [cursor=pointer]: 
+          - generic "扩展程序" [ref=e180] [cursor=pointer]: 
+        - text:       
+  - text:                       1       
+  - generic:                 +                             +                      +         +                      • • • •        • • • • • • •                  +        +       +                                           +          +       +     +                  +  +                       +           +         +               +      +                                    ✓               
+  - option "(请先获取并选择模型)" [selected]
+  - option "智绘姬 (默认)" [selected]
+  - option "自定义 (LLM预设)"
+  - generic [ref=e183]: 
+  - status [ref=e185]
+  - status [ref=e186]
+  - status [ref=e187]
+  - status [ref=e188]
+  - status [ref=e189]
+  - status [ref=e190]
+  - status [ref=e191]
+  - status [ref=e192]
+  - status [ref=e193]
+  - status [ref=e194]
+  - status [ref=e195]
+  - status [ref=e196]
+  - generic "切换酒馆原生界面(逃生舱)" [ref=e568] [cursor=pointer]: ❀
+  - button "手机" [ref=e570] [cursor=pointer]

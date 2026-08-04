@@ -147,13 +147,77 @@
             <button class="toggle" :class="{ on: 减动效 }" @click="((减动效 = !减动效), 改设置())"><i /></button>
           </div>
 
+          <div class="set-group">
+            <div class="set-label">变量解析路线</div>
+            <div class="seg">
+              <button :class="{ on: MVU解析.外置模式 }" @click="选择解析路线('额外模型解析')">外置模型解析</button>
+              <button :class="{ on: !MVU解析.外置模式 }" @click="选择解析路线('随AI输出')">随AI输出</button>
+            </div>
+            <p class="set-hint">
+              在这里选择即直接写入 MVU 变量框架，无需打开 MVU 面板。外置（推荐、默认）=每轮由独立模型单独结算变量，更稳定；随AI输出=正文模型顺带写变量。对游戏立即生效；MVU
+              插件自身的行为需刷新页面后才跟上。
+            </p>
+          </div>
+
+          <div v-if="MVU解析.外置模式" class="set-group row">
+            <div>
+              <div class="set-label">内置变量解析</div>
+              <p class="set-hint">
+                由游戏在回合内直接请求解析模型、一次完成变量结算，不依赖 MVU
+                的自动请求（游戏会代为关闭它）。关闭本开关则回到 MVU 官方自动解析，需自行在 MVU
+                面板重新勾选“启用自动请求”。
+              </p>
+            </div>
+            <button class="toggle" :class="{ on: 内置变量解析 }" @click="切换内置变量解析"><i /></button>
+          </div>
+
+          <div v-if="MVU解析.外置模式 && MVU解析.内置解析" class="set-group">
+            <div class="set-label">解析模型通道</div>
+            <div class="seg">
+              <button :class="{ on: 解析通道 === '自动' }" @click="选择解析通道('自动')">自动</button>
+              <button :class="{ on: 解析通道 === '正文' }" @click="选择解析通道('正文')">正文API</button>
+              <button :class="{ on: 解析通道 === '自定义' }" @click="选择解析通道('自定义')">自定义模型</button>
+            </div>
+            <p class="set-hint">
+              自动（推荐）：装了数据库插件就由数据库代发请求，沿用数据库当前配置（与微信相同，不读取数据库的密钥与模型）；未安装才使用正文
+              API。自定义：使用下方单独填写的接口。
+            </p>
+            <div v-if="解析通道 === '自定义'" class="mvu-api-form">
+              <label
+                >API 地址（OpenAI 兼容）
+                <input v-model="解析API表单.api地址" placeholder="https://…/v1" @change="提交解析API表单" />
+              </label>
+              <label
+                >API Key
+                <input v-model="解析API表单.密钥" type="password" autocomplete="off" @change="提交解析API表单" />
+              </label>
+              <label
+                >模型名称
+                <input v-model="解析API表单.模型名称" placeholder="如 gemini-2.5-flash" @change="提交解析API表单" />
+              </label>
+              <div class="mvu-api-nums">
+                <label>温度<input v-model="解析API表单.温度" inputmode="decimal" placeholder="默认" @change="提交解析API表单" /></label>
+                <label>top_p<input v-model="解析API表单.top_p" inputmode="decimal" placeholder="默认" @change="提交解析API表单" /></label>
+                <label
+                  >最大回复token<input
+                    v-model="解析API表单.最大回复token数"
+                    inputmode="numeric"
+                    placeholder="8192"
+                    @change="提交解析API表单"
+                /></label>
+              </div>
+              <p class="set-hint">改完即写入 MVU 变量框架的「额外模型解析配置」，游戏与 MVU 共用同一份配置。</p>
+            </div>
+          </div>
+
           <div class="set-group row" :class="{ 'route-locked': MVU解析.外置模式 }">
             <div>
               <div class="set-label">模型二次变量结算</div>
               <p v-if="MVU解析.外置模式" class="set-hint route-hint">
                 MVU 外置模型已接管变量，正文二次结算已自动关闭，避免两个模型重复处理。
-                <template v-if="!MVU解析.自动请求">
-                  但 MVU 的“自动请求”目前关闭；请去 MVU 开启，否则每轮需要手动点“重试额外模型解析”。
+                <template v-if="!MVU解析.内置解析 && !MVU解析.自动请求">
+                  当前内置变量解析关闭且 MVU 的“自动请求”也关闭；请去 MVU
+                  开启自动请求，否则每轮需要手动点“重试额外模型解析”。
                 </template>
               </p>
               <p v-else class="set-hint">
@@ -225,9 +289,10 @@
                 }}。若不是最新版，建议更新，但不会阻止开始游戏。
               </p>
               <div class="setup-sql-reminder setup-mvu-reminder" role="note">
-                <strong>强烈建议：使用 MVU 外置模型解析变量</strong>
+                <strong>变量解析已自动配置，无需打开 MVU 面板</strong>
                 <span
-                  >在 MVU 设置中选择【额外模型解析】并开启【自动请求】，可大幅提高变量更新稳定性。启用后本游戏会自动关闭【模型二次变量结算】，正文模型只负责剧情，外置模型单独处理变量，避免重复请求和互相覆盖。这不是开局检测的强制项，但每轮会增加一次解析请求、耗时与模型费用。</span
+                  >游戏默认使用【外置模型解析】：正文模型只负责剧情，独立请求单独结算变量，更稳定。默认由数据库插件代发解析请求（沿用数据库当前配置）；想换通道或改用自定义模型，去游戏【设置
+                  → 变量解析】调整即可，所有改动会自动写入 MVU 变量框架。每轮会多一次解析请求、耗时与模型费用。</span
                 >
               </div>
             </li>
@@ -2313,7 +2378,15 @@
 import { compare } from 'compare-versions';
 import type { FunctionalComponent } from 'vue';
 
-import { 读取MVU解析状态, type MVU解析状态 } from '../../MVU解析模式';
+import {
+  写入MVU设置,
+  写入变量解析通道,
+  读取MVU外置模型配置,
+  读取MVU解析状态,
+  读取变量解析通道,
+  type MVU解析状态,
+  type 变量解析通道类型,
+} from '../../MVU解析模式';
 import type { SchemaType } from '../../schema';
 import {
   获取静音会议回退状态序列,
@@ -6263,8 +6336,55 @@ const 省流 = ref(false);
 const 减动效 = ref(false);
 /** 未使用 MVU 外置解析时，是否让当前正文模型追加一次只输出变量块的静默结算。 */
 const 二次变量结算 = ref(false);
+/** MVU 外置模式下，由游戏直接请求解析模型（默认开）。 */
+const 内置变量解析 = ref(true);
 const MVU解析 = ref<MVU解析状态>(读取MVU解析状态());
 let MVU解析刷新timer: ReturnType<typeof setInterval> | undefined;
+/** 解析模型通道（游戏偏好）：自动=数据库代发优先（同微信），或强制正文/自定义。 */
+const 解析通道 = ref<变量解析通道类型>('自动');
+/**
+ * 自定义解析模型表单：与 MVU 额外模型解析配置同源（写穿持久层，玩家不必开 MVU 面板）。
+ * 只在设置页打开或切到自定义通道时从 MVU 载入一次，输入过程中绝不被轮询刷新覆盖。
+ */
+const 解析API表单 = reactive({ api地址: '', 密钥: '', 模型名称: '', 温度: '', top_p: '', 最大回复token数: '' });
+
+function 载入解析API表单() {
+  const 配置 = 读取MVU外置模型配置();
+  解析API表单.api地址 = 配置?.api地址 ?? '';
+  解析API表单.密钥 = 配置?.密钥 ?? '';
+  解析API表单.模型名称 = 配置?.模型名称 ?? '';
+  解析API表单.温度 = 配置?.温度 !== undefined ? String(配置.温度) : '';
+  解析API表单.top_p = 配置?.top_p !== undefined ? String(配置.top_p) : '';
+  解析API表单.最大回复token数 = 配置?.最大回复token数 !== undefined ? String(配置.最大回复token数) : '';
+}
+
+function 选择解析路线(路线: '额外模型解析' | '随AI输出') {
+  写入MVU设置({ 更新方式: 路线 });
+  刷新MVU解析状态();
+}
+
+function 选择解析通道(通道: 变量解析通道类型) {
+  解析通道.value = 通道;
+  写入变量解析通道(通道);
+  if (通道 === '自定义') 载入解析API表单();
+}
+
+/** 表单任一项失焦提交：写穿 MVU 持久层。数字留空=不写、沿用 MVU 现值。 */
+function 提交解析API表单() {
+  const 取数 = (原: string): number | undefined => {
+    const 数 = Number(原.trim());
+    return 原.trim() !== '' && Number.isFinite(数) ? 数 : undefined;
+  };
+  写入MVU设置({
+    模型来源: '自定义',
+    api地址: 解析API表单.api地址.trim(),
+    密钥: 解析API表单.密钥.trim(),
+    模型名称: 解析API表单.模型名称.trim(),
+    温度: 取数(解析API表单.温度),
+    top_p: 取数(解析API表单.top_p),
+    最大回复token数: 取数(解析API表单.最大回复token数),
+  });
+}
 
 const 字号档表: Record<'小' | '中' | '大', string> = { 小: '0.82em', 中: '0.9em', 大: '1.02em' };
 
@@ -6295,9 +6415,19 @@ function 持久化设置() {
   if (最新MVU解析.外置模式) 二次变量结算.value = false;
   try {
     localStorage.setItem(主题存储键, 暗色.value ? '1' : '0'); // 兼容旧键
+    // 合并写:同一个键还承载脚本侧写入的 变量解析通道/MVU外置默认已初始化 等,整体覆写会冲掉它们。
+    let 已存: Record<string, unknown> = {};
+    try {
+      const raw = localStorage.getItem(设置存储键);
+      const 值 = raw ? JSON.parse(raw) : null;
+      if (值 && typeof 值 === 'object') 已存 = 值;
+    } catch {
+      /* 坏 JSON 当空处理 */
+    }
     localStorage.setItem(
       设置存储键,
       JSON.stringify({
+        ...已存,
         主题模式: 主题模式.value,
         字号档: 字号档.value,
         正文字色: 正文字色.value,
@@ -6306,6 +6436,7 @@ function 持久化设置() {
         减动效: 减动效.value,
         立绘显示: 立绘显示.value,
         二次变量结算: 二次变量结算.value,
+        内置变量解析: 内置变量解析.value,
       }),
     );
   } catch {
@@ -6326,6 +6457,12 @@ function 刷新MVU解析状态() {
   if (!最新.外置模式 || !二次变量结算.value) return;
   二次变量结算.value = false;
   持久化设置();
+}
+
+function 切换内置变量解析() {
+  内置变量解析.value = !内置变量解析.value;
+  改设置();
+  刷新MVU解析状态();
 }
 
 function 切换二次变量结算() {
@@ -6353,6 +6490,7 @@ function 恢复设置() {
       减动效.value = !!s.减动效;
       if (typeof s.立绘显示 === 'boolean') 立绘显示.value = s.立绘显示;
       if (typeof s.二次变量结算 === 'boolean') 二次变量结算.value = s.二次变量结算;
+      if (typeof s.内置变量解析 === 'boolean') 内置变量解析.value = s.内置变量解析;
     } else {
       主题模式.value = localStorage.getItem(主题存储键) === '1' ? '夜间' : '日间';
     }
@@ -6373,6 +6511,9 @@ watch(设置开, 开 => {
   MVU解析刷新timer = undefined;
   if (开) {
     刷新MVU解析状态();
+    // 通道与自定义 API 表单只在打开时载入一次，输入过程中绝不被轮询覆盖。
+    解析通道.value = 读取变量解析通道();
+    载入解析API表单();
     // MVU 没有公开设置变更事件；仅在设置页可见时轻量刷新，关闭后不常驻轮询。
     MVU解析刷新timer = setInterval(刷新MVU解析状态, 1500);
   } else {
@@ -10456,6 +10597,50 @@ onUnmounted(() => {
   width: 100%;
   accent-color: var(--pink);
   cursor: pointer;
+}
+
+/* 变量解析:自定义模型接口表单(写穿 MVU 额外模型解析配置) */
+.mvu-api-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.mvu-api-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.72em;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+
+.mvu-api-form input {
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid var(--pink-soft);
+  border-radius: 8px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 0.98em;
+  font-weight: 400;
+  color: var(--ink);
+}
+
+.mvu-api-form input:focus {
+  outline: none;
+  border-color: var(--pink);
+}
+
+.mvu-api-nums {
+  display: flex;
+  gap: 8px;
+}
+
+.mvu-api-nums label {
+  flex: 1;
+  min-width: 0;
 }
 
 /* 开关 */

@@ -1,0 +1,476 @@
+- generic [ref=e1]:
+  - generic [ref=e5]:
+    - generic [ref=e6]:
+      - button "" [ref=e48] [cursor=pointer]
+      - text:                                        + No items                         ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☑ ☰ ☑ ☰ ☑ ☰ ☑ ☰ ☑ ☰ ☑ ☰ ☐ ☰ ☐ ☰ ☐ ☰                                  + No items      ☰ ☰ ☰ ☰ ☰ ☰ ☰  ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰  ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰  ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰ ☰                   +     No items   X     *    *    *    *    *    *        *       *       *    *             *       *       *    *    *      *    *      *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *    *       *    *    *    *      
+    - generic [ref=e9]:
+      - button "" [ref=e49] [cursor=pointer]
+      - text:                                                                           
+    - generic [ref=e12]:
+      - button "" [ref=e50] [cursor=pointer]
+      - text:                                               
+    - generic [ref=e15]:
+      - button "" [ref=e51] [cursor=pointer]
+      - text:                +     
+    - generic [ref=e18]:
+      - button "" [ref=e52] [cursor=pointer]
+      - text:                                   
+    - generic [ref=e21]:
+      - generic "更改背景图片" [ref=e53]:
+        - button "" [ref=e54] [cursor=pointer]
+      - text:       +                             
+    - generic [ref=e24]:
+      - button "" [ref=e55] [cursor=pointer]
+      - text: "        +               +                                                           渲染被```包裹的html、!DOCTYPE、script的代码块内容为交互式界面 提供STscript(command)异步函数执行酒馆命令: await STscript('/echo 你好世界！') 控制代码块转换为iframe渲染的功能 关闭后将清理所有已渲染的iframe 大型html适用 按需在 iframe 中注入 Wrapperiframe.js 流式多楼层动态渲染  每条消息添加图标，点击可看到发送给时AI的记录 在聊天框显示图标，点击可拦截将发送给AI的消息并显示 重构界面布局与细节优化 使用 NovelAI 为 AI 回复自动或手动生成配图，需在酒馆设置中配置 NovelAI Key  AI回复渲染后自动朗读。需要先在 config.yaml 开启 enableCorsProxy: true 并重启。所有请求通过 ST 内置代理，不经过第三方。  自动执行设定好的斜杠命令 输入/xbqte {{任务名称}}可以手动激活任务 导出/入角色卡时, 角色任务会随角色卡一起导出/入   No tasks found No tasks found No tasks found 突破第四面墙，与角色进行元对话交流。悬浮按钮位于页面右侧中间。 在消息楼层添加总结按钮，点击可打开剧情总结面板，AI分析生成关键词云、时间线、人物关系、角色弧光 在X按钮区域添加地图图标，点击可打开可视化剧情地图编辑器                                                                                                    +   + +  +     +        +        +        +        +        +        +        +        +        +        +        +        +        +        +        +        +        +        +        +                                                                                                                                                               没有找到脚本           "
+    - generic [ref=e27]:
+      - button "" [ref=e56] [cursor=pointer]
+      - text:                    
+    - generic [ref=e30]:
+      - button "" [ref=e57] [cursor=pointer]
+      - navigation [ref=e202]:
+        - text: 
+        - generic [ref=e203]:
+          - generic [ref=e204]:
+            - text:  
+            - button "" [ref=e205] [cursor=pointer]
+          - generic [ref=e209]:
+            - generic [ref=e210]: 
+            - text: 收藏角色以将它们添加到快速热切换区
+        - generic [ref=e211]:   
+        - generic [ref=e214]:
+          - text:                                             群聊暂无成员。          无可用角色
+          - generic [ref=e215]:
+            - generic [ref=e216]:
+              - generic [ref=e217]:
+                - button "" [ref=e218] [cursor=pointer]
+                - button "" [ref=e219] [cursor=pointer]
+                - button "" [ref=e220] [cursor=pointer]
+                - button "" [ref=e221] [cursor=pointer]
+                - combobox "角色排序顺序" [ref=e222]:
+                  - option "A-Z" [selected]
+                  - option "Z-A"
+                  - option "最新"
+                  - option "最旧"
+                  - option "收藏夹"
+                  - option "最近"
+                  - option "最多聊天"
+                  - option "最少聊天"
+                  - option "最多 Token"
+                  - option "最少 Token"
+                  - option "随机"
+                - button "" [ref=e223] [cursor=pointer]
+              - generic [ref=e225]:
+                - button "" [ref=e226] [cursor=pointer]:
+                  - generic "仅显示收藏" [ref=e227]: 
+                  - text: 
+                - button "" [ref=e228] [cursor=pointer]:
+                  - generic "仅显示群聊" [ref=e229]: 
+                  - text: 
+                - button "" [ref=e230] [cursor=pointer]:
+                  - generic "启用 '标签作为文件夹' 允许按分配的标签将角色分组在文件夹中。 标签必须显式选择为文件夹才能显示。 点击这里开始" [ref=e231]: 
+                  - text: 
+                - button "" [ref=e232] [cursor=pointer]:
+                  - generic "管理标签" [ref=e233]: 
+                  - text: 
+                - button "" [ref=e234] [cursor=pointer]:
+                  - generic "显示标签列表" [ref=e235]: 
+                  - text: 
+                - button "" [ref=e236] [cursor=pointer]:
+                  - generic "清除所有过滤器" [ref=e237]: 
+                  - text: 
+                - text:   
+            - generic [ref=e238]:
+              - generic [ref=e239]:
+                - generic [ref=e240]: 1-31 .. 31
+                - list [ref=e242]:
+                  - listitem [ref=e243]:
+                    - button "«" [ref=e244]
+                  - listitem [ref=e245]:
+                    - button "<" [ref=e246]
+                  - listitem [ref=e247]:
+                    - button ">" [ref=e248]
+                  - listitem [ref=e249]:
+                    - button "»" [ref=e250]
+                - combobox [ref=e252]:
+                  - option "10 / 页"
+                  - option "25 / 页"
+                  - option "50 / 页" [selected]
+                  - option "100 / 页"
+                  - option "250 / 页"
+                  - option "500 / 页"
+                  - option "1000 / 页"
+              - button "" [ref=e253] [cursor=pointer]
+              - button "" [ref=e254] [cursor=pointer]
+              - text:  
+            - list [ref=e256]:
+              - listitem [ref=e257] [cursor=pointer]:
+                - 'generic "[Character] 《道友先上我断后》新2.9版本 File: 《道友先上我断后》新2.9版本.png" [ref=e258]':
+                  - img "《道友先上我断后》新2.9版本" [ref=e259]
+                - generic [ref=e260]:
+                  - generic "[Character] 《道友先上我断后》新2.9版本" [ref=e262]: 《道友先上我断后》新2.9版本
+                  - text: 
+              - listitem [ref=e263] [cursor=pointer]:
+                - 'generic "[Character] 《道渊》v5.2 File: 《道渊》v5.2.png" [ref=e264]':
+                  - img "《道渊》v5.2" [ref=e265]
+                - generic [ref=e266]:
+                  - generic "[Character] 《道渊》v5.2" [ref=e268]: 《道渊》v5.2
+                  - text: 
+              - listitem [ref=e269] [cursor=pointer]:
+                - 'generic "[Character] 慈脂佛母 File: 慈脂佛母.png" [ref=e270]':
+                  - img "慈脂佛母" [ref=e271]
+                - generic [ref=e272]:
+                  - generic "[Character] 慈脂佛母" [ref=e274]: 慈脂佛母
+                  - text: 
+              - listitem [ref=e275] [cursor=pointer]:
+                - 'generic "[Character] 诡秘剧场 File: 诡秘剧场.png" [ref=e276]':
+                  - img "诡秘剧场" [ref=e277]
+                - generic [ref=e278]:
+                  - generic "[Character] 诡秘剧场" [ref=e280]: 诡秘剧场
+                  - text: 
+              - listitem [ref=e281] [cursor=pointer]:
+                - 'generic "[Character] 诡秘剧场 File: 诡秘剧场1.png" [ref=e282]':
+                  - img "诡秘剧场" [ref=e283]
+                - generic [ref=e284]:
+                  - generic "[Character] 诡秘剧场" [ref=e286]: 诡秘剧场
+                  - text: 
+              - listitem [ref=e287] [cursor=pointer]:
+                - 'generic "[Character] 禁忌修道院 File: 禁忌修道院.png" [ref=e288]':
+                  - img "禁忌修道院" [ref=e289]
+                - generic [ref=e290]:
+                  - generic [ref=e291]:
+                    - generic "[Character] 禁忌修道院" [ref=e292]: 禁忌修道院
+                    - generic [ref=e293]: "0.12"
+                  - text: 
+                  - generic [ref=e294]: 禁忌修道院(重置版)v0.12 内测组包。需酒馆助手(tavern_helper)启用。开局:0楼主页签署调令后自动进入到任之日。图标素材来自 game-icons.net(Lorc, Delapouite 等作者,CC BY 3.0);角色头像基于 DiceBear Lorelei(Lisa Wischofsky 原作,CC0 1.0)生成。
+              - listitem [ref=e295] [cursor=pointer]:
+                - 'generic "[Character] 禁忌修道院 File: 禁忌修道院1.png" [ref=e296]':
+                  - img "禁忌修道院" [ref=e297]
+                - generic [ref=e298]:
+                  - generic [ref=e299]:
+                    - generic "[Character] 禁忌修道院" [ref=e300]: 禁忌修道院
+                    - generic [ref=e301]: "0.12"
+                  - text: 
+                  - generic [ref=e302]: 禁忌修道院(重置版)v0.12 内测组包。需酒馆助手(tavern_helper)启用。开局:0楼主页签署调令后自动进入到任之日。图标素材来自 game-icons.net(Lorc, Delapouite 等作者,CC BY 3.0);角色头像基于 DiceBear Lorelei(Lisa Wischofsky 原作,CC0 1.0)生成。
+                  - button "禁忌修道院" [ref=e304]: 
+              - listitem [ref=e306] [cursor=pointer]:
+                - 'generic "[Character] 禁忌修道院 File: 禁忌修道院2.png" [ref=e307]':
+                  - img "禁忌修道院" [ref=e308]
+                - generic [ref=e309]:
+                  - generic [ref=e310]:
+                    - generic "[Character] 禁忌修道院" [ref=e311]: 禁忌修道院
+                    - generic [ref=e312]: "0.12"
+                  - text: 
+                  - generic [ref=e313]: 禁忌修道院(重置版)v0.12 内测组包。需酒馆助手(tavern_helper)启用。开局:0楼主页签署调令后自动进入到任之日。图标素材来自 game-icons.net(Lorc, Delapouite 等作者,CC BY 3.0);角色头像基于 DiceBear Lorelei(Lisa Wischofsky 原作,CC0 1.0)生成。
+                  - button "禁忌修道院" [ref=e315]: 
+              - listitem [ref=e317] [cursor=pointer]:
+                - 'generic "[Character] 酒馆助手编写示例 File: 酒馆助手编写示例.png" [ref=e318]':
+                  - img "酒馆助手编写示例" [ref=e319]
+                - generic [ref=e320]:
+                  - generic "[Character] 酒馆助手编写示例" [ref=e322]: 酒馆助手编写示例
+                  - text: 
+              - listitem [ref=e323] [cursor=pointer]:
+                - 'generic "[Character] 可以随便做爱的世界！ File: 可以随便做爱的世界！.png" [ref=e324]':
+                  - img "可以随便做爱的世界！" [ref=e325]
+                - generic [ref=e326]:
+                  - generic "[Character] 可以随便做爱的世界！" [ref=e328]: 可以随便做爱的世界！
+                  - text: 
+              - listitem [ref=e329] [cursor=pointer]:
+                - 'generic "[Character] 门之主写卡助手 File: 门之主写卡助手.png" [ref=e330]':
+                  - img "门之主写卡助手" [ref=e331]
+                - generic [ref=e332]:
+                  - generic "[Character] 门之主写卡助手" [ref=e334]: 门之主写卡助手
+                  - text: 
+              - listitem [ref=e335] [cursor=pointer]:
+                - 'generic "[Character] 母上攻略 File: 母上攻略.png" [ref=e336]':
+                  - img "母上攻略" [ref=e337]
+                - generic [ref=e338]:
+                  - generic [ref=e339]:
+                    - generic "[Character] 母上攻略" [ref=e340]: 母上攻略
+                    - generic [ref=e341]: "1.1"
+                  - text: 
+                  - generic [ref=e342]: 作者：emo的lsp 仅发布于Discord旅程和类脑
+              - listitem [ref=e343] [cursor=pointer]:
+                - 'generic "[Character] 母猪改造 File: 母猪改造.png" [ref=e344]':
+                  - img "母猪改造" [ref=e345]
+                - generic [ref=e346]:
+                  - generic "[Character] 母猪改造" [ref=e348]: 母猪改造
+                  - text: 
+              - listitem [ref=e349] [cursor=pointer]:
+                - 'generic "[Character] 妻悦论坛 File: 妻悦论坛.png" [ref=e350]':
+                  - img "妻悦论坛" [ref=e351]
+                - generic [ref=e352]:
+                  - generic [ref=e353]:
+                    - generic "[Character] 妻悦论坛" [ref=e354]: 妻悦论坛
+                    - generic [ref=e355]: "1.8"
+                  - text: 
+                  - generic [ref=e356]: 作者：emo的lsp 仅发布于Discord旅程和类脑
+              - listitem [ref=e357] [cursor=pointer]:
+                - 'generic "[Character] 秦璐 File: 秦璐.png" [ref=e358]':
+                  - img "秦璐" [ref=e359]
+                - generic [ref=e360]:
+                  - generic "[Character] 秦璐" [ref=e362]: 秦璐
+                  - text: 
+              - listitem [ref=e363] [cursor=pointer]:
+                - 'generic "[Character] 清月师尊 File: 清月师尊.png" [ref=e364]':
+                  - img "清月师尊" [ref=e365]
+                - generic [ref=e366]:
+                  - generic "[Character] 清月师尊" [ref=e368]: 清月师尊
+                  - text: 
+              - listitem [ref=e369] [cursor=pointer]:
+                - 'generic "[Character] 人妻公寓 File: 人妻公寓.png" [ref=e370]':
+                  - img "人妻公寓" [ref=e371]
+                - generic [ref=e372]:
+                  - generic [ref=e373]:
+                    - generic "[Character] 人妻公寓" [ref=e374]: 人妻公寓
+                    - generic [ref=e375]: "0.51"
+                  - text: 
+                  - generic [ref=e376]: 人妻公寓 v0.51 测试版。需安装最新版酒馆助手，并启用卡内 MVU 与提示词模板。首次进入须在数据库与智脑 v5.0.8 中二选一作为长期记忆方案；数据库玩家按引导安装四张 RQ_ 表。开局：0楼进入游戏界面，选难度→接父亲电话进入到任首日；输入走游戏内。
+              - listitem [ref=e377] [cursor=pointer]:
+                - 'generic "[Character] 人妻公寓 File: 人妻公寓1.png" [ref=e378]':
+                  - img "人妻公寓" [ref=e379]
+                - generic [ref=e380]:
+                  - generic [ref=e381]:
+                    - generic "[Character] 人妻公寓" [ref=e382]: 人妻公寓
+                    - generic [ref=e383]: "0.57"
+                  - text: 
+                  - generic [ref=e384]: 人妻公寓 v0.57 测试版。需安装最新版酒馆助手，并启用卡内 MVU 与提示词模板。首次进入须在数据库与智脑 v5.0.8 中二选一作为长期记忆方案；数据库玩家按引导安装四张 RQ_ 表。开局：0楼进入游戏界面，选难度→接父亲电话进入到任首日；输入走游戏内。
+                  - button "人妻公寓" [ref=e386]: 
+              - listitem [ref=e388] [cursor=pointer]:
+                - 'generic "[Character] 十二年的冬夏 File: 十二年的冬夏.png" [ref=e389]':
+                  - img "十二年的冬夏" [ref=e390]
+                - generic [ref=e391]:
+                  - generic [ref=e392]:
+                    - generic "[Character] 十二年的冬夏" [ref=e393]: 十二年的冬夏
+                    - generic [ref=e394]: "1.1"
+                  - text: 
+                  - generic [ref=e395]: 作者：emo的lsp 仅发布于Discord旅程和类脑
+              - listitem [ref=e396] [cursor=pointer]:
+                - 'generic "[Character] 温知夏 File: 温知夏.png" [ref=e397]':
+                  - img "温知夏" [ref=e398]
+                - generic [ref=e399]:
+                  - generic "[Character] 温知夏" [ref=e401]: 温知夏
+                  - text: 
+              - listitem [ref=e402] [cursor=pointer]:
+                - 'generic "[Character] 我当系统？ File: 我当系统？.png" [ref=e403]':
+                  - img "我当系统？" [ref=e404]
+                - generic [ref=e405]:
+                  - generic [ref=e406]:
+                    - generic "[Character] 我当系统？" [ref=e407]: 我当系统？
+                    - generic [ref=e408]: "1.2"
+                  - text: 
+                  - generic [ref=e409]: 作者：emo的lsp 仅发布于Discord旅程和类脑
+              - listitem [ref=e410] [cursor=pointer]:
+                - 'generic "[Character] 我的师尊是论坛榜一大姐 File: 我的师尊是论坛榜一大姐.png" [ref=e411]':
+                  - img "我的师尊是论坛榜一大姐" [ref=e412]
+                - generic [ref=e413]:
+                  - generic [ref=e414]:
+                    - generic "[Character] 我的师尊是论坛榜一大姐" [ref=e415]: 我的师尊是论坛榜一大姐
+                    - generic [ref=e416]: "1.1"
+                  - text: 
+                  - generic [ref=e417]: 作者：emo的lsp 仅发布于Discord类脑
+              - listitem [ref=e418] [cursor=pointer]:
+                - 'generic "[Character] 我的姨母和妈妈好润MVU版-终版 File: 我的姨母和妈妈好润MVU版-终版.png" [ref=e419]':
+                  - img "我的姨母和妈妈好润MVU版-终版" [ref=e420]
+                - generic [ref=e421]:
+                  - generic "[Character] 我的姨母和妈妈好润MVU版-终版" [ref=e423]: 我的姨母和妈妈好润MVU版-终版
+                  - text: 
+              - listitem [ref=e424] [cursor=pointer]:
+                - 'generic "[Character] 我那冰清玉洁的绝色女侠娘子才不会趁我断腿改嫁给京城肥猪恶少当小妾还写信来咒我呢 File: 我那冰清玉洁的绝色女侠娘子才不会趁我断腿改嫁给京城肥猪恶少当小妾还写信来咒我呢.png" [ref=e425]':
+                  - img "我那冰清玉洁的绝色女侠娘子才不会趁我断腿改嫁给京城肥猪恶少当小妾还写信来咒我呢" [ref=e426]
+                - generic [ref=e427]:
+                  - generic "[Character] 我那冰清玉洁的绝色女侠娘子才不会趁我断腿改嫁给京城肥猪恶少当小妾还写信来咒我呢" [ref=e429]: 我那冰清玉洁的绝色女侠娘子才不会趁我断腿改嫁给京城肥猪恶少当小妾还写信来咒我呢
+                  - text: 
+              - listitem [ref=e430] [cursor=pointer]:
+                - 'generic "[Character] 我有一个飞机杯 File: 我有一个飞机杯.png" [ref=e431]':
+                  - img "我有一个飞机杯" [ref=e432]
+                - generic [ref=e433]:
+                  - generic "[Character] 我有一个飞机杯" [ref=e435]: 我有一个飞机杯
+                  - text: 
+              - listitem [ref=e436] [cursor=pointer]:
+                - 'generic "[Character] 萧谴写卡助手版_V4.5.1 File: 萧谴写卡助手版_V4.5.1.png" [ref=e437]':
+                  - img "萧谴写卡助手版_V4.5.1" [ref=e438]
+                - generic [ref=e439]:
+                  - generic "[Character] 萧谴写卡助手版_V4.5.1" [ref=e441]: 萧谴写卡助手版_V4.5.1
+                  - text: 
+              - listitem [ref=e442] [cursor=pointer]:
+                - 'generic "[Character] 修仙世界 File: 修仙世界.png" [ref=e443]':
+                  - img "修仙世界" [ref=e444]
+                - generic [ref=e445]:
+                  - generic "[Character] 修仙世界" [ref=e447]: 修仙世界
+                  - text: 
+              - listitem [ref=e448] [cursor=pointer]:
+                - 'generic "[Character] 云霜凝 File: 云霜凝.png" [ref=e449]':
+                  - img "云霜凝" [ref=e450]
+                - generic [ref=e451]:
+                  - generic "[Character] 云霜凝" [ref=e453]: 云霜凝
+                  - text: 
+              - listitem [ref=e454] [cursor=pointer]:
+                - 'generic "[Character] 赵霞 File: 赵霞.png" [ref=e455]':
+                  - img "赵霞" [ref=e456]
+                - generic [ref=e457]:
+                  - generic "[Character] 赵霞" [ref=e459]: 赵霞
+                  - text: 
+              - listitem [ref=e460] [cursor=pointer]:
+                - 'generic "[Character] Assistant File: default_Assistant.png" [ref=e461]':
+                  - img "Assistant" [ref=e462]
+                - generic [ref=e463]:
+                  - generic [ref=e464]:
+                    - generic "[Character] Assistant" [ref=e465]: Assistant
+                    - generic "此角色将作为欢迎页面助理。" [ref=e466]: 
+                  - text: 
+                  - generic [ref=e468]: 自动创建的角色。可以自由编辑。
+              - listitem [ref=e469] [cursor=pointer]:
+                - 'generic "[Character] Seraphina File: default_Seraphina.png" [ref=e470]':
+                  - img "Seraphina" [ref=e471]
+                - generic [ref=e472]:
+                  - generic [ref=e473]:
+                    - generic "[Character] Seraphina" [ref=e474]: Seraphina
+                    - generic [ref=e475]: 1.0.0
+                  - text: 
+                  - generic [ref=e476]: "ST Default Bot contest winner: roleplay bots category"
+                  - button "ST Default" [ref=e478]: 
+  - generic:                      +                                                                                +    + +                  
+  - generic:                  
+  - generic [ref=e33]:
+    - text: 
+    - generic [ref=e34]:
+      - generic [ref=e58]:
+        - generic [ref=e59]:
+          - img "SillyTavern 徽标" [ref=e60]
+          - generic [ref=e61]: SillyTavern 1.18.0 'release' (8172dcd0e)
+          - text: 
+          - button "" [ref=e62] [cursor=pointer]
+          - button "" [ref=e64] [cursor=pointer]
+        - generic [ref=e66]:
+          - generic [ref=e67]: 最近的聊天
+          - generic [ref=e68]:
+            - button "" [ref=e69] [cursor=pointer]
+            - button "" [ref=e71] [cursor=pointer]
+            - button "" [ref=e73] [cursor=pointer]
+            - generic [ref=e75]: "|"
+            - button " 临时聊天" [ref=e76] [cursor=pointer]:
+              - generic [ref=e77]: 
+              - generic [ref=e78]: 临时聊天
+        - list [ref=e80]:
+          - listitem [ref=e81] [cursor=pointer]:
+            - 'generic "[Character] 秦璐 File: 秦璐.png" [ref=e82]':
+              - img "秦璐" [ref=e83]
+            - generic [ref=e84]:
+              - generic [ref=e85]:
+                - generic "秦璐 - 2026-08-02@01h24m15s942ms.jsonl" [ref=e86]:
+                  - strong [ref=e87]: 秦璐
+                  - text: – 秦璐 - 2026-08-02@01h24m15s942ms
+                - generic "2026年8月2日 04:28" [ref=e88]: 2026/8/2
+                - generic [ref=e89]:
+                  - button "" [ref=e90]
+                  - button "" [ref=e92]
+                  - button "" [ref=e94]
+              - generic [ref=e96]:
+                - generic [ref=e97]
+                - generic [ref=e98]:
+                  - generic [ref=e99]:
+                    - generic [ref=e100]: 
+                    - generic [ref=e101]: "68"
+                    - text: "|"
+                  - generic [ref=e102]: 1.72MB
+          - listitem [ref=e103] [cursor=pointer]:
+            - 'generic "[Character] 秦璐 File: 秦璐.png" [ref=e104]':
+              - img "秦璐" [ref=e105]
+            - generic [ref=e106]:
+              - generic [ref=e107]:
+                - generic "秦璐 - 2026-08-02@01h24m11s799ms.jsonl" [ref=e108]:
+                  - strong [ref=e109]: 秦璐
+                  - text: – 秦璐 - 2026-08-02@01h24m11s799ms
+                - generic "2026年8月2日 01:24" [ref=e110]: 2026/8/2
+                - generic [ref=e111]:
+                  - button "" [ref=e112]
+                  - button "" [ref=e114]
+                  - button "" [ref=e116]
+              - generic [ref=e118]:
+                - generic [ref=e119]
+                - generic [ref=e120]:
+                  - generic [ref=e121]:
+                    - generic [ref=e122]: 
+                    - generic [ref=e123]: "1"
+                    - text: "|"
+                  - generic [ref=e124]: 19.4KB
+          - listitem [ref=e125] [cursor=pointer]:
+            - 'generic "[Character] 秦璐 File: 秦璐.png" [ref=e126]':
+              - img "秦璐" [ref=e127]
+            - generic [ref=e128]:
+              - generic [ref=e129]:
+                - generic "秦璐 - 2026-08-02@01h20m09s891ms.jsonl" [ref=e130]:
+                  - strong [ref=e131]: 秦璐
+                  - text: – 秦璐 - 2026-08-02@01h20m09s891ms
+                - generic "2026年8月2日 01:20" [ref=e132]: 2026/8/2
+                - generic [ref=e133]:
+                  - button "" [ref=e134]
+                  - button "" [ref=e136]
+                  - button "" [ref=e138]
+              - generic [ref=e140]:
+                - generic [ref=e141]
+                - generic [ref=e142]:
+                  - generic [ref=e143]:
+                    - generic [ref=e144]: 
+                    - generic [ref=e145]: "3"
+                    - text: "|"
+                  - generic [ref=e146]: 246.36KB
+          - button "" [ref=e147] [cursor=pointer]
+      - generic [ref=e149]:
+        - generic [ref=e150]: "#0"
+        - generic [ref=e154]:
+          - generic [ref=e155]:
+            - generic [ref=e157]:
+              - generic [ref=e158]: Assistant
+              - text: 
+              - generic [ref=e159]: 2026年8月2日 21:08
+            - generic [ref=e160]:                
+            - text:       
+          - text:       
+          - generic [ref=e161]:
+            - paragraph [ref=e162]: 如果您已连接到一个 API，试着问我点什么吧！
+            - separator [ref=e163]
+            - paragraph [ref=e164]:
+              - strong [ref=e165]: 提示：
+              - text: 您可以通过角色设置中的 "更多…" 菜单将角色设为欢迎页面的助手。
+      - generic [ref=e167]:
+        - text:                               
+        - generic [ref=e169]:
+          - button " API 连接" [ref=e170] [cursor=pointer]:
+            - generic [ref=e171]: 
+            - generic [ref=e172]: API 连接
+          - button " 角色管理" [active] [ref=e173] [cursor=pointer]:
+            - generic [ref=e174]: 
+            - generic [ref=e175]: 角色管理
+          - button " 扩展程序" [ref=e176] [cursor=pointer]:
+            - generic [ref=e177]: 
+            - generic [ref=e178]: 扩展程序
+    - generic [ref=e36]:
+      - generic: 
+      - text:  
+      - generic [ref=e37]:
+        - generic [ref=e38]:
+          - generic [ref=e39] [cursor=pointer]: 
+          - generic "扩展程序" [ref=e180] [cursor=pointer]: 
+        - textbox "输入想发送的消息，或输入 /? 获取帮助" [ref=e181]
+        - generic [ref=e41]:
+          - text:      
+          - generic "发送消息" [ref=e182] [cursor=pointer]: 
+  - text:                       1       
+  - generic:                 +                             +                      +         +                      • • • •        • • • • • • •                  +        +       +                                           +          +       +     +                  +  +                       +           +         +               +      +                                     
+  - option "(请先获取并选择模型)" [selected]
+  - option "智绘姬 (默认)" [selected]
+  - option "自定义 (LLM预设)"
+  - generic [ref=e183]: 
+  - status [ref=e185]
+  - status [ref=e186]
+  - status [ref=e187]
+  - status [ref=e188]
+  - status [ref=e189]
+  - status [ref=e190]
+  - status [ref=e191]
+  - status [ref=e192]
+  - status [ref=e193]
+  - status [ref=e194]
+  - status [ref=e195]
+  - status [ref=e196]
