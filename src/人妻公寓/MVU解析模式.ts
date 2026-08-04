@@ -36,23 +36,107 @@ type MVU设置 = {
 
 type 宿主窗口类型 = Window & {
   Mvu?: unknown;
-  SillyTavern?: {
-    extensionSettings?: Record<string, unknown>;
-    saveSettingsDebounced?: () => void;
-  };
+  SillyTavern?: ST接口;
+};
+
+type ST接口 = {
+  extensionSettings?: Record<string, unknown>;
+  saveSettingsDebounced?: () => void;
+  getContext?: () => { extensionSettings?: Record<string, unknown>; saveSettingsDebounced?: () => void };
 };
 
 function 宿主窗口(): 宿主窗口类型 {
   return (window.parent ?? window) as 宿主窗口类型;
 }
 
+/**
+ * 取真正带 extensionSettings 的 ST 接口。
+ *
+ * 酒馆助手在 iframe 里注入的 `SillyTavern` 全局已经拍平了 `extensionSettings` 与
+ * `saveSettingsDebounced`；而顶层酒馆页面的 `window.SillyTavern` 只暴露 `getContext()`，
+ * 直接读 `window.parent.SillyTavern.extensionSettings` 会拿到 undefined ——
+ * 于是路线按钮读不出状态、写入静默失败（rq0.71 症状）。
+ * 依次尝试：iframe 注入全局 → 本窗口 → 父窗口，父窗口再回退 getContext()。
+ */
+function 取ST(): ST接口 | undefined {
+  const 候选: (ST接口 | undefined)[] = [];
+  try {
+    候选.push((globalThis as unknown as { SillyTavern?: ST接口 }).SillyTavern);
+  } catch {
+    /* 忽略跨域或未注入 */
+  }
+  try {
+    候选.push((window as unknown as { SillyTavern?: ST接口 }).SillyTavern);
+  } catch {
+    /* 忽略 */
+  }
+  try {
+    候选.push(宿主窗口().SillyTavern);
+  } catch {
+    /* 忽略跨域 */
+  }
+  for (const st of 候选) {
+    if (st?.extensionSettings) return st;
+  }
+  // 全部拍平字段缺失时，用顶层的 getContext() 兜底（酒馆主页面形态）。
+  for (const st of 候选) {
+    try {
+      const ctx = st?.getContext?.();
+      if (ctx?.extensionSettings) {
+        return { extensionSettings: ctx.extensionSettings, saveSettingsDebounced: ctx.saveSettingsDebounced };
+      }
+    } catch {
+      /* 忽略 */
+    }
+  }
+  return 候选.find(Boolean);
+}
+
 function 读MVU设置(): MVU设置 | undefined {
-  return 宿主窗口().SillyTavern?.extensionSettings?.mvu_settings as MVU设置 | undefined;
+  return 取ST()?.extensionSettings?.mvu_settings as MVU设置 | undefined;
+}
+
+/** Mvu 同样是逐窗口注入：iframe 里在本作用域，主页面里在 window 上。 */
+function Mvu已加载(): boolean {
+  try {
+    if ((globalThis as unknown as { Mvu?: unknown }).Mvu) return true;
+  } catch {
+    /* 忽略 */
+  }
+  try {
+    if ((window as unknown as { Mvu?: unknown }).Mvu) return true;
+  } catch {
+    /* 忽略 */
+  }
+  try {
+    return Boolean(宿主窗口().Mvu);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 偏好统一落在顶层窗口的 localStorage：App.vue（画幅 iframe）与游戏逻辑脚本必须
+ * 读同一份，`window.parent` 是二者唯一的共同锚点。父窗口不可达时退回本窗口，
+ * 至少不让整份偏好读不出来。
+ */
+function 偏好存储(): Storage | undefined {
+  try {
+    const s = 宿主窗口().localStorage;
+    if (s) return s;
+  } catch {
+    /* 跨域时不可达 */
+  }
+  try {
+    return window.localStorage;
+  } catch {
+    return undefined;
+  }
 }
 
 function 读界面偏好(): Record<string, unknown> {
   try {
-    const raw = 宿主窗口().localStorage?.getItem('人妻公寓_界面偏好');
+    const raw = 偏好存储()?.getItem('人妻公寓_界面偏好');
     if (!raw) return {};
     const 值 = JSON.parse(raw) as unknown;
     return 值 && typeof 值 === 'object' ? (值 as Record<string, unknown>) : {};
@@ -63,7 +147,7 @@ function 读界面偏好(): Record<string, unknown> {
 
 function 写界面偏好(补丁: Record<string, unknown>): void {
   try {
-    宿主窗口().localStorage?.setItem('人妻公寓_界面偏好', JSON.stringify({ ...读界面偏好(), ...补丁 }));
+    偏好存储()?.setItem('人妻公寓_界面偏好', JSON.stringify({ ...读界面偏好(), ...补丁 }));
   } catch (e) {
     console.warn('[人妻公寓] 写界面偏好失败:', e);
   }
@@ -85,7 +169,7 @@ export function 读取MVU解析状态(): MVU解析状态 {
     const 设置 = 读MVU设置();
     const 自动请求原值 = 设置?.额外模型解析配置?.启用自动请求 ?? 设置?.自动触发额外模型解析;
     return {
-      已加载: Boolean(宿主窗口().Mvu),
+      已加载: Mvu已加载(),
       外置模式: 设置?.更新方式 === '额外模型解析',
       自动请求: 自动请求原值 === undefined ? true : 自动请求原值 === true,
       内置解析: 内置变量解析开启(),
@@ -139,7 +223,7 @@ export function 自动代关MVU自动请求(): boolean {
     const 配置 = 设置.额外模型解析配置;
     if (!配置 || 配置.启用自动请求 !== true) return false;
     配置.启用自动请求 = false;
-    宿主窗口().SillyTavern?.saveSettingsDebounced?.();
+    取ST()?.saveSettingsDebounced?.();
     return true;
   } catch {
     return false;
@@ -189,9 +273,12 @@ const MVU外置配置键 = ['模型来源', 'api地址', '密钥', '模型名称
  */
 export function 写入MVU设置(补丁: MVU设置补丁): boolean {
   try {
-    const st = 宿主窗口().SillyTavern;
+    const st = 取ST();
     const 根 = st?.extensionSettings;
-    if (!根) return false;
+    if (!根) {
+      console.warn('[人妻公寓] 写入MVU设置失败:拿不到 SillyTavern.extensionSettings');
+      return false;
+    }
     const 设置 = (根.mvu_settings ??= {}) as MVU设置;
     if (补丁.更新方式 !== undefined) 设置.更新方式 = 补丁.更新方式;
     if (MVU外置配置键.some(键 => 补丁[键] !== undefined)) {

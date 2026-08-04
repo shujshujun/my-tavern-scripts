@@ -26,13 +26,35 @@ function _读内置解析开关(): boolean {
 
 /** 读取 MVU 当前更新方式（内联）。 */
 function _是外置模式(): boolean {
+  // 酒馆助手在 iframe 里注入的 SillyTavern 已拍平 extensionSettings；
+  // 顶层页面的 window.SillyTavern 只有 getContext()。依次尝试三处。
+  const _取根 = (): Record<string, unknown> | undefined => {
+    const 候选: unknown[] = [];
+    try {
+      候选.push((globalThis as { SillyTavern?: unknown }).SillyTavern);
+    } catch {
+      /* 忽略 */
+    }
+    try {
+      候选.push((window.parent ?? window) as unknown);
+    } catch {
+      /* 忽略 */
+    }
+    for (const c of 候选) {
+      const st = (c as { SillyTavern?: unknown })?.SillyTavern ?? c;
+      const 根 = (st as { extensionSettings?: Record<string, unknown> })?.extensionSettings;
+      if (根) return 根;
+      try {
+        const ctx = (st as { getContext?: () => { extensionSettings?: Record<string, unknown> } })?.getContext?.();
+        if (ctx?.extensionSettings) return ctx.extensionSettings;
+      } catch {
+        /* 忽略 */
+      }
+    }
+    return undefined;
+  };
   try {
-    const _w = (window.parent ?? window) as unknown as {
-      SillyTavern?: { extensionSettings?: Record<string, unknown> };
-    };
-    const s = _w.SillyTavern?.extensionSettings?.mvu_settings as
-      | { 更新方式?: unknown }
-      | undefined;
+    const s = _取根()?.mvu_settings as { 更新方式?: unknown } | undefined;
     return s?.更新方式 === '额外模型解析';
   } catch {
     return false;
