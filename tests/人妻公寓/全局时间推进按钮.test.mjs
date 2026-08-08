@@ -14,6 +14,7 @@ const { Schema } = require('../../src/人妻公寓/schema.ts');
 const { 执行时间推进事务 } = require('../../src/人妻公寓/脚本/游戏逻辑/时间推进系统.ts');
 const { 资源上限 } = require('../../src/人妻公寓/脚本/游戏逻辑/玩家资源系统.ts');
 const App源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
+const 回合输入源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/components/回合输入.vue', import.meta.url), 'utf8');
 
 function 建数据(精力, 体力) {
   return Schema.parse({
@@ -98,11 +99,18 @@ test('普通推进不能从深夜跨日，必须回管理员室或 302 睡觉', 
 });
 
 test('固定大按钮显示当前到下一时段，满状态点击前二次确认', () => {
-  assert.match(App源, /class="global-time-advance"/);
-  assert.match(App源, /推进到\{\{ 下一时段显示/);
+  // A8b:按钮模板/样式归 components/回合输入.vue，当前/下一时段经英文 props 注入
+  assert.match(回合输入源, /class="global-time-advance"/);
+  assert.match(回合输入源, /currentPeriodLabel/);
+  assert.match(回合输入源, /推进到\{\{ nextPeriodLabel \}\}/);
+  assert.match(回合输入源, /\.global-time-advance\s*\{[\s\S]{0,260}min-height:\s*56px/);
+  // 二次确认与深夜硬门仍在 App 推进固定时段
   assert.match(App源, /玩家资源已满/);
   assert.match(App源, /window\.confirm\([\s\S]{0,260}什么也没做[\s\S]{0,120}确定推进到/);
   assert.match(App源, /时段\.value === '深夜'[\s\S]{0,220}管理员室或 302 睡觉[\s\S]{0,160}不能跨到第二天/);
   assert.match(App源, /发起时间推进\('推进一时段'\)/);
-  assert.match(App源, /\.global-time-advance\s*\{[\s\S]{0,260}min-height:\s*(?:4[8-9]|[5-9]\d)px/);
+  // App 导入并挂载 RoundInput，推进按钮唯一入口经组件接线
+  assert.match(App源, /import RoundInput from '\.\/components\/回合输入\.vue';/);
+  assert.equal((App源.match(/<RoundInput/g) ?? []).length, 1);
+  assert.match(App源, /@advance-time="推进固定时段"/);
 });

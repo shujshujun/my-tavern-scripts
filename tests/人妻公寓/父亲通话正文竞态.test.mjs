@@ -56,10 +56,30 @@ test('父亲通话写与正文最终整表提交严格串行，后到写不能�
   assert.match(提交段, /Mvu\.replaceMvuData/);
 });
 
-test('父亲通话结束只向下一正文写抽象心绪，不拼接通话前四句原文', () => {
+test('父亲通话结束事务不再把来电回流/线索事件写进待发送事件，仍原子归档线索并清锁', () => {
   const 开始 = index源.indexOf("eventOn('人妻公寓:父亲通话结束'");
   const 结束 = index源.indexOf('// ─────────────────────────────────────────────', 开始);
   const 段 = index源.slice(开始, 结束);
   assert.doesNotMatch(段, /记录\s*\.slice\(0,\s*4\)|内容大意:\$\{摘要/);
-  assert.match(段, /刚挂了爸的电话|刚挂父亲电话/);
+  assert.doesNotMatch(段, /【来电回流】/, '不再向 _待发送事件 写入来电回流');
+  assert.doesNotMatch(段, /线索\?\.事件/, '线索.事件 不再排进 _待发送事件');
+  assert.match(段, /const 线索 = 母亲来电线索\(data\)/, '仍调用母亲来电线索推进碎片进度/镜像/toast');
+  assert.match(段, /data\.系统\._父亲通话 = 空父亲通话\(\)/, '仍与玩法归档同原子清空 _父亲通话');
+  assert.match(段, /线索\?\.提示/, '线索.提示 仍是完整可见的玩法反馈');
+});
+
+test('父亲收尾先触发核心结束事件，数据库同步为后置非阻塞副作用', () => {
+  const 父亲通话源 = readFileSync('src/人妻公寓/脚本/游戏逻辑/手机/交互/父亲通话.ts', 'utf8');
+  const 完成段 = 父亲通话源.slice(
+    父亲通话源.indexOf('async function 完成父亲通话'),
+    父亲通话源.indexOf('export async function 结束通话'),
+  );
+  const 结束事件位 = 完成段.indexOf("eventEmit('人妻公寓:父亲通话结束'");
+  // 注释里也会出现“同步社交轨迹”，必须按真实调用定位，避免先匹配到结束事件前的注释文本。
+  const 数据库位 = 完成段.indexOf('void 同步社交轨迹(');
+  assert.ok(结束事件位 >= 0 && 数据库位 > 结束事件位, '核心结束事件必须先于数据库同步触发');
+  assert.match(完成段, /void 同步社交轨迹\(/, '数据库同步必须是 fire-and-forget，不得 await');
+  assert.doesNotMatch(完成段, /await 同步社交轨迹/, '数据库失败不得阻塞或延长通话收尾');
+  assert.match(完成段, /事件键: `RQP-来电-\$\{最新\.标识\}`/, '数据库事件键保持幂等');
+  assert.match(完成段, /console\.(info|warn)\([^\n]*长期记忆/, '数据库失败只记录日志，不弹“电话没保存完整”');
 });

@@ -2,7 +2,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 
 process.env.TS_NODE_COMPILER_OPTIONS = JSON.stringify({ module: 'CommonJS', moduleResolution: 'node' });
@@ -12,6 +11,18 @@ require('ts-node/register/transpile-only');
 const { 手机聊天批次控制器, 收口手机聊天输入, 执行手机聊天批次任务 } = require(
   '../../src/人妻公寓/脚本/游戏逻辑/手机聊天批次.ts'
 );
+
+const 手机目录 = new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/', import.meta.url);
+// P8:批次执行/发送/撤回收口等交互实现迁至 ./交互/邀约与发消息,会话清理在 壳/会话瞬态,收口在 壳/渲染。
+const 交互源码 = readFileSync(new URL('./交互/邀约与发消息.ts', 手机目录), 'utf8');
+const 会话瞬态源码 = readFileSync(new URL('./壳/会话瞬态.ts', 手机目录), 'utf8');
+const 渲染index源码 = readFileSync(new URL('./壳/渲染/index.ts', 手机目录), 'utf8');
+const 渲染chat源码 = readFileSync(new URL('./壳/渲染/chat.ts', 手机目录), 'utf8');
+const 红点开合源码 = readFileSync(new URL('./壳/红点与开合.ts', 手机目录), 'utf8');
+const 挂载源码 = readFileSync(new URL('./壳/挂载.ts', 手机目录), 'utf8');
+const 渲染共享源码 = readFileSync(new URL('./壳/渲染/共享.ts', 手机目录), 'utf8');
+const 生成引擎源码 = readFileSync(new URL('./生成引擎.ts', 手机目录), 'utf8');
+const 摘要系统源码 = readFileSync(new URL('./摘要系统.ts', 手机目录), 'utf8');
 
 function 假时钟() {
   let 当前 = 0;
@@ -250,55 +261,43 @@ test('红灯前置步骤抛错时仍依次执行全部收口且不向外拒绝',
 });
 
 test('手机实装使用独立 generation_id 与定向停止，并把一次私聊结果拆成多气泡', () => {
-  const 源码 = readFileSync(
-    fileURLToPath(new URL('../../src/人妻公寓/脚本/游戏逻辑/手机系统.ts', import.meta.url)),
-    'utf8',
-  );
-  assert.match(源码, /async function 执行待回复批次\(请求: 手机聊天批次请求\)/);
-  assert.match(源码, /generation_id: 控制\.生成ID/);
-  assert.match(源码, /stopGenerationById\(上下文\.活动生成ID\)/);
-  assert.doesNotMatch(源码, /stopAllGeneration\(/, '手机停止不得中断正文或其他生成');
-  assert.match(源码, /单次请求:\s*true/);
-  assert.match(源码, /!控制\?\.单次请求\s*&&\s*c\.ai来源 === '自动'/, '手动聊天批次不得跨来源补发第二次请求');
-  assert.match(源码, /控制\?\.单次请求[\s\S]{0,180}return '';/, '格式异常时手动批次应放弃而不是暗中重试');
-  assert.match(源码, /解析微信私聊气泡\(回, 配\.妻名, 手机可见单条硬上限, 5\)/);
-  assert.match(源码, /新消息: \[消息\]/, '群聊回复也应逐气泡落库，而不是一次整批闪现');
+  // P8:执行待回复批次/批次聊天回复迁至 交互/邀约与发消息；活动生成ID 的定向停止归 壳/会话瞬态。
+  assert.match(交互源码, /async function 执行待回复批次\(请求: 手机聊天批次请求\)/);
+  assert.match(生成引擎源码, /generation_id: 控制\.生成ID/);
+  assert.match(会话瞬态源码, /stopGenerationById\(上下文\.活动生成ID\)/);
+  assert.doesNotMatch(交互源码, /stopAllGeneration\(/, '手机停止不得中断正文或其他生成');
+  assert.match(交互源码, /单次请求:\s*true/);
+  // v0.74 第 8 项：数据库失败不再跨来源补发第二次请求（避免双请求/二次计费）。
+  assert.doesNotMatch(生成引擎源码, /数据库失败回退/, '手动聊天批次不再有数据库失败回退正文 API 的开关');
+  assert.match(生成引擎源码, /控制\?\.单次请求[\s\S]{0,180}return '';/, '格式异常时手动批次应放弃而不是暗中重试');
+  assert.match(交互源码, /解析微信私聊气泡\(回, 配\.妻名, 手机可见单条硬上限, 5\)/);
+  assert.match(交互源码, /新消息: \[消息\]/, '群聊回复也应逐气泡落库，而不是一次整批闪现');
 });
 
 test('系统在首次异步写库前预留消息，并按预留ID顺序组装一次请求', () => {
-  const 源码 = readFileSync(
-    fileURLToPath(new URL('../../src/人妻公寓/脚本/游戏逻辑/手机系统.ts', import.meta.url)),
-    'utf8',
-  );
-  const 发送段 = 源码.slice(源码.indexOf('async function 发消息('), 源码.indexOf('/** 黄灯到时'));
+  const 发送段 = 交互源码.slice(交互源码.indexOf('async function 发消息('), 交互源码.indexOf('/** 黄灯到时'));
   assert.ok(发送段.indexOf('开始写入(键, 玩家消息标识)') < 发送段.indexOf('await 写库增量'));
   assert.match(发送段, /finally\s*\{[\s\S]*完成写入\(键, 玩家消息标识, 已成功落库\)/);
 
-  const 批次段 = 源码.slice(源码.indexOf('async function 执行待回复批次('), 源码.indexOf('async function 执行批次聊天回复('));
+  const 批次段 = 交互源码.slice(交互源码.indexOf('async function 执行待回复批次('), 交互源码.indexOf('async function 执行批次聊天回复('));
   assert.match(批次段, /请求\.消息标识\s*\.map\(标识\s*=>/);
   assert.match(批次段, /活动消息标识\s*=\s*\[\.\.\.请求\.消息标识\]/);
 });
 
 test('撤回、换时间线和收起手机都能收口尚未完成的聊天批次', () => {
-  const 源码 = readFileSync(
-    fileURLToPath(new URL('../../src/人妻公寓/脚本/游戏逻辑/手机系统.ts', import.meta.url)),
-    'utf8',
-  );
-  assert.match(源码, /手机聊天批次\.含消息\(键, 定位\.标识\)/);
-  assert.match(源码, /取消手机聊天批次键\(键, false\)/);
-  assert.match(源码, /function 清理失效手机聊天批次\(\)/);
-  assert.match(源码, /function 结束当前聊天输入\(\)/);
-  assert.match(源码, /compositionend[\s\S]{0,360}activeElement\s*===\s*ta[\s\S]{0,220}收口手机聊天输入/);
-  assert.doesNotMatch(源码, /if \(!\(会话草稿\.get\(键\) \?\? ''\)\.trim\(\)\) 手机聊天批次\.结束输入\(键\)/);
-  assert.ok((源码.match(/结束当前聊天输入\(\);/g) ?? []).length >= 4, '关闭、返回和数据库让位都应显式结束输入');
+  // P8:撤回收口在交互模块；失效批次清理在 壳/会话瞬态；结束当前聊天输入 与 compositionend 收口在 壳/渲染。
+  assert.match(交互源码, /手机聊天批次\.含消息\(键, 定位\.标识\)/);
+  assert.match(交互源码, /取消手机聊天批次键\(键, false\)/);
+  assert.match(会话瞬态源码, /function 清理失效手机聊天批次\(\)/);
+  assert.match(渲染index源码, /function 结束当前聊天输入\(\)/);
+  assert.match(渲染chat源码, /compositionend[\s\S]{0,360}activeElement\s*===\s*ta[\s\S]{0,220}收口手机聊天输入/);
+  assert.doesNotMatch(渲染chat源码, /if \(!\(会话草稿\.get\(键\) \?\? ''\)\.trim\(\)\) 手机聊天批次\.结束输入\(键\)/);
+  const 壳收口点 = `${红点开合源码}\n${挂载源码}\n${渲染chat源码}\n${渲染index源码}\n${渲染共享源码}`;
+  assert.ok((壳收口点.match(/结束当前聊天输入\(\);/g) ?? []).length >= 4, '关闭、返回和数据库让位都应显式结束输入');
 });
 
 test('手动批次保留本地微信进展记忆，但整条链路不再追加第二次数据库AI', () => {
-  const 源码 = readFileSync(
-    fileURLToPath(new URL('../../src/人妻公寓/脚本/游戏逻辑/手机系统.ts', import.meta.url)),
-    'utf8',
-  );
-  const 摘要段 = 源码.slice(源码.indexOf('async function 刷新微信进展摘要('), 源码.indexOf('/** 正文若紧接在手机回复之后开始'));
+  const 摘要段 = 摘要系统源码.slice(摘要系统源码.indexOf('async function 刷新微信进展摘要('), 摘要系统源码.indexOf('/** 正文若紧接在手机回复之后开始'));
   assert.match(摘要段, /合并本地微信进展摘要/);
   assert.match(摘要段, /同步社交轨迹/);
   assert.doesNotMatch(摘要段, /通过数据库生成/);

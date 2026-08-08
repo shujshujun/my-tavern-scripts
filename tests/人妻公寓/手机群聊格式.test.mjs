@@ -9,7 +9,7 @@ const require = createRequire(import.meta.url);
 require('ts-node/register/transpile-only');
 
 const { 解析微信群消息 } = require('../../src/人妻公寓/脚本/游戏逻辑/手机群聊格式.ts');
-const 手机源 = readFileSync('src/人妻公寓/脚本/游戏逻辑/手机系统.ts', 'utf8');
+const 手机源 = readFileSync('src/人妻公寓/脚本/游戏逻辑/手机/生成引擎.ts', 'utf8');
 
 const 成员 = new Set(['夏乔', '林悦']);
 

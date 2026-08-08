@@ -1,5 +1,6 @@
 /* eslint-disable import-x/no-nodejs-modules -- Node-only regression test */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import test from 'node:test';
 
@@ -26,11 +27,16 @@ require.cache[数据库桥路径] = {
 };
 
 const { Schema, 创建户节点 } = require('../../src/人妻公寓/schema.ts');
-const { 特殊场景表, 特殊场景锁定状态 } = require('../../src/人妻公寓/stageConfig.ts');
+const { 查裂缝, 是母亲破墙服饰, 特殊场景表, 特殊场景锁定状态 } = require('../../src/人妻公寓/stageConfig.ts');
 const { 取货架, 购买, 送礼 } = require('../../src/人妻公寓/脚本/游戏逻辑/商店系统.ts');
+const { 请求晋阶 } = require('../../src/人妻公寓/脚本/游戏逻辑/结算系统.ts');
+const { 等待晋阶镜像写入 } = require('../../src/人妻公寓/脚本/游戏逻辑/守护系统.ts');
 const { 赠礼丈夫 } = require('../../src/人妻公寓/脚本/游戏逻辑/侦探系统.ts');
 const { 母亲撞见检测, 母亲撞见风险 } = require('../../src/人妻公寓/脚本/游戏逻辑/打断系统.ts');
 const { 仅你可见触发参数 } = require('../../src/人妻公寓/脚本/游戏逻辑/手机触发参数.ts');
+const App源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
+const 背包源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/components/背包.vue', import.meta.url), 'utf8');
+const 档案源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/components/档案卡.vue', import.meta.url), 'utf8');
 
 function 建数据(...门牌们) {
   return Schema.parse({
@@ -75,6 +81,82 @@ test('母亲破墙礼物只追加自己的正戏，不覆盖已经排队的事�
   assert.equal(result.成功, true);
   assert.match(data.系统._待发送事件, /^【旧事件】另一桩尚未演出的正戏\|/);
   assert.match(data.系统._待发送事件, /【破墙】/);
+});
+
+test('母亲阶段0只有确认裂缝后的低档外装或妆容会消耗并晋阶，结果可持久化', async () => {
+  const data = 建数据('302');
+  data.户['302'].妻.裂缝.已确认 = true;
+  data.背包.push('碎花连衣裙');
+
+  assert.equal(是母亲破墙服饰('碎花连衣裙'), true);
+  assert.equal(是母亲破墙服饰('烈色口红'), true);
+  assert.equal(是母亲破墙服饰('蕾丝套装'), false);
+  assert.equal(是母亲破墙服饰('开叉旗袍'), false);
+  assert.equal(是母亲破墙服饰('女仆装'), false);
+  const result = await 送礼(data, '碎花连衣裙', '302');
+  await 等待晋阶镜像写入();
+
+  assert.equal(result.成功, true);
+  assert.equal(data.户['302'].妻.当前阶段, 1);
+  assert.equal(data.背包.includes('碎花连衣裙'), false);
+  assert.match(data.系统._待发送事件, /【破墙】/);
+  assert.equal(Schema.parse(data).户['302'].妻.当前阶段, 1);
+  assert.equal(chatVars.人妻公寓_晋阶镜像.户['302'].阶段, 1);
+  assert.equal(data.户['302'].妻._阶段线路.目标阶段, 2);
+
+  const 已排事件 = data.系统._待发送事件;
+  const 重复提交 = await 送礼(data, '碎花连衣裙', '302');
+  assert.equal(重复提交.成功, false);
+  assert.equal(data.户['302'].妻.当前阶段, 1);
+  assert.equal(data.系统._待发送事件, 已排事件);
+});
+
+test('母亲阶段0未确认裂缝或送错服饰时明确拒绝，物品和阶段原样保留', async () => {
+  for (const [名称, 已确认, 道具] of [
+    ['裂缝未确认', false, '碎花连衣裙'],
+    ['内衣不属于破墙礼物', true, '蕾丝套装'],
+    ['L4外装过界', true, '开叉旗袍'],
+  ]) {
+    const data = 建数据('302');
+    data.户['302'].妻.裂缝.已确认 = 已确认;
+    data.背包.push(道具);
+
+    const result = await 送礼(data, 道具, '302');
+
+    assert.equal(result.成功, false, 名称);
+    assert.equal(result.变动, undefined, 名称);
+    assert.equal(data.户['302'].妻.当前阶段, 0, 名称);
+    assert.deepEqual(data.背包, [道具], 名称);
+    assert.equal(data.系统._待发送事件, '', 名称);
+    assert.match(result.提示, /先|不会|收回来|看懂/, 名称);
+  }
+});
+
+test('阶段0不能从档案晋阶旁路越过赠礼，但普通住户的正确开门礼仍能晋阶', async () => {
+  const 旁路局 = 建数据('302');
+  旁路局.户['302'].妻.裂缝.已确认 = true;
+  const 旁路 = 请求晋阶(旁路局, '302');
+  assert.equal(旁路.成功, false);
+  assert.equal(旁路局.户['302'].妻.当前阶段, 0);
+  assert.match(旁路.消息, /礼物|当面|打开/);
+
+  const 正常局 = 建数据('101');
+  正常局.户['101'].妻.裂缝.已确认 = true;
+  const 正确礼物 = 查裂缝('101').对症礼物[0];
+  正常局.背包.push(正确礼物);
+  const 正常 = await 送礼(正常局, 正确礼物, '101');
+  assert.equal(正常.成功, true);
+  assert.equal(正常局.户['101'].妻.当前阶段, 1);
+  assert.equal(正常局.背包.includes(正确礼物), false);
+});
+
+test('背包在手机上直接显示母亲赠衣资格，档案不再展示阶段0晋阶按钮', () => {
+  assert.match(App源, /是母亲破墙服饰/);
+  assert.match(App源, /先从裂缝线索看懂她/);
+  assert.match(App源, /她不会把这件当成自己的/);
+  assert.match(背包源, /妻\.可送 === false/);
+  assert.match(背包源, /妻\.提示/);
+  assert.match(档案源, /选中档案\.妻\.当前阶段 > 0/);
 });
 
 test('香烟与球赛票都能当面送给在家的丈夫，消耗道具并提供不同信任加成', () => {

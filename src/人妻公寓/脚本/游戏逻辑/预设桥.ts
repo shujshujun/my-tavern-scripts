@@ -8,6 +8,11 @@
  *
  * 占位词条(世界书/角色卡/示例/玩家人设)不取:手机内容自带人设包,整卡跟上既漏底又爆量。
  * 词条内容过一遍宏替换({{user}}/{{char}});读取失败或预设为空=返回空段,行为退回裸发。
+ *
+ * 独立时间事件(晨跑/健身/睡眠)不会创建真实临时玩家楼,预设里的 {{lastUserMessage}} 会被
+ * substitudeMacros 按真实聊天尾楼展开成上一楼玩家指令——与回合引擎必须先建临时 user 楼
+ * 是同一问题,但独立事件不能建正文楼。预设破限段因此接受可选的本拍玩家输入:在宏展开前
+ * 精确覆写这个历史宏,让预设读到的是本拍行动,而非真实聊天的上一楼指令。
  */
 
 import type { 预设正文标签 } from './预设输出兼容';
@@ -45,7 +50,12 @@ export function 当前预设正文标签(): 预设正文标签 | null {
   }
 }
 
-export function 预设破限段(): { 前: 预设消息[]; 后: 预设消息[] } {
+/**
+ * 本拍玩家输入存在时,在 substitudeMacros 之前把预设里的 {{lastUserMessage}} 精确覆写为
+ * 本拍行动。独立事件没有真实临时玩家楼,若交给 substitudeMacros 按真实聊天尾楼展开,
+ * 会重复真实聊天上一楼的玩家指令。用回调替换避免输入中的 $&/$1 被当成替换模板。
+ */
+export function 预设破限段(本拍玩家输入?: string): { 前: 预设消息[]; 后: 预设消息[] } {
   try {
     const 预设 = getPreset('in_use');
     const 前: 预设消息[] = [];
@@ -58,7 +68,12 @@ export function 预设破限段(): { 前: 预设消息[]; 后: 预设消息[] } 
         continue;
       }
       if (typeof p.content !== 'string' || !p.content.trim()) continue;
-      const 文 = substitudeMacros(p.content);
+      let 待展开 = p.content;
+      if (本拍玩家输入 !== undefined) {
+        const 覆写为 = 本拍玩家输入;
+        待展开 = 待展开.replace(/\{\{\s*lastUserMessage\s*\}\}/gi, () => 覆写为);
+      }
+      const 文 = substitudeMacros(待展开);
       if (!文.trim()) continue;
       // in_chat 深度词条本就锚在聊天底部(高权重),与 chatHistory 之后的词条同归后段
       (过史 || p.position?.type === 'in_chat' ? 后 : 前).push({ role: p.role ?? 'system', content: 文 });

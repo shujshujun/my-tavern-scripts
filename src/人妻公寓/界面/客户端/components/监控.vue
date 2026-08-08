@@ -1,0 +1,152 @@
+<script setup lang="ts">
+// 监控弹窗：只展示列表并 emit 关闭/选择/头像失败；业务状态(显示监控/监控列表/看监控)留在 App。
+import { 户静态表, type 门牌 } from '../../../stageConfig';
+
+defineProps<{
+  rooms: readonly 门牌[];
+  sending: boolean;
+  avatarFailed: Record<string, boolean>;
+  backgroundUrl: (door: string) => string;
+  avatarUrl: (name: string) => string;
+}>();
+
+const emit = defineEmits<{ close: []; select: [门牌]; avatarError: [string] }>();
+</script>
+
+<template>
+  <div class="mask" @click.self="emit('close')">
+    <div class="sheet">
+      <button class="sheet-close" @click="emit('close')">✕</button>
+      <div class="shop-hero cams">
+        <div class="ui-kicker light">HIDDEN EYES / 你装下的眼睛</div>
+        <b>监 控</b>
+        <em>没人看着的时候的她。看完记得想想:你注意到了什么?</em>
+      </div>
+      <div class="sheet-body">
+        <button v-for="m in rooms" :key="m" class="cam-row" :disabled="sending" @click="emit('select', m)">
+          <img class="cam-room" :src="backgroundUrl(m)" :alt="m + '室监控背景'" />
+          <img
+            v-if="!avatarFailed[户静态表[m].妻名]"
+            class="cam-face"
+            :src="avatarUrl(户静态表[m].妻名)"
+            :alt="户静态表[m].妻名"
+            @error="emit('avatarError', 户静态表[m].妻名)"
+          />
+          <b v-else class="cam-face fb">{{ 户静态表[m].妻名[0] }}</b>
+          <span class="cam-main">
+            <b>{{ m }} 室 · {{ 户静态表[m].妻名 }}</b>
+            <em>调出画面</em>
+          </span>
+          <span class="cam-rec">● REC</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped src="./弹窗基础.css"></style>
+
+<style scoped>
+/* 监控 gal 化(2026-07-17):紫调 hero + 头像行 + REC 呼吸点（完整移动自 App.vue） */
+.shop-hero.cams {
+  background:
+    linear-gradient(180deg, rgba(20, 22, 30, 0.1), rgba(20, 22, 30, 0.45)),
+    linear-gradient(130deg, #8c73ff, #4ab7ff 70%);
+}
+
+.cam-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  font-family: inherit;
+  text-align: left;
+  background: var(--glass);
+  border: 1px solid rgba(140, 115, 255, 0.3);
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(140, 115, 255, 0.12);
+  transition: all 0.18s;
+}
+
+.cam-row:hover:not(:disabled) {
+  border-color: rgba(140, 115, 255, 0.7);
+  box-shadow: 0 6px 16px rgba(140, 115, 255, 0.25);
+}
+
+.cam-row:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.cam-room {
+  box-sizing: border-box;
+  flex: none;
+  width: 72px;
+  height: 46px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.76);
+  border-radius: 7px;
+  filter: saturate(0.72) contrast(1.04);
+  box-shadow: 0 2px 8px rgba(25, 24, 34, 0.18);
+}
+
+.cam-face {
+  box-sizing: border-box;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: top;
+  background: linear-gradient(160deg, #ffe3ee, #ffd0e2);
+  box-shadow: 0 2px 8px rgba(30, 26, 38, 0.2);
+}
+
+.cam-face.fb {
+  display: grid;
+  place-items: center;
+  font-style: normal;
+  color: #d4407a;
+}
+
+.cam-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.cam-main b {
+  font-size: 0.88em;
+  color: var(--ink);
+}
+
+.cam-main em {
+  font-style: normal;
+  font-size: 0.72em;
+  color: var(--ink-faint);
+}
+
+.cam-rec {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 0.68em;
+  font-weight: 700;
+  color: var(--red);
+  animation: rec-blink 1.6s infinite;
+}
+
+@keyframes rec-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+:global(html.rq-dark) .cam-row {
+  background: #2c2e40;
+}
+</style>

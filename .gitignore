@@ -13,3 +13,5 @@ auto-imports.d.ts
 components.d.ts
 
 .claude/
+
+.delegate/

@@ -1,0 +1,131 @@
+/**
+ * 临时回合楼生命周期(第 6 项):本轮 user/assistant 临时楼的定位、扫描与转正纯函数集。
+ *
+ * 设计初衷:临时 user 楼让预设的 {{lastUserMessage}} 读到本轮行动并继承上一楼 MVU 快照;
+ * 临时 assistant 楼承载正文与变量解析候选。只有最终可信整表已写入 assistant 楼后,
+ * 两楼才同时转为正式历史;失败、取消、时间线失效时只删本轮两条,成功则保留两条并转正。
+ *
+ * 本模块不持有任何全局状态:消息表与副作用全部由调用方注入,保证可被动态测试。
+ * 定位纪律(精确定位语义):
+ *   1) 登记楼层仍是同一对象 → 直接接受;
+ *   2) 否则在当前消息表按对象引用重定位(MVU 外置解析会在“正文已落楼、尚未转正”窗口
+ *      自己写/插/删楼,楼层号漂移后按旧号盲删会删掉之前回合的 AI 正文);
+ *   3) 宿主重建对象导致引用丢失 → 才允许按 同一精确令牌 + 同一角色 兜底;
+ *   4) 找不到 = 消息已不在当前分支,不删除任何同楼替代消息;
+ *   5) 不得只因正文/行动文本相同而匹配,不得只按登记楼层盲删。
+ *
+ * 旧版成功消息只有 `_rqgy回合令牌` 而没有新临时标记,必须视为正式历史,绝不清理。
+ */
+
+/** 新临时标记键:只有该键严格为 true 的楼才属于“临时、可恢复清理”状态。 */
+export const 临时楼标记键 = '_rqgy回合临时';
+/** 回合唯一令牌键(旧版既有键名,保持不变)。 */
+export const 回合令牌键 = '_rqgy回合令牌';
+/** 楼角色键(旧版既有键名,保持不变)。 */
+export const 回合角色键 = '_rqgy回合角色';
+/** 合法临时令牌前缀:由 执行回合 以 `rqgy-turn-` 开头生成。 */
+export const 合法回合令牌前缀 = 'rqgy-turn-';
+
+export interface 临时楼登记 {
+  /** 建楼登记时刻的楼层号;null 表示该角色楼从未成功落位。 */
+  楼层: number | null;
+  /** 建楼时捕获的对象引用(宿主可能重建对象导致引用失效)。 */
+  引用: unknown;
+  角色: 'user' | 'assistant';
+}
+
+export interface 定位命中 {
+  楼层: number;
+  角色: 'user' | 'assistant';
+}
+
+function 消息extra(消息: unknown): Record<string, unknown> | null {
+  const extra = (消息 as { extra?: unknown } | null)?.extra;
+  return extra && typeof extra === 'object' && !Array.isArray(extra) ? (extra as Record<string, unknown>) : null;
+}
+
+/** 按登记定位本轮临时楼;返回带角色的命中(去重),顺序不代表楼层序。 */
+export function 定位本轮临时楼(消息表: readonly unknown[], 令牌: string, 登记: readonly 临时楼登记[]): 定位命中[] {
+  const 结果: 定位命中[] = [];
+  for (const 项 of 登记) {
+    if (项.楼层 === null || 项.引用 === undefined) continue;
+    let 实际楼层 = -1;
+    const 原位消息 = 消息表[项.楼层];
+    if (原位消息 === 项.引用) {
+      // 登记楼层仍是同一对象,直接接受(不扫描、不比较文本)。
+      实际楼层 = 项.楼层;
+    } else {
+      const 引用楼层 = 消息表.findIndex(消息 => 消息 === 项.引用);
+      if (引用楼层 >= 0) {
+        // 楼号漂移:MVU 外置解析插/删楼后按对象引用重定位。
+        实际楼层 = 引用楼层;
+      } else {
+        // 宿主重建了消息对象,引用已丢失;只有此时才允许 精确令牌 + 角色 兜底。
+        const 令牌楼层 = 消息表.findIndex(
+          消息 => 消息extra(消息)?.[回合令牌键] === 令牌 && 消息extra(消息)?.[回合角色键] === 项.角色,
+        );
+        if (令牌楼层 >= 0) 实际楼层 = 令牌楼层;
+      }
+    }
+    if (实际楼层 >= 0 && !结果.some(已 => 已.楼层 === 实际楼层)) 结果.push({ 楼层: 实际楼层, 角色: 项.角色 });
+  }
+  return 结果;
+}
+
+/** 命中结果去重并按楼层降序:删楼须从高往低,避免删第一条后第二条移位。 */
+export function 临时楼降序楼层(命中: readonly 定位命中[]): number[] {
+  return [...new Set(命中.map(项 => 项.楼层))].sort((a, b) => b - a);
+}
+
+/**
+ * 中断恢复扫描:只认“新临时标记严格为 true 且令牌/角色格式有效”的楼,降序返回。
+ * false、缺字段、旧版只有令牌、令牌格式错误、角色错误 一律保留——旧版成功回合
+ * 只有令牌没有新临时标记,必须视为正式历史,绝不能清理。
+ */
+export function 扫描遗留临时楼(消息表: readonly unknown[]): number[] {
+  const 命中: number[] = [];
+  for (let 楼层 = 消息表.length - 1; 楼层 >= 0; 楼层 -= 1) {
+    const extra = 消息extra(消息表[楼层]);
+    if (!extra || extra[临时楼标记键] !== true) continue;
+    const 令牌 = extra[回合令牌键];
+    const 角色 = extra[回合角色键];
+    if (typeof 令牌 !== 'string' || !令牌.startsWith(合法回合令牌前缀)) continue;
+    if (角色 !== 'user' && 角色 !== 'assistant') continue;
+    命中.push(楼层);
+  }
+  return 命中.sort((a, b) => b - a);
+}
+
+/**
+ * 构造转正更新负载:批量 setChatMessages 时保留每条已有 extra,只把临时标记改为 false。
+ */
+export function 构造转正更新负载(
+  消息表: readonly unknown[],
+  命中: readonly 定位命中[],
+): Array<{ message_id: number; extra: Record<string, unknown> }> {
+  return 命中.map(项 => {
+    const extra = 消息extra(消息表[项.楼层]) ?? {};
+    return { message_id: 项.楼层, extra: { ...extra, [临时楼标记键]: false } };
+  });
+}
+
+/**
+ * 转正前校验:本轮临时 user/assistant 两条必须都定位到,且都仍是严格临时、令牌一致、
+ * extra 角色与命中角色一致。少任一条即拒绝转正(调用方据此走失败清理);标记非严格
+ * true 拒绝,防止误把旧版无标记的正式回合或非本轮消息改写成正式;extra 角色错位拒绝,
+ * 防止宿主异常替换对象/extra 后把角色错位楼转正。
+ */
+export function 校验转正候选(消息表: readonly unknown[], 令牌: string, 命中: readonly 定位命中[]): void {
+  if (命中.length !== 2) {
+    throw new Error('转正失败:本轮临时 user/assistant 楼未齐(可能已被删除或分支已变),按失败路径清理');
+  }
+  if (new Set(命中.map(项 => 项.角色)).size !== 2) {
+    throw new Error('转正失败:本轮临时楼角色重复,按失败路径清理');
+  }
+  for (const 项 of 命中) {
+    const extra = 消息extra(消息表[项.楼层]);
+    if (!extra || extra[临时楼标记键] !== true || extra[回合令牌键] !== 令牌 || extra[回合角色键] !== 项.角色) {
+      throw new Error('转正失败:临时楼标记、令牌或角色异常,拒绝把非本轮消息标为正式');
+    }
+  }
+}

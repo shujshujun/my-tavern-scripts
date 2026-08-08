@@ -141,8 +141,9 @@ test('胜任HUD读取真实通牒状态并提供详情，风闻HUD不直接渲�
 });
 
 test('父亲来电界面明确显示最后通牒，风闻与胜任从Schema起保持整数阈值', () => {
-  const phone = readFileSync('src/人妻公寓/脚本/游戏逻辑/手机系统.ts', 'utf8');
-  assert.match(phone, /_待接来电\.通牒[\s\S]{0,120}最后通牒/);
+  // P7B2:来电页已迁至 ./手机/壳/渲染/call.ts,通牒文案断言改读真实所有者。
+  const call = readFileSync('src/人妻公寓/脚本/游戏逻辑/手机/壳/渲染/call.ts', 'utf8');
+  assert.match(call, /_待接来电\.通牒[\s\S]{0,120}最后通牒/);
   const data = Schema.parse({ 风闻: 74.6, 胜任度: 39.6 });
   assert.equal(Number.isInteger(data.风闻), true);
   assert.equal(Number.isInteger(data.胜任度), true);

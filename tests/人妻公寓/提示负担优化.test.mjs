@@ -251,7 +251,7 @@ test('原生路径会覆盖世界书已展开的旧演员变量视图', () => {
   const index源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
   assert.match(index源, /function 覆盖原生本轮变量视图/);
   assert.match(index源, /<status_current_variable>[\s\S]*?<\\\/status_current_variable>/);
-  assert.match(index源, /覆盖原生本轮变量视图\(chat, 演出data, _本轮变量范围\)/);
+  assert.match(index源, /覆盖原生本轮变量视图\(chat, 演出data, _本轮变量范围, 解析候选亲密妻\(_本轮变量范围\)\)/);
 });
 
 test('主路径与原生路径的守护、最终视图共用提示阶段冻结的精确范围', () => {
@@ -266,9 +266,11 @@ test('主路径与原生路径的守护、最终视图共用提示阶段冻结�
 test('原生 MVU 外置辅助请求不会被误判成下一正文轮', () => {
   const index源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
   const 辅助闸 = index源.indexOf("typeof Mvu.isDuringExtraAnalysis === 'function'");
-  const 令牌递增 = index源.indexOf('const 本次原生轮令牌 = ++_原生本轮令牌');
+  // 租约认领锚定 PROMPT_READY 内的本地 owner 声明（唯一锚点，非 import 行）：
+  // 外置辅助请求闸必须先于真正的正文租约认领。
+  const 租约认领 = index源.indexOf('const 本次原生轮owner = 认领正文租约(');
 
-  assert.ok(辅助闸 >= 0 && 辅助闸 < 令牌递增);
-  assert.match(index源, /同步整表视图\(演出data, 原生请求仍有效, _本轮变量范围, 楼层\)/);
+  assert.ok(辅助闸 >= 0 && 辅助闸 < 租约认领);
+  assert.match(index源, /同步整表视图\(\s*演出data,\s*原生请求仍有效,\s*_本轮变量范围,\s*楼层,\s*解析候选亲密妻\(_本轮变量范围\),\s*\)/);
   assert.match(index源, /if \(!读取MVU解析状态\(\)\.外置模式\) 覆盖原生本轮变量视图/);
 });

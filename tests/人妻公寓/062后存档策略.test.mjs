@@ -29,6 +29,10 @@ const 时钟源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏�
 const 入住源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/入住系统.ts', import.meta.url), 'utf8');
 const 稽查源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/稽查系统.ts', import.meta.url), 'utf8');
 const 客户端源码 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
+const 档案卡源码 = readFileSync(
+  new URL('../../src/人妻公寓/界面/客户端/components/档案卡.vue', import.meta.url),
+  'utf8',
+);
 
 test('0.62 后只接受当前 MVU 存档，不再逐版迁移旧档', () => {
   const { 当前MVU数据版本, 验证当前MVU存档版本 } = schema模块;
@@ -86,9 +90,10 @@ test('派生显示字段不入存档，0.62 后阶段线路预约状态继续保
   assert.match(时钟源码, /data\.系统\._绝对时段 = 旧时间\.绝对时段 \+ 时段数/);
   assert.match(入住源码, /创建户节点\(绝对时段\)/);
   assert.match(荣耀洞源码, /系\._荣耀洞上次时段 = 绝对时段/);
-  assert.match(客户端源码, /阶段标题: 阶段标题\(妻\.当前阶段, m\)/);
-  assert.match(客户端源码, /气质描述: 户静态表\[m\]\.初始\?\.气质描述 \?\? ''/);
-  assert.match(客户端源码, /v-if="选中档案\.妻\.裂缝\.已确认"/);
+  // A5b 拆分后：档案派生与模板已随档案卡迁入 components/档案卡.vue
+  assert.match(档案卡源码, /阶段标题: 阶段标题\(妻\.当前阶段, m\)/);
+  assert.match(档案卡源码, /气质描述: 户静态表\[m\]\.初始\?\.气质描述 \?\? ''/);
+  assert.match(档案卡源码, /v-if="选中档案\.妻\.裂缝\.已确认"/);
 });
 
 test('写而不读的聊天空壳与旧摄像头兼容读取已移除', () => {

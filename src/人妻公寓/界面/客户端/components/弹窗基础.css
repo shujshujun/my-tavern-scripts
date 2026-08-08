@@ -1,0 +1,221 @@
+/* ═══ 弹窗基础：A2 弹窗组件共享的通用基础声明 ═══
+   精确复制自 App.vue 原 scoped 规则（不要凭印象重写）。App 仍保留同名规则给未拆组件；
+   本文件仅供四个弹窗组件以 `<style scoped src="./弹窗基础.css">` 复用。 */
+
+/* ── 遮罩与玻璃面板 ── */
+
+/* gal 式遮罩(2026-07-17 用户提案重设计):斜纹绢帘+粉蓝双色晕影+中心聚焦,替代死黑蒙版 */
+.mask {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  background:
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.045) 0 2px, transparent 2px 6px),
+    radial-gradient(120% 90% at 50% 0%, rgba(255, 79, 154, 0.12), transparent 55%),
+    radial-gradient(130% 100% at 50% 110%, rgba(38, 169, 244, 0.14), transparent 60%),
+    radial-gradient(140% 140% at 50% 50%, rgba(24, 22, 34, 0.3), rgba(16, 14, 26, 0.6)), rgba(20, 22, 30, 0.2);
+  backdrop-filter: blur(4px) saturate(0.9);
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  border-radius: 12px;
+}
+
+.sheet {
+  position: relative;
+  box-sizing: border-box;
+  width: min(480px, 96%);
+  max-height: 94%;
+  display: flex;
+  flex-direction: column;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  border-radius: 18px;
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(38, 169, 244, 0.4) transparent;
+}
+
+.sheet-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  z-index: 5;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--ink-soft);
+  font-size: 0.8em;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sheet-close:hover {
+  color: #fff;
+  background: var(--pink);
+  border-color: var(--pink);
+}
+
+.sheet-title {
+  text-align: center;
+  color: var(--ink);
+  font-weight: 900;
+  letter-spacing: 0.32em;
+  text-indent: 0.32em;
+  font-size: 1em;
+  margin-bottom: 8px;
+}
+
+.sheet-title::after {
+  content: '';
+  display: block;
+  width: 46px;
+  height: 4px;
+  margin: 5px auto 0;
+  border-radius: 3px;
+  background: linear-gradient(130deg, #ff8ab9, #4ab7ff 46%, #ffd24f);
+}
+
+.sheet-body {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+/* ── 按钮:白玻璃胶囊,悬停上浮+辉光;rite=粉色主按钮 ── */
+
+.btn {
+  padding: 6px 18px;
+  font-family: inherit;
+  font-size: 0.92em;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  box-shadow: 0 2px 8px rgba(30, 26, 38, 0.08);
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease,
+    background 0.18s ease;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: rgba(38, 169, 244, 0.6);
+  box-shadow: 0 8px 20px rgba(38, 169, 244, 0.22);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+.btn.mini {
+  padding: 2px 9px;
+  font-size: 0.78em;
+}
+
+.btn.rite {
+  align-self: center;
+  padding: 8px 32px;
+  font-size: 0.95em;
+  letter-spacing: 0.16em;
+  color: #fff;
+  background: linear-gradient(180deg, #ff6cab, #ff4f9a);
+  border-color: rgba(255, 79, 154, 0.5);
+  box-shadow: 0 8px 22px rgba(255, 79, 154, 0.35);
+}
+
+.btn.rite:hover:not(:disabled) {
+  border-color: rgba(255, 79, 154, 0.85);
+  box-shadow: 0 12px 26px rgba(255, 79, 154, 0.42);
+}
+
+/* ── kicker + 题头 ── */
+
+.ui-kicker {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+
+.ui-kicker.light {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+/* ── 正文 ── */
+
+.narr {
+  font-family: var(--font-prose);
+  /* 字色三级:玩家自选 > 主题墨色(rq-dark 自动翻浅) */
+  color: var(--prose-ink, var(--prose-default, var(--ink)));
+  font-size: var(--prose-size, 0.9em);
+  line-height: 1.85;
+  margin: 5px 0;
+  text-indent: 2em;
+}
+
+/* ── 商店 hero(监控弹窗复用) ── */
+
+.shop-hero {
+  position: relative;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: -14px -16px 10px;
+  padding: 16px 18px 12px;
+  color: #fff;
+  background:
+    linear-gradient(180deg, rgba(20, 22, 30, 0.06), rgba(20, 22, 30, 0.4)),
+    linear-gradient(130deg, #ff8ab9, #ffca35 58%, #4ab7ff);
+  border-radius: 18px 18px 0 0;
+}
+
+.shop-hero b {
+  font-size: 1.2em;
+  font-weight: 900;
+  letter-spacing: 0.28em;
+}
+
+.shop-hero em {
+  font-style: normal;
+  font-size: 0.75em;
+  opacity: 0.92;
+}
+
+/* ── 夜间 ── */
+
+:global(html.rq-dark) .sheet {
+  background: rgba(38, 40, 56, 0.97);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+:global(html.rq-dark) .sheet-close {
+  background: #2c2e40;
+  color: var(--ink);
+}
+
+/* ── 减少动效:关掉全局过渡与动画(组件内部 DOM 同样服从 rq-still) ── */
+
+:global(html.rq-still) *,
+:global(html.rq-still) *::before,
+:global(html.rq-still) *::after {
+  animation-duration: 0.001s !important;
+  transition-duration: 0.001s !important;
+}

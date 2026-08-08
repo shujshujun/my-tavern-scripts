@@ -16,6 +16,8 @@ require.extensions['.json'] = jsonLoader;
 globalThis._ = require('lodash');
 
 const App源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
+const 回合输入源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/components/回合输入.vue', import.meta.url), 'utf8');
+const 合成源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/composables/useRoomActions.ts', import.meta.url), 'utf8');
 const Index源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
 const 时钟源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/楼层时钟.ts', import.meta.url), 'utf8');
 const 隔离事件源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/隔离事件引擎.ts', import.meta.url), 'utf8');
@@ -58,9 +60,10 @@ function 收集业务源码(目录) {
 }
 
 test('管理员室与302保留小憩和睡眠，全局只显示一个固定推进按钮', () => {
-  const 三零二动作 = 截段(App源, "if (id === '302')", '\n  // 管理员室世界时间');
-  const 管理员室动作 = 截段(App源, "if (id === '管理员室')", '\n  // 公共区');
-  const 发起函数 = 截段(App源, 'function 发起时间推进', '\nfunction 房间动作');
+  // A6b:302/管理员室房卡动作已迁入 useRoomActions.ts
+  const 三零二动作 = 截段(合成源, "if (id === '302')", '// 管理员室世界时间');
+  const 管理员室动作 = 截段(合成源, "if (id === '管理员室')", '// 公共区');
+  const 发起函数 = 截段(App源, 'function 发起时间推进', '\nfunction 欠租中');
 
   assert.match(三零二动作, /文案: '睡到次日早晨'[\s\S]*?发起时间推进\('睡到次日早晨'\)/);
   assert.match(三零二动作, /文案: '小憩（推进一时段）'[\s\S]*?发起时间推进\('小憩'\)/);
@@ -72,13 +75,17 @@ test('管理员室与302保留小憩和睡眠，全局只显示一个固定推�
   assert.match(发起函数, /方式,[\s\S]*?预期绝对时段: 绝对时段\.value/);
   assert.match(发起函数, /发送中\.value = true/);
   assert.doesNotMatch(管理员室动作, /_上次杀时间楼层|每真实楼层一次/);
-  assert.equal((App源.match(/class="global-time-advance"/g) ?? []).length, 1);
+  // A8b:唯一固定推进按钮归 components/回合输入.vue；App 导入并挂载 RoundInput 作为全局唯一入口
+  assert.equal((回合输入源.match(/class="global-time-advance"/g) ?? []).length, 1);
+  assert.match(App源, /import RoundInput from '\.\/components\/回合输入\.vue';/);
+  assert.equal((App源.match(/<RoundInput/g) ?? []).length, 1);
 });
 
 test('时间按钮在无正文事务期间锁住界面，并由后端结束信号在失败时解锁', () => {
   assert.match(Index源, /\.finally\(\(\) => \{[\s\S]{0,160}eventEmit\('人妻公寓:时间推进结束', 已提交\)/);
   assert.match(App源, /eventOn\('人妻公寓:时间推进结束',[\s\S]{0,180}发送中\.value = false/);
-  assert.match(App源, /<textarea[\s\S]{0,180}:disabled="发送中 \|\| 由头写入中"/);
+  // A8b:输入 textarea 归 回合输入.vue，禁用契约经 props 等价绑定发送中/由头写入中
+  assert.match(回合输入源, /<textarea[\s\S]{0,180}:disabled="sending \|\| prefaceWriting"/);
 });
 
 test('成功回合必须拉取新时钟并完成响应式刷新后才解除时间按钮锁', () => {
@@ -107,7 +114,7 @@ test('时间事务失败按键是否原本存在精确恢复聊天结构', () =>
 test('晨跑、健身与睡眠先只生成草稿，隔离日志和撤销点在同一聊天事务内落地', () => {
   const 处理段 = 截段(Index源, 'function 处理时间推进', '\n  function 处理撤销时间推进');
   const 草稿函数 = 截段(隔离事件源, 'export async function 生成隔离事件草稿', '\nexport function 写入隔离事件草稿');
-  const 纯写函数 = 截段(隔离事件源, 'export function 写入隔离事件草稿', '\nexport async function 执行隔离事件');
+  const 纯写函数 = 截段(隔离事件源, 'export function 写入隔离事件草稿', '\nexport const 隔离提交聊天键');
 
   // 草稿阶段可以调用模型和读取同线程上下文，但绝不能先把结果写进当前聊天。
   assert.doesNotMatch(草稿函数, /updateVariablesWith|\.日志\.push\(|_隔离事件['".)]/);
@@ -160,21 +167,19 @@ test('晨跑健身睡眠只给AI自由创作方向，小憩不请求AI，睡眠�
   assert.match(方向段, /不能证明属于今天的正文，不拿来诱导睡眠回想/);
 });
 
-test('手机与隔离短生成在正文令牌和时间锁之前旁路，时间内正式剧情仍由固定回合接管', () => {
+test('手机与隔离短生成在正文认领之前旁路，时间内正式剧情仍由固定回合接管', () => {
   const prompt起 = Index源.lastIndexOf('tavern_events.CHAT_COMPLETION_PROMPT_READY');
   const prompt止 = Index源.indexOf('Mvu.events.VARIABLE_UPDATE_ENDED', prompt起);
   assert.ok(prompt起 >= 0 && prompt止 > prompt起);
   const prompt段 = Index源.slice(prompt起, prompt止);
   const 标记位置 = prompt段.indexOf('请求提示文本.includes(手机生成请求标记)');
   const 隔离标记位置 = prompt段.indexOf('请求提示文本.includes(隔离事件请求标记)');
-  const 令牌位置 = prompt段.indexOf('++_原生本轮令牌');
+  const 认领位置 = prompt段.indexOf('认领正文租约(');
   const 正文回合位置 = prompt段.indexOf('if (回合进行中())');
   const 时间锁位置 = prompt段.indexOf('if (_时间推进中)');
-  const AI锁位置 = prompt段.indexOf('_isInAiCycle = true');
 
-  assert.ok(标记位置 >= 0 && 隔离标记位置 >= 0);
-  assert.ok(标记位置 < 令牌位置 && 隔离标记位置 < 令牌位置, '短生成不得递增正文令牌');
-  assert.ok(标记位置 < AI锁位置 && 隔离标记位置 < AI锁位置, '短生成不得占用正文AI锁');
+  assert.ok(标记位置 >= 0 && 隔离标记位置 >= 0 && 认领位置 >= 0);
+  assert.ok(标记位置 < 认领位置 && 隔离标记位置 < 认领位置, '短生成不得进入正文认领（不得递增正文令牌或占用正文租约）');
   assert.ok(正文回合位置 >= 0 && 正文回合位置 < 时间锁位置, '时间动作触发的正式剧情必须先由固定回合认领');
 });
 
@@ -204,7 +209,7 @@ test('入口硬门限制睡眠与活动地点，普通推进保留原地点并�
     "方式 === '小憩' && 当前房间 !== '管理员室' && 当前房间 !== '302'",
     "方式 === '晨跑' && 当前房间 !== '晨跑公园'",
     "方式 === '健身' && 当前房间 !== '健身房'",
-    'if (_isInAiCycle)',
+    'if (正文租约生效中())',
     'if (回合进行中())',
     'if (脚本写入中)',
     'if (隔离事件进行中())',

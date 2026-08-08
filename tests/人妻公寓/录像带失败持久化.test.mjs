@@ -17,6 +17,7 @@ const { Schema } = require('../../src/人妻公寓/schema.ts');
 const { 读取录像带连点失败状态, 推进录像带连点失败 } = require('../../src/人妻公寓/界面/客户端/录像带交互状态.ts');
 
 const appSource = await readFile(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
+const composableSource = await readFile(new URL('../../src/人妻公寓/界面/客户端/composables/useVideoTape.ts', import.meta.url), 'utf8');
 
 function 等待202(交互 = {}) {
   return { id: '录像带', 阶段: '等待202', 交互 };
@@ -65,9 +66,18 @@ test('非录像带等待202状态不允许记账', () => {
 });
 
 test('App 只把完整失败尝试写入 MVU，单次点击进度仍留在前端内存', () => {
-  assert.match(appSource, /const 录像带连点计数 = ref\(0\)/);
+  // 单击进度是 composable 的前端内存 ref，App 不再声明局部状态机
+  assert.match(composableSource, /const 录像带连点计数 = ref\(0\)/);
+  assert.doesNotMatch(appSource, /const 录像带连点计数 = ref\(0\)/);
+  // 不存在本地“连续失败”持久源（失败数只存在于 MVU 快照里）
+  assert.doesNotMatch(composableSource, /const 录像带连续失败 = ref\(0\)/);
   assert.doesNotMatch(appSource, /const 录像带连续失败 = ref\(0\)/);
-  assert.match(appSource, /const 录像带失败状态 = computed/);
+  // 失败状态由持久快照读取，composable 持有 读取录像带连点失败状态 computed
+  assert.match(composableSource, /const 录像带失败状态 = computed/);
+  assert.match(composableSource, /读取录像带连点失败状态/);
+  // 完整失败才经 保存失败交互 回调写 MVU：推进生成新快照 → 回调 → App 写 _特殊场景.交互 并 flush
+  assert.match(composableSource, /推进录像带连点失败/);
+  assert.match(composableSource, /保存失败交互\(新交互\)/);
   assert.match(appSource, /data\.value\.\u7cfb\u7edf\._\u7279\u6b8a\u573a\u666f\.\u4ea4\u4e92 = 新交互/);
   assert.match(appSource, /\.flush\?\.\(\)/);
 });

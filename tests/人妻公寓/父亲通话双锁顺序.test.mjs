@@ -17,6 +17,8 @@ const { 排队MVU操作 } = require('../../src/人妻公寓/脚本/游戏逻辑/
 const { 排队父亲通话整表写 } = require('../../src/人妻公寓/脚本/游戏逻辑/父亲通话写租约.ts');
 const index源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
 const 手机源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/手机系统.ts', import.meta.url), 'utf8');
+// P5:父亲通话业务已迁移至 ./手机/交互/父亲通话,源码断言改读新所有者。
+const 父亲通话源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/交互/父亲通话.ts', import.meta.url), 'utf8');
 
 function 截源(源, 开始, 结束) {
   const 起 = 源.indexOf(开始);
@@ -86,7 +88,7 @@ test('父亲内锁被占时，全局外锁任务按统一顺序等待并最终�
 test('父亲入口源码均为全局MVU外锁到父亲内锁，且内锁后重读', () => {
   const 接听 = 截源(index源, "eventOn('人妻公寓:接听来电'", "eventOn('人妻公寓:父亲通话结束'");
   const 收尾 = 截源(index源, "eventOn('人妻公寓:父亲通话结束'", '// ─────────────────────────────────────────────');
-  const 手机写 = 截源(手机源, 'async function 持久修改父亲通话(', 'export function 来电已接');
+  const 手机写 = 截源(父亲通话源, 'async function 持久修改父亲通话(', 'export function 来电已接');
 
   for (const 段 of [接听, 收尾]) {
     const 外锁 = 段.indexOf('安全操作');
@@ -102,8 +104,8 @@ test('父亲入口源码均为全局MVU外锁到父亲内锁，且内锁后重�
 });
 
 test('父亲异步回复冻结请求发起时的时间线世代，同聊天 swipe 后不能认领新分支', () => {
-  const 手机写 = 截源(手机源, 'async function 持久修改父亲通话(', 'export function 来电已接');
-  const 回复 = 截源(手机源, 'async function 推进父亲回复(', 'async function 通话应答');
+  const 手机写 = 截源(父亲通话源, 'async function 持久修改父亲通话(', 'export function 来电已接');
+  const 回复 = 截源(父亲通话源, 'async function 推进父亲回复(', 'async function 通话应答');
   assert.match(手机写, /预期时间线世代 = 当前时间线切换世代\(\)/);
   assert.match(手机写, /登记MVU提交校验\(请求仍在原时间线\)/);
   assert.match(回复, /回复请求时间线世代 = 当前时间线切换世代\(\)/);

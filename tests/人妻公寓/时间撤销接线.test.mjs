@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const App源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
+const 合成源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/composables/useRoomActions.ts', import.meta.url), 'utf8');
 const Index源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
 const 撤销源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/时间撤销系统.ts', import.meta.url), 'utf8');
 
@@ -114,11 +115,12 @@ test('推进与撤销的每次 stat 改写都在正确边界作废手机租约�
 });
 
 test('客户端在室内与原地训练地点且撤销点仍有效时显示按钮，坏结局页也保留救援入口', () => {
-  const 晨跑动作 = 截段(App源, "if (id === '晨跑公园')", "\n  if (id === '健身房')");
-  const 健身动作 = 截段(App源, "if (id === '健身房')", "\n  if (房?.类型 === '户'");
-  const 三零二动作 = 截段(App源, "if (id === '302')", '\n  // 管理员室世界时间');
-  const 管理员室动作 = 截段(App源, "if (id === '管理员室')", '\n  // 公共区');
-  const 公共区动作 = 截段(App源, '\n  // 公共区', '\n  return 动作;\n}');
+  // A6b:房卡动作段已迁入 useRoomActions.ts，模板与撤销资格仍读 App
+  const 晨跑动作 = 截段(合成源, "if (id === '晨跑公园')", "if (id === '健身房')");
+  const 健身动作 = 截段(合成源, "if (id === '健身房')", "if (房?.类型 === '户'");
+  const 三零二动作 = 截段(合成源, "if (id === '302')", '// 管理员室世界时间');
+  const 管理员室动作 = 截段(合成源, "if (id === '管理员室')", '// 公共区');
+  const 公共区动作 = 截段(合成源, '// 公共区', 'return 动作;');
 
   for (const 动作段 of [晨跑动作, 健身动作, 三零二动作, 管理员室动作]) {
     assert.match(动作段, /时间撤销可用\.value/);

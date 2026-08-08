@@ -186,6 +186,35 @@ export function 构造AI可写变量范围(
 }
 
 /**
+ * 两段式写权：解析候选 与 最终守护 分离。
+ *
+ * 解析候选亲密妻 = 本轮可写妻中可能发生亲密的候选。只来自现有 `范围.妻`，不含丈夫、
+ * 后台户、仅旁观且不在可写妻中的角色。它只让解析器在正文/外置解析前看见堕落与身体
+ * 开发叶子，绝不作为最终亲密权限写入 `_整表视图范围`；提交许可仍由守护层按最终正文
+ * 的实际尺度精确授予。
+ */
+export function 解析候选亲密妻(范围: Partial<AI可写变量范围>): readonly 门牌[] {
+  return 规范AI可写变量范围(范围).妻;
+}
+
+/**
+ * 按逐角色最终实际尺度扩展精确亲密权限：只补 `实际>=1` 且原本属于 `范围.妻` 的门牌；
+ * 去重、幂等；缺失、0、非法门牌一律不补。返回新范围，不改动入参。
+ * 用于“首稿/静默重写/二次失败兜底结束后、守护执行前”把本轮可写妻里真正参与亲密者
+ * 纳入精确范围，让守护/成长/最终视图消费同一份范围。
+ */
+export function 扩展精确亲密妻(
+  范围: Partial<AI可写变量范围>,
+  逐角色实际尺度?: Readonly<Record<string, number | null | undefined>>,
+): AI可写变量范围 {
+  const 规范 = 规范AI可写变量范围(范围);
+  if (!逐角色实际尺度) return 规范;
+  const 补充 = 规范.妻.filter(m => !规范.亲密妻.includes(m) && (逐角色实际尺度[m] ?? 0) >= 1);
+  if (!补充.length) return 规范;
+  return { ...规范, 亲密妻: [...规范.亲密妻, ...补充] };
+}
+
+/**
  * 变量解析只需要“本轮可写演员的现值”，不需要整份存档。
  *
  * - 妻本人在场：日常只给好感、心理、情绪与可换装字段；
@@ -193,8 +222,14 @@ export function 构造AI可写变量范围(
  * - 丈夫本人在场：只给其两个 AI 可写表现字段；
  * - 后台住户、资源、经济、婚姻、阶段与所有脚本字段完全不进入提示。
  */
-export function 构造AI可写变量视图(stat: unknown, 输入范围: Partial<AI可写变量范围>): Record<string, unknown> {
+export function 构造AI可写变量视图(
+  stat: unknown,
+  输入范围: Partial<AI可写变量范围>,
+  候选亲密妻?: readonly 门牌[],
+): Record<string, unknown> {
   const 范围 = 规范AI可写变量范围(输入范围);
+  // 候选亲密妻只在本轮可写妻中生效（解析可见性），不与范围.亲密妻混为提交权限。
+  const 候选 = 范围.妻.filter(m => (候选亲密妻 ?? []).includes(m));
   const 户源 = (_.get(stat, '户') ?? {}) as Record<string, unknown>;
   const 户: Record<string, unknown> = {};
   const 门牌们 = _.uniq([...范围.妻, ...范围.夫]);
@@ -213,7 +248,7 @@ export function 构造AI可写变量视图(stat: unknown, 输入范围: Partial<
         内衣: 规范AI表现文本(妻源.内衣),
         妆容: 规范AI表现文本(妻源.妆容),
       };
-      if (范围.亲密妻.includes(门牌号)) {
+      if (范围.亲密妻.includes(门牌号) || 候选.includes(门牌号)) {
         妻.堕落值 = 妻源.堕落值;
         妻.身体开发 = _.pick((妻源.身体开发 ?? {}) as Record<string, unknown>, ['小嘴', '胸部', '小屄', '屁穴']);
       }
@@ -237,6 +272,7 @@ export async function 同步整表视图(
   额外提交校验?: () => boolean,
   显式范围?: Partial<AI可写变量范围>,
   显式楼层?: number,
+  候选亲密妻?: readonly 门牌[],
 ): Promise<boolean> {
   if (!stat || _.isEmpty(stat)) return false; // 毒快照纪律:无真值绝不写空视图
   const 确认视图提交仍有效 = () => {
@@ -253,7 +289,8 @@ export async function 同步整表视图(
       ...范围,
       楼层: Number.isInteger(显式楼层) ? 显式楼层! : 旧记录.楼层,
     };
-    const 视图 = 构造AI可写变量视图(stat, 范围);
+    // 记录仍写精确守护范围；候选亲密妻只进入视图（解析可见），绝不提前授权记录本身。
+    const 视图 = 构造AI可写变量视图(stat, 范围, 候选亲密妻);
     // updateVariablesWith + _.set 整值替换(insertOrAssign 深合并会让缩短的数组残留旧尾)
     await Promise.resolve(
       updateVariablesWith(

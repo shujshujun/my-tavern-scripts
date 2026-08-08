@@ -97,7 +97,7 @@ test('主回合、流式界面、手机与隔离生成都接入同一兼容清�
   const 根 = new URL('../../src/人妻公寓/', import.meta.url);
   const 回合源 = readFileSync(new URL('脚本/游戏逻辑/回合引擎.ts', 根), 'utf8');
   const 客户端源 = readFileSync(new URL('界面/客户端/App.vue', 根), 'utf8');
-  const 手机源 = readFileSync(new URL('脚本/游戏逻辑/手机系统.ts', 根), 'utf8');
+  const 手机源 = readFileSync(new URL('脚本/游戏逻辑/手机/生成引擎.ts', 根), 'utf8');
   const 隔离源 = readFileSync(new URL('脚本/游戏逻辑/隔离事件引擎.ts', 根), 'utf8');
 
   assert.match(回合源, /清洗预设输出\(原文, 当前预设正文标签\(\)\)/);

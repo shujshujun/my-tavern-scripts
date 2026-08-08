@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const App源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
+const 偏好源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/composables/useUIPrefs.ts', import.meta.url), 'utf8');
 const 快照源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/snapshotSystem.ts', import.meta.url), 'utf8');
 const 游戏逻辑源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
 
@@ -75,9 +76,12 @@ test('角色卡切换持久主焦点，快照明确主焦点与非焦点参与�
 });
 
 test('移动端断点会随 iframe 画幅变化同步，避免窄屏仍保留桌面主题按钮', () => {
-  assert.match(App源, /const 移动端媒体 = window\.matchMedia\('\(max-width: 540px\)'\)/);
-  assert.match(App源, /移动端媒体\.addEventListener\('change', 同步移动端断点\)/);
-  assert.match(App源, /移动端媒体\.removeEventListener\('change', 同步移动端断点\)/);
+  // A3:媒体断点监听归 composables/useUIPrefs.ts，App 只经共享单例消费 移动端
+  assert.match(偏好源, /const 移动端媒体 = window\.matchMedia\('\(max-width: 540px\)'\)/);
+  assert.match(偏好源, /移动端媒体\.addEventListener\('change', 同步移动端断点\)/);
+  assert.match(偏好源, /移动端媒体\.removeEventListener\('change', 同步移动端断点\)/);
+  assert.match(App源, /import \{ useUIPrefs \} from '\.\/composables\/useUIPrefs';/);
+  assert.match(App源, /const \{[\s\S]*?移动端,[\s\S]*?\} = useUIPrefs\(/);
 });
 
 test('移动端媒体规则必须把全屏选择卡从基础隐藏态改为可见布局', () => {

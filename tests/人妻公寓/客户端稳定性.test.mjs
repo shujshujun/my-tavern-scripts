@@ -9,6 +9,7 @@ process.env.TS_NODE_COMPILER_OPTIONS = JSON.stringify({ module: 'CommonJS', modu
 require('ts-node/register/transpile-only');
 
 const App源码 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
+const 反馈提示源码 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/components/反馈提示.vue', import.meta.url), 'utf8');
 const 客户端模板 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/index.html', import.meta.url), 'utf8');
 const 客户端产物 = readFileSync(new URL('../../dist/人妻公寓/界面/客户端/index.html', import.meta.url), 'utf8');
 
@@ -58,7 +59,8 @@ test('普通toast不会取消性爱结果卡自己的隐藏计时', () => {
 });
 
 test('移动端点击反馈保留换行且不会横向溢出画幅', () => {
-  const toast = App源码.match(/\.toast\s*\{([^}]*)\}/)?.[1] ?? '';
+  // A2 拆分后 toast/loot 样式迁入 components/反馈提示.vue（.clue-card 仍属 App）
+  const toast = 反馈提示源码.match(/\.toast\s*\{([^}]*)\}/)?.[1] ?? '';
   assert.doesNotMatch(toast, /white-space:\s*nowrap/);
   assert.match(toast, /box-sizing:\s*border-box/);
   assert.match(toast, /max-width:\s*calc\(100%\s*-\s*24px\)/);
@@ -69,7 +71,7 @@ test('移动端点击反馈保留换行且不会横向溢出画幅', () => {
   assert.match(clue, /white-space:\s*pre-wrap/);
   assert.match(clue, /overflow-wrap:\s*anywhere/);
 
-  const lootText = App源码.match(/\.loot-card p\s*\{([^}]*)\}/)?.[1] ?? '';
+  const lootText = 反馈提示源码.match(/\.loot-card p\s*\{([^}]*)\}/)?.[1] ?? '';
   assert.match(lootText, /white-space:\s*pre-wrap/);
   assert.match(lootText, /overflow-wrap:\s*anywhere/);
 });

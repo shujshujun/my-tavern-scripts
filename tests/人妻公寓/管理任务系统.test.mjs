@@ -554,10 +554,16 @@ test('同模板冷却两个完整考核期，换门牌也不得在第二期提�
 
 test('界面、回合引擎与楼务结算保持单次原子接线', () => {
   const app = readFileSync('src/人妻公寓/界面/客户端/App.vue', 'utf8');
+  const 合成 = readFileSync('src/人妻公寓/界面/客户端/composables/useRoomActions.ts', 'utf8');
   const index = readFileSync('src/人妻公寓/脚本/游戏逻辑/index.ts', 'utf8');
   const engine = readFileSync('src/人妻公寓/脚本/游戏逻辑/回合引擎.ts', 'utf8');
 
-  assert.match(app, /eventEmit\('人妻公寓:处理管理任务', \{ 任务id: 任务\.id, 选项id: 选项\.id, 地点 \}\)/);
+  // A6b:强类型边界拆成两半——composable 经领域回调,App 回调内保留原事件名与载荷
+  assert.match(合成, /事件\.处理管理任务\(\{ 任务id: 任务\.id, 选项id: 选项\.id, 地点 \}\)/);
+  assert.match(
+    app,
+    /处理管理任务: \(\{ 任务id, 选项id, 地点 \}\) => eventEmit\('人妻公寓:处理管理任务', \{ 任务id, 选项id, 地点 \}\)/,
+  );
   assert.match(index, /eventOn\('人妻公寓:处理管理任务'/);
   assert.match(index, /成功结算: newData => \{\s*const 结算 = 结算管理任务/);
   assert.match(engine, /选项\.成功结算\?\.\(newStat\)/);
@@ -569,15 +575,18 @@ test('界面、回合引擎与楼务结算保持单次原子接线', () => {
 });
 
 test('报修与投诉微信由任务真相编译，并在普通消息频率门禁前同步', () => {
-  const phone = readFileSync('src/人妻公寓/脚本/游戏逻辑/手机系统.ts', 'utf8');
-  const compileStart = phone.indexOf('function 是管理通知任务');
-  const syncStart = phone.indexOf('export async function 同步管理任务微信');
-  const rhythmStart = phone.indexOf('export async function 手机节拍');
-  const rhythm = phone.slice(rhythmStart);
+  // P5:管理任务通知编译已迁移至 ./手机/通知桥,编译段断言改读新所有者；
+  // P6:手机节拍已迁移至 ./手机/节拍引擎,节拍顺序断言读新所有者。
+  const 节拍引擎 = readFileSync('src/人妻公寓/脚本/游戏逻辑/手机/节拍引擎.ts', 'utf8');
+  const 通知桥 = readFileSync('src/人妻公寓/脚本/游戏逻辑/手机/通知桥.ts', 'utf8');
+  const compileStart = 通知桥.indexOf('function 是管理通知任务');
+  const syncStart = 通知桥.indexOf('export async function 同步管理任务微信');
+  const rhythmStart = 节拍引擎.indexOf('export async function 手机节拍');
+  const rhythm = 节拍引擎.slice(rhythmStart);
 
   assert.ok(syncStart >= 0);
-  assert.match(phone.slice(compileStart, rhythmStart), /任务\.类型 === '报修' \|\| 任务\.类型 === '投诉'/);
-  assert.match(phone.slice(compileStart, rhythmStart), /`楼务:\$\{任务\.id\}`/);
+  assert.match(通知桥.slice(compileStart), /任务\.类型 === '报修' \|\| 任务\.类型 === '投诉'/);
+  assert.match(通知桥.slice(compileStart), /`楼务:\$\{任务\.id\}`/);
   assert.ok(rhythm.indexOf('await 同步管理任务微信(data)') < rhythm.indexOf('const 倍 = 频率倍率'));
 });
 
@@ -642,16 +651,23 @@ test('楼务硬事实走系统注入且入口拒绝冲突状态', () => {
   assert.doesNotMatch(handler, /执行回合\(`\$\{预检\.行动\}\\n/);
   assert.match(handler, /_时间推进中/);
   assert.ok((handler.match(/_时间推进中/g) ?? []).length >= 2, '排队前和安全操作真正执行时都要检查时间推进');
-  assert.match(handler, /_待发送事件/);
+  // P7:启动迁移已清掉旧电话软项(来电回流/母亲裂缝·父亲来电)，队列即强剧情——楼务入口对
+  // 迁移后的真实 _待发送事件 做普通强阻塞，不再有“来电可略过”运行时白名单。
+  assert.match(handler, /取阻塞时间的待发送事件\(data\.系统\._待发送事件\)/, '楼务入口必须经归一化队列识别阻塞事件');
+  assert.match(handler, /if \(阻塞事件\)/, '楼务入口必须只被队列里的阻塞事件拒绝');
+  assert.match(handler, /描述待发送事件\(阻塞事件\)/, '拒绝提示必须描述过滤结果而非原始整串');
+  assert.doesNotMatch(handler, /if \(data\.系统\._待发送事件\)/, '楼务入口不得再对原始队列做无语义判断');
   assert.match(handler, /_特殊场景\.id/);
   assert.match(handler, /隔离事件进行中\(\)/);
 });
 
 test('两个楼务瓷砖都带任务名与剩余或逾期状态', () => {
   const app = readFileSync('src/人妻公寓/界面/客户端/App.vue', 'utf8');
-  const start = app.indexOf('function 添加管理任务动作');
-  const end = app.indexOf('function 添加地点线路动作', start);
-  const actions = app.slice(start, end);
+  // A6b:楼务瓷砖随 房间动作 迁入 useRoomActions.ts，角标仍读 App
+  const 合成 = readFileSync('src/人妻公寓/界面/客户端/composables/useRoomActions.ts', 'utf8');
+  const start = 合成.indexOf('function 添加管理任务动作');
+  const end = 合成.indexOf('function 添加地点线路动作', start);
+  const actions = 合成.slice(start, end);
 
   assert.match(actions, /任务\.模板/);
   assert.match(actions, /任务\.截止时段/);

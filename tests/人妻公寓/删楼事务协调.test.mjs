@@ -138,7 +138,10 @@ test('运行中的主回合捕获时间线世代，分支变化后跳过旧快�
   assert.match(主回合, /finally \{[\s\S]*捕获本轮临时消息\('user'\)/);
   assert.match(主回合, /finally \{[\s\S]*捕获本轮临时消息\('assistant'\)/);
   assert.match(主回合, /时间线已改变/);
-  assert.match(主回合, /SillyTavern\.chat\?\.\[楼层\] === 引用/);
+  // 第 6 项起 finally 一律走纯函数精确定位(登记楼层→引用→精确令牌+角色兜底),不再按楼号盲删。
+  assert.match(主回合, /定位本轮临时楼\(/);
+  assert.match(主回合, /临时楼降序楼层\(/);
+  assert.doesNotMatch(主回合, /SillyTavern\.chat\?\.\[楼层\] === 引用/);
   assert.match(主回合, /if \(!时间线已改变 && chat快照\)/);
   assert.match(主回合, /await updateVariablesWith\([\s\S]*_上次回合[\s\S]*确认本轮事务有效/);
 });

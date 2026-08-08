@@ -218,7 +218,23 @@ test('丈夫、赴约与未过期粘滞会占用管理员室，离场冷却按�
 
 test('主回合对空确定性剧情拒绝推进，并在失败 finally 恢复 chat 快照', () => {
   assert.match(回合源, /事件必须有正文\(本楼事件\)\s*&&\s*!已清洗正文/);
-  assert.match(回合源, /if \(!临时用户已转正[\s\S]{0,1200}恢复回合变量快照/);
+
+  // 定位主回合 finally 清理区：以 执行回合 函数为稳定区块标记。
+  const 主回合区 = 回合源.slice(
+    回合源.indexOf('export async function 执行回合('),
+    回合源.indexOf('export async function 重掷回合('),
+  );
+  const 未转正分支位置 = 主回合区.indexOf('if (!临时用户已转正)');
+  // 未转正分支是主回合最外层 finally 的首条语句，取其前最近的 finally 作清理区。
+  const finally位置 = 主回合区.lastIndexOf('} finally {', 未转正分支位置);
+  const 恢复快照位置 = 主回合区.indexOf('恢复回合变量快照(chat快照)', 未转正分支位置);
+
+  assert.ok(finally位置 >= 0, '主回合 finally 清理区缺失');
+  assert.ok(未转正分支位置 >= 0, 'finally 清理区缺少 未转正分支(if (!临时用户已转正))');
+  assert.ok(恢复快照位置 >= 0, '未转正分支后缺少 恢复回合变量快照(chat快照) 调用');
+  assert.ok(finally位置 < 未转正分支位置, '顺序错：未转正分支必须位于 finally 之内');
+  assert.ok(未转正分支位置 < 恢复快照位置, '顺序错：恢复回合变量快照(chat快照) 必须位于未转正分支之后');
+
   assert.match(回合源, /本轮事件可提交\(/);
 });
 

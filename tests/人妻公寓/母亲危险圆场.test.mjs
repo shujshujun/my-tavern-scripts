@@ -21,8 +21,9 @@ const { Schema, 创建户节点 } = require('../../src/人妻公寓/schema.ts');
 const { 经济配置, 难度表 } = require('../../src/人妻公寓/stageConfig.ts');
 const { 接听来电, 经济结算 } = require('../../src/人妻公寓/脚本/游戏逻辑/经济系统.ts');
 
-const 手机源码 = readFileSync(
-  new URL('../../src/人妻公寓/脚本/游戏逻辑/手机系统.ts', import.meta.url),
+// P5:父亲圆场快照/父亲台词已迁移至 ./手机/交互/父亲通话,源码断言改读新所有者。
+const 父亲通话源码 = readFileSync(
+  new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/交互/父亲通话.ts', import.meta.url),
   'utf8',
 );
 const Schema源码 = readFileSync(new URL('../../src/人妻公寓/schema.ts', import.meta.url), 'utf8');
@@ -201,9 +202,9 @@ test('待接来电冻结圆场事实，接听时原样转入活动父亲通话',
 });
 
 test('父亲生成读取冻结圆场快照并区分免责与纯剧情，不扩充第三个通话角色', () => {
-  const start = 手机源码.indexOf('type 母亲圆场快照');
-  const end = 手机源码.indexOf('/**\n * `待回复.序号`', start);
-  const implementation = 手机源码.slice(start, end);
+  const start = 父亲通话源码.indexOf('type 母亲圆场快照');
+  const end = 父亲通话源码.indexOf('/**\n * `待回复.序号`', start);
+  const implementation = 父亲通话源码.slice(start, end);
 
   assert.ok(start >= 0 && end > start);
   assert.match(implementation, /母亲圆场/, '父亲台词必须读取活动通话冻结的圆场快照');

@@ -22,7 +22,8 @@ require('ts-node/register/transpile-only');
 const { 登记MVU提交校验, 排队MVU操作, 脚本写入 } = require('../../src/人妻公寓/脚本/游戏逻辑/mvuIO.ts');
 const { 排队时间线切换协调 } = require('../../src/人妻公寓/脚本/游戏逻辑/时间线切换协调.ts');
 const index源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
-const 手机源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/手机系统.ts', import.meta.url), 'utf8');
+// P5:手机侧的全局 MVU 队列消费点（会场摘要/父亲通话）已迁至各自模块；手机系统.ts 已是纯 re-export 门面。
+const 旁路源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/静音会议旁路.ts', import.meta.url), 'utf8');
 
 test('正文安全操作与会场摘要共享同一租约，后项拿锁后才能重读前项真值', async () => {
   let 真值 = { 安全操作: 0, 会场摘要: 0 };
@@ -54,7 +55,7 @@ test('正文安全操作与会场摘要共享同一租约，后项拿锁后才�
   assert.deepEqual(真值, { 安全操作: 1, 会场摘要: 1 });
 
   assert.match(index源, /排队MVU操作/);
-  assert.match(手机源, /排队MVU操作/);
+  assert.match(旁路源码, /排队MVU操作/, '手机侧会场私聊摘要必须共享同一全局 MVU 队列');
 });
 
 test('已取得全局锁的旧操作在 await 期间失效后也不能提交整表', async () => {

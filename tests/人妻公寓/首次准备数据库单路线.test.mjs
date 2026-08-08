@@ -6,50 +6,42 @@ import test from 'node:test';
 const 读 = 路径 => readFileSync(new URL(`../../${路径}`, import.meta.url), 'utf8');
 
 test('首次准备页只保留数据库路线，不再暴露或检测智脑兼容', () => {
-  const 客户端 = 读('src/人妻公寓/界面/客户端/App.vue');
+  const 准备页 = 读('src/人妻公寓/界面/客户端/components/首次准备.vue');
   const 数据库桥 = 读('src/人妻公寓/脚本/游戏逻辑/数据库桥.ts');
 
-  const 准备页起点 = 客户端.indexOf('<div v-if="首次说明开"');
-  const 准备页终点 = 客户端.indexOf('<!-- ═══════════ 数据未就绪', 准备页起点);
-  assert.ok(准备页起点 >= 0 && 准备页终点 > 准备页起点, '应能定位首次准备页模板');
-  const 准备页 = 客户端.slice(准备页起点, 准备页终点);
-
-  assert.match(准备页, /准备数据库与运行环境/);
-  assert.match(准备页, /安装本游戏表/);
+  assert.match(准备页, /开始前准备一下/);
+  assert.match(准备页, /一键安装游戏记忆/);
   assert.doesNotMatch(准备页, /智脑|记忆方案|二选一|zhino/i);
   assert.doesNotMatch(数据库桥, /智脑状态|zhino-root|zhino-panel/i);
-  assert.match(客户端, /const 数据库准备完成 = computed/);
-  assert.match(客户端, /const 首次准备完成 = computed\(\(\) => 酒馆助手已安装\.value && 数据库准备完成\.value\)/);
+  assert.match(
+    准备页,
+    /const 数据库准备完成 = computed\(\(\) => 数据库检测\.value\.已安装 && 数据库检测\.value\.已装游戏模板\)/,
+  );
+  assert.match(
+    准备页,
+    /const 首次准备完成 = computed\(\(\) => 酒馆助手已安装\.value && 提示词已确认\.value && 数据库准备完成\.value\)/,
+  );
 });
 
-test('首次准备页醒目提示玩家手动把数据库存储模式改为 SQLite SQL', () => {
-  const 客户端 = 读('src/人妻公寓/界面/客户端/App.vue');
-  const 准备页起点 = 客户端.indexOf('<div v-if="首次说明开"');
-  const 准备页终点 = 客户端.indexOf('<!-- ═══════════ 数据未就绪', 准备页起点);
-  const 准备页 = 客户端.slice(准备页起点, 准备页终点);
+test('SQLite 手动切换提醒进入折叠高级区，游戏无法代替自动切换', () => {
+  const 准备页 = 读('src/人妻公寓/界面/客户端/components/首次准备.vue');
 
-  assert.match(准备页, /class="setup-sql-reminder"/);
+  assert.match(准备页, /<details class="setup-advanced">/);
   assert.match(准备页, /数据库设置 →\s*存储模式/);
   assert.match(准备页, /SQLite（SQL）/);
   assert.match(准备页, /游戏无法代替你自动切换/);
-  assert.match(客户端, /首次说明存储键\s*=\s*'人妻公寓_首次游玩说明_database_sql_mode_20260803'/);
+  assert.match(
+    准备页,
+    /首次说明存储键\s*=\s*'人妻公寓_首次游玩说明_database_sql_mode_20260803'/,
+  );
+  assert.doesNotMatch(准备页, /class="setup-sql-reminder"/, 'SQLite 提醒不再醒目常驻首屏');
 });
 
-test('首次准备页强烈建议使用 MVU 外置模型提高变量稳定性', () => {
-  const 客户端 = 读('src/人妻公寓/界面/客户端/App.vue');
-  const 准备页起点 = 客户端.indexOf('<div v-if="首次说明开"');
-  const 准备页终点 = 客户端.indexOf('<!-- ═══════════ 数据未就绪', 准备页起点);
-  const 准备页 = 客户端.slice(准备页起点, 准备页终点);
+test('首次准备页说明游戏默认使用外置模型解析，正文只负责故事', () => {
+  const 准备页 = 读('src/人妻公寓/界面/客户端/components/首次准备.vue');
 
-  assert.match(准备页, /class="setup-sql-reminder setup-mvu-reminder"/);
-  assert.match(准备页, /使用 MVU 外置模型解析变量/);
-  assert.match(准备页, /额外模型解析/);
-  assert.match(准备页, /开启【自动请求】/);
-  assert.match(准备页, /模型二次变量结算/);
-  assert.match(准备页, /自动关闭/);
-  assert.match(准备页, /避免重复请求和互相覆盖/);
-  assert.match(准备页, /可大幅提高变量更新稳定性/);
-  assert.match(准备页, /不是开局检测的强制项/);
+  assert.match(准备页, /游戏默认使用外置模型解析，正文只负责故事/);
+  assert.match(准备页, /遇到问题？高级检查/);
   assert.doesNotMatch(准备页, /二次变量结算】开启（默认开启）/);
 });
 

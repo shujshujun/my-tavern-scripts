@@ -37,6 +37,9 @@ const { 请求晋阶 } = require('../../src/人妻公寓/脚本/游戏逻辑/结
 const { 读取阶段线路审计矩阵 } = require('../../src/人妻公寓/脚本/游戏逻辑/阶段线路系统.ts');
 const { 六时段列表, 星期列表 } = require('../../src/人妻公寓/周作息.ts');
 const App源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
+const 背包源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/components/背包.vue', import.meta.url), 'utf8');
+const 商店源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/components/商店.vue', import.meta.url), 'utf8');
+const 档案卡源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/components/档案卡.vue', import.meta.url), 'utf8');
 
 function 建三户数据() {
   const data = Schema.parse({
@@ -179,10 +182,18 @@ test('普通五户 2→3 第一夜只允许晚上请求，白天和深夜都不�
 });
 
 test('界面与后端使用同一夜间门：错误时段显示等待而不是仍给可点按钮', () => {
-  assert.match(App源, /普通首夜时段已满足/);
-  assert.match(App源, /选中首夜待晚上 \? '✦ 等到晚上'/);
-  assert.match(App源, /发送中 \|\| !夫\.时段可用/);
-  assert.match(App源, /发送中 \|\| !妻\.时段可用/);
-  assert.match(App源, /商品锁定原因\(项\)\.length > 0/);
+  // A5b 拆分后晋阶时段与按钮文案随档案卡迁入组件，App 已迁出
+  assert.match(档案卡源, /普通首夜时段已满足/);
+  assert.match(档案卡源, /选中首夜待晚上 \? '✦ 等到晚上'/);
+  assert.doesNotMatch(App源, /普通首夜时段已满足/);
+  assert.doesNotMatch(App源, /选中首夜待晚上/);
+  // A5a 拆分后三条 UI 断言随模板迁入组件：时段锁断言读背包源，商品锁定断言读商店源
+  assert.match(背包源, /sending \|\| !夫\.时段可用/);
+  assert.match(背包源, /sending \|\| !妻\.时段可用/);
+  assert.match(商店源, /lockReasons\(项\)\.length > 0/);
+  assert.doesNotMatch(App源, /发送中 \|\| !夫\.时段可用/);
+  assert.doesNotMatch(App源, /发送中 \|\| !妻\.时段可用/);
+  assert.doesNotMatch(App源, /商品锁定原因\(项\)\.length > 0/);
+  // 业务计算仍留 App：晋阶时段判断、锁定原因文案、购买文案的时段标签
   assert.match(App源, /须在.*允许时段\.join\('或'\).*开演/);
 });

@@ -24,6 +24,7 @@ const {
 } = require('../../src/人妻公寓/周作息.ts');
 
 const 界面源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
+const 合成源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/composables/useRoomActions.ts', import.meta.url), 'utf8');
 const 配置源 = readFileSync(new URL('../../src/人妻公寓/stageConfig.ts', import.meta.url), 'utf8');
 
 test('绝对时段从第1周星期一早上起步，并按六时段、七天正确换日换周', () => {
@@ -105,8 +106,9 @@ test('界面只从系统绝对时段显示周历，妻子有效位置不再读�
     /_时段偏移楼|钟楼号|当前时段\(|当前天数\(|位置种子|Math\.floor\(Math\.max\(0,[^)]+\) \/ 18\)/,
   );
   assert.match(界面源, /const 今日 = 天数\.value - 1/);
-  assert.match(界面源, /查金币\(id, 绝对时段\.value\)/);
-  assert.match(界面源, /类型: '地点',[\s\S]{0,160}楼层: 绝对时段\.value/);
+  // A6b:零钱与地点线路候选参数随 房间动作 一并迁入 useRoomActions.ts
+  assert.match(合成源, /查金币\(id, 绝对时段\.value\)/);
+  assert.match(合成源, /类型: '地点',[\s\S]{0,160}楼层: 绝对时段\.value/);
 
   const 位置函数开始 = 界面源.indexOf('function 妻现位');
   const 位置函数结束 = 界面源.indexOf('\n}', 位置函数开始);
@@ -122,8 +124,9 @@ test('界面只从系统绝对时段显示周历，妻子有效位置不再读�
 });
 
 test('管理员室房卡只保留小憩和睡眠，全局推进事件携带防双击预期水位', () => {
-  const 管理员室开始 = 界面源.indexOf("if (id === '管理员室')");
-  const 管理员室段 = 界面源.slice(管理员室开始, 界面源.indexOf('\n  // 公共区', 管理员室开始));
+  // A6b:房卡动作已迁入 useRoomActions.ts，事件/水位仍在 App
+  const 管理员室开始 = 合成源.indexOf("if (id === '管理员室')");
+  const 管理员室段 = 合成源.slice(管理员室开始, 合成源.indexOf('// 公共区', 管理员室开始));
   assert.match(管理员室段, /文案: '小憩（推进一时段）'[\s\S]{0,120}发起时间推进\('小憩'\)/);
   assert.match(管理员室段, /文案: '睡到次日早晨'[\s\S]{0,120}发起时间推进\('睡到次日早晨'\)/);
   assert.doesNotMatch(管理员室段, /文案: '推进一时段'|发起时间推进\('推进一时段'\)/);

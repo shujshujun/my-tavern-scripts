@@ -4,6 +4,11 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 const App源码 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
+const 合成源码 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/composables/useRoomActions.ts', import.meta.url), 'utf8');
+const 房内操作抽屉源码 = readFileSync(
+  new URL('../../src/人妻公寓/界面/客户端/components/房内操作抽屉.vue', import.meta.url),
+  'utf8',
+);
 const 入口源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
 
 function 事件段(事件名) {
@@ -23,14 +28,15 @@ function 断言守卫早于业务(事件名, 守卫片段, 业务片段) {
 }
 
 test('组合动作只有确认成功到达目标地点后才继续执行，翻垃圾不再上地图房卡', () => {
+  // A6b:组合动作与到达确认门随 房间动作 迁入 useRoomActions.ts
   assert.match(
-    App源码,
+    合成源码,
     /async function 确认已到达动作地点\(地点: string\): Promise<boolean>[\s\S]*?try[\s\S]*?await 进入\(地点, false, true\)[\s\S]*?catch[\s\S]*?同步场景自变量\(\)[\s\S]*?当前房间\.value === 地点/,
   );
 
-  const 动作开始 = App源码.indexOf("if (房?.类型 === '户'");
-  const 动作结束 = App源码.indexOf('function 添加管理任务动作', 动作开始);
-  const 组合动作源码 = App源码.slice(动作开始, 动作结束);
+  const 动作开始 = 合成源码.indexOf("if (房?.类型 === '户'");
+  const 动作结束 = 合成源码.indexOf('function 添加管理任务动作', 动作开始);
+  const 组合动作源码 = 合成源码.slice(动作开始, 动作结束);
   const 地点门 = 组合动作源码.match(/if \(!\(await 确认已到达动作地点\(id\)\)\) return;/g) ?? [];
   assert.equal(地点门.length, 5, '对饮、丈夫礼物、催租、打听、捡零钱都必须走同一个到达确认门');
   assert.doesNotMatch(
@@ -44,9 +50,11 @@ test('组合动作只有确认成功到达目标地点后才继续执行，翻�
   assert.doesNotMatch(组合动作源码, /确认已到达动作地点\('垃圾房'\)/, '地图房卡不得再远程一键翻垃圾');
   assert.match(
     App源码,
-    /当前房间 === '垃圾房' && 垃圾袋列表\.length/,
-    '房内翻垃圾按钮必须以玩家真实身处垃圾房为前提',
+    /const 垃圾入口可见 = computed\(\(\) => 当前房间\.value === '垃圾房' && 垃圾袋列表\.value\.length > 0\);/,
+    'App 必须以玩家真实身处垃圾房为前提计算翻垃圾入口',
   );
+  assert.match(App源码, /:garbage-visible="垃圾入口可见"/, 'App 必须把地点门结果交给房内操作抽屉');
+  assert.match(房内操作抽屉源码, /<div v-if="garbageVisible" class="garbage-pick">/, '抽屉必须消费地点门结果');
 });
 
 test('脚本端在扣资源、发奖励或调用AI以前再次复核真实场景', () => {

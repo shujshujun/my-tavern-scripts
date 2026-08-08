@@ -22,7 +22,12 @@ const require = createRequire(import.meta.url);
 const { 安全父亲台词, 验收群聊隐私, 群聊安全回退 } = require(
   '../../src/人妻公寓/脚本/游戏逻辑/手机输出安全.ts'
 );
-const 手机源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/手机系统.ts', import.meta.url), 'utf8');
+// P6:父亲生产已迁至 ./手机/交互/父亲通话；朋友圈/评论/仅你可见迁至 ./手机/节拍引擎。
+const 父亲通话源码 = readFileSync(
+  new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/交互/父亲通话.ts', import.meta.url),
+  'utf8',
+);
+const 节拍引擎源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/节拍引擎.ts', import.meta.url), 'utf8');
 
 test('母亲圆场首句必须在输出级出现父亲转述，否则使用本地安全台词', () => {
   assert.equal(安全父亲台词('这期账怎么回事？', true), '你妈已经替你说过话了，这期账我还是要逐项问清。');
@@ -51,9 +56,9 @@ test('父亲来电兼容自己的中英文冒号与自然折行，但仍拒绝�
 });
 
 test('父亲生产调用保留原始行边界，先通过严格安全验收再落通话记录', () => {
-  const 开始 = 手机源码.indexOf('async function 父亲台词');
-  const 结束 = 手机源码.indexOf('/**\n * `待回复.序号`', 开始);
-  const 父亲段 = 手机源码.slice(开始, 结束);
+  const 开始 = 父亲通话源码.indexOf('async function 父亲台词');
+  const 结束 = 父亲通话源码.indexOf('/**\n * `待回复.序号`', 开始);
+  const 父亲段 = 父亲通话源码.slice(开始, 结束);
   assert.ok(开始 >= 0 && 结束 > 开始);
   assert.doesNotMatch(父亲段, /微信短文本\(/);
   assert.match(父亲段, /安全父亲台词\(候选/);
@@ -69,13 +74,13 @@ test('群聊输出逐条拒绝私聊、亲密和婚姻隐私，失败时提供�
 });
 
 test('公开朋友圈正文和评论复用楼务隐私门，仅你可见不套公开过滤', () => {
-  const 正文开始 = 手机源码.indexOf('function 校验朋友圈文案');
-  const 正文结束 = 手机源码.indexOf('function 取朋友圈兜底', 正文开始);
-  const 评论开始 = 手机源码.indexOf("const 评论行 =", 正文结束);
-  const 评论结束 = 手机源码.indexOf('if (!时间线仍有效()) return;', 评论开始);
-  const 私密开始 = 手机源码.indexOf('// ── 仅你可见');
-  const 私密结束 = 手机源码.indexOf('// ── 姐妹群主动拍', 私密开始);
-  assert.match(手机源码.slice(正文开始, 正文结束), /验收群聊隐私\(文, '楼务'\)/);
-  assert.match(手机源码.slice(评论开始, 评论结束), /验收群聊隐私\(行, '楼务'\)/);
-  assert.doesNotMatch(手机源码.slice(私密开始, 私密结束), /验收群聊隐私/);
+  const 正文开始 = 节拍引擎源码.indexOf('function 校验朋友圈文案');
+  const 正文结束 = 节拍引擎源码.indexOf('function 取朋友圈兜底', 正文开始);
+  const 评论开始 = 节拍引擎源码.indexOf("const 评论行 =", 正文结束);
+  const 评论结束 = 节拍引擎源码.indexOf('if (!时间线仍有效()) return;', 评论开始);
+  const 私密开始 = 节拍引擎源码.indexOf('// ── 仅你可见');
+  const 私密结束 = 节拍引擎源码.indexOf('// ── 姐妹群主动拍', 私密开始);
+  assert.match(节拍引擎源码.slice(正文开始, 正文结束), /验收群聊隐私\(文, '楼务'\)/);
+  assert.match(节拍引擎源码.slice(评论开始, 评论结束), /验收群聊隐私\(行, '楼务'\)/);
+  assert.doesNotMatch(节拍引擎源码.slice(私密开始, 私密结束), /验收群聊隐私/);
 });
