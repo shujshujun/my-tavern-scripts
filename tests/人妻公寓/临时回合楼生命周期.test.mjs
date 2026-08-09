@@ -15,6 +15,7 @@ const {
   定位本轮临时楼,
   临时楼降序楼层,
   扫描遗留临时楼,
+  判定可自动清理的遗留临时楼,
   构造转正更新负载,
   校验转正候选,
 } = require('../../src/人妻公寓/脚本/游戏逻辑/临时回合楼.ts');
@@ -244,12 +245,53 @@ test('C2 扫描后再次执行零命中:物理楼删掉后恢复入口幂等', (
   assert.deepEqual(扫描遗留临时楼(清理后), [], '再次扫描必须零命中,不能按旧楼号再删别的消息');
 });
 
-test('C3 恢复入口组合:零命中零写入,有命中则冻结→删楼→等待数据库时间线,失败向上抛', () => {
+test('C2b 自动恢复只允许聊天尾部同令牌的一条 user 或连续 user+assistant', () => {
+  assert.deepEqual(
+    判定可自动清理的遗留临时楼([建消息({}), 建消息(用户extra(令牌, 'user'))]),
+    { 待删: [1], 拒绝原因: '' },
+  );
+  assert.deepEqual(
+    判定可自动清理的遗留临时楼([
+      建消息({}),
+      建消息(用户extra(令牌, 'user')),
+      建消息(用户extra(令牌, 'assistant')),
+    ]),
+    { 待删: [2, 1], 拒绝原因: '' },
+  );
+});
+
+test('C2c 多回合、非尾部、角色倒置一律失败关闭，不把旧历史批量删除', () => {
+  const 多回合 = 判定可自动清理的遗留临时楼([
+    建消息({}),
+    建消息(用户extra(令牌, 'user')),
+    建消息(用户extra(令牌, 'assistant')),
+    建消息(用户extra(令牌B, 'user')),
+    建消息(用户extra(令牌B, 'assistant')),
+  ]);
+  assert.deepEqual(多回合.待删, []);
+  assert.match(多回合.拒绝原因, /超过单回合上限|多个临时回合令牌/);
+
+  const 非尾部 = 判定可自动清理的遗留临时楼([
+    建消息({}),
+    建消息(用户extra(令牌, 'user')),
+    建消息(用户extra(令牌, 'assistant')),
+    建消息({}, '后来已完成的正式历史'),
+  ]);
+  assert.deepEqual(非尾部.待删, []);
+  assert.match(非尾部.拒绝原因, /不在聊天尾部/);
+
+  const 倒置 = 判定可自动清理的遗留临时楼([建消息({}), 建消息(用户extra(令牌, 'assistant'))]);
+  assert.deepEqual(倒置.待删, []);
+  assert.match(倒置.拒绝原因, /角色顺序/);
+});
+
+test('C3 恢复入口组合:异常历史失败关闭；安全命中才冻结→删楼→等待数据库时间线', () => {
   const 恢复函数 = engine.slice(
     engine.indexOf('export async function 恢复遗留临时回合楼'),
-    engine.indexOf('export function 裁手机时间线'),
+    engine.indexOf('async function 立即持久保存宿主聊天'),
   );
-  assert.match(恢复函数, /扫描遗留临时楼/);
+  assert.match(恢复函数, /判定可自动清理的遗留临时楼/);
+  assert.match(恢复函数, /if \(判定\.拒绝原因\)/, '异常标记必须先失败关闭，不能继续删楼');
   assert.match(恢复函数, /if \(!待删\.length\) return 0/, '没有命中必须零写入');
   assert.match(恢复函数, /标记数据库时间线将变更/);
   assert.match(恢复函数, /内部删除聊天消息/);
@@ -288,6 +330,10 @@ test('D1 成功:最终整表写入后先持久转正,之后才置内存转正标
   );
   assert.match(主回合, /await 校验转正候选\(|校验转正候选\(/, '转正前必须按精确令牌/角色校验两条齐全');
   assert.match(主回合, /setChatMessages\(构造转正更新负载/, '转正必须调用纯函数构造负载(保留每条已有 extra 只改标记,标记置 false 由 B1 动态验证)');
+  const 标记更新位置 = 主回合.indexOf('setChatMessages(构造转正更新负载');
+  const 硬保存位置 = 主回合.indexOf('await 立即持久保存宿主聊天()');
+  assert.ok(标记更新位置 >= 0 && 标记更新位置 < 硬保存位置 && 硬保存位置 < 转正标志位置, '临时标记 false 必须先经宿主 saveChat 硬落盘，之后才可置内存转正');
+  assert.match(主回合, /复核命中\.some[\s\S]*?临时楼标记键[\s\S]*?!== false/, '硬保存后必须复核两楼标记都为 false');
 });
 
 test('D2 普通失败/取消:未转正分支按精确令牌/引用清理,既有正文不动', () => {

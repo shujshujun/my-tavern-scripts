@@ -9,6 +9,7 @@ process.env.TS_NODE_COMPILER_OPTIONS = JSON.stringify({ module: 'CommonJS', modu
 require('ts-node/register/transpile-only');
 
 const {
+  生成失败时可保留的流式正文,
   提取纯控制协议尾段,
   是当前正文流事件,
   选择正文生成原文,
@@ -31,6 +32,13 @@ test('最终返回丢失正文时采用同一正文请求的完整流式缓存',
 
 test('最终返回本身含有效正文时不让较早的流式片段覆盖它', () => {
   assert.equal(选择正文生成原文('最终完整正文', '较早的流式片段', 清掉变量协议), '最终完整正文');
+});
+
+test('最终 Promise 失败时只保留已经自然收句的完整流式正文', () => {
+  const 完整 = '夏乔看着修好的水管，终于舒了口气。\n<UpdateVariable>[]</UpdateVariable>';
+  assert.equal(生成失败时可保留的流式正文(完整, 严格清除协议残留), 完整);
+  assert.equal(生成失败时可保留的流式正文('夏乔看着修好的水管，正要', 严格清除协议残留), '');
+  assert.equal(生成失败时可保留的流式正文('<JSONPatch>[]</JSONPatch>', 严格清除协议残留), '');
 });
 
 test('正文模型只回传 JSONPatch 尾段与孤立外层闭标签时必须判为纯协议', () => {
@@ -171,6 +179,11 @@ test('回合只缓存正文请求流，并在正文清洗前完成流式兜底',
   assert.doesNotMatch(回合源码, /eventOn\(iframe_events\.STREAM_TOKEN_RECEIVED_FULLY/);
   assert.match(回合源码, /generation_id && generation_id !== 本回合生成id/);
   assert.match(回合源码, /更新有效流式正文\(正文流式原文,\s*文本,\s*清洗严格正文\)/);
+  assert.match(
+    回合源码,
+    /catch \(生成错误\)[\s\S]{0,280}生成失败时可保留的流式正文\(正文流式原文, 清洗严格正文\)[\s\S]{0,180}throw 生成错误/,
+    '最终 Promise 失败也只能在同 generation_id 已有完整流式正文时继续',
+  );
   assert.match(回合源码, /提取纯控制协议尾段\(最终返回原文\)/);
   assert.match(回合源码, /流式兜底变量块 \?\? 取变量块\(原文\)/);
   assert.match(回合源码, /const 数组 = 提取末尾裸JSON补丁\(/, '裸空数组也必须能被包装成变量块');

@@ -39,6 +39,13 @@ export interface 定位命中 {
   角色: 'user' | 'assistant';
 }
 
+export interface 遗留临时楼恢复判定 {
+  /** 只有满足“当前聊天尾部、同一令牌、合法单 user 或 user+assistant 对”时才允许自动删除。 */
+  待删: number[];
+  /** 非空表示检测到异常临时标记；调用方必须保留历史并停止自动删除。 */
+  拒绝原因: string;
+}
+
 function 消息extra(消息: unknown): Record<string, unknown> | null {
   const extra = (消息 as { extra?: unknown } | null)?.extra;
   return extra && typeof extra === 'object' && !Array.isArray(extra) ? (extra as Record<string, unknown>) : null;
@@ -94,6 +101,44 @@ export function 扫描遗留临时楼(消息表: readonly unknown[]): number[] {
     命中.push(楼层);
   }
   return 命中.sort((a, b) => b - a);
+}
+
+/**
+ * 自动恢复的失败关闭门。
+ *
+ * 一次正常中断最多只会在聊天尾部留下同一令牌的一条 user，或连续的 user+assistant 两条。
+ * 多令牌、超过两条、非尾部、角色倒置都不可能属于“刚刚中断的一轮”；这类状态宁可保留
+ * 半成品并报警，也绝不能把历史上所有仍带 true 标记的完成回合批量删除。
+ */
+export function 判定可自动清理的遗留临时楼(消息表: readonly unknown[]): 遗留临时楼恢复判定 {
+  const 全部 = 扫描遗留临时楼(消息表);
+  if (!全部.length) return { 待删: [], 拒绝原因: '' };
+
+  const 尾楼 = 消息表.length - 1;
+  if (全部[0] !== 尾楼) {
+    return { 待删: [], 拒绝原因: '临时标记不在聊天尾部' };
+  }
+  if (全部.length > 2) {
+    return { 待删: [], 拒绝原因: `同时命中 ${全部.length} 条临时楼，超过单回合上限` };
+  }
+
+  const 升序 = [...全部].sort((a, b) => a - b);
+  if (升序[0] !== 消息表.length - 升序.length || 升序.some((楼层, i) => i > 0 && 楼层 !== 升序[i - 1] + 1)) {
+    return { 待删: [], 拒绝原因: '临时楼不是聊天尾部的连续单回合' };
+  }
+
+  const 信息 = 升序.map(楼层 => {
+    const extra = 消息extra(消息表[楼层])!;
+    return { 楼层, 令牌: String(extra[回合令牌键]), 角色: extra[回合角色键] };
+  });
+  if (new Set(信息.map(项 => 项.令牌)).size !== 1) {
+    return { 待删: [], 拒绝原因: '聊天尾部存在多个临时回合令牌' };
+  }
+  if (信息[0].角色 !== 'user' || (信息.length === 2 && 信息[1].角色 !== 'assistant')) {
+    return { 待删: [], 拒绝原因: '临时楼角色顺序不是 user → assistant' };
+  }
+
+  return { 待删: [...升序].sort((a, b) => b - a), 拒绝原因: '' };
 }
 
 /**

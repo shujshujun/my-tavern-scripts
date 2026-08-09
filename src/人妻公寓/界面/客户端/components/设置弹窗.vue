@@ -53,6 +53,12 @@ const 解析通道 = ref<变量解析通道类型>('自动');
  * 只在设置页打开或切到自定义通道时从 MVU 载入一次，输入过程中绝不被轮询刷新覆盖。
  */
 const 解析API表单 = reactive({ api地址: '', 密钥: '', 模型名称: '', 温度: '', top_p: '', 最大回复token数: '' });
+/** 模型读取结果与读取中状态：只写本组件草稿内存，绝不直接写 MVU 配置。 */
+const 模型列表 = ref<string[]>([]);
+const 读取模型中 = ref(false);
+/** 自定义表单可见反馈（读取/保存结果，绝不包含 Key 内容）。 */
+const 自定义反馈 = ref('');
+const 自定义反馈类型 = ref<'ok' | 'err'>('ok');
 
 function 载入解析API表单() {
   const 配置 = 读取MVU外置模型配置();
@@ -62,6 +68,9 @@ function 载入解析API表单() {
   解析API表单.温度 = 配置?.温度 !== undefined ? String(配置.温度) : '';
   解析API表单.top_p = 配置?.top_p !== undefined ? String(配置.top_p) : '';
   解析API表单.最大回复token数 = 配置?.最大回复token数 !== undefined ? String(配置.最大回复token数) : '';
+  模型列表.value = [];
+  自定义反馈.value = '';
+  自定义反馈类型.value = 'ok';
 }
 
 /** 恢复默认路线：0.74 起正文路线已移除，这里只负责把 MVU 写回外置。 */
@@ -71,26 +80,115 @@ function 选择解析路线() {
 }
 
 function 选择解析通道(通道: 变量解析通道类型) {
+  if (通道 === 解析通道.value) return;
   解析通道.value = 通道;
-  写入变量解析通道(通道);
-  if (通道 === '自定义') 载入解析API表单();
+  自定义反馈.value = '';
+  自定义反馈类型.value = 'ok';
+  if (通道 === '自定义') {
+    载入解析API表单();
+  } else {
+    // 回自动只写通道偏好（不动 MVU 配置）；进自定义必须完整填表+保存才写自定义通道。
+    写入变量解析通道('自动');
+  }
 }
 
-/** 表单任一项失焦提交：写穿 MVU 持久层。数字留空=不写、沿用 MVU 现值。 */
-function 提交解析API表单() {
-  const 取数 = (原: string): number | undefined => {
+function 安全错误反馈(e: unknown, 密钥: string): string {
+  const 原文 = e instanceof Error ? e.message : String(e);
+  return (密钥 ? 原文.split(密钥).join('***') : 原文).slice(0, 300);
+}
+
+/** 读取 OpenAI 兼容端点模型列表：走宿主 getModelList 代理（禁 iframe 直接 fetch，避免 CORS/WebView 拦截）。
+ * 失败/空列表只给可见原因，绝不清空已填草稿、不保存半配置、不切换通道。 */
+async function 读取模型() {
+  if (读取模型中.value) return;
+  const base = 解析API表单.api地址.trim().replace(/\/+$/, '');
+  const key = 解析API表单.密钥.trim();
+  if (!base) {
+    自定义反馈.value = '请先填写 API 地址再读取模型。';
+    自定义反馈类型.value = 'err';
+    return;
+  }
+  读取模型中.value = true;
+  自定义反馈.value = '读取中…';
+  自定义反馈类型.value = 'ok';
+  try {
+    const 模型们 = await getModelList({ apiurl: base, key });
+    模型列表.value = [
+      ...new Set(模型们.map(String).map(模型 => 模型.trim()).filter(Boolean)),
+    ].sort((a, b) => a.localeCompare(b));
+    if (!模型列表.value.length) {
+      自定义反馈.value = '该接口没有返回可用模型，可以直接手填模型名称。';
+      自定义反馈类型.value = 'err';
+    } else {
+      自定义反馈.value = `读到 ${模型列表.value.length} 个模型，从下拉里选一个，或直接手填。`;
+      自定义反馈类型.value = 'ok';
+    }
+  } catch (e) {
+    自定义反馈.value = `读取模型失败：${安全错误反馈(e, key)}（可手填模型名称）`;
+    自定义反馈类型.value = 'err';
+  } finally {
+    读取模型中.value = false;
+  }
+}
+
+/** 显式提交自定义解析配置：先 trim 地址/Key/模型并校验，再写 MVU 配置；
+ * 只有写入成功才切自定义通道、刷新真实状态并显示成功。失败保持草稿与现有通道不变。
+ * 数值留空=不覆盖、沿用 MVU 现值；非空但不是有限数字必须指出字段，不得静默当空。 */
+function 保存并启用() {
+  const 地址 = 解析API表单.api地址.trim().replace(/\/+$/, '');
+  const 密钥 = 解析API表单.密钥.trim();
+  const 模型 = 解析API表单.模型名称.trim();
+  if (!地址) {
+    自定义反馈.value = '请填写 API 地址。';
+    自定义反馈类型.value = 'err';
+    return;
+  }
+  if (!模型) {
+    自定义反馈.value = '请填写模型名称。';
+    自定义反馈类型.value = 'err';
+    return;
+  }
+  const 取数 = (原: string): number | undefined | null => {
+    if (原.trim() === '') return undefined;
     const 数 = Number(原.trim());
-    return 原.trim() !== '' && Number.isFinite(数) ? 数 : undefined;
+    return Number.isFinite(数) ? 数 : null;
   };
-  写入MVU设置({
+  const 温度 = 取数(解析API表单.温度);
+  if (温度 === null) {
+    自定义反馈.value = '「温度」不是有效数字，请修正后再保存。';
+    自定义反馈类型.value = 'err';
+    return;
+  }
+  const top_p = 取数(解析API表单.top_p);
+  if (top_p === null) {
+    自定义反馈.value = '「top_p」不是有效数字，请修正后再保存。';
+    自定义反馈类型.value = 'err';
+    return;
+  }
+  const 最大回复token数 = 取数(解析API表单.最大回复token数);
+  if (最大回复token数 === null) {
+    自定义反馈.value = '「最大回复token」不是有效数字，请修正后再保存。';
+    自定义反馈类型.value = 'err';
+    return;
+  }
+  const 成功 = 写入MVU设置({
     模型来源: '自定义',
-    api地址: 解析API表单.api地址.trim(),
-    密钥: 解析API表单.密钥.trim(),
-    模型名称: 解析API表单.模型名称.trim(),
-    温度: 取数(解析API表单.温度),
-    top_p: 取数(解析API表单.top_p),
-    最大回复token数: 取数(解析API表单.最大回复token数),
+    api地址: 地址,
+    密钥,
+    模型名称: 模型,
+    温度,
+    top_p,
+    最大回复token数,
   });
+  if (成功) {
+    写入变量解析通道('自定义');
+    刷新MVU解析状态();
+    自定义反馈.value = '已保存并启用：本轮起变量走此自定义模型。';
+    自定义反馈类型.value = 'ok';
+  } else {
+    自定义反馈.value = '保存失败：未能写入 MVU 配置，草稿已保留。';
+    自定义反馈类型.value = 'err';
+  }
 }
 
 /** 设置页与回合引擎都以 MVU 的真实更新方式为准。 */
@@ -304,28 +402,34 @@ onUnmounted(() => {
         <div v-if="解析通道 === '自定义'" class="mvu-api-form">
           <label
             >API 地址（OpenAI 兼容）
-            <input v-model="解析API表单.api地址" placeholder="https://…/v1" @change="提交解析API表单" />
+            <input v-model="解析API表单.api地址" placeholder="https://…/v1" />
           </label>
           <label
             >API Key
-            <input v-model="解析API表单.密钥" type="password" autocomplete="off" @change="提交解析API表单" />
+            <input v-model="解析API表单.密钥" type="password" autocomplete="off" />
           </label>
           <label
             >模型名称
-            <input v-model="解析API表单.模型名称" placeholder="如 gemini-2.5-flash" @change="提交解析API表单" />
+            <input v-model="解析API表单.模型名称" placeholder="如 gemini-2.5-flash" />
           </label>
+          <div class="mvu-api-row">
+            <button class="btn mini" :disabled="读取模型中" @click="读取模型">读取模型</button>
+            <select v-if="模型列表.length" v-model="解析API表单.模型名称" class="mvu-api-select">
+              <option v-for="m in 模型列表" :key="m" :value="m">{{ m }}</option>
+            </select>
+          </div>
           <div class="mvu-api-nums">
-            <label>温度<input v-model="解析API表单.温度" inputmode="decimal" placeholder="默认" @change="提交解析API表单" /></label>
-            <label>top_p<input v-model="解析API表单.top_p" inputmode="decimal" placeholder="默认" @change="提交解析API表单" /></label>
+            <label>温度<input v-model="解析API表单.温度" inputmode="decimal" placeholder="默认" /></label>
+            <label>top_p<input v-model="解析API表单.top_p" inputmode="decimal" placeholder="默认" /></label>
             <label
-              >最大回复token<input
-                v-model="解析API表单.最大回复token数"
-                inputmode="numeric"
-                placeholder="8192"
-                @change="提交解析API表单"
+              >最大回复token<input v-model="解析API表单.最大回复token数" inputmode="numeric" placeholder="8192"
             /></label>
           </div>
-          <p class="set-hint">改完即写入 MVU 变量框架的「额外模型解析配置」，游戏与 MVU 共用同一份配置。</p>
+          <button class="btn" :disabled="读取模型中" @click="保存并启用">保存并启用</button>
+          <p v-if="自定义反馈" class="set-hint mvu-api-feedback" :class="自定义反馈类型 === 'err' ? 'err' : 'ok'">
+            {{ 自定义反馈 }}
+          </p>
+          <p class="set-hint">点击「保存并启用」后写入 MVU 变量框架的「额外模型解析配置」，游戏与 MVU 共用同一份配置。</p>
         </div>
       </div>
 
@@ -489,6 +593,41 @@ onUnmounted(() => {
 .mvu-api-nums label {
   flex: 1;
   min-width: 0;
+}
+
+.mvu-api-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mvu-api-select {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 9px;
+  border: 1px solid var(--pink-soft);
+  border-radius: 8px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 0.9em;
+  color: var(--ink);
+}
+
+.mvu-api-feedback.err {
+  color: #c0574f;
+}
+
+.mvu-api-feedback.ok {
+  color: #287a50;
+}
+
+:global(html.rq-dark) .mvu-api-feedback.err {
+  color: #e08a80;
+}
+
+:global(html.rq-dark) .mvu-api-feedback.ok {
+  color: #6fce9b;
 }
 
 /* 开关 */

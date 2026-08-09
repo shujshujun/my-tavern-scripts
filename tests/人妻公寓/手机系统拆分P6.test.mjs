@@ -247,8 +247,8 @@ test('节拍引擎不 import 内核/门面，P2–P5 模块无反向依赖', () 
   assert.match(节拍引擎源码, /from '\.\/UI刷新'/);
 });
 
-test('内核显式 re-export 手机节拍，旧门面路径不变', () => {
-  assert.match(内核源码, /export \{ 手机节拍 \} from '\.\/节拍引擎';/);
+test('内核显式 re-export 手机节拍与占用查询，旧门面路径不变', () => {
+  assert.match(内核源码, /export \{ 手机节拍, 手机节拍进行中 \} from '\.\/节拍引擎';/);
   assert.match(门面源码, /export \* from '\.\/手机\/内核'/);
   assert.match(index源码, /import \{[\s\S]*手机节拍,[\s\S]*\} from '\.\/手机系统';/, 'index.ts 旧 import 路径不变');
   assert.match(index源码, /void 手机节拍\(\)/, '回合完成后仍驱动手机节拍');

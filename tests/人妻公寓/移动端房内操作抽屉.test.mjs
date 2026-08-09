@@ -325,6 +325,11 @@ test('组件自身：消费 普通房间动作、触发动作收起并直调原�
   );
   assert.match(
     抽屉源码,
+    /const 有主训练动作 = computed\(\(\) => props\.mobile && props\.actions\.some\(动作 => 动作\.kicker === 'TRAIN'\)\)/,
+    '手机公园/健身房的主训练瓷砖不得随抽屉自动收起而消失',
+  );
+  assert.match(
+    抽屉源码,
     /function 触发动作\(动作: 卡动作\): void \{\n {2}机器\.手动收起\(\);[\s\S]{0,40}动作\.做\(\);/,
     '动作点击后先收起,再直调原回调',
   );
@@ -376,7 +381,11 @@ test('手机：把手至少 44px 且只在手机渲染；面板 absolute 向上�
 
 test('桌面：把手隐藏、内容恒显且流内两列；窄屏两列不横溢', () => {
   const 模板段 = 提取模板(抽屉源码);
-  assert.match(模板段, /v-if="mobile \? 状态\.展开 : true"/, '桌面内容恒显(流内),手机才受展开控制');
+  assert.match(
+    模板段,
+    /v-if="mobile \? 状态\.展开 \|\| 有主训练动作 : true"/,
+    '桌面内容恒显；手机主训练瓷砖即使抽屉自动收起也保持可见',
+  );
   assert.doesNotMatch(抽屉源码, /\.drawer-content \{\s*position: absolute;/, '桌面内容不得绝对定位(不参与正文高度)');
   assert.match(
     抽屉源码,

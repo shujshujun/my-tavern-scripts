@@ -191,7 +191,7 @@ test('档案模板关键契约全量保持：头像/立绘/三轴/心镜/仪容/
   assert.match(模板段, /:src="选中档案\.基础立绘"/, '立绘失败回退基础立绘');
   assert.match(模板段, /v-for="轴 in 选中档案\.三轴"/, '三轴循环');
   assert.match(模板段, /role="meter"[\s\S]*?aria-valuemin="0"[\s\S]*?aria-valuemax="100"[\s\S]*?:aria-valuenow="轴\.值"/, '三轴 meter/ARIA');
-  assert.match(模板段, /'--level': `\$\{Math\.max\(0, Math\.min\(100, 轴\.值\)\)\}%`/, '三轴 clamp 百分比');
+  assert.match(模板段, /'--level': Math\.max\(0, Math\.min\(100, 轴\.值\)\) \/ 100/, '三轴 clamp 0-1 比例');
   assert.match(模板段, /<b>情绪<\/b> \{\{ 选中档案\.妻\.当前情绪 \}\}/, '心镜情绪');
   assert.match(模板段, /<b>心声<\/b> \{\{ 选中档案\.妻\.当前心理想法 \}\}/, '心镜心声');
   assert.match(模板段, /<b>气质<\/b> \{\{ 选中档案\.气质描述 \}\}/, '心镜气质');
@@ -268,8 +268,8 @@ test('档案专属 CSS 已从 App 移到组件；基础 popup scoped 引入；av
     '.dossier-portrait {',
     '.dossier-axes {',
     '.dossier-axes .axis-row {',
-    '.dossier-battery {',
-    '.dossier-battery .axis-charge.fav {',
+    '.dossier-axes .axis-row::before {',
+    '.dossier-axes .axis-row.fav::before {',
     '.axis-top {',
     '.axis-top i {',
     '.axis-row {',
@@ -341,6 +341,7 @@ test('dark/mobile 档案规则完整迁移；rq-still 来自弹窗基础；App �
     ':global(html.rq-dark) .dossier-hero {',
     ':global(html.rq-dark) .dossier-card,',
     ':global(html.rq-dark) .dossier-axes .axis-row,',
+    ':global(html.rq-dark) .dossier-axes .axis-row.fav::before {',
     ':global(html.rq-dark) .a-cell {',
     ':global(html.rq-dark) .a-cell .a-pic {',
     '.mask:has(.dossier) {',

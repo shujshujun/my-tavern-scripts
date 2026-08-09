@@ -82,3 +82,57 @@ test('原有官方 MVU 按钮路线仍存在', () => {
   assert.match(引擎源码, /MVU解析\.自动请求 &&[\s\S]*?await eventEmit\('人妻公寓:MVU外置模型重试'\)/, '官方外置模型重试事件保持');
   assert.match(引擎源码, /读取MVU解析状态/, 'MVU 状态读取保持');
 });
+
+test('自定义表单有明确“读取模型”按钮，走宿主 getModelList 代理而非 iframe 直接 fetch', () => {
+  assert.match(设置源码, />读取模型<\/button>/, '存在明确读取模型按钮');
+  assert.match(设置源码, /getModelList\(\{ apiurl: base, key \}\)/, '读取模型调用宿主 getModelList 代理');
+  assert.doesNotMatch(设置源码, /\bfetch\s*\(/, '设置组件不得直接 fetch 外部 API');
+});
+
+test('模型列表逐项转字符串、trim、去空、去重并排序；下拉选择只写表单草稿', () => {
+  assert.match(设置源码, /map\(String\)/, '逐项转字符串');
+  assert.match(设置源码, /map\(模型 => 模型\.trim\(\)\)/, '逐项 trim');
+  assert.match(设置源码, /filter\(Boolean\)/, '去空');
+  assert.match(设置源码, /new Set\(/, '去重');
+  assert.match(设置源码, /\.sort\(\(a, b\) => a\.localeCompare\(b\)\)/, '排序');
+  assert.match(设置源码, /v-model="解析API表单\.模型名称"/, '下拉选择绑定表单草稿(模型名称)');
+});
+
+test('存在“保存并启用”按钮与独立提交函数：只有它写 MVU 配置，写入成功后才写自定义通道', () => {
+  assert.match(设置源码, />保存并启用<\/button>/, '存在明确保存并启用按钮');
+  assert.doesNotMatch(设置源码, /function 提交解析API表单/, '失焦自动提交函数已删除');
+  assert.doesNotMatch(设置源码, /@change="提交解析API表单"|@blur="提交解析API表单"/, '不再有失焦自动提交');
+  const 保存段 = 设置源码.slice(设置源码.indexOf('function 保存并启用'), 设置源码.indexOf('</script>'));
+  assert.match(保存段, /const 成功 = 写入MVU设置\(\{/, '保存函数调用 写入MVU设置 并保留返回值');
+  assert.match(保存段, /if \(成功\)[\s\S]{0,80}写入变量解析通道\('自定义'\)/, '写入成功后才写自定义解析通道');
+  assert.doesNotMatch(保存段, /写入变量解析通道\('自动'\)/, '保存函数只写自定义通道');
+  // 切通道分段按钮不写 MVU 配置、不立即写自定义通道（自定义只走完整表单+保存）
+  const 通道段 = 设置源码.slice(设置源码.indexOf('function 选择解析通道'), 设置源码.indexOf('function 保存并启用'));
+  assert.doesNotMatch(通道段, /写入MVU设置/, '切通道按钮不写 MVU 配置');
+  assert.doesNotMatch(通道段, /写入变量解析通道\('自定义'\)/, '切自定义按钮不立即写自定义通道');
+  assert.equal(
+    (设置源码.match(/写入变量解析通道\('自定义'\)/g) ?? []).length,
+    1,
+    '自定义通道只由保存函数写入一次',
+  );
+});
+
+test('API 地址、Key、模型与数值输入框不再通过 @change／@blur 自动提交', () => {
+  for (const 字段 of ['api地址', '密钥', '模型名称', '温度', 'top_p', '最大回复token数']) {
+    assert.doesNotMatch(设置源码, new RegExp(`解析API表单\\.${字段}[^>]*@change`), `${字段} 输入框不得 @change 自动提交`);
+    assert.doesNotMatch(设置源码, new RegExp(`解析API表单\\.${字段}[^>]*@blur`), `${字段} 输入框不得 @blur 自动提交`);
+  }
+  assert.doesNotMatch(设置源码, /提交解析API表单/, '自动提交逻辑已整体移除');
+});
+
+test('读取中禁用按钮；读取失败与保存失败都有可见反馈；失败不清空表单、不切换通道', () => {
+  assert.match(设置源码, /:disabled="读取模型中"/, '读取中禁用读取按钮');
+  assert.match(设置源码, /自定义反馈/, '存在可见反馈状态');
+  assert.match(设置源码, /自定义反馈类型/, '反馈带类型(成功/失败)');
+  assert.match(设置源码, /读取模型失败/, '读取失败有可见原因');
+  assert.match(设置源码, /保存失败/, '保存失败有可见反馈');
+  assert.match(设置源码, /已保存并启用/, '保存成功有可见反馈');
+  assert.match(设置源码, /安全错误反馈\(e, key\)/, '宿主错误反馈先按当前 Key 脱敏');
+  assert.match(设置源码, /\.split\(密钥\)\.join\('\*\*\*'\)/, '错误文本不会把 API Key 回显到界面');
+  assert.match(设置源码, /const 地址 = 解析API表单\.api地址\.trim\(\)\.replace\(\/\\\/\+\$\/, ''\)/, '保存与读取统一去掉末尾斜杠');
+});

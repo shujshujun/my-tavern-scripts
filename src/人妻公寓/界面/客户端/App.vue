@@ -489,17 +489,22 @@
             </div>
           </Transition>
           <TransitionGroup v-if="立绘显示 && !显示成人CG && !静音会议显示组合图" name="fade">
-            <img
+            <span
               v-for="绘 in 立绘列表"
               :key="绘.src"
-              class="portrait"
-              :class="{ 'portrait-glory': 绘.src.includes('/立绘/荣耀洞_') }"
+              class="portrait-slot"
+              :class="{ 'portrait-slot-glory': 绘.src.includes('/立绘/荣耀洞_') }"
               :style="绘.style"
-              :src="绘.src"
-              alt=""
-              draggable="false"
-              @error="立绘失效[绘.src] = true"
-            />
+            >
+              <img
+                class="portrait"
+                :class="{ 'portrait-glory': 绘.src.includes('/立绘/荣耀洞_') }"
+                :src="绘.src"
+                alt=""
+                draggable="false"
+                @error="立绘失效[绘.src] = true"
+              />
+            </span>
           </TransitionGroup>
           <!-- 正文卷轴:只演当前幕,且幕跟着房间走——人走了戏就收,回来戏还在(氛围色随位置)(A8a 迁入 components/正文卷轴.vue) -->
           <StoryScroll
@@ -961,13 +966,7 @@
       />
 
       <!-- ═══════════ 角色CG图库：已解锁显示缩略图，未解锁不泄露画面 ═══════════ -->
-      <CgLibrary
-        v-if="CG图库门牌"
-        :key="CG图库门牌"
-        :door="CG图库门牌"
-        :unlocked="已解锁CG"
-        @close="关闭CG图库"
-      />
+      <CgLibrary v-if="CG图库门牌" :key="CG图库门牌" :door="CG图库门牌" :unlocked="已解锁CG" @close="关闭CG图库" />
 
       <!-- ═══════════ 背包(道具可用:布设/送礼/读信) ═══════════ -->
       <InventoryPopup
@@ -1042,12 +1041,7 @@
       <!-- ═══════════ 读信(揭晓时刻:碎片拼合的实物) ═══════════
            三条关闭路径全走 合上信(审计 C3):组件内三条路径统一 emit close,App 绑定 @close="合上信",
            揭晓从未漏登记——信留在背包、可晋阶 恒 false、由头门照锁,玩家没有任何提示知道要重读一遍 -->
-      <LetterPopup
-        v-if="读信门牌"
-        :door="读信门牌"
-        :evidence-slots="裂缝证物槽"
-        @close="合上信"
-      />
+      <LetterPopup v-if="读信门牌" :door="读信门牌" :evidence-slots="裂缝证物槽" @close="合上信" />
 
       <!-- ═══════════ 史册(完整往事 + 回档) ═══════════ -->
       <div v-if="显示史册" class="mask" @click.self="显示史册 = false">
@@ -1184,6 +1178,13 @@ import {
 import { useDataStore } from './store';
 import { CG加载事件属于当前请求 } from './cgLoadState';
 import { 计算场景同步, type 场景聊天状态 } from './场景状态同步';
+import {
+  创建正文幕归属,
+  作废正文幕归属,
+  应用回合完成正文幕,
+  正文幕属于当前房间,
+  type 回合完成正文选项,
+} from './正文幕归属';
 import { 同步画幅 } from './viewport';
 import { useUIPrefs } from './composables/useUIPrefs';
 import { useRoomActions } from './composables/useRoomActions';
@@ -1525,14 +1526,21 @@ watch(显示地图, 开 => {
   }
 });
 
-async function 写场景(房间id: string | null, 破门 = false): Promise<void> {
+interface 待提交场景状态 {
+  进房末楼: number;
+  由头已用: boolean;
+  非法进入: boolean;
+}
+
+async function 写场景(房间id: string | null, 破门 = false, 待提交状态?: 待提交场景状态): Promise<void> {
   const 变量 = getVariables({ type: 'chat' });
   const 旧场景 = (_.get(变量, '_场景') as 场景聊天状态 | null | undefined) ?? null;
   const 旧房间 = 旧场景?.房间id ?? null;
-  if (旧房间 !== 房间id) {
-    当前成人CG.value = null;
-    最近CG信号 = null;
-  }
+  const 新场景状态 = 待提交状态 ?? {
+    进房末楼: 进房末楼.value,
+    由头已用: 本次入房由头已用.value,
+    非法进入: 已破门进入.value,
+  };
   const 旧轨迹 = (_.get(变量, '_地图轨迹') as string[] | undefined) ?? [];
   const 从 = 旧房间 ? (查房间(旧房间)?.名称 ?? 旧房间) : '楼道';
   const 到 = 房间id ? (查房间(房间id)?.名称 ?? 房间id) : '楼道';
@@ -1555,9 +1563,9 @@ async function 写场景(房间id: string | null, 破门 = false): Promise<void>
         ? {
             房间id,
             破门,
-            非法进入: 已破门进入.value,
-            进房末楼: 进房末楼.value,
-            由头已用: 本次入房由头已用.value,
+            非法进入: 新场景状态.非法进入,
+            进房末楼: 新场景状态.进房末楼,
+            由头已用: 新场景状态.由头已用,
           }
         : null,
       _无耗时拜访: 无耗时拜访,
@@ -1566,6 +1574,10 @@ async function 写场景(房间id: string | null, 破门 = false): Promise<void>
     },
     { type: 'chat' },
   );
+  if (旧房间 !== 房间id) {
+    当前成人CG.value = null;
+    最近CG信号 = null;
+  }
 }
 
 function 启动阶段线路剧情(房间id: string, 候选: 阶段线路候选): void {
@@ -1588,6 +1600,7 @@ function 启动阶段线路剧情(房间id: string, 候选: 阶段线路候选):
 }
 
 let 亲密离场处理中: Promise<boolean> | null = null;
+let 场景移动中 = false;
 
 async function 确认亲密离场(): Promise<boolean> {
   if (!性爱进行中.value) return true;
@@ -1610,49 +1623,69 @@ async function 确认亲密离场(): Promise<boolean> {
 }
 
 async function 进入(房间id: string, 破门 = false, 保持地图 = false): Promise<boolean> {
+  if (场景移动中) return false;
   // 地图上重复点当前房间只是“确认留在这里”：不算重新进门，也不能刷新由头配额/进房楼戳。
   if (房间id === 当前房间.value) {
     if (!保持地图) 关地图();
     闪转场(查房间(房间id)?.名称 ?? 房间id);
     return true;
   }
-  if (!(await 确认亲密离场())) return false;
-  const 无耗时拜访 =
-    (_.get(getVariables({ type: 'chat' }), '_无耗时拜访') as 无耗时拜访记录 | null | undefined) ?? null;
-  const 续接同次拜访 =
-    无耗时拜访?.房间id === 房间id && 无耗时拜访.绝对时段 === 绝对时段.value && 查房间(房间id)?.类型 === '户';
-  if (续接同次拜访) {
-    进房末楼.value = 无耗时拜访.进房末楼;
-  } else {
-    try {
-      进房末楼.value = getLastMessageId();
-    } catch {
-      进房末楼.value = 末楼号.value;
+  场景移动中 = true;
+  try {
+    if (!(await 确认亲密离场())) return false;
+    const 无耗时拜访 =
+      (_.get(getVariables({ type: 'chat' }), '_无耗时拜访') as 无耗时拜访记录 | null | undefined) ?? null;
+    const 续接同次拜访 =
+      无耗时拜访?.房间id === 房间id && 无耗时拜访.绝对时段 === 绝对时段.value && 查房间(房间id)?.类型 === '户';
+    let 新进房末楼 = 无耗时拜访?.进房末楼 ?? 末楼号.value;
+    if (!续接同次拜访) {
+      try {
+        新进房末楼 = getLastMessageId();
+      } catch {
+        新进房末楼 = 末楼号.value;
+      }
     }
+    const 新由头已用 = 续接同次拜访 ? 无耗时拜访.由头已用 : false;
+    const 新非法进入 = 破门 || (续接同次拜访 && !!无耗时拜访?.非法进入);
+    await 写场景(房间id, 破门, {
+      进房末楼: 新进房末楼,
+      由头已用: 新由头已用,
+      非法进入: 新非法进入,
+    });
+    当前房间.value = 房间id;
+    进房末楼.value = 新进房末楼;
+    本次入房由头已用.value = 新由头已用;
+    已破门进入.value = 新非法进入;
+    粘滞在场.value = { 位置: null, 们: [] };
+    if (!保持地图) 关地图();
+    正文幕归属状态.value = 作废正文幕归属(正文幕归属状态.value);
+    记待办(房间id);
+    闪转场(查房间(房间id)?.名称 ?? 房间id);
+    // 头像即时点亮(走到谁身边谁亮;回合结束后脚本按位置系统重算)
+    在场.value = { 焦点: 可见门牌.value.filter(m => 妻现位(m) === 房间id), 在场: [] };
+    return true;
+  } finally {
+    场景移动中 = false;
   }
-  当前房间.value = 房间id;
-  本次入房由头已用.value = 续接同次拜访 ? 无耗时拜访.由头已用 : false;
-  已破门进入.value = 破门 || (续接同次拜访 && !!无耗时拜访?.非法进入);
-  粘滞在场.value = { 位置: null, 们: [] };
-  if (!保持地图) 关地图();
-  await 写场景(房间id, 破门);
-  记待办(房间id);
-  闪转场(查房间(房间id)?.名称 ?? 房间id);
-  // 头像即时点亮(走到谁身边谁亮;回合结束后脚本按位置系统重算)
-  在场.value = { 焦点: 可见门牌.value.filter(m => 妻现位(m) === 房间id), 在场: [] };
-  return true;
 }
 
 async function 离开房间(): Promise<void> {
-  if (!(await 确认亲密离场())) return;
-  当前房间.value = null;
-  本次入房由头已用.value = false;
-  粘滞在场.value = { 位置: null, 们: [] };
-  已破门进入.value = false;
-  await 写场景(null);
-  闪转场('楼道');
-  在场.value = { 焦点: [], 在场: [] }; // 身边已无人,头像随之熄灭
-  显示地图.value = true; // 走出房门=站上楼道,顺手展开地图选下一处
+  if (场景移动中) return;
+  场景移动中 = true;
+  try {
+    if (!(await 确认亲密离场())) return;
+    await 写场景(null);
+    当前房间.value = null;
+    本次入房由头已用.value = false;
+    粘滞在场.value = { 位置: null, 们: [] };
+    已破门进入.value = false;
+    正文幕归属状态.value = 作废正文幕归属(正文幕归属状态.value);
+    闪转场('楼道');
+    在场.value = { 焦点: [], 在场: [] }; // 身边已无人,头像随之熄灭
+    显示地图.value = true; // 走出房门=站上楼道,顺手展开地图选下一处
+  } finally {
+    场景移动中 = false;
+  }
 }
 
 /**
@@ -1684,7 +1717,10 @@ function 同步场景自变量() {
     已破门进入.value = 下一状态.非法进入;
     本次入房由头已用.value = 下一状态.由头已用;
     进房末楼.value = 下一状态.进房末楼;
-    if (下一状态.房间变化) 粘滞在场.value = { 位置: null, 们: [] };
+    if (下一状态.房间变化) {
+      粘滞在场.value = { 位置: null, 们: [] };
+      正文幕归属状态.value = 作废正文幕归属(正文幕归属状态.value);
+    }
   } catch (e) {
     console.error('[人妻公寓客户端] 场景同步失败:', e);
   }
@@ -1787,14 +1823,15 @@ const 可输入 = computed(() => {
  * 这场戏就翻篇,正文让位给到场卡;在新地方开口=新的一楼,正文才回来。
  * 走回旧房间不会"复活"旧对话(线性上下文里它已在更早的楼层),而是当作一次新的到场。
  */
-const 幕房间 = ref<string | null>(null);
+const 正文幕归属状态 = ref(创建正文幕归属(null));
+const 幕房间 = computed(() => 正文幕归属状态.value.房间);
 
 /** 人还站在最近这场戏发生的地方(正文可见;一走动就=新场景,正文隐去换到场卡) */
-const 在幕中 = computed(() => 当前房间.value === 幕房间.value);
+const 在幕中 = computed(() => 正文幕属于当前房间(正文幕归属状态.value, 当前房间.value));
 
 const 显示选项 = computed(() => {
   if (发送中.value || !行动选项.value.length) return false;
-  if (!当前房间.value) return 幕房间.value === null; // 楼道态:序章引导等
+  if (!当前房间.value) return 在幕中.value && 幕房间.value === null; // 楼道态:序章引导等
   return 可输入.value && 在幕中.value;
 });
 
@@ -2840,10 +2877,7 @@ const 背包列表 = computed(() =>
       ? {
           门牌: '302' as 门牌,
           妻名: '妈',
-          可送:
-            !配?.服饰 ||
-            母亲.当前阶段 !== 0 ||
-            (母亲.裂缝.已确认 && 是母亲破墙服饰(id)),
+          可送: !配?.服饰 || 母亲.当前阶段 !== 0 || (母亲.裂缝.已确认 && 是母亲破墙服饰(id)),
           提示:
             配?.服饰 && 母亲.当前阶段 === 0
               ? !母亲.裂缝.已确认
@@ -3711,7 +3745,7 @@ const {
   toast: 弹提示,
   lockMeetingUI: () => {
     当前房间.value = '管理员室';
-    幕房间.value = '管理员室';
+    正文幕归属状态.value = 创建正文幕归属('管理员室');
     显示地图.value = false;
     显示商店.value = false;
     显示背包.value = false;
@@ -3833,7 +3867,7 @@ onMounted(() => {
     }
     处理CG回合信号(信号);
   });
-  eventOn('人妻公寓:回合完成', async () => {
+  eventOn('人妻公寓:回合完成', async (选项?: 回合完成正文选项) => {
     停止生成计时();
     try {
       清除待恢复行动();
@@ -3845,7 +3879,7 @@ onMounted(() => {
       处理静音会议回合完成前();
       同步场景自变量(); // 回档把 _场景 清空后 UI 必须跟着回楼道(审计 C2)
       清理越界成人CG(); // 回档也走本事件收口,被抹掉楼层上的成人画面一并退场(审计 M10)
-      幕房间.value = 当前房间.value; // 本轮的戏与选项绑定产出场景,换地方即收
+      正文幕归属状态.value = 应用回合完成正文幕(正文幕归属状态.value, 当前房间.value, 选项);
       // 先同步消息历史，再刷新 MVU；时间事务必须等新时钟真正 pull 完成后才能重新点按钮。
       await 取卷轴();
       刷新可重掷();
@@ -3872,7 +3906,7 @@ onMounted(() => {
     流式段.value = [];
     同步场景自变量(); // 隔离撤回会把 _场景 恢复成事件前旧值(审计 C2)
     清理越界成人CG(); // 撤回删楼后同样不得残留成人画面(审计 M10)
-    幕房间.value = 当前房间.value;
+    正文幕归属状态.value = 创建正文幕归属(当前房间.value);
     await 取卷轴();
     刷新可重掷();
     刷赴约();
@@ -3884,7 +3918,7 @@ onMounted(() => {
       /* store 未带 pull 时靠轮询兜底 */
     }
   });
-  eventOn('人妻公寓:回合失败', (原因: string) => {
+  eventOn('人妻公寓:回合失败', async (原因: string) => {
     发送中.value = false;
     运行阶段.value = '';
     停止生成计时();
@@ -3899,11 +3933,22 @@ onMounted(() => {
     偷窥待选.value = null; // 偷窥回合没演成,挂起的选择卡一并作废(脚本侧同步清账)
     // 回合失败=这一轮没发生,是提示不是事故——走可消散 toast,不占常驻错误横幅(2026-07-17 用户反馈)
     if (!原因.startsWith('已取消')) 弹提示(`回合失败,这一轮没有发生:${原因}`, 6000);
-    void 取卷轴();
+    // 引擎只在临时楼删除与 chat 快照恢复完成后广播失败；这里仍完整重拉
+    // 消息/MVU/在场三路真值，不能保留生成期间 store 曾观察到的临时 assistant 快照。
+    await 取卷轴();
     刷新可重掷();
+    刷赴约();
+    刷新在场();
+    刷新行动选项();
+    try {
+      await Promise.resolve((store as unknown as { pull?: () => void | Promise<void> }).pull?.());
+    } catch {
+      /* store 未带 pull 时靠轮询兜底 */
+    }
+    await nextTick();
     if (将自动重试) {
       取消后自动重试.value = false;
-      // 回合引擎在发出失败事件后的 finally 才释放内部锁，下一事件循环再重发。
+      // 等回滚后的消息、MVU 与 Vue 画面都重新对齐，再重发原行动。
       setTimeout(() => {
         失败行动.value = '';
         发出(待重试);
@@ -3974,7 +4019,7 @@ onMounted(() => {
   当前房间.value = 场景?.房间id ?? null;
   已破门进入.value = !!场景?.非法进入;
   本次入房由头已用.value = !!场景?.由头已用;
-  幕房间.value = 当前房间.value; // 刷新恢复:已有正文与选项视为当前场景的
+  正文幕归属状态.value = 创建正文幕归属(当前房间.value); // 刷新恢复:已有正文与选项视为当前场景的
   try {
     进房末楼.value = 场景?.进房末楼 ?? getLastMessageId();
   } catch {
@@ -4456,44 +4501,54 @@ onUnmounted(() => {
   opacity: 0;
 }
 
-/* 立绘:每人占一个独立横槽。高度随人数递减，宽度受槽硬约束，素材比例再不同也不会互相遮挡。 */
-.portrait {
+/* 立绘槽负责定位与裁边；图片只按槽高等比缩放。这样同场角色不会因透明画布宽度不同被 contain 二次缩矮。 */
+.portrait-slot {
   position: absolute;
   left: var(--portrait-desktop-left);
   bottom: 0;
   z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
   width: var(--portrait-desktop-width);
   height: var(--portrait-desktop-height);
-  max-width: none;
-  max-height: none;
-  transform: none;
-  object-fit: contain;
-  object-position: center bottom;
   pointer-events: none;
-  filter: drop-shadow(0 0 1.2px rgba(255, 255, 255, 0.85)) drop-shadow(0 0 1.2px rgba(255, 255, 255, 0.85))
-    drop-shadow(0 8px 20px rgba(20, 24, 40, 0.35));
   transition:
     left 0.35s ease,
     top 0.35s ease,
     width 0.35s ease,
     height 0.35s ease,
-    transform 0.35s ease,
     opacity 0.35s ease;
 }
 
+.portrait {
+  flex: none;
+  width: auto;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  pointer-events: none;
+  filter: drop-shadow(0 0 1.2px rgba(255, 255, 255, 0.85)) drop-shadow(0 0 1.2px rgba(255, 255, 255, 0.85))
+    drop-shadow(0 8px 20px rgba(20, 24, 40, 0.35));
+}
+
 /* 单人镜头略偏右，给左侧正文保留呼吸；仍处于自己的 78% 宽槽内。 */
-.portrait-count-1 .portrait {
+.portrait-count-1 .portrait-slot {
   left: 22%;
   width: 78%;
   height: var(--portrait-desktop-height);
-  transform: none;
-  object-fit: contain;
-  object-position: center bottom;
 }
 
 /* 荣耀洞件与背景共用同一张16:9舞台坐标：不能套普通人物槽，否则洞口接触点会随端宽漂移。 */
-.portrait-count-1 .portrait.portrait-glory {
+.portrait-slot-glory {
   inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.portrait-glory {
   width: 100%;
   height: 100%;
   object-fit: contain;
@@ -6868,40 +6923,28 @@ button.battery:focus-visible {
    省出来的高度会自动全部归正文;不动任何逻辑,纯视觉压缩 */
 @media (max-width: 540px) {
   /* 手机全屏立绘：1~3 人横向独立槽；4~6 人转为两排半身镜头。
-     每个 img 的几何盒互不相交，因此不依赖 z-index 或遮挡来制造站位。 */
-  :global(html.rqgy-full) .portrait {
+     每个槽的几何盒互不相交，槽内图片统一按高度缩放，超宽部分只做无损裁边。 */
+  :global(html.rqgy-full) .portrait-slot {
     left: var(--portrait-mobile-left);
     top: var(--portrait-mobile-top);
     bottom: auto;
     width: var(--portrait-mobile-width);
     height: var(--portrait-mobile-height);
-    transform: none;
-    object-fit: contain;
-    object-position: center bottom;
     clip-path: inset(0 2px 0 2px);
   }
 
-  :global(html.rqgy-full) .portrait-count-1 .portrait {
+  :global(html.rqgy-full) .portrait-count-1 .portrait-slot {
     left: 8%;
     top: 0;
     width: 92%;
     height: 100%;
   }
 
-  :global(html.rqgy-full) .portrait-count-1 .portrait.portrait-glory {
+  :global(html.rqgy-full) .portrait-count-1 .portrait-slot-glory {
     inset: 0;
     width: 100%;
     height: 100%;
-    object-fit: contain;
-    object-position: center;
     clip-path: none;
-  }
-
-  /* 双人/三人使用同高镜头框：原始透明画布宽度不同也不会把某人缩矮一截。 */
-  :global(html.rqgy-full) .portrait-count-2 .portrait,
-  :global(html.rqgy-full) .portrait-count-3 .portrait {
-    object-fit: cover;
-    object-position: center bottom;
   }
 
   :global(html.rqgy-full) .story-glory {
@@ -6910,9 +6953,7 @@ button.battery:focus-visible {
   }
 
   /* 四人以上保留脸和上半身，比六人挤成一条细立绘更容易辨认。 */
-  :global(html.rqgy-full) .portraits-many .portrait {
-    object-fit: cover;
-    object-position: center top;
+  :global(html.rqgy-full) .portraits-many .portrait-slot {
     clip-path: inset(2px);
     mask-image: linear-gradient(to bottom, #000 82%, transparent 100%);
     -webkit-mask-image: linear-gradient(to bottom, #000 82%, transparent 100%);
@@ -7151,7 +7192,6 @@ button.battery:focus-visible {
   .dock-btn span {
     font-size: 0.6em;
   }
-
 }
 /* ═══ 特殊场景：静音会议 ═══ */
 

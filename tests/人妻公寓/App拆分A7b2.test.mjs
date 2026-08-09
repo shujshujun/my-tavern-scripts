@@ -30,7 +30,7 @@ test('composable 非空；App 真实 import 并恰好调用一次、解构完整
   assert.ok(composable源码.length > 0, 'useMuteMeeting.ts 应为非空文件');
   assert.match(App源码, /import \{ useMuteMeeting \} from '\.\/composables\/useMuteMeeting';/, 'App 应导入 useMuteMeeting');
   assert.strictEqual((App源码.match(/useMuteMeeting\(/g) ?? []).length, 1, 'App 应恰好调用一次 useMuteMeeting');
-  assert.match(App源码, /\} = useMuteMeeting\(\{[\s\S]*?\n  data,[\s\S]*?\n\}\);/, 'App 应解构消费 API 并注入 data');
+  assert.match(App源码, /\} = useMuteMeeting\(\{[\s\S]*?\n {2}data,[\s\S]*?\n\}\);/, 'App 应解构消费 API 并注入 data');
   assert.match(App源码, /function 打开静音会议筹备\(\) \{[\s\S]*?请求打开静音会议筹备\(\);[\s\S]*?\}/, 'App 应保留背包 wrapper');
   const 依赖 = 提取导入specifier(composable源码);
   assert.ok(!依赖.some(s => s.includes('App.vue') || s === './App' || s === '../App'), 'composable 不得反向导入 App');
@@ -137,7 +137,7 @@ test('options 强类型：13 项注入能力逐项声明；App 接线含 6 事�
   assert.match(App源码, /clearStream: \(\) => \{\n {4}流式段\.value = \[\];\n {2}\},/, 'App 注入清流');
   assert.match(App源码, /pullState: \(\) => \(store as unknown as \{ pull\?: \(\) => void \}\)\.pull\?\.\(\)/, 'App 注入 store pull');
   assert.match(App源码, /toast: 弹提示,/, 'App 注入 toast');
-  assert.match(App源码, /lockMeetingUI: \(\) => \{[\s\S]*?当前房间\.value = '管理员室';[\s\S]*?幕房间\.value = '管理员室';[\s\S]*?垃圾选择开\.value = false;\n {2}\},/, 'App 注入 UI lock 且集合/顺序保持');
+  assert.match(App源码, /lockMeetingUI: \(\) => \{[\s\S]*?当前房间\.value = '管理员室';[\s\S]*?正文幕归属状态\.value = 创建正文幕归属\('管理员室'\);[\s\S]*?垃圾选择开\.value = false;\n {2}\},/, 'App 注入 UI lock 且集合/顺序保持');
   assert.match(App源码, /focusInput: \(\) => \{\n {4}回合输入\.value\?\.聚焦\(\);\n {2}\},/, 'App 注入输入聚焦(经回合输入组件公开接口)');
   assert.match(回合输入源码, /defineExpose\(\{ 聚焦 \}\)/, '回合输入组件公开聚焦接口');
   assert.match(回合输入源码, /输入框\.value\?\.focus\(\)/, '组件内聚焦经本地 textarea DOM ref');
@@ -269,8 +269,8 @@ test('散会/自由/收尾状态与 handler、App 六处 listener 调用顺序�
   assert.match(composable源码, /lockMeetingUI\(\);\n {2}\}\n\n {2}\/\*\* 回合完成收口/, '同步界面正式分支委托 lockMeetingUI');
   // App 六处 listener 调用顺序契约
   assert.match(App源码, /eventOn\('人妻公寓:生成开始', \(\) => \{[\s\S]*?if \(静音会议中\.value\) 同步静音会议界面\(\);/, '生成开始仍同步界面');
-  assert.match(App源码, /eventOn\('人妻公寓:回合完成', async \(\) => \{[\s\S]*?处理静音会议回合完成前\(\);[\s\S]*?await nextTick\(\);[\s\S]*?同步静音会议界面\(\);/, '回合完成在 pull+nextTick 后同步界面');
-  assert.match(App源码, /eventOn\('人妻公寓:回合失败', \(原因: string\) => \{[\s\S]*?处理静音会议回合失败前\(\);[\s\S]*?const 将自动重试 = 取消后自动重试\.value && !!待重试;\n {4}处理静音会议自由回合失败\(将自动重试\);/, '回合失败清现场后按将自动重试复位自由闩锁');
+  assert.match(App源码, /eventOn\('人妻公寓:回合完成', async \(选项\?: 回合完成正文选项\) => \{[\s\S]*?处理静音会议回合完成前\(\);[\s\S]*?await nextTick\(\);[\s\S]*?同步静音会议界面\(\);/, '回合完成在 pull+nextTick 后同步界面');
+  assert.match(App源码, /eventOn\('人妻公寓:回合失败', async \(原因: string\) => \{[\s\S]*?处理静音会议回合失败前\(\);[\s\S]*?const 将自动重试 = 取消后自动重试\.value && !!待重试;\n {4}处理静音会议自由回合失败\(将自动重试\);/, '回合失败清现场后按将自动重试复位自由闩锁');
   assert.match(App源码, /eventOn\('人妻公寓:特殊场景状态', \(\) => \{[\s\S]*?nextTick\(同步静音会议界面\);/, '特殊场景状态 pull 后 nextTick 同步');
   assert.match(App源码, /eventOn\('人妻公寓:提示', \(消息: string\) => \{[\s\S]*?处理静音会议提示\(\);/, '提示开头调用处理静音会议提示');
   assert.match(App源码, /标记静音会议自由行动开始\(\);\n {2}\}\n {2}发送中\.value = true;/, '发出在原时点标记自由行动开始');

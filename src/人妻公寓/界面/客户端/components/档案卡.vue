@@ -245,20 +245,21 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
       </div>
 
       <div class="axes dossier-axes">
-        <div v-for="轴 in 选中档案.三轴" :key="轴.名" class="axis-row">
+        <div
+          v-for="轴 in 选中档案.三轴"
+          :key="轴.名"
+          class="axis-row"
+          :class="轴.类"
+          role="meter"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          :aria-valuenow="轴.值"
+          :style="{ '--level': Math.max(0, Math.min(100, 轴.值)) / 100 }"
+        >
           <span class="axis-top"
             ><b>{{ 轴.名 }}</b
             ><i>{{ Math.round(轴.值) }}</i></span
           >
-          <div
-            class="axis dossier-battery"
-            role="meter"
-            aria-valuemin="0"
-            aria-valuemax="100"
-            :aria-valuenow="轴.值"
-          >
-            <i class="axis-charge" :class="轴.类" :style="{ '--level': `${Math.max(0, Math.min(100, 轴.值))}%` }" />
-          </div>
           <small v-if="轴.名 === '堕落'" class="axis-note">
             今日 AI 增长 {{ 今日堕落增长 }}/{{ 每日堕落上限 }}<template v-if="堕落轴说明"> · {{ 堕落轴说明 }}</template>
           </small>
@@ -638,6 +639,9 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
 }
 
 .dossier-axes .axis-row {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   align-items: stretch;
@@ -649,10 +653,42 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
   box-shadow: 0 3px 10px rgba(44, 40, 56, 0.05);
 }
 
+/* 三轴整框填充:整个好感/堕落/婚姻卡本身就是进度条,::before 按 --level 从左向右 scaleX 填满卡片 */
+.dossier-axes .axis-row::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  transform-origin: left center;
+  transform: scaleX(var(--level, 0));
+  pointer-events: none;
+  transition: transform 0.8s cubic-bezier(0.2, 0.85, 0.25, 1);
+}
+
+.dossier-axes .axis-row.fav::before {
+  background: linear-gradient(90deg, #ffb1cf, var(--pink));
+}
+
+.dossier-axes .axis-row.sin::before {
+  background: linear-gradient(90deg, #ffb091, color-mix(in srgb, var(--red) 78%, white));
+}
+
+.dossier-axes .axis-row.marr::before {
+  background: linear-gradient(90deg, #9cebd7, var(--green));
+}
+
+/* 标签/数值/堕落说明浮在填充层上方,保证文字始终可读可选中 */
+.dossier-axes .axis-top,
+.dossier-axes .axis-note {
+  position: relative;
+  z-index: 1;
+}
+
 .dossier-axes .axis-note {
   display: block;
-  color: var(--ink-soft);
-  font-size: 0.64em;
+  color: var(--ink);
+  font-size: 0.68em;
+  font-weight: 600;
   line-height: 1.4;
   text-align: left;
 }
@@ -662,52 +698,6 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
   opacity: 0.72;
 }
 
-.dossier-battery {
-  position: relative;
-  display: block;
-  height: 14px;
-  padding: 2px;
-  overflow: visible;
-  border: 2px solid rgba(36, 33, 38, 0.28);
-  border-radius: 4px;
-  background: rgba(36, 33, 38, 0.07);
-}
-
-.dossier-battery::after {
-  content: '';
-  position: absolute;
-  top: 3px;
-  right: -6px;
-  width: 4px;
-  height: 6px;
-  border-radius: 0 2px 2px 0;
-  background: rgba(36, 33, 38, 0.3);
-}
-
-.dossier-battery .axis-charge {
-  display: block;
-  width: var(--level);
-  height: 100%;
-  border-radius: 1px;
-  transform-origin: left center;
-  transition: width 0.8s cubic-bezier(0.2, 0.85, 0.25, 1);
-}
-
-.dossier-battery .axis-charge.fav {
-  background: linear-gradient(90deg, #ffb1cf, var(--pink));
-  box-shadow: 0 0 5px rgba(255, 79, 154, 0.24);
-}
-
-.dossier-battery .axis-charge.sin {
-  background: linear-gradient(90deg, #ffb091, var(--red));
-  box-shadow: 0 0 5px rgba(228, 82, 90, 0.22);
-}
-
-.dossier-battery .axis-charge.marr {
-  background: linear-gradient(90deg, #9cebd7, var(--green));
-  box-shadow: 0 0 5px rgba(49, 179, 146, 0.22);
-}
-
 .axis-top {
   display: flex;
   align-items: baseline;
@@ -715,7 +705,7 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
 }
 
 .axis-top b {
-  color: var(--ink-soft);
+  color: var(--ink);
   font-size: 0.76em;
 }
 
@@ -1155,6 +1145,19 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
   border-color: rgba(255, 255, 255, 0.08);
 }
 
+/* 深色模式整框填充:用较低透明度的语义色,让深色卡底透出,浅色文字保持可读 */
+:global(html.rq-dark) .dossier-axes .axis-row.fav::before {
+  background: linear-gradient(90deg, rgba(255, 79, 154, 0.45), rgba(255, 79, 154, 0.18));
+}
+
+:global(html.rq-dark) .dossier-axes .axis-row.sin::before {
+  background: linear-gradient(90deg, rgba(229, 83, 63, 0.45), rgba(229, 83, 63, 0.18));
+}
+
+:global(html.rq-dark) .dossier-axes .axis-row.marr::before {
+  background: linear-gradient(90deg, rgba(32, 223, 173, 0.45), rgba(32, 223, 173, 0.18));
+}
+
 :global(html.rq-dark) .a-cell .a-pic {
   background: #343648;
   border-right-color: rgba(255, 255, 255, 0.08);
@@ -1231,6 +1234,13 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
 
   .dev-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* 减少动效:整框填充过渡只服务真实数值变化,用户偏好关闭时取消 */
+@media (prefers-reduced-motion: reduce) {
+  .dossier-axes .axis-row::before {
+    transition: none;
   }
 }
 </style>

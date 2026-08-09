@@ -81,7 +81,7 @@ test('撤销恢复完整 MVU 与版本2隔离日志快照，并复用手机双�
   assert.match(时间段, /delete vars\[时间撤销点键\]/);
   assert.match(时间段, /清保护快照\(\)/);
   assert.match(时间段, /同步入住世界书条目/);
-  assert.match(时间段, /eventEmit\('人妻公寓:回合完成'\)/);
+  assert.match(时间段, /eventEmit\('人妻公寓:回合完成', \{ 更新正文幕: false \}\)/);
 });
 
 test('推进与撤销的每次 stat 改写都在正确边界作废手机租约世代', () => {

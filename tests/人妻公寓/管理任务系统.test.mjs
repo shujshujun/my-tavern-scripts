@@ -154,9 +154,10 @@ test('成功结算只扣一次资源、写一次票据并返回行动演出', ()
   assert.equal(first.变动, true);
   assert.match(first.行动, /自己维修/);
   assert.match(first.事件, /楼务任务完成/);
-  assert.equal(data.玩家资源.体力.当前值, 3);
-  assert.equal(data.胜任度, 52);
-  assert.deepEqual(data.系统._管理考核.完成票据, ['repair-once']);
+    assert.equal(data.玩家资源.体力.当前值, 3);
+    assert.equal(data.胜任度, 52);
+    assert.deepEqual(data.背包, ['工具箱'], '工具箱是维修门槛，不是一次性消耗品');
+    assert.deepEqual(data.系统._管理考核.完成票据, ['repair-once']);
   assert.deepEqual(data.系统._管理考核.本期完成摘要, [
     {
       任务: '水龙头漏水',
@@ -173,9 +174,10 @@ test('成功结算只扣一次资源、写一次票据并返回行动演出', ()
   const second = 结算管理任务(data, 'repair-once', '自己维修', '101');
   assert.equal(second.成功, true);
   assert.equal(second.变动, false);
-  assert.equal(data.玩家资源.体力.当前值, 3);
-  assert.equal(data.胜任度, 52);
-  assert.deepEqual(data.系统._管理考核.完成票据, ['repair-once']);
+    assert.equal(data.玩家资源.体力.当前值, 3);
+    assert.equal(data.胜任度, 52);
+    assert.deepEqual(data.背包, ['工具箱'], '重复提交也不得吞掉工具箱');
+    assert.deepEqual(data.系统._管理考核.完成票据, ['repair-once']);
   assert.equal(data.系统._管理考核.本期完成摘要.length, 1, '重复提交不得重复记录完成摘要');
 });
 
@@ -565,7 +567,10 @@ test('界面、回合引擎与楼务结算保持单次原子接线', () => {
     /处理管理任务: \(\{ 任务id, 选项id, 地点 \}\) => eventEmit\('人妻公寓:处理管理任务', \{ 任务id, 选项id, 地点 \}\)/,
   );
   assert.match(index, /eventOn\('人妻公寓:处理管理任务'/);
-  assert.match(index, /成功结算: newData => \{\s*const 结算 = 结算管理任务/);
+  assert.match(
+    index,
+    /成功结算: newData => \{\s*if \(\(读场景\(\)\.房间id \?\? ''\) !== 当前地点\) throw new Error\('楼务结算时地点已经变化'\);\s*const 结算 = 结算管理任务/,
+  );
   assert.match(engine, /选项\.成功结算\?\.\(newStat\)/);
   assert.ok(
     engine.indexOf('结算成功现场楼(newStat') < engine.indexOf('选项.成功结算?.(newStat)') &&

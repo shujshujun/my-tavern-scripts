@@ -73,8 +73,8 @@ test('生成标记与手机小生成控制等由交互模块正确 import，内�
   assert.match(交互源码, /await 微信群文本\(/);
   assert.match(交互源码, /手机小生成仍有效\(控制\)/);
 
-  // 生成标记显式 re-export，保持游戏逻辑/index.ts 旧 import 路径不变
-  assert.match(内核源码, /export \{ 手机生成请求标记 \} from '\.\/生成引擎';/);
+  // 生成标记与占用查询显式 re-export，保持游戏逻辑/index.ts 旧 import 路径不变
+  assert.match(内核源码, /export \{ 手机AI生成中, 手机生成请求标记 \} from '\.\/生成引擎';/);
   assert.match(门面源码, /export \* from '\.\/手机\/内核'/);
 });
 

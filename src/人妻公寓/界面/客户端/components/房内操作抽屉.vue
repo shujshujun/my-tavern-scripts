@@ -42,6 +42,9 @@ onScopeDispose(() => 机器.销毁());
 // 普通动作仍按旧语义只受「录像带中」门控；垃圾入口原 v-if 没有录像带门控，两类门互不合并。
 const 普通动作可见 = computed(() => !props.videoTapeActive && props.actions.length > 0);
 const 有可见动作 = computed(() => props.garbageVisible || 普通动作可见.value);
+// 晨跑/健身是地点的主操作，不是可有可无的二级菜单。0.74 抽屉化后自动收起会让公园
+// 的 TRAIN 瓷砖看起来凭空消失；手机端只要主训练仍可执行，就保持面板可见。
+const 有主训练动作 = computed(() => props.mobile && props.actions.some(动作 => 动作.kicker === 'TRAIN'));
 
 function 触发动作(动作: 卡动作): void {
   机器.手动收起(); // 点击任一房内动作后收起；不包装、不等待原回调
@@ -86,7 +89,7 @@ function 面板交互(): void {
     <!-- 桌面保持流内两列；手机在展开时以绝对面板承载同一份瓷砖，不参与正文高度计算 -->
     <transition :name="mobile ? 'drawer' : ''" :css="mobile">
       <div
-        v-if="mobile ? 状态.展开 : true"
+        v-if="mobile ? 状态.展开 || 有主训练动作 : true"
         id="in-room-acts-panel"
         class="drawer-content"
         :class="{ 'drawer-panel': mobile }"

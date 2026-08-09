@@ -43,7 +43,9 @@ function 是纯变量体(变量体: string): boolean {
     .split(/\r?\n/)
     .map(行 => 行.trim())
     .filter(Boolean);
-  return 命令行.length > 0 && 命令行.every(行 => /^_\.(?:set|insert|assign|remove|unset|delete|add)\(.*\)\s*;?$/.test(行));
+  return (
+    命令行.length > 0 && 命令行.every(行 => /^_\.(?:set|insert|assign|remove|unset|delete|add)\(.*\)\s*;?$/.test(行))
+  );
 }
 
 /**
@@ -124,4 +126,16 @@ export function 选择正文生成原文(最终返回: unknown, 流式缓存: un
   if (有有效正文(最终原文, 清洗正文)) return 最终原文;
   if (有有效正文(流式原文, 清洗正文)) return 流式原文;
   return 最终原文;
+}
+
+/**
+ * 有些中转在完整累计流已经送达后，最终 Promise 仍以“AI回复失败”拒绝。只有清洗后确实
+ * 留下正文且已经以自然句末收口时才允许保住该流；半句、纯协议和思维链仍返回空，让上层
+ * 按失败回滚，不能拿玩家刚看见的一截残文冒充完成。
+ */
+export function 生成失败时可保留的流式正文(流式缓存: unknown, 清洗正文: (原文: string) => string): string {
+  const 原文 = typeof 流式缓存 === 'string' ? 流式缓存 : '';
+  if (!有有效正文(原文, 清洗正文)) return '';
+  const 净文 = 清洗正文(原文).trim();
+  return /[。！？!?…」』”’）)]$/.test(净文) ? 原文 : '';
 }

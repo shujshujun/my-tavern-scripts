@@ -41,6 +41,19 @@ test('三路小生成共同要求完整封套，缺失或未闭合都只按原�
   assert.match(生成引擎源码, /重生成后回复封套仍不完整/);
 });
 
+test('手机借用正文 API 时必须静默，避免绑定全局停止按钮并干扰正文生成', () => {
+  const 正文路由 = 生成引擎源码.slice(
+    生成引擎源码.indexOf('async function 正文API生成'),
+    生成引擎源码.indexOf('async function 自定义API生成'),
+  );
+  const 自定义路由 = 生成引擎源码.slice(
+    生成引擎源码.indexOf('async function 自定义API生成'),
+    生成引擎源码.indexOf('let 手机AI生成计数'),
+  );
+  assert.match(正文路由, /generateRaw\(\{[\s\S]*?should_silence:\s*true,/, '正文路由不得绑定全局停止按钮');
+  assert.match(自定义路由, /generateRaw\(\{[\s\S]*?should_silence:\s*true,/, '自定义路由同样保持静默');
+});
+
 test('手机原始返回只净化一次，最终字数验收不重复执行玩家正则', () => {
   assert.doesNotMatch(生成引擎源码, /验收短文本\(净化消息\(原\)/);
   assert.doesNotMatch(生成引擎源码, /取合法\(净化消息\(原\)\)/);

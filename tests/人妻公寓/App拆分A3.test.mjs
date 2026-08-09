@@ -141,7 +141,7 @@ test('设置组件拥有全部可见设置文案、UI prefs 共享、MVU 外置�
   assert.match(设置源码, /解析模型通道/, '通道组保持');
   assert.match(设置源码, /自定义模型/, '自定义通道保持');
   assert.match(设置源码, /mvu-api-form/, '自定义 API 表单保持');
-  assert.match(设置源码, /改完即写入 MVU 变量框架的「额外模型解析配置」/, 'API 表单提示保持');
+  assert.match(设置源码, /点击「保存并启用」后写入 MVU 变量框架的「额外模型解析配置」/, 'API 表单提示保持');
   assert.match(设置源码, /setInterval\(刷新MVU解析状态, 1500\)/, '1500ms 轮询在组件');
   assert.match(设置源码, /clearInterval\(MVU解析刷新timer\)/, '关闭/卸载清轮询');
   assert.match(设置源码, /JSON\.stringify\(\{\s*\.\.\.已存,/, '解析字段持久化合并写');
