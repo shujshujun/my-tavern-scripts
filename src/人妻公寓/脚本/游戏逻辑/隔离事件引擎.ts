@@ -1,5 +1,7 @@
 import { Schema, 当前MVU数据版本, type SchemaType } from '../../schema';
 import { 数据库状态, 通过数据库生成 } from './数据库桥';
+import { 全局数据库AI租约 } from './数据库AI租约';
+import { 取得前台生成租约 } from './生成通道互斥';
 import { 当前正文模型是DeepSeek } from './正文模型识别';
 import { 预设破限段 } from './预设桥';
 import { 清洗预设输出 } from './预设输出兼容';
@@ -176,10 +178,24 @@ function 最近线程(线程: string): { role: 'user' | 'assistant'; content: st
 /** 只调用 AI 并返回草稿；本函数成功时仍不会改动聊天变量。 */
 export async function 生成隔离事件草稿(参数: 隔离事件参数): Promise<隔离事件草稿 | null> {
   if (生成中) return null;
-  生成中 = true;
-  已取消 = false;
-  eventEmit('人妻公寓:生成开始');
+  // 数据库 AI 迟到租约：底层 callAI 无法取消，超时后仍占用 TavernHelper 生成槽；忙时
+  // 明确失败且零 AI 调用（不建临时楼、不发生成开始）。失败通知由调用方对 null 的既有
+  // 失败分支收口，本函数不重复广播，避免与调用方 catch 的双重提示。
+  if (全局数据库AI租约.在结算()) {
+    return null;
+  }
+  // 共享前台生成租约：前台正文在途时隔离短生成不得反向占用生成槽；取得失败明确失败、
+  // 零 AI 调用。本租约只保护本函数 AI 生成期，后续纯提交仍由既有事务/时间线租约负责。
+  const 前台租约 = 取得前台生成租约();
+  if (!前台租约) {
+    return null;
+  }
+  // 生成中 置位与 生成开始 广播都放进 try：监听器抛错也不得泄漏共享前台租约，
+  // 统一由 finally 释放（含成功/失败/取消全部路径）。
   try {
+    生成中 = true;
+    已取消 = false;
+    eventEmit('人妻公寓:生成开始');
     const system = 系统提示(参数.类型, 参数.导演事件);
     const history = 最近线程(参数.线程);
     // 预设破限段护航(2026-07-27):特殊场景正戏最敏感,裸发必被 Gemini 安全截断
@@ -226,6 +242,7 @@ export async function 生成隔离事件草稿(参数: 隔离事件参数): Prom
     return { 参数: { ...参数 }, 正文, 提示词 };
   } finally {
     生成中 = false;
+    前台租约.释放();
   }
 }
 
@@ -686,34 +703,111 @@ export async function 回滚隔离事件事务(参数: {
  * 时才删除记录。身份/分支变化、事务键缺失、记录损坏、ID 不同均抛错且零写入——绝不猜测删除。
  * 保留当前 `_侦探`（该点击合法写入的软冷却/死路计数）；调用方须在 落地 成功后才调用，
  * 身份已变时不接触新聊天，旧聊天事务交给启动恢复整体取消本次点击。
+ *
+ * 确认失败且仍在本时间线时必须立即整体取消本次点击（不能只报错留到刷新恢复）：先严格证明仍
+ * 持有本事务——当前仍持有同一有效事务，或 删除 updater 已同步执行且事务键确实缺失（覆盖
+ * updater 已删后宿主才 reject/throw 的歧义窗口）。证明成立才经 恢复核心 写回入口 MVU 快照，
+ * 并在同一 chat updater 内精确恢复事务记录里的四键快照、删除仍存在的同一事务键；证明不成立
+ * （缺记录/损坏/他事务且 updater 未执行）时 恢复核心 与 chat 均零写入，绝不猜测覆盖。身份已变
+ * 绝不写新聊天直接向上抛；MVU/chat 补偿失败与原确认错误合并并保留 cause。
  */
 export async function 确认隔离事务无需隔离(参数: {
   事务: 隔离事件事务记录;
   身份: 隔离时间线身份;
   操作仍有效: () => boolean;
+  /** 确认失败且仍在本时间线、并已严格证明仍持有本事务时才调用（普通提示收口把入口 data快照写回 MVU）。 */
+  恢复核心?: () => void | Promise<unknown>;
 }): Promise<void> {
   if (!(参数.操作仍有效() && 当前聊天ID() === 参数.身份.聊天ID)) {
     throw new Error('聊天或分支已经变化，不能删除隔离事件事务记录');
   }
-  await Promise.resolve(
-    updateVariablesWith(
-      vars => {
-        if (!(参数.操作仍有效() && 当前聊天ID() === 参数.身份.聊天ID)) {
-          throw new Error('聊天或分支已经变化，不能删除隔离事件事务记录');
-        }
-        if (!vars || typeof vars !== 'object') throw new Error('聊天变量缺失，本拍隔离事件已取消');
-        if (!Object.prototype.hasOwnProperty.call(vars, 隔离事件事务键)) {
-          throw new Error('隔离事件事务记录缺失，不能确认本次点击');
-        }
-        const 当前事务 = 读取隔离事件事务记录(vars[隔离事件事务键]);
-        if (!当前事务) throw new Error('隔离事件事务记录损坏，不能确认本次点击');
-        if (当前事务.事务ID !== 参数.事务.事务ID) throw new Error('隔离事件事务记录已经变化');
-        delete vars[隔离事件事务键];
-        return vars;
-      },
-      { type: 'chat' },
-    ),
-  );
+  const 仍在本时间线 = () => 参数.操作仍有效() && 当前聊天ID() === 参数.身份.聊天ID;
+  // 闭包阶段标志：删除 updater 已严格核对本事务并同步执行删除。updater 抛错时保持 false，
+  // 只凭标志无法证明“记录已删、事务键确实缺失”，从而禁止猜测恢复。
+  let 已执行删除 = false;
+  try {
+    await Promise.resolve(
+      updateVariablesWith(
+        vars => {
+          if (!仍在本时间线()) {
+            throw new Error('聊天或分支已经变化，不能删除隔离事件事务记录');
+          }
+          if (!vars || typeof vars !== 'object') throw new Error('聊天变量缺失，本拍隔离事件已取消');
+          if (!Object.prototype.hasOwnProperty.call(vars, 隔离事件事务键)) {
+            throw new Error('隔离事件事务记录缺失，不能确认本次点击');
+          }
+          const 当前事务 = 读取隔离事件事务记录(vars[隔离事件事务键]);
+          if (!当前事务) throw new Error('隔离事件事务记录损坏，不能确认本次点击');
+          if (当前事务.事务ID !== 参数.事务.事务ID) throw new Error('隔离事件事务记录已经变化');
+          delete vars[隔离事件事务键];
+          已执行删除 = true;
+          return vars;
+        },
+        { type: 'chat' },
+      ),
+    );
+  } catch (error) {
+    const 补偿错误: string[] = [];
+    if (!仍在本时间线()) {
+      // 身份/分支已变：绝不调用 恢复核心、绝不写当前新聊天，直接向上抛；旧聊天事务由启动恢复处理。
+      throw error;
+    }
+    // 先严格证明仍持有本事务再补偿：当前仍持有同一有效事务，或 删除 updater 已同步执行且事务键
+    // 确实缺失。缺记录/损坏/他事务且 updater 未执行时证明不成立，恢复核心 0 次、chat 0 次。
+    const 当前快照 = getVariables({ type: 'chat' });
+    const 快照事务 = 读取隔离事件事务记录(
+      当前快照 && typeof 当前快照 === 'object' ? 当前快照[隔离事件事务键] : undefined,
+    );
+    const 可补偿 =
+      (快照事务 !== null && 快照事务.事务ID === 参数.事务.事务ID) ||
+      (已执行删除 &&
+        (!当前快照 ||
+          typeof 当前快照 !== 'object' ||
+          !Object.prototype.hasOwnProperty.call(当前快照, 隔离事件事务键)));
+    if (!可补偿) throw error;
+    try {
+      await Promise.resolve(参数.恢复核心?.());
+    } catch (补偿) {
+      补偿错误.push(`MVU 回滚失败:${补偿 instanceof Error ? 补偿.message : String(补偿)}`);
+    }
+    try {
+      if (!仍在本时间线()) throw new Error('聊天或分支已经变化，不能跨时间线写回业务聊天');
+      await Promise.resolve(
+        updateVariablesWith(
+          vars => {
+            if (!仍在本时间线()) throw new Error('聊天或分支已经变化，不能跨时间线写回业务聊天');
+            if (!vars || typeof vars !== 'object') throw new Error('聊天变量缺失，本拍隔离事件已取消');
+            const 当前事务 = 读取隔离事件事务记录(vars[隔离事件事务键]);
+            if (当前事务) {
+              if (当前事务.事务ID !== 参数.事务.事务ID) throw new Error('隔离事件事务记录已经变化');
+              恢复精确聊天快照(vars as Record<string, unknown>, 参数.事务.提交前聊天, 隔离恢复聊天键);
+              delete vars[隔离事件事务键];
+            } else if (已执行删除) {
+              // 删除 updater 已同步执行（记录已删），宿主随后才报错：按闭包证据恢复四键即可。
+              恢复精确聊天快照(vars as Record<string, unknown>, 参数.事务.提交前聊天, 隔离恢复聊天键);
+            } else if (Object.prototype.hasOwnProperty.call(vars, 隔离事件事务键)) {
+              // 键存在但记录损坏，无法证明是本事务：绝不猜测覆盖。
+              throw new Error('隔离事件事务记录损坏，不能猜测为本事务恢复');
+            } else {
+              // 键缺失且本删除 updater 未同步执行（如 恢复核心 的 await 窗口内事务被并发删除）：
+              // 无闭包证据证明记录已删，缺记录不能猜测为本事务恢复，必须明示聊天回滚失败。
+              throw new Error('隔离事件事务记录缺失，不能猜测为本事务恢复');
+            }
+            return vars;
+          },
+          { type: 'chat' },
+        ),
+      );
+    } catch (补偿) {
+      补偿错误.push(`聊天回滚失败:${补偿 instanceof Error ? 补偿.message : String(补偿)}`);
+    }
+    if (补偿错误.length) {
+      throw new Error(`${error instanceof Error ? error.message : String(error)}；${补偿错误.join('；')}`, {
+        cause: error,
+      });
+    }
+    throw error;
+  }
 }
 
 /**

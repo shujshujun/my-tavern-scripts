@@ -46,12 +46,29 @@ export interface 遗留临时楼恢复判定 {
   拒绝原因: string;
 }
 
-export type 转正更新负载 = Array<{ message_id: number; extra: Record<string, unknown> }>;
+/**
+ * 转正更新负载:除 message_id 外必须携带无损原正文 `message`。酒馆助手真实 setChatMessages
+ * 只会对含 `message` 或 `data` 的项处理 `extra`;纯 {message_id, extra} 会被整项忽略,
+ * refresh:'all' 后复核仍读到 临时=true 必失败。
+ */
+export type 转正更新负载 = Array<{ message_id: number; message: string; extra: Record<string, unknown> }>;
 export type 写入转正消息 = (负载: 转正更新负载, 选项: { refresh: 'none' | 'all' }) => void | Promise<void>;
 
 function 消息extra(消息: unknown): Record<string, unknown> | null {
   const extra = (消息 as { extra?: unknown } | null)?.extra;
   return extra && typeof extra === 'object' && !Array.isArray(extra) ? (extra as Record<string, unknown>) : null;
+}
+
+/**
+ * 读取消息正文:按“明确存在的字符串字段”读取,优先真实宿主 SillyTavern.chat 的 `mes`,
+ * 兼容测试/旧对象提供 `message`;两者都非字符串(含缺字段)时返回 null。
+ * 空字符串是合法正文,必须逐字保留,不做 trim/净化/截断。
+ */
+function 消息正文(消息: unknown): string | null {
+  const 对象 = 消息 as Record<string, unknown> | null;
+  if (对象 && typeof 对象['mes'] === 'string') return 对象['mes'];
+  if (对象 && typeof 对象['message'] === 'string') return 对象['message'];
+  return null;
 }
 
 /** 按登记定位本轮临时楼;返回带角色的命中(去重),顺序不代表楼层序。 */
@@ -145,15 +162,23 @@ export function 判定可自动清理的遗留临时楼(消息表: readonly unkn
 }
 
 /**
- * 构造转正更新负载:批量 setChatMessages 时保留每条已有 extra,只把临时标记改为 false。
+ * 构造转正更新负载:批量 setChatMessages 时携带无损原正文 `message`(让酒馆助手进入
+ * ChatMessage 分支真正写 extra),保留每条已有 extra,只把临时标记改为 false。
+ * 正文必须逐字写回;若命中消息既无字符串 `mes` 也无字符串 `message`,在调用方发起
+ * setChatMessages 前失败关闭抛转正错误,绝不发送可能改坏正文的负载。
  */
 export function 构造转正更新负载(
   消息表: readonly unknown[],
   命中: readonly 定位命中[],
 ): 转正更新负载 {
   return 命中.map(项 => {
-    const extra = 消息extra(消息表[项.楼层]) ?? {};
-    return { message_id: 项.楼层, extra: { ...extra, [临时楼标记键]: false } };
+    const 消息 = 消息表[项.楼层];
+    const 正文 = 消息正文(消息);
+    if (正文 === null) {
+      throw new Error(`转正失败:第 ${项.楼层} 楼缺少字符串正文字段(mes/message),拒绝写入可能改坏正文的负载`);
+    }
+    const extra = 消息extra(消息) ?? {};
+    return { message_id: 项.楼层, message: 正文, extra: { ...extra, [临时楼标记键]: false } };
   });
 }
 

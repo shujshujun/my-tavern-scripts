@@ -24,12 +24,19 @@ const {
   租约owner仍有效,
   重置原生正文租约,
 } = require('../../src/人妻公寓/脚本/游戏逻辑/原生正文租约.ts');
+const {
+  取得前台生成租约,
+  取得手机生成租约,
+  前台生成租约持有中,
+  手机生成租约持有中,
+  清空生成租约,
+} = require('../../src/人妻公寓/脚本/游戏逻辑/生成通道互斥.ts');
 
 const Index源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
 
 const 用户消息 = { id: 'user-12', name: '沈翊' };
-const 建票 = (覆盖 = {}) =>
-  登记原生正文开始票({
+const 建票 = (覆盖 = {}) => {
+  const 票 = 登记原生正文开始票({
     聊天ID: 'chat-1',
     时间线世代: 7,
     开始类型: 'normal',
@@ -37,6 +44,9 @@ const 建票 = (覆盖 = {}) =>
     用户消息引用: 用户消息,
     ...覆盖,
   });
+  assert.ok(票, '空闲共享槽时登记原生开始票必须成功');
+  return 票;
+};
 
 const 认领当前票 = (覆盖 = {}) => {
   const 票 = 读原生正文开始票();
@@ -341,6 +351,95 @@ test('重置原生正文租约：热挂载/重入后令牌与序号归零、无�
 });
 
 // ─────────────────────────────────────────────
+// 共享前台生成槽（生成通道互斥）接入：登记/释放/作废/重置 与手机 token 的双向互斥
+// ─────────────────────────────────────────────
+
+test('C1 手机 token 在途时登记原生票返回 null，且不改变手机 token', () => {
+  清空生成租约();
+  重置原生正文租约();
+  const 手机 = 取得手机生成租约();
+  assert.ok(手机);
+  const 票 = 登记原生正文开始票({
+    聊天ID: 'chat-1',
+    时间线世代: 7,
+    开始类型: 'normal',
+    用户楼层: 12,
+    用户消息引用: 用户消息,
+  });
+  assert.equal(票, null, '手机在途时登记原生票必须失败');
+  assert.equal(手机生成租约持有中(), true, '失败登记不得改变手机 token');
+  assert.equal(读原生正文开始票(), null, '失败登记不得留下开始票');
+  手机.释放();
+  assert.equal(手机生成租约持有中(), false);
+});
+
+test('C2 空闲登记返回票并持有共享前台 token；此时手机取得失败', () => {
+  清空生成租约();
+  重置原生正文租约();
+  const 票 = 建票();
+  assert.ok(票);
+  assert.equal(前台生成租约持有中(), true, '登记后必须持有共享前台 token');
+  assert.equal(取得手机生成租约(), null, '原生占槽时手机取得必须失败');
+  assert.equal(手机生成租约持有中(), false);
+});
+
+test('C3 错 owner 释放返回 false 且共享 token 仍在；正确 owner 释放后 token 空闲', () => {
+  清空生成租约();
+  重置原生正文租约();
+  建票();
+  const owner = 认领当前票();
+  assert.ok(owner !== null);
+  assert.equal(前台生成租约持有中(), true);
+  assert.equal(释放正文租约(owner + 100), false, '错 owner 释放必须失败');
+  assert.equal(前台生成租约持有中(), true, '错 owner 释放不得释放共享 token');
+  assert.equal(读当前租约owner(), owner, '错 owner 释放不得清新票');
+  assert.equal(释放正文租约(owner), true, '正确 owner 释放成功');
+  assert.equal(前台生成租约持有中(), false, '释放后共享 token 空闲');
+});
+
+test('C4 作废原生正文租约 与 重置原生正文租约 都幂等释放共享前台 token', () => {
+  清空生成租约();
+  重置原生正文租约();
+  建票();
+  assert.equal(前台生成租约持有中(), true);
+  作废原生正文租约();
+  assert.equal(前台生成租约持有中(), false, '作废必须释放共享 token');
+  // 重置（热重入）同样释放共享 token。
+  清空生成租约();
+  建票();
+  assert.equal(前台生成租约持有中(), true);
+  重置原生正文租约();
+  assert.equal(前台生成租约持有中(), false, '重置必须释放共享 token');
+  // 释放后手机可正常取得：共享槽回到空闲。
+  const 手机 = 取得手机生成租约();
+  assert.ok(手机, '共享 token 释放后手机才可取得');
+  手机.释放();
+});
+
+test('C5 等待票与已认领票都持有共享 token；新票替换旧等待票后旧 owner 不清新票、不释放 token', () => {
+  清空生成租约();
+  重置原生正文租约();
+  建票({ 用户楼层: 10 }); // 等待票 A
+  assert.equal(前台生成租约持有中(), true, '等待票也持有共享 token');
+  const 旧owner = 认领当前票();
+  assert.ok(旧owner !== null);
+  // 新登记替换旧票并转移共享 token：token 仍持有，票换成新票。
+  建票({ 用户楼层: 11 }); // 等待票 B
+  assert.equal(前台生成租约持有中(), true, '新票必须继续持有共享 token');
+  assert.equal(读原生正文开始票()?.用户楼层, 11, '新登记必须替换旧票');
+  assert.equal(释放正文租约(旧owner), false, '旧 owner 不得清新票');
+  assert.equal(前台生成租约持有中(), true, '旧 owner 释放不得释放共享 token');
+  const 新owner = 认领当前票();
+  assert.ok(新owner !== null && 新owner !== 旧owner, '新轮 owner 必须与旧轮不同');
+  // 已认领票（正文结算）仍持有共享 token；错 owner 释放不影响 token。
+  assert.equal(前台生成租约持有中(), true, '已认领票同样持有共享 token');
+  assert.equal(释放正文租约(旧owner), false);
+  assert.equal(前台生成租约持有中(), true);
+  assert.equal(释放正文租约(新owner), true);
+  assert.equal(前台生成租约持有中(), false, '正确 owner 释放后共享 token 空闲');
+});
+
+// ─────────────────────────────────────────────
 // 接线源契约（宿主事件无法在 Node 内运行，用紧范围断言补足宿主接线）
 // ─────────────────────────────────────────────
 
@@ -354,6 +453,44 @@ test('固定 0 楼主回合不登记原生正文租约，仍由 回合进行中(
   assert.ok(开始段.includes("类型 !== 'normal'"), '只登记 normal 原生正文，不扩张 regenerate/swipe/continue');
   assert.ok(开始段.includes('选项?.automatic_trigger'), '自动后台触发不得登记');
   assert.ok(开始段.includes('!末楼.is_user'), '兼容广播/末楼非 user 不得登记');
+});
+
+test('GENERATION_STARTED 登记前先查数据库迟到租约；忙时先安排精确停止、再广播失败、不得登记', () => {
+  const 开始位置 = Index源.lastIndexOf('tavern_events.GENERATION_STARTED');
+  const 开始段 = Index源.slice(开始位置, Index源.indexOf('tavern_events.CHAT_COMPLETION_PROMPT_READY', 开始位置));
+  const 数据库检查 = 开始段.indexOf('全局数据库AI租约.在结算()');
+  const 登记 = 开始段.indexOf('登记原生正文开始票(');
+  assert.ok(数据库检查 >= 0 && 登记 > 数据库检查, '数据库迟到租约必须同步先于登记检查');
+  // 登记失败的正常不变量是“无票”：忙时必须先安排精确停止、再广播失败提示，提示是可选呈现。
+  const 停止位置 = 开始段.indexOf('原生拒绝停止(楼层, 末楼)', 数据库检查);
+  const 失败位置 = 开始段.indexOf("eventEmit('人妻公寓:回合失败'", 数据库检查);
+  assert.ok(停止位置 > 数据库检查, '数据库忙时必须按精确身份停止原生请求');
+  assert.ok(失败位置 > 停止位置, '数据库忙时必须先安排停止、再广播失败：监听器异常不得阻断硬收口');
+  assert.ok(失败位置 < 登记, '数据库忙时广播失败后直接 return，不得登记开始票');
+  assert.match(开始段.slice(数据库检查, 登记), /return/, '数据库忙时不得登记开始票');
+});
+
+test('登记返回 null（共享槽冲突）时先安排精确停止、再广播失败；存在任何原生票即不得停止', () => {
+  const 开始位置 = Index源.lastIndexOf('tavern_events.GENERATION_STARTED');
+  const 开始段 = Index源.slice(开始位置, Index源.indexOf('tavern_events.CHAT_COMPLETION_PROMPT_READY', 开始位置));
+  const 登记 = 开始段.indexOf('登记原生正文开始票(');
+  const 失败分支 = 开始段.slice(登记);
+  assert.match(失败分支, /if \(!原生票\)/, '登记结果必须被消费');
+  // 登记失败（共享槽冲突）先安排停止、再广播失败：广播是可选呈现，不得阻断硬收口。
+  const 冲突停止位置 = 失败分支.indexOf('原生拒绝停止(楼层, 末楼)');
+  const 冲突失败位置 = 失败分支.indexOf("eventEmit('人妻公寓:回合失败'");
+  assert.ok(冲突停止位置 >= 0, '登记失败按精确身份延迟停止');
+  assert.ok(冲突失败位置 > 冲突停止位置, '共享冲突分支必须先安排停止、再广播失败');
+  // 原生拒绝停止 必须用聊天/世代/楼层/对象引用与“当前无任何原生票”保护 stopGeneration。
+  const 停止起 = Index源.lastIndexOf('const 原生拒绝停止 = ');
+  assert.ok(停止起 >= 0, '原生拒绝停止 助手必须存在');
+  const 停止段 = Index源.slice(停止起, Index源.indexOf('\n  eventOn(', 停止起));
+  assert.match(停止段, /当前聊天ID\(\) !== 聊天ID \|\| 当前时间线切换世代\(\) !== 时间线世代/, '切聊/切分支不得停止');
+  assert.match(停止段, /当前楼层\(\) !== 楼层 \|\| SillyTavern\.chat\?\.\[楼层\] !== 用户消息引用/, 'user 引用变化不得停止');
+  // 登记失败的正常不变量是“无票”：延迟执行时存在任何原生票（后来请求/不可证明归属）即不得停止。
+  assert.match(停止段, /读原生正文开始票\(\) !== null/, '存在任何原生票即不得停止稍后请求');
+  assert.doesNotMatch(停止段, /拒绝时票/, '不得用“仍等于拒绝时票”的无新票守卫');
+  assert.match(停止段, /SillyTavern\.stopGeneration\(\)/, '最终按精确身份停止本笔原生请求');
 });
 
 test('PROMPT_READY：无票辅助请求先返回，文本标记不再旁路，认证后才进冲突门', () => {

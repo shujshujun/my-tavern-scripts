@@ -27,18 +27,34 @@ test('序章完成只同步确定性楼务微信，不启动会抢正文生成�
   assert.match(完成监听, /else \{\s*void 手机节拍\(\)/);
 });
 
-test('手机自动节拍和每个手机 AI 请求都公开在途状态，主正文启动前执行碰撞门', () => {
+test('手机自动节拍和每个手机 AI 请求都公开在途状态，主正文启动前执行双向生成互斥门', () => {
   assert.match(手机节拍源码, /export function 手机节拍进行中\(\): boolean \{\s*return 节拍进行中;/);
   const 手机小生成 = 手机生成源码.slice(
     手机生成源码.indexOf('export async function 小生成'),
     手机生成源码.indexOf('export async function 微信短文本'),
   );
-  assert.match(手机小生成, /手机AI生成计数 \+= 1;/);
-  assert.match(手机小生成, /finally \{\s*手机AI生成计数 = Math\.max/);
+  assert.match(手机小生成, /取得手机生成租约\(\)/);
+  assert.match(手机小生成, /if \(!租约\) return '';/);
+  assert.match(手机小生成, /finally \{[\s\S]*租约\.释放\(\)/);
   const 回合入口 = 回合源码.slice(
     回合源码.indexOf('export async function 执行回合'),
     回合源码.indexOf('const 回合时间线世代'),
   );
   assert.match(回合入口, /手机节拍进行中\(\) \|\| 手机AI生成中\(\)/);
   assert.match(回合入口, /手机后台消息正在生成/);
+  assert.match(回合入口, /取得前台生成租约\(\)/);
+});
+
+test('手机小生成在取得手机租约/任一路由前同步检查数据库迟到租约；忙时空返回零 AI', () => {
+  const 手机小生成 = 手机生成源码.slice(
+    手机生成源码.indexOf('export async function 小生成'),
+    手机生成源码.indexOf('export async function 微信短文本'),
+  );
+  const 数据库检查 = 手机小生成.indexOf('全局数据库AI租约.在结算()');
+  const 获租约 = 手机小生成.indexOf('取得手机生成租约()');
+  assert.ok(数据库检查 >= 0 && 获租约 > 数据库检查, '数据库迟到检查必须先于取得手机租约');
+  const 首个await = 手机小生成.indexOf('await ');
+  assert.ok(首个await === -1 || 数据库检查 < 首个await, '数据库检查必须早于任何 await');
+  const 拒绝位 = 手机小生成.indexOf("if (全局数据库AI租约.在结算()) return '';");
+  assert.ok(拒绝位 >= 0 && 拒绝位 < 获租约, '数据库忙时必须直接空返回，不产生新 token/AI 调用');
 });

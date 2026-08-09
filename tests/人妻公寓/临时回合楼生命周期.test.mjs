@@ -164,10 +164,10 @@ test('B1 构造转正更新负载:保留每条已有 extra,只把临时标记改
   assert.deepEqual(
     负载,
     [
-      { message_id: 1, extra: { ...user.extra, [临时楼标记键]: false } },
-      { message_id: 2, extra: { ...assistant.extra, [临时楼标记键]: false } },
+      { message_id: 1, message: user.message, extra: { ...user.extra, [临时楼标记键]: false } },
+      { message_id: 2, message: assistant.message, extra: { ...assistant.extra, [临时楼标记键]: false } },
     ],
-    '除临时标记外其余 extra 必须原样保留(令牌/角色不丢)',
+    '除临时标记外其余 extra 必须原样保留(令牌/角色不丢),正文逐字写回(message)',
   );
   assert.equal(负载[0].extra[回合令牌键], 令牌);
   assert.equal(负载[0].extra[回合角色键], 'user');
@@ -222,8 +222,51 @@ test('B4 转正校验:extra 角色与命中角色必须一致,宿主替换对象
   assert.throws(() => 校验转正候选(表, 令牌, 命中), /转正失败/, 'extra 角色与登记角色不符必须拒绝转正');
 });
 
+test('B4b 转正负载必须携带原正文：酒馆助手会忽略纯 message_id+extra 更新', () => {
+  const user = { mes: '本轮行动', extra: 用户extra(令牌, 'user') };
+  const assistant = { mes: '本轮正文', extra: 用户extra(令牌, 'assistant') };
+  const 表 = [建消息({}), user, assistant];
+  const 命中 = 定位本轮临时楼(表, 令牌, [
+    { 楼层: 1, 引用: user, 角色: 'user' },
+    { 楼层: 2, 引用: assistant, 角色: 'assistant' },
+  ]);
+  const 负载 = 构造转正更新负载(表, 命中);
+
+  assert.deepEqual(
+    负载.map(项 => 项.message),
+    ['本轮行动', '本轮正文'],
+    '必须用无损原正文让酒馆助手进入 ChatMessage 分支，才能真正写 extra',
+  );
+
+  // 对齐酒馆助手真实 setChatMessages 分派：只有含 message 或 data 才处理 extra；
+  // 0.77 的纯 {message_id, extra} 载荷会整项被忽略，随后 refresh:all 复核必失败。
+  for (const 更新 of 负载) {
+    if (!Object.hasOwn(更新, 'message') && !Object.hasOwn(更新, 'data')) continue;
+    表[更新.message_id] = { ...表[更新.message_id], mes: 更新.message, extra: { ...更新.extra } };
+  }
+  assert.equal(表[1].extra[临时楼标记键], false);
+  assert.equal(表[2].extra[临时楼标记键], false);
+});
+
+test('B4c 缺字符串正文字段(mes/message)时构造负载失败关闭,绝不发送可能改坏正文的负载', () => {
+  const 表 = [
+    建消息({}),
+    { extra: 用户extra(令牌, 'user') },
+    { extra: 用户extra(令牌, 'assistant'), mes: 42 },
+  ];
+  const 命中 = [
+    { 楼层: 1, 角色: 'user' },
+    { 楼层: 2, 角色: 'assistant' },
+  ];
+  assert.throws(() => 构造转正更新负载(表, 命中), /转正失败/, '缺字符串正文必须失败关闭,不写坏正文');
+
+  const 空串表 = [建消息({}), { extra: 用户extra(令牌, 'user'), mes: '' }];
+  const 负载 = 构造转正更新负载(空串表, [{ 楼层: 1, 角色: 'user' }]);
+  assert.equal(负载[0].message, '', '空字符串是合法正文,必须逐字保留');
+});
+
 test('B5 宿主暴露同步保存时:先 none 写双楼 false,再等待 saveChat 完成', async () => {
-  const 负载 = [{ message_id: 1, extra: 用户extra(令牌, 'user', false) }];
+  const 负载 = [{ message_id: 1, message: '正文', extra: 用户extra(令牌, 'user', false) }];
   const 步骤 = [];
 
   const 路线 = await 持久写入转正标记(
@@ -252,11 +295,17 @@ test('B6 旧宿主没有 saveChat 时:同批更新走 refresh all 同步保存,�
   ];
   const 命中 = 定位本轮临时楼(表, 令牌, 登记);
   const 负载 = 构造转正更新负载(表, 命中);
+  const 原正文 = { user: user.message, assistant: assistant.message };
   const 步骤 = [];
 
+  // 对齐酒馆助手真实 setChatMessages 分派：只有含 message 或 data 的项才处理 extra；
+  // 纯 {message_id, extra} 会被整项忽略，refresh:'all' 复核必失败(见 B4b)。
   const 路线 = await 持久写入转正标记(负载, async (收到负载, 选项) => {
     步骤.push(`写入:${选项.refresh}`);
-    for (const 更新 of 收到负载) 表[更新.message_id] = { ...表[更新.message_id], extra: { ...更新.extra } };
+    for (const 更新 of 收到负载) {
+      if (!Object.hasOwn(更新, 'message') && !Object.hasOwn(更新, 'data')) continue;
+      表[更新.message_id] = { ...表[更新.message_id], mes: 更新.message, extra: { ...更新.extra } };
+    }
     // refresh:'all' 会重载聊天；模拟宿主把整张消息表重建成新对象。
     表 = 表.map(消息 => ({ ...消息, extra: { ...消息.extra } }));
   });
@@ -266,10 +315,14 @@ test('B6 旧宿主没有 saveChat 时:同批更新走 refresh all 同步保存,�
   const 复核命中 = 定位本轮临时楼(表, 令牌, 登记);
   assert.equal(复核命中.length, 2, '宿主重建对象后必须按精确令牌+角色重新定位双楼');
   assert.ok(复核命中.every(项 => 表[项.楼层].extra[临时楼标记键] === false));
+  const 用户楼 = 复核命中.find(项 => 项.角色 === 'user').楼层;
+  const 助手楼 = 复核命中.find(项 => 项.角色 === 'assistant').楼层;
+  assert.equal(表[用户楼].mes, 原正文.user, '转正后 user 楼正文必须逐字未变');
+  assert.equal(表[助手楼].mes, 原正文.assistant, '转正后 assistant 楼正文必须逐字未变');
 });
 
 test('B7 两条持久化路线失败都向上抛,未保存不得伪装转正成功', async () => {
-  const 负载 = [{ message_id: 1, extra: 用户extra(令牌, 'user', false) }];
+  const 负载 = [{ message_id: 1, message: '正文', extra: 用户extra(令牌, 'user', false) }];
 
   await assert.rejects(
     持久写入转正标记(负载, async () => {}, async () => {

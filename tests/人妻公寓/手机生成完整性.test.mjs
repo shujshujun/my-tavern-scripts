@@ -48,7 +48,8 @@ test('手机借用正文 API 时必须静默，避免绑定全局停止按钮并
   );
   const 自定义路由 = 生成引擎源码.slice(
     生成引擎源码.indexOf('async function 自定义API生成'),
-    生成引擎源码.indexOf('let 手机AI生成计数'),
+    // rq0.75:独立在途计数已由 共享生成通道租约 取代，自定义路由的收尾锚点改为紧随其后的小生成入口。
+    生成引擎源码.indexOf('export async function 小生成'),
   );
   assert.match(正文路由, /generateRaw\(\{[\s\S]*?should_silence:\s*true,/, '正文路由不得绑定全局停止按钮');
   assert.match(自定义路由, /generateRaw\(\{[\s\S]*?should_silence:\s*true,/, '自定义路由同样保持静默');
