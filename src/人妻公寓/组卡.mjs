@@ -167,7 +167,7 @@ for (const 组 of index.条目) {
 if (!开场白) throw new Error('未找到 [开场白] 条目');
 
 // ── 资源走 jsdelivr(手机友好；角色卡版本与正式发布 tag 同步) ──
-const TAG = 'rq0.76';
+const TAG = 'rq0.77';
 const BASE = `https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@${TAG}`;
 
 const 加载块 = url => "```\n<body>\n<script>\n$('body').load('" + url + "')\n</script>\n</body>\n```";
@@ -271,7 +271,7 @@ const tavern_helper = {
 
 // ── 卡体 ──
 const 卡名 = '人妻公寓';
-const 版本 = '0.76';
+const 版本 = '0.77';
 const data = {
   name: 卡名,
   description: '',

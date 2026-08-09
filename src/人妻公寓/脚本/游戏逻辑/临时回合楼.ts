@@ -46,6 +46,9 @@ export interface 遗留临时楼恢复判定 {
   拒绝原因: string;
 }
 
+export type 转正更新负载 = Array<{ message_id: number; extra: Record<string, unknown> }>;
+export type 写入转正消息 = (负载: 转正更新负载, 选项: { refresh: 'none' | 'all' }) => void | Promise<void>;
+
 function 消息extra(消息: unknown): Record<string, unknown> | null {
   const extra = (消息 as { extra?: unknown } | null)?.extra;
   return extra && typeof extra === 'object' && !Array.isArray(extra) ? (extra as Record<string, unknown>) : null;
@@ -147,11 +150,33 @@ export function 判定可自动清理的遗留临时楼(消息表: readonly unkn
 export function 构造转正更新负载(
   消息表: readonly unknown[],
   命中: readonly 定位命中[],
-): Array<{ message_id: number; extra: Record<string, unknown> }> {
+): 转正更新负载 {
   return 命中.map(项 => {
     const extra = 消息extra(消息表[项.楼层]) ?? {};
     return { message_id: 项.楼层, extra: { ...extra, [临时楼标记键]: false } };
   });
+}
+
+/**
+ * 把转正标记同步写入宿主存档。
+ *
+ * 新版宿主暴露 `saveChat` 时保持无刷新写入，再显式等待硬保存；旧版宿主没有该接口时，
+ * 改用酒馆助手 `refresh:'all'` 路线。后者会先等待宿主保存，再重载/刷新消息表，调用方
+ * 必须在返回后按精确令牌与角色重新定位复核，不能继续信任建楼时的对象引用或楼层号。
+ * 两条路线的异常都向上抛，未持久化成功不得伪装成正式回合。
+ */
+export async function 持久写入转正标记(
+  负载: 转正更新负载,
+  写入消息: 写入转正消息,
+  立即保存?: () => void | Promise<void>,
+): Promise<'saveChat' | 'refresh-all'> {
+  if (立即保存) {
+    await 写入消息(负载, { refresh: 'none' });
+    await 立即保存();
+    return 'saveChat';
+  }
+  await 写入消息(负载, { refresh: 'all' });
+  return 'refresh-all';
 }
 
 /**

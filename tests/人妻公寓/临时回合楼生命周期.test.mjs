@@ -18,6 +18,7 @@ const {
   判定可自动清理的遗留临时楼,
   构造转正更新负载,
   校验转正候选,
+  持久写入转正标记,
 } = require('../../src/人妻公寓/脚本/游戏逻辑/临时回合楼.ts');
 const { 数据库快照未越过楼层 } = require('../../src/人妻公寓/脚本/游戏逻辑/数据库时间线栅栏.ts');
 
@@ -221,6 +222,70 @@ test('B4 转正校验:extra 角色与命中角色必须一致,宿主替换对象
   assert.throws(() => 校验转正候选(表, 令牌, 命中), /转正失败/, 'extra 角色与登记角色不符必须拒绝转正');
 });
 
+test('B5 宿主暴露同步保存时:先 none 写双楼 false,再等待 saveChat 完成', async () => {
+  const 负载 = [{ message_id: 1, extra: 用户extra(令牌, 'user', false) }];
+  const 步骤 = [];
+
+  const 路线 = await 持久写入转正标记(
+    负载,
+    async (收到负载, 选项) => {
+      assert.deepEqual(收到负载, 负载);
+      步骤.push(`写入:${选项.refresh}`);
+    },
+    async () => {
+      步骤.push('硬保存');
+    },
+  );
+
+  assert.equal(路线, 'saveChat');
+  assert.deepEqual(步骤, ['写入:none', '硬保存'], '必须先改标记再等待宿主硬保存');
+});
+
+test('B6 旧宿主没有 saveChat 时:同批更新走 refresh all 同步保存,重建对象后仍按令牌角色复核', async () => {
+  const 旧楼 = 建消息({});
+  const user = 建消息(用户extra(令牌, 'user'), '行动');
+  const assistant = 建消息(用户extra(令牌, 'assistant'));
+  let 表 = [旧楼, user, assistant];
+  const 登记 = [
+    { 楼层: 1, 引用: user, 角色: 'user' },
+    { 楼层: 2, 引用: assistant, 角色: 'assistant' },
+  ];
+  const 命中 = 定位本轮临时楼(表, 令牌, 登记);
+  const 负载 = 构造转正更新负载(表, 命中);
+  const 步骤 = [];
+
+  const 路线 = await 持久写入转正标记(负载, async (收到负载, 选项) => {
+    步骤.push(`写入:${选项.refresh}`);
+    for (const 更新 of 收到负载) 表[更新.message_id] = { ...表[更新.message_id], extra: { ...更新.extra } };
+    // refresh:'all' 会重载聊天；模拟宿主把整张消息表重建成新对象。
+    表 = 表.map(消息 => ({ ...消息, extra: { ...消息.extra } }));
+  });
+
+  assert.equal(路线, 'refresh-all');
+  assert.deepEqual(步骤, ['写入:all'], '缺 saveChat 时必须由酒馆助手 all 路线同步保存，不能抛错或等防抖');
+  const 复核命中 = 定位本轮临时楼(表, 令牌, 登记);
+  assert.equal(复核命中.length, 2, '宿主重建对象后必须按精确令牌+角色重新定位双楼');
+  assert.ok(复核命中.every(项 => 表[项.楼层].extra[临时楼标记键] === false));
+});
+
+test('B7 两条持久化路线失败都向上抛,未保存不得伪装转正成功', async () => {
+  const 负载 = [{ message_id: 1, extra: 用户extra(令牌, 'user', false) }];
+
+  await assert.rejects(
+    持久写入转正标记(负载, async () => {}, async () => {
+      throw new Error('saveChat 失败');
+    }),
+    /saveChat 失败/,
+  );
+  await assert.rejects(
+    持久写入转正标记(负载, async (_收到负载, 选项) => {
+      assert.equal(选项.refresh, 'all');
+      throw new Error('refresh all 保存失败');
+    }),
+    /refresh all 保存失败/,
+  );
+});
+
 // ── C:中断恢复扫描(纯函数动态测试) ─────────────────────────────
 
 test('C1 遗留扫描只认严格 true 标记:false/缺字段/旧版只有令牌/错令牌格式/错角色全部保留', () => {
@@ -288,7 +353,7 @@ test('C2c 多回合、非尾部、角色倒置一律失败关闭，不把旧历�
 test('C3 恢复入口组合:异常历史失败关闭；安全命中才冻结→删楼→等待数据库时间线', () => {
   const 恢复函数 = engine.slice(
     engine.indexOf('export async function 恢复遗留临时回合楼'),
-    engine.indexOf('async function 立即持久保存宿主聊天'),
+    engine.indexOf('function 读取立即持久保存宿主聊天'),
   );
   assert.match(恢复函数, /判定可自动清理的遗留临时楼/);
   assert.match(恢复函数, /if \(判定\.拒绝原因\)/, '异常标记必须先失败关闭，不能继续删楼');
@@ -329,10 +394,10 @@ test('D1 成功:最终整表写入后先持久转正,之后才置内存转正标
     '顺序必须为:replaceMvuData → 持久转正 → 内存标志置真',
   );
   assert.match(主回合, /await 校验转正候选\(|校验转正候选\(/, '转正前必须按精确令牌/角色校验两条齐全');
-  assert.match(主回合, /setChatMessages\(构造转正更新负载/, '转正必须调用纯函数构造负载(保留每条已有 extra 只改标记,标记置 false 由 B1 动态验证)');
-  const 标记更新位置 = 主回合.indexOf('setChatMessages(构造转正更新负载');
-  const 硬保存位置 = 主回合.indexOf('await 立即持久保存宿主聊天()');
-  assert.ok(标记更新位置 >= 0 && 标记更新位置 < 硬保存位置 && 硬保存位置 < 转正标志位置, '临时标记 false 必须先经宿主 saveChat 硬落盘，之后才可置内存转正');
+  assert.match(主回合, /持久写入转正标记\([\s\S]*?构造转正更新负载/, '转正必须调用纯函数构造负载(保留每条已有 extra 只改标记,标记置 false 由 B1 动态验证)');
+  const 持久写入位置 = 主回合.indexOf('await 持久写入转正标记(');
+  const 复核位置 = 主回合.indexOf('const 复核表 = SillyTavern.chat');
+  assert.ok(持久写入位置 >= 0 && 持久写入位置 < 复核位置 && 复核位置 < 转正标志位置, '临时标记 false 必须先经 saveChat 或 refresh all 硬落盘并复核，之后才可置内存转正');
   assert.match(主回合, /复核命中\.some[\s\S]*?临时楼标记键[\s\S]*?!== false/, '硬保存后必须复核两楼标记都为 false');
 });
 

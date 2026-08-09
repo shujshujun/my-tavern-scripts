@@ -96,6 +96,7 @@ import {
   判定可自动清理的遗留临时楼,
   构造转正更新负载,
   校验转正候选,
+  持久写入转正标记,
 } from './临时回合楼';
 
 /**
@@ -173,35 +174,50 @@ export async function 恢复遗留临时回合楼(): Promise<number> {
 }
 
 /**
- * `setChatMessages(..., refresh:'none')` 只安排宿主的一秒防抖保存，Promise 返回不代表
- * `_rqgy回合临时:false` 已经落盘。若随后 iframe 重载，旧盘面仍可能是 true，启动恢复就会
- * 把已经完成的回合误当中断楼。转正属于硬生命周期，必须调用宿主 saveChat 等到落盘完成。
+ * 查找宿主可选的同步保存接口。酒馆助手 iframe 里的 `SillyTavern` 可能已经是 context，
+ * 也可能仍是带 `getContext()` 的包装对象；父窗口在 sandbox/跨域环境下则可能不可访问。
+ * 找不到时不在这里报错，由 持久写入转正标记 改走酒馆助手 refresh:'all' 同步保存路线。
  */
-async function 立即持久保存宿主聊天(): Promise<void> {
+function 读取立即持久保存宿主聊天(): (() => Promise<void>) | undefined {
   type ST保存接口 = {
     saveChat?: () => void | Promise<void>;
-    getContext?: () => { saveChat?: () => void | Promise<void> };
+    getContext?: () => ST保存接口;
   };
   const 候选: ST保存接口[] = [];
+  const 加入候选 = (值: ST保存接口 | undefined) => {
+    if (值 && !候选.includes(值)) 候选.push(值);
+  };
+  try {
+    // 酒馆助手 predefine 会把已展开的 context 直接挂成 iframe 全局 SillyTavern。
+    加入候选(SillyTavern as unknown as ST保存接口);
+  } catch {
+    /* 极旧运行时未注入时继续找其他入口 */
+  }
   try {
     const st = (globalThis as unknown as { SillyTavern?: ST保存接口 }).SillyTavern;
-    if (st) 候选.push(st);
+    加入候选(st);
   } catch {
     /* 未注入时继续找宿主窗口 */
   }
   try {
     const st = (window.parent as unknown as { SillyTavern?: ST保存接口 })?.SillyTavern;
-    if (st && !候选.includes(st)) 候选.push(st);
+    加入候选(st);
   } catch {
     /* 跨域时由 iframe 注入接口兜底 */
   }
   for (const st of 候选) {
-    const 上下文 = st.getContext?.() ?? st;
-    if (typeof 上下文.saveChat !== 'function') continue;
-    await Promise.resolve(上下文.saveChat());
-    return;
+    try {
+      const 上下文 = st.getContext?.() ?? st;
+      if (typeof 上下文.saveChat !== 'function') continue;
+      const 保存 = 上下文.saveChat;
+      return async () => {
+        await Promise.resolve(保存.call(上下文));
+      };
+    } catch {
+      // 某个包装对象取 context 失败时继续尝试其他候选，最终仍可回退 refresh:'all'。
+    }
   }
-  throw new Error('转正失败：宿主没有暴露 saveChat，无法确认临时标记已经持久化');
+  return undefined;
 }
 
 // ── 重掷支持:回合快照(存 chat 变量,iframe 重载/刷新后仍可重掷) ──
@@ -1990,11 +2006,13 @@ export async function 执行回合(
         { 楼层: 临时助手楼层, 引用: 临时助手消息引用, 角色: 'assistant' },
       ]);
       校验转正候选(消息表, 本回合消息令牌, 命中);
-      // 批量 setChatMessages 保留每条已有 extra,只更新临时标记为 false。
-      await setChatMessages(构造转正更新负载(消息表, 命中), { refresh: 'none' });
-      确认本轮事务有效();
-      // refresh:none 只触发宿主防抖保存；必须显式等待硬落盘，不能把“内存已 false”误当转正完成。
-      await 立即持久保存宿主聊天();
+      // 批量写入保留每条已有 extra,只更新临时标记为 false。新版宿主用 saveChat 无刷新硬保存；
+      // 旧宿主没有该接口时由酒馆助手 refresh:'all' 先同步保存再重载，随后仍按令牌/角色复核。
+      await 持久写入转正标记(
+        构造转正更新负载(消息表, 命中),
+        setChatMessages,
+        读取立即持久保存宿主聊天(),
+      );
       确认本轮事务有效();
       const 复核表 = SillyTavern.chat ?? [];
       const 复核命中 = 定位本轮临时楼(复核表, 本回合消息令牌, [
