@@ -25,6 +25,28 @@ interface SQL写入结果 {
   saved?: boolean;
 }
 
+/** spv8.9.1 导入接口的完整返回契约；runtimeReady=false 表示模板已保存但运行态重建失败。 */
+interface 模板导入结果 {
+  success: boolean;
+  message: string;
+  scope?: string;
+  presetName?: string;
+  dataMode?: string;
+  conflictPolicy?: string;
+  runtimeReady?: boolean;
+  saved?: boolean;
+  warning?: string;
+  error?: string;
+  deduplication?: unknown;
+}
+
+interface 模板导入选项 {
+  scope?: 'global' | 'chat';
+  presetName?: string;
+  dataMode?: 'replace' | 'merge' | 'seed';
+  conflictPolicy?: 'keep-current' | 'template-wins' | 'reject';
+}
+
 type SQL查询方法 = (
   sqlOrOptions: string | { sql: string; params?: unknown[]; limit?: number; offset?: number },
   params?: unknown[],
@@ -35,10 +57,7 @@ interface 数据库API {
   callAI?: (messages: 数据库消息[], options?: { presetName?: string; max_tokens?: number }) => Promise<string | null>;
   getUpdateConfigParams?: () => unknown;
   setUpdateConfigParams?: (params: { autoUpdateTokenThreshold?: number }) => boolean | Promise<boolean>;
-  importTemplateFromData?: (
-    templateData: object | string,
-    options?: { scope?: 'global' | 'chat'; presetName?: string },
-  ) => Promise<{ success: boolean; message: string }>;
+  importTemplateFromData?: (templateData: object | string, options?: 模板导入选项) => Promise<模板导入结果>;
   exportTableAsJson?: () => unknown;
   insertRow?: (tableName: string, data: Record<string, unknown>) => Promise<number>;
   updateRow?: (tableName: string, rowIndex: number, data: Record<string, unknown>) => Promise<boolean>;
@@ -63,13 +82,147 @@ interface 数据表 {
 }
 
 const 数据库旗 = '__ACU_STAR_DB_III_LOADED__';
-const 游戏表名 = ['RQ_剧情事件', 'RQ_人物长期记忆', 'RQ_承诺与伏笔', 'RQ_社交轨迹'] as const;
+const 游戏表名 = ['RQ_剧情事件', 'RQ_人物长期记忆', 'RQ_承诺与伏笔', 'RQ_社交轨迹', '纪要表'] as const;
 const 游戏表头: Record<(typeof 游戏表名)[number], readonly string[]> = {
   RQ_剧情事件: ['row_id', '楼层', '时间', '地点', '参与者', '玩家行动', '结果摘要', '事件编码'],
   RQ_人物长期记忆: ['row_id', '人物', '主题', '记忆', '未来影响', '最后楼层', '可信度'],
   RQ_承诺与伏笔: ['row_id', '事项', '相关人物', '内容', '状态', '最后进展', '最后楼层'],
   RQ_社交轨迹: ['row_id', '类型', '人物', '事件', '结果', '最后楼层', '事件键'],
+  纪要表: ['row_id', '编码索引', '时间跨度', '概览', '纪要', '重要对话'],
 };
+
+/** 安装模板收敛后的五张游戏表：四张 RQ_ 表由游戏脚本/读取消费，纪要表由数据库插件按轮生成并回溯。 */
+const 安装目标表 = 游戏表名;
+
+/**
+ * 会凭正文猜测玩家名、母亲姓名/年龄、背包道具、任务和选项的默认通用表。
+ * 只移除“名称 + 表头结构”都命中已知默认结构（含恋爱特化覆盖）的表；作者自定义的同名表必须保留。
+ */
+const 默认通用表处置: Readonly<Record<string, readonly (readonly string[])[]>> = {
+  全局数据表: [
+    ['row_id', '主角当前所在地点', '当前时间', '上轮场景时间', '经过的时间'],
+    ['row_id', '全局状态', '当前详细地点', '当前次要地区', '当前主要地区', '上轮场景时间', '经过的时间', '当前时间'],
+  ],
+  主角信息表: [
+    ['row_id', '人物名称', '性别/年龄', '外貌特征', '职业/身份', '过往经历', '性格特点'],
+    ['row_id', '姓名', '性别', '年龄', '外貌特征', '身份', '近况', '所在地点', '随身财物'],
+  ],
+  重要角色表: [
+    ['row_id', '姓名', '性别/年龄', '一句话介绍', '外貌特征', '持有的重要物品', '是否离场', '过往经历'],
+    ['row_id', '姓名', '性别', '年龄', '一句话介绍', '外貌特征', '穿着打扮', '所在地点', '在场状态', '人际关系', '过往经历', '交互选项'],
+  ],
+  主角技能表: [['row_id', '技能名称', '技能类型', '等级/阶段', '效果描述']],
+  背包物品表: [['row_id', '物品名称', '数量', '描述/效果', '类别']],
+  任务与事件表: [['row_id', '任务名称', '任务类型', '发布者', '详细描述', '当前进度', '任务时限', '奖励', '惩罚']],
+  选项表: [['row_id', '选项一', '选项二', '选项三', '选项四']],
+};
+
+/** 摘要与玩家行动的字符上限（按 Unicode 码点计数，避免代理对拆散中文/表情）。 */
+const 玩家行动上限 = 40;
+const 结果摘要上限 = 60;
+
+function 截断字符(text: string, 上限: number): string {
+  return Array.from(String(text ?? '')).slice(0, 上限).join('');
+}
+
+/** 同步边界：玩家行动最终不超过 40 字；换行压缩为单行。 */
+export function 规范玩家行动(行动: string): string {
+  return 截断字符(String(行动 ?? '').replace(/\s+/g, ' ').trim(), 玩家行动上限);
+}
+
+/** 模型漏块/块无效或收到长正文时的安全摘要：围绕该玩家行动完成本轮记录，不虚构结果。 */
+export function 保守回合摘要(行动: string): string {
+  return 截断字符(`玩家尝试「${规范玩家行动(行动) || '未记录行动'}」；本轮结果未取得可靠摘要`, 结果摘要上限);
+}
+
+/**
+ * 判断旧 `结果摘要` 是否明显是整篇正文污染（超长、多段、含包装标签或对话引用）。
+ * 命中时禁止 slice 正文冒充摘要，必须走纪要概览或安全短句迁移。
+ */
+function 判断结果摘要为正文(结果: string): boolean {
+  const 原文 = String(结果 ?? '');
+  const 压缩 = 原文.replace(/\s+/g, ' ').trim();
+  if (!压缩) return false; // 空串不是正文；由调用方按空值处理
+  // 超过字段上限的一律视为不可靠，禁止再 slice(0, 60) 把正文或长文伪装成摘要。
+  if (Array.from(压缩).length > 结果摘要上限) return true;
+  if (/[\r\n]/.test(原文)) return true; // 多段
+  if (/<[^>]{1,40}>|{{|}}|```/.test(压缩)) return true; // 包装标签/模板残留
+  if (/[「」『』]/.test(压缩) || /“[^”]{1,60}”/.test(压缩)) return true; // 含对话引用
+  return false;
+}
+
+/** 同步数据库回合的最后边界：空值、超限值与正文污染一律改为安全短句；合规短摘要保持原样。 */
+export function 规范事件摘要(摘要: string, 行动: string): string {
+  const 原文 = String(摘要 ?? '');
+  if (!原文.replace(/\s+/g, ' ').trim()) return 保守回合摘要(行动);
+  if (判断结果摘要为正文(原文)) return 保守回合摘要(行动);
+  return 截断字符(原文.replace(/\s+/g, ' ').trim(), 结果摘要上限);
+}
+
+const 回合事件摘要块 = /<rq_event_summary>([\s\S]*?)<\/rq_event_summary>/i;
+
+/**
+ * 从最终采用的原始模型输出中提取事件摘要机器块。
+ * 只有完整闭合、单行、非空、不超过 60 字且非正文/HTML/协议的内容才接受；
+ * 模型漏块、块无效或流式截断时返回 null，由调用方使用基于玩家行动的安全短句，不追加 AI 请求。
+ */
+export function 提取回合事件摘要(原文: string): string | null {
+  if (typeof 原文 !== 'string') return null;
+  const 全部匹配 = [...原文.matchAll(new RegExp(回合事件摘要块.source, 'gi'))];
+  if (全部匹配.length !== 1) return null; // 多块含义不唯一，拒绝猜测
+  const 匹配 = 全部匹配[0];
+  const 内容 = 匹配[1];
+  if (/[\r\n]/.test(内容)) return null; // 必须单行
+  const 干净 = 内容.replace(/\s+/g, ' ').trim();
+  if (!干净) return null; // 必须非空
+  if (Array.from(干净).length > 结果摘要上限) return null; // 必须 ≤60 字
+  if (/[<>]|{{|}}|```/.test(干净)) return null; // 拒绝 HTML/协议/模板
+  if (/^(?:system|developer|assistant|user)\s*[:：]/i.test(干净)) return null; // 拒绝角色标题伪装
+  // 与整篇正文等价：摘要几乎原文出现在正文里（模型把正文塞进摘要）时拒绝。
+  const 无块正文 = 原文.replace(new RegExp(回合事件摘要块.source, 'gi'), '');
+  if (Array.from(干净).length >= 30 && 无块正文.includes(干净)) return null;
+  return 干净;
+}
+
+function 表头是否命中默认通用表(sheet: 数据表 | null, name: string): boolean {
+  const 候选表头列表 = 默认通用表处置[name];
+  if (!候选表头列表) return false;
+  const headers = (sheet?.content?.[0] ?? []).map(String);
+  return 候选表头列表.some(候选 => headers.length === 候选.length && headers.every((cell, index) => cell === 候选[index]));
+}
+
+/**
+ * spv8.9.1 同时存在基础版与恋爱版两种官方纪要表头。目标表头不同时按列名迁移，
+ * 保留编码、时间、概览和纪要；基础版独有的地点并入纪要前缀，避免更新模板时静默丢历史。
+ */
+function 迁移官方纪要表内容(旧表: 数据表, 新表: 数据表): boolean {
+  const 旧内容 = 旧表.content ?? [];
+  const 新表头 = (新表.content?.[0] ?? []).map(String);
+  const 目标表头 = ['row_id', '编码索引', '时间跨度', '概览', '纪要', '重要对话'];
+  if (旧内容.length < 1 || 新表头.length !== 目标表头.length || 新表头.some((列名, index) => 列名 !== 目标表头[index])) {
+    return false;
+  }
+  const 旧表头 = 旧内容[0].map(String);
+  const 索引 = (列名: string) => 旧表头.indexOf(列名);
+  if (['row_id', '编码索引', '时间跨度', '概览', '纪要'].some(列名 => 索引(列名) < 0)) return false;
+  const 地点列 = 索引('地点');
+  const 对话列 = 索引('重要对话');
+  const 新行 = 旧内容.slice(1).map(row => {
+    const 原纪要 = String(row[索引('纪要')] ?? '').trim();
+    const 地点 = 地点列 >= 0 ? String(row[地点列] ?? '').trim() : '';
+    const 纪要 = 地点 && !原纪要.includes(地点) ? `地点：${地点}。${原纪要}` : 原纪要;
+    return [
+      row[索引('row_id')],
+      row[索引('编码索引')],
+      row[索引('时间跨度')],
+      row[索引('概览')],
+      纪要,
+      对话列 >= 0 ? row[对话列] : null,
+    ];
+  });
+  新表.content = [新表头, ...新行];
+  return true;
+}
 
 export interface 微信进展数据 {
   v: 1;
@@ -713,7 +866,7 @@ export function 标记数据库时间线将变更(目标楼层: number | null, �
 }
 
 /**
- * 等待 spv8.4 的消息级回放，并主动稳定复验公开快照。超时后游戏继续，
+ * 等待 spv8.9.1 的消息级回放，并主动稳定复验公开快照。超时后游戏继续，
  * 栅栏保持关闭并以退避方式后台重试；绝不因超时直接放行未知分支。
  */
 export async function 等待数据库时间线就绪(最长等待毫秒 = 3500): Promise<boolean> {
@@ -949,11 +1102,73 @@ export async function 通过数据库生成(
   return 全局数据库AI租约.执行(messages, options, api.callAI.bind(api), 90000);
 }
 
+/** 同一聊天同一时刻只允许一个安装任务；按聊天标识隔离，失败/完成后释放，不形成全局永久锁。 */
+const 安装互斥 = new Map<string, boolean>();
+
+/** 纪要概览与事件至少共享 2 个连续汉字二元组，才认为内容匹配；单个常见汉字不构成证据。 */
+function 概览与事件相似度足够(概览: string, row: unknown[], 楼层列: number): boolean {
+  const 事件文本 = row
+    .map((value, index) => (index === 楼层列 ? '' : String(value ?? '')))
+    .join('');
+  const 转汉字二元组 = (text: string): Set<string> => {
+    const 汉字 = [...text].filter(字符 => /\p{Script=Han}/u.test(字符));
+    return new Set(汉字.slice(0, -1).map((字符, index) => 字符 + 汉字[index + 1]));
+  };
+  const 事件二元组 = 转汉字二元组(事件文本);
+  const 概览二元组 = 转汉字二元组(概览);
+  let 命中 = 0;
+  for (const 二元组 of 概览二元组) {
+    if (事件二元组.has(二元组)) 命中 += 1;
+  }
+  return 命中 >= 2;
+}
+
+/**
+ * 旧存档的 RQ 剧情事件正文污染安全迁移。玩家行动最终不超过 40 字、结果摘要最终不超过 60 字；
+ * 旧结果摘要明显是正文（超长、多段、含包装标签）时，优先用可一一对应的同轮纪要表概览，
+ * 不能可靠对应时改为围绕玩家行动的安全短句，绝不截取正文前 60 字冒充摘要；正常短摘要保持不变。
+ */
+function 迁移旧RQ事件数据(rq事件表: 数据表, 纪要表: 数据表 | undefined): void {
+  const content = rq事件表.content ?? [];
+  if (content.length < 2) return;
+  const headers = content[0].map(String);
+  const 楼层列 = headers.indexOf('楼层');
+  const 玩家行动列 = headers.indexOf('玩家行动');
+  const 结果摘要列 = headers.indexOf('结果摘要');
+  if (楼层列 < 0 || 玩家行动列 < 0 || 结果摘要列 < 0) return;
+  const 纪要行 = 纪要表?.content?.slice(1) ?? [];
+  const 纪要概览列 = (纪要表?.content?.[0] ?? []).map(String).indexOf('概览');
+  const 事件行 = content.slice(1);
+  // 只有总行数一一对应时才允许按顺序复用纪要；数量不等通常意味着纪要跨回合合并或缺行。
+  const 可按序匹配纪要 = 纪要概览列 >= 0 && 纪要行.length === 事件行.length;
+  for (const [index, row] of 事件行.entries()) {
+    const 行动 = String(row[玩家行动列] ?? '');
+    row[玩家行动列] = 规范玩家行动(行动);
+    const 结果 = String(row[结果摘要列] ?? '');
+    if (!判断结果摘要为正文(结果)) {
+      row[结果摘要列] = 截断字符(结果.replace(/\s+/g, ' ').trim(), 结果摘要上限);
+      continue;
+    }
+    const 候选 = 可按序匹配纪要 ? String(纪要行[index][纪要概览列] ?? '').replace(/\s+/g, ' ').trim() : '';
+    const 概览 =
+      候选 && Array.from(候选).length <= 结果摘要上限 && 概览与事件相似度足够(候选, row, 楼层列)
+        ? 候选
+        : '';
+    row[结果摘要列] = 概览 ? 截断字符(概览, 结果摘要上限) : 保守回合摘要(行动);
+  }
+}
+
 export async function 安装人妻公寓数据库模板(): Promise<{ success: boolean; message: string }> {
   const api = 取数据库API();
   if (typeof api?.importTemplateFromData !== 'function') {
     return { success: false, message: '未检测到支持聊天级模板导入的数据库插件。' };
   }
+  const 聊天标识 = 当前聊天标识();
+  if (!聊天标识) return { success: false, message: '无法确认当前聊天身份，请稍后再试。' };
+  if (安装互斥.get(聊天标识)) {
+    return { success: false, message: '本聊天正在安装游戏表，请等待本次安装结束再试。' };
+  }
+  安装互斥.set(聊天标识, true);
   try {
     const 游戏模板 = JSON.parse(数据库模板文本) as Record<string, unknown>;
     const 当前 = 解析数据库数据(api.getTableTemplate?.());
@@ -967,7 +1182,7 @@ export async function 安装人妻公寓数据库模板(): Promise<{ success: bo
           ? (_.cloneDeep(当前数据) as Record<string, unknown>)
           : { mate: 游戏模板.mate };
     // getTableTemplate 负责结构，exportTableAsJson 才是当前合并后的实值；导入前把所有同表头数据灌回模板，
-    // 否则给现有数据库加 RQ_ 表时，可能把其他作者表格的游玩进度退回模板初始值。
+    // 否则给现有数据库加游戏表时，可能把其他作者表格的游玩进度退回模板初始值。
     for (const value of Object.values(当前模板)) {
       const sheet = value as 数据表 | null;
       const 实值表 = sheet?.name ? 取表(当前数据, sheet.name) : undefined;
@@ -975,16 +1190,31 @@ export async function 安装人妻公寓数据库模板(): Promise<{ success: bo
         sheet.content = _.cloneDeep(实值表.content);
       }
     }
-    // 只替换同名 RQ_ 表，保留玩家当前模板中的其他表；因此能与不同作者的数据库模板共生。
-    // 同名表的表头未变化时保留已有数据行，避免玩家点“更新”后丢失长期记忆。
+    // 1) 移除 7 张“名称 + 默认表头结构”都命中的默认通用表；作者自定义表必须保留。
+    for (const [key, value] of Object.entries(当前模板)) {
+      const sheet = value as 数据表 | null;
+      if (key.startsWith('sheet_') && sheet?.name && 表头是否命中默认通用表(sheet, sheet.name)) {
+        delete 当前模板[key];
+      }
+    }
+    // 2) 收走并移除旧版 5 张目标表，稍后用本地模板整体替换。
     const 旧游戏表 = new Map<string, 数据表>();
     for (const [key, value] of Object.entries(当前模板)) {
       const sheet = value as 数据表 | null;
-      if (key.startsWith('sheet_') && 游戏表名.includes(sheet?.name as (typeof 游戏表名)[number])) {
+      if (key.startsWith('sheet_') && 安装目标表.includes(sheet?.name as (typeof 安装目标表)[number])) {
         if (sheet?.name) 旧游戏表.set(sheet.name, _.cloneDeep(sheet));
         delete 当前模板[key];
       }
     }
+    // 纪要表可能只存在于运行态实值（全局模板带、当前聊天无 override）——补一次取数。
+    for (const name of 安装目标表) {
+      if (!旧游戏表.has(name)) {
+        const 实值表 = 取表(当前数据, name);
+        if (实值表) 旧游戏表.set(name, _.cloneDeep(实值表));
+      }
+    }
+    // 3) 用本地模板落 5 张目标表；同表头时保留当前实值行，并迁移旧 RQ 事件的正文污染。
+    const 旧纪要表 = 旧游戏表.get('纪要表');
     for (const [key, value] of Object.entries(游戏模板)) {
       if (!key.startsWith('sheet_')) continue;
       let targetKey = key;
@@ -995,16 +1225,37 @@ export async function 安装人妻公寓数据库模板(): Promise<{ success: bo
       const 旧表 = sheet.name ? 旧游戏表.get(sheet.name) : undefined;
       if (旧表?.content?.length && sheet.content?.length && _.isEqual(旧表.content[0], sheet.content[0])) {
         sheet.content = _.cloneDeep(旧表.content);
+      } else if (sheet.name === '纪要表' && 旧表) {
+        迁移官方纪要表内容(旧表, sheet);
       }
+      if (sheet.name === 'RQ_剧情事件') 迁移旧RQ事件数据(sheet, 旧纪要表);
       当前模板[targetKey] = sheet;
     }
-    const result = await api.importTemplateFromData(当前模板, { scope: 'chat', presetName: '人妻公寓·长期记忆' });
-    return result.success
-      ? { ...result, message: `${result.message || '安装完成'}（已保留当前模板中的其他表）` }
-      : result;
+    const result = await api.importTemplateFromData(当前模板, {
+      scope: 'chat',
+      presetName: '人妻公寓·长期记忆',
+      dataMode: 'replace',
+    });
+    // 等待期间切到其他聊天：不能把新聊天误报为已完成。
+    if (!仍是同一聊天(聊天标识)) {
+      return { success: false, message: '安装期间聊天已切换，本次安装结果无法确认；请在目标聊天重新点击安装。' };
+    }
+    if (result.success !== true || result.runtimeReady === false) {
+      const 细节 = [result.warning, result.error, result.message].filter(Boolean).join('；');
+      return {
+        success: false,
+        message: `数据库安装未完成：${细节 || '模板已保存但运行态未同步，请打开数据库设置检查 SQLite/表格状态后重试。'}`,
+      };
+    }
+    return {
+      success: true,
+      message: `当前聊天已收敛为五张游戏记忆表；全局模板未修改；自定义表已保留。${result.message ? `（${result.message}）` : ''}`,
+    };
   } catch (error) {
     console.error('[人妻公寓·数据库] 安装聊天级模板失败:', error);
     return { success: false, message: error instanceof Error ? error.message : String(error) };
+  } finally {
+    安装互斥.delete(聊天标识);
   }
 }
 
@@ -1055,13 +1306,15 @@ export async function 同步数据库回合(
   if (!api || !数据库状态().已装游戏模板 || !额外提交校验()) return false;
   const 聊天标识 = 当前聊天标识();
   try {
+    // 最后边界：玩家行动 ≤40 字；结果摘要必须是真实短摘要，收到长正文时改为安全短句，
+    // 禁止 slice(0,800) 或把正文截成 60 字冒充摘要。
     const data: Record<string, unknown> = {
       楼层: event.楼层,
       时间: event.时间,
       地点: event.地点,
       参与者: event.参与者.join('、'),
-      玩家行动: event.玩家行动.slice(0, 500),
-      结果摘要: event.结果摘要.replace(/\s+/g, ' ').slice(0, 800),
+      玩家行动: 规范玩家行动(event.玩家行动),
+      结果摘要: 规范事件摘要(event.结果摘要, event.玩家行动),
       事件编码: `RQ-${event.楼层}`,
     };
     const SQL写入状态 = await 执行SQLite写入(
@@ -1193,7 +1446,7 @@ function 取表(data: unknown, name: string): 数据表 | undefined {
   }) as 数据表 | undefined;
 }
 
-/** SP·数据库 8.4 会按 DDL 字段后的 `-- 中文表头` 注释做双向映射；缺任一映射会拒绝 hydrate。 */
+/** SP·数据库 spv8.9.1 会按 DDL 字段后的 `-- 中文表头` 注释做双向映射；缺任一映射会拒绝 hydrate。 */
 function 表结构可用(sheet: 数据表 | undefined, expectedHeaders: readonly string[]): boolean {
   const headers = (sheet?.content?.[0] ?? []).map(String);
   if (!_.isEqual(headers, expectedHeaders)) return false;

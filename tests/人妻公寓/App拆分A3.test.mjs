@@ -12,6 +12,7 @@ const 设置源码 = readFileSync(new URL('./components/设置弹窗.vue', 客�
 const 准备源码 = readFileSync(new URL('./components/首次准备.vue', 客户端目录), 'utf8');
 const 标题源码 = readFileSync(new URL('./components/序章标题屏.vue', 客户端目录), 'utf8');
 const 地图源码 = readFileSync(new URL('./components/地图.vue', 客户端目录), 'utf8');
+const 依赖版本源码 = readFileSync(new URL('../../脚本/游戏逻辑/依赖版本.ts', 客户端目录), 'utf8');
 
 /** 提取真实静态 import 语句里的模块 specifier（只认 import 语句，不搜普通文本/注释）。 */
 function 提取导入specifier(源码) {
@@ -177,19 +178,19 @@ test('首次准备组件拥有新手向导模板、三准备项、渐进披露�
   assert.match(准备源码, /SQLite（SQL）/, 'SQLite 提醒保持(在高级区)');
   assert.match(准备源码, /游戏无法代替你自动切换/, 'SQLite 手动切换提醒保持');
   assert.match(准备源码, /游戏默认使用外置模型解析，正文只负责故事/, '外置解析一句保持');
-  assert.match(准备源码, /四张 RQ_ 表/, 'RQ 表诊断保持(在高级区)');
+  assert.match(准备源码, /五张游戏记忆表/, '五表诊断保持(在高级区)');
   assert.match(准备源码, /脚本心跳/, '脚本心跳诊断保持');
-  assert.match(准备源码, /N0VI028\/JS-Slash-Runner\/main\/manifest\.json/, '官方 manifest URL 保持');
+  assert.match(依赖版本源码, /N0VI028\/JS-Slash-Runner\/main\/manifest\.json/, '官方 manifest URL 保持');
   assert.match(
-    准备源码,
+    依赖版本源码,
     /fastly\.jsdelivr\.net\/gh\/N0VI028\/JS-Slash-Runner@main\/manifest\.json/,
     '镜像 manifest URL 保持',
   );
-  assert.match(准备源码, /cache: 'no-store'/, '版本检测 no-store 保持');
+  assert.match(依赖版本源码, /cache: 'no-store'/, '版本检测 no-store 保持');
   assert.match(准备源码, /compare\(当前版本, 最新版本, '>='\)/, '版本 compare 保持');
   assert.match(准备源码, /'人妻公寓_首次游玩说明_database_sql_mode_20260803'/, '版本化 storage key 保持');
   assert.match(准备源码, /'人妻公寓_提示词已确认_20260808'/, '提示词确认持久化键保持');
-  assert.match(准备源码, /confirm\('将《人妻公寓》的四张 RQ_ 表合并到当前聊天/, '安装模板 confirm 保持');
+  assert.match(准备源码, /confirm\('将《人妻公寓》的五张游戏记忆表应用到当前聊天/, '安装模板 confirm 保持');
   assert.match(准备源码, /宿主\.alert\(result\.message/, '安装结果 alert 保持');
   assert.match(准备源码, /这会把数据库插件的全局“AI 回复最小长度”从/, '全局最短回复 confirm 保持');
   assert.match(准备源码, /const 首次准备完成 = computed/, '完成判定在组件');

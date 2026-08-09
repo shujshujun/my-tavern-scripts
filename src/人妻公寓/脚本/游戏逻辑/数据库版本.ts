@@ -21,12 +21,12 @@ export function 提取数据库脚本版本(树: readonly 酒馆脚本[]): strin
 
   for (const 脚本 of 候选) {
     const 文本 = `${脚本.name ?? ''}\n${脚本.info ?? ''}\n${脚本.content ?? ''}`;
-    const 地址版本 = 文本.match(/https?:\/\/[^\s'"]+@v?(\d+(?:\.\d+){1,3})(?=[/)'"\s]|$)/i)?.[1];
+    const 地址版本 = 文本.match(/https?:\/\/[^\s'"]+@(?:spv|v)?(\d+(?:\.\d+){1,3})(?=[/)'"\s]|$)/i)?.[1];
     if (地址版本) return 地址版本;
   }
   for (const 脚本 of 候选) {
     const 文本 = `${脚本.name ?? ''}\n${脚本.info ?? ''}\n${脚本.content ?? ''}`;
-    const 标注版本 = 文本.match(/(?:版本|version|(?:^|[\s·_-])v)\s*[:：]?\s*(\d+(?:\.\d+){1,3})/im)?.[1];
+    const 标注版本 = 文本.match(/(?:版本|version|(?:^|[\s·_-])(?:spv|v))\s*[:：]?\s*(\d+(?:\.\d+){1,3})/im)?.[1];
     if (标注版本) return 标注版本;
   }
   return '';

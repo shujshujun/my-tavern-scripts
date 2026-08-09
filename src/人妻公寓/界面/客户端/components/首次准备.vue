@@ -12,6 +12,7 @@ import {
   打开数据库设置,
   数据库状态,
 } from '../../../脚本/游戏逻辑/数据库桥';
+import { 查询数据库官方最新版本, 查询酒馆助手官方最新版本 } from '../../../脚本/游戏逻辑/依赖版本';
 
 const props = defineProps<{
   open: boolean;
@@ -26,17 +27,19 @@ const 首次说明存储键 = '人妻公寓_首次游玩说明_database_sql_mode
 // 游戏提示词确认：玩家手动确认已在酒馆预设启用本卡提示词并关闭【小白X】；确认状态持久化，
 // 重新打开已完成向导时不丢失。
 const 提示词确认存储键 = '人妻公寓_提示词已确认_20260808';
-const 酒馆助手版本清单地址 = [
-  'https://raw.githubusercontent.com/N0VI028/JS-Slash-Runner/main/manifest.json',
-  'https://fastly.jsdelivr.net/gh/N0VI028/JS-Slash-Runner@main/manifest.json',
-];
 const 数据库检测 = ref(数据库状态());
 const 安装模板中 = ref(false);
 const 调整填表设置中 = ref(false);
+const 数据库最新版本 = ref('');
+const 数据库最新版本查询失败 = ref(false);
+const 数据库检测中 = ref(false);
 const 酒馆助手版本 = ref('');
 const 酒馆助手最新版本 = ref('');
 const 酒馆助手最新版本查询失败 = ref(false);
 const 酒馆助手检测中 = ref(false);
+let 版本检测轮次 = 0;
+let 已提示更新签名 = '';
+
 const 酒馆助手已安装 = computed(() => {
   const 版本 = 酒馆助手版本.value.match(/\d+(?:\.\d+){1,3}/)?.[0];
   return Boolean(版本);
@@ -58,6 +61,37 @@ const 酒馆助手检测说明 = computed(() =>
           ? `检测到 ${酒馆助手版本.value}，已是官方最新版本`
           : `检测到 ${酒馆助手版本.value}；官方最新版本为 ${酒馆助手最新版本.value}，建议更新（不影响开始游戏）`,
 );
+const 数据库为最新版 = computed<boolean | null>(() => {
+  const 当前版本 = 数据库检测.value.版本.match(/\d+(?:\.\d+){1,3}/)?.[0];
+  const 最新版本 = 数据库最新版本.value.match(/\d+(?:\.\d+){1,3}/)?.[0];
+  if (!当前版本 || !最新版本) return null;
+  return compare(当前版本, 最新版本, '>=');
+});
+const 数据库检测说明 = computed(() =>
+  数据库检测中.value
+    ? '正在检测当前版本及官方最新稳定版'
+    : !数据库检测.value.已安装
+      ? '未检测到数据库插件，请安装并启用后刷新页面'
+      : !数据库检测.value.版本
+        ? 数据库最新版本查询失败.value
+          ? '已检测到插件，但无法读取当前版本或查询官方最新版'
+          : `已检测到插件，但无法读取当前版本；官方最新稳定版为 v${数据库最新版本.value}`
+        : 数据库最新版本查询失败.value
+          ? `检测到 v${数据库检测.value.版本}；暂时无法查询官方最新稳定版，可继续游戏`
+          : 数据库为最新版.value
+            ? `检测到 v${数据库检测.value.版本}，已是官方最新稳定版`
+            : `检测到 v${数据库检测.value.版本}；官方最新稳定版为 v${数据库最新版本.value}，建议更新（不影响开始游戏）`,
+);
+const 依赖更新提示 = computed(() => {
+  const 更新项: string[] = [];
+  if (酒馆助手为最新版.value === false) {
+    更新项.push(`酒馆助手 ${酒馆助手版本.value} → ${酒馆助手最新版本.value}`);
+  }
+  if (数据库为最新版.value === false) {
+    更新项.push(`数据库 v${数据库检测.value.版本} → v${数据库最新版本.value}`);
+  }
+  return 更新项.length > 0 ? `检测到可更新：${更新项.join('；')}` : '';
+});
 
 // 游戏提示词确认：初始从 localStorage 恢复，勾选即持久化。
 const 提示词已确认 = ref(false);
@@ -80,51 +114,79 @@ function 确认提示词() {
 const 数据库准备完成 = computed(() => 数据库检测.value.已安装 && 数据库检测.value.已装游戏模板);
 const 首次准备完成 = computed(() => 酒馆助手已安装.value && 提示词已确认.value && 数据库准备完成.value);
 
-async function 查询酒馆助手最新版本() {
-  let 最后错误: unknown;
-  for (const 地址 of 酒馆助手版本清单地址) {
-    try {
-      const response = await fetch(`${地址}?t=${Date.now()}`, { cache: 'no-store' });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const manifest = (await response.json()) as { version?: unknown };
-      if (typeof manifest.version !== 'string' || !manifest.version.match(/\d+(?:\.\d+){1,3}/)) {
-        throw new Error('版本清单缺少有效 version');
-      }
-      return manifest.version;
-    } catch (error) {
-      最后错误 = error;
-    }
-  }
-  throw 最后错误 ?? new Error('无法读取版本清单');
-}
-
-async function 刷新酒馆助手检测() {
+async function 执行酒馆助手版本检测(轮次: number) {
   酒馆助手检测中.value = true;
   酒馆助手最新版本.value = '';
   酒馆助手最新版本查询失败.value = false;
+  let 当前版本 = '';
+  let 最新版本 = '';
+  let 最新版本查询失败 = false;
   try {
-    const 版本 = await getTavernHelperVersion();
-    酒馆助手版本.value = typeof 版本 === 'string' ? 版本 : '';
+    const 版本 = getTavernHelperVersion();
+    当前版本 = typeof 版本 === 'string' ? 版本 : '';
   } catch (error) {
-    酒馆助手版本.value = '';
     console.warn('[人妻公寓] 无法读取酒馆助手版本', error);
   }
+  if (轮次 !== 版本检测轮次) return;
+  // 当前版本来自本地同步 API，不必等待最慢 8 秒的远端查询才解除“未安装”状态。
+  酒馆助手版本.value = 当前版本;
   try {
-    酒馆助手最新版本.value = await 查询酒馆助手最新版本();
+    最新版本 = await 查询酒馆助手官方最新版本();
   } catch (error) {
-    酒馆助手最新版本查询失败.value = true;
+    最新版本查询失败 = true;
     console.warn('[人妻公寓] 无法查询酒馆助手官方最新版本', error);
   }
+  if (轮次 !== 版本检测轮次) return;
+  酒馆助手版本.value = 当前版本;
+  酒馆助手最新版本.value = 最新版本;
+  酒馆助手最新版本查询失败.value = 最新版本查询失败;
   酒馆助手检测中.value = false;
 }
 
-function 刷新数据库检测() {
+function 刷新数据库本地状态() {
   数据库检测.value = 数据库状态();
 }
 
-function 刷新全部检测() {
-  刷新数据库检测();
-  void 刷新酒馆助手检测();
+async function 执行数据库版本检测(轮次: number) {
+  数据库检测中.value = true;
+  数据库最新版本.value = '';
+  数据库最新版本查询失败.value = false;
+  let 最新版本 = '';
+  let 最新版本查询失败 = false;
+  try {
+    最新版本 = await 查询数据库官方最新版本();
+  } catch (error) {
+    最新版本查询失败 = true;
+    console.warn('[人妻公寓] 无法查询数据库官方最新稳定版', error);
+  }
+  if (轮次 !== 版本检测轮次) return;
+  数据库最新版本.value = 最新版本;
+  数据库最新版本查询失败.value = 最新版本查询失败;
+  数据库检测中.value = false;
+}
+
+function 提示可用更新() {
+  if (!依赖更新提示.value) return;
+  const 签名 = `${酒馆助手版本.value}|${酒馆助手最新版本.value}|${数据库检测.value.版本}|${数据库最新版本.value}`;
+  if (签名 === 已提示更新签名) return;
+  已提示更新签名 = 签名;
+  emit('toast', `检测到可更新：${依赖更新提示.value.replace(/^检测到可更新：/, '')}`, 7000);
+}
+
+async function 刷新酒馆助手检测() {
+  await 刷新全部检测();
+}
+
+async function 刷新数据库检测() {
+  await 刷新全部检测();
+}
+
+async function 刷新全部检测(_后台检测 = false) {
+  const 轮次 = ++版本检测轮次;
+  刷新数据库本地状态();
+  await Promise.all([执行酒馆助手版本检测(轮次), 执行数据库版本检测(轮次)]);
+  if (轮次 !== 版本检测轮次) return;
+  提示可用更新();
 }
 
 /** 只有全部完成才允许写入“首次说明已完成”存储键；中途关闭只收起点位，下次刷新仍自动提示。 */
@@ -140,17 +202,17 @@ function 完成首次说明() {
 }
 
 async function 从说明安装数据库模板() {
-  刷新数据库检测();
+  刷新数据库本地状态();
   if (!数据库检测.value.已安装) {
     emit('toast', '未检测到数据库插件。安装并刷新酒馆后，再回来重新检测。', 5000);
     return;
   }
   const 宿主 = window.parent ?? window;
-  if (!宿主.confirm('将《人妻公寓》的四张 RQ_ 表合并到当前聊天，并保留其他作者的表与已有数据。确定继续吗？')) return;
+  if (!宿主.confirm('将《人妻公寓》的五张游戏记忆表应用到当前聊天（默认通用表不再保留，作者自定义表保留），并保留已有数据。确定继续吗？')) return;
   安装模板中.value = true;
   try {
     const result = await 安装人妻公寓数据库模板();
-    刷新数据库检测();
+    刷新数据库本地状态();
     宿主.alert(result.message || (result.success ? '人妻公寓数据库表安装完成。' : '数据库表安装失败。'));
   } catch (error) {
     宿主.alert(`数据库表安装失败：${error instanceof Error ? error.message : String(error)}`);
@@ -160,7 +222,7 @@ async function 从说明安装数据库模板() {
 }
 
 async function 从说明应用数据库填表兼容设置() {
-  刷新数据库检测();
+  刷新数据库本地状态();
   const 当前值 = 数据库检测.value.填表最短回复;
   if (当前值 === null || 当前值 <= 0 || !数据库检测.value.可设置填表参数) {
     emit('toast', '当前状态不支持一键修改，请打开数据库设置手动确认。', 5000);
@@ -178,7 +240,7 @@ async function 从说明应用数据库填表兼容设置() {
   调整填表设置中.value = true;
   try {
     const result = await 应用数据库填表兼容设置();
-    刷新数据库检测();
+    刷新数据库本地状态();
     宿主.alert(result.message);
   } finally {
     调整填表设置中.value = false;
@@ -200,6 +262,19 @@ watch(
   开 => {
     if (开) 刷新全部检测();
   },
+);
+
+// 不把更新检测绑死在“首次说明是否还会打开”上：旧玩家进入已完成的存档后，
+// 等脚本心跳就绪也会后台检查一次；有更新时由 App toast 主动提示。
+let 已后台检测 = false;
+watch(
+  () => props.scriptAlive,
+  存活 => {
+    if (!存活 || 已后台检测) return;
+    已后台检测 = true;
+    void 刷新全部检测(true);
+  },
+  { immediate: true },
 );
 
 // 数据就绪且序章未完成时，读版本化 storage key，未完成过才自动打开。
@@ -242,6 +317,10 @@ watch(
         </span>
       </div>
 
+      <p v-if="依赖更新提示" class="setup-update-warning" role="status">
+        {{ 依赖更新提示 }}。建议更新后刷新页面；这不会阻止你开始游戏。
+      </p>
+
       <ol class="setup-steps">
         <li class="required" :class="{ done: 首次准备完成 }">
           <template v-if="!酒馆助手已安装">
@@ -267,7 +346,9 @@ watch(
             <b><em>3</em>安装数据库插件</b>
             <p>长期记忆需要数据库插件。安装并启用后刷新酒馆页面，再回来点“重新检测”。</p>
             <div class="setup-db-actions">
-              <button class="btn rite" @click="刷新数据库检测">重新检测</button>
+              <button class="btn rite" :disabled="数据库检测中" @click="刷新数据库检测">
+                {{ 数据库检测中 ? '检测中…' : '重新检测' }}
+              </button>
               <button class="btn ghost" @click="从说明打开数据库设置">打开数据库设置</button>
             </div>
           </template>
@@ -294,13 +375,15 @@ watch(
             存储模式：打开【数据库设置 → 存储模式】选择【SQLite（SQL）】。游戏无法代替你自动切换；切换后回来重新检测。
           </p>
           <p class="setup-adv-note">变量解析：游戏默认使用外置模型解析，正文只负责故事。</p>
-          <p v-if="数据库检测.已安装" class="setup-adv-note">
-            数据库 {{ 数据库检测.版本 ? `v${数据库检测.版本}` : '版本未知' }}：四张 RQ_ 表{{
+          <p class="setup-adv-note" :class="{ warn: 数据库为最新版 === false }">
+            数据库：{{ 数据库检测说明 }}。五张游戏记忆表{{
               数据库检测.已装游戏模板 ? '已就绪' : '尚未安装'
             }}。
           </p>
           <div class="setup-db-actions">
-            <button class="btn mini" @click="刷新全部检测">重新检测全部</button>
+            <button class="btn mini" :disabled="酒馆助手检测中 || 数据库检测中" @click="刷新全部检测">
+              {{ 酒馆助手检测中 || 数据库检测中 ? '检测中…' : '重新检测全部' }}
+            </button>
             <button class="btn mini" @click="从说明打开数据库设置">打开数据库设置</button>
             <button
               v-if="数据库检测.填表最短回复 !== null && 数据库检测.填表最短回复 > 0 && 数据库检测.可设置填表参数"
@@ -320,7 +403,7 @@ watch(
           <p v-else-if="数据库检测.已安装" class="setup-adv-note">
             · 当前数据库版本未开放填表参数读取，请在“填表工作台 → 自动更新设置 → 高级参数”中手动设为 0。
           </p>
-          <p class="setup-adv-note">
+          <p class="setup-adv-note" :class="{ warn: 酒馆助手为最新版 === false }">
             酒馆助手：{{ 酒馆助手检测说明 }}。脚本心跳：{{ scriptAlive ? '正常' : '未响应' }}。
           </p>
         </div>
@@ -414,6 +497,18 @@ watch(
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+.setup-update-warning {
+  margin: 0 0 9px;
+  padding: 8px 10px;
+  color: #934b1d;
+  background: rgba(241, 153, 72, 0.13);
+  border: 1px solid rgba(211, 115, 45, 0.32);
+  border-radius: 10px;
+  font-size: 0.8em;
+  font-weight: 750;
+  line-height: 1.5;
 }
 
 .setup-steps li {
@@ -601,6 +696,12 @@ watch(
 
 :global(html.rq-dark) .setup-adv-note {
   color: rgba(255, 255, 255, 0.62);
+}
+
+:global(html.rq-dark) .setup-update-warning {
+  color: #ffc58f;
+  background: rgba(224, 131, 58, 0.14);
+  border-color: rgba(255, 171, 99, 0.3);
 }
 
 :global(html.rq-dark) .setup-confirm {
