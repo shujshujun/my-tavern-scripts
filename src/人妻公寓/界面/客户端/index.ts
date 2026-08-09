@@ -2,6 +2,7 @@ import { waitUntil } from 'async-wait-until';
 import App from './App.vue';
 import './global.css';
 import { 注册画幅页面生命周期, 同步画幅 } from './viewport';
+import { 等待客户端启动依赖 } from './启动等待';
 
 /** 全局错误横幅:根组件自身的渲染错误 onErrorCaptured 抓不到,必须挂在应用层 */
 function 显示致命错误(err: unknown, 来源: string) {
@@ -27,12 +28,18 @@ window.addEventListener('unhandledrejection', ev => 显示致命错误(ev.reason
 
 $(async () => {
   try {
-    await waitGlobalInitialized('Mvu');
-    await waitUntil(() => _.has(getVariables({ type: 'message', message_id: -1 }), 'stat_data'), {
-      timeout: 15000,
-    }).catch(() => {
-      console.warn('[人妻公寓客户端] 等待 stat_data 超时,以默认值挂载');
-    });
+    const 启动等待 = await 等待客户端启动依赖(
+      () => waitGlobalInitialized('Mvu'),
+      () =>
+        waitUntil(() => _.has(getVariables({ type: 'message', message_id: -1 }), 'stat_data'), {
+          timeout: 15000,
+        }),
+    );
+    if (!启动等待.mvu就绪) {
+      显示致命错误(启动等待.mvu错误, 'Mvu初始化（界面已降级打开）');
+    } else if (!启动等待.statData就绪) {
+      console.warn('[人妻公寓客户端] 等待 stat_data 超时,以默认值挂载', 启动等待.statData错误);
+    }
     const app = createApp(App);
     app.config.errorHandler = (err, _instance, info) => 显示致命错误(err, `vue:${info}`);
     app.use(createPinia()).mount('#app');

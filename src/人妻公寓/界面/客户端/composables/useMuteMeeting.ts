@@ -28,7 +28,8 @@ import {
   type 静音会议画面状态 as 静音会议画面状态类型,
 } from '../../../静音会议配置';
 import { 户静态表 } from '../../../stageConfig';
-import { 获取静音会议手机状态 } from '../../../脚本/游戏逻辑/手机系统';
+// 只读纯业务判定，不能经手机系统组合根把宿主手机渲染副作用带进客户端 iframe。
+import { 获取静音会议手机状态 } from '../../../脚本/游戏逻辑/手机/静音会议旁路';
 import { 版本素材基址 } from '../assets';
 import type {
   静音会议互动ID,

@@ -9,9 +9,68 @@ process.env.TS_NODE_COMPILER_OPTIONS = JSON.stringify({ module: 'CommonJS', modu
 require('ts-node/register/transpile-only');
 
 const App源码 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
+const 静音会议源码 = readFileSync(
+  new URL('../../src/人妻公寓/界面/客户端/composables/useMuteMeeting.ts', import.meta.url),
+  'utf8',
+);
 const 反馈提示源码 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/components/反馈提示.vue', import.meta.url), 'utf8');
 const 客户端模板 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/index.html', import.meta.url), 'utf8');
 const 客户端产物 = readFileSync(new URL('../../dist/人妻公寓/界面/客户端/index.html', import.meta.url), 'utf8');
+
+test('客户端启动等待覆盖 MVU 成功、拒绝、超时与 stat_data 缺失', async () => {
+  const { 等待客户端启动依赖 } = require('../../src/人妻公寓/界面/客户端/启动等待.ts');
+
+  const 正常 = await 等待客户端启动依赖(() => Promise.resolve(), () => Promise.resolve(), 20);
+  assert.deepEqual(正常, { mvu就绪: true, statData就绪: true });
+
+  let 拒绝后等待存档 = false;
+  const 拒绝错误 = new Error('MVU 加载失败');
+  const 拒绝 = await 等待客户端启动依赖(
+    () => Promise.reject(拒绝错误),
+    () => {
+      拒绝后等待存档 = true;
+      return Promise.resolve();
+    },
+    20,
+  );
+  assert.equal(拒绝.mvu就绪, false);
+  assert.equal(拒绝.statData就绪, false);
+  assert.equal(拒绝.mvu错误, 拒绝错误);
+  assert.equal(拒绝后等待存档, false, 'MVU 未就绪时不应再额外空等 stat_data');
+
+  let 超时后等待存档 = false;
+  const 超时开始 = Date.now();
+  const 超时 = await 等待客户端启动依赖(
+    () => new Promise(() => {}),
+    () => {
+      超时后等待存档 = true;
+      return Promise.resolve();
+    },
+    5,
+  );
+  assert.equal(超时.mvu就绪, false);
+  assert.equal(超时.statData就绪, false);
+  assert.match(String(超时.mvu错误), /等待 Mvu 初始化超时/);
+  assert.equal(超时后等待存档, false);
+  assert.ok(Date.now() - 超时开始 < 100, 'MVU 无响应必须在有界时间内返回');
+
+  const 存档错误 = new Error('stat_data 超时');
+  const 存档缺失 = await 等待客户端启动依赖(() => Promise.resolve(), () => Promise.reject(存档错误), 20);
+  assert.equal(存档缺失.mvu就绪, true);
+  assert.equal(存档缺失.statData就绪, false);
+  assert.equal(存档缺失.statData错误, 存档错误);
+});
+
+test('客户端不得从手机兼容门面引入宿主渲染副作用', () => {
+  const 客户端手机依赖源码 = `${App源码}\n${静音会议源码}`;
+  assert.doesNotMatch(
+    客户端手机依赖源码,
+    /from ['"][^'"]*脚本\/游戏逻辑\/手机系统['"]/,
+    '手机系统门面会加载渲染调度器与交互组合根，客户端只能直连纯运行时上下文',
+  );
+  assert.match(App源码, /from ['"]\.\.\/\.\.\/脚本\/游戏逻辑\/手机\/运行时上下文['"]/);
+  assert.match(静音会议源码, /from ['"]\.\.\/\.\.\/\.\.\/脚本\/游戏逻辑\/手机\/静音会议旁路['"]/);
+});
 
 test('客户端生产包不含未声明的 webpack CJS 拼接运行时', () => {
   assert.doesNotMatch(

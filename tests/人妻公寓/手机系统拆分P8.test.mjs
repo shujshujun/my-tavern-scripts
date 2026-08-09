@@ -117,7 +117,7 @@ test('门面导出精确收口：21 个真实消费者符号保留，无人使�
   assert.doesNotMatch(门面源码, /function 约出来|function 发消息|const 手机邀约队列/);
 });
 
-test('四个外部消费方仍从旧门面路径 import 各自实际使用的符号', () => {
+test('宿主组合根仍走旧门面，客户端只直连无副作用的手机子模块', () => {
   const 游戏逻辑目录 = new URL('../../src/人妻公寓/脚本/游戏逻辑/', import.meta.url);
   const index源码 = readFileSync(new URL('./index.ts', 游戏逻辑目录), 'utf8');
   const 回合源码 = readFileSync(new URL('./回合引擎.ts', 游戏逻辑目录), 'utf8');
@@ -130,9 +130,13 @@ test('四个外部消费方仍从旧门面路径 import 各自实际使用的符
   assert.match(index源码, /import \{[\s\S]*挂载手机,[\s\S]*打开手机,[\s\S]*刷新红点,[\s\S]*\} from '\.\/手机系统';/);
   assert.match(index源码, /import \{[\s\S]*冷落预警节拍,[\s\S]*手机节拍,[\s\S]*当前聊天ID,[\s\S]*来电已接,[\s\S]*父亲通话已清理,[\s\S]*隔离当前手机分支,[\s\S]*手机生成请求标记,[\s\S]*设置静音会议手机生成中,[\s\S]*静音会议私聊回复生成中,[\s\S]*\} from '\.\/手机系统';/);
   assert.match(回合源码, /import \{[\s\S]*按消息重建已发私聊图,[\s\S]*当前微信摘要引用,[\s\S]*当前聊天ID,[\s\S]*等待微信摘要任务,[\s\S]*读取近期微信胶囊,[\s\S]*设置静音会议手机生成中,[\s\S]*\} from '\.\/手机系统';/);
-  // A7b2:当前聊天ID 留在 App 从旧门面取；获取静音会议手机状态归 useMuteMeeting.ts，App 调用 composable
-  assert.match(app源码, /import \{ 当前聊天ID \} from '\.\.\/\.\.\/脚本\/游戏逻辑\/手机系统';/);
-  assert.match(mute源码, /import \{ 获取静音会议手机状态 \} from '\.\.\/\.\.\/\.\.\/脚本\/游戏逻辑\/手机系统';/);
+  // 客户端运行在独立 iframe，不能经旧门面触发内核的宿主渲染/交互副作用。
+  assert.doesNotMatch(`${app源码}\n${mute源码}`, /from '[^']*脚本\/游戏逻辑\/手机系统';/);
+  assert.match(app源码, /import \{ 当前聊天ID \} from '\.\.\/\.\.\/脚本\/游戏逻辑\/手机\/运行时上下文';/);
+  assert.match(
+    mute源码,
+    /import \{ 获取静音会议手机状态 \} from '\.\.\/\.\.\/\.\.\/脚本\/游戏逻辑\/手机\/静音会议旁路';/,
+  );
   assert.match(app源码, /import \{ useMuteMeeting \} from '\.\/composables\/useMuteMeeting';/);
   assert.match(app源码, /\} = useMuteMeeting\(\{/);
   assert.match(特殊源码, /import \{ 取会场私聊摘要提示 \} from '\.\/手机系统';/);
