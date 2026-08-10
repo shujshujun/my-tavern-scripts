@@ -121,7 +121,7 @@ const emit = defineEmits<{
 
 .act-kicker {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: var(--font-micro);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-faint);

@@ -28,9 +28,9 @@
   max-height: 94%;
   display: flex;
   flex-direction: column;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.65);
-  border-radius: 18px;
+  background: var(--surface-sheet);
+  border: 1px solid var(--surface-sheet-border);
+  border-radius: var(--radius-sheet);
   padding: 14px 16px;
   box-shadow: var(--shadow);
   overflow-y: auto;
@@ -43,23 +43,61 @@
   top: 8px;
   right: 10px;
   z-index: 5;
-  width: 26px;
-  height: 26px;
+  width: var(--control-icon-sm);
+  height: var(--control-icon-sm);
   display: grid;
   place-items: center;
-  background: #fff;
+  background: var(--field-bg);
   border: 1px solid var(--line);
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   color: var(--ink-soft);
   font-size: 0.8em;
   cursor: pointer;
-  transition: all 0.15s;
+  transition:
+    color var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    transform var(--motion-fast) ease;
 }
 
 .sheet-close:hover {
   color: #fff;
   background: var(--pink);
   border-color: var(--pink);
+}
+
+.sheet-close:active {
+  transform: translateY(1px);
+}
+
+.sheet-close:focus-visible,
+.btn:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 2px;
+}
+
+/* 工具型弹窗题头：设置与首次准备共享；地图、档案、CG 等体验型场景不套用。 */
+.sheet-heading {
+  display: grid;
+  flex: none;
+  gap: 3px;
+  margin: 2px 34px 12px 0;
+}
+
+.sheet-heading-title {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1.12em;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  line-height: 1.35;
+}
+
+.sheet-heading-lead {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.84em;
+  line-height: 1.55;
 }
 
 .sheet-title {
@@ -98,14 +136,14 @@
   color: var(--ink);
   background: var(--glass);
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   box-shadow: 0 2px 8px rgba(30, 26, 38, 0.08);
   cursor: pointer;
   transition:
-    transform 0.18s ease,
-    box-shadow 0.18s ease,
-    border-color 0.18s ease,
-    background 0.18s ease;
+    transform var(--motion-base) ease,
+    box-shadow var(--motion-base) ease,
+    border-color var(--motion-base) ease,
+    background var(--motion-base) ease;
 }
 
 .btn:hover:not(:disabled) {
@@ -202,12 +240,12 @@
 /* ── 夜间 ── */
 
 :global(html.rq-dark) .sheet {
-  background: rgba(38, 40, 56, 0.97);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: var(--surface-sheet);
+  border-color: var(--surface-sheet-border);
 }
 
 :global(html.rq-dark) .sheet-close {
-  background: #2c2e40;
+  background: var(--field-bg);
   color: var(--ink);
 }
 

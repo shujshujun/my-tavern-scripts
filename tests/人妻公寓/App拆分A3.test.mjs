@@ -260,7 +260,16 @@ test('两组件以 scoped src 用弹窗基础.css；专属 CSS 所有权正确�
   assert.match(设置源码, /\.ink-row \{/, '字色行应到 设置弹窗.vue');
   assert.match(设置源码, /\.btn\.ghost\.restart\.armed/, '重开武装 CSS 应到 设置弹窗.vue');
   assert.match(设置源码, /:global\(html\.rq-dark\) \.seg \{/, 'dark seg 应到 设置弹窗.vue');
-  assert.match(设置源码, /:global\(html\.rq-dark\) \.seg button\.on \{/, 'dark seg.on 应到 设置弹窗.vue');
+  assert.match(
+    设置源码,
+    /\.seg button\.on \{[\s\S]{0,100}background: var\(--field-bg\);/,
+    'seg.on 由日夜语义令牌统一着色',
+  );
+  assert.doesNotMatch(
+    设置源码,
+    /:global\(html\.rq-dark\) \.seg button\.on \{/,
+    'dark seg.on 不再复制局部颜色',
+  );
   assert.match(设置源码, /:global\(html\.rq-dark\) \.toggle \{/, 'dark toggle 应到 设置弹窗.vue');
   assert.match(准备源码, /\.sheet\.setup-sheet \{/, 'setup sheet 应到 首次准备.vue');
   assert.match(准备源码, /\.setup-statuses \{/, 'statuses 应到 首次准备.vue');

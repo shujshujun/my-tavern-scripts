@@ -12,7 +12,7 @@ delete require.extensions['.json'];
 require.extensions['.json'] = jsonLoader;
 globalThis._ = require('lodash');
 
-const { Schema, 当前MVU数据版本 } = require('../../src/人妻公寓/schema.ts');
+const { Schema, 当前MVU数据版本, 创建户节点 } = require('../../src/人妻公寓/schema.ts');
 const {
   时间撤销点键,
   时间撤销点版本,
@@ -178,6 +178,35 @@ test('自动收到的手机消息不阻断撤销，但玩家手动发送或撤�
   assert.equal(判定(撤回基线.点, 撤回基线.后, 玩家撤回).有效, false);
 });
 
+test('孕情微信落库后的自动公开确认不破坏撤销点，其他孕情改写仍会令其失效', () => {
+  const 前 = Schema.parse({ 户: { 101: 创建户节点(0) }, 系统: { _绝对时段: 41, _序章完成: true } });
+  前.户['101'].妻._怀孕 = {
+    状态: '已受孕',
+    受孕绝对时段: 0,
+    预计告知绝对时段: 42,
+    告知绝对时段: -1,
+    受孕场次标识: 'undo-pregnancy',
+    上次判定日: 1,
+    连续未中次数: 0,
+    告知文案: '',
+    已曝光: false,
+  };
+  const 后 = structuredClone(前);
+  后.系统._绝对时段 = 42;
+  后.户['101'].妻._怀孕.状态 = '待告知';
+  后.户['101'].妻._怀孕.告知文案 = '我确认过了，我怀孕了。';
+  const 基线 = 建撤销点({ 前, 后 });
+
+  const 微信确认后 = structuredClone(后);
+  微信确认后.户['101'].妻._怀孕.状态 = '已告知';
+  微信确认后.户['101'].妻._怀孕.告知绝对时段 = 42;
+  assert.equal(判定(基线.点, 微信确认后, 基线.后聊天).有效, true);
+
+  const 非确认改写 = structuredClone(微信确认后);
+  非确认改写.户['101'].妻._怀孕.告知文案 = '被改写的消息';
+  assert.equal(判定(基线.点, 非确认改写, 基线.后聊天).有效, false);
+});
+
 test('旧版本、损坏结构和被篡改的推进前快照一律拒绝', () => {
   const { 点, 后, 后聊天 } = 建撤销点();
   const 旧点 = structuredClone(点);
@@ -311,10 +340,7 @@ test('时间推进恢复记录可跨重载校验，损坏时拒绝猜测且记�
   const 持久记录 = JSON.parse(JSON.stringify(记录));
 
   assert.deepEqual(读取时间推进事务记录(持久记录), 记录);
-  assert.equal(
-    时间聊天状态指纹({ ...前聊天变量, [时间推进事务键]: 持久记录 }),
-    时间聊天状态指纹(前聊天变量),
-  );
+  assert.equal(时间聊天状态指纹({ ...前聊天变量, [时间推进事务键]: 持久记录 }), 时间聊天状态指纹(前聊天变量));
 
   const 坏数据 = structuredClone(持久记录);
   坏数据.推进前数据.现金 += 1;

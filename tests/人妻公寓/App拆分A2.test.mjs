@@ -29,25 +29,25 @@ function 提取导入specifier(源码) {
 }
 
 test('六个 A2 文件非空；App 导入/渲染五组件；新模块无真实反向 import App，无循环边界', () => {
-  for (const [名, 源码] of [
-    ['App.vue', App源码],
-    ['弹窗基础.css', 基础CSS],
-    ...组件源码们,
-  ]) {
+  for (const [名, 源码] of [['App.vue', App源码], ['弹窗基础.css', 基础CSS], ...组件源码们]) {
     assert.ok(源码.length > 0, `${名} 应为非空文件`);
   }
   for (const [组件名] of 组件源码们) {
-    assert.match(
-      App源码,
-      new RegExp(`from '\\./components/${组件名}';`),
-      `App 应导入 components/${组件名}`,
-    );
+    assert.match(App源码, new RegExp(`from '\\./components/${组件名}';`), `App 应导入 components/${组件名}`);
   }
   assert.match(App源码, /<CgLibrary\b[\s\S]*?@close="关闭CG图库"[\s\S]*?\/>/, 'App 模板应挂载 CgLibrary');
   assert.match(App源码, /<MonitorPopup\b[\s\S]*?@close="显示监控 = false"[\s\S]*?\/>/, 'App 模板应挂载 MonitorPopup');
   assert.match(App源码, /<LetterPopup\b[\s\S]*?@close="合上信"[\s\S]*?\/>/, 'App 模板应挂载 LetterPopup');
-  assert.match(App源码, /<EventPromptPopup\b[\s\S]*?@close="事件提示词文本 = ''"[\s\S]*?\/>/, 'App 模板应挂载 EventPromptPopup');
-  assert.match(App源码, /<FeedbackOverlay\b[\s\S]*?@dismiss-loot="拾获卡 = ''"[\s\S]*?\/>/, 'App 模板应挂载 FeedbackOverlay');
+  assert.match(
+    App源码,
+    /<EventPromptPopup\b[\s\S]*?@close="事件提示词文本 = ''"[\s\S]*?\/>/,
+    'App 模板应挂载 EventPromptPopup',
+  );
+  assert.match(
+    App源码,
+    /<FeedbackOverlay\b[\s\S]*?@dismiss-loot="拾获卡 = ''"[\s\S]*?\/>/,
+    'App 模板应挂载 FeedbackOverlay',
+  );
   for (const [名, 源码] of 组件源码们) {
     const 依赖 = 提取导入specifier(源码);
     assert.ok(!依赖.some(s => s.includes('App.vue') || s.includes('/App')), `${名} 不得反向导入 App`);
@@ -67,7 +67,8 @@ test('App 不再内联五段模板，但对应组件拥有原文案与关键 DOM
   assert.match(CG图库源码, /class="cg-tile"/, 'CG图库应保留缩略图格');
   assert.match(CG图库源码, /loading="lazy"/, 'CG图库缩略图应仍 lazy');
   assert.match(CG图库源码, /class="cg-lock"/, 'CG图库应保留未解锁锁标');
-  assert.match(CG图库源码, /🔒/, 'CG图库未解锁仍只显示 🔒');
+  assert.match(CG图库源码, /<Ic n="lock"\s*\/>/, 'CG图库未解锁仍只显示统一锁图标');
+  assert.doesNotMatch(CG图库源码, /🔒/, 'CG图库不再依赖平台 Emoji');
   assert.match(CG图库源码, /查看大图/, 'CG图库解锁 title 保持');
   assert.match(CG图库源码, /尚未解锁/, 'CG图库未解锁 title 保持');
   assert.match(CG图库源码, /‹ 上一页/, 'CG图库分页上一页保持');
@@ -101,7 +102,11 @@ test('图库 state ownership：App 仅保留门牌开关与 open/close，阶段/
   assert.match(App源码, /function 打开CG图库/, 'App 保留打开CG图库');
   assert.match(App源码, /function 关闭CG图库/, 'App 保留关闭CG图库');
   assert.doesNotMatch(App源码, /CG图库阶段/, 'App 不应再有阶段状态');
-  assert.doesNotMatch(App源码, /CG图库页码|CG图库每页|CG图库当前项|CG图库总页数|CG图库全部项|CG图库页签/, 'App 不应再保留图库派生状态');
+  assert.doesNotMatch(
+    App源码,
+    /CG图库页码|CG图库每页|CG图库当前项|CG图库总页数|CG图库全部项|CG图库页签/,
+    'App 不应再保留图库派生状态',
+  );
   assert.doesNotMatch(App源码, /CG预览/, 'App 不应再保留大图预览状态');
   assert.doesNotMatch(App源码, /CG阶段名/, 'App 不应再有阶段名表');
   assert.doesNotMatch(App源码, /切换CG图库阶段|翻CG图库页/, 'App 不应再保留图库切页函数');
@@ -127,7 +132,11 @@ test('图库 state ownership：App 仅保留门牌开关与 open/close，阶段/
 });
 
 test('读信：组件内三条路径 emit close，App 统一 @close="合上信"，正文 computed 在组件，证物槽由 App 传入', () => {
-  assert.match(读信源码, /const 读信正文 = computed\(\(\) => \(查裂缝\(props\.door\)\?\.信全文 \?\? ''\)\)/, '正文 computed 在组件读取查裂缝');
+  assert.match(
+    读信源码,
+    /const 读信正文 = computed\(\(\) => \(查裂缝\(props\.door\)\?\.信全文 \?\? ''\)\)/,
+    '正文 computed 在组件读取查裂缝',
+  );
   assert.match(读信源码, /import Ic from '\.\/Icon\.vue'/, '读信复用 A1 Icon.vue');
   assert.doesNotMatch(App源码, /读信正文/, 'App 不再声明读信正文 computed');
   assert.match(App源码, /@close="合上信"/, 'App 统一绑定 @close=合上信');
@@ -198,7 +207,7 @@ test('弹窗基础.css 精确含通用 selector；四弹窗以 scoped src 使用
   assert.match(基础CSS, /:global\(html\.rq-dark\) \.sheet/, '基础 CSS 应含 dark sheet');
   assert.match(基础CSS, /:global\(html\.rq-dark\) \.sheet-close/, '基础 CSS 应含 dark sheet-close');
   assert.match(基础CSS, /:global\(html\.rq-still\) \*/, '基础 CSS 应含 rq-still 减动效');
-  assert.match(基础CSS, /background:\s*rgba\(38, 40, 56, 0\.97\);/, 'dark sheet 声明应精确复制');
+  assert.match(基础CSS, /background:\s*var\(--surface-sheet\);/, 'sheet 明暗表面应由语义令牌统一');
   assert.match(基础CSS, /backdrop-filter: blur\(4px\) saturate\(0\.9\);/, 'mask 关键声明应保留');
 
   for (const [名, 源码] of [
@@ -208,7 +217,11 @@ test('弹窗基础.css 精确含通用 selector；四弹窗以 scoped src 使用
     ['事件提示词.vue', 事件提示词源码],
   ]) {
     assert.match(源码, /<style scoped src="\.\/弹窗基础\.css"><\/style>/, `${名} 应以 scoped src 用基础 CSS`);
-    assert.equal((源码.match(/<style\b/g) ?? []).length, (源码.match(/<style scoped/g) ?? []).length, `${名} 所有样式块都应 scoped`);
+    assert.equal(
+      (源码.match(/<style\b/g) ?? []).length,
+      (源码.match(/<style scoped/g) ?? []).length,
+      `${名} 所有样式块都应 scoped`,
+    );
   }
   assert.doesNotMatch(反馈提示源码, /弹窗基础\.css/, '反馈只复制 .ui-kicker，不引入 mask/sheet 无关 CSS');
 
@@ -216,12 +229,20 @@ test('弹窗基础.css 精确含通用 selector；四弹窗以 scoped src 使用
   assert.match(App源码, /^\.sheet \{/m, 'App 共享基础 .sheet 规则仍存在');
   assert.match(App源码, /^\.btn \{/m, 'App 共享基础 .btn 规则仍存在');
   assert.match(App源码, /^\.ui-kicker \{/m, 'App 共享基础 .ui-kicker 规则仍存在');
-  assert.doesNotMatch(App源码, /^\.shop-hero \{/m, 'App 已移除 .shop-hero（A5a 商店拆出，监控经 scoped 弹窗基础 CSS 自取）');
+  assert.doesNotMatch(
+    App源码,
+    /^\.shop-hero \{/m,
+    'App 已移除 .shop-hero（A5a 商店拆出，监控经 scoped 弹窗基础 CSS 自取）',
+  );
 });
 
 test('五组专属 CSS 已从 App 移除并出现在正确组件；App 仍保留无关基础/未拆卡片规则', () => {
   assert.doesNotMatch(App源码, /\.cg-library|\.cg-tile|\.cg-lock|\.cg-preview/, 'App 不应再有图库专属 CSS');
-  assert.doesNotMatch(App源码, /\.cam-row|\.cam-room|\.cam-face|\.cam-main|\.cam-rec|rec-blink/, 'App 不应再有监控专属 CSS');
+  assert.doesNotMatch(
+    App源码,
+    /\.cam-row|\.cam-room|\.cam-face|\.cam-main|\.cam-rec|rec-blink/,
+    'App 不应再有监控专属 CSS',
+  );
   assert.doesNotMatch(App源码, /^\.letter \{/m, 'App 不应再有 .letter 基础');
   assert.doesNotMatch(App源码, /\.truth-fragments/, 'App 不应再有证物槽 CSS');
   assert.doesNotMatch(App源码, /\.event-prompt-view/, 'App 不应再有事件提示词 CSS');
@@ -259,13 +280,29 @@ test('五组专属 CSS 已从 App 移除并出现在正确组件；App 仍保留
 
 test('组件 props/emits/import 边界与地址/门牌 domain import 正确；无 ?url；不触碰 A1 契约', () => {
   assert.match(CG图库源码, /from '\.\.\/\.\.\/\.\.\/stageConfig'/, 'CG图库应从 stageConfig 取户静态表/门牌');
-  assert.match(CG图库源码, /from '\.\.\/\.\.\/\.\.\/脚本\/游戏逻辑\/成人CG系统'/, 'CG图库应从成人CG系统取角色CG列表/类型');
+  assert.match(
+    CG图库源码,
+    /from '\.\.\/\.\.\/\.\.\/脚本\/游戏逻辑\/成人CG系统'/,
+    'CG图库应从成人CG系统取角色CG列表/类型',
+  );
   assert.match(CG图库源码, /成人CG基址/, 'CG图库仍用成人CG基址拼地址');
-  assert.match(CG图库源码, /defineProps<\{[\s\S]*door: 门牌[\s\S]*unlocked: Set<string>[\s\S]*\}>/, 'CG图库 props 契约 door/unlocked');
+  assert.match(
+    CG图库源码,
+    /defineProps<\{[\s\S]*door: 门牌[\s\S]*unlocked: Set<string>[\s\S]*\}>/,
+    'CG图库 props 契约 door/unlocked',
+  );
   assert.match(监控源码, /from '\.\.\/\.\.\/\.\.\/stageConfig'/, '监控应从 stageConfig 取户静态表/门牌');
-  assert.match(监控源码, /defineProps<\{[\s\S]*rooms: readonly 门牌\[\][\s\S]*backgroundUrl: \(door: string\) => string[\s\S]*avatarUrl: \(name: string\) => string[\s\S]*\}>/, '监控 props 契约');
+  assert.match(
+    监控源码,
+    /defineProps<\{[\s\S]*rooms: readonly 门牌\[\][\s\S]*backgroundUrl: \(door: string\) => string[\s\S]*avatarUrl: \(name: string\) => string[\s\S]*\}>/,
+    '监控 props 契约',
+  );
   assert.match(读信源码, /from '\.\.\/\.\.\/\.\.\/stageConfig'/, '读信应从 stageConfig 取查裂缝/门牌');
-  assert.match(读信源码, /defineProps<\{[\s\S]*door: 门牌[\s\S]*evidenceSlots: readonly \{ 标: string; 图: string \}\[\][\s\S]*\}>/, '读信 props 契约');
+  assert.match(
+    读信源码,
+    /defineProps<\{[\s\S]*door: 门牌[\s\S]*evidenceSlots: readonly \{ 标: string; 图: string \}\[\][\s\S]*\}>/,
+    '读信 props 契约',
+  );
 
   for (const [名, 源码] of [
     ['App.vue', App源码],

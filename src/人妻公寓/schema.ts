@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const 当前MVU数据版本 = 7;
+export const 当前MVU数据版本 = 8;
 
 type 原始记录 = Record<string, unknown>;
 
@@ -12,10 +12,7 @@ function 是记录(value: unknown): value is 原始记录 {
   return 原型 === null || Object.getPrototypeOf(原型) === null;
 }
 
-/**
- * rq0.62 是最后一条旧档兼容边界。之后版本只接受本版 initvar 创建的存档；
- * 刷新、重掷和回档仍由同版本快照体系负责，不再逐级改写旧版业务数据。
- */
+/** v0.81 只接受本版 initvar 创建的存档；刷新、重掷和回档仍由同版本快照体系负责。 */
 export function 验证当前MVU存档版本(input: unknown): void {
   if (!是记录(input)) {
     throw new Error('人妻公寓存档结构损坏：stat_data 必须是对象。请新建聊天开始游戏。');
@@ -24,9 +21,9 @@ export function 验证当前MVU存档版本(input: unknown): void {
   const 系统 = 是记录(input.系统) ? input.系统 : undefined;
   const 版本 = 系统?._数据版本;
   if (!系统 || !Object.prototype.hasOwnProperty.call(系统, '_数据版本') || 版本 !== 当前MVU数据版本) {
-    const 显示版本 = typeof 版本 === 'number' && Number.isInteger(版本) ? String(版本) : 'rq0.62或更早';
+    const 显示版本 = typeof 版本 === 'number' && Number.isInteger(版本) ? String(版本) : '未知';
     throw new Error(
-      `0.62 后不兼容旧存档：当前存档版本为 ${显示版本}，本脚本要求版本 ${当前MVU数据版本}。请新建聊天开始游戏。`,
+      `v0.81 不兼容其他版本存档：当前存档版本为 ${显示版本}，本脚本要求数据版本 ${当前MVU数据版本}。请新建聊天开始游戏。`,
     );
   }
 }
@@ -86,7 +83,7 @@ const absolutePeriod = (def: number) =>
     .transform(v => (isNaN(v) ? def : Math.max(0, Math.floor(v))))
     .prefault(def);
 
-/** 楼层标记(-1 = 未设置/旧档首见校准)。
+/** 楼层标记(-1 = 未设置/首次校准)。
  * 下限取 min(-1, def):zod 的 .prefault 会让默认值走完整 transform 管道,
  * 固定夹 -1 会把 -999 这类"从未发生"哨兵吃掉(2026-07-26 审计 H4:荣耀洞开局误报冷却)。 */
 const floorMark = (def: number) =>
@@ -173,7 +170,7 @@ const 妻状态 = z
         已结算冷落日: nonNegInt(0),
       })
       .prefault({}),
-    /** 堕落触底后的脚本专属安抚账；非“无”状态时普通 AI 堕落增减双向冻结。 */
+    /** 堕落触底后的脚本专属安抚账；仅对仍具冷落资格（阶段≥2，302需入列）的妻，非“无”状态才双向冻结普通 AI 堕落增减。 */
     _冷落余波: z
       .object({
         状态: z.enum(['无', '待诉苦', '安抚中']).catch('无').prefault('无'),
@@ -182,11 +179,48 @@ const 妻状态 = z
         已安抚楼: nonNegInt(0),
         /** 每个正文楼最多计一次安抚；手机私聊不走正文楼，不能推进。 */
         上次安抚正文楼: floorMark(-1),
+        /** 每名角色每个世界日最多三件成功礼物可替代安抚；随楼层快照回档。 */
+        送礼安抚日: floorMark(-1),
+        当日送礼安抚次数: nonNegInt(0),
       })
       .prefault({}),
     /** 同日堕落收益账(2026-07-27 拍板C,根治"关房间刷一天直通下一阶段"):AI 涨幅当日累计,
      *  超每日上限的楼戏照演账不涨;脚本大额结算(正戏/特殊场景)不走此账。随楼层快照回滚自洽 */
     _堕落日账: z.object({ 日: floorMark(-1), 值: nonNegInt(0) }).prefault({}),
+    /** 怀孕全生命周期由脚本维护；“已受孕/待告知”均不得进入正文、手机 AI 或界面。 */
+    _怀孕: z
+      .object({
+        状态: z.enum(['未孕', '已受孕', '待告知', '已告知']).catch('未孕').prefault('未孕'),
+        受孕绝对时段: floorMark(-1),
+        预计告知绝对时段: floorMark(-1),
+        告知绝对时段: floorMark(-1),
+        受孕场次标识: z.string().prefault(''),
+        /** 只有易孕日内的有效无保护阴道内射才占用当天判定。 */
+        上次判定日: floorMark(-1),
+        /** 有效判定连续失败次数；0/1/2 分别对应下一次 60%/80%/100%。 */
+        连续未中次数: z.coerce
+          .number()
+          .catch(0)
+          .transform(v => (isNaN(v) ? 0 : _.clamp(Math.floor(v), 0, 2)))
+          .prefault(0),
+        /** 到期瞬间按当时阶段与关系数值冻结；只供确定性微信通知使用。 */
+        告知文案: z.string().prefault(''),
+        /** 高风闻下孕情已成为公开硬证据；持久保存，避免风闻事件账裁剪后错误恢复为私密认知。 */
+        已曝光: z.boolean().catch(false).prefault(false),
+        /** 曝光后的丈夫登门由脚本独立排期；变体标识保持字符串，给后续丈夫结局注册新演法。 */
+        丈夫登门: z
+          .object({
+            状态: z.enum(['无', '待触发', '进行中', '已完成']).catch('无').prefault('无'),
+            排期绝对时段: floorMark(-1),
+            变体标识: z.string().prefault(''),
+            当前拍: nonNegInt(0),
+            /** 玩家在登门开始前把安神助眠剂交给妻子后置真；过程不进入正文。 */
+            隐藏圆场: z.boolean().catch(false).prefault(false),
+            已结算: z.boolean().catch(false).prefault(false),
+          })
+          .prefault({}),
+      })
+      .prefault({}),
     /** 当前阶段攻略线路：每户只保存一条活动线路，不为24条路线扩散布尔变量。完成位图低4位对应四个固定节点。 */
     _阶段线路: z
       .object({
@@ -478,7 +512,7 @@ const 当前Schema = z.object({
 
   系统: z
     .object({
-      /** 当前存档契约版本；0.62 后只接受完全同版数据，不再执行旧档迁移。 */
+      /** 当前存档契约版本；v0.81 只接受完全同版数据。 */
       _数据版本: z.literal(当前MVU数据版本).prefault(当前MVU数据版本),
       _坏结局: z.string().prefault(''), // 单向锁:非空=全冻结,快照只注入终局指引
       /** 一次性剧情事件队列(| 分隔;写阶段转存 _已注入事件 供同楼重roll重放,防护10) */
@@ -489,6 +523,8 @@ const 当前Schema = z.object({
           内容: z.string().prefault(''),
         })
         .prefault({}),
+      /** `观察者门牌>孕妇门牌>受孕场次` → 首次当面评价成功楼；同楼重掷重放，后续楼才视为已消费。 */
+      _孕情初见评价楼: z.record(z.string(), floorMark(-1)).catch({}).prefault({}),
       _母亲撞见次数: nonNegInt(0), // 静默暗账:母亲入列时折算初始堕落+破墙正戏差分
       /** P5 母亲入列(2026-07-19):301 到阶段2 时置真——地图头像亮起,302 从背景板转攻略对象 */
       _母亲入列: z.coerce.boolean().catch(false).prefault(false),
@@ -599,6 +635,8 @@ const 当前Schema = z.object({
           场次标识: z.string().prefault(''),
           结束方式: z.string().prefault(''),
           最终位置: z.string().prefault(''),
+          /** 多人场景冻结收尾时的主焦点；受孕判定只认这一名明确对象。 */
+          收尾对象门牌: z.string().prefault(''),
           保护状态: z.string().prefault(''),
           当前行为: z.string().prefault(''),
           有效楼数: nonNegInt(0),
@@ -627,15 +665,17 @@ const 当前Schema = z.object({
           活跃任务: 管理任务列表.prefault([]),
           完成票据: z.array(z.string()).catch([]).prefault([]),
           本期完成摘要: z
-            .array(管理任务完成摘要.catch({
-              任务: '',
-              类型: '公共',
-              级别: '日常',
-              地点: '',
-              门牌: '',
-              按期: false,
-              方式: '',
-            }))
+            .array(
+              管理任务完成摘要.catch({
+                任务: '',
+                类型: '公共',
+                级别: '日常',
+                地点: '',
+                门牌: '',
+                按期: false,
+                方式: '',
+              }),
+            )
             .catch([])
             .transform(items => items.filter(item => item.任务.trim() && item.地点.trim()))
             .prefault([]),
@@ -649,7 +689,10 @@ const 当前Schema = z.object({
           记分条目: 胜任记分列表.prefault([]),
           /** 粉刷使用期 +3；当前考核期达到此值才可再次使用。 */
           粉刷冷却至期: floorMark(-1),
-          通牒主因: z.enum(['', ...胜任责任类别们]).catch('').prefault(''),
+          通牒主因: z
+            .enum(['', ...胜任责任类别们])
+            .catch('')
+            .prefault(''),
           通牒原因: z.string().prefault(''),
           /** 同一危险轮次只允许母亲介入一次；回到不满或更好并完成一次考核后重置。 */
           母亲圆场: z

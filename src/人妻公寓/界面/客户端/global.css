@@ -13,6 +13,24 @@
   --glass: rgba(255, 255, 255, 0.88);
   --paper-card: #fffefd;
   --cream: #fffaf2;
+  /* 工具层基础语义：场景页可保留自己的构图，只共享表面、尺度、动效与焦点语言。 */
+  --surface-sheet: rgba(255, 255, 255, 0.96);
+  --surface-sheet-border: rgba(255, 255, 255, 0.65);
+  --radius-control: 10px;
+  --radius-card: 14px;
+  --radius-sheet: 18px;
+  --radius-pill: 999px;
+  --control-icon-sm: 30px;
+  --motion-fast: 150ms;
+  --motion-base: 180ms;
+  --focus-ring-color: color-mix(in srgb, var(--field-focus) 48%, transparent);
+  /* 表单与极小系统标签：组件只消费语义，不再各自猜日夜颜色和可读下限。 */
+  --field-bg: #fffefd;
+  --field-text: #242126;
+  --field-placeholder: #6f6a76;
+  --field-border: rgba(41, 35, 44, 0.18);
+  --field-focus: #ff4f9a;
+  --font-micro: 10px;
   /* 点色(初星六色取四,粉为主) */
   --pink: #ff4f9a;
   --pink-soft: #ffd7e7;
@@ -70,6 +88,13 @@ html.rq-dark {
   --glass: rgba(34, 36, 50, 0.88);
   --paper-card: #262838;
   --cream: #2a2734;
+  --surface-sheet: rgba(38, 40, 56, 0.97);
+  --surface-sheet-border: rgba(255, 255, 255, 0.1);
+  --field-bg: #303246;
+  --field-text: #f1edf7;
+  --field-placeholder: #b7b2c4;
+  --field-border: rgba(255, 255, 255, 0.22);
+  --field-focus: #ff77af;
   --pink-soft: rgba(255, 79, 154, 0.24);
   --blue-soft: rgba(38, 169, 244, 0.2);
   --line: rgba(255, 255, 255, 0.16);

@@ -51,6 +51,45 @@ export function 楼务微信消息仍有效(消息: Pick<微信承接消息, '�
   return !!任务id && 有效楼务任务id.has(任务id);
 }
 
+/**
+ * 找出“当前正文楼之后刚完成一轮玩家→本人回复”的可靠在场人物。
+ * 微信消息用发送时的正文末楼作分支锚：正文失败/取消时末楼不变，下一次重试仍可承接；
+ * 正文成功后末楼前进，旧往返自然失去一次性即时资格，无需新增会跨分支漂移的消费状态。
+ */
+export function 筛选待正文承接人物(
+  消息: readonly 微信承接消息[],
+  人物: readonly 微信承接人物[],
+  截止楼: number,
+  截止时段: number,
+  有效楼务任务id们: readonly string[] = [],
+): 微信承接人物[] {
+  if (!Number.isFinite(截止楼) || !Number.isFinite(截止时段)) return [];
+  const 人物们 = [...new Map(人物.filter(item => item.门牌 && item.人物).map(item => [item.门牌, item])).values()];
+  const 有效楼务任务id = new Set(有效楼务任务id们);
+  return 人物们.filter(item => {
+    let 玩家待回复 = false;
+    for (const message of 消息) {
+      if (
+        message.会话 !== item.门牌 ||
+        message.楼 !== 截止楼 ||
+        (message.发 !== '我' && message.发 !== '对方') ||
+        message.类 === '撤回' ||
+        !楼务微信消息仍有效(message, 有效楼务任务id) ||
+        !在截止点内(message, 截止楼, 截止时段) ||
+        !清洗聊天文本(message.文)
+      ) {
+        continue;
+      }
+      if (message.发 === '我') {
+        玩家待回复 = true;
+        continue;
+      }
+      if (玩家待回复) return true;
+    }
+    return false;
+  });
+}
+
 /** 纯函数边界：正文只读取当前时间线内、可靠在场本人的近期私聊。 */
 export function 编译近期微信胶囊(
   消息: readonly 微信承接消息[],

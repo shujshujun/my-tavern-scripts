@@ -388,7 +388,7 @@ const 地图点位 = computed(() =>
 
 .outing-launch small {
   color: #5b84ac;
-  font: 800 7px/1.2 var(--font-mono);
+  font: 800 var(--font-micro) / 1.2 var(--font-mono);
   letter-spacing: 0.14em;
 }
 
@@ -1040,7 +1040,7 @@ const 地图点位 = computed(() =>
 
 .act-kicker {
   font-family: var(--font-mono);
-  font-size: 8px;
+  font-size: var(--font-micro);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--ink-faint);
@@ -1186,7 +1186,7 @@ const 地图点位 = computed(() =>
 }
 
 .spot-note {
-  font-size: 9px;
+  font-size: var(--font-micro);
   line-height: 1;
   color: var(--ink-faint);
 }

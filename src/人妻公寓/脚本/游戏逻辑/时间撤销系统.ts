@@ -192,6 +192,22 @@ export function 时间状态指纹(value: unknown): string {
   return `tf1:${text.length}:${十六进制(h1)}${十六进制(h2)}${十六进制(h3)}${十六进制(h4)}`;
 }
 
+/**
+ * 微信自动落库后的“待告知→已告知”只是同一时间结果的异步公开确认，不应让刚建立的
+ * 时间撤销点失效。这里只归一这两个脚本专属字段；受孕本身、到期文案和其他孕情变化
+ * 仍完整参加指纹，后续亲密互动或任何业务变更照常令撤销点失效。
+ */
+function 时间撤销MVU指纹(data: SchemaType): string {
+  const 视图 = _.cloneDeep(data) as SchemaType;
+  for (const 节点 of Object.values(视图.户)) {
+    const 孕情 = 节点.妻._怀孕;
+    if (孕情.状态 !== '待告知' && 孕情.状态 !== '已告知') continue;
+    孕情.状态 = '待告知';
+    孕情.告知绝对时段 = -1;
+  }
+  return 时间状态指纹(视图);
+}
+
 function 聊天一致性视图(vars: Record<string, unknown>): Record<string, unknown> {
   const 微信 = 是记录(vars._微信) ? vars._微信 : {};
   const 消息 = Array.isArray(微信.消息) ? 微信.消息 : [];
@@ -299,10 +315,7 @@ export function 读取时间推进事务记录(raw: unknown): 时间推进事务
   if (!解析.success || 读MVU版本(解析.data) !== 当前MVU数据版本) return null;
   const 推进前数据 = 解析.data as SchemaType;
   const 推进前聊天 = _.cloneDeep(raw.推进前聊天) as 精确聊天快照;
-  if (
-    时间状态指纹(推进前数据) !== raw.推进前数据指纹 ||
-    时间状态指纹(推进前聊天) !== raw.推进前聊天指纹
-  ) {
+  if (时间状态指纹(推进前数据) !== raw.推进前数据指纹 || 时间状态指纹(推进前聊天) !== raw.推进前聊天指纹) {
     return null;
   }
   return {
@@ -404,7 +417,7 @@ export function 创建时间撤销点(参数: 创建时间撤销点参数): 时�
     推进前数据指纹: 时间状态指纹(推进前数据),
     推进前聊天,
     推进前聊天指纹: 时间状态指纹(推进前聊天),
-    推进后数据指纹: 时间状态指纹(推进后数据),
+    推进后数据指纹: 时间撤销MVU指纹(推进后数据),
     推进后聊天指纹: 时间聊天状态指纹(参数.推进后聊天变量),
   };
 }
@@ -474,7 +487,7 @@ export function 判定时间撤销点(raw: unknown, 上下文: 时间撤销校�
     }
     if (时间状态指纹(前数据) !== raw.推进前数据指纹) return 无效('推进前 MVU 快照损坏');
     if (时间状态指纹(raw.推进前聊天) !== raw.推进前聊天指纹) return 无效('推进前聊天快照损坏');
-    if (时间状态指纹(当前数据) !== raw.推进后数据指纹) return 无效('推进后的 MVU 已变化');
+    if (时间撤销MVU指纹(当前数据) !== raw.推进后数据指纹) return 无效('推进后的 MVU 已变化');
     if (时间聊天状态指纹(上下文.当前聊天变量) !== raw.推进后聊天指纹) {
       return 无效('推进后的聊天状态已变化');
     }

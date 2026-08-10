@@ -151,8 +151,8 @@ function 创建UIPrefs(options: UIPrefs选项) {
   function 持久化设置() {
     try {
       localStorage.setItem(主题存储键, 暗色.value ? '1' : '0'); // 兼容旧键
-      // 合并写:同一个键还承载脚本侧写入的 变量解析通道/MVU外置默认V074已初始化 与
-      // 设置组件写入的 二次变量结算/内置变量解析,整体覆写会冲掉它们。
+      // 合并写:同一个键还承载脚本侧写入的 变量解析通道/MVU外置默认V080已初始化 与
+      // 设置组件写入的内置变量解析、严格审计等解析字段，整体覆写会冲掉它们。
       let 已存: Record<string, unknown> = {};
       try {
         const raw = localStorage.getItem(设置存储键);
@@ -208,7 +208,7 @@ function 创建UIPrefs(options: UIPrefs选项) {
     应用界面偏好();
   }
 
-  /** 重置纯 UI 默认值并清存储键；解析字段的既有重置语义(二次结算关闭/MVU 刷新)由设置组件负责。 */
+  /** 只重置纯 UI 默认值；共享存储键里的变量解析字段必须保留。 */
   function 重置界面偏好() {
     主题模式.value = '日间';
     字号档.value = '中';
@@ -217,13 +217,13 @@ function 创建UIPrefs(options: UIPrefs选项) {
     省流.value = false;
     减动效.value = false;
     立绘显示.value = true;
+    应用界面偏好();
+    持久化设置();
     try {
-      localStorage.removeItem(设置存储键);
       localStorage.removeItem(主题存储键);
     } catch {
       /* ignore */
     }
-    应用界面偏好();
   }
 
   // ── 夜间模式(html.rq-dark 令牌覆盖;localStorage 记住偏好) ──

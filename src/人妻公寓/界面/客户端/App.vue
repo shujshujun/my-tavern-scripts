@@ -365,18 +365,24 @@
             v-for="项 in 头像列表"
             :key="项.门牌"
             class="avatar"
-            :class="项.态"
-            :title="项.妻名 + '(' + 项.门牌 + ')'"
+            :class="[项.态, 项.冷落态, 项.怀孕态]"
+            :title="`${项.妻名}(${项.门牌})${项.冷落说明 ? ` · ${项.冷落说明}` : ''}`"
             @click="!静音会议正式中 && (选中门牌 = 项.门牌)"
           >
             <img
               v-if="!头像失效[项.妻名]"
               class="avatar-glyph img"
               :src="头像图(项.妻名)"
-              :alt="项.妻名"
+              :alt="项.冷落说明 ? `${项.妻名}，${项.冷落说明}` : 项.妻名"
               @error="头像失效[项.妻名] = true"
             />
-            <span v-else class="avatar-glyph">{{ 项.妻名[0] }}</span>
+            <span
+              v-else
+              class="avatar-glyph"
+              role="img"
+              :aria-label="项.冷落说明 ? `${项.妻名}，${项.冷落说明}` : 项.妻名"
+              >{{ 项.妻名[0] }}</span
+            >
             <span class="avatar-name">{{ 项.妻名 }}</span>
           </div>
         </div>
@@ -398,6 +404,7 @@
               'portraits-many': 立绘列表.length >= 4,
               'story-glory': !!荣耀洞图,
               'story-adult-cg': 显示成人CG,
+              'story-visual-only': 正文隐藏,
               'story-special-interaction': 录像带交互幕 || 静音会议交互幕,
               'story-mute-meeting': 静音会议显示组合图,
               'story-intimacy-open': 性爱进行中 && 亲密抽屉展开,
@@ -412,7 +419,7 @@
             :title="正文隐藏 ? '显示正文' : '隐藏正文,欣赏画面'"
             @click.stop="正文隐藏 = !正文隐藏"
           >
-            {{ 正文隐藏 ? '👁' : '🙈' }}
+            <Ic :n="正文隐藏 ? 'eye' : 'eyeOff'" />
           </button>
           <MuteMeetingStage
             :formal="静音会议正式中"
@@ -1145,11 +1152,16 @@ import {
 } from '../../stageConfig';
 import { 解析绝对时段 } from '../../周作息';
 import { 丈夫在楼, 妻位置推算 } from '../../脚本/游戏逻辑/楼层时钟';
+import { 余波有冻结效力 } from '../../脚本/游戏逻辑/冷落系统';
+import { 怀孕已公开 } from '../../脚本/游戏逻辑/怀孕系统';
+import { 安眠药可圆场, 丈夫登门药物窗口已开启 } from '../../脚本/游戏逻辑/丈夫登门系统';
 import { 列出地点管理任务 } from '../../脚本/游戏逻辑/管理任务系统';
 import { 规范荣耀洞上次时段 } from '../../脚本/游戏逻辑/荣耀洞';
 import { 列出阶段线路候选详情, type 阶段线路候选 } from '../../脚本/游戏逻辑/阶段线路系统';
 // 客户端只需要无副作用的聊天身份读取；禁止经手机系统兼容门面把宿主渲染组合根打进 iframe。
 import { 当前聊天ID } from '../../脚本/游戏逻辑/手机/运行时上下文';
+// 纯函数模块：客户端直连可安全用于目标时段的地图赴约位置派生。
+import { 手机邀约计划状态, type 手机邀约计划 } from '../../脚本/游戏逻辑/手机/邀约计划';
 import { 手机锚消息签名 } from '../../脚本/游戏逻辑/手机时间线租约';
 import { 判定时间撤销点, 是时间撤销地点, 时间撤销点键 } from '../../脚本/游戏逻辑/时间撤销系统';
 import { 风闻事件安全摘要 } from '../../脚本/游戏逻辑/风闻系统';
@@ -1159,7 +1171,6 @@ import { 清洗预设输出, type 预设正文标签 } from '../../脚本/游戏
 import { 更新有效流式正文 } from '../../脚本/游戏逻辑/正文生成完整性';
 import {
   行动资源门槛,
-  行动疑似性爱,
   距离下级经验,
   玩家资源已满,
   资源上限,
@@ -1234,6 +1245,7 @@ import {
   专注训练手册道具图,
   蛋白粉道具图,
   素材基址,
+  角色立绘候选,
   成人CG基址,
   CG解锁存储键,
 } from './assets';
@@ -1502,13 +1514,26 @@ function 刷粘滞() {
   }
 }
 
-/** 赴约(微信"+"约出来,2026-07-18):有效期内她的位置=玩家所在;回档/过期自动失效 */
-const 赴约妻 = ref<string | null>(null);
+/** 赴约显示(微信"+"约出来):旧即时赴约=有效期内她在玩家身边;v0.80 新预约计划=目标时段她在约定地点。回档/过期自动失效 */
+const 赴约妻 = ref<{ m: string; 地点: string } | null>(null);
 function 刷赴约() {
   try {
-    const p = _.get(getVariables({ type: 'chat' }), '_赴约') as { m?: string; 起楼?: number; 至楼?: number } | null;
+    const 变量 = getVariables({ type: 'chat' });
+    const p = _.get(变量, '_赴约') as { m?: string; 起楼?: number; 至楼?: number } | null;
     const 楼 = 末楼号.value;
-    赴约妻.value = p?.m && (p.起楼 ?? 0) <= 楼 && (p.至楼 ?? -1) >= 楼 ? p.m : null;
+    if (p?.m && (p.起楼 ?? 0) <= 楼 && (p.至楼 ?? -1) >= 楼) {
+      // 旧即时赴约:她的位置=玩家所在。
+      赴约妻.value = { m: p.m, 地点: 当前房间.value ?? '大堂' };
+      return;
+    }
+    // v0.80 新预约计划:只有赴约时段(当前钟===目标钟)才在约定地点现身;
+    // 待赴约/已过期/创建点在回档后失效的都按固定作息显示,不提前现身。
+    const 计划 = _.get(变量, '_手机邀约计划') as 手机邀约计划 | null;
+    if (手机邀约计划状态(计划, 绝对时段.value, 楼) === '赴约中') {
+      赴约妻.value = { m: 计划!.m, 地点: 计划!.地点 };
+      return;
+    }
+    赴约妻.value = null;
   } catch {
     赴约妻.value = null;
   }
@@ -1516,7 +1541,7 @@ function 刷赴约() {
 /** 妻位置显示统一口：特殊场景、赴约、连续对话优先，最后才读取固定周作息。 */
 function 妻现位(m: 门牌): string {
   if (静音会议正式中.value && 是静音会议候选门牌(m) && 静音会议演出妻.value.includes(m)) return '管理员室';
-  if (赴约妻.value === m) return 当前房间.value ?? '大堂';
+  if (赴约妻.value?.m === m) return 赴约妻.value.地点;
   if (粘滞在场.value.位置 && 粘滞在场.value.们.includes(m)) return 粘滞在场.value.位置;
   return 妻位置推算(m, 绝对时段.value, data.value.户[m]);
 }
@@ -2265,8 +2290,9 @@ const 立绘列表 = computed<立绘项[]>(() => {
       const 妻名 = 户静态表[m].妻名;
       const 穿着 = data.value.户[m]?.妻._穿着SKU;
       const sku = 穿着?._立绘 ?? 穿着?.内衣 ?? 穿着?.外装;
-      const 差分 = sku ? `${素材基址}/立绘/${妻名}_${sku}.webp` : '';
-      return 差分 && !立绘失效.value[差分] ? 差分 : `${素材基址}/立绘/${妻名}.webp`;
+      return (
+        角色立绘候选(妻名, sku, 怀孕已公开(data.value, m)).find(src => !立绘失效.value[src]) ?? ''
+      );
     })
     .filter(src => !立绘失效.value[src])
     .slice(0, 6);
@@ -2307,21 +2333,30 @@ function 刷新在场() {
 }
 
 const 头像列表 = computed(() =>
-  可见门牌.value.map(m => ({
-    门牌: m,
-    妻名: 户静态表[m].妻名,
-    态: 静音会议正式中.value
-      ? 是静音会议候选门牌(m) && 静音会议演出妻.value.includes(m)
-        ? 静音会议场景.value.重点妻 === m || 静音会议场景.value.会后妻.includes(m)
+  可见门牌.value.map(m => {
+    const 妻 = data.value.户[m]?.妻;
+    const 冷落状态 = 妻 && 余波有冻结效力(m, 妻, data.value.系统._母亲入列) ? 妻._冷落余波.状态 : '无';
+    const 怀孕公开 = 怀孕已公开(data.value, m);
+    const 冷落说明 = 冷落状态 === '待诉苦' ? '冷落状态：等待回应' : 冷落状态 === '安抚中' ? '冷落状态：安抚中' : '';
+    return {
+      门牌: m,
+      妻名: 户静态表[m].妻名,
+      态: 静音会议正式中.value
+        ? 是静音会议候选门牌(m) && 静音会议演出妻.value.includes(m)
+          ? 静音会议场景.value.重点妻 === m || 静音会议场景.value.会后妻.includes(m)
+            ? 'focus'
+            : 'ambient'
+          : 'away'
+        : 在场.value.焦点.includes(m)
           ? 'focus'
-          : 'ambient'
-        : 'away'
-      : 在场.value.焦点.includes(m)
-        ? 'focus'
-        : 在场.value.在场.includes(m)
-          ? 'ambient'
-          : 'away',
-  })),
+          : 在场.value.在场.includes(m)
+            ? 'ambient'
+            : 'away',
+      冷落态: 冷落状态 === '待诉苦' ? 'neglect-pending' : 冷落状态 === '安抚中' ? 'neglect-soothing' : '',
+      怀孕态: 怀孕公开 ? 'pregnant' : '',
+      冷落说明: [冷落说明, 怀孕公开 ? '已告知怀孕' : ''].filter(Boolean).join('；'),
+    };
+  }),
 );
 
 // ── 游戏内输入(固定0楼:行动发给脚本回合引擎,不碰酒馆输入框) ──
@@ -2362,6 +2397,8 @@ const { 房间动作, 当前房间动作, 普通房间动作, 确认已到达动
     处理管理任务: ({ 任务id, 选项id, 地点 }) => eventEmit('人妻公寓:处理管理任务', { 任务id, 选项id, 地点 }),
   },
 });
+// 保留 App 对组合器完整返回契约的接线；当前模板只直接消费普通房间动作。
+void 当前房间动作;
 const 流式段 = ref<string[]>([]);
 // ── 特殊场景「录像带」交互(App A7a:状态机/5 秒与 10 连点/完整失败记账/补偿迁入 composables/useVideoTape.ts) ──
 // App 只注入运行态 refs 与业务事件回调;事件名与载荷保持原样,composable 不直连事件总线。
@@ -2874,6 +2911,12 @@ const 背包列表 = computed(() =>
         : [];
     const 全局线路候选 = 全局运作候选.length === 1 ? 全局运作候选[0] : undefined;
     const 母亲 = data.value.户['302']?.妻;
+    const 安眠药圆场对象 =
+      id === '安眠药'
+        ? 可见门牌.value
+            .filter(m => 妻在玩家身边(m) && 安眠药可圆场(data.value, m))
+            .map(m => ({ 门牌: m, 妻名: 户静态表[m].妻名, 提示: '交给她处理即将到来的丈夫登门' }))
+        : [];
     const 母亲赠送项 = 母亲
       ? {
           门牌: '302' as 门牌,
@@ -2911,22 +2954,24 @@ const 背包列表 = computed(() =>
         !data.value.系统._已完成特殊场景.includes('静音会议'),
       // 安全套只允许在空闲时为下一场准备；进行中不展示一个注定会被后端拒绝的按钮。
       可用资源: !!配?.资源效果 && !(id === '安全套' && 性爱进行中.value),
-      // 礼物等可送出:须与她同处一室(当面);工具/运作/药物/性癖不走"送"
-      // (药物=晋阶按钮自动消耗;性癖=装载;302特例:回家时可送妈东西——破妈妈墙的唯一入口,入列前也通)
+      // 礼物等可送出:须与她同处一室；普通药物不走“送”，安眠药只在丈夫登门圆场窗口例外。
+      // 性癖=装载；302特例:回家时可送妈东西——破妈妈墙的唯一入口,入列前也通。
       可送对象:
-        !配?.常驻 &&
-        id !== '录像带' &&
-        id !== '静音会议' &&
-        !信门牌 &&
-        id !== '针孔摄像头' &&
-        !['补给', '运作', '工具', '药物', '性癖'].includes(配?.类别 ?? '')
-          ? [
-              ...可见门牌.value
-                .filter(m => 妻在玩家身边(m))
-                .map(m => (m === '302' && 母亲赠送项 ? 母亲赠送项 : { 门牌: m, 妻名: 户静态表[m].妻名 })),
-              ...(当前房间.value === '302' && 母亲赠送项 ? [母亲赠送项] : []),
-            ].filter((v, i, a) => a.findIndex(x => x.门牌 === v.门牌) === i)
-          : [],
+        id === '安眠药'
+          ? 安眠药圆场对象
+          : !配?.常驻 &&
+              id !== '录像带' &&
+              id !== '静音会议' &&
+              !信门牌 &&
+              id !== '针孔摄像头' &&
+              !['补给', '运作', '工具', '药物', '性癖'].includes(配?.类别 ?? '')
+            ? [
+                ...可见门牌.value
+                  .filter(m => 妻在玩家身边(m))
+                  .map(m => (m === '302' && 母亲赠送项 ? 母亲赠送项 : { 门牌: m, 妻名: 户静态表[m].妻名 })),
+                ...(当前房间.value === '302' && 母亲赠送项 ? [母亲赠送项] : []),
+              ].filter((v, i, a) => a.findIndex(x => x.门牌 === v.门牌) === i)
+            : [],
       // 性癖装载(P5):对象=阶段够档且槽未满的妻(不必同室,装载是管理动作)
       可装载对象:
         配?.类别 === '性癖'
@@ -3028,8 +3073,11 @@ const 货架 = computed(() => {
       空文案: '有些节目要等合适的人到齐才开演。',
     });
   if (最高阶段 >= 4) 架.push({ 页签: '性癖', 商品: 按类('性癖'), 空文案: '这一栏的货,认人。到货会通知你。' });
-  // 药物页签不常驻(P5):剧情节点开窗——当前唯一窗口=母亲入列且到阶段2(她的首夜必需)
-  if (data.value?.系统?._母亲入列 && (data.value.户['302']?.妻.当前阶段 ?? 0) >= 2) {
+  // 药物页签不常驻(P5):母亲首夜线路或丈夫登门圆场窗口开启时才展示。
+  if (
+    (data.value?.系统?._母亲入列 && (data.value.户['302']?.妻.当前阶段 ?? 0) >= 2) ||
+    丈夫登门药物窗口已开启(data.value)
+  ) {
     架.push({ 页签: '药物', 商品: 按类('药物'), 空文案: '柜台下面的东西,问了才有。' });
   }
   return 架;
@@ -3884,16 +3932,16 @@ onMounted(() => {
       // 先同步消息历史，再刷新 MVU；时间事务必须等新时钟真正 pull 完成后才能重新点按钮。
       await 取卷轴();
       刷新可重掷();
-      刷赴约();
-      刷新在场();
-      刷新行动选项();
-      刷新偷窥待选();
       try {
         await Promise.resolve((store as unknown as { pull?: () => void | Promise<void> }).pull?.());
       } catch {
         /* store 未带 pull 时靠轮询兜底 */
       }
       await nextTick();
+      刷赴约();
+      刷新在场();
+      刷新行动选项();
+      刷新偷窥待选();
       同步静音会议界面();
     } finally {
       发送中.value = false;
@@ -3910,14 +3958,16 @@ onMounted(() => {
     正文幕归属状态.value = 创建正文幕归属(当前房间.value);
     await 取卷轴();
     刷新可重掷();
-    刷赴约();
-    刷新在场();
-    刷新偷窥待选();
     try {
-      (store as unknown as { pull?: () => void }).pull?.();
+      await Promise.resolve((store as unknown as { pull?: () => void | Promise<void> }).pull?.());
     } catch {
       /* store 未带 pull 时靠轮询兜底 */
     }
+    await nextTick();
+    刷赴约();
+    刷新在场();
+    刷新行动选项();
+    刷新偷窥待选();
   });
   eventOn('人妻公寓:回合失败', async (原因: string) => {
     发送中.value = false;
@@ -3938,15 +3988,15 @@ onMounted(() => {
     // 消息/MVU/在场三路真值，不能保留生成期间 store 曾观察到的临时 assistant 快照。
     await 取卷轴();
     刷新可重掷();
-    刷赴约();
-    刷新在场();
-    刷新行动选项();
     try {
       await Promise.resolve((store as unknown as { pull?: () => void | Promise<void> }).pull?.());
     } catch {
       /* store 未带 pull 时靠轮询兜底 */
     }
     await nextTick();
+    刷赴约();
+    刷新在场();
+    刷新行动选项();
     if (将自动重试) {
       取消后自动重试.value = false;
       // 等回滚后的消息、MVU 与 Vue 画面都重新对齐，再重发原行动。
@@ -4246,14 +4296,14 @@ onUnmounted(() => {
   color: var(--ink);
   background: var(--glass);
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   box-shadow: 0 2px 8px rgba(30, 26, 38, 0.08);
   cursor: pointer;
   transition:
-    transform 0.18s ease,
-    box-shadow 0.18s ease,
-    border-color 0.18s ease,
-    background 0.18s ease;
+    transform var(--motion-base) ease,
+    box-shadow var(--motion-base) ease,
+    border-color var(--motion-base) ease,
+    background var(--motion-base) ease;
 }
 
 .btn:hover:not(:disabled) {
@@ -4264,6 +4314,11 @@ onUnmounted(() => {
 
 .btn:active:not(:disabled) {
   transform: translateY(0);
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 2px;
 }
 
 .btn:disabled {
@@ -4374,10 +4429,41 @@ onUnmounted(() => {
   box-shadow: 0 3px 10px rgba(30, 26, 38, 0.16);
 }
 
+.avatar.ambient .avatar-glyph {
+  border-color: rgba(255, 79, 154, 0.52);
+  box-shadow:
+    0 0 0 1px rgba(255, 79, 154, 0.08),
+    0 3px 12px rgba(255, 79, 154, 0.2);
+}
+
 .avatar.focus .avatar-glyph {
   border-color: var(--pink);
   box-shadow: 0 4px 14px rgba(255, 79, 154, 0.4);
   animation: avatar-bounce 0.4s ease;
+}
+
+/* 冷落余波优先覆盖位置辉光；离场仍保留原透明度，避免把冷落误认成“正在现场”。 */
+.avatar.neglect-pending .avatar-glyph {
+  border-color: #596bb9;
+  box-shadow:
+    0 0 0 2px rgba(89, 107, 185, 0.18),
+    0 0 16px rgba(89, 107, 185, 0.48);
+}
+
+.avatar.neglect-soothing .avatar-glyph {
+  border-color: #a96819;
+  box-shadow:
+    0 0 0 2px rgba(169, 104, 25, 0.16),
+    0 0 15px rgba(169, 104, 25, 0.42);
+}
+
+/* 只有微信告知真正落库后才出现；玫瑰金外圈覆盖冷落色，但不改变在场/离场透明度。 */
+.avatar.pregnant .avatar-glyph {
+  border-color: #d58a93;
+  box-shadow:
+    0 0 0 2px rgba(213, 138, 147, 0.2),
+    0 0 18px rgba(224, 143, 153, 0.56),
+    0 3px 12px rgba(109, 61, 70, 0.2);
 }
 
 @keyframes avatar-bounce {
@@ -4489,7 +4575,10 @@ onUnmounted(() => {
 }
 
 .adult-cg-stage img {
-  position: relative;
+  /* 脱离 grid 的固有尺寸计算：竖图若作为 grid item，会先按 2:3 宽度撑高再被舞台裁掉，
+     导致桌面窗口虽然声明 contain，实际仍只显示中段。钉住四边后 contain 才以舞台为画框。 */
+  position: absolute;
+  inset: 0;
   z-index: 1;
   width: 100%;
   height: 100%;
@@ -4500,6 +4589,16 @@ onUnmounted(() => {
 
 .adult-cg-stage.loading img {
   opacity: 0;
+}
+
+/* 纯画面欣赏(正文隐藏)+成人CG:仅两者同时成立才把 CG 提到亲密底栏(z12)之上完整展示,
+   恢复按钮同步提到 CG 之上保证显示正文按钮仍可点;恢复正文后 class 消失,dock/抽屉原样回来,不卸载不重置 */
+.story-wrap.story-adult-cg.story-visual-only .adult-cg-stage {
+  z-index: 20;
+}
+
+.story-wrap.story-adult-cg.story-visual-only .story-hide-btn {
+  z-index: 21;
 }
 
 /* 立绘槽负责定位与裁边；图片只按槽高等比缩放。这样同场角色不会因透明画布宽度不同被 contain 二次缩矮。 */
@@ -4581,21 +4680,25 @@ onUnmounted(() => {
   top: 8px;
   right: 10px;
   z-index: 3;
-  width: 30px;
-  height: 30px;
+  width: var(--control-icon-sm);
+  height: var(--control-icon-sm);
   border: 1px solid rgba(255, 255, 255, 0.55);
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   background: rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(4px);
-  font-size: 14px;
   line-height: 1;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(20, 24, 40, 0.18);
-  transition: transform 0.15s ease;
+  transition: transform var(--motion-fast) ease;
 }
 
 .story-hide-btn:hover {
   transform: translateY(-1px);
+}
+
+.story-hide-btn:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 2px;
 }
 
 :global(html.rq-dark) .story-hide-btn {
@@ -5020,7 +5123,7 @@ onUnmounted(() => {
 
 .intimacy-panel > header small {
   color: #c94779;
-  font: 800 7px/1 var(--font-mono);
+  font: 800 var(--font-micro) / 1 var(--font-mono);
   letter-spacing: 0.16em;
 }
 
@@ -5318,7 +5421,7 @@ onUnmounted(() => {
 
 .scene-result-card > header small {
   color: #b17727;
-  font: 800 7px/1 var(--font-mono);
+  font: 800 var(--font-micro) / 1 var(--font-mono);
   letter-spacing: 0.16em;
 }
 
@@ -5580,9 +5683,9 @@ onUnmounted(() => {
   max-height: 94%;
   display: flex;
   flex-direction: column;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(255, 255, 255, 0.65);
-  border-radius: 18px;
+  background: var(--surface-sheet);
+  border: 1px solid var(--surface-sheet-border);
+  border-radius: var(--radius-sheet);
   padding: 14px 16px;
   box-shadow: var(--shadow);
   overflow-y: auto;
@@ -5595,23 +5698,32 @@ onUnmounted(() => {
   top: 8px;
   right: 10px;
   z-index: 5;
-  width: 26px;
-  height: 26px;
+  width: var(--control-icon-sm);
+  height: var(--control-icon-sm);
   display: grid;
   place-items: center;
-  background: #fff;
+  background: var(--field-bg);
   border: 1px solid var(--line);
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   color: var(--ink-soft);
   font-size: 0.8em;
   cursor: pointer;
-  transition: all 0.15s;
+  transition:
+    color var(--motion-fast) ease,
+    background var(--motion-fast) ease,
+    border-color var(--motion-fast) ease,
+    transform var(--motion-fast) ease;
 }
 
 .sheet-close:hover {
   color: #fff;
   background: var(--pink);
   border-color: var(--pink);
+}
+
+.sheet-close:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 2px;
 }
 
 .sheet-title {
@@ -6672,7 +6784,7 @@ button.battery:focus-visible {
 
 .rent-ledger small {
   color: #91633f;
-  font: 700 0.58em/1.1 var(--font-mono);
+  font: 700 var(--font-micro) / 1.1 var(--font-mono);
   letter-spacing: 0.08em;
 }
 
@@ -6687,7 +6799,7 @@ button.battery:focus-visible {
   height: 20px;
   display: grid;
   place-items: center;
-  font: 700 7px/1 var(--font-mono);
+  font: 700 var(--font-micro) / 1 var(--font-mono);
   font-style: normal;
   color: #885226;
   background: rgba(255, 255, 255, 0.64);
@@ -6883,13 +6995,13 @@ button.battery:focus-visible {
 }
 
 :global(html.rq-dark) .sheet {
-  background: rgba(38, 40, 56, 0.97);
-  border-color: rgba(255, 255, 255, 0.1);
+  background: var(--surface-sheet);
+  border-color: var(--surface-sheet-border);
 }
 
 :global(html.rq-dark) .sheet-close,
 :global(html.rq-dark) .edit-area {
-  background: #2c2e40;
+  background: var(--field-bg);
   color: var(--ink);
 }
 
@@ -6915,8 +7027,108 @@ button.battery:focus-visible {
   color: #ff9ec4;
 }
 
+:global(html.rq-dark) .avatar.ambient .avatar-glyph {
+  border-color: rgba(255, 158, 196, 0.68);
+  box-shadow:
+    0 0 0 1px rgba(255, 158, 196, 0.12),
+    0 3px 12px rgba(255, 79, 154, 0.24);
+}
+
 :global(html.rq-dark) .avatar.focus .avatar-glyph {
   border-color: var(--pink);
+}
+
+:global(html.rq-dark) .avatar.neglect-pending .avatar-glyph {
+  border-color: #8193e2;
+  box-shadow:
+    0 0 0 2px rgba(129, 147, 226, 0.2),
+    0 0 18px rgba(111, 132, 221, 0.58);
+}
+
+:global(html.rq-dark) .avatar.neglect-soothing .avatar-glyph {
+  border-color: #d59a4a;
+  box-shadow:
+    0 0 0 2px rgba(213, 154, 74, 0.18),
+    0 0 17px rgba(213, 154, 74, 0.5);
+}
+
+:global(html.rq-dark) .avatar.pregnant .avatar-glyph {
+  border-color: #f0aeb4;
+  box-shadow:
+    0 0 0 2px rgba(240, 174, 180, 0.2),
+    0 0 20px rgba(225, 132, 145, 0.64),
+    0 3px 12px rgba(0, 0, 0, 0.32);
+}
+
+/* ── 窗口化电脑紧凑档：只重排视觉，不把电脑误判为手机业务。 ── */
+@media (min-width: 541px) and (max-width: 900px) {
+  .page {
+    padding: 6px 10px 8px;
+  }
+
+  .masthead {
+    padding-bottom: 4px;
+    margin-bottom: 4px;
+  }
+
+  .hud {
+    flex-direction: column;
+    gap: 6px;
+    padding: 6px 10px;
+    margin-bottom: 5px;
+  }
+
+  .hud-time {
+    min-width: 0;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding-right: 0;
+    padding-bottom: 4px;
+    border-right: 0;
+    border-bottom: 1px dashed var(--line-soft);
+  }
+
+  .hud-stats {
+    width: 100%;
+    grid-template-columns: 0.72fr repeat(4, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  .battery,
+  .hstat {
+    min-width: 0;
+    padding-right: 6px;
+    padding-left: 6px;
+  }
+
+  .avatar-row {
+    gap: 3px 9px;
+    margin-bottom: 4px;
+  }
+
+  .avatar-glyph {
+    width: 46px;
+    height: 46px;
+  }
+
+  .dock {
+    padding: 5px 7px;
+    margin-top: 5px;
+  }
+
+  .dock-btn {
+    padding: 5px 2px 4px;
+  }
+
+  .dock-btn .ic {
+    width: 22px;
+    height: 22px;
+  }
+
+  .dock-btn span {
+    font-size: var(--font-micro);
+  }
 }
 
 /* ── 移动端紧凑档(2026-07-18 用户反馈:手机上正文只剩一小条)──
@@ -7003,7 +7215,7 @@ button.battery:focus-visible {
   }
 
   .hud-time .ui-kicker {
-    font-size: 8px;
+    font-size: var(--font-micro);
   }
 
   .battery {
@@ -7024,7 +7236,7 @@ button.battery:focus-visible {
   .battery small,
   .hstat small {
     overflow: hidden;
-    font-size: 0.55em;
+    font-size: var(--font-micro);
     text-overflow: ellipsis;
     white-space: nowrap;
   }
@@ -7067,7 +7279,7 @@ button.battery:focus-visible {
   }
 
   .avatar-name {
-    font-size: 0.64em;
+    font-size: var(--font-micro);
   }
 
   /* 场景条/选项/输入/撤回行:半高半距 */
@@ -7191,7 +7403,7 @@ button.battery:focus-visible {
   }
 
   .dock-btn span {
-    font-size: 0.6em;
+    font-size: var(--font-micro);
   }
 }
 /* ═══ 特殊场景：静音会议 ═══ */

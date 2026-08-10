@@ -296,11 +296,20 @@ watch(
 
 <template>
   <!-- ═══════════ rq0.34 首次游玩准备（0.74 新手向导版）：第一次进卡自动出现，标题页可随时重开 ═══════════ -->
-  <div v-if="open" class="mask setup-mask" @click.self="emit('update:open', false)">
+  <div
+    v-if="open"
+    class="mask setup-mask"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="setup-sheet-title"
+    @click.self="emit('update:open', false)"
+  >
     <div class="sheet setup-sheet">
       <button class="sheet-close" aria-label="关闭（稍后处理）" @click="emit('update:open', false)">✕</button>
-      <h3 class="setup-title">开始前准备一下</h3>
-      <p class="setup-lead">按顺序完成 3 项即可开始，做完的项会记住。</p>
+      <header class="sheet-heading">
+        <h3 id="setup-sheet-title" class="sheet-heading-title">开始前准备一下</h3>
+        <p class="sheet-heading-lead">按顺序完成 3 项即可开始，做完的项会记住。</p>
+      </header>
 
       <div class="setup-statuses">
         <span :class="{ on: 酒馆助手已安装 }">
@@ -381,7 +390,7 @@ watch(
             }}。
           </p>
           <div class="setup-db-actions">
-            <button class="btn mini" :disabled="酒馆助手检测中 || 数据库检测中" @click="刷新全部检测">
+            <button class="btn mini" :disabled="酒馆助手检测中 || 数据库检测中" @click="刷新全部检测()">
               {{ 酒馆助手检测中 || 数据库检测中 ? '检测中…' : '重新检测全部' }}
             </button>
             <button class="btn mini" @click="从说明打开数据库设置">打开数据库设置</button>
@@ -430,21 +439,6 @@ watch(
   max-height: 94%;
   padding: 17px 18px 15px;
   background: linear-gradient(145deg, rgba(255, 247, 239, 0.94), rgba(245, 250, 255, 0.96)), #fff;
-}
-
-.setup-title {
-  margin: 3px 0 4px;
-  color: var(--ink);
-  font-size: 1.16em;
-  font-weight: 900;
-  letter-spacing: 0.08em;
-}
-
-.setup-lead {
-  margin: 0 0 10px;
-  color: var(--ink-soft);
-  font-size: 0.85em;
-  line-height: 1.55;
 }
 
 .setup-statuses {

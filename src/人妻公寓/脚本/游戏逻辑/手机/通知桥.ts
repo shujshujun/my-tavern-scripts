@@ -3,6 +3,7 @@ import type { 门牌 } from '../../../stageConfig';
 import { 户静态表, 门牌列表 } from '../../../stageConfig';
 import { 取绝对时段 } from '../楼层时钟';
 import { 编译管理任务通知文案 } from '../管理任务通知';
+import { 列出待告知孕情, 怀孕微信键, type 怀孕送达凭据 } from '../怀孕系统';
 import { 姐妹群成员 } from '../雌竞系统';
 import { 已入住微信妻友门牌 } from '../微信好友规则';
 import { 创建手机时间线租约, 手机时间线租约仍有效 } from '../手机时间线租约';
@@ -96,6 +97,30 @@ export function 编译管理任务微信通知(data: SchemaType, 楼: number, �
   });
 }
 
+/** 孕情消息只读取时间事务已经冻结的文案；隐藏期不会出现在这里，也不调用 AI。 */
+export function 编译怀孕微信通知(data: SchemaType, 楼: number, 时: number): 微信消息[] {
+  return 列出待告知孕情(data).flatMap(凭据 => {
+    const 文 = data.户[凭据.门牌]?.妻._怀孕.告知文案.trim();
+    if (!文) return [];
+    return [
+      {
+        楼,
+        时,
+        会话: 凭据.门牌,
+        发: '对方' as const,
+        文,
+        类: '文本' as const,
+        键: 怀孕微信键(凭据.门牌, 凭据.场次标识),
+      },
+    ];
+  });
+}
+
+function 通知孕情已送达(凭据们: readonly 怀孕送达凭据[]): void {
+  if (!凭据们.length) return;
+  eventEmit('人妻公寓:怀孕微信已送达', 凭据们);
+}
+
 export async function 同步管理任务微信(data: SchemaType): Promise<boolean> {
   const 楼 = 末楼();
   const 时 = 取绝对时段(data);
@@ -103,13 +128,25 @@ export async function 同步管理任务微信(data: SchemaType): Promise<boolea
   if (!时间线租约) return false;
   const 库 = 读库();
   const 已有键 = new Set(库.消息.flatMap(消息 => (消息.键 ? [消息.键] : [])));
-  const 新消息 = 编译管理任务微信通知(data, 楼, 时).filter(消息 => !已有键.has(消息.键 as string));
-  if (!新消息.length) return false;
+  const 孕情凭据 = 列出待告知孕情(data);
+  const 已存在孕情 = 孕情凭据.filter(凭据 => 已有键.has(怀孕微信键(凭据.门牌, 凭据.场次标识)));
+  const 候选消息 = [...编译管理任务微信通知(data, 楼, 时), ...编译怀孕微信通知(data, 楼, 时)];
+  const 新消息 = 候选消息.filter(消息 => !已有键.has(消息.键 as string));
+  const 新消息键 = new Set(新消息.flatMap(消息 => (消息.键 ? [消息.键] : [])));
+  const 新增孕情 = 孕情凭据.filter(凭据 => 新消息键.has(怀孕微信键(凭据.门牌, 凭据.场次标识)));
+  if (!新消息.length) {
+    通知孕情已送达(已存在孕情);
+    return false;
+  }
   const 时间线仍有效 = () => 手机时间线租约仍有效(时间线租约, 当前聊天ID(), SillyTavern.chat ?? [], 当前手机绝对时段());
   const 已写 = await 写库增量({ 新圈: [], 新消息, 节拍改: {} }, 时间线仍有效);
   if (已写) {
+    // 只确认数据库原本已有或本次真正写入的孕情键；其他楼务消息成功不能替空文案孕情“送达”。
+    通知孕情已送达([...已存在孕情, ...新增孕情]);
     请求刷新手机红点();
     请求手机重绘();
+  } else {
+    通知孕情已送达(已存在孕情);
   }
   return 已写;
 }

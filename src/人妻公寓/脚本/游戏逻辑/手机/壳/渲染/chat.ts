@@ -3,6 +3,7 @@ import { 户静态表 } from '../../../../../stageConfig';
 import { 旧钟楼跨度转时段 } from '../../../楼层时钟';
 import { 手机记录时间字, 手机消息时间组键 } from '../../../手机时间显示';
 import { 创建微信撤回定位 } from '../../../微信消息撤回';
+import { 创建微信引用定位, 定位微信消息, 解析微信引用展示, 微信消息可引用 } from '../../../微信消息引用';
 import { 头像块, el, 根文档, 群消息头像名, 私聊图片地址 } from '../资源与皮肤';
 import {
   手机聊天批次,
@@ -12,6 +13,8 @@ import {
   写会话草稿,
   取会话草稿,
   删除会话草稿,
+  删除会话引用草稿,
+  取会话引用草稿,
   标记会话输入聚焦,
   会话输入聚焦中,
   会话正在输入,
@@ -20,14 +23,15 @@ import {
   清除手机聊天状态刷新计时,
   手机聊天渲染世代仍当前,
 } from '../会话瞬态';
-import { 邀约节拍键 } from '../../数据层';
+import { 会话有未读, 玩家名, 写实时手机已读, 邀约节拍键 } from '../../数据层';
+import { 请求刷新手机红点 } from '../../UI刷新';
 import { 取渲染业务端口 } from './业务端口';
 import { 渲染头, type 渲染上下文 } from './共享';
 
 /** 单聊/群聊页：时间线过滤、气泡左右/撤回墓碑、长按撤回、图片/通话类型、
  *  草稿与焦点恢复、绿黄红灯、取消/立即发送、输入状态 interval/渲染世代护栏、邀约 + 菜单与会议硬门。 */
 export function 渲染chat(上下文: 渲染上下文): void {
-  const { 屏, root, 库, 当前绝对时段, 在当前时间线, 会议手机, 本次渲染世代 } = 上下文;
+  const { 屏, root, 库, 楼, 当前绝对时段, 在当前时间线, 会议手机, 本次渲染世代 } = 上下文;
   const 当前页 = 上下文.读取当前页();
   const 会话 = 当前页.会话!;
   const 名 =
@@ -89,20 +93,28 @@ export function 渲染chat(上下文: 渲染上下文): void {
     } else {
       const 我方 = m.发 === '我';
       const 消息头像 = 我方 ? '主角' : 群消息头像名(会话, m.文, 对方头像名);
+      const 引用展示 = 解析微信引用展示(库.消息, m.引用, 玩家名(), 对方头像名, 36, m.会话);
+      const 引用卡 = 引用展示
+        ? `<div class="rqp-msg-quote${引用展示.已撤回 ? ' withdrawn' : ''}">${_.escape(
+            引用展示.已撤回 ? 引用展示.摘要 : `${引用展示.发送者}: ${引用展示.摘要}`,
+          )}</div>`
+        : '';
       const 消息行 = el(
         'div',
         `rqp-line ${我方 ? 'me' : 'ta'}`,
-        `${头像块(消息头像)}<div class="rqp-b ${我方 ? 'me' : 'ta'}">${_.escape(m.文)}${
+        `${头像块(消息头像)}<div class="rqp-b ${我方 ? 'me' : 'ta'}">${引用卡}<span class="rqp-msg-text">${_.escape(m.文)}</span>${
           m.图
             ? `<img class="rqp-chat-photo" src="${私聊图片地址(m.图)}" loading="lazy" onerror="this.remove()"/>`
             : ''
         }</div>`,
       );
       const 撤回定位 = 创建微信撤回定位(库.消息, 消息索引);
-      const 我方气泡 = 消息行.querySelector('.rqp-b.me') as HTMLElement | null;
-      if (撤回定位 && 我方气泡) {
-        我方气泡.classList.add('recallable');
-        取渲染业务端口()?.绑定玩家微信撤回(我方气泡, 屏, 撤回定位);
+      const 引用定位 = 创建微信引用定位(库.消息, 消息索引);
+      const 气泡 = 消息行.querySelector('.rqp-b') as HTMLElement | null;
+      if (气泡 && 引用定位) {
+        气泡.classList.add('actionable');
+        if (撤回定位) 取渲染业务端口()?.绑定玩家微信撤回(气泡, 屏, 撤回定位, 批次键, 引用定位);
+        else 取渲染业务端口()?.绑定玩家微信撤回(气泡, 屏, null, 批次键, 引用定位);
       }
       泡区.appendChild(消息行);
     }
@@ -122,6 +134,7 @@ export function 渲染chat(上下文: 渲染上下文): void {
   // 输入(群=只发物业通知;父亲单聊只读——他只打电话)
   if (会话 !== '父亲') {
     const 是妻 = 会话 !== '群' && 会话 !== '姐妹群';
+    const 输入区 = el('div', 'rqp-input-wrap');
     const 行 = el('div', 'rqp-input');
     if (是妻 && !会议手机.场景中) {
       // "+"菜单(2026-07-18 用户提案:仿真微信;第一期只有"约出来")
@@ -142,6 +155,25 @@ export function 渲染chat(上下文: 渲染上下文): void {
           ? '插一句…'
           : '发消息…';
     ta.value = 取会话草稿(批次键) ?? '';
+    const 引用草稿 = 取会话引用草稿(批次键);
+    const 引用目标 = 定位微信消息(库.消息, 引用草稿);
+    if (引用草稿 && (!微信消息可引用(引用目标) || 引用目标?.会话 !== 会话)) 删除会话引用草稿(批次键);
+    else if (引用草稿 && 引用目标) {
+      const 展示 = 解析微信引用展示(库.消息, 引用草稿, 玩家名(), 对方头像名, 28, 会话);
+      if (展示 && !展示.已撤回) {
+        const 预览 = el(
+          'div',
+          'rqp-quote-draft',
+          `<span><b>${_.escape(展示.发送者)}</b>${_.escape(展示.摘要)}</span><button type="button" title="取消引用">×</button>`,
+        );
+        (预览.querySelector('button') as HTMLButtonElement).addEventListener('click', () => {
+          删除会话引用草稿(批次键);
+          标记会话输入聚焦(批次键);
+          上下文.重绘();
+        });
+        输入区.appendChild(预览);
+      }
+    }
     const 发钮 = el('button', '', '发送') as HTMLButtonElement;
     const 更新批次状态展示 = () => {
       const 展示 = 批次状态文案();
@@ -222,12 +254,16 @@ export function 渲染chat(上下文: 渲染上下文): void {
       }
       ta.value = '';
       删除会话草稿(批次键);
+      const 引用 = 取会话引用草稿(批次键);
+      删除会话引用草稿(批次键);
+      屏.querySelector('.rqp-quote-draft')?.remove();
       手机聊天批次.继续输入(批次键);
-      void 取渲染业务端口()?.发消息(会话, 文);
+      void 取渲染业务端口()?.发消息(会话, 文, 引用);
     });
     行.appendChild(ta);
     行.appendChild(发钮);
-    屏.appendChild(行);
+    输入区.appendChild(行);
+    屏.appendChild(输入区);
     更新批次状态展示();
     if (会话输入聚焦中(批次键) && !ta.disabled) {
       setTimeout(() => {
@@ -248,17 +284,38 @@ export function 渲染chat(上下文: 渲染上下文): void {
     }, 250));
     if (是妻 && 当前页.加 && !会议手机.场景中) {
       const 冷 = 当前绝对时段 - (库.节拍[邀约节拍键(会话)] ?? -999) < 旧钟楼跨度转时段(8);
-      const 已约 = !!取渲染业务端口()?.读赴约条(上下文.楼);
+      const 赴约条 = 取渲染业务端口()?.读赴约条(上下文.楼) ?? null;
+      const 已约 = !!赴约条;
       const 面 = el('div', 'rqp-plus');
-      const b = el('button', '', `<i>📍</i>约出来${已约 ? '·已在身边' : 冷 ? '·刚约过' : ''}`) as HTMLButtonElement;
+      const b = el('button', '', `<i>📍</i>约出来${赴约条?.待赴约 ? '·已约好时段' : 已约 ? '·已在身边' : 冷 ? '·刚约过' : ''}`) as HTMLButtonElement;
       b.disabled = 冷 || 已约;
       b.addEventListener('click', () => {
-        上下文.写入当前页({ ...上下文.读取当前页(), 加: false });
-        void 取渲染业务端口()?.约出来(会话 as 门牌);
+        // v0.80:点"约出来"只进安排邀约页(微信内置网页/设置页样式),不发送、不进冷却;
+        // 选定本周某天/某时段/某地点后才由安排页调用业务端口发送。
+        上下文.写入当前页({ ...上下文.读取当前页(), 加: false, 名: 'invite' });
+        上下文.重绘();
       });
       面.appendChild(b);
       屏.appendChild(面);
     }
   }
   体.scrollTop = 体.scrollHeight;
+  // v0.80 已读所有权回渲染层：只有手机仍开着、当前页仍是本会话且确有未读时，
+  // 才异步确认已读并只刷新红点（不重绘，避免 渲染→已读写→重绘 无限循环）。
+  // 从关闭状态重开并直接停留在本 chat 页也会在此确认已读；关闭、切联系人、
+  // 切页面、回档、切档都会令前台校验或时间线租约失效而不写。
+  if (会话有未读(库, 会话, 楼, 当前绝对时段)) {
+    const 前台仍有效 = () =>
+      root.classList.contains('open') &&
+      上下文.读取当前页().名 === 'chat' &&
+      上下文.读取当前页().会话 === 会话;
+    // v0.80 失败收口：变量层异常只记录不重绘，也不得把失败当成功刷新红点。
+    void 写实时手机已读({ 会话 }, 前台仍有效)
+      .then(已写 => {
+        if (已写) 请求刷新手机红点();
+      })
+      .catch(错误 => {
+        console.warn('微信实时已读确认失败', 错误);
+      });
+  }
 }

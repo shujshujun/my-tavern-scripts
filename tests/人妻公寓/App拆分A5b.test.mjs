@@ -11,7 +11,7 @@ const 档案卡源码 = readFileSync(new URL('./components/档案卡.vue', 客�
 const 弹窗基础css = readFileSync(new URL('./components/弹窗基础.css', 客户端目录), 'utf8');
 const A2测试源码 = readFileSync(new URL('../../../../tests/人妻公寓/App拆分A2.test.mjs', 客户端目录), 'utf8');
 const 仪容测试源码 = readFileSync(new URL('../../../../tests/人妻公寓/仪容缩略图.test.mjs', 客户端目录), 'utf8');
-const 存档策略测试源码 = readFileSync(new URL('../../../../tests/人妻公寓/062后存档策略.test.mjs', 客户端目录), 'utf8');
+const 存档策略测试源码 = readFileSync(new URL('../../../../tests/人妻公寓/v080存档策略.test.mjs', 客户端目录), 'utf8');
 const 夜间门测试源码 = readFileSync(new URL('../../../../tests/人妻公寓/夜间触发门.test.mjs', 客户端目录), 'utf8');
 
 /** 只提取 <template>…</template> 段，避免把注释/字符串当模板。 */
@@ -68,8 +68,16 @@ test('App 不再内联档案卡大模板与九组档案派生状态；跨区块�
 });
 
 test('组件拥有完整派生 imports/逻辑；App 仅档案 imports 移除但保留其他消费者；素材来自 ../assets，无 ?url', () => {
-  assert.match(档案卡源码, /import \{[\s\S]*?查考古[\s\S]*?\} from '\.\.\/\.\.\/\.\.\/stageConfig'/, '组件应从 stageConfig 导入查考古');
-  assert.match(档案卡源码, /import \{[\s\S]*?阶段标题[\s\S]*?\} from '\.\.\/\.\.\/\.\.\/stageConfig'/, '组件应从 stageConfig 导入阶段标题');
+  assert.match(
+    档案卡源码,
+    /import \{[\s\S]*?查考古[\s\S]*?\} from '\.\.\/\.\.\/\.\.\/stageConfig'/,
+    '组件应从 stageConfig 导入查考古',
+  );
+  assert.match(
+    档案卡源码,
+    /import \{[\s\S]*?阶段标题[\s\S]*?\} from '\.\.\/\.\.\/\.\.\/stageConfig'/,
+    '组件应从 stageConfig 导入阶段标题',
+  );
   assert.match(
     档案卡源码,
     /import \{ 可晋阶, 可启动母亲药物首夜, 普通首夜时段已满足, 晋阶预约现场已满足 \} from '\.\.\/\.\.\/\.\.\/脚本\/游戏逻辑\/结算系统'/,
@@ -77,8 +85,8 @@ test('组件拥有完整派生 imports/逻辑；App 仅档案 imports 移除但�
   );
   assert.match(
     档案卡源码,
-    /import \{ 读取关系线索 \} from '\.\.\/\.\.\/\.\.\/脚本\/游戏逻辑\/阶段线路系统'/,
-    '组件应从阶段线路系统导入读取关系线索',
+    /import \{ 读取关系线索, 读取开门线索 \} from '\.\.\/\.\.\/\.\.\/脚本\/游戏逻辑\/阶段线路系统'/,
+    '组件应从阶段线路系统导入关系线路与阶段0开门线索',
   );
   assert.match(
     档案卡源码,
@@ -90,31 +98,51 @@ test('组件拥有完整派生 imports/逻辑；App 仅档案 imports 移除但�
     /import \{ 当前天数, 丈夫在楼 \} from '\.\.\/\.\.\/\.\.\/脚本\/游戏逻辑\/楼层时钟'/,
     '组件应从楼层时钟导入丈夫在楼与共享世界日函数',
   );
-  assert.match(档案卡源码, /import \{ 素材基址 \} from '\.\.\/assets'/, '组件从 ../assets 导入素材基址');
-  assert.match(档案卡源码, /import type \{ SchemaType \} from '\.\.\/\.\.\/\.\.\/schema'/, '组件从 ../../../schema type 导入 SchemaType');
+  assert.match(
+    档案卡源码,
+    /import \{ 角色立绘候选 \} from '\.\.\/assets'/,
+    '组件从 ../assets 导入统一立绘候选解析器',
+  );
+  assert.match(
+    档案卡源码,
+    /import type \{ SchemaType \} from '\.\.\/\.\.\/\.\.\/schema'/,
+    '组件从 ../../../schema type 导入 SchemaType',
+  );
 
   // App 移除仅档案 imports，但保留同模块其他消费者
   assert.doesNotMatch(App源码, /查考古/, 'App 不再导入查考古');
   assert.doesNotMatch(App源码, /阶段标题/, 'App 不再导入阶段标题');
-  assert.doesNotMatch(App源码, /可启动母亲药物首夜|普通首夜时段已满足|晋阶预约现场已满足/, 'App 不再导入结算系统晋阶四件套');
+  assert.doesNotMatch(
+    App源码,
+    /可启动母亲药物首夜|普通首夜时段已满足|晋阶预约现场已满足/,
+    'App 不再导入结算系统晋阶四件套',
+  );
   assert.doesNotMatch(App源码, /读取关系线索/, 'App 不再导入读取关系线索');
   assert.doesNotMatch(App源码, /角色CG总数/, 'App 不再导入角色CG总数');
-  assert.match(App源码, /import \{ 丈夫在楼, 妻位置推算 \} from '\.\.\/\.\.\/脚本\/游戏逻辑\/楼层时钟'/, '丈夫在楼其他消费者仍在 App');
+  assert.match(
+    App源码,
+    /import \{ 丈夫在楼, 妻位置推算 \} from '\.\.\/\.\.\/脚本\/游戏逻辑\/楼层时钟'/,
+    '丈夫在楼其他消费者仍在 App',
+  );
   assert.match(
     App源码,
     /import \{ 列出阶段线路候选详情, type 阶段线路候选 \} from '\.\.\/\.\.\/脚本\/游戏逻辑\/阶段线路系统'/,
     '阶段线路候选仍在 App',
   );
-  assert.match(App源码, /import \{[\s\S]*?CG条目[\s\S]*?\} from '\.\.\/\.\.\/脚本\/游戏逻辑\/成人CG系统'/, '成人CG其他符号仍在 App');
-  assert.match(App源码, /import \{[\s\S]*?道具表[\s\S]*?\} from '\.\.\/\.\.\/stageConfig'/, 'stageConfig 其他符号仍在 App');
+  assert.match(
+    App源码,
+    /import \{[\s\S]*?CG条目[\s\S]*?\} from '\.\.\/\.\.\/脚本\/游戏逻辑\/成人CG系统'/,
+    '成人CG其他符号仍在 App',
+  );
+  assert.match(
+    App源码,
+    /import \{[\s\S]*?道具表[\s\S]*?\} from '\.\.\/\.\.\/stageConfig'/,
+    'stageConfig 其他符号仍在 App',
+  );
 
   // 派生逻辑在组件内等价保留
   assert.match(档案卡源码, /if \(!m \|\| !props\.ready \|\| !props\.data\.户\[m\]\) return null;/, '就绪/数据门原样');
-  assert.match(
-    档案卡源码,
-    /夫状态: 丈夫在楼\(props\.data\.户\[m\], m, props\.absolutePeriod\)/,
-    '夫状态派生读 props',
-  );
+  assert.match(档案卡源码, /夫状态: 丈夫在楼\(props\.data\.户\[m\], m, props\.absolutePeriod\)/, '夫状态派生读 props');
   assert.match(档案卡源码, /阶段标题: 阶段标题\(妻\.当前阶段, m\)/, '阶段标题派生');
   assert.match(档案卡源码, /气质描述: 户静态表\[m\]\.初始\?\.气质描述 \?\? ''/, '气质描述派生');
   assert.match(
@@ -134,8 +162,14 @@ test('组件拥有完整派生 imports/逻辑；App 仅档案 imports 移除但�
     2,
     '预约现场调用出现 2 次（选中可晋阶/选中晋阶待现场）',
   );
-  assert.match(档案卡源码, /m === '302' && 可启动母亲药物首夜\(props\.data, props\.currentRoom\)/, '302 母亲药物首夜分支');
+  assert.match(
+    档案卡源码,
+    /m === '302' && 可启动母亲药物首夜\(props\.data, props\.currentRoom\)/,
+    '302 母亲药物首夜分支',
+  );
   assert.match(档案卡源码, /读取关系线索\(props\.data, m\)/, '关系线索读取');
+  assert.match(档案卡源码, /读取开门线索\(props\.data, m\)/, '阶段0开门线索读取');
+  assert.match(档案卡源码, /const 选中关系轨迹 = computed/, '开门与四节点线路统一为只读关系轨迹');
   assert.match(档案卡源码, /watch\(\(\) => props\.door, \(\) => \{/, '门牌变化 watch 在组件');
   assert.match(档案卡源码, /!!妻 && 妻\.当前阶段 >= 4 && props\.wifeNearby/, '要钱=阶段4+wifeNearby');
   assert.match(档案卡源码, /查裂缝\(m\)/, '选中线索/裂缝读查裂缝');
@@ -187,10 +221,18 @@ test('档案模板关键契约全量保持：头像/立绘/三轴/心镜/仪容/
   assert.match(模板段, /ROOM \{\{ 选中档案\.门牌 \}\} · RESIDENT FILE/, 'role kicker');
   assert.match(模板段, /:title="'阶段:' \+ 选中档案\.阶段标题"/, 'hearts 阶段 title');
   assert.match(模板段, /<i v-for="n in 5" :key="n" :class="\{ on: n <= 选中档案\.妻\.当前阶段 \}">♥<\/i>/, '五心');
-  assert.match(模板段, /v-if="!portraitFailed\[选中档案\.立绘图\]"/, '立绘失败门');
-  assert.match(模板段, /:src="选中档案\.基础立绘"/, '立绘失败回退基础立绘');
+  assert.match(模板段, /v-if="选中档案\.立绘图"/, '立绘候选存在门');
+  assert.match(
+    档案卡源码,
+    /角色立绘候选\(户静态表\[m\]\.妻名, 当前立绘SKU, 怀孕公开\)\.find\([\s\S]*?!props\.portraitFailed\[src\]/,
+    '立绘失败后由统一候选解析器逐级回退',
+  );
   assert.match(模板段, /v-for="轴 in 选中档案\.三轴"/, '三轴循环');
-  assert.match(模板段, /role="meter"[\s\S]*?aria-valuemin="0"[\s\S]*?aria-valuemax="100"[\s\S]*?:aria-valuenow="轴\.值"/, '三轴 meter/ARIA');
+  assert.match(
+    模板段,
+    /role="meter"[\s\S]*?aria-valuemin="0"[\s\S]*?aria-valuemax="100"[\s\S]*?:aria-valuenow="轴\.值"/,
+    '三轴 meter/ARIA',
+  );
   assert.match(模板段, /'--level': Math\.max\(0, Math\.min\(100, 轴\.值\)\) \/ 100/, '三轴 clamp 0-1 比例');
   assert.match(模板段, /<b>情绪<\/b> \{\{ 选中档案\.妻\.当前情绪 \}\}/, '心镜情绪');
   assert.match(模板段, /<b>心声<\/b> \{\{ 选中档案\.妻\.当前心理想法 \}\}/, '心镜心声');
@@ -200,8 +242,9 @@ test('档案模板关键契约全量保持：头像/立绘/三轴/心镜/仪容/
   assert.match(模板段, /:class="\{ initial: a\.图id\?\.startsWith\('初始外装_'\) \}"/, '初始外装标记');
   assert.match(模板段, /loading="lazy"/, '仪容图 lazy');
   assert.match(模板段, /<b v-else aria-hidden="true">衣<\/b>/, '道具图失败回退 衣');
-  assert.match(模板段, /v-if="选中档案\.妻\.当前阶段 >= 3" class="dsec dossier-card"/, '开发阶段门');
+  assert.match(模板段, /v-if="选中档案\.妻\.当前阶段 >= 2" class="dsec dossier-card"/, '阶段2起显示CG图库入口');
   assert.match(模板段, /CG \{\{ 选中档案\.CG进度\.已解锁 \}\}\/\{\{ 选中档案\.CG进度\.总数 \}\} ›/, 'CG 进度文案');
+  assert.match(模板段, /<div v-if="选中档案\.妻\.当前阶段 >= 3" class="dev-grid">/, '身体开发数值仍从阶段3才显示');
   assert.match(模板段, /v-for="部位 in 选中档案\.开发"[\s\S]*?:key="部位\.名"/, '开发四部位循环');
   assert.match(模板段, /class="bar dev"[\s\S]*?:style="\{ width: 部位\.值 \+ '%' \}"/, '开发进度条');
   assert.match(
@@ -219,7 +262,11 @@ test('档案模板关键契约全量保持：头像/立绘/三轴/心镜/仪容/
   assert.match(模板段, /此刻\{\{ 选中档案\.夫状态 \}\}/, '夫状态');
   assert.match(模板段, /aria-label="丈夫疑心与信任风险盘"/, '风险盘 aria');
   assert.match(模板段, /<Ic n="lock" \/> 信任[\s\S]*?<Ic n="peep" \/> 疑心/, '风险盘图标');
-  assert.match(模板段, /Math\.min\(95, \(选中档案\.夫\.疑心值 \/ Math\.max\(1, 选中档案\.夫\.疑心值 \+ 选中档案\.夫\.信任值\)\) \* 100\)/, '风险针公式');
+  assert.match(
+    模板段,
+    /Math\.min\(95, \(选中档案\.夫\.疑心值 \/ Math\.max\(1, 选中档案\.夫\.疑心值 \+ 选中档案\.夫\.信任值\)\) \* 100\)/,
+    '风险针公式',
+  );
   assert.match(模板段, /<i class="bar sin" :style="\{ width: 选中档案\.夫\.疑心值 \+ '%' \}"/, '疑心轴');
   assert.match(模板段, /<i class="bar marr" :style="\{ width: 选中档案\.夫\.信任值 \+ '%' \}"/, '信任轴');
   assert.match(模板段, /<b>心里<\/b> \{\{ 选中档案\.夫\.当前心理想法 \}\}/, '丈夫心里');
@@ -233,18 +280,41 @@ test('档案模板关键契约全量保持：头像/立绘/三轴/心镜/仪容/
   assert.match(模板段, /v-if="选中档案\.妻\.裂缝\.已确认 && 选中裂缝" class="dsec"/, '裂缝节');
   assert.match(模板段, /\{\{ 选中裂缝\.诊断 \}\}/, '裂缝诊断');
   assert.match(模板段, /✦ \{\{ 选中裂缝\.对症提示 \}\}/, '对症提示');
-  assert.match(模板段, /class="btn relation-clue-open"[\s\S]*?@click="显示关系线索 = !显示关系线索"/, '关系线索开关');
-  assert.match(模板段, /◇ 关系线索 \{\{ 选中关系线索\.进度 \}\}\/4/, '关系线索进度');
-  assert.match(模板段, /v-if="显示关系线索 && 选中关系线索" class="dsec relation-clue-board"/, '关系线索面板');
-  assert.match(模板段, /下一步 · \{\{ 选中关系线索\.预约 \}\}/, '预约文案');
-  assert.match(模板段, /:class="\{ done: 线索\.完成 \}"/, '线索 done 态');
-  assert.match(模板段, /已到阶段门前，先完成关系线索/, '数值已冻结文案(明确阶段门前与关系线索进度)');
+  assert.match(
+    模板段,
+    /v-if="选中关系轨迹"[\s\S]*?class="relation-clue-open"[\s\S]*?@click="显示关系线索 = !显示关系线索"/,
+    '统一关系轨迹开关',
+  );
+  assert.match(
+    模板段,
+    /:aria-expanded="显示关系线索"[\s\S]*?aria-controls="relation-trace-panel"/,
+    '关系轨迹开关具有展开语义',
+  );
+  assert.match(模板段, /选中关系轨迹\.类型 === '开门' \? '开门线索' : '关系线索'/, '阶段0与四节点线路标题分流');
+  assert.match(模板段, /\{\{ 选中关系轨迹\.进度 \}\}\/4/, '四节点关系进度');
+  assert.match(模板段, /v-if="显示关系线索 && 选中关系轨迹"[\s\S]*?class="dsec relation-clue-board"/, '关系轨迹面板');
+  assert.match(模板段, /class="relation-action"[\s\S]*?\{\{ 选中关系轨迹\.行动提示 \}\}/, '阶段0开门行动提示');
+  assert.match(模板段, /v-if="选中关系轨迹\.预约" class="relation-appointment"/, '预约行动卡');
+  assert.match(
+    模板段,
+    /:class="\{ done: i < 选中关系轨迹\.进度, current: i === 选中关系轨迹\.进度, future: i > 选中关系轨迹\.进度 \}"/,
+    '线索完成/当前/后续三态',
+  );
+  assert.match(
+    模板段,
+    /数值已经到达阶段门前。当前进度 \{\{ 选中关系轨迹\.进度 \}\}\/4/,
+    '数值已冻结文案明确门前与关系线索进度',
+  );
   assert.match(
     模板段,
     /v-if="选中档案\.妻\.当前阶段 > 0 && 选中档案\.妻\.当前阶段 < 5 && 选中档案\.妻\.裂缝\.已确认"[\s\S]*?class="btn rite"[\s\S]*?:disabled="sending \|\| !选中可晋阶"[\s\S]*?@click="emit\('advance', 选中档案\.门牌\)"/,
     '晋阶显示门排除阶段0赠礼旁路，并保留disabled',
   );
-  assert.match(模板段, /选中首夜待晚上 \? '✦ 等到晚上' : 选中晋阶待现场 \? '✦ 按预约见面' : '✦ 跨过界线'/, '三路晋阶文案');
+  assert.match(
+    模板段,
+    /选中首夜待晚上 \? '✦ 等到晚上' : 选中晋阶待现场 \? '✦ 按预约见面' : '✦ 跨过界线'/,
+    '三路晋阶文案',
+  );
   assert.match(
     模板段,
     /v-if="选中可要钱"[\s\S]*?class="btn"[\s\S]*?:disabled="sending"[\s\S]*?title="她的钱,现在也是你的钱"[\s\S]*?@click="emit\('askMoney', 选中档案\.门牌\)"[\s\S]*?¥ 开口要钱\s*<\/button>/,
@@ -365,10 +435,7 @@ test('四份既有测试按所有权读取组件且不弱化；A1–A5a 组件�
   assert.ok(仪容测试源码.includes('auto-fill'), '仪容 84px auto-fill 断言仍在');
   assert.ok(仪容测试源码.includes('App 已随档案卡移除 .attire-grid'), '仪容测试断言 App 已移除');
   assert.match(存档策略测试源码, /components\/档案卡\.vue/, '062 存档策略测试读取档案组件');
-  assert.ok(
-    存档策略测试源码.includes('v-if="选中档案\\.妻\\.裂缝\\.已确认"'),
-    '062 模板断言改查组件',
-  );
+  assert.ok(存档策略测试源码.includes('v-if="选中档案\\.妻\\.裂缝\\.已确认"'), '062 模板断言改查组件');
   assert.match(夜间门测试源码, /components\/档案卡\.vue/, '夜间触发门测试读取档案组件');
   assert.ok(夜间门测试源码.includes('普通首夜时段已满足'), '晋阶时段断言仍在');
   assert.ok(夜间门测试源码.includes("选中首夜待晚上 \\? '✦ 等到晚上'"), '晋阶文案断言仍在');
@@ -382,7 +449,11 @@ test('四份既有测试按所有权读取组件且不弱化；A1–A5a 组件�
   assert.match(App源码, /import FeedbackOverlay from '\.\/components\/反馈提示\.vue';/, 'App 仍导入 A2 反馈提示');
   assert.match(App源码, /import SettingsPopup from '\.\/components\/设置弹窗\.vue';/, 'App 仍导入 A3 设置弹窗');
   assert.match(App源码, /import FirstRunSetup from '\.\/components\/首次准备\.vue';/, 'App 仍导入 A3 首次准备');
-  assert.match(App源码, /import PrologueTitleScreen from '\.\/components\/序章标题屏\.vue';/, 'App 仍导入 A4 序章标题屏');
+  assert.match(
+    App源码,
+    /import PrologueTitleScreen from '\.\/components\/序章标题屏\.vue';/,
+    'App 仍导入 A4 序章标题屏',
+  );
   assert.match(App源码, /import InventoryPopup from '\.\/components\/背包\.vue';/, 'App 仍导入 A5a 背包');
   assert.match(App源码, /import ShopPopup from '\.\/components\/商店\.vue';/, 'App 仍导入 A5a 商店');
   assert.match(App源码, /import \{ useUIPrefs \} from '\.\/composables\/useUIPrefs';/, 'App 仍导入 A3 useUIPrefs');

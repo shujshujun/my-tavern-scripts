@@ -1,6 +1,7 @@
 import type { SchemaType } from '../../schema';
 import { 查道具, 户静态表, type 门牌 } from '../../stageConfig';
 import { 登记攻略风闻 } from './风闻系统';
+import { 判定受孕 } from './怀孕系统';
 import { 独立结算特殊场景中 } from './特殊场景策略';
 
 /** 训练经验达到门槛时派生等级；索引即 LV。 */
@@ -162,8 +163,7 @@ export function 判定角色性爱结果(
   return { 时长评价, 结局态度 };
 }
 
-const 性爱意图词 =
-  /做爱|性交|上床|进入她|插入|抽插|干她|操她|口交|乳交|肛交|后入|骑乘|体位|内射|外射|射精|高潮|性行为/;
+const 性爱意图词 = /做爱|性交|上床|进入她|插入|抽插|干她|操她|口交|乳交|肛交|后入|骑乘|体位|内射|外射|射精|高潮|性行为/;
 
 function 夹取整数(值: number, 下限: number, 上限: number): number {
   return Math.min(上限, Math.max(下限, Math.round(Number.isFinite(值) ? 值 : 下限)));
@@ -467,10 +467,7 @@ function 正文明示参与(输入: 现场楼结算输入, 门牌号: 门牌): b
   return 正文角色参与片段(输入, 门牌号) !== null;
 }
 
-export function 切换性爱主焦点(
-  data: SchemaType,
-  门牌号: 门牌,
-): { 成功: boolean; 提示: string; 变动?: boolean } {
+export function 切换性爱主焦点(data: SchemaType, 门牌号: 门牌): { 成功: boolean; 提示: string; 变动?: boolean } {
   const 场景 = data.系统._性爱场景;
   if (场景.状态 === '空闲') return { 成功: false, 提示: '当前没有进行中的亲密场景。' };
   if (场景.状态 === '收尾中') return { 成功: false, 提示: '已经进入失控收尾，不能再切换主焦点。' };
@@ -524,8 +521,8 @@ function 脚本正戏本楼收尾(data: SchemaType, 旧data: SchemaType, 输入:
 function 本楼是特殊剧情(data: SchemaType, 旧data: SchemaType, 输入: 现场楼结算输入): boolean {
   return Boolean(
     data.系统._特殊场景.id ||
-      旧data.系统._特殊场景.id ||
-      /【(?:特殊场景(?:·|:)|转折正戏|药物首夜|性癖开幕)/.test(输入.本楼事件),
+    旧data.系统._特殊场景.id ||
+    /【(?:特殊场景(?:·|:)|转折正戏|药物首夜|性癖开幕)/.test(输入.本楼事件),
   );
 }
 
@@ -577,13 +574,21 @@ function 空性爱场景(): SchemaType['系统']['_性爱场景'] {
   };
 }
 
-function 结束性爱场景(data: SchemaType, 方式: 性爱结束方式, 最终位置: string): { 圆满: boolean } {
+function 结束性爱场景(
+  data: SchemaType,
+  方式: 性爱结束方式,
+  最终位置: string,
+  指定收尾对象: string = '',
+): { 圆满: boolean } {
   const 场景 = data.系统._性爱场景;
-  const 圆满 = Object.values(场景.参与者).length > 0 && Object.values(场景.参与者).every(项 => 项.满意度 >= 项.满意目标);
+  const 收尾对象门牌 = 指定收尾对象 && 场景.参与者[指定收尾对象] ? 指定收尾对象 : (规范性爱主焦点(场景) ?? '');
+  const 圆满 =
+    Object.values(场景.参与者).length > 0 && Object.values(场景.参与者).every(项 => 项.满意度 >= 项.满意目标);
   data.系统._上次性爱结果 = {
     场次标识: 场景.场次标识,
     结束方式: 方式,
     最终位置,
+    收尾对象门牌,
     保护状态: 场景.保护状态,
     当前行为: 场景.当前行为,
     有效楼数: 场景.有效楼数,
@@ -608,6 +613,7 @@ function 结束性爱场景(data: SchemaType, 方式: 性爱结束方式, 最终
       }),
     ),
   };
+  判定受孕(data, data.系统._上次性爱结果);
   data.系统._性爱场景 = 空性爱场景();
   if (圆满) {
     const 今日 = 玩家当前日(data);
@@ -649,8 +655,7 @@ export function 结算成功现场楼(data: SchemaType, 旧data: SchemaType, 输
   const 中止判定参与者 = 原本在性爱中 ? (Object.keys(旧场景.参与者) as 门牌[]) : 输入.妻在场;
   const 本楼角色中止 = 角色明确中止(输入.正文, 中止判定参与者);
   const 收尾请求位置 = 读取收尾位置(输入.行动);
-  const 主动位置 =
-    原本在性爱中 && 收尾请求位置 && 亲密收尾选项(旧场景).includes(收尾请求位置) ? 收尾请求位置 : '';
+  const 主动位置 = 原本在性爱中 && 收尾请求位置 && 亲密收尾选项(旧场景).includes(收尾请求位置) ? 收尾请求位置 : '';
   const 收尾控制提示 =
     收尾请求位置 && !主动位置 ? `忽略了当前场景不允许的收尾位置“${收尾请求位置}”；本楼不会结束场景。` : '';
   // 计费楼的性爱判定以玩家输入为准(2026-08-03 用户拍板:NSFW 文风下 AI 自己加的搂抱、
@@ -686,7 +691,7 @@ export function 结算成功现场楼(data: SchemaType, 旧data: SchemaType, 输
   // 体力耗尽后的免费强制收尾楼只演结果，不重复扣最后一点。
   if (旧场景.状态 === '收尾中') {
     const 最终位置 = 旧场景.待收尾位置 || 默认失控位置(旧场景);
-    const { 圆满 } = 结束性爱场景(data, '体力耗尽', 最终位置);
+    const { 圆满 } = 结束性爱场景(data, '体力耗尽', 最终位置, 旧场景.主焦点门牌);
     return {
       已消费: null,
       提示: `失控收尾已结算（${最终位置}）；${圆满 ? '本场参与者均已满足。' : '本场并未自动补满满意度。'}`,
@@ -696,7 +701,7 @@ export function 结算成功现场楼(data: SchemaType, 旧data: SchemaType, 输
   }
 
   if (原本在性爱中 && 本楼角色中止) {
-    const { 圆满 } = 结束性爱场景(data, '角色中止', '角色拒绝继续');
+    const { 圆满 } = 结束性爱场景(data, '角色中止', '角色拒绝继续', 旧场景.主焦点门牌);
     return {
       已消费: null,
       提示: `角色明确中止了本场互动；${圆满 ? '此前累计满意度已经达标。' : '本楼不扣体力，也不增加满意度。'}`,
@@ -767,8 +772,7 @@ export function 结算成功现场楼(data: SchemaType, 旧data: SchemaType, 输
     if (!输入.妻在场.includes(门牌值)) continue;
     const 本人片段 = 门牌值 === 主焦点 ? null : 正文角色参与片段(输入, 门牌值);
     if (门牌值 !== 主焦点 && !本人片段) continue;
-    const 本人行为 =
-      门牌值 === 主焦点 ? 行为 : 推断行为(本人片段 ?? '', 场景.当前行为);
+    const 本人行为 = 门牌值 === 主焦点 ? 行为 : 推断行为(本人片段 ?? '', 场景.当前行为);
     const 增长 = 结算角色本楼满意增长(场景, 门牌值, 本人行为.行为, 本人行为.部位);
     if (增长.等级加成 > 0) {
       偏好反馈.push(`${户静态表[门牌值].妻名}领取本场体力等级加成：满意度 +${增长.等级加成}`);
@@ -791,7 +795,8 @@ export function 结算成功现场楼(data: SchemaType, 旧data: SchemaType, 输
 
   const 资源结算 = 扣除本楼资源('体力');
   if (主动位置) {
-    const { 圆满 } = 结束性爱场景(data, '主动收尾', 主动位置);
+    // 玩家点击收尾时看到的主焦点来自旧场景；本楼满意度结算可能自动轮焦，不能反过来改写收尾对象。
+    const { 圆满 } = 结束性爱场景(data, '主动收尾', 主动位置, 旧场景.主焦点门牌);
     return {
       已消费: 资源结算.已消费,
       提示: 合并资源提示(

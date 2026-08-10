@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // 设置弹窗（App A3 从 App.vue 等价外移）：界面偏好走共享 useUIPrefs 单例；
-// MVU/模型解析业务设置(更新路线/内置解析/解析通道/自定义API表单)整体内聚本组件。
+// MVU/模型解析业务设置(更新路线/内置解析/严格审计/解析通道/自定义API表单)整体内聚本组件。
 // "重开一局"只 emit restart，真正的 发送中=true + 业务事件仍在 App 点重开()。
 import { onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import {
@@ -43,6 +43,8 @@ const {
 
 /** MVU 外置模式下，由游戏直接请求解析模型（默认开）。 */
 const 内置变量解析 = ref(true);
+/** 逐叶审计只增强既有解析请求，不新增请求；未设置时默认关。 */
+const 严格变量审计 = ref(false);
 const MVU解析 = ref<MVU解析状态>(读取MVU解析状态());
 let MVU解析刷新timer: ReturnType<typeof setInterval> | undefined;
 /** 解析模型通道（游戏偏好）：自动=数据库独立模型代发优先（同微信），或强制自定义。 */
@@ -73,7 +75,7 @@ function 载入解析API表单() {
   自定义反馈类型.value = 'ok';
 }
 
-/** 恢复默认路线：0.74 起正文路线已移除，这里只负责把 MVU 写回外置。 */
+/** 恢复 v0.80 唯一变量路线：把 MVU 写回额外模型解析。 */
 function 选择解析路线() {
   写入MVU设置({ 更新方式: '额外模型解析' });
   刷新MVU解析状态();
@@ -212,6 +214,7 @@ function 持久化解析字段() {
       JSON.stringify({
         ...已存,
         内置变量解析: 内置变量解析.value,
+        严格变量审计: 严格变量审计.value,
       }),
     );
   } catch {
@@ -226,6 +229,11 @@ function 切换内置变量解析() {
   刷新MVU解析状态();
 }
 
+function 切换严格变量审计() {
+  严格变量审计.value = !严格变量审计.value;
+  持久化解析字段();
+}
+
 /** 恢复解析字段(纯 UI 字段由 useUIPrefs.恢复设置 负责)；挂载与 global_Mvu_initialized 后都刷真实状态。 */
 function 恢复解析字段() {
   try {
@@ -233,6 +241,7 @@ function 恢复解析字段() {
     if (raw) {
       const s = JSON.parse(raw);
       if (typeof s.内置变量解析 === 'boolean') 内置变量解析.value = s.内置变量解析;
+      if (typeof s.严格变量审计 === 'boolean') 严格变量审计.value = s.严格变量审计;
     }
   } catch {
     /* 读不到就用默认 */
@@ -275,11 +284,19 @@ onUnmounted(() => {
 
 <template>
   <!-- ═══════════ 设置弹窗(界面偏好,全走 localStorage) ═══════════ -->
-  <div v-if="设置开" class="mask" @click.self="设置开 = false">
+  <div
+    v-if="设置开"
+    class="mask"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="settings-sheet-title"
+    @click.self="设置开 = false"
+  >
     <div class="sheet settings">
-      <button class="sheet-close" @click="设置开 = false">✕</button>
-      <div class="ui-kicker">SETTINGS / 界面偏好</div>
-      <h3 class="set-title">看着舒服最要紧</h3>
+      <button class="sheet-close" aria-label="关闭设置" @click="设置开 = false">✕</button>
+      <header class="sheet-heading">
+        <h3 id="settings-sheet-title" class="sheet-heading-title">看着舒服最要紧</h3>
+      </header>
 
       <div class="set-group">
         <div class="set-label">主题</div>
@@ -389,6 +406,25 @@ onUnmounted(() => {
         <button class="toggle" :class="{ on: 内置变量解析 }" @click="切换内置变量解析"><i /></button>
       </div>
 
+      <div v-if="MVU解析.外置模式 && MVU解析.内置解析" class="set-group row">
+        <div>
+          <div class="set-label">严格变量审计</div>
+          <p class="set-hint">
+            默认关闭。打开后，解析模型会逐项核对本轮可写变量，但只在正文有明确依据时更新；不会增加模型请求。
+          </p>
+        </div>
+        <button
+          type="button"
+          class="toggle"
+          :class="{ on: 严格变量审计 }"
+          :aria-pressed="严格变量审计"
+          aria-label="切换严格变量审计"
+          @click="切换严格变量审计"
+        >
+          <i />
+        </button>
+      </div>
+
       <div v-if="MVU解析.外置模式 && MVU解析.内置解析" class="set-group">
         <div class="set-label">解析模型通道</div>
         <div class="seg">
@@ -468,13 +504,6 @@ onUnmounted(() => {
   overflow-y: auto;
 }
 
-.set-title {
-  margin: 2px 0 12px;
-  font-size: 1.05em;
-  font-weight: 800;
-  color: var(--ink);
-}
-
 .set-group {
   padding: 10px 0;
   border-top: 1px solid var(--line-soft);
@@ -539,7 +568,7 @@ onUnmounted(() => {
 }
 
 .seg button.on {
-  background: #fff;
+  background: var(--field-bg);
   color: var(--pink);
   box-shadow: 0 2px 8px rgba(255, 79, 154, 0.22);
 }
@@ -569,20 +598,29 @@ onUnmounted(() => {
 }
 
 .mvu-api-form input {
+  box-sizing: border-box;
   width: 100%;
   padding: 7px 9px;
-  border: 1px solid var(--pink-soft);
+  border: 1px solid var(--field-border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--field-bg);
   font-family: inherit;
   font-size: 0.98em;
   font-weight: 400;
-  color: var(--ink);
+  color: var(--field-text);
+  caret-color: var(--field-focus);
 }
 
-.mvu-api-form input:focus {
-  outline: none;
-  border-color: var(--pink);
+.mvu-api-form input::placeholder {
+  color: var(--field-placeholder);
+  opacity: 1;
+}
+
+.mvu-api-form input:focus-visible,
+.mvu-api-select:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--field-focus) 42%, transparent);
+  outline-offset: 1px;
+  border-color: var(--field-focus);
 }
 
 .mvu-api-nums {
@@ -606,12 +644,17 @@ onUnmounted(() => {
   flex: 1;
   min-width: 0;
   padding: 7px 9px;
-  border: 1px solid var(--pink-soft);
+  border: 1px solid var(--field-border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--field-bg);
   font-family: inherit;
   font-size: 0.9em;
-  color: var(--ink);
+  color: var(--field-text);
+}
+
+.mvu-api-select option {
+  background: var(--field-bg);
+  color: var(--field-text);
 }
 
 .mvu-api-feedback.err {
@@ -730,10 +773,6 @@ onUnmounted(() => {
 
 :global(html.rq-dark) .seg {
   background: rgba(255, 255, 255, 0.08);
-}
-
-:global(html.rq-dark) .seg button.on {
-  background: #3a3d52;
 }
 
 :global(html.rq-dark) .toggle {

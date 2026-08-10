@@ -15,8 +15,8 @@ test('MVU 更新方式按官方设置读取，并兼容旧自动请求键', () =
   assert.doesNotMatch(状态, /设置\?\.(?:密钥|api地址|模型来源)/);
 });
 
-test('设置页已移除正文“随AI输出”路线与二次结算控件，保留外置通道/内置解析/自定义 API 与恢复按钮', () => {
-  // A3 拆分后 MVU 解析设置整体在 设置弹窗.vue（App 只接线）；0.74 起正文路线整体移除。
+test('设置页只保留v0.80外置通道、内置解析、自定义API与恢复按钮', () => {
+  // A3 拆分后 MVU 解析设置整体在 设置弹窗.vue（App 只接线）。
   const 设置弹窗 = 读('src/人妻公寓/界面/客户端/components/设置弹窗.vue');
 
   assert.doesNotMatch(设置弹窗, /随AI输出/, '正文随AI输出按钮已移除');
@@ -32,35 +32,28 @@ test('设置页已移除正文“随AI输出”路线与二次结算控件，保
   assert.doesNotMatch(设置弹窗, /切换二次变量结算/, '二次结算交互函数已移除');
 });
 
-test('0.74 默认外置迁移用版本化新键，只在已是外置或写入成功后记录，失败可重试', () => {
+test('v0.80默认外置初始化用当前版本键，只在已是外置或写入成功后记录，失败可重试', () => {
   const 状态 = 读('src/人妻公寓/MVU解析模式.ts');
 
-  assert.match(状态, /MVU外置默认V074已初始化/, 'V074 版本化初始化键存在');
-  assert.match(状态, /读界面偏好\(\)\[MVU外置默认V074初始化键\] === true/, '已标记时直接返回');
+  assert.match(状态, /MVU外置默认V080已初始化/, 'V080 版本化初始化键存在');
+  assert.match(状态, /读界面偏好\(\)\[MVU外置默认V080初始化键\] === true/, '已标记时直接返回');
   assert.match(状态, /设置\?\.更新方式 === '额外模型解析'/, '已是外置判定保持');
   assert.match(状态, /const 成功 = 写入MVU设置\(\{ 更新方式: '额外模型解析' \}\)/, '写入结果先保存再判断');
-  assert.match(状态, /if \(成功\) 写界面偏好\(\{ \[MVU外置默认V074初始化键\]: true \}\)/, '写入成功才记录标记');
+  assert.match(状态, /if \(成功\) 写界面偏好\(\{ \[MVU外置默认V080初始化键\]: true \}\)/, '写入成功才记录标记');
   assert.match(状态, /return 成功/, '只在实际写成外置时返回 true');
   assert.doesNotMatch(状态, /写界面偏好\(\{ MVU外置默认已初始化: true \}\)/, '旧键不再提前标记');
   assert.doesNotMatch(状态, /MVU外置默认已初始化 === true/, '初始化判定不再依赖旧键');
 });
 
-test('外置路线让正文模型退出变量处理：官方桥已解析结果不重复应用，内置外置原始变量块本地应用一次', () => {
+test('v0.80让正文模型始终退出变量处理：官方桥已解析结果不重复应用，内置外置原始变量块本地应用一次', () => {
   const 引擎 = 读('src/人妻公寓/脚本/游戏逻辑/回合引擎.ts');
   const 世界书 = 读('src/人妻公寓/世界书/index.yaml');
   const MVU桥 = 读('src/人妻公寓/脚本/MVU/index.ts');
 
   assert.match(引擎, /const 使用MVU外置解析 = MVU解析\.外置模式/);
-  assert.match(引擎, /with_depth_entries: false/);
-  assert.match(引擎, /是Gemini && !使用MVU外置解析/);
-  assert.match(
-    引擎,
-    /!使用MVU外置解析[\s\S]{0,160}本轮有可写演员[\s\S]{0,160}\(是DeepSeek \|\| 是Gemini\)[\s\S]{0,160}二次变量结算开启\(\)/,
-  );
-  assert.match(
-    引擎,
-    /本轮静音会议 \|\| 使用MVU外置解析 \|\| !本轮有可写演员[\s\S]{0,100}\? ''[\s\S]{0,100}流式兜底变量块 \?\? 取变量块\(原文\)/,
-  );
+  assert.match(引擎, /const 正文模型覆盖 = \{ chat_history: \{ with_depth_entries: false \} \};/);
+  assert.doesNotMatch(引擎, /补模型变量结算|二次变量结算开启|GEMINI变量更新强制令|流式兜底变量块/);
+  assert.match(引擎, /let 变量块 = '';/, '正文模型偶然输出的变量协议不进入候选');
   assert.match(
     引擎,
     /使用MVU外置解析 &&[\s\S]*?MVU解析\.自动请求 &&[\s\S]*?await eventEmit\('人妻公寓:MVU外置模型重试'\)/,
@@ -111,11 +104,10 @@ test('外置路线让正文模型退出变量处理：官方桥已解析结果�
     '官方桥不置就绪标记，其已解析结果不得再走本地 parse 二次应用',
   );
 
-  // 最终本地解析段：正文路线（!使用MVU外置解析）可直接进入；外置模式只允许
-  // 内置外置解析产出的原始变量块（就绪标记为 true）进入；变量解析已降级一律禁止。
+  // 最终本地解析段只允许内置外置解析产出的原始变量块进入；变量解析已降级一律禁止。
   assert.match(
     最终本地解析段,
-    /if \(\(!使用MVU外置解析 \|\| 内置解析变量块已就绪\) && !变量解析已降级\)[\s\S]{0,220}const 候选基准 = _\.cloneDeep\(解析基准\)[\s\S]{0,220}await Mvu\.parseMessage\(可重处理楼层正文, 候选基准\)/,
+    /if \(内置解析变量块已就绪 && !变量解析已降级\)[\s\S]{0,220}const 候选基准 = _\.cloneDeep\(解析基准\)[\s\S]{0,220}await Mvu\.parseMessage\(可重处理楼层正文, 候选基准\)/,
     '官方桥结果已由 MVU 解析不重复应用；内置外置原始变量块本地应用一次；降级不得进入',
   );
 
@@ -131,11 +123,10 @@ test('外置路线让正文模型退出变量处理：官方桥已解析结果�
   assert.equal((MVU桥.match(/getButtonEvent\('重试额外模型解析'\)/g) ?? []).length, 1);
 });
 
-test('正文路线的二次结算偏好未设置时保持关闭', () => {
+test('正文变量路线已从v0.80运行源码和写设置类型中物理删除', () => {
   const 引擎 = 读('src/人妻公寓/脚本/游戏逻辑/回合引擎.ts');
-  const 读取偏好 = 引擎.slice(引擎.indexOf('function 二次变量结算开启'), 引擎.indexOf('/** 楼层尾部'));
-
-  assert.match(读取偏好, /if \(!raw\) return false/);
-  assert.match(读取偏好, /二次变量结算 === true/);
-  assert.match(读取偏好, /catch \{[\s\S]*?return false/);
+  const 状态 = 读('src/人妻公寓/MVU解析模式.ts');
+  assert.doesNotMatch(引擎, /随AI输出|补模型变量结算|二次变量结算|正文模型变量路线/);
+  assert.doesNotMatch(状态, /'随AI输出'/);
+  assert.match(状态, /更新方式\?: '额外模型解析';/);
 });

@@ -5,6 +5,7 @@ import { computed, ref } from 'vue';
 import { 户静态表, type 门牌 } from '../../../stageConfig';
 import { 角色CG列表, type CG阶段, type 成人CG项 } from '../../../脚本/游戏逻辑/成人CG系统';
 import { 成人CG基址 } from '../assets';
+import Ic from './Icon.vue';
 
 const props = defineProps<{
   door: 门牌;
@@ -85,7 +86,7 @@ function 翻页(偏移: number): void {
           @click="预览 = 项"
         >
           <img v-if="unlocked.has(项.id)" :src="成人CG地址(项)" alt="" loading="lazy" draggable="false" />
-          <span v-else class="cg-lock">🔒</span>
+          <span v-else class="cg-lock"><Ic n="lock" /></span>
         </button>
       </div>
       <div v-if="总页数 > 1" class="cg-pagination">
@@ -186,7 +187,12 @@ function 翻页(偏移: number): void {
   height: 100%;
   place-items: center;
   opacity: 0.5;
-  filter: grayscale(1);
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.cg-lock .ic {
+  width: 24px;
+  height: 24px;
 }
 
 .cg-preview-mask {

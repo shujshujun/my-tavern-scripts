@@ -722,7 +722,9 @@ test('渲染模块均不反向 import 内核/门面，子页不 import 调度器
   assert.match(渲染chat源码, /取渲染业务端口\(\)\?\.绑定玩家微信撤回/);
   assert.match(渲染chat源码, /取渲染业务端口\(\)\?\.发消息/);
   assert.match(渲染chat源码, /取渲染业务端口\(\)\?\.读赴约条/);
-  assert.match(渲染chat源码, /取渲染业务端口\(\)\?\.约出来/);
+  // v0.80:发送入口从单聊"+"面板迁到安排邀约页(WeUI 设置页),仍经同一业务端口发起。
+  const 渲染invite源码 = readFileSync(new URL('./壳/渲染/invite.ts', 手机目录), 'utf8');
+  assert.match(渲染invite源码, /取渲染业务端口\(\)\?\.约出来\(m, 计划\)/);
 });
 
 test('调度器保持 -1 未就绪语义、时间线放行、渲染世代/批次清理、父亲/会议页面合法化与六页分派', () => {
@@ -743,14 +745,16 @@ test('调度器保持 -1 未就绪语义、时间线放行、渲染世代/批次
   }
 });
 
-test('共享头/底栏保持导航、实时已读锚、会议禁用与未读/来电', () => {
+test('共享头/底栏保持导航、会议禁用与未读/来电；已读确认归 chat/moments 渲染层', () => {
   assert.match(渲染共享源码, /export function 渲染头\(/);
   assert.match(渲染共享源码, /export function 渲染底栏\(/);
   assert.match(渲染共享源码, /手机图标\('gear'\)/);
   assert.match(渲染共享源码, /写入当前页\(\{ 名: 'settings' \}\)/);
-  // v0.74 第 7 项：已读推进统一走数据层实时入口（内部冻结时间线租约），共享层不再裸拼锚。
-  assert.match(渲染共享源码, /写实时手机已读\(\{ 朋友圈: true \}\)/);
-  assert.doesNotMatch(渲染共享源码, /创建手机已读时锚/, '共享层不得再裸拼已读锚，必须走数据层实时入口');
+  // v0.80 已读所有权回 chat/moments 渲染层（前台校验异步确认），共享层/底栏只导航，不预写。
+  assert.doesNotMatch(渲染共享源码, /写实时手机已读\s*\(/, '底栏不得调用实时已读入口');
+  assert.doesNotMatch(渲染共享源码, /创建手机已读时锚/, '共享层不得裸拼已读锚');
+  assert.match(渲染chat源码, /写实时手机已读\(\{ 会话 \}, 前台仍有效\)/);
+  assert.match(渲染moments源码, /写实时手机已读\(\{ 朋友圈: true \}, 前台仍有效\)/);
   assert.match(渲染共享源码, /会议期间朋友圈暂时冻结。/);
   assert.match(渲染共享源码, /会议期间只开放参与妻私聊。/);
   assert.match(渲染共享源码, /未读 \|\| 有来电\(\)/);

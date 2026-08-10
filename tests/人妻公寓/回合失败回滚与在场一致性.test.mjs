@@ -27,7 +27,9 @@ test('客户端失败收口重拉消息、MVU、行动选项和两套在场真�
   assert.match(片段, /刷新在场\(\)/);
   assert.match(片段, /刷新行动选项\(\)/);
   assert.match(片段, /await Promise\.resolve\([\s\S]{0,120}\.pull\?\.\(\)\)/);
-  assert.match(片段, /await nextTick\(\)[\s\S]{0,180}发出\(待重试\)/);
+  const 渲染完成位 = 片段.indexOf('await nextTick()');
+  const 自动重试位 = 片段.indexOf('发出(待重试)');
+  assert.ok(渲染完成位 >= 0 && 自动重试位 > 渲染完成位, '自动重试必须等待 MVU 拉取与 Vue 渲染完成');
 });
 
 test('连续反感按同一次进房标识计数，换房重访不接旧链；真实离场同步熄灭头像', () => {

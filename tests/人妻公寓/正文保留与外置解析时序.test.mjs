@@ -1,7 +1,5 @@
 /* eslint-disable import-x/no-nodejs-modules -- Node-only regression test */
-// 2026-08-04 玩家实测两大症状的回归锁:
-// ① 随AI输出:流式正文被整篇吞没(清屏),开二次结算按钮也救不回;
-// ② 外置模型解析:引擎过早读楼层,好感值不更新,需手点"重试额外模型解析"。
+// v0.80 正文完整性与两条外置变量解析时序回归锁。
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -26,13 +24,11 @@ test('修1:预设期望标签缺失时回退通用清洗，不得整篇清空正
   );
 });
 
-test('修2:空 JSONPatch 补丁不算可用变量命令，兜底二次结算不得被短路', () => {
-  assert.match(回合源码, /function 含可改变量命令\(可解析文本: string\)/);
-  assert.match(
-    回合源码,
-    /Array\.isArray\(值\) && 值\.length > 0/,
-    '标签块与裸补丁都必须真 JSON.parse 且为非空数组才算会改变量',
-  );
+test('修2:完整空JSONPatch是合法完成信号，不让无变化回合白等120秒', () => {
+  assert.match(回合源码, /function 取变量块\(文本: string\)/);
+  assert.match(回合源码, /if \(完整\) return 完整;/, '完整标签块包含空数组时也应被提取');
+  assert.match(回合源码, /Date\.now\(\) < 外置解析截止 &&\s*!取变量块\(外置后正文\) &&/);
+  assert.doesNotMatch(回合源码, /function 有可用变量命令|function 含可改变量命令/);
 });
 
 test('修3:变量块被未闭合思考段连坐吞掉时启用防过删兜底', () => {
@@ -46,27 +42,24 @@ test('修3:变量块被未闭合思考段连坐吞掉时启用防过删兜底', 
   );
   assert.match(
     回合源码,
-    /const 宽松完整 = 宽松提取完整变量块\(文本, 可解析文本\);\s*return 宽松完整 !== null && 含可改变量命令\(宽松完整\);/,
-    '有可用变量命令 必须与 取变量块 的兜底口径一致，否则会触发多余重算',
+    /const 宽松完整 = 宽松提取完整变量块\(文本, 可解析文本\);\s*if \(宽松完整\)/,
+    '当前两条外置路线共用取变量块的防过删口径',
   );
 });
 
-test('修4:二次结算必须有超时，超时只放弃结算保留第一遍，绝不作废回合', () => {
-  assert.match(回合源码, /const 二次结算超时毫秒 = 180_000;/);
-  assert.match(回合源码, /Promise\.race\(\[\s*等待正文生成\(/);
+test('修4:数据库代发与自定义解析都受同一超时门保护，超时只放弃变量更新', () => {
+  assert.match(回合源码, /const 内置变量解析超时毫秒 = 180_000;/);
+  assert.match(回合源码, /generateRaw\([\s\S]{0,900}超时门/);
+  assert.match(回合源码, /Promise\.race\(\[\s*通过数据库生成\(/, '数据库代发也必须进入超时竞速');
   assert.match(回合源码, /stopGenerationById\(生成id\)/, '超时要主动停掉悬空的底层请求');
-  assert.match(回合源码, /__RQGY_VARS_TIMEOUT__/);
+  assert.match(回合源码, /__RQGY_MVUVARS_TIMEOUT__/);
   assert.match(
     回合源码,
-    /__RQGY_VARS_TIMEOUT__[\s\S]{0,400}return \{ 原文, 已生成变量块: false \};/,
-    '超时路径必须原样保留第一遍结果',
+    /__RQGY_MVUVARS_TIMEOUT__[\s\S]{0,400}return \{ 结果: '失败' \};/,
+    '超时路径返回解析失败，由回合保留正文与旧值',
   );
   assert.match(回合源码, /finally \{\s*clearTimeout\(超时句柄\);/);
-  assert.match(
-    回合源码,
-    /原文: `\$\{正文 \|\| 原文\}\\n\$\{变量块\}`/,
-    '清洗结果为空时以原始返回为拼接基底，不得把空正文固化进楼层',
-  );
+  assert.doesNotMatch(回合源码, /补模型变量结算|二次变量结算开启/);
 });
 
 test('修5:外置解析走轮询等待，不得在跨脚本桥返回后立即读楼层', () => {
@@ -74,8 +67,8 @@ test('修5:外置解析走轮询等待，不得在跨脚本桥返回后立即读
   assert.match(回合源码, /const 外置解析截止 = Date\.now\(\) \+ 外置解析等待毫秒;/);
   assert.match(
     回合源码,
-    /while \(\s*Date\.now\(\) < 外置解析截止 &&\s*!有可用变量命令\(外置后正文\) &&/,
-    '楼层出现可用变量命令或变量数据变化前必须持续等待',
+    /while \(\s*Date\.now\(\) < 外置解析截止 &&\s*!取变量块\(外置后正文\) &&/,
+    '楼层出现完整变量块或变量数据变化前必须持续等待',
   );
   assert.match(
     回合源码,

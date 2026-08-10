@@ -170,6 +170,14 @@
                   "上次安抚正文楼": {
                     "default": -1,
                     "type": "number"
+                  },
+                  "送礼安抚日": {
+                    "default": -1,
+                    "type": "number"
+                  },
+                  "当日送礼安抚次数": {
+                    "default": 0,
+                    "type": "number"
                   }
                 }
               },
@@ -184,6 +192,90 @@
                   "值": {
                     "default": 0,
                     "type": "number"
+                  }
+                }
+              },
+              "_怀孕": {
+                "default": {},
+                "type": "object",
+                "properties": {
+                  "状态": {
+                    "default": "未孕",
+                    "type": "string",
+                    "enum": [
+                      "未孕",
+                      "已受孕",
+                      "待告知",
+                      "已告知"
+                    ]
+                  },
+                  "受孕绝对时段": {
+                    "default": -1,
+                    "type": "number"
+                  },
+                  "预计告知绝对时段": {
+                    "default": -1,
+                    "type": "number"
+                  },
+                  "告知绝对时段": {
+                    "default": -1,
+                    "type": "number"
+                  },
+                  "受孕场次标识": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "上次判定日": {
+                    "default": -1,
+                    "type": "number"
+                  },
+                  "连续未中次数": {
+                    "default": 0,
+                    "type": "number"
+                  },
+                  "告知文案": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "已曝光": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "丈夫登门": {
+                    "default": {},
+                    "type": "object",
+                    "properties": {
+                      "状态": {
+                        "default": "无",
+                        "type": "string",
+                        "enum": [
+                          "无",
+                          "待触发",
+                          "进行中",
+                          "已完成"
+                        ]
+                      },
+                      "排期绝对时段": {
+                        "default": -1,
+                        "type": "number"
+                      },
+                      "变体标识": {
+                        "default": "",
+                        "type": "string"
+                      },
+                      "当前拍": {
+                        "default": 0,
+                        "type": "number"
+                      },
+                      "隐藏圆场": {
+                        "default": false,
+                        "type": "boolean"
+                      },
+                      "已结算": {
+                        "default": false,
+                        "type": "boolean"
+                      }
+                    }
                   }
                 }
               },
@@ -405,9 +497,9 @@
       "type": "object",
       "properties": {
         "_数据版本": {
-          "default": 7,
+          "default": 8,
           "type": "number",
-          "const": 7
+          "const": 8
         },
         "_坏结局": {
           "default": "",
@@ -429,6 +521,17 @@
               "default": "",
               "type": "string"
             }
+          }
+        },
+        "_孕情初见评价楼": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "default": -1,
+            "type": "number"
           }
         },
         "_母亲撞见次数": {
@@ -739,6 +842,10 @@
               "type": "string"
             },
             "最终位置": {
+              "default": "",
+              "type": "string"
+            },
+            "收尾对象门牌": {
               "default": "",
               "type": "string"
             },

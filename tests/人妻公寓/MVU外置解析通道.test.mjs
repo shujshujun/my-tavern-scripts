@@ -57,7 +57,7 @@ test('设置页不再出现"正文API"按钮，文案说明无可用独立模型
 
 test('内置外置变量解析段内不存在正文通道与等待正文生成调用，使用路由矩阵纯函数', () => {
   const 段起点 = 引擎源码.indexOf('async function 内置外置变量解析');
-  const 段终点 = 引擎源码.indexOf('async function 补模型变量结算');
+  const 段终点 = 引擎源码.indexOf('async function 结算连续反感');
   assert.ok(段起点 !== -1 && 段终点 !== -1, '内置外置变量解析函数段应存在');
   const 段 = 引擎源码.slice(段起点, 段终点);
   assert.doesNotMatch(段, /'正文'/, '函数段内不存在正文通道字样');

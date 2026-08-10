@@ -50,11 +50,16 @@ test('玩家发送、已读、邀约与妻回复全部走增量提交，不再�
   const 调度段 = 截源(渲染index源码, 'export function 渲染()', '注册父亲通话UI端口');
   assert.doesNotMatch(调度段, /await 写库\(/);
   // P7:两类已读统一委托给数据层 写实时手机已读，增量形状断言改读该入口的合并段。
+  // v0.80 已读所有权在 chat/moments 渲染层（前台校验异步确认），chats/共享 只导航。
   const 实时已读段 = 截源(数据层源码, 'export async function 写实时手机已读', 'function 赴约仍活动');
   assert.match(实时已读段, /读到改/, '会话目标经数据层写 读到改');
   assert.match(实时已读段, /圈读到改/, '朋友圈目标经数据层写 圈读到改');
-  assert.match(渲染共享源码, /写实时手机已读\(\{ 朋友圈: true \}\)/);
-  assert.match(渲染chats源码, /写实时手机已读\(\{ 会话:/);
+  const 渲染chat源码 = readFileSync(new URL('./壳/渲染/chat.ts', 手机目录), 'utf8');
+  const 渲染moments源码 = readFileSync(new URL('./壳/渲染/moments.ts', 手机目录), 'utf8');
+  assert.match(渲染chat源码, /写实时手机已读\(\{ 会话 \}, 前台仍有效\)/);
+  assert.match(渲染moments源码, /写实时手机已读\(\{ 朋友圈: true \}, 前台仍有效\)/);
+  assert.doesNotMatch(渲染共享源码, /写实时手机已读\s*\(/, '底栏不再预写已读（注释提及不算调用）');
+  assert.doesNotMatch(渲染chats源码, /写实时手机已读\s*\(/, '会话列表页不再预写已读');
   assert.doesNotMatch(渲染共享源码, /await 写库\(/);
   assert.doesNotMatch(渲染chats源码, /await 写库\(/);
 
@@ -281,10 +286,14 @@ test('跨妻邀约全局串行，接受回复与单例赴约在同一变量回�
   放行旧世代();
   await oldEpoch;
 
-  assert.match(邀约段, /赴约提交/);
+  // v0.80:接受回复与新的 `_手机邀约计划` 在同一变量回调 CAS(原 起楼/至楼 即时赴约
+  // 提交语义被定时定点计划取代),旧 `_赴约` 的兼容读取/清理仍保留。
+  assert.match(邀约段, /邀约计划提交/);
   assert.match(邀约段, /写库增量/);
-  assert.match(邀约段, /赴约提交:\s*\{ m, 起楼: 回复楼, 至楼: 回复楼 \+ 2 \}/);
+  assert.match(邀约段, /邀约计划提交: \{\s*m,\s*创建楼: 楼,\s*创建绝对时段: 钟,\s*目标绝对时段: 计划\.目标绝对时段,\s*地点: 计划\.地点/);
   assert.doesNotMatch(邀约段, /insertOrAssignVariables\(\{\s*_赴约/);
   const 增量写 = 截源(数据层源码, 'async function 写库增量(', 'function 赴约仍活动');
   assert.match(增量写, /_赴约/);
+  assert.match(增量写, /手机邀约计划键/, '计划键写入使用导出常量，不强制字面量键名');
+  assert.match(增量写, /手机邀约计划占用中/);
 });

@@ -8,7 +8,14 @@ import { 读库 } from '../../数据层';
 import { 末楼 } from '../../运行时上下文';
 import { 获取静音会议手机状态 } from '../../静音会议旁路';
 import { 活动父亲通话, 恢复父亲通话, 注册父亲通话UI端口 } from '../../交互/父亲通话';
-import { 清理失效手机聊天批次, 开始新手机聊天渲染世代, 当前会话批次键, 收口手机聊天输入键 } from '../会话瞬态';
+import {
+  删除会话引用草稿,
+  清理失效会话引用草稿,
+  清理失效手机聊天批次,
+  开始新手机聊天渲染世代,
+  当前会话批次键,
+  收口手机聊天输入键,
+} from '../会话瞬态';
 import { 记录会议手机渲染键, 刷新红点, 开合防抖, 有来电, 注册手机红点开合端口 } from '../红点与开合';
 import { 注册手机挂载端口, type 手机页面 } from '../挂载';
 import { ROOT_ID, el, 根文档 } from '../资源与皮肤';
@@ -18,6 +25,7 @@ import { 渲染moments } from './moments';
 import { 渲染call } from './call';
 import { 渲染talk } from './talk';
 import { 渲染settings } from './settings';
+import { 渲染invite } from './invite';
 import { 渲染头, type 渲染上下文 } from './共享';
 
 /**
@@ -32,11 +40,13 @@ let 当前页: 手机页面 = { 名: 'chats' };
 export function 结束当前聊天输入(): void {
   if (当前页.名 !== 'chat' || !当前页.会话) return;
   const 键 = 当前会话批次键(当前页.会话);
+  删除会话引用草稿(键);
   收口手机聊天输入键(键);
 }
 
 export function 渲染(): void {
   清理失效手机聊天批次();
+  清理失效会话引用草稿();
   const root = 根文档().getElementById(ROOT_ID);
   if (!root || !root.classList.contains('open')) return;
   const 屏 = root.querySelector('.rqp-screen') as HTMLElement;
@@ -114,6 +124,7 @@ export function 渲染(): void {
   else if (当前页.名 === 'call') 渲染call(上下文);
   else if (当前页.名 === 'talk') 渲染talk(上下文);
   else if (当前页.名 === 'settings') 渲染settings(上下文);
+  else if (当前页.名 === 'invite' || 当前页.名 === 'invite-pick') 渲染invite(上下文);
 }
 
 // ── 端口注册：父亲通话 UI 端口、挂载端口（含真实渲染/红点，UI 刷新注册表由挂载层安装）、

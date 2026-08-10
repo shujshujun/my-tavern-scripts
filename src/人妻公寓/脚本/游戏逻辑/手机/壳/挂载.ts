@@ -1,3 +1,4 @@
+import type { 星期名, 周作息时段 } from '../../../../周作息';
 import { ROOT_ID, 手机CSS, 手机图标, 根文档, el } from './资源与皮肤';
 import { 注册手机UI刷新实现 } from '../UI刷新';
 import { 获取静音会议手机状态 } from '../静音会议旁路';
@@ -11,7 +12,7 @@ import { 活动父亲通话 } from '../交互/父亲通话';
  * 本模块只依赖 资源与皮肤/UI刷新/静音会议旁路/父亲通话 等叶子，不 import 内核/门面。
  */
 
-export type 手机页面名 = 'chats' | 'chat' | 'moments' | 'call' | 'talk' | 'settings';
+export type 手机页面名 = 'chats' | 'chat' | 'moments' | 'call' | 'talk' | 'settings' | 'invite' | 'invite-pick';
 
 export interface 手机页面 {
   名: 手机页面名;
@@ -21,6 +22,10 @@ export interface 手机页面 {
   展开?: number; // moments:考古已加载条数(混排流)
   题?: string; // moments:展开中的"哪里不对劲?"(`门牌:序`)
   滚动?: number; // moments:题目展开/作答触发整页重绘时恢复当前位置
+  /** invite:安排邀约页的当前选择（时间变化时渲染层会重新规范）。 */
+  邀约?: { 选星期?: 星期名; 选时段?: 周作息时段; 选地点?: string };
+  /** invite-pick:正在选择哪一栏（日期/时段/地点）。 */
+  选择?: '日期' | '时段' | '地点';
 }
 
 /** 挂载层访问本轮仍在内核的 UI 状态/动作的最小显式端口。 */

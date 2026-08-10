@@ -52,7 +52,9 @@ test('手动楼务群与姐妹群回复共用聊天+锚楼+绝对时段租约，
   assert.match(手动群, /手机发送租约仍有效/);
   assert.match(手动群, /发送租约\.绝对时段/);
   assert.match(手动群, /写库增量/);
-  assert.match(手动群, /读到改/);
+  // v0.80 群聊不再无条件写已读：已读由 chat 页前台渲染确认。
+  assert.doesNotMatch(手动群, /读到改/);
+  assert.doesNotMatch(手动群, /创建手机已读时锚/);
   assert.doesNotMatch(手动群, /await 写库\(/);
 
   const 发送 = 截源(手机源, 'async function 发消息(', '// 本模块初始化完成时向渲染层注册 P8 业务端口与批次执行器');

@@ -153,7 +153,7 @@ export const 手机CSS = `
 #${ROOT_ID} .rqp-line .rqp-ava{width:38px;height:38px;border-radius:4px;font-size:15px;}
 #${ROOT_ID} .rqp-b{position:relative;max-width:72%;padding:8px 11px;border-radius:5px;font-size:13.5px;line-height:1.5;color:#111;word-break:break-word;}
 #${ROOT_ID} .rqp-b.me{background:#95ec69;}
-#${ROOT_ID} .rqp-b.me.recallable{cursor:context-menu;touch-action:pan-y;user-select:none;-webkit-user-select:none;}
+#${ROOT_ID} .rqp-b.actionable{cursor:context-menu;touch-action:pan-y;user-select:none;-webkit-user-select:none;}
 #${ROOT_ID} .rqp-b.me::after{content:'';position:absolute;top:13px;right:-5px;border-style:solid;border-width:5px 0 5px 6px;border-color:transparent transparent transparent #95ec69;}
 #${ROOT_ID} .rqp-b.ta{background:#fff;}
 #${ROOT_ID} .rqp-b.ta::before{content:'';position:absolute;top:13px;left:-5px;border-style:solid;border-width:5px 6px 5px 0;border-color:transparent #fff transparent transparent;}
@@ -162,13 +162,22 @@ export const 手机CSS = `
 #${ROOT_ID} .rqp-msg-menu{position:absolute;width:68px;padding:4px;background:#303136;border-radius:6px;box-shadow:0 5px 16px rgba(0,0,0,.28);}
 #${ROOT_ID} .rqp-msg-menu button{width:100%;border:none;background:transparent;color:#fff;padding:7px 5px;font-size:13px;line-height:1;cursor:pointer;font-family:inherit;}
 #${ROOT_ID} .rqp-msg-menu button:hover{background:rgba(255,255,255,.1);}
+#${ROOT_ID} .rqp-msg-quote{margin:-2px -3px 6px;padding:4px 7px;border-left:3px solid rgba(62,91,64,.45);border-radius:3px;background:rgba(0,0,0,.065);color:#667064;font-size:11px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px;}
+#${ROOT_ID} .rqp-b.ta .rqp-msg-quote{border-left-color:#b6b6b6;color:#858585;background:#f2f2f2;}
+#${ROOT_ID} .rqp-msg-quote.withdrawn{color:#999;font-style:italic;}
+#${ROOT_ID} .rqp-msg-text{white-space:pre-wrap;}
 #${ROOT_ID} .rqp-chat-photo{display:block;width:min(176px,100%);max-height:230px;object-fit:cover;border-radius:4px;margin-top:7px;background:#eee;}
 #${ROOT_ID} .rqp-typing{display:flex;gap:4px;align-items:center;min-height:20px;}
 #${ROOT_ID} .rqp-typing i{width:6px;height:6px;border-radius:50%;background:#b0b0b0;animation:rqp-tp 1.2s infinite;}
 #${ROOT_ID} .rqp-typing i:nth-child(2){animation-delay:.2s;}
 #${ROOT_ID} .rqp-typing i:nth-child(3){animation-delay:.4s;}
 @keyframes rqp-tp{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-3px)}}
-#${ROOT_ID} .rqp-input{flex:none;display:flex;gap:8px;padding:8px 10px;background:#f7f7f7;border-top:.5px solid #d9d9d9;align-items:flex-end;}
+#${ROOT_ID} .rqp-input-wrap{flex:none;background:#f7f7f7;border-top:.5px solid #d9d9d9;}
+#${ROOT_ID} .rqp-input{display:flex;gap:8px;padding:8px 10px;align-items:flex-end;}
+#${ROOT_ID} .rqp-quote-draft{display:flex;align-items:center;gap:8px;padding:6px 10px 0;color:#777;font-size:11px;line-height:1.35;}
+#${ROOT_ID} .rqp-quote-draft span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-left:3px solid #a9a9a9;padding-left:7px;}
+#${ROOT_ID} .rqp-quote-draft b{font-weight:500;color:#576b95;margin-right:5px;}
+#${ROOT_ID} .rqp-quote-draft button{border:none;background:transparent;color:#888;font-size:18px;line-height:1;cursor:pointer;padding:0 3px;}
 #${ROOT_ID} .rqp-input textarea{flex:1;resize:none;border:none;border-radius:4px;padding:8px 9px;font-size:13.5px;height:38px;font-family:inherit;background:#fff;color:#111!important;-webkit-text-fill-color:#111!important;caret-color:#111;opacity:1;}
 #${ROOT_ID} .rqp-input textarea::placeholder{color:#8a8a8a!important;-webkit-text-fill-color:#8a8a8a!important;opacity:1;}
 #${ROOT_ID} .rqp-input button{border:none;border-radius:4px;background:#07c160;color:#fff;padding:8px 14px;cursor:pointer;font-size:13px;font-weight:500;}
@@ -244,6 +253,28 @@ export const 手机CSS = `
 #${ROOT_ID} .rqp-set button:disabled{color:#777!important;-webkit-text-fill-color:#777!important;opacity:.7;cursor:default;}
 #${ROOT_ID} .rqp-set .save{position:sticky;bottom:0;z-index:2;flex:none;border:none;border-radius:6px;background:#07c160;color:#fff!important;-webkit-text-fill-color:#fff!important;padding:9px;cursor:pointer;font-size:13px;box-shadow:0 -7px 12px rgba(255,255,255,.92);}
 #${ROOT_ID} .rqp-set .credit{font-size:10px;color:#707070!important;-webkit-text-fill-color:#707070!important;margin-top:4px;line-height:1.6;}
+/* ── 安排邀约(微信内置网页/设置页 WeUI 样式,v0.80;全部限定 ROOT_ID 作用域,
+      窄手机画幅可滚动、触控行 ≥44px、文字不溢出) ── */
+#${ROOT_ID} .rqp-invite{flex:1;display:flex;flex-direction:column;min-height:0;overflow-y:auto;background:#ededed;}
+#${ROOT_ID} .rqp-invite .rqp-iuser{display:flex;align-items:center;gap:10px;padding:13px 16px;background:#fff;border-bottom:.5px solid #dcdcdc;flex:none;}
+#${ROOT_ID} .rqp-invite .rqp-iuser .rqp-ava{width:44px;height:44px;border-radius:6px;overflow:hidden;flex:none;display:grid;place-items:center;background:#e5e5e5;color:#888;font-size:15px;}
+#${ROOT_ID} .rqp-invite .rqp-iuser .rqp-ava img{width:100%;height:100%;object-fit:cover;display:block;}
+#${ROOT_ID} .rqp-invite .rqp-iuser .txt{flex:1;min-width:0;display:flex;flex-direction:column;}
+#${ROOT_ID} .rqp-invite .rqp-iuser b{font-size:16px;font-weight:600;color:#111;}
+#${ROOT_ID} .rqp-invite .rqp-iuser p{font-size:12px;color:#999;margin-top:3px;line-height:1.5;word-break:break-word;}
+#${ROOT_ID} .rqp-igroup{background:#fff;margin:10px 12px 0;border-radius:8px;overflow:hidden;flex:none;}
+#${ROOT_ID} .rqp-igroup .rqp-irow{display:flex;align-items:center;justify-content:space-between;min-height:52px;padding:0 14px;border-bottom:.5px solid #ebebeb;cursor:pointer;}
+#${ROOT_ID} .rqp-igroup .rqp-irow:last-child{border-bottom:none;}
+#${ROOT_ID} .rqp-irow>span{font-size:15px;color:#111;flex:none;}
+#${ROOT_ID} .rqp-irow .v{display:flex;align-items:center;justify-content:flex-end;gap:5px;min-width:0;margin-left:12px;font-size:14px;color:#999;}
+#${ROOT_ID} .rqp-irow .v .arr{color:#c8c8c8;font-size:17px;line-height:1;flex:none;}
+#${ROOT_ID} .rqp-irow .ok{color:#07c160;font-weight:700;font-size:15px;flex:none;line-height:1;}
+#${ROOT_ID} .rqp-irow.on .v{color:#07c160;}
+#${ROOT_ID} .rqp-igroup .rqp-ihead{padding:10px 14px 6px;font-size:12px;color:#888;}
+#${ROOT_ID} .rqp-ibtn{flex:none;margin:14px 12px 0;background:#07c160;color:#fff!important;-webkit-text-fill-color:#fff!important;border:none;border-radius:6px;height:48px;font-size:16px;font-weight:600;cursor:pointer;}
+#${ROOT_ID} .rqp-ibtn:disabled{background:#9ee0b7;cursor:not-allowed;}
+#${ROOT_ID} .rqp-ibtn-cancel{flex:none;margin:10px 12px 16px;background:#fff;color:#111;border:none;border-radius:6px;height:46px;font-size:16px;cursor:pointer;}
+#${ROOT_ID} .rqp-ipick{flex:1;display:flex;flex-direction:column;min-height:0;overflow-y:auto;background:#ededed;}
 `;
 
 export function 头像块(名: string): string {

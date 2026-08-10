@@ -2,22 +2,15 @@
 // 档案卡弹窗：只展示选中住户档案并 emit 动作；门牌选择/CG图库开关/失败表/业务动作留在 App。
 import { computed, ref, watch } from 'vue';
 import type { SchemaType } from '../../../schema';
-import {
-  户静态表,
-  查考古,
-  查性癖,
-  查裂缝,
-  查道具,
-  道具表,
-  阶段标题,
-  type 门牌,
-} from '../../../stageConfig';
+import { 户静态表, 查考古, 查性癖, 查裂缝, 查道具, 道具表, 阶段标题, type 门牌 } from '../../../stageConfig';
 import { 当前天数, 丈夫在楼 } from '../../../脚本/游戏逻辑/楼层时钟';
+import { 余波有冻结效力 } from '../../../脚本/游戏逻辑/冷落系统';
+import { 怀孕已公开 } from '../../../脚本/游戏逻辑/怀孕系统';
 import { 每日堕落上限 } from '../../../脚本/游戏逻辑/守护系统';
 import { 可晋阶, 可启动母亲药物首夜, 普通首夜时段已满足, 晋阶预约现场已满足 } from '../../../脚本/游戏逻辑/结算系统';
-import { 读取关系线索 } from '../../../脚本/游戏逻辑/阶段线路系统';
+import { 读取关系线索, 读取开门线索 } from '../../../脚本/游戏逻辑/阶段线路系统';
 import { CG条目, 角色CG总数 } from '../../../脚本/游戏逻辑/成人CG系统';
-import { 素材基址 } from '../assets';
+import { 角色立绘候选 } from '../assets';
 import Ic from './Icon.vue';
 
 const props = defineProps<{
@@ -53,7 +46,10 @@ const 选中档案 = computed(() => {
   if (!m || !props.ready || !props.data.户[m]) return null;
   const { 妻, 夫 } = props.data.户[m];
   const 当前立绘SKU = 妻._穿着SKU._立绘 ?? 妻._穿着SKU.内衣 ?? 妻._穿着SKU.外装;
-  const 基础立绘 = `${素材基址}/立绘/${户静态表[m].妻名}.webp`;
+  const 怀孕公开 = 怀孕已公开(props.data, m);
+  const 立绘图 = 角色立绘候选(户静态表[m].妻名, 当前立绘SKU, 怀孕公开).find(
+    src => !props.portraitFailed[src],
+  );
   return {
     门牌: m,
     妻名: 户静态表[m].妻名,
@@ -61,8 +57,8 @@ const 选中档案 = computed(() => {
     夫状态: 丈夫在楼(props.data.户[m], m, props.absolutePeriod),
     阶段标题: 阶段标题(妻.当前阶段, m),
     气质描述: 户静态表[m].初始?.气质描述 ?? '',
-    基础立绘,
-    立绘图: 当前立绘SKU ? `${素材基址}/立绘/${户静态表[m].妻名}_${当前立绘SKU}.webp` : 基础立绘,
+    立绘图,
+    怀孕公开,
     妻,
     夫,
     三轴: [
@@ -138,8 +134,38 @@ const 选中关系线索 = computed(() => {
   const 妻 = m ? props.data.户[m]?.妻 : undefined;
   return m && 妻 ? 读取关系线索(props.data, m) : null;
 });
+const 选中开门线索 = computed(() => {
+  const m = props.door;
+  const 妻 = m ? props.data.户[m]?.妻 : undefined;
+  return m && 妻 ? 读取开门线索(props.data, m) : null;
+});
+const 选中关系轨迹 = computed(() => {
+  if (选中开门线索.value) return { 类型: '开门' as const, ...选中开门线索.value };
+  if (选中关系线索.value) return { 类型: '线路' as const, ...选中关系线索.value };
+  return null;
+});
 watch(() => props.door, () => {
   显示关系线索.value = false;
+});
+
+/** 头像只显示当前仍有游戏效力的冷落余波，避免阶段1/未入列302的旧档残留误亮。 */
+const 选中冷落状态 = computed(() => {
+  const m = props.door;
+  const 妻 = m ? props.data.户[m]?.妻 : undefined;
+  if (!m || !妻 || !余波有冻结效力(m, 妻, props.data.系统._母亲入列)) return '无';
+  return 妻._冷落余波.状态;
+});
+const 选中头像状态类 = computed(() => ({
+  'neglect-pending': 选中冷落状态.value === '待诉苦',
+  'neglect-soothing': 选中冷落状态.value === '安抚中',
+  pregnant: !!选中档案.value?.怀孕公开,
+}));
+const 选中头像状态说明 = computed(() => {
+  const 状态 = [
+    选中冷落状态.value === '待诉苦' ? '冷落状态：等待回应' : 选中冷落状态.value === '安抚中' ? '冷落状态：安抚中' : '',
+    选中档案.value?.怀孕公开 ? '已告知怀孕' : '',
+  ];
+  return 状态.filter(Boolean).join('；');
 });
 
 /** 堕落轴可见反馈:今日 AI 实际落地增长(日账记的不是今天按 0 显示,夹在 0~每日堕落上限)。 */
@@ -159,8 +185,7 @@ const 堕落轴说明 = computed(() => {
   if (!妻) return '';
   if (妻.当前阶段 === 0) return `阶段初期先按裂缝线索推进（碎片 ${妻.裂缝.碎片进度}/4），别只盯着堕落数值。`;
   // 阶段门前冻结是当前阶段真正的硬门槛,优先于每日上限,直接告诉玩家差几条线索
-  if (选中关系线索.value?.数值已冻结)
-    return `已到阶段门前，先完成关系线索（${选中关系线索.value.进度}/4）。`;
+  if (选中关系线索.value?.数值已冻结) return `已到阶段门前，先完成关系线索（${选中关系线索.value.进度}/4）。`;
   if (今日堕落增长.value >= 每日堕落上限) return '今日变化已到上限，推进到下一天后恢复。';
   return '实质暧昧或亲密并让她真实动摇时增长；普通闲聊不会增长。';
 });
@@ -212,18 +237,28 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
 
 <template>
   <div v-if="选中档案" class="mask" @click.self="emit('close')">
-    <div class="sheet dossier">
+    <div class="sheet dossier" :class="{ pregnant: 选中档案.怀孕公开 }">
       <button class="sheet-close" @click="emit('close')">✕</button>
       <div class="dossier-hero">
         <div class="dossier-head">
           <img
             v-if="!avatarFailed[选中档案.妻名]"
             class="avatar-glyph big img"
+            :class="选中头像状态类"
             :src="avatarImage(选中档案.妻名)"
-            :alt="选中档案.妻名"
+            :alt="选中头像状态说明 ? `${选中档案.妻名}，${选中头像状态说明}` : 选中档案.妻名"
+            :title="选中头像状态说明 || undefined"
             @error="emit('avatarError', 选中档案.妻名)"
           />
-          <span v-else class="avatar-glyph big">{{ 选中档案.妻名[0] }}</span>
+          <span
+            v-else
+            class="avatar-glyph big"
+            :class="选中头像状态类"
+            role="img"
+            :aria-label="选中头像状态说明 ? `${选中档案.妻名}，${选中头像状态说明}` : 选中档案.妻名"
+            :title="选中头像状态说明 || undefined"
+            >{{ 选中档案.妻名[0] }}</span
+          >
           <span class="dossier-id">
             <span class="dossier-role">ROOM {{ 选中档案.门牌 }} · RESIDENT FILE</span>
             <span class="dossier-name">{{ 选中档案.妻名 }}</span>
@@ -235,12 +270,11 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
         </div>
         <div class="dossier-portrait" aria-hidden="true">
           <img
-            v-if="!portraitFailed[选中档案.立绘图]"
+            v-if="选中档案.立绘图"
             :src="选中档案.立绘图"
             :alt="选中档案.妻名 + '当前立绘'"
             @error="emit('portraitError', 选中档案.立绘图)"
           />
-          <img v-else :src="选中档案.基础立绘" :alt="选中档案.妻名" />
         </div>
       </div>
 
@@ -299,14 +333,14 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
             </div>
           </div>
         </div>
-        <div v-if="选中档案.妻.当前阶段 >= 3" class="dsec dossier-card">
+        <div v-if="选中档案.妻.当前阶段 >= 2" class="dsec dossier-card">
           <div class="dsec-title">
-            <span>身 体 开 发</span>
+            <span>{{ 选中档案.妻.当前阶段 >= 3 ? '身 体 开 发' : 'CG 图 库' }}</span>
             <button class="cg-progress" type="button" @click.stop="emit('openCg', 选中档案.门牌)">
               CG {{ 选中档案.CG进度.已解锁 }}/{{ 选中档案.CG进度.总数 }} ›
             </button>
           </div>
-          <div class="dev-grid">
+          <div v-if="选中档案.妻.当前阶段 >= 3" class="dev-grid">
             <div v-for="部位 in 选中档案.开发" :key="部位.名" class="axis-row">
               <span class="axis-label">{{ 部位.名 }}</span>
               <div class="axis"><i class="bar dev" :style="{ width: 部位.值 + '%' }" /></div>
@@ -420,25 +454,87 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
       </div>
 
       <button
-        v-if="选中关系线索"
-        class="btn relation-clue-open"
+        v-if="选中关系轨迹"
+        id="relation-trace-trigger"
+        class="relation-clue-open"
         type="button"
+        :aria-expanded="显示关系线索"
+        aria-controls="relation-trace-panel"
         @click="显示关系线索 = !显示关系线索"
       >
-        ◇ 关系线索 {{ 选中关系线索.进度 }}/4 <span>{{ 显示关系线索 ? '收起' : '查看' }}</span>
+        <span class="relation-open-main">
+          <span class="relation-open-icon" aria-hidden="true"><Ic n="favor" /></span>
+          <span class="relation-open-copy">
+            <b>{{ 选中关系轨迹.类型 === '开门' ? '开门线索' : '关系线索' }}</b>
+            <small>{{ 选中关系轨迹.类型 === '开门' ? '看懂她以后，还要让她知道' : 选中关系轨迹.标题 }}</small>
+          </span>
+        </span>
+        <span class="relation-open-status">
+          <span v-if="选中关系轨迹.类型 === '开门'" class="relation-action-badge">待行动</span>
+          <span v-else class="relation-mini-progress" :aria-label="`已完成 ${选中关系轨迹.进度} 条，共 4 条`">
+            <i v-for="n in 4" :key="n" :class="{ done: n <= 选中关系轨迹.进度 }" />
+            <b>{{ 选中关系轨迹.进度 }}/4</b>
+          </span>
+          <span class="relation-toggle-copy">{{ 显示关系线索 ? '收起' : '查看' }}</span>
+          <Ic class="relation-toggle-icon" n="arrow" aria-hidden="true" />
+        </span>
       </button>
-      <div v-if="显示关系线索 && 选中关系线索" class="dsec relation-clue-board">
-        <div class="dsec-title">{{ 选中关系线索.标题 }}</div>
-        <p class="relation-aside">· {{ 选中关系线索.侧写 }}</p>
-        <p v-if="选中关系线索.预约" class="relation-appointment">下一步 · {{ 选中关系线索.预约 }}</p>
-        <div v-for="(线索, i) in 选中关系线索.线索" :key="i" class="relation-clue" :class="{ done: 线索.完成 }">
-          <i>{{ 线索.完成 ? '✓' : '◇' }}</i
-          ><span>{{ 线索.文案 }}</span>
-        </div>
-        <p v-if="选中关系线索.数值已冻结" class="relation-wait">
-          已到阶段门前，先完成关系线索（{{ 选中关系线索.进度 }}/4）。
-        </p>
-      </div>
+      <section
+        v-if="显示关系线索 && 选中关系轨迹"
+        id="relation-trace-panel"
+        class="dsec relation-clue-board"
+        role="region"
+        aria-labelledby="relation-trace-title"
+      >
+        <header class="relation-board-head">
+          <span class="relation-kicker">RELATION TRACE</span>
+          <div id="relation-trace-title" class="dsec-title">{{ 选中关系轨迹.标题 }}</div>
+          <p class="relation-aside">{{ 选中关系轨迹.侧写 }}</p>
+        </header>
+
+        <template v-if="选中关系轨迹.类型 === '开门'">
+          <div class="relation-action">
+            <span class="relation-action-icon" aria-hidden="true"><Ic n="gift" /></span>
+            <span>
+              <small>本次行动</small>
+              <b>{{ 选中关系轨迹.行动标题 }}</b>
+              <p>{{ 选中关系轨迹.行动提示 }}</p>
+            </span>
+          </div>
+          <p class="relation-scene-tip">
+            <Ic n="door" /> <span>{{ 选中关系轨迹.现场提示 }}</span>
+          </p>
+        </template>
+
+        <template v-else>
+          <div v-if="选中关系轨迹.预约" class="relation-appointment">
+            <Ic n="clock" aria-hidden="true" />
+            <span
+              ><small>本次行动</small><b>{{ 选中关系轨迹.预约 }}</b></span
+            >
+          </div>
+          <ol class="relation-route">
+            <li
+              v-for="(线索, i) in 选中关系轨迹.线索"
+              :key="i"
+              class="relation-step"
+              :class="{ done: i < 选中关系轨迹.进度, current: i === 选中关系轨迹.进度, future: i > 选中关系轨迹.进度 }"
+            >
+              <span class="relation-step-marker" aria-hidden="true">{{ i + 1 }}</span>
+              <span class="relation-step-copy">
+                <small>{{
+                  i < 选中关系轨迹.进度 ? '已完成' : i === 选中关系轨迹.进度 ? '当前线索' : '后续线索'
+                }}</small>
+                <span>{{ 线索.文案 }}</span>
+              </span>
+            </li>
+          </ol>
+          <p v-if="选中关系轨迹.数值已冻结" class="relation-wait">
+            <Ic n="lock" aria-hidden="true" />
+            <span>数值已经到达阶段门前。当前进度 {{ 选中关系轨迹.进度 }}/4，完成剩余关系线索后才能继续推进。</span>
+          </p>
+        </template>
+      </section>
       <button
         v-if="选中档案.妻.当前阶段 > 0 && 选中档案.妻.当前阶段 < 5 && 选中档案.妻.裂缝.已确认"
         class="btn rite"
@@ -464,17 +560,22 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
 
 <style scoped>
 .avatar-glyph {
+  --avatar-ring-color: #fff;
+
   display: grid;
   place-items: center;
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  border: 2px solid #fff;
+  border: 2px solid var(--avatar-ring-color);
   background: linear-gradient(160deg, #ffe3ee, #ffd0e2);
   color: #d4407a;
   font-size: 1.15em;
   font-weight: 800;
   box-shadow: 0 3px 10px rgba(30, 26, 38, 0.16);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .avatar-glyph.big {
@@ -490,56 +591,455 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
   background: linear-gradient(160deg, #fff4f9, #ffe3ee);
 }
 
+/* 冷落余波：待回应保持冷色警示，开始安抚后转暖；仅改变头像外圈，不挤占档案布局。 */
+.avatar-glyph.neglect-pending {
+  --avatar-ring-color: #596bb9;
+
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--avatar-ring-color) 24%, transparent),
+    0 0 20px color-mix(in srgb, var(--avatar-ring-color) 58%, transparent),
+    0 3px 10px rgba(30, 26, 38, 0.16);
+}
+
+.avatar-glyph.neglect-soothing {
+  --avatar-ring-color: #a96819;
+
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--avatar-ring-color) 22%, transparent),
+    0 0 18px color-mix(in srgb, var(--avatar-ring-color) 52%, transparent),
+    0 3px 10px rgba(30, 26, 38, 0.16);
+}
+
+.avatar-glyph.pregnant {
+  --avatar-ring-color: #d58a93;
+
+  box-shadow:
+    0 0 0 3px color-mix(in srgb, var(--avatar-ring-color) 24%, transparent),
+    0 0 22px color-mix(in srgb, var(--avatar-ring-color) 64%, transparent),
+    0 3px 10px rgba(76, 39, 48, 0.18);
+}
+
 /* ═══ 档案卡 ═══ */
 .relation-clue-open {
   width: 100%;
   margin-top: 10px;
   display: flex;
+  align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  color: var(--ink);
+  text-align: left;
+  background:
+    linear-gradient(115deg, color-mix(in srgb, var(--pink) 9%, var(--paper-card)), var(--paper-card) 62%),
+    var(--paper-card);
+  border: 1px solid color-mix(in srgb, var(--pink) 30%, var(--line));
+  border-radius: var(--radius);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.58),
+    0 5px 16px rgba(97, 45, 73, 0.09);
+  cursor: pointer;
+  transition:
+    transform 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
 }
-.relation-clue-open span {
-  opacity: 0.65;
+
+.relation-clue-open:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--pink) 55%, var(--line));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.66),
+    0 8px 20px rgba(97, 45, 73, 0.13);
+}
+
+.relation-clue-open:active {
+  transform: translateY(0) scale(0.995);
+}
+
+.relation-clue-open:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--pink) 76%, white);
+  outline-offset: 2px;
+}
+
+.relation-open-main,
+.relation-open-status,
+.relation-mini-progress {
+  display: flex;
+  align-items: center;
+}
+
+.relation-open-main {
+  min-width: 0;
+  gap: 9px;
+}
+
+.relation-open-icon,
+.relation-action-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--pink);
+  background: color-mix(in srgb, var(--pink) 12%, var(--paper-card));
+  border: 1px solid color-mix(in srgb, var(--pink) 22%, var(--line));
+}
+
+.relation-open-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+}
+
+.relation-open-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.relation-open-copy b {
+  font-size: 0.86em;
+  letter-spacing: 0.08em;
+}
+
+.relation-open-copy small {
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.relation-open-status {
+  flex: 0 0 auto;
+  gap: 8px;
+}
+
+.relation-action-badge {
+  padding: 3px 7px;
+  color: #8f3568;
+  font-size: 11px;
+  font-weight: 800;
+  background: color-mix(in srgb, var(--pink) 11%, var(--paper-card));
+  border: 1px solid color-mix(in srgb, var(--pink) 24%, var(--line));
+  border-radius: 7px;
+}
+
+.relation-mini-progress {
+  gap: 4px;
+}
+
+.relation-mini-progress i {
+  width: 6px;
+  height: 6px;
+  background: var(--line);
+  border-radius: 50%;
+}
+
+.relation-mini-progress i.done {
+  background: var(--pink);
+}
+
+.relation-mini-progress b {
+  margin-left: 2px;
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
   font-size: 11px;
 }
-.relation-clue-board {
+
+.relation-toggle-copy {
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+.relation-toggle-icon {
+  width: 15px;
+  height: 15px;
+  color: var(--pink);
+  transition: transform 0.18s ease;
+}
+
+.relation-clue-open[aria-expanded='true'] .relation-toggle-icon {
+  transform: rotate(90deg);
+}
+
+.dsec.relation-clue-board {
+  position: relative;
+  flex: 0 0 auto;
   margin-top: 8px;
-  padding: 12px;
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--pink) 24%, var(--line));
+  border-radius: var(--radius);
+  background:
+    radial-gradient(circle at 100% 0%, color-mix(in srgb, var(--pink) 9%, transparent), transparent 34%),
+    var(--paper-card);
+  box-shadow: 0 5px 18px rgba(69, 46, 62, 0.08);
 }
+
+.relation-clue-board::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--pink), color-mix(in srgb, var(--pink) 24%, transparent));
+  content: '';
+}
+
+.relation-board-head {
+  padding-left: 2px;
+}
+
+.relation-kicker {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--pink);
+  font-family: var(--font-mono);
+  font-size: var(--font-micro);
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
 .relation-aside {
-  margin: 5px 0 10px;
-  font-style: italic;
-  opacity: 0.75;
-}
-.relation-appointment {
-  margin: -2px 0 10px;
-  padding: 7px 9px;
-  color: #8f3568;
-  background: rgba(244, 95, 158, 0.1);
-  border: 1px solid rgba(225, 78, 145, 0.18);
-  border-radius: 9px;
-  font-size: 0.73em;
-  font-weight: 700;
-}
-.relation-clue {
-  display: flex;
-  gap: 8px;
-  padding: 7px 0;
-  border-top: 1px dashed color-mix(in srgb, currentColor 16%, transparent);
-}
-.relation-clue i {
-  flex: 0 0 16px;
-  color: var(--muted);
-}
-.relation-clue.done i {
-  color: var(--accent);
-}
-.relation-wait {
-  margin: 10px 0 0;
-  color: var(--accent);
+  margin: 7px 0 12px;
+  color: var(--ink-soft);
   font-size: 12px;
+  line-height: 1.65;
+}
+
+.relation-action {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 11px;
+  background: color-mix(in srgb, var(--pink) 7%, var(--paper-card));
+  border: 1px solid color-mix(in srgb, var(--pink) 20%, var(--line));
+  border-radius: 12px;
+}
+
+.relation-action-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 11px;
+}
+
+.relation-action > span:last-child {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.relation-action small,
+.relation-appointment small,
+.relation-step-copy small {
+  color: var(--pink);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.relation-action b {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.relation-action p {
+  margin: 1px 0 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.relation-scene-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 9px 2px 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.relation-scene-tip .ic {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--pink);
+}
+
+.relation-appointment {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 5px;
+  padding: 9px 10px;
+  color: var(--pink);
+  background: color-mix(in srgb, var(--pink) 8%, var(--paper-card));
+  border: 1px solid color-mix(in srgb, var(--pink) 18%, var(--line));
+  border-radius: 11px;
+}
+
+.relation-appointment > span {
+  display: grid;
+  gap: 1px;
+}
+
+.relation-appointment b {
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.relation-route {
+  margin: 0;
+  padding: 4px 0 0;
+  list-style: none;
+}
+
+.relation-step {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  min-height: 47px;
+  padding: 7px 0;
+}
+
+.relation-step:not(:last-child)::after {
+  position: absolute;
+  top: 31px;
+  bottom: -7px;
+  left: 12px;
+  width: 1px;
+  background: var(--line);
+  content: '';
+}
+
+.relation-step.done:not(:last-child)::after {
+  background: color-mix(in srgb, var(--pink) 42%, var(--line));
+}
+
+.relation-step-marker {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  flex: 0 0 25px;
+  width: 25px;
+  height: 25px;
+  color: var(--ink-faint);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 800;
+  background: var(--paper-card);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+}
+
+.relation-step.done .relation-step-marker {
+  color: #fff;
+  background: var(--pink);
+  border-color: var(--pink);
+}
+
+.relation-step.current .relation-step-marker {
+  color: var(--pink);
+  background: color-mix(in srgb, var(--pink) 10%, var(--paper-card));
+  border-color: var(--pink);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--pink) 12%, transparent);
+}
+
+.relation-step-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  padding-top: 1px;
+}
+
+.relation-step-copy > span {
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.relation-step.done .relation-step-copy > span,
+.relation-step.future .relation-step-copy > span {
+  color: var(--ink-soft);
+}
+
+.relation-step.future {
+  opacity: 0.72;
+}
+
+.relation-wait {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 8px 0 0;
+  padding: 8px 9px;
+  color: #8f3568;
+  font-size: 12px;
+  line-height: 1.5;
+  background: color-mix(in srgb, var(--pink) 9%, var(--paper-card));
+  border-radius: 9px;
+}
+
+.relation-wait .ic {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--pink);
+}
+
+:global(html.rq-dark) .relation-clue-open,
+:global(html.rq-dark) .relation-clue-board {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 8px 22px rgba(0, 0, 0, 0.22);
+}
+
+:global(html.rq-dark) .relation-clue-board {
+  background: radial-gradient(circle at 100% 0%, rgba(255, 79, 154, 0.12), transparent 34%), var(--paper-card);
+}
+
+:global(html.rq-dark) .relation-action-badge,
+:global(html.rq-dark) .relation-wait {
+  color: #ff9fc5;
+}
+
+@media (max-width: 540px) {
+  .relation-clue-open {
+    min-height: 52px;
+    gap: 8px;
+    padding: 9px 10px;
+  }
+
+  .relation-open-copy small,
+  .relation-toggle-copy {
+    display: none;
+  }
+
+  .relation-open-status {
+    gap: 6px;
+  }
+
+  .relation-clue-board {
+    padding: 13px 11px 12px;
+  }
+
+  .relation-aside,
+  .relation-action p,
+  .relation-scene-tip,
+  .relation-step-copy > span,
+  .relation-wait {
+    font-size: 13px;
+  }
+
+  .relation-step {
+    min-height: 51px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .relation-clue-open,
+  .relation-toggle-icon {
+    transition: none;
+  }
 }
 
 .sheet.dossier {
@@ -629,6 +1129,38 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
   height: 100%;
   object-fit: contain;
   object-position: 50% 10%;
+}
+
+/* 孕情公开态只换视觉语气，不新增信息卡；隐藏期与待发送期完全不套用这些样式。 */
+.sheet.dossier.pregnant {
+  --pregnancy-accent: #c97883;
+
+  background:
+    radial-gradient(circle at 88% 4%, rgba(244, 193, 184, 0.34), transparent 28%),
+    linear-gradient(180deg, rgba(255, 249, 246, 0.99), rgba(249, 245, 251, 0.99)), #fff;
+}
+
+.sheet.dossier.pregnant .dossier-hero {
+  background:
+    radial-gradient(circle at 18% 28%, rgba(255, 255, 255, 0.96), transparent 34%),
+    linear-gradient(125deg, rgba(250, 220, 211, 0.9), rgba(239, 222, 237, 0.82) 58%, rgba(250, 231, 196, 0.72));
+  border-bottom-color: rgba(201, 120, 131, 0.3);
+}
+
+.sheet.dossier.pregnant .dossier-role,
+.sheet.dossier.pregnant .dsec-title {
+  color: var(--pregnancy-accent);
+}
+
+.sheet.dossier.pregnant .dossier-stage {
+  background: linear-gradient(180deg, #d98f96, #bd6978);
+  box-shadow: 0 3px 12px rgba(177, 88, 104, 0.34);
+}
+
+.sheet.dossier.pregnant .dossier-card,
+.sheet.dossier.pregnant .dossier-axes .axis-row {
+  border-color: color-mix(in srgb, var(--pregnancy-accent) 24%, var(--line));
+  box-shadow: 0 4px 14px rgba(126, 75, 83, 0.07);
 }
 
 .dossier-axes {
@@ -1164,9 +1696,34 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
 }
 
 :global(html.rq-dark) .avatar-glyph {
+  --avatar-ring-color: #3a3d52;
+
   background: linear-gradient(160deg, rgba(255, 79, 154, 0.3), rgba(255, 79, 154, 0.16));
-  border-color: #3a3d52;
+  border-color: var(--avatar-ring-color);
   color: #ff9ec4;
+}
+
+:global(html.rq-dark) .avatar-glyph.pregnant {
+  --avatar-ring-color: #f0aeb4;
+
+  box-shadow:
+    0 0 0 3px rgba(240, 174, 180, 0.2),
+    0 0 24px rgba(225, 132, 145, 0.62),
+    0 3px 12px rgba(0, 0, 0, 0.34);
+}
+
+:global(html.rq-dark) .sheet.dossier.pregnant {
+  --pregnancy-accent: #f0aeb4;
+
+  background:
+    radial-gradient(circle at 88% 4%, rgba(209, 117, 133, 0.18), transparent 30%),
+    linear-gradient(180deg, rgba(42, 34, 42, 0.99), rgba(31, 31, 41, 0.99));
+}
+
+:global(html.rq-dark) .sheet.dossier.pregnant .dossier-hero {
+  background:
+    radial-gradient(circle at 18% 28%, rgba(255, 255, 255, 0.08), transparent 34%),
+    linear-gradient(125deg, rgba(118, 68, 77, 0.72), rgba(83, 62, 82, 0.7) 58%, rgba(101, 78, 54, 0.56));
 }
 
 /* 角色档案：手机上让立绘保留存在感，但不挤压仪容道具图。 */
@@ -1239,6 +1796,7 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
 
 /* 减少动效:整框填充过渡只服务真实数值变化,用户偏好关闭时取消 */
 @media (prefers-reduced-motion: reduce) {
+  .avatar-glyph,
   .dossier-axes .axis-row::before {
     transition: none;
   }

@@ -10,6 +10,7 @@ import { 读库 } from '../数据层';
 import { 请求手机重绘 } from '../UI刷新';
 import { 获取静音会议手机状态, type 会场私聊摘要租约 } from '../静音会议旁路';
 import type { 生成通道租约 } from '../../生成通道互斥';
+import type { 微信消息定位 } from '../../微信消息撤回';
 
 /**
  * 手机会话瞬态（拆分方案 P7）：会话输入计数与租约/待回复上下文/草稿/输入聚焦/
@@ -61,6 +62,8 @@ export interface 会话待回复上下文 {
 
 const 会话待回复 = new Map<string, 会话待回复上下文>();
 const 会话草稿 = new Map<string, string>();
+/** 引用不是普通文字草稿：只在当前聊天/当前时间线短暂存活，离页即清。 */
+const 会话引用草稿 = new Map<string, 微信消息定位>();
 const 会话输入聚焦 = new Set<string>();
 let 手机聊天渲染世代 = 0;
 let 手机聊天状态刷新计时: ReturnType<typeof setInterval> | null = null;
@@ -116,6 +119,26 @@ export function 写会话草稿(键: string, 文: string): void {
 
 export function 删除会话草稿(键: string): void {
   会话草稿.delete(键);
+}
+
+export function 取会话引用草稿(键: string): 微信消息定位 | undefined {
+  const 引用 = 会话引用草稿.get(键);
+  return 引用 ? { ...引用 } : undefined;
+}
+
+export function 写会话引用草稿(键: string, 引用: 微信消息定位): void {
+  会话引用草稿.clear();
+  会话引用草稿.set(键, { ...引用 });
+}
+
+export function 删除会话引用草稿(键: string): void {
+  会话引用草稿.delete(键);
+}
+
+/** 切档、回档、swipe 或 ABA 世代变化时，即使没有待回复批次也必须清引用。 */
+export function 清理失效会话引用草稿(): void {
+  const 前缀 = `${当前聊天ID()}\u0000${读取当前手机时间线租约世代()}\u0000`;
+  for (const 键 of 会话引用草稿.keys()) if (!键.startsWith(前缀)) 会话引用草稿.delete(键);
 }
 
 export function 标记会话输入聚焦(键: string): void {
@@ -197,7 +220,9 @@ export function 取消手机聊天批次键(键: string, 重绘 = true): boolean
 }
 
 export function 取消手机聊天批次(会话: string): void {
-  取消手机聊天批次键(当前会话批次键(会话));
+  const 键 = 当前会话批次键(会话);
+  删除会话引用草稿(键);
+  取消手机聊天批次键(键);
 }
 
 /** 切档、回滚或推进到另一时段后，旧世界的绿/黄/红批次都不能继续占锁或落回复。 */

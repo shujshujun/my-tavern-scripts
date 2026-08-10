@@ -463,7 +463,7 @@ test('D2 普通失败/取消:未转正分支按精确令牌/引用清理,既有�
 });
 
 test('D3 变量解析超时:按设计保留正文继续提交,绝不走临时楼全删', () => {
-  const 解析块 = engine.slice(engine.indexOf('async function 内置外置变量解析'), engine.indexOf('async function 补模型变量结算'));
+  const 解析块 = engine.slice(engine.indexOf('async function 内置外置变量解析'), engine.indexOf('async function 结算连续反感'));
   assert.match(解析块, /__RQGY_MVUVARS_TIMEOUT__/, '超时哨兵存在');
   assert.match(解析块, /reject\(new Error\('__RQGY_MVUVARS_TIMEOUT__'\)\)/);
   assert.match(解析块, /return \{ 结果: '失败' \}/, '超时被捕获并返回失败,不向回合抛错');
@@ -471,7 +471,7 @@ test('D3 变量解析超时:按设计保留正文继续提交,绝不走临时楼
   assert.doesNotMatch(失败处理, /内置解析待补/, '失败不再挂跨轮待补标记,不留跨轮内存状态');
   assert.match(失败处理, /本轮变量解析失败，数值未更新；可重试本回合/, '两次失败只提示一次本轮结果,不再承诺下一轮自动补');
   assert.match(失败处理, /保留正文与旧变量/, '未配置与失败路径都保留正文,不作废回合');
-  assert.match(失败处理, /绝不降级成随AI输出[\s\S]{0,120}不 throw/, '失败链承诺不 throw 作废回合(否则已输出的正文会被 finally 全删)');
+  assert.match(失败处理, /绝不改用正文模型[\s\S]{0,120}不 throw/, '失败链承诺不回落正文且不 throw 作废回合');
 });
 
 test('D4 回档/原生删楼/分支切换:定位不到即零删除,不得删当前位置替代消息', () => {
