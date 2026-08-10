@@ -41,21 +41,23 @@ test('initvar 与 Schema 默认结构逐键一致，动态户表除外', () => {
   assert.equal(initvar.系统._数据版本, 当前MVU数据版本);
 });
 
-test('v0.81 v8 新局契约移除系统操作中字段，并拒绝其他版本存档', () => {
+test('v0.82 v8 新局契约移除系统操作中字段，并只迁移 v0.80 的 v7 存档', () => {
   assert.equal(当前MVU数据版本, 8);
   assert.equal(Object.hasOwn(initvar.系统, '_系统操作中'), false);
   assert.throws(
     () => 验证当前MVU存档版本({ 系统: { _数据版本: 6, _系统操作中: true } }),
-    /v0\.81 不兼容其他版本存档/,
+    /v0\.82 仅兼容数据版本 7 和 8/,
   );
+  assert.doesNotThrow(() => 验证当前MVU存档版本({ 系统: { _数据版本: 7 } }));
+  assert.equal(Schema.parse({ 系统: { _数据版本: 7 } }).系统._数据版本, 8);
   const 新局 = Schema.parse(initvar);
   assert.equal(Object.hasOwn(新局.系统, '_系统操作中'), false);
   assert.equal(新局.系统._数据版本, 8);
 });
 
-test('v0.81 存档版本守卫与 Schema 一样拒绝字符串版本号', () => {
-  assert.throws(() => 验证当前MVU存档版本({ 系统: { _数据版本: '8' } }), /v0\.81 不兼容其他版本存档/);
-  assert.throws(() => Schema.safeParse({ 系统: { _数据版本: '8' } }), /v0\.81 不兼容其他版本存档/);
+test('v0.82 存档版本守卫与 Schema 一样拒绝字符串版本号', () => {
+  assert.throws(() => 验证当前MVU存档版本({ 系统: { _数据版本: '8' } }), /v0\.82 仅兼容数据版本 7 和 8/);
+  assert.throws(() => Schema.safeParse({ 系统: { _数据版本: '8' } }), /v0\.82 仅兼容数据版本 7 和 8/);
 });
 
 test('好感单轮上限在世界书与脚本契约中统一为正负3', () => {

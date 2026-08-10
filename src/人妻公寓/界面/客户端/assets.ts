@@ -28,7 +28,7 @@ export const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tav
  * 生成计划已经封板：只支持下列 62 张，不再尝试其余角色/SKU 组合。
  */
 export const 孕态服装立绘基址 =
-  'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.81/output/imagegen/rqgy-reset/pregnancy-portraits/approved';
+  'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.82/output/imagegen/rqgy-reset/pregnancy-portraits/approved';
 const 通用孕态服装SKU = [
   '碎花连衣裙',
   '牛仔背带裙',

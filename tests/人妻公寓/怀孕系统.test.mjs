@@ -349,7 +349,7 @@ test('孕态立绘只支持已生成的62张，并按统一候选顺序安全回
     'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.55/dist/人妻公寓/素材/立绘/安若妍.webp',
   ]);
   assert.match(孕态候选[0], /pregnancy-portraits\/approved\/安若妍\/服装_碎花连衣裙_孕态\.webp$/);
-  assert.match(孕态候选[0], /@rq0\.81\//, '0.81 发布资源必须固定到包含孕态立绘的新标签');
+  assert.match(孕态候选[0], /@rq0\.82\//, '0.82 发布资源必须固定到包含孕态立绘的新标签');
 
   const 未公开候选 = 角色立绘候选('安若妍', '碎花连衣裙', false);
   assert.equal(未公开候选.length, 2);

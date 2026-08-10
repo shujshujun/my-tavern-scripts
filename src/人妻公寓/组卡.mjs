@@ -167,7 +167,7 @@ for (const 组 of index.条目) {
 if (!开场白) throw new Error('未找到 [开场白] 条目');
 
 // ── 资源走 jsdelivr(手机友好；角色卡版本与正式发布 tag 同步) ──
-const TAG = 'rq0.81';
+const TAG = 'rq0.82';
 const BASE = `https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@${TAG}`;
 
 const 加载块 = url => "```\n<body>\n<script>\n$('body').load('" + url + "')\n</script>\n</body>\n```";
@@ -271,7 +271,7 @@ const tavern_helper = {
 
 // ── 卡体 ──
 const 卡名 = '人妻公寓';
-const 版本 = '0.81';
+const 版本 = '0.82';
 const data = {
   name: 卡名,
   description: '',
@@ -279,7 +279,7 @@ const data = {
   scenario: '',
   first_mes: '<StatusPlaceHolderImpl/>',
   mes_example: '',
-  creator_notes: `人妻公寓 v${版本} 测试版。不兼容旧存档，请新建聊天。需安装最新版酒馆助手、MVU 与数据库插件，并把数据库模式设为 SQLite；首次进入按引导安装五张游戏记忆表。变量解析已自动配置（默认走数据库代发），无需手动调整 MVU 面板；如需切换解析通道，进入游戏【设置 → 变量解析】调整即可。本作不再兼容智脑。开局：0楼进入游戏界面，选难度→接父亲电话进入到任首日；输入使用游戏内输入框。`,
+  creator_notes: `人妻公寓 v${版本} 测试版。支持继承 v0.80／v0.81 存档（v0.80 首次载入会自动迁移）；更早版本请新建聊天。需安装最新版酒馆助手、MVU 与数据库插件，并把数据库模式设为 SQLite；首次进入按引导安装五张游戏记忆表。变量解析已自动配置（默认走数据库代发），无需手动调整 MVU 面板；如需切换解析通道，进入游戏【设置 → 变量解析】调整即可。本作不再兼容智脑。开局：0楼进入游戏界面，选难度→接父亲电话进入到任首日；输入使用游戏内输入框。`,
   system_prompt: '',
   post_history_instructions: '',
   tags: ['人妻公寓'],

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export const 当前MVU数据版本 = 8;
+const 可迁移MVU数据版本 = 7;
 
 type 原始记录 = Record<string, unknown>;
 
@@ -12,7 +13,7 @@ function 是记录(value: unknown): value is 原始记录 {
   return 原型 === null || Object.getPrototypeOf(原型) === null;
 }
 
-/** v0.81 只接受本版 initvar 创建的存档；刷新、重掷和回档仍由同版本快照体系负责。 */
+/** v0.82 接受 v0.80(v7) 与 v0.81/v0.82(v8)；更早或未来版本继续硬拒绝。 */
 export function 验证当前MVU存档版本(input: unknown): void {
   if (!是记录(input)) {
     throw new Error('人妻公寓存档结构损坏：stat_data 必须是对象。请新建聊天开始游戏。');
@@ -20,18 +21,83 @@ export function 验证当前MVU存档版本(input: unknown): void {
   if (Object.keys(input).length === 0) return;
   const 系统 = 是记录(input.系统) ? input.系统 : undefined;
   const 版本 = 系统?._数据版本;
-  if (!系统 || !Object.prototype.hasOwnProperty.call(系统, '_数据版本') || 版本 !== 当前MVU数据版本) {
+  if (
+    !系统 ||
+    !Object.prototype.hasOwnProperty.call(系统, '_数据版本') ||
+    (版本 !== 可迁移MVU数据版本 && 版本 !== 当前MVU数据版本)
+  ) {
     const 显示版本 = typeof 版本 === 'number' && Number.isInteger(版本) ? String(版本) : '未知';
     throw new Error(
-      `v0.81 不兼容其他版本存档：当前存档版本为 ${显示版本}，本脚本要求数据版本 ${当前MVU数据版本}。请新建聊天开始游戏。`,
+      `v0.82 仅兼容数据版本 7 和 8：当前存档版本为 ${显示版本}。v0.80/v0.81 存档可直接继承；其他版本请新建聊天开始游戏。`,
     );
   }
 }
 
-/** Schema 的局部构造允许省略版本；一旦显式携带版本，就必须与当前版本完全一致。 */
-function 验证显式MVU版本(input: unknown): unknown {
+/** 空 Schema 构造不是外部存档；其余合法输入只有 v7 需要一次性迁移。 */
+export function 需要迁移MVU存档(input: unknown): boolean {
+  验证当前MVU存档版本(input);
+  if (!是记录(input) || Object.keys(input).length === 0) return false;
+  return 是记录(input.系统) && input.系统._数据版本 === 可迁移MVU数据版本;
+}
+
+function 仅在缺失时写入(记录: 原始记录, 键: string, 值: unknown): void {
+  if (!Object.prototype.hasOwnProperty.call(记录, 键)) 记录[键] = 值;
+}
+
+function 创建未孕默认值(): 原始记录 {
+  return {
+    状态: '未孕',
+    受孕绝对时段: -1,
+    预计告知绝对时段: -1,
+    告知绝对时段: -1,
+    受孕场次标识: '',
+    上次判定日: -1,
+    连续未中次数: 0,
+    告知文案: '',
+    已曝光: false,
+    丈夫登门: {
+      状态: '无',
+      排期绝对时段: -1,
+      变体标识: '',
+      当前拍: 0,
+      隐藏圆场: false,
+      已结算: false,
+    },
+  };
+}
+
+/**
+ * 把 v0.80 的 v7 原始数据迁到当前 v8。先深拷贝、后逐字段补缺，保证失败不污染原档；
+ * v8 原样返回，因此重复调用幂等。最终类型归一仍统一交给当前 Schema。
+ */
+export function 迁移MVU存档到当前版本(input: unknown): unknown {
+  if (!需要迁移MVU存档(input)) return input;
+
+  const 已迁移 = _.cloneDeep(input) as 原始记录;
+  const 系统 = 已迁移.系统 as 原始记录;
+  系统._数据版本 = 当前MVU数据版本;
+  仅在缺失时写入(系统, '_孕情初见评价楼', {});
+
+  if (!是记录(系统._上次性爱结果)) 系统._上次性爱结果 = {};
+  仅在缺失时写入(系统._上次性爱结果 as 原始记录, '收尾对象门牌', '');
+
+  if (是记录(已迁移.户)) {
+    for (const 户 of Object.values(已迁移.户)) {
+      if (!是记录(户) || !是记录(户.妻)) continue;
+      const 妻 = 户.妻;
+      if (!是记录(妻._冷落余波)) 妻._冷落余波 = {};
+      仅在缺失时写入(妻._冷落余波 as 原始记录, '送礼安抚日', -1);
+      仅在缺失时写入(妻._冷落余波 as 原始记录, '当日送礼安抚次数', 0);
+      if (!是记录(妻._怀孕)) 妻._怀孕 = 创建未孕默认值();
+    }
+  }
+  return 已迁移;
+}
+
+/** Schema 的局部构造允许省略版本；显式 v7 会先迁移，显式未知版本会硬拒绝。 */
+function 迁移显式MVU版本(input: unknown): unknown {
   if (是记录(input) && 是记录(input.系统) && Object.prototype.hasOwnProperty.call(input.系统, '_数据版本')) {
-    验证当前MVU存档版本(input);
+    return 迁移MVU存档到当前版本(input);
   }
   return input;
 }
@@ -512,7 +578,7 @@ const 当前Schema = z.object({
 
   系统: z
     .object({
-      /** 当前存档契约版本；v0.81 只接受完全同版数据。 */
+      /** 当前存档契约版本；v0.80(v7) 由入口一次性迁到 v8。 */
       _数据版本: z.literal(当前MVU数据版本).prefault(当前MVU数据版本),
       _坏结局: z.string().prefault(''), // 单向锁:非空=全冻结,快照只注入终局指引
       /** 一次性剧情事件队列(| 分隔;写阶段转存 _已注入事件 供同楼重roll重放,防护10) */
@@ -809,6 +875,6 @@ const 当前Schema = z.object({
     .prefault({}),
 });
 
-export const Schema = z.preprocess(验证显式MVU版本, 当前Schema);
+export const Schema = z.preprocess(迁移显式MVU版本, 当前Schema);
 
 export type SchemaType = z.output<typeof Schema>;

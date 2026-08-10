@@ -2,7 +2,7 @@ import { registerMvuSchema } from 'https://testingcf.jsdelivr.net/gh/StageDog/ta
 
 import { reloadOnChatChange } from '@/util/script';
 import { 确保MVU默认外置解析, 自动代关MVU自动请求, 读取MVU解析状态 } from '../../MVU解析模式';
-import { Schema, type SchemaType, 验证当前MVU存档版本 } from '../../schema';
+import { Schema, type SchemaType, 需要迁移MVU存档, 验证当前MVU存档版本 } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
 import { 户静态表, 首夜差分, 首批门牌, 阶段标题, 查道具, 查房间, 查特殊场景 } from '../../stageConfig';
 import { 使用运作, 催租, 接听来电, 空父亲通话, 捡金币, 空房偷窃, 经济结算, 要钱 } from './经济系统';
@@ -782,10 +782,24 @@ $(() => {
       );
       await Promise.race([waitGlobalInitialized('Mvu'), 超时]);
 
-      // v0.81 只接受本版存档。当前版本仍完整支持刷新、重掷与回档，但检测到其他版本
-      // stat_data 时立即停止，避免 Zod 默认值把不完整数据伪装成可继续游玩的新档。
+      // v0.82 在任何监听与 UI 操作挂载前，把 v0.80(v7) 原子迁移并写回当前尾楼。
+      // 未知版本仍立即停止，避免 Zod 默认值把不完整数据伪装成可继续游玩的新档。
       const 启动存档 = 读最近有效stat();
-      if (启动存档) 验证当前MVU存档版本(启动存档);
+      if (启动存档) {
+        验证当前MVU存档版本(启动存档);
+        if (需要迁移MVU存档(启动存档)) {
+          const 有效 = 读取最近有效();
+          if (!有效) throw new Error('找到 v0.80 存档，但无法取得可写入的当前尾楼；迁移已中止，原存档未修改。');
+          await 排队MVU操作(() =>
+            脚本写入(有效.raw, 有效.data, {
+              记录成长: false,
+              当前绝对时段: 有效.data.系统._绝对时段,
+            }),
+          );
+          _top.toastr?.success?.('v0.80 存档已安全迁移到 v0.82，可继续原进度。', '人妻公寓', { timeOut: 8000 });
+          console.info('[人妻公寓] v0.80(v7) 存档已迁移并写回当前尾楼');
+        }
+      }
 
       // 只在互斥旗存在、公开 API 经过等待仍不存在时清理死旗；活动中的数据库实例绝不触碰。
       await 清理数据库陈旧互斥旗();

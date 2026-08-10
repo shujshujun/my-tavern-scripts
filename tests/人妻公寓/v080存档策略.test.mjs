@@ -34,13 +34,15 @@ const 档案卡源码 = readFileSync(
   'utf8',
 );
 
-test('v0.81 只接受当前 MVU 存档，不再逐版迁移旧档', () => {
+test('v0.82 接受 v0.80/v0.81 存档并拒绝未知版本与损坏结构', () => {
   const { 当前MVU数据版本, 验证当前MVU存档版本 } = schema模块;
   assert.equal(当前MVU数据版本, 8);
   assert.doesNotThrow(() => 验证当前MVU存档版本(initvar));
   assert.doesNotThrow(() => 验证当前MVU存档版本({}));
-  assert.throws(() => 验证当前MVU存档版本({ 系统: { _数据版本: 7 } }), /v0\.81 不兼容其他版本存档/);
-  assert.throws(() => 验证当前MVU存档版本({ 系统: { _序章完成: true } }), /v0\.81 不兼容其他版本存档/);
+  assert.doesNotThrow(() => 验证当前MVU存档版本({ 系统: { _数据版本: 7 } }));
+  assert.throws(() => 验证当前MVU存档版本({ 系统: { _数据版本: 6 } }), /v0\.82 仅兼容数据版本 7 和 8/);
+  assert.throws(() => 验证当前MVU存档版本({ 系统: { _数据版本: 9 } }), /v0\.82 仅兼容数据版本 7 和 8/);
+  assert.throws(() => 验证当前MVU存档版本({ 系统: { _序章完成: true } }), /v0\.82 仅兼容数据版本 7 和 8/);
   for (const 坏存档 of [
     null,
     'v7',
@@ -58,9 +60,52 @@ test('v0.81 只接受当前 MVU 存档，不再逐版迁移旧档', () => {
   assert.equal(schema模块.Schema.parse({}).系统._数据版本, 当前MVU数据版本, '内部默认 Schema 构造仍须合法');
 });
 
-test('Schema 与启动链不再包含旧档迁移和 rq0.54 尾楼恢复', () => {
-  assert.doesNotMatch(schema源码, /MVU迁移|聊天迁移|迁移MVU原始数据|迁移聊天原始数据|判定MVUv4时间迁移|半迁移/);
-  assert.doesNotMatch(index源码, /rq0\.54|需要落迁移|检测到临时尾楼回归|聊天变量已迁移/);
+test('v7→v8 迁移幂等补齐新机制字段且不改写原对象与原有数值', () => {
+  const { Schema, 创建户节点, 迁移MVU存档到当前版本 } = schema模块;
+  const v7 = Schema.parse({
+    ...initvar,
+    户: { 101: 创建户节点(12), 102: 创建户节点(18) },
+  });
+  v7.系统._数据版本 = 7;
+  v7.系统._上次性爱结果.场次标识 = '旧场次';
+  delete v7.系统._上次性爱结果.收尾对象门牌;
+  delete v7.系统._孕情初见评价楼;
+  v7.户['101'].妻.好感值 = 73;
+  v7.户['101'].妻._冷落余波.状态 = '安抚中';
+  delete v7.户['101'].妻._冷落余波.送礼安抚日;
+  delete v7.户['101'].妻._冷落余波.当日送礼安抚次数;
+  delete v7.户['101'].妻._怀孕;
+  delete v7.户['102'].妻._怀孕;
+  const 原始副本 = structuredClone(v7);
+
+  const 第一次 = 迁移MVU存档到当前版本(v7);
+  const 第二次 = 迁移MVU存档到当前版本(第一次);
+  const data = Schema.parse(第一次);
+
+  assert.deepEqual(v7, 原始副本, '迁移必须先复制，失败时不能留下半迁移原档');
+  assert.deepEqual(第二次, 第一次, '已经迁移到 v8 后重复执行不得产生新变化');
+  assert.equal(data.系统._数据版本, 8);
+  assert.equal(data.系统._上次性爱结果.场次标识, '旧场次');
+  assert.equal(data.系统._上次性爱结果.收尾对象门牌, '');
+  assert.deepEqual(data.系统._孕情初见评价楼, {});
+  assert.equal(data.户['101'].妻.好感值, 73);
+  assert.equal(data.户['101'].妻._冷落余波.状态, '安抚中');
+  assert.equal(data.户['101'].妻._冷落余波.送礼安抚日, -1);
+  assert.equal(data.户['101'].妻._冷落余波.当日送礼安抚次数, 0);
+  for (const 门牌 of ['101', '102']) {
+    assert.equal(data.户[门牌].妻._怀孕.状态, '未孕');
+    assert.equal(data.户[门牌].妻._怀孕.受孕绝对时段, -1);
+    assert.equal(data.户[门牌].妻._怀孕.丈夫登门.状态, '无');
+    assert.equal(data.户[门牌].妻._怀孕.丈夫登门.已结算, false);
+  }
+});
+
+test('启动链在监听挂载前把 v7 原子迁移并写回当前尾楼', () => {
+  assert.match(schema源码, /迁移MVU存档到当前版本/);
+  assert.match(index源码, /需要迁移MVU存档/);
+  assert.match(index源码, /读取最近有效\(\)/);
+  assert.match(index源码, /脚本写入\([^)]*记录成长:\s*false/s);
+  assert.doesNotMatch(index源码, /rq0\.54|检测到临时尾楼回归|半迁移/);
 });
 
 test('派生显示字段不入存档，v0.80 阶段线路预约状态继续保留', () => {
