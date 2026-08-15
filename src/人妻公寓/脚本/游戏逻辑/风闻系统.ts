@@ -21,6 +21,7 @@ export const 风闻数值 = {
   危机责任: 8,
   处理投诉降低: 5,
   聚餐降低: 经济配置.聚餐风闻直降,
+  答谢会降低: 经济配置.答谢会风闻直降,
   聚餐冷却时段: 经济配置.聚餐冷却时段,
 } as const;
 
@@ -752,12 +753,23 @@ export function 聚餐可降低风闻(data: SchemaType): { 可用: boolean; 尚�
   return { 可用: 尚余时段 <= 0, 尚余时段 };
 }
 
-export function 使用聚餐降低风闻(data: SchemaType): number {
+/** 聚餐与答谢会共用旧档已有的聚餐冷却字段，避免叠加公关活动绕过剧情压力。 */
+function 使用住户公关降低风闻(data: SchemaType, 计划降低: number): number {
   const 当前 = Math.max(0, 整数(data.系统._绝对时段));
   const 状态 = 聚餐可降低风闻(data);
   if (!状态.可用 || data.风闻 <= 风闻最低值(data)) return 0;
+  const 实际降低 = 降低风闻(data, 计划降低);
+  if (实际降低 <= 0) return 0;
   data.系统._风闻账.聚餐冷却至 = 当前 + 风闻数值.聚餐冷却时段;
-  return 降低风闻(data, 风闻数值.聚餐降低);
+  return 实际降低;
+}
+
+export function 使用聚餐降低风闻(data: SchemaType): number {
+  return 使用住户公关降低风闻(data, 风闻数值.聚餐降低);
+}
+
+export function 使用答谢会降低风闻(data: SchemaType): number {
+  return 使用住户公关降低风闻(data, 风闻数值.答谢会降低);
 }
 
 /** 周期父亲报表只结算尚未传达的结构化风闻责任。 */

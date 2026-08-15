@@ -32,14 +32,16 @@ test('收尾选择在场景推进或行为变化时清空，确认前再次校�
   assert.match(监听段, /有效楼数/);
   assert.match(监听段, /当前行为/);
   assert.match(监听段, /保护状态/);
+  assert.match(监听段, /主焦点门牌/);
   assert.match(确认段, /收尾选项\.value\.includes\(位置\)/);
   assert.match(确认段, /待确认收尾位置\.value = ''/);
 });
 
-test('五个收尾部位使用统一规则生成，并把对应约束送入 AI 快照', () => {
+test('收尾部位按完整存档中的主焦点阶段统一生成，并把对应约束送入 AI 快照', () => {
   const 选项段 = 截段(App源, 'const 收尾选项', 'const 资源详情');
   assert.match(App源, /class="intimacy-finish-label">射精部位</);
-  assert.match(选项段, /构造亲密收尾选项\(性爱场景\.value\)/);
+  assert.match(选项段, /构造亲密收尾选项\(data\.value\)/);
+  assert.match(快照源, /亲密收尾选项\(data\)/);
   assert.match(快照源, /亲密收尾AI提示\(收尾位置\)/);
   assert.match(快照源, /\$\{收尾演出约束\}/);
 });

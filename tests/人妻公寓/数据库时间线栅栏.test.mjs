@@ -1,8 +1,10 @@
 /* eslint-disable import-x/no-nodejs-modules -- Node-only regression test */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import {
+  数据库异步写栅栏,
   数据库快照未越过楼层,
   数据库时间线栅栏,
   解析数据库时间线持久状态,
@@ -138,4 +140,55 @@ test('等待期间楼层增长时，即使回调和快照稳定也不能扩大�
   assert.equal(栅栏.通知刷新提示('chat-a', 快照, 11, 1000, true), false);
   assert.equal(栅栏.提交主动快照('chat-a', 快照, 11, 1000, { 允许无回调恢复: true }), false);
   assert.equal(栅栏.可读取('chat-a'), false);
+});
+
+test('回档会立即作废已起跑的数据库写；补偿结算前不得重新开放读取或发起新写', async () => {
+  const 栅栏 = new 数据库异步写栅栏();
+  const 旧写租约 = 栅栏.捕获('chat-a');
+  let 完成旧写;
+  const 旧写 = new Promise(resolve => {
+    完成旧写 = resolve;
+  });
+  栅栏.登记(旧写租约, 旧写);
+
+  assert.equal(栅栏.可提交(旧写租约), true);
+  栅栏.作废('chat-a');
+  assert.equal(栅栏.可提交(旧写租约), false, '回档同步拍必须先让旧租约失效');
+  assert.equal(栅栏.有已作废写入('chat-a'), true, '旧 SQL 尚未结算/补偿时，数据库重建不能宣告完成');
+  assert.equal(栅栏.可开始新写('chat-a'), false, '数据库仍可能被迟到结果改写时，不得让新时间线继续混写');
+
+  完成旧写();
+  await 旧写;
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(栅栏.有已作废写入('chat-a'), false);
+  assert.equal(栅栏.可开始新写('chat-a'), true);
+  assert.equal(栅栏.可提交(栅栏.捕获('chat-a')), true);
+});
+
+test('回档接线同时保护脚本 SQL 与数据库官方召回，不只过滤本卡记忆胶囊', () => {
+  const 数据库桥 = readFileSync('src/人妻公寓/脚本/游戏逻辑/数据库桥.ts', 'utf8');
+  const 回合引擎 = readFileSync('src/人妻公寓/脚本/游戏逻辑/回合引擎.ts', 'utf8');
+  const 标记函数 = 数据库桥.slice(
+    数据库桥.indexOf('export function 标记数据库时间线将变更'),
+    数据库桥.indexOf('export async function 等待数据库时间线就绪'),
+  );
+  const 执行恢复 = 数据库桥.slice(
+    数据库桥.indexOf('async function 执行数据库时间线恢复'),
+    数据库桥.indexOf('function 启动数据库时间线恢复'),
+  );
+  const 执行回合 = 回合引擎.slice(
+    回合引擎.indexOf('export async function 执行回合'),
+    回合引擎.indexOf('export async function 重掷回合'),
+  );
+
+  assert.match(标记函数, /数据库异步写\.作废\(聊天标识\)/, '删楼前必须同步作废已起跑 SQL');
+  assert.match(执行恢复, /数据库异步写\.有已作废写入\(聊天标识\)/, '旧 SQL 与补偿结算前不得开栅栏');
+  assert.match(数据库桥, /构造SQLite唯一行失效补偿[\s\S]*?DELETE FROM rq_events WHERE floor_no = \?/);
+  assert.match(数据库桥, /构造SQLite唯一行失效补偿[\s\S]*?DELETE FROM rq_social_history WHERE event_key = \?/);
+  assert.match(执行回合, /本轮数据库时间线可用\s*=\s*await 等待数据库时间线就绪\(\)/);
+  assert.match(
+    执行回合,
+    /启用数据库规划:\s*本轮数据库已安装\s*&&\s*本轮数据库时间线可用/,
+    '栅栏未恢复时，数据库插件自己的官方召回也必须停用',
+  );
 });

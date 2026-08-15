@@ -132,10 +132,10 @@ test('Icon.vue 保留 n:string、svg 四属性、内容注入与三段基础样�
   assert.match(Icon源码, /\.ic :deep\(\.ic-gem\)/, '应保留能命中注入子节点的 :deep(.ic-gem)');
 });
 
-test('assets.ts 精确含 rq0.70/rq0.55/cg1 三个基址与全部文件名，App 与新模块无 ?url 位图导入', () => {
+test('assets.ts 精确含 rq0.70/rq0.55/cg3 三个基址与全部文件名，App 与新模块无 ?url 位图导入', () => {
   assert.match(assets源码, /https:\/\/testingcf\.jsdelivr\.net\/gh\/shujshujun\/my-tavern-scripts@rq0\.70\/src\/人妻公寓\/素材/, '应保留 rq0.70 增量素材基址');
   assert.match(assets源码, /https:\/\/testingcf\.jsdelivr\.net\/gh\/shujshujun\/my-tavern-scripts@rq0\.55\/dist\/人妻公寓\/素材/, '应保留 rq0.55 完整素材快照基址');
-  assert.match(assets源码, /https:\/\/testingcf\.jsdelivr\.net\/gh\/shujun8520-design\/qgy-assets@cg1\/cg1/, '应保留 qgy-assets@cg1 成人 CG 基址');
+  assert.match(assets源码, /https:\/\/testingcf\.jsdelivr\.net\/gh\/shujun8520-design\/qgy-assets@cg3\/cg1/, '成人 CG 应锁定普通/孕肚五阶段 qgy-assets@cg3 基址');
   for (const 文件 of [
     '01_双屏关闭.png', '02_左屏亮起.png', '03_双屏亮起.png',
     '公寓外部.webp', '晨跑公园.webp', '健身房.webp',
@@ -144,7 +144,7 @@ test('assets.ts 精确含 rq0.70/rq0.55/cg1 三个基址与全部文件名，App
   ]) {
     assert.ok(assets源码.includes(文件), `assets.ts 应保留文件 ${文件}`);
   }
-  assert.match(assets源码, /CG解锁存储键 = '人妻公寓_成人CG解锁_cg1'/, '应保留 CG 解锁存储键');
+  assert.match(assets源码, /CG解锁存储键 = '人妻公寓_成人CG解锁_cg1'/, '资源标签升级时应保留旧 CG 解锁存储键');
   for (const [名, 源码] of [
     ['App.vue', App源码],
     ['icons.ts', icons源码],

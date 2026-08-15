@@ -1,10 +1,12 @@
 <script setup lang="ts">
-// 角色CG图库：已解锁显示缩略图，未解锁不泄露画面。阶段/页码/页签/大图预览均为图库内部状态；
+// 角色CG图库：已解锁显示缩略图，未解锁不泄露画面。图库/阶段/页码/页签/大图预览均为图库内部状态；
 // App 只保留 CG图库门牌 开关与 打开/关闭 两个跨区块动作（用 :key="门牌" 每次开不同角色都从头开始）。
-import { computed, ref } from 'vue';
+// 顶层按 普通CG/怀孕CG 分线，每线内部用五阶段页签；总数与已解锁都按 图库+阶段 计算。
+import { computed, onBeforeUnmount, ref } from 'vue';
 import { 户静态表, type 门牌 } from '../../../stageConfig';
-import { 角色CG列表, type CG阶段, type 成人CG项 } from '../../../脚本/游戏逻辑/成人CG系统';
+import { 角色CG列表, type CG变体, type CG阶段, type 成人CG项 } from '../../../脚本/游戏逻辑/成人CG系统';
 import { 成人CG基址 } from '../assets';
+import { CG全览模式, CG项可查看, 创建CG全览连击状态, 记录CG全览标题点击 } from './CG图库全览';
 import Ic from './Icon.vue';
 
 const props = defineProps<{
@@ -14,20 +16,30 @@ const props = defineProps<{
 
 const emit = defineEmits<{ close: [] }>();
 
-const 阶段 = ref<CG阶段>('foreplay');
+const 变体 = ref<CG变体>('normal');
+const 阶段 = ref<CG阶段>('intro_no_contact');
 const 页码 = ref(1);
 const 每页 = 15;
 const 预览 = ref<成人CG项 | null>(null);
+const 全览点击状态 = ref(创建CG全览连击状态());
+const 全览提示 = ref('');
+let 全览提示计时器: ReturnType<typeof setTimeout> | null = null;
 
 const 阶段名: Record<CG阶段, string> = {
-  foreplay: '前戏',
+  intro_no_contact: '亲密开场',
+  light_contact: '普通接触',
+  deep_foreplay: '深度前戏',
   active: '进行中',
-  climax_after: '高潮事后',
+  aftermath: '事后',
+};
+const 变体名: Record<CG变体, string> = {
+  normal: '普通 CG',
+  pregnancy: '怀孕 CG',
 };
 
 const 角色名 = computed(() => 户静态表[props.door].妻名);
-const 全部项 = computed(() => 角色CG列表(props.door));
-const 阶段全部项 = computed(() => 全部项.value.filter(item => item.phase === 阶段.value));
+const 全部项 = computed(() => 角色CG列表(props.door, 变体.value));
+const 阶段全部项 = computed(() => 全部项.value.filter(item => item.stage === 阶段.value));
 const 总页数 = computed(() => Math.max(1, Math.ceil(阶段全部项.value.length / 每页)));
 const 当前项 = computed(() => {
   const 起点 = (页码.value - 1) * 每页;
@@ -35,7 +47,7 @@ const 当前项 = computed(() => {
 });
 const 页签 = computed(() =>
   (Object.keys(阶段名) as CG阶段[]).map(值 => {
-    const 项 = 全部项.value.filter(item => item.phase === 值);
+    const 项 = 全部项.value.filter(item => item.stage === 值);
     return {
       值,
       名: 阶段名[值],
@@ -44,9 +56,40 @@ const 页签 = computed(() =>
     };
   }),
 );
+/** 怀孕库当前为空时展示明确空状态，不伪造条目，也不显示普通图库内容。 */
+const 空库提示 = computed(() => {
+  if (变体.value !== 'pregnancy') return '';
+  return 全部项.value.length ? '' : '怀孕 CG 素材待接入';
+});
 
 function 成人CG地址(项: 成人CG项): string {
   return `${成人CG基址}/${项.path}`;
+}
+
+function 可查看CG(项: 成人CG项): boolean {
+  return CG项可查看(props.unlocked, 项.id, CG全览模式.value);
+}
+
+function 处理全览标题点击(): void {
+  if (CG全览模式.value) return;
+
+  const 结果 = 记录CG全览标题点击(全览点击状态.value, Date.now());
+  全览点击状态.value = 结果.状态;
+  if (!结果.应开启) return;
+
+  CG全览模式.value = true;
+  全览提示.value = '全览模式已开启';
+  if (全览提示计时器) clearTimeout(全览提示计时器);
+  全览提示计时器 = setTimeout(() => {
+    全览提示.value = '';
+    全览提示计时器 = null;
+  }, 1_800);
+}
+
+function 切换变体(变体值: CG变体): void {
+  变体.value = 变体值;
+  阶段.value = 'intro_no_contact';
+  页码.value = 1;
 }
 
 function 切换阶段(阶段值: CG阶段): void {
@@ -57,13 +100,32 @@ function 切换阶段(阶段值: CG阶段): void {
 function 翻页(偏移: number): void {
   页码.value = Math.min(Math.max(页码.value + 偏移, 1), 总页数.value);
 }
+
+onBeforeUnmount(() => {
+  if (全览提示计时器) clearTimeout(全览提示计时器);
+});
 </script>
 
 <template>
   <div v-if="door" class="mask cg-library-mask" @click.self="emit('close')">
     <div class="sheet cg-library">
       <button class="sheet-close" @click="emit('close')">✕</button>
-      <div class="sheet-title">{{ 角色名 }} · CG 图库</div>
+      <button type="button" class="sheet-title cg-library-title" @click="处理全览标题点击">
+        {{ 角色名 }} · CG 图库
+        <span v-if="CG全览模式" class="cg-view-all-badge">全览</span>
+      </button>
+      <div v-if="全览提示" class="cg-view-all-toast" role="status">{{ 全览提示 }}</div>
+      <div class="cg-library-tabs cg-library-variants">
+        <button
+          v-for="(名, 值) in 变体名"
+          :key="值"
+          class="btn mini"
+          :class="{ on: 变体 === 值 }"
+          @click="切换变体(值)"
+        >
+          {{ 名 }}
+        </button>
+      </div>
       <div class="cg-library-tabs">
         <button
           v-for="页 in 页签"
@@ -75,21 +137,24 @@ function 翻页(偏移: number): void {
           {{ 页.名 }} {{ 页.已解锁 }}/{{ 页.总数 }}
         </button>
       </div>
-      <div class="sheet-body cg-library-grid">
+      <div v-if="空库提示" class="cg-empty">
+        {{ 空库提示 }}
+      </div>
+      <div v-else class="sheet-body cg-library-grid">
         <button
           v-for="项 in 当前项"
           :key="项.id"
           class="cg-tile"
-          :class="{ locked: !unlocked.has(项.id) }"
-          :disabled="!unlocked.has(项.id)"
-          :title="unlocked.has(项.id) ? '查看大图' : '尚未解锁'"
+          :class="{ locked: !可查看CG(项) }"
+          :disabled="!可查看CG(项)"
+          :title="可查看CG(项) ? '查看大图' : '尚未解锁'"
           @click="预览 = 项"
         >
-          <img v-if="unlocked.has(项.id)" :src="成人CG地址(项)" alt="" loading="lazy" draggable="false" />
+          <img v-if="可查看CG(项)" :src="成人CG地址(项)" alt="" loading="lazy" draggable="false" />
           <span v-else class="cg-lock"><Ic n="lock" /></span>
         </button>
       </div>
-      <div v-if="总页数 > 1" class="cg-pagination">
+      <div v-if="!空库提示 && 总页数 > 1" class="cg-pagination">
         <button class="btn mini" :disabled="页码 <= 1" @click="翻页(-1)">‹ 上一页</button>
         <span>第 {{ 页码 }} / {{ 总页数 }} 页</span>
         <button class="btn mini" :disabled="页码 >= 总页数" @click="翻页(1)">下一页 ›</button>
@@ -110,10 +175,53 @@ function 翻页(偏移: number): void {
 <style scoped>
 /* 图库专属样式：完整移动自 App.vue（原 .cg-library 至该段 @media (max-width: 720px) 结束） */
 .cg-library {
+  position: relative;
   width: min(980px, calc(100vw - 28px));
   height: min(820px, calc(100dvh - 28px));
   display: flex;
   flex-direction: column;
+}
+
+.cg-library-title {
+  box-sizing: border-box;
+  width: 100%;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  text-align: inherit;
+  background: transparent;
+  cursor: default;
+  appearance: none;
+  user-select: none;
+}
+
+.cg-view-all-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 7px;
+  border: 1px solid color-mix(in srgb, var(--pink) 65%, transparent);
+  border-radius: 999px;
+  color: var(--pink);
+  font-size: 0.68em;
+  line-height: 1.2;
+  vertical-align: middle;
+}
+
+.cg-view-all-toast {
+  position: absolute;
+  z-index: 3;
+  top: 46px;
+  left: 50%;
+  padding: 7px 12px;
+  border: 1px solid color-mix(in srgb, var(--pink) 45%, transparent);
+  border-radius: 999px;
+  color: #fff;
+  background: color-mix(in srgb, var(--pink) 86%, #1c1a24);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.24);
+  font-size: 0.78em;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translateX(-50%);
 }
 
 .cg-library-tabs {
@@ -127,6 +235,19 @@ function 翻页(偏移: number): void {
   color: #fff;
   border-color: var(--pink);
   background: var(--pink);
+}
+
+.cg-library-variants {
+  padding-bottom: 6px;
+}
+
+.cg-empty {
+  flex: 1 1 auto;
+  display: grid;
+  min-height: 120px;
+  place-items: center;
+  color: var(--ink-soft);
+  font-size: 0.92em;
 }
 
 .cg-library-grid {

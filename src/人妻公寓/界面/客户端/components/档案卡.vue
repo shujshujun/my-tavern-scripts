@@ -9,7 +9,7 @@ import { 怀孕已公开 } from '../../../脚本/游戏逻辑/怀孕系统';
 import { 每日堕落上限 } from '../../../脚本/游戏逻辑/守护系统';
 import { 可晋阶, 可启动母亲药物首夜, 普通首夜时段已满足, 晋阶预约现场已满足 } from '../../../脚本/游戏逻辑/结算系统';
 import { 读取关系线索, 读取开门线索 } from '../../../脚本/游戏逻辑/阶段线路系统';
-import { CG条目, 角色CG总数 } from '../../../脚本/游戏逻辑/成人CG系统';
+import { CG条目, 角色CG总数全部变体 } from '../../../脚本/游戏逻辑/成人CG系统';
 import { 角色立绘候选 } from '../assets';
 import Ic from './Icon.vue';
 
@@ -36,7 +36,6 @@ const emit = defineEmits<{
   portraitError: [url: string];
   itemError: [id: string];
   openCg: [door: 门牌];
-  unload: [door: 门牌, kinkId: string];
   advance: [door: 门牌];
   askMoney: [door: 门牌];
 }>();
@@ -88,12 +87,10 @@ const 选中档案 = computed(() => {
       { 名: '小屄', 值: 妻.身体开发.小屄 },
       { 名: '屁穴', 值: 妻.身体开发.屁穴 },
     ],
-    // 性癖(P5):装载中3槽(可卸载)+曾开发永久标记(避开云霜凝"卸下即失忆"坑)
-    性癖装载: 妻.性癖装载.map(id => ({ id, 名: 查性癖(id)?.名称 ?? id })),
-    曾开发: 妻.曾开发性癖.filter(id => !妻.性癖装载.includes(id)).map(id => 查性癖(id)?.名称 ?? id),
+    阶段性癖: 妻.阶段性癖 ? (查性癖(妻.阶段性癖)?.名称 ?? 妻.阶段性癖) : '',
     CG进度: {
       已解锁: [...props.unlockedCg].filter(id => CG条目(id)?.door === m).length,
-      总数: 角色CG总数(m),
+      总数: 角色CG总数全部变体(m),
     },
   };
 });
@@ -348,32 +345,11 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
             </div>
           </div>
         </div>
-        <!-- 性癖(P5):装载中3槽可卸载;"曾开发"永久留档=她的身体记得 -->
-        <div
-          v-if="选中档案.妻.当前阶段 >= 4 && (选中档案.性癖装载.length || 选中档案.曾开发.length)"
-          class="dsec dossier-card"
-        >
-          <div class="dsec-title">性 癖({{ 选中档案.性癖装载.length }}/3)</div>
+        <!-- 每位角色只有一个随阶段线路完成的永久主题；档案只读，不提供装卸。 -->
+        <div v-if="选中档案.阶段性癖" class="dsec dossier-card">
+          <div class="dsec-title">阶 段 性 癖</div>
           <div class="kink-row">
-            <span v-for="k in 选中档案.性癖装载" :key="k.id" class="kink-chip on">
-              {{ k.名 }}
-              <button
-                class="kink-off"
-                title="卸下(她的身体不会忘)"
-                :disabled="sending"
-                @click="emit('unload', 选中档案.门牌, k.id)"
-              >
-                ×
-              </button>
-            </span>
-            <span
-              v-for="(名, i) in 选中档案.曾开发"
-              :key="'曾' + i"
-              class="kink-chip was"
-              title="曾开发过——重装免开幕,直接生效"
-            >
-              {{ 名 }}
-            </span>
+            <span class="kink-chip on">{{ 选中档案.阶段性癖 }}</span>
           </div>
         </div>
         <!-- 丈夫状态栏(解锁后:双轴可见——疑心是风险表,信任是钥匙) -->
@@ -1302,7 +1278,7 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
   font-size: 0.9em;
 }
 
-/* 性癖槽(P5):装载中=粉底可卸;曾开发=灰底留档 */
+/* 阶段性癖：角色线路完成后永久留档，只读展示。 */
 .kink-row {
   display: flex;
   flex-wrap: wrap;
@@ -1319,22 +1295,6 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
   border: 1px solid rgba(255, 79, 154, 0.35);
   background: rgba(255, 79, 154, 0.12);
   color: #d64d8f;
-}
-
-.kink-chip.was {
-  border-color: rgba(120, 120, 130, 0.3);
-  background: rgba(120, 120, 130, 0.1);
-  color: #8a8890;
-}
-
-.kink-off {
-  border: none;
-  background: none;
-  color: inherit;
-  font-size: 13px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 0 0 0 2px;
 }
 
 /* 丈夫状态栏(解锁后:双轴=风险表与钥匙) */

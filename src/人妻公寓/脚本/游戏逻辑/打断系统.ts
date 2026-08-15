@@ -88,7 +88,7 @@ function 反讽文案(妻名: string, 夫名: string): string {
  * 打断检测:焦点户丈夫按 疑心×信任 决定是否/如何打断本场戏。
  * 只在"妻子在场与{{user}}互动 且 丈夫不在场"时有意义;排队走 系统._待发送事件。
  */
-export function 打断检测(data: SchemaType, 焦点: 门牌[], _消息楼层: number): void {
+function 取丈夫打断候选(data: SchemaType, 焦点: readonly 门牌[]) {
   if (data.系统._待发送事件) return; // 事件通道已占用,不叠
   const 门牌号 = 焦点[0];
   if (!门牌号 || 门牌号 === '302') return; // 母亲户:父亲永远不知道(spec)
@@ -105,6 +105,18 @@ export function 打断检测(data: SchemaType, 焦点: 门牌[], _消息楼层: 
   // 频控:同户同时段最多一次
   const 档号 = 绝对时段;
   if (夫._上次打断档 >= 档号) return;
+  return { 门牌号, 节点, 配, 夫, 档号 };
+}
+
+/** 变量重生成用：此时若疑心贡献改变，就可能改变已经掷过的一次性打断剧情。 */
+export function 丈夫打断会读取疑心(data: SchemaType, 焦点: readonly 门牌[]): boolean {
+  return Boolean(取丈夫打断候选(data, 焦点));
+}
+
+export function 打断检测(data: SchemaType, 焦点: 门牌[], _消息楼层: number): void {
+  const 候选 = 取丈夫打断候选(data, 焦点);
+  if (!候选) return;
+  const { 门牌号, 配, 夫, 档号 } = 候选;
   if (夫.疑心值 < 疑心门槛) return;
 
   // 确定性触发(档号为种子:同档内每楼同一判定,重roll不换命)

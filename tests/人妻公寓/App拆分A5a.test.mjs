@@ -55,6 +55,16 @@ test('App 不再内联两弹窗模板与页签局部状态；商店组件拥有 
   assert.match(商店源码, /const 当前货架 = computed/, '商店组件应拥有 当前货架');
   assert.match(商店源码, /const 当前空文案 = computed/, '商店组件应拥有 当前空文案');
   assert.match(商店源码, /\?\? '\(暂时没货\)'/, '页签缺失回退空文案保持');
+  assert.match(
+    商店源码,
+    /watch\(\s*\(\)\s*=>\s*props\.shelves\.map\([\s\S]*?商店页签\.value\s*=\s*页签们\[0\]/,
+    '商店应以响应式 watch 监听可用页签，页签集合变化时把失效页签校正到第一个可用页签',
+  );
+  assert.match(
+    商店源码,
+    /if \(!页签们\.includes\(商店页签\.value\)\)/,
+    '只在当前页签不属于最新可用页签集合时才校正，现存页签保持不变',
+  );
 
   assert.match(App源码, /const 显示商店 = ref\(false\)/, '显示商店仍留 App');
   assert.match(App源码, /const 显示背包 = ref\(false\)/, '显示背包仍留 App');
@@ -67,7 +77,6 @@ test('App 不再内联两弹窗模板与页签局部状态；商店组件拥有 
     '买',
     '用运作',
     '用资源道具',
-    '装载',
     '送出',
     '布设',
     '打开信',
@@ -78,16 +87,16 @@ test('App 不再内联两弹窗模板与页签局部状态；商店组件拥有 
   }
 });
 
-test('props/emits 接线完整：背包十事件、商店三事件、useOperation 三参数、image error 回 App、close 置 false', () => {
+test('props/emits 接线完整：背包九事件、商店状态函数、useOperation 三参数、image error 回 App、close 置 false', () => {
   const 模板段 = 提取模板(App源码);
   assert.match(
     模板段,
-    /<InventoryPopup\b[\s\S]*?:open="显示背包"[\s\S]*?:items="背包列表"[\s\S]*?:sending="发送中"[\s\S]*?:item-failed="道具图失效"[\s\S]*?:item-image="道具图"[\s\S]*?@close="显示背包 = false"[\s\S]*?@image-error="道具图失效\[\$event\] = true"[\s\S]*?@read="打开信"[\s\S]*?@deploy="布设"[\s\S]*?@use-resource="用资源道具"[\s\S]*?@use-operation="用运作"[\s\S]*?@play-tape="使用录像带"[\s\S]*?@prepare-meeting="打开静音会议筹备"[\s\S]*?@gift="送出"[\s\S]*?@load="装载"[\s\S]*?\/>/,
+    /<InventoryPopup\b[\s\S]*?:open="显示背包"[\s\S]*?:items="背包列表"[\s\S]*?:sending="发送中"[\s\S]*?:item-failed="道具图失效"[\s\S]*?:item-image="道具图"[\s\S]*?@close="显示背包 = false"[\s\S]*?@image-error="道具图失效\[\$event\] = true"[\s\S]*?@read="打开信"[\s\S]*?@deploy="布设"[\s\S]*?@use-resource="用资源道具"[\s\S]*?@use-operation="用运作"[\s\S]*?@play-tape="使用录像带"[\s\S]*?@prepare-meeting="打开静音会议筹备"[\s\S]*?@gift="送出"[\s\S]*?\/>/,
     '背包 tag 全部 props/emits 接线',
   );
   assert.match(
     模板段,
-    /<ShopPopup\b[\s\S]*?:open="显示商店"[\s\S]*?:cash="data\.现金"[\s\S]*?:sending="发送中"[\s\S]*?:shelves="货架"[\s\S]*?:item-failed="道具图失效"[\s\S]*?:item-image="道具图"[\s\S]*?:item-visual="道具视觉信息"[\s\S]*?:lock-reasons="商品锁定原因"[\s\S]*?:purchase-label="商品购买文案"[\s\S]*?@close="显示商店 = false"[\s\S]*?@image-error="道具图失效\[\$event\] = true"[\s\S]*?@buy="买"[\s\S]*?\/>/,
+    /<ShopPopup\b[\s\S]*?:open="显示商店"[\s\S]*?:cash="data\.现金"[\s\S]*?:sending="发送中"[\s\S]*?:shelves="货架"[\s\S]*?:item-failed="道具图失效"[\s\S]*?:item-image="道具图"[\s\S]*?:item-visual="道具视觉信息"[\s\S]*?:lock-reasons="商品锁定原因"[\s\S]*?:purchase-label="商品购买文案"[\s\S]*?:purchase-disabled="商品不可购买"[\s\S]*?:price-label="商品价格文案"[\s\S]*?@close="显示商店 = false"[\s\S]*?@image-error="道具图失效\[\$event\] = true"[\s\S]*?@buy="买"[\s\S]*?\/>/,
     '商店 tag 全部 props/emits 接线',
   );
   // 组件 emits 强类型契约
@@ -98,9 +107,10 @@ test('props/emits 接线完整：背包十事件、商店三事件、useOperatio
   );
   assert.match(
     背包源码,
-    /defineEmits<\{[\s\S]*?gift: \[itemId: string, door: 门牌\][\s\S]*?load: \[itemId: string, door: 门牌\]/,
-    'gift/load 签名',
+    /defineEmits<\{[\s\S]*?gift: \[itemId: string, door: 门牌\]/,
+    'gift 签名',
   );
+  assert.doesNotMatch(背包源码, /load: \[itemId: string, door: 门牌\]/, '下线的性癖装载事件不应残留');
   assert.match(商店源码, /defineEmits<\{ close: \[\]; imageError: \[id: string\]; buy: \[itemId: string\] \}>/, '商店三事件签名');
   assert.match(背包源码, /emit\('useOperation', 项\.id, 项\.全局线路候选\?\.门牌, 项\.全局线路候选\)/, '背包内 useOperation 三参数调用保持');
   assert.match(背包源码, /emit\('useOperation', 项\.id, 候选\.门牌, 候选\)/, '全局多线候选三参数调用保持');
@@ -122,14 +132,11 @@ test('背包模板全量保持：动作/disabled/title/候选循环/户静态表
   assert.match(模板段, /@click="emit\('playTape'\)">\s*在管理员室播放\s*<\/button>/, '播放录像带按钮');
   assert.match(模板段, /@click="emit\('prepareMeeting'\)">\s*筹备会议\s*<\/button>/, '筹备会议按钮');
   assert.match(模板段, /:disabled="sending \|\| !夫\.时段可用"/, '运作对象发送中+时段锁');
-  assert.match(模板段, /:disabled="sending \|\| !妻\.时段可用"/, '装载对象发送中+时段锁');
-  assert.match(模板段, /:title="妻\.时段提示"/, '装载 title 保持');
+  assert.doesNotMatch(模板段, /可装载对象|emit\('load'/, '背包不再承载性癖装载');
   assert.match(模板段, /夫\.时段可用 \? `给\$\{夫\.夫名\}` : `晚上再给\$\{夫\.夫名\}`/, '运作对象文案');
-  assert.match(模板段, /妻\.时段可用 \? `装载给\$\{妻\.妻名\}` : `\$\{妻\.时段提示\}再装载`/, '装载对象文案');
   assert.match(模板段, /:key="'运' \+ 夫\.门牌"/, '运作对象循环 key');
   assert.match(模板段, /:key="'线运' \+ 项\.id \+ 候选\.门牌"/, '全局候选循环 key');
   assert.match(模板段, /:key="妻\.门牌"/, '送礼对象循环 key');
-  assert.match(模板段, /:key="'载' \+ 妻\.门牌"/, '装载对象循环 key');
   assert.match(模板段, /户静态表\[项\.全局线路候选\.门牌\]\.妻名/, '单线候选取户静态表妻名');
   assert.match(模板段, /户静态表\[候选\.门牌\]\.妻名/, '多线候选取户静态表妻名');
   assert.match(模板段, /查道具\(项\.id\) && !itemFailed\[项\.id\]/, '查道具图片门');
@@ -143,7 +150,7 @@ test('背包模板全量保持：动作/disabled/title/候选循环/户静态表
   );
 });
 
-test('商店模板全量保持：hero/现金/页签/三重 disabled/三路文案/锁定原因/图片 error', () => {
+test('商店模板保持 hero/现金/页签，并由父层统一提供禁用、文案、价格与锁定原因', () => {
   const 模板段 = 提取模板(商店源码);
   assert.match(模板段, /WUTONGLI MALL \/ 网购商城/, 'hero kicker');
   assert.match(模板段, /<b>商 店<\/b>/, 'hero 标题');
@@ -152,17 +159,18 @@ test('商店模板全量保持：hero/现金/页签/三重 disabled/三路文案
   assert.match(模板段, /v-for="页 in shelves"[\s\S]*?:key="页\.页签"[\s\S]*?:class="\{ on: 商店页签 === 页\.页签 \}"/, '页签循环与 on 态');
   assert.match(模板段, /@click="商店页签 = 页\.页签"/, '页签点击切页');
   assert.match(模板段, /v-for="项 in 当前货架"[\s\S]*?:key="项\.id"/, '当前货架循环');
-  assert.match(模板段, /:class="\['ware-' \+ itemVisual\(项\)\.类, \{ locked: lockReasons\(项\)\.length \}\]"/, '视觉类与锁定 class');
-  assert.match(模板段, /:disabled="sending \|\| cash < \(项\.价格 \?\? 0\) \|\| lockReasons\(项\)\.length > 0"/, '购买三重 disabled');
   assert.match(
     模板段,
-    /lockReasons\(项\)\.length \? '未解锁' : cash < \(项\.价格 \?\? 0\) \? '钱不够' : purchaseLabel\(项\)/,
-    '三路购买文案',
+    /:class="\['ware-' \+ itemVisual\(项\)\.类, \{ locked: lockReasons\(项\)\.length, placeholder: 是设计占位\(项\) \}\]"/,
+    '视觉类、锁定与全部设计占位 class',
   );
+  assert.match(模板段, /:disabled="sending \|\| purchaseDisabled\(项\)"/, '购买禁用由统一状态函数裁决');
+  assert.match(模板段, /\{\{ purchaseLabel\(项\) \}\}/, '购买文案由统一状态函数裁决');
   assert.match(模板段, /class="ware-lock">尚缺：\{\{ lockReasons\(项\)\.join\('；'\) \}\}/, '锁定原因展示');
-  assert.match(模板段, /<em class="ware-price">¥\{\{ 项\.价格 \}\}<\/em>/, '商品价格');
+  assert.match(模板段, /<em class="ware-price">\{\{ priceLabel\(项\) \}\}<\/em>/, '商品价格支持剧情获得和已支付状态');
   assert.match(模板段, /@error="emit\('imageError', 项\.id\)"/, '图片 error emit 回 App');
-  assert.match(模板段, /v-if="!itemFailed\[项\.id\]"/, '图片失败隐藏');
+  assert.match(模板段, /v-if="!是设计占位\(项\) && !itemFailed\[项\.id\]"/, '全部设计占位不请求图片，普通图片失败后隐藏');
+  assert.match(商店源码, /return !!项\.剧情占位 \|\| !!项\.特殊剧情占位;/, '路线占位和特殊剧情占位使用同一展示硬门');
   assert.match(模板段, /v-if="!当前货架\.length" class="hint center">\{\{ 当前空文案 \}\}/, '空货架文案');
   assert.match(商店源码, /import type \{ 道具配置 \} from '\.\.\/\.\.\/\.\.\/stageConfig'/, '从 stageConfig 导入 道具配置 type');
   assert.match(商店源码, /道具视觉类型/, '道具视觉类型 参与 props 契约');
@@ -264,8 +272,8 @@ test('夜间触发门测试按所有权读取新组件且不弱化断言；A1–
   assert.match(夜间门测试源码, /components\/背包\.vue/, '夜间门测试读取背包组件');
   assert.match(夜间门测试源码, /components\/商店\.vue/, '夜间门测试读取商店组件');
   assert.ok(夜间门测试源码.includes('sending \\|\\| !夫\\.时段可用'), '夫时段锁断言改用 sending prop 且读背包源');
-  assert.ok(夜间门测试源码.includes('sending \\|\\| !妻\\.时段可用'), '妻时段锁断言改用 sending prop 且读背包源');
-  assert.ok(夜间门测试源码.includes('lockReasons\\(项\\)\\.length > 0'), '商品锁定购买禁用断言仍在');
+  assert.ok(夜间门测试源码.includes("可装载对象|emit\\('load'"), '夜间门测试确认背包装载入口已经移除');
+  assert.ok(夜间门测试源码.includes('purchaseDisabled\\(项\\)'), '商品购买禁用改由状态函数裁决');
   assert.match(夜间门测试源码, /普通首夜时段已满足/, 'App 侧晋阶断言仍在');
   assert.ok(夜间门测试源码.includes('选中首夜待晚上 \\? \'✦ 等到晚上\''), '晋阶文案断言仍在');
   // A1–A4 边界未回退

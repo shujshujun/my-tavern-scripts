@@ -242,7 +242,11 @@ test('App 其他录像带门控原样；A1–A6 边界未回退；无中文首�
   assert.match(App源码, /'story-special-interaction': 录像带交互幕 \|\| 静音会议交互幕/, 'story-wrap 场景态保持');
   assert.match(App源码, /v-if="!录像带中 && !静音会议交互幕"/, '隐藏正文钮门控保持');
   // A8a 后 story-veiled 映射归属 正文卷轴.vue:App 只保留 props 门控表达式,组件根负责 class 映射
-  assert.match(App源码, /:veiled="正文隐藏 \|\| 录像带交互幕 \|\| 静音会议交互幕"/, 'App 的 StoryScroll 保留隐层门控表达式');
+  assert.match(
+    App源码,
+    /:veiled="正文隐藏 \|\| 录像带交互幕 \|\| 静音会议交互幕 \|\| !!当前事件CG"/,
+    'App 的 StoryScroll 保留原隐层门控，并让家庭计划或生产事件画面遮住正文',
+  );
   assert.match(正文卷轴源码, /:class="\{ 'story-veiled': veiled \}"/, '组件根把 veiled 映射到 story-veiled');
   assert.match(App源码, /v-if="当前房间 && !录像带中"/, '离房钮门控保持');
   // 普通房内动作瓷砖迁入 房内操作抽屉.vue：录像带门控等价保留在组件，App 接线动作数组与统一抑制

@@ -34,7 +34,6 @@ const 交互可执行源码 = 剥离注释(交互源码);
 
 test('P8 交互模块真实拥有全部交互业务与模块级状态，两个注册各一次，内核无重复声明', () => {
   // 模块级状态与函数
-  assert.match(交互源码, /function 最近正文\(\): string \{/);
   assert.match(交互源码, /const 微信撤回长按毫秒 = 520;/);
   assert.match(交互源码, /let 玩家微信消息序号 = 0;/);
   assert.match(交互源码, /const 手机邀约队列 = new Map<string, Promise<void>>\(\)/);
@@ -209,7 +208,8 @@ test('邀约不变量：聊天ID+世代串行、先占输入锁、每 await 后�
   assert.match(邀约段, /!读赴约条\(楼\) &&\s*!手机邀约计划占用中\(读手机邀约计划\(\), 钟, 楼\)/);
   assert.match(邀约段, /邀约计划提交: \{\s*m,\s*创建楼: 楼,\s*创建绝对时段: 钟,\s*目标绝对时段: 计划\.目标绝对时段,\s*地点: 计划\.地点/);
   assert.match(邀约段, /实际应 = false;/);
-  assert.match(邀约段, /刚刚临时有点事，恐怕不能赴约了……改天好吗？/);
+  assert.doesNotMatch(邀约段, /刚刚临时有点事，恐怕不能赴约了……改天好吗？/);
+  assert.match(邀约段, /生成邀约裁定回复/);
   assert.match(邀约段, /排队刷新微信进展摘要\(m\)/);
   assert.match(邀约段, /事件键: `RQP-约-\$\{m\}-\$\{楼\}`/);
 });

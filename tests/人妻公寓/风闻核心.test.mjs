@@ -12,6 +12,7 @@ globalThis._ = require('lodash');
 const { Schema, 创建户节点 } = require('../../src/人妻公寓/schema.ts');
 const { 生成本期管理任务, 结算管理任务 } = require('../../src/人妻公寓/脚本/游戏逻辑/管理任务系统.ts');
 const {
+  使用答谢会降低风闻,
   使用聚餐降低风闻,
   尝试转入风闻投诉,
   登记攻略风闻,
@@ -827,4 +828,36 @@ test('全楼聚餐降低十点并冷却十二时段，且不能压破投诉下�
   noEffect.系统._风闻账.当前投诉事件 = '未处理投诉';
   assert.equal(使用聚餐降低风闻(noEffect), 0);
   assert.equal(noEffect.系统._风闻账.聚餐冷却至, -1, '没有可降低风闻时不能空耗聚餐冷却');
+});
+
+test('住户答谢会降低二十五点，与聚餐共享冷却且遵守事件下限', () => {
+  const data = 建数据({ 时段: 10, 风闻: 80 });
+
+  assert.equal(使用答谢会降低风闻(data), 25);
+  assert.equal(data.风闻, 55);
+  assert.deepEqual(聚餐可降低风闻(data), { 可用: false, 尚余时段: 12 });
+  assert.equal(使用聚餐降低风闻(data), 0, '答谢会后不能立刻追加聚餐');
+
+  const reverse = 建数据({ 时段: 10, 风闻: 80 });
+  assert.equal(使用聚餐降低风闻(reverse), 10);
+  assert.equal(使用答谢会降低风闻(reverse), 0, '聚餐后不能立刻追加答谢会');
+  assert.equal(reverse.风闻, 70);
+
+  const complaint = 建数据({ 时段: 5, 风闻: 40 });
+  添加活跃责任(complaint, '未处理投诉');
+  complaint.系统._风闻账.当前投诉事件 = '未处理投诉';
+  assert.equal(使用答谢会降低风闻(complaint), 15);
+  assert.equal(complaint.风闻, 25);
+
+  const crisis = 建数据({ 时段: 5, 风闻: 70 });
+  添加活跃责任(crisis, '未处理危机', 8);
+  crisis.系统._风闻账.危机活跃 = true;
+  assert.equal(使用答谢会降低风闻(crisis), 20);
+  assert.equal(crisis.风闻, 50);
+
+  const noEffect = 建数据({ 时段: 5, 风闻: 25 });
+  添加活跃责任(noEffect, '未处理投诉');
+  noEffect.系统._风闻账.当前投诉事件 = '未处理投诉';
+  assert.equal(使用答谢会降低风闻(noEffect), 0);
+  assert.equal(noEffect.系统._风闻账.聚餐冷却至, -1, '没有可降低风闻时不能空耗共享冷却');
 });

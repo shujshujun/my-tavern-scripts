@@ -66,7 +66,8 @@
       "updateFrequency": 3,
       "batchSize": 3,
       "skipFloors": 0,
-      "groupId": 62001
+      "groupId": 62001,
+      "sendLatestRows": 60
     },
     "exportConfig": {
       "enabled": false,
@@ -106,7 +107,8 @@
       "updateFrequency": 3,
       "batchSize": 3,
       "skipFloors": 0,
-      "groupId": 62001
+      "groupId": 62001,
+      "sendLatestRows": 60
     },
     "exportConfig": {
       "enabled": false,
@@ -146,7 +148,8 @@
       "updateFrequency": 6,
       "batchSize": 6,
       "skipFloors": 0,
-      "groupId": 62002
+      "groupId": 62002,
+      "sendLatestRows": 60
     },
     "exportConfig": {
       "enabled": false,

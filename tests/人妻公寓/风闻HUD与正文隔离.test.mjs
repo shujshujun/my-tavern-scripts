@@ -26,7 +26,7 @@ test('风闻详情只读展示三条来源、投诉危机与两类平息提示',
   assert.match(客户端源, /当前投诉事件/);
   assert.match(客户端源, /危机活跃/);
   assert.match(客户端源, /自然平息/);
-  assert.match(客户端源, /住户聚餐/);
+  assert.match(客户端源, /住户公关/);
   assert.match(客户端源, /聚餐冷却至/);
   assert.match(客户端源, /事件\.父亲责任/);
   assert.doesNotMatch(客户端源, /危机活跃期间不会自然平息/);

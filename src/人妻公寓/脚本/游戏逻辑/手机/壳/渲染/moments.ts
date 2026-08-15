@@ -7,6 +7,7 @@ import { 朋友圈有未读, 写实时手机已读 } from '../../数据层';
 import { 请求刷新手机红点 } from '../../UI刷新';
 import { 头像块, el, 手机图标, 素材基址 } from '../资源与皮肤';
 import { 渲染底栏, 渲染头, type 渲染上下文 } from './共享';
+import { 取朋友圈显示页, 手机朋友圈每页条数 } from './分页';
 
 /** 朋友圈/考古层：公开/仅你可见/历史混排、已读、滚动恢复、题目展开与回答、加载更早、图片/评论/门牌规则。 */
 export function 渲染moments(上下文: 渲染上下文): void {
@@ -19,11 +20,12 @@ export function 渲染moments(上下文: 渲染上下文): void {
   const 我名 = (SillyTavern as unknown as { name1?: string })?.name1 || '我';
   体.appendChild(el('div', 'rqm-cover', `<b>${_.escape(我名)}</b>${头像块('主角')}`));
   const 圈们 = 库.圈.filter(c => 在当前时间线(c));
+  const 朋友圈页 = 取朋友圈显示页(圈们, 上下文.当前页.展开);
   if (!圈们.length)
     体.appendChild(
       el('div', 'rqw-post', '<div class="rqw-r"><p class="rqw-text" style="color:#999">朋友圈还静悄悄的。</p></div>'),
     );
-  for (const c of 圈们) {
+  for (const c of 朋友圈页.条目) {
     const 赞 = 1 + Math.floor(seededRandom(c.楼, c.谁, '赞') * 9);
     const 正文 = _.escape(c.文).replace(/#([^#\s]{1,12})#/g, '<span class="tp">#$1#</span>');
     // 真微信排版:左头像右内容;时间行右侧两点钮(纯装饰);赞+评合进浅灰盒
@@ -46,6 +48,18 @@ export function 渲染moments(上下文: 渲染上下文): void {
         `</div>`,
     );
     体.appendChild(卡);
+  }
+  if (朋友圈页.有更早) {
+    const 更早动态 = el('button', 'rqw-more', '加载更早的朋友圈');
+    更早动态.addEventListener('click', () => {
+      上下文.写入当前页({
+        ...上下文.读取当前页(),
+        展开: 朋友圈页.已加载 + 手机朋友圈每页条数,
+        滚动: 体.scrollTop,
+      });
+      上下文.重绘();
+    });
+    体.appendChild(更早动态);
   }
   // 考古层直接混在朋友圈里(2026-07-18 用户拍板:不做个人相册——往下翻,
   // 众人的旧动态按年代交错混排,"加载更早"翻的是整栋楼的过去)

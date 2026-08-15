@@ -27,12 +27,17 @@ export function 姐妹群成员(data: SchemaType): 门牌[] {
  * 在意度 ≈ 好感/2 + 堕落/4 + 冷落加成(他越久没理她,火越旺,封顶20)
  */
 export function 雌竞火气(节点: 户节点Type, 楼层: number): string {
-  const 妻 = 节点.妻;
-  const 冷落 = Math.min(20, Math.max(0, 楼层 - 妻.上次互动楼层) * 0.8);
-  const 度 = 妻.好感值 / 2 + 妻.堕落值 / 4 + 冷落;
+  const 度 = 雌竞火气值(节点, 楼层);
   if (度 >= 60) return '妒火已经压不太住,看到他和别人多说一句都刺眼';
   if (度 >= 35) return '明着较劲的程度,嘴上不承认';
   return '淡淡的在意,自己都没太察觉';
+}
+
+/** 同一公式的数值口只供脚本排序与逐角色知情反应使用，不写入存档。 */
+export function 雌竞火气值(节点: 户节点Type, 楼层: number): number {
+  const 妻 = 节点.妻;
+  const 冷落 = Math.min(20, Math.max(0, 楼层 - 妻.上次互动楼层) * 0.8);
+  return 妻.好感值 / 2 + 妻.堕落值 / 4 + 冷落;
 }
 
 /** 撞场演出块(snapshotSystem 调用;竞者≥2 时注入,概率与冷却由调用方管) */

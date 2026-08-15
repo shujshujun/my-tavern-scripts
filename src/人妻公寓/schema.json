@@ -102,19 +102,13 @@
                   }
                 }
               },
-              "性癖装载": {
-                "default": [],
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
+              "阶段性癖": {
+                "default": "",
+                "type": "string"
               },
-              "曾开发性癖": {
-                "default": [],
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
+              "_阶段性癖已支付": {
+                "default": false,
+                "type": "boolean"
               },
               "上次互动楼层": {
                 "default": 0,
@@ -276,6 +270,102 @@
                         "type": "boolean"
                       }
                     }
+                  }
+                }
+              },
+              "_生产": {
+                "default": {},
+                "type": "object",
+                "properties": {
+                  "状态": {
+                    "default": "无",
+                    "type": "string",
+                    "enum": [
+                      "无",
+                      "孕期",
+                      "待产通知",
+                      "待产",
+                      "陪产中",
+                      "住院中",
+                      "已出院"
+                    ]
+                  },
+                  "本胎序号": {
+                    "default": 0,
+                    "type": "number"
+                  },
+                  "家庭计划知情": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "确认已读绝对时段": {
+                    "default": -1,
+                    "type": "number"
+                  },
+                  "预产绝对时段": {
+                    "default": -1,
+                    "type": "number"
+                  },
+                  "自动生产绝对时段": {
+                    "default": -1,
+                    "type": "number"
+                  },
+                  "预产通知文案": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "预产通知已读": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "产前看望": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "陪产已选择": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "生产结算标识": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "生产叙事已完成": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "实际生产绝对时段": {
+                    "default": -1,
+                    "type": "number"
+                  },
+                  "住院结束绝对时段": {
+                    "default": -1,
+                    "type": "number"
+                  },
+                  "结果": {
+                    "default": "未定",
+                    "type": "string",
+                    "enum": [
+                      "未定",
+                      "陪产",
+                      "仅产前看望",
+                      "完全缺席"
+                    ]
+                  },
+                  "产后看望": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "获知生产路径": {
+                    "default": "",
+                    "type": "string",
+                    "enum": [
+                      "",
+                      "陪产",
+                      "姐妹群",
+                      "私聊",
+                      "产后看望"
+                    ]
                   }
                 }
               },
@@ -497,9 +587,9 @@
       "type": "object",
       "properties": {
         "_数据版本": {
-          "default": 8,
+          "default": 9,
           "type": "number",
-          "const": 8
+          "const": 9
         },
         "_坏结局": {
           "default": "",
@@ -681,6 +771,115 @@
             "会场私聊摘要楼层": {
               "default": -1,
               "type": "number"
+            }
+          }
+        },
+        "_家庭计划": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "阶段": {
+              "default": "未开始",
+              "type": "string",
+              "enum": [
+                "未开始",
+                "待安装",
+                "待投资料",
+                "待观察资料",
+                "待写磁贴",
+                "待送磁贴",
+                "待确认人选",
+                "待微信",
+                "待赴约",
+                "已完成"
+              ]
+            },
+            "最早继续日": {
+              "default": -1,
+              "type": "number"
+            },
+            "完成楼层": {
+              "default": -1,
+              "type": "number"
+            }
+          }
+        },
+        "_家庭文档": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "孩子": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "母亲门牌": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "胎次": {
+                    "default": 0,
+                    "type": "number"
+                  },
+                  "性别": {
+                    "default": "女",
+                    "type": "string",
+                    "enum": [
+                      "男",
+                      "女"
+                    ]
+                  },
+                  "出生绝对时段": {
+                    "default": -1,
+                    "type": "number"
+                  },
+                  "结果": {
+                    "default": "完全缺席",
+                    "type": "string",
+                    "enum": [
+                      "陪产",
+                      "仅产前看望",
+                      "完全缺席"
+                    ]
+                  },
+                  "玩家产后看望": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "获知生产路径": {
+                    "default": "私聊",
+                    "type": "string",
+                    "enum": [
+                      "陪产",
+                      "姐妹群",
+                      "私聊",
+                      "产后看望"
+                    ]
+                  },
+                  "叙事最小年龄": {
+                    "default": 0,
+                    "type": "number"
+                  },
+                  "年龄阶段": {
+                    "default": "新生儿",
+                    "type": "string",
+                    "enum": [
+                      "新生儿",
+                      "一岁以上",
+                      "两岁以上"
+                    ]
+                  },
+                  "出生场次标识": {
+                    "default": "",
+                    "type": "string"
+                  }
+                }
+              }
             }
           }
         },

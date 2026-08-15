@@ -16,7 +16,7 @@ function 截段(源, 开始标记, 结束标记) {
 }
 
 test('移动端全屏提示挂在酒馆 0 楼正文，而不是被压缩的游戏 iframe 内', () => {
-  const 注入段 = 截段(游戏逻辑源, 'function 注入全屏样式()', '\n/**\n * 玩家把酒馆助手');
+  const 注入段 = 截段(游戏逻辑源, 'function 注入全屏样式()', '\n// ============================================\n// 启动引导:');
 
   assert.match(注入段, /getElementById\('rq-mobile-fullscreen-guide'\)/);
   assert.match(注入段, /querySelector<HTMLElement>\('#chat \.mes\[mesid="0"\]'\)/);
@@ -27,7 +27,7 @@ test('移动端全屏提示挂在酒馆 0 楼正文，而不是被压缩的游�
 });
 
 test('宿主提示只在手机宽度且 iframe 异常矮小时显示，并保持普通文档流布局', () => {
-  const 注入段 = 截段(游戏逻辑源, 'function 注入全屏样式()', '\n/**\n * 玩家把酒馆助手');
+  const 注入段 = 截段(游戏逻辑源, 'function 注入全屏样式()', '\n// ============================================\n// 启动引导:');
 
   assert.match(注入段, /@media \(max-width:\s*600px\)/);
   assert.match(注入段, /#rq-mobile-fullscreen-guide\.rq-visible\{display:flex/);
@@ -39,7 +39,7 @@ test('宿主提示只在手机宽度且 iframe 异常矮小时显示，并保持
 });
 
 test('全屏往返使 iframe 恢复高度后，提示会通过尺寸观察自动隐藏', () => {
-  const 注入段 = 截段(游戏逻辑源, 'function 注入全屏样式()', '\n/**\n * 玩家把酒馆助手');
+  const 注入段 = 截段(游戏逻辑源, 'function 注入全屏样式()', '\n// ============================================\n// 启动引导:');
 
   assert.match(注入段, /new 宿主窗\.ResizeObserver/);
   assert.match(注入段, /尺寸观察\?\.observe\(游戏框\)/);

@@ -14,6 +14,7 @@ import { 镜像直写 } from './守护系统';
 import { 同步阶段线路, 线路已完成 } from './阶段线路系统';
 import { 事件角色标记, 读场景 } from './snapshotSystem';
 import { 登记攻略风闻, 登记风闻事件 } from './风闻系统';
+import { 读取医院内容策略 } from './生产系统';
 
 /**
  * 结算系统:户级运行时的惰性结算 + 派生轴脚本结算(变量分工表:婚姻值/丈夫双轴全脚本)
@@ -177,6 +178,7 @@ function 母亲首夜前三节点已完成(data: SchemaType): boolean {
 export function 可启动母亲药物首夜(data: SchemaType, 当前地点?: string | null): boolean {
   const 妻 = data.户['302']?.妻;
   if (!妻 || !母亲首夜前三节点已完成(data)) return false;
+  if (!读取医院内容策略(data, '302').允许普通阶段推进) return false;
   const 时段 = 当前时段(取绝对时段(data));
   return (
     妻.堕落值 >= (晋阶门槛[3] ?? 40) - 1 &&
@@ -209,6 +211,7 @@ export function 普通首夜时段已满足(data: SchemaType, 门牌号: 门牌)
 export function 晋阶预约现场已满足(data: SchemaType, 门牌号: 门牌, 当前地点 = 读场景().房间id): boolean {
   const 节点 = data.户[门牌号];
   if (!节点) return false;
+  if (!读取医院内容策略(data, 门牌号).允许普通阶段推进) return false;
   const 妻 = 节点.妻;
   if (妻.当前阶段 === 0) return true;
   if (!线路已完成(妻)) return false;
@@ -241,6 +244,9 @@ export function 晋阶预约现场提示(data: SchemaType, 门牌号: 门牌): s
 function 请求晋阶核心(data: SchemaType, 门牌号: 门牌, 允许阶段0开门: boolean): 晋阶结果 {
   const 节点 = data.户[门牌号];
   if (!节点) return { 成功: false, 消息: '这户还没入住', 动作: '无变化' };
+  if (!读取医院内容策略(data, 门牌号).允许普通阶段推进) {
+    return { 成功: false, 消息: '她正在医院待产或恢复，普通关系阶段暂停，出院后再继续。', 动作: '无变化' };
+  }
   const 妻 = 节点.妻;
 
   // 阶段0的裂缝确认只是资格；只有商店核验过的对症礼物能调用开门入口。

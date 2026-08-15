@@ -24,7 +24,7 @@ const 转义 = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const 驼峰转中划线 = s => s.replace(/([A-Z])/g, '-$1').toLowerCase();
 
-/** 回合输入组件 props 契约（19 项：原 17 项 + 生成恢复行动/切换态） */
+/** 回合输入组件 props 契约（20 项：原 17 项 + 生成恢复行动/切换态 + 变量重生成状态） */
 const 期望props = [
   'open',
   'text',
@@ -41,13 +41,14 @@ const 期望props = [
   'failedAction',
   'retryAction',
   'retrying',
+  'variableRegenerationState',
   'videoActive',
   'period',
   'currentPeriodLabel',
   'nextPeriodLabel',
 ];
 
-/** 回合输入组件 emits 契约（9 项：原 8 项 + 生成中停止并重试） */
+/** 回合输入组件 emits 契约（10 项：原 8 项 + 生成中停止并重试 + 变量重生成） */
 const 期望emits = [
   'updateText',
   'submit',
@@ -57,6 +58,7 @@ const 期望emits = [
   'reroll',
   'retryFailed',
   'abandonAndRetry',
+  'regenerateVariables',
   'advanceTime',
 ];
 
@@ -118,6 +120,10 @@ test('App 不再内联 option-row/quill/reroll/global-time 模板；两组件拥
   assert.match(回合输入模板, /@click="emit\('undo'\)"/, '撤回只 emit undo');
   assert.match(回合输入模板, /title="正文不完整时，用同样的行动重新生成"/, '正文不完整重生成 title');
   assert.match(回合输入模板, /@click="emit\('reroll'\)"/, '正文重生成只 emit reroll');
+  assert.match(回合输入模板, /title="只重新计算最近一回合的变量，不重新生成正文"/, '变量重生成 title');
+  assert.match(回合输入模板, /@click="emit\('regenerateVariables'\)"/, '变量重生成只 emit regenerateVariables');
+  assert.match(回合输入模板, /<Ic n="refresh" \/>/, '变量重生成使用 refresh 图标');
+  assert.match(回合输入模板, />重新生成变量<\/span>/, '变量重生成默认文案');
   assert.match(回合输入模板, /v-if="sending && retryAction" class="generation-recovery-row"/, '生成中固定恢复行');
   assert.match(回合输入模板, /@click="emit\('abandonAndRetry'\)"/, '生成中停止重试只 emit abandonAndRetry');
   assert.match(回合输入模板, /class="reroll-row failed-reroll"/, '失败重试行 class');
@@ -146,8 +152,8 @@ test('props/emits 强类型完整，App 逐项接线存在，所有 handler 参�
   assert.match(选项props, /options: readonly string\[\];/, 'options 强类型 readonly string[]');
   assert.equal((选项emits.match(/^ {2}[A-Za-z]+(?=:)/gm) || []).length, 1, '行动选项 emits 应为 1 项');
   assert.match(选项emits, /select: \[option: string\]/, 'select 参数为 string');
-  assert.equal((输入props.match(/^ {2}[A-Za-z]+(?=:)/gm) || []).length, 19, '回合输入 props 应为 19 项');
-  assert.equal((输入emits.match(/^ {2}[A-Za-z]+(?=:)/gm) || []).length, 9, '回合输入 emits 应为 9 项');
+  assert.equal((输入props.match(/^ {2}[A-Za-z]+(?=:)/gm) || []).length, 20, '回合输入 props 应为 20 项');
+  assert.equal((输入emits.match(/^ {2}[A-Za-z]+(?=:)/gm) || []).length, 10, '回合输入 emits 应为 10 项');
   for (const 名 of 期望props) {
     assert.match(输入props, new RegExp(`\\b${名}:`), `props 契约应有 ${名}`);
   }
@@ -159,6 +165,7 @@ test('props/emits 强类型完整，App 逐项接线存在，所有 handler 参�
     'turnRoom: string | null;',
     'failedAction: string;',
     'sendLabel: string;',
+    "variableRegenerationState: '不可用' | '未配置' | '可用' | '进行中' | '已完成';",
     'updateText: [text: string];',
   ]) {
     assert.match(输入props + 输入emits, new RegExp(转义(类型)), `应强类型 ${类型}`);
@@ -171,7 +178,7 @@ test('props/emits 强类型完整，App 逐项接线存在，所有 handler 参�
   );
   assert.match(App源码, /:options="行动选项"/, 'App 接线 ActionOptions :options');
   assert.match(App源码, /@select="点选项"/, 'App 接线 ActionOptions @select');
-  // App 接线：回合输入 19 props
+  // App 接线：回合输入 20 props
   for (const 名 of 期望props) {
     assert.match(App源码, new RegExp(`:${驼峰转中划线(名)}="`), `App 应接线 :${驼峰转中划线(名)}=`);
   }
@@ -179,7 +186,7 @@ test('props/emits 强类型完整，App 逐项接线存在，所有 handler 参�
   assert.match(App源码, /:send-label="发送按钮文案"/, '按钮文案 prop 接 computed');
   assert.match(App源码, /:resource-allowed="当前资源门槛\.可行动"/, '资源门槛只传 primitive');
   assert.match(App源码, /:resource-hint="当前资源门槛\.提示"/, '资源提示只传 primitive');
-  // App 接线：回合输入 9 emits 接原 handler / 原值回 App
+  // App 接线：回合输入 10 emits 接原 handler / 原值回 App
   assert.match(App源码, /@update-text="输入文本 = \$event"/, '文本原值回 App');
   for (const [事件, handler] of [
     ['submit', '发送'],
@@ -189,13 +196,14 @@ test('props/emits 强类型完整，App 逐项接线存在，所有 handler 参�
     ['reroll', '重掷'],
     ['retry-failed', '重试失败行动'],
     ['abandon-and-retry', '放弃并重试'],
+    ['regenerate-variables', '发起变量重生成'],
     ['advance-time', '推进固定时段'],
   ]) {
     assert.match(App源码, new RegExp(`@${事件}="${handler}"`), `App 应接线 @${事件} 到 ${handler}`);
   }
 });
 
-test('ActionOptions 完整组合门控，组件只映射 open；RoundInput 输入/重掷/失败/时间门控完整且 v-if/v-else-if 链不破', () => {
+test('ActionOptions 完整组合门控，组件只映射 open；RoundInput 输入/重掷/失败/变量重生成/时间门控完整', () => {
   const App模板 = 提取模板(App源码);
   assert.match(
     App模板,
@@ -213,16 +221,23 @@ test('ActionOptions 完整组合门控，组件只映射 open；RoundInput 输�
   assert.match(输入模板, /v-if="open" class="quill"/, '输入根 v-if="open"');
   assert.match(
     输入模板,
-    /v-else-if="!formalMeeting && canReroll && !sending && currentRoom === turnRoom" class="reroll-row"/,
-    '正常重掷门完整',
+    /\(!formalMeeting && !failedAction && canReroll && !sending && currentRoom === turnRoom\) \|\|\s+variableRegenerationState !== '不可用'/,
+    '快捷入口行在正常重掷可用或变量可重生成时显示',
   );
   assert.match(输入模板, /v-if="failedAction && !sending" class="reroll-row failed-reroll"/, '失败门优先起链');
+  assert.match(
+    输入模板,
+    /v-if="!formalMeeting && !failedAction && canReroll && !sending && currentRoom === turnRoom"/,
+    '撤回与正文重生成仍受原正常门控制',
+  );
+  assert.match(输入模板, /v-if="variableRegenerationState !== '不可用'"/, '变量重生成入口独立常驻，不受正文重掷门影响');
+  assert.match(输入模板, /:disabled="sending \|\| variableRegenerationState !== '可用'"/, '变量按钮仅可用态允许点击');
   assert.match(输入模板, /v-if="!videoActive && !formalMeeting"[\s\S]*?class="global-time-advance"/, '推进时间门完整');
   const 失败位置 = 输入模板.indexOf('v-if="failedAction');
-  const 重掷位置 = 输入模板.indexOf('v-else-if="!formalMeeting && canReroll');
+  const 重掷位置 = 输入模板.indexOf("variableRegenerationState !== '不可用'");
   const 时间位置 = 输入模板.indexOf('class="global-time-advance"');
-  assert.ok(失败位置 >= 0 && 重掷位置 > 失败位置, '失败行动必须优先于旧回合重掷状态');
-  assert.ok(时间位置 > 重掷位置, '推进时间按钮在恢复链之后');
+  assert.ok(失败位置 >= 0 && 重掷位置 > 失败位置, '失败行动提示位于快捷入口之前');
+  assert.ok(时间位置 > 重掷位置, '推进时间按钮在快捷入口之后');
   // 组件内无业务状态派生
   assert.doesNotMatch(
     回合输入源码,

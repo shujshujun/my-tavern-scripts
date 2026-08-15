@@ -7,6 +7,10 @@ import test from 'node:test';
 // 纯 UI 层级修复：仅当 story-wrap 同时满足 成人CG + 纯画面欣赏(story-visual-only) 时，
 // 才把 CG 提到亲密底栏(z-index 12)之上，并把恢复按钮提到 CG 之上；普通立绘/无 CG 不匹配该窄范围选择器。
 const App源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
+const 偏好源 = readFileSync(
+  new URL('../../src/人妻公寓/界面/客户端/composables/useUIPrefs.ts', import.meta.url),
+  'utf8',
+);
 
 const 转义 = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -38,7 +42,11 @@ test('模板把 正文隐藏 ref 派生到 story-visual-only class；隐藏按�
   assert.match(模板段, /class="story-hide-btn"/, '隐藏正文钮仍在');
   assert.match(模板段, /v-if="!录像带中 && !静音会议交互幕"/, '隐藏正文钮门控保持');
   assert.match(模板段, /@click\.stop="正文隐藏 = !正文隐藏"/, '隐藏按钮仍切换 正文隐藏');
-  assert.match(模板段, /:veiled="正文隐藏 \|\| 录像带交互幕 \|\| 静音会议交互幕"/, '正文卷轴仍按 正文隐藏 渐隐');
+  assert.match(
+    模板段,
+    /:veiled="正文隐藏 \|\| 录像带交互幕 \|\| 静音会议交互幕 \|\| !!当前事件CG"/,
+    '正文卷轴仍按 正文隐藏 渐隐，家庭计划或生产专属画面打开时也必须遮住正文',
+  );
 });
 
 test('窄范围层级规则：仅 story-adult-cg + story-visual-only 同时成立才提升 CG，普通 CG 不全局提升', () => {
@@ -77,6 +85,22 @@ test('CG 前景仍 object-fit: contain；不改为 cover、不放大画框', () 
   assert.match(前景块, /object-fit:\s*contain;/, 'CG 前景图仍应为 object-fit: contain');
   assert.doesNotMatch(前景块, /object-fit:\s*cover;/, '不得改为 cover');
   assert.match(前景块, /object-position:\s*center;/, 'object-position 保持 center');
+});
+
+test('760px 以上成人 CG 使用等权双列，窄窗只挂载第一槽且单例自动居中', () => {
+  const 模板段 = 提取模板(App源);
+  assert.match(模板段, /v-for="槽 in 当前成人CG显示槽位"/, '模板按响应式可见槽位渲染');
+  assert.match(模板段, /'adult-cg-stage-double': 当前成人CG显示槽位\.length > 1/, '只有真实两槽时才启用双列');
+  assert.match(App源, /选择CG显示槽位\(当前成人CG槽位\.value, 成人CG双列\.value\)/, '窄窗应从状态层裁成单槽');
+  assert.match(偏好源, /matchMedia\('\(min-width: 760px\)'\)/, '双列断点跟随 iframe 实际画幅');
+  assert.match(
+    App源,
+    /@media \(min-width: 760px\) \{[\s\S]*?\.adult-cg-stage-double \.adult-cg-grid \{[\s\S]*?grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/,
+    '宽桌面应切为两个等权画框',
+  );
+  assert.match(App源, /\.adult-cg-grid \{[\s\S]*?grid-template-columns: minmax\(0, 1fr\);/, '基础布局保持单列');
+  assert.match(App源, /\.adult-cg-frame\.loading img \{[\s\S]*?opacity: 0;/, '每槽独立 loading');
+  assert.doesNotMatch(App源, /\.adult-cg-stage\.loading img/, '第二张慢时不得把第一张一起隐藏');
 });
 
 test('反例：亲密底栏不卸载、不 v-if 掉、不被纯画面 class 施加样式', () => {

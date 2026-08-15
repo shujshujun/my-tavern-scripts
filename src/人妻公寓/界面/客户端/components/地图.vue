@@ -18,6 +18,7 @@ const props = defineProps<{
   period: '早上' | '中午' | '下午' | '傍晚' | '晚上' | '深夜';
   lite: boolean;
   sending: boolean;
+  hospitalVisible: boolean;
   avatarFailed: Record<string, boolean>;
   avatarImage: (name: string) => string;
   avatarName: (displayName: string) => string;
@@ -289,6 +290,18 @@ const 地图点位 = computed(() =>
         </div>
       </div>
 
+      <button
+        v-if="hospitalVisible"
+        class="hospital-launch"
+        type="button"
+        :disabled="sending"
+        @click="点房('医院')"
+      >
+        <span><small>MATERNITY / 产科</small><b>前往市立医院</b></span>
+        <em>预产消息已读 · 产科入口开放</em>
+        <Ic n="arrow" />
+      </button>
+
       <button class="outing-launch" type="button" :disabled="sending" @click="请求外出">
         <span><small>OUTING / 外出</small><b>走出公寓</b></span>
         <em>晨跑 · 健身房 · 更多地点准备中</em>
@@ -354,11 +367,11 @@ const 地图点位 = computed(() =>
   padding: 0;
 }
 
-.outing-launch {
+.outing-launch,
+.hospital-launch {
   position: absolute;
   z-index: 5;
   left: 50%;
-  bottom: max(12px, env(safe-area-inset-bottom));
   width: min(500px, calc(100% - 30px));
   display: flex;
   align-items: center;
@@ -380,44 +393,61 @@ const 地图点位 = computed(() =>
     box-shadow 0.16s ease;
 }
 
-.outing-launch span {
+.outing-launch {
+  bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+.hospital-launch {
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 66px);
+  background: linear-gradient(90deg, rgba(248, 253, 255, 0.96), rgba(242, 249, 255, 0.95)), var(--paper-card);
+  border-color: rgba(72, 139, 177, 0.42);
+}
+
+.outing-launch span,
+.hospital-launch span {
   display: flex;
   flex: none;
   flex-direction: column;
 }
 
-.outing-launch small {
+.outing-launch small,
+.hospital-launch small {
   color: #5b84ac;
   font: 800 var(--font-micro) / 1.2 var(--font-mono);
   letter-spacing: 0.14em;
 }
 
-.outing-launch b {
+.outing-launch b,
+.hospital-launch b {
   font-size: 0.88em;
   letter-spacing: 0.06em;
 }
 
-.outing-launch em {
+.outing-launch em,
+.hospital-launch em {
   flex: 1;
   color: var(--ink-faint);
   font-size: 0.66em;
   font-style: normal;
 }
 
-.outing-launch .ic {
+.outing-launch .ic,
+.hospital-launch .ic {
   width: 23px;
   height: 23px;
   color: #4f86b6;
 }
 
-.outing-launch:hover:not(:disabled) {
+.outing-launch:hover:not(:disabled),
+.hospital-launch:hover:not(:disabled) {
   transform: translate(-50%, -3px);
   box-shadow:
     0 13px 32px rgba(35, 38, 58, 0.29),
     0 0 0 2px rgba(82, 149, 206, 0.12);
 }
 
-.outing-launch:disabled {
+.outing-launch:disabled,
+.hospital-launch:disabled {
   opacity: 0.46;
   cursor: default;
 }
@@ -1338,6 +1368,12 @@ const 地图点位 = computed(() =>
   border-color: rgba(142, 177, 209, 0.34);
 }
 
+:global(html.rq-dark) .hospital-launch {
+  color: #f4edf2;
+  background: linear-gradient(90deg, rgba(48, 44, 55, 0.95), rgba(39, 47, 61, 0.95));
+  border-color: rgba(142, 177, 209, 0.34);
+}
+
 /* 省流会使用纯 CSS 楼体兜底；夜间必须同步换深卡，否则浅字落在浅玻璃上。 */
 :global(html.rq-dark.rq-lite) .map-fallback .bldg-body {
   background: rgba(24, 27, 42, 0.92);
@@ -1392,7 +1428,15 @@ const 地图点位 = computed(() =>
     padding: 7px 9px;
   }
 
-  .outing-launch em {
+  .hospital-launch {
+    bottom: calc(max(7px, env(safe-area-inset-bottom)) + 56px);
+    width: calc(100% - 16px);
+    gap: 7px;
+    padding: 7px 9px;
+  }
+
+  .outing-launch em,
+  .hospital-launch em {
     font-size: 0.58em;
   }
 }

@@ -76,6 +76,12 @@ test('正文显隐与 CG 锁使用同一 SVG 图标体系，行为门槛保持',
   assert.match(CG图库源码, /import Ic from '\.\/Icon\.vue'/, 'CG 图库复用现有图标组件');
   assert.match(CG图库源码, /<span v-else class="cg-lock">\s*<Ic n="lock"\s*\/>\s*<\/span>/, '未解锁格只显示 SVG 锁');
   assert.doesNotMatch(CG图库源码, /🔒/, 'CG 锁不再依赖平台 Emoji');
-  assert.match(CG图库源码, /:disabled="!unlocked\.has\(项\.id\)"/, '未解锁格仍禁用');
-  assert.match(CG图库源码, /<img v-if="unlocked\.has\(项\.id\)"/, '未解锁格仍不创建图片节点');
+  // 正常模式锁定与全览临时放开共用可查看CG/CG项可查看 同一通道（不再内联 unlocked.has）。
+  assert.match(CG图库源码, /:disabled="!可查看CG\(项\)"/, '未解锁格仍禁用');
+  assert.match(CG图库源码, /<img v-if="可查看CG\(项\)"/, '未解锁格仍不创建图片节点');
+  assert.match(
+    CG图库源码,
+    /function 可查看CG[\s\S]*?CG项可查看\(props\.unlocked/,
+    '正常模式锁定由可查看CG委托给 CG项可查看；全览放开由 CG图库全览.test.mjs 验证',
+  );
 });

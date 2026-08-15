@@ -1,6 +1,16 @@
 import type { SchemaType } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
-import { 户静态表, 查特殊场景, 查裂缝, 查道具, 是母亲破墙服饰, 道具表, 特殊场景锁定状态 } from '../../stageConfig';
+import {
+  户静态表,
+  查性癖,
+  查特殊场景,
+  查角色剧情占位,
+  查裂缝,
+  查道具,
+  是母亲破墙服饰,
+  道具表,
+  特殊场景锁定状态,
+} from '../../stageConfig';
 import { 镜像直写 } from './守护系统';
 import { 登记脚本正增长候选, 推进送礼安抚 } from './冷落系统';
 import { 记余波 } from './雌竞系统';
@@ -11,6 +21,11 @@ import { 开始录像带首送, 录像带前置键 } from './特殊场景系统'
 import { 母亲药物窗口已开启, 同步阶段线路 } from './阶段线路系统';
 import { 当前时段 } from './楼层时钟';
 import { 交付圆场安眠药, 丈夫登门药物窗口已开启 } from './丈夫登门系统';
+import { 准备开启阶段性癖 } from './性癖系统';
+import { 全部阶段性癖已完成 } from './阶段性癖状态';
+import { 家庭计划套件ID, 家庭计划已上架, 购买家庭计划套件 } from './家庭计划系统';
+import { 角色剧情占位已上架, 角色剧情占位购买提示 } from './角色结局占位';
+import { 读取医院内容策略 } from './生产系统';
 
 /**
  * 商店系统(P2:工具+礼物两页签起步;八页签全量框架；小时达按本时段内送达展示)
@@ -42,7 +57,9 @@ export function 全楼最高阶段(data: SchemaType): number {
 
 /** 当前可见页签的货架(动态亮起=商店自己就是进度条;P5 服饰上架) */
 export function 取货架(data: SchemaType): { 页签: string; 商品: (typeof 道具表)[string][] }[] {
-  const 全部 = Object.values(道具表).filter(d => (d.价格 ?? 0) > 0);
+  const 全部 = Object.values(道具表).filter(
+    d => (d.价格 ?? 0) > 0 || d.特殊剧情占位 || (!!d.剧情占位 && 角色剧情占位已上架(data, d.id)),
+  );
   const 架: { 页签: string; 商品: (typeof 道具表)[string][] }[] = [
     { 页签: '工具', 商品: 全部.filter(d => d.类别 === '工具') },
     { 页签: '补给', 商品: 全部.filter(d => d.类别 === '补给') },
@@ -63,12 +80,12 @@ export function 取货架(data: SchemaType): { 页签: string; 商品: (typeof �
   if (最高 >= 3) {
     架.push({
       页签: '特殊场景',
-      // 九场始终可见；前置不足由锁定状态与购买硬门说明，不再从货架消失。
-      商品: 全部.filter(d => d.类别 === '特殊场景'),
+      // 三个现有场景与六个待设计占位始终可见；现有场景不足前置时继续显示锁定说明。
+      商品: 全部.filter(d => d.类别 === '特殊场景' && (d.id !== 家庭计划套件ID || 家庭计划已上架(data))),
     });
   }
-  if (最高 >= 4) {
-    架.push({ 页签: '性癖', 商品: 全部.filter(d => d.类别 === '性癖') });
+  if (最高 >= 4 && !全部阶段性癖已完成(data)) {
+    架.push({ 页签: '性癖', 商品: Object.values(道具表).filter(d => d.类别 === '性癖') });
   }
   if (母亲药物窗口已开启(data) || 丈夫登门药物窗口已开启(data)) {
     架.push({ 页签: '药物', 商品: 全部.filter(d => d.类别 === '药物') });
@@ -82,11 +99,25 @@ export function 取货架(data: SchemaType): { 页签: string; 商品: (typeof �
 
 export function 购买(data: SchemaType, 道具id: string): 商店结果 {
   const 配 = 查道具(道具id);
-  if (!配 || !(配.价格 ?? 0)) return { 成功: false, 提示: '货架上没有这件东西。' };
+  if (!配) return { 成功: false, 提示: '货架上没有这件东西。' };
   // 权限必须由脚本端复核。否则旧版界面、第三方主题或手工 eventEmit 可以绕过
   // 页签进度，提前买到特殊场景、性癖与母亲线药物。
   const 当前在架 = 取货架(data).some(页 => 页.商品.some(商品 => 商品.id === 道具id));
   if (!当前在架) return { 成功: false, 提示: '这个柜台还没开，或者这件商品尚未上架。' };
+  const 路线占位 = 查角色剧情占位(道具id);
+  if (路线占位) return { 成功: false, 提示: 角色剧情占位购买提示(路线占位) };
+  if (道具id === 家庭计划套件ID) return 购买家庭计划套件(data, 配.价格 ?? 0);
+  const 场景 = 查特殊场景(道具id);
+  if (场景?.待设计) {
+    return { 成功: false, 提示: `设计待完成：${配.名称}正在重新设计，不会扣款、入包或启动剧情。` };
+  }
+  const 性癖 = 查性癖(道具id);
+  if (性癖) {
+    const 门牌号 = 性癖.限定户[0];
+    if (性癖.剧情获得) return { 成功: false, 提示: `「${配.名称}」需要在对应角色的剧情中开启。` };
+    return 准备开启阶段性癖(data, 门牌号);
+  }
+  if (!(配.价格 ?? 0)) return { 成功: false, 提示: '货架上没有这件东西。' };
   if (配.常驻 && data.背包.includes(道具id)) return { 成功: false, 提示: `「${配.名称}」已经在背包里。` };
   if (配.资源效果?.唯一 && (data.背包.includes(道具id) || data.玩家资源._已使用永久道具.includes(道具id))) {
     return { 成功: false, 提示: `「${配.名称}」每局只能完成一次。` };
@@ -100,8 +131,7 @@ export function 购买(data: SchemaType, 道具id: string): 商店结果 {
   }
   if (data.现金 < 配.价格!) return { 成功: false, 提示: '钱不够。' };
 
-  // 特殊场景(P5):配置为“背包使用”的先买票、到指定地点二次确认；其余旧场景仍买下即开演。
-  const 场景 = 查特殊场景(道具id);
+  // 特殊场景(P5):配置为“背包使用”的先买票、到指定地点二次确认；其余现有场景仍买下即开演。
   if (场景) {
     const 锁定 = 特殊场景锁定状态(data as never, 道具id);
     if (!锁定.已解锁) return { 成功: false, 提示: `「${配.名称}」尚未解锁：${锁定.缺少.join('；')}。` };
@@ -115,8 +145,8 @@ export function 购买(data: SchemaType, 道具id: string): 商店结果 {
     if (data.系统._待发送事件) {
       return { 成功: false, 提示: '眼下已有一桩事在发生——过一楼再来。' };
     }
-    data.现金 -= 配.价格!;
     if (场景.启动?.方式 === '背包使用') {
+      data.现金 -= 配.价格!;
       data.背包.push(道具id);
       return {
         成功: true,
@@ -125,6 +155,11 @@ export function 购买(data: SchemaType, 道具id: string): 商店结果 {
       };
     }
     const 参与妻 = 场景.参与(data as never);
+    const 住院妻 = 参与妻.find(门牌号 => !读取医院内容策略(data, 门牌号).允许成人特殊场景);
+    if (住院妻) {
+      return { 成功: false, 提示: `${户静态表[住院妻].妻名}正在医院待产或恢复，这场特殊剧情暂时不能开始。` };
+    }
+    data.现金 -= 配.价格!;
     const 演出妻 = 场景.演出妻?.(data as never) ?? 参与妻;
     const 演出夫 = 场景.演出夫?.(data as never) ?? [];
     data.系统._待发送事件 = `${事件角色标记({ 在场妻: 演出妻, 在场夫: 演出夫 })}${场景.剧情}`;
@@ -158,6 +193,9 @@ export async function 送礼(
   const 配 = 查道具(道具id);
   const 节点 = data.户[门牌号];
   if (!配 || !节点) return { 成功: false, 提示: '送不出去。' };
+  if (!读取医院内容策略(data, 门牌号).允许普通礼物) {
+    return { 成功: false, 提示: `${户静态表[门牌号].妻名}正在医院待产或恢复，普通当面赠礼暂停。` };
+  }
   const i = data.背包.indexOf(道具id);
   if (i < 0) return { 成功: false, 提示: '背包里没有这件东西。' };
   if (配.常驻) return { 成功: false, 提示: '这是吃饭的家伙,送不得。' };

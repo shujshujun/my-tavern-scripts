@@ -42,6 +42,11 @@ test('聊天模板固定为五张有用记忆表，七张默认硬状态/选项�
   assert.equal(取('RQ_人物长期记忆').updateConfig.groupId, 取('RQ_承诺与伏笔').updateConfig.groupId);
   assert.equal(取('纪要表').updateConfig.groupId, 取('RQ_人物长期记忆').updateConfig.groupId);
   assert.equal(取('RQ_社交轨迹').updateConfig.updateFrequency, 6);
+  assert.equal(取('RQ_人物长期记忆').updateConfig.sendLatestRows, 60);
+  assert.equal(取('RQ_承诺与伏笔').updateConfig.sendLatestRows, 60);
+  assert.equal(取('RQ_社交轨迹').updateConfig.sendLatestRows, 60);
+  assert.equal(取('RQ_剧情事件').updateConfig.sendLatestRows, undefined);
+  assert.equal(取('纪要表').updateConfig.sendLatestRows, undefined);
   assert.match(取('纪要表').sourceData.initNode, /本批处理范围/);
   assert.equal(取('纪要表').exportConfig.keywords, '编码索引');
 });

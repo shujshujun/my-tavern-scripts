@@ -9,6 +9,7 @@ import {
   读取MVU外置模型配置,
   读取MVU解析状态,
   读取变量解析通道,
+  规范OpenAI兼容API地址,
   type MVU解析状态,
   type 变量解析通道类型,
 } from '../../../MVU解析模式';
@@ -103,7 +104,7 @@ function 安全错误反馈(e: unknown, 密钥: string): string {
  * 失败/空列表只给可见原因，绝不清空已填草稿、不保存半配置、不切换通道。 */
 async function 读取模型() {
   if (读取模型中.value) return;
-  const base = 解析API表单.api地址.trim().replace(/\/+$/, '');
+  const base = 规范OpenAI兼容API地址(解析API表单.api地址);
   const key = 解析API表单.密钥.trim();
   if (!base) {
     自定义反馈.value = '请先填写 API 地址再读取模型。';
@@ -137,7 +138,7 @@ async function 读取模型() {
  * 只有写入成功才切自定义通道、刷新真实状态并显示成功。失败保持草稿与现有通道不变。
  * 数值留空=不覆盖、沿用 MVU 现值；非空但不是有限数字必须指出字段，不得静默当空。 */
 function 保存并启用() {
-  const 地址 = 解析API表单.api地址.trim().replace(/\/+$/, '');
+  const 地址 = 规范OpenAI兼容API地址(解析API表单.api地址);
   const 密钥 = 解析API表单.密钥.trim();
   const 模型 = 解析API表单.模型名称.trim();
   if (!地址) {

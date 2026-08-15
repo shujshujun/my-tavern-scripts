@@ -22,6 +22,7 @@ defineProps<{
   failedAction: string;
   retryAction: string;
   retrying: boolean;
+  variableRegenerationState: '不可用' | '未配置' | '可用' | '进行中' | '已完成';
   videoActive: boolean;
   period: string;
   currentPeriodLabel: string;
@@ -37,6 +38,7 @@ const emit = defineEmits<{
   reroll: [];
   retryFailed: [];
   abandonAndRetry: [];
+  regenerateVariables: [];
   advanceTime: [];
 }>();
 
@@ -89,10 +91,43 @@ defineExpose({ 聚焦 });
     <span>刚才的生成没有完成。</span>
     <button class="btn" title="使用刚才完全相同的行动重新请求" @click="emit('retryFailed')">↻ 重新生成刚才行动</button>
   </div>
-  <div v-else-if="!formalMeeting && canReroll && !sending && currentRoom === turnRoom" class="reroll-row">
-    <button class="btn" title="撤回本回合(你的行动与回应),重新措辞" @click="emit('undo')">⌫ 撤回</button>
-    <button class="btn" title="正文不完整时，用同样的行动重新生成" @click="emit('reroll')">
+  <div
+    v-if="
+      (!formalMeeting && !failedAction && canReroll && !sending && currentRoom === turnRoom) ||
+      variableRegenerationState !== '不可用'
+    "
+    class="reroll-row"
+    aria-live="polite"
+  >
+    <button
+      v-if="!formalMeeting && !failedAction && canReroll && !sending && currentRoom === turnRoom"
+      class="btn"
+      title="撤回本回合(你的行动与回应),重新措辞"
+      @click="emit('undo')"
+    >
+      ⌫ 撤回
+    </button>
+    <button
+      v-if="!formalMeeting && !failedAction && canReroll && !sending && currentRoom === turnRoom"
+      class="btn"
+      title="正文不完整时，用同样的行动重新生成"
+      @click="emit('reroll')"
+    >
       ↻ 正文不完整？重新生成
+    </button>
+    <button
+      v-if="variableRegenerationState !== '不可用'"
+      class="btn variable-regenerate"
+      :class="{ completed: variableRegenerationState === '已完成' }"
+      :disabled="sending || variableRegenerationState !== '可用'"
+      title="只重新计算最近一回合的变量，不重新生成正文"
+      @click="emit('regenerateVariables')"
+    >
+      <Ic n="refresh" />
+      <span v-if="variableRegenerationState === '进行中'">正在生成变量…</span>
+      <span v-else-if="variableRegenerationState === '已完成'">本回合变量已重新生成</span>
+      <span v-else-if="variableRegenerationState === '未配置'">请先配置变量模型</span>
+      <span v-else>重新生成变量</span>
     </button>
   </div>
 
@@ -160,8 +195,26 @@ defineExpose({ 聚焦 });
   flex: none;
   display: flex;
   gap: 10px;
+  flex-wrap: wrap;
   justify-content: center;
   margin-top: 6px;
+}
+
+.variable-regenerate {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--blue);
+}
+
+.variable-regenerate :deep(.ic) {
+  width: 15px;
+  height: 15px;
+}
+
+.variable-regenerate.completed {
+  color: var(--ink-soft);
 }
 
 .generation-recovery-row {

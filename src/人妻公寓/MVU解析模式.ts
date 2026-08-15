@@ -92,6 +92,14 @@ function 取ST(): ST接口 | undefined {
   return 候选.find(Boolean);
 }
 
+/**
+ * 宿主集成功能共用的稳定设置入口。优先使用酒馆助手注入到 iframe 本身的拍平接口，
+ * 再回退父窗口 `getContext()`；禁止直接假定 `window.parent.SillyTavern` 已拍平设置字段。
+ */
+export function 读取宿主SillyTavern接口(): ST接口 | undefined {
+  return 取ST();
+}
+
 function 读MVU设置(): MVU设置 | undefined {
   return 取ST()?.extensionSettings?.mvu_settings as MVU设置 | undefined;
 }
@@ -212,6 +220,29 @@ export function 读取MVU外置模型配置(): MVU外置模型配置 | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * 统一规范 OpenAI 兼容 API Base URL（语义与 MVU 官方 normalizeBaseURL 完全对齐）。
+ *
+ * 玩家在自定义 API 表单里可能填裸域名、带 /vN 的版本路径、完整 /models 或
+ * /chat/completions 终端路径，也可能带首尾空格或末尾斜杠。若原样把错误 base 交给
+ * generateRaw/getModelList，请求会失败两次后按设计保留旧变量——表现为"正文正常生成但变量不再更新"。
+ * 本函数只做地址规范化，不触碰路由、密钥、模型名等任何其它语义：
+ * - 空值/纯空白 → 空字符串（空白配置仍判不可用，绝不把空配置补成 /v1）；
+ * - 已是 /vN 版本路径（如 /v1、/v2）→ 原样保留；
+ * - 末尾 /models、/chat/completions → 去掉终端路径；
+ * - 其余裸域名/代理根路径 → 补 /v1。
+ * 设置页"读取模型"、"保存并启用"与回合引擎自定义变量请求共用本函数（单一事实来源），
+ * 已规范的 /v1 地址幂等不变，也兼容现存裸域名、/vN、/models、/chat/completions 保存值，无需存档迁移。
+ */
+export function 规范OpenAI兼容API地址(原地址: string): string {
+  const 地址 = 原地址.trim().replace(/\/+$/, '');
+  if (!地址) return '';
+  if (/\/v\d+$/.test(地址)) return 地址;
+  if (地址.endsWith('/models')) return 地址.replace(/\/models$/, '');
+  if (地址.endsWith('/chat/completions')) return 地址.replace(/\/chat\/completions$/, '');
+  return `${地址}/v1`;
 }
 
 /**

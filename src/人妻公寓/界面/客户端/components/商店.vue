@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 商店弹窗：页签局部状态(商店页签/当前货架/当前空文案)随组件自持，关闭再开仍保持；
 // 货架计算/锁定原因/购买文案/购买动作留在 App。
-import { computed, ref } from 'vue';
+import { computed, ref, watch } from 'vue';
 import type { 道具配置 } from '../../../stageConfig';
 import type { 道具视觉类型 } from '../types';
 import Ic from './Icon.vue';
@@ -16,6 +16,8 @@ const props = defineProps<{
   itemVisual: (item?: 道具配置, readableLetter?: boolean) => { 类: 道具视觉类型; 标: string; 图: string };
   lockReasons: (item: 道具配置) => string[];
   purchaseLabel: (item: 道具配置) => string;
+  purchaseDisabled: (item: 道具配置) => boolean;
+  priceLabel: (item: 道具配置) => string;
 }>();
 
 const emit = defineEmits<{ close: []; imageError: [id: string]; buy: [itemId: string] }>();
@@ -23,6 +25,22 @@ const emit = defineEmits<{ close: []; imageError: [id: string]; buy: [itemId: st
 const 商店页签 = ref('工具');
 const 当前货架 = computed(() => props.shelves.find(页 => 页.页签 === 商店页签.value)?.商品 ?? []);
 const 当前空文案 = computed(() => props.shelves.find(页 => 页.页签 === 商店页签.value)?.空文案 ?? '(暂时没货)');
+
+function 是设计占位(项: 道具配置): boolean {
+  return !!项.剧情占位 || !!项.特殊剧情占位;
+}
+
+// 父层下线性癖货架后，失效页签自动回退到第一个可用页签；没有可用页签时安全落到空值。
+// 只在页签集合实际变化时校正，正常关闭/再开不重置现存页签。
+watch(
+  () => props.shelves.map(页 => 页.页签),
+  页签们 => {
+    if (!页签们.includes(商店页签.value)) {
+      商店页签.value = 页签们[0] ?? '';
+    }
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
@@ -51,11 +69,11 @@ const 当前空文案 = computed(() => props.shelves.find(页 => 页.页签 === 
           v-for="项 in 当前货架"
           :key="项.id"
           class="ware-card"
-          :class="['ware-' + itemVisual(项).类, { locked: lockReasons(项).length }]"
+          :class="['ware-' + itemVisual(项).类, { locked: lockReasons(项).length, placeholder: 是设计占位(项) }]"
         >
           <span class="ware-pic">
             <img
-              v-if="!itemFailed[项.id]"
+              v-if="!是设计占位(项) && !itemFailed[项.id]"
               :src="itemImage(项.id)"
               :alt="项.名称"
               loading="lazy"
@@ -68,17 +86,13 @@ const 当前空文案 = computed(() => props.shelves.find(页 => 页.页签 === 
           <span class="ware-main">
             <b class="ware-name"
               >{{ 项.名称 }} <em class="ware-kind-label">{{ itemVisual(项).标 }}</em>
-              <em class="ware-price">¥{{ 项.价格 }}</em></b
+              <em class="ware-price">{{ priceLabel(项) }}</em></b
             >
             <span class="ware-desc">{{ 项.描述 }}</span>
             <span v-if="lockReasons(项).length" class="ware-lock">尚缺：{{ lockReasons(项).join('；') }}</span>
           </span>
-          <button
-            class="btn rite ware-buy"
-            :disabled="sending || cash < (项.价格 ?? 0) || lockReasons(项).length > 0"
-            @click="emit('buy', 项.id)"
-          >
-            {{ lockReasons(项).length ? '未解锁' : cash < (项.价格 ?? 0) ? '钱不够' : purchaseLabel(项) }}
+          <button class="btn rite ware-buy" :disabled="sending || purchaseDisabled(项)" @click="emit('buy', 项.id)">
+            {{ purchaseLabel(项) }}
           </button>
         </div>
         <p v-if="!当前货架.length" class="hint center">{{ 当前空文案 }}</p>

@@ -111,7 +111,7 @@ test('时间事务失败按键是否原本存在精确恢复聊天结构', () =>
   );
 });
 
-test('晨跑、健身与睡眠先只生成草稿，隔离日志和撤销点在同一聊天事务内落地', () => {
+test('只有睡眠先生成草稿，隔离日志和撤销点在同一聊天事务内落地', () => {
   const 处理段 = 截段(Index源, 'function 处理时间推进', '\n  function 处理撤销时间推进');
   const 草稿函数 = 截段(隔离事件源, 'export async function 生成隔离事件草稿', '\nexport function 写入隔离事件草稿');
   const 纯写函数 = 截段(隔离事件源, 'export function 写入隔离事件草稿', '\nexport const 隔离提交聊天键');
@@ -152,14 +152,15 @@ test('晨跑、健身与睡眠先只生成草稿，隔离日志和撤销点在�
   );
 });
 
-test('晨跑健身睡眠只给AI自由创作方向，小憩不请求AI，睡眠素材只取当天可靠正文', () => {
+test('晨跑健身小憩直接结算不请求AI，只有睡眠生成独立演出', () => {
   const 方向段 = 截段(Index源, 'function 时间动作需要独立演出', '\n  async function 恢复时间聊天备份');
   const 动作门 = 截段(方向段, 'function 时间动作需要独立演出', '\n\n  /**');
 
-  for (const 方式 of ['晨跑', '健身', '睡到次日早晨']) assert.match(动作门, new RegExp(`方式 === '${方式}'`));
-  assert.doesNotMatch(动作门, /方式 === '小憩'/, '小憩必须直接结算，不能调用AI');
-  assert.match(方向段, /不要求固定起承转合、段落或句式/);
-  assert.match(方向段, /不要求固定流程、段落或句式/);
+  assert.match(动作门, /方式 === '睡到次日早晨'/);
+  for (const 方式 of ['晨跑', '健身', '小憩']) {
+    assert.doesNotMatch(动作门, new RegExp(`方式 === '${方式}'`), `${方式}必须直接结算，不能调用AI`);
+  }
+  assert.doesNotMatch(方向段, /日常晨跑|日常健身|开始今天的晨跑|开始今天的锻炼/);
   assert.match(方向段, /这只是可选方向，不要求固定总结格式，也不必每次都回想/);
   assert.match(方向段, /可自由安排叙述重心与表达方式，不套固定流程或句式/);
   assert.match(方向段, /Mvu\.getMvuData\(\{ type: 'message', message_id: 楼层 \}\)/);

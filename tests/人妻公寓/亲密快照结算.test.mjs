@@ -22,7 +22,7 @@ const { 结算成功现场楼 } = require('../../src/人妻公寓/脚本/游戏�
 
 test('主动收尾快照与实际结算共用基础、首次偏好和冻结等级加成', () => {
   const data = Schema.parse({ 户: { 101: 创建户节点(0) } });
-  data.户['101'].妻.当前阶段 = 3;
+  data.户['101'].妻.当前阶段 = 4;
   data.玩家资源.体力.当前值 = 5;
   data.系统._性爱场景 = {
     状态: '进行中',
@@ -47,6 +47,13 @@ test('主动收尾快照与实际结算共用基础、首次偏好和冻结等�
   const 快照 = 组公寓快照([{ role: 'user', content: 行动 }], data, 10);
   assert.match(快照, /逐角色预计结论:夏乔:合适/);
   assert.doesNotMatch(快照, /逐角色预计结论:夏乔:太短/);
+  assert.match(快照, /无保护阴道内射.*4级|4级.*无保护阴道内射/);
+
+  const L3数据 = structuredClone(data);
+  L3数据.户['101'].妻.当前阶段 = 3;
+  const L3快照 = 组公寓快照([{ role: 'user', content: 行动 }], L3数据, 10);
+  assert.doesNotMatch(L3快照, /【亲密场景·主动收尾】/, 'L3 伪造的无套阴道内收尾不得进入成功演出指令');
+  assert.match(L3快照, /无保护.*内射.*4级|4级.*无保护.*内射/);
 
   const 新值 = structuredClone(data);
   const 结果 = 结算成功现场楼(新值, structuredClone(data), {
@@ -55,7 +62,7 @@ test('主动收尾快照与实际结算共用基础、首次偏好和冻结等�
     正文: '夏乔维持此前的阴道插入，并按确认位置完成收尾。',
     本楼事件: '',
     妻在场: ['101'],
-    实际尺度: { 101: 3 },
+    实际尺度: { 101: 4 },
     资源计费: true,
   });
   assert.equal(结果.性爱结束, true);

@@ -10,6 +10,8 @@ export interface CG亲密上下文 {
   当前接触部位: string;
   结束方式: string;
   最终位置: string;
+  /** 本楼是否是旧场景空闲 → 新场景进行中的首个成功楼；只用于首楼开场图。 */
+  本楼开始?: boolean;
 }
 
 function 是门牌(value: string): value is 门牌 {
@@ -52,6 +54,7 @@ export function 构造CG亲密上下文(旧值: SchemaType, 新值: SchemaType, 
       : 新场景.状态 !== '空闲'
         ? 首名参与者(新场景.参与者)
         : 首名参与者(新值.系统._上次性爱结果.参与者);
+  const 本楼开始 = !性爱结束 && 旧场景.状态 === '空闲' && 新场景.状态 === '进行中';
   if (性爱结束) {
     const 结果 = 新值.系统._上次性爱结果;
     const 最终行为 = 结果.当前行为 || 旧场景.当前行为;
@@ -72,6 +75,7 @@ export function 构造CG亲密上下文(旧值: SchemaType, 新值: SchemaType, 
       当前接触部位: 新场景.当前接触部位,
       结束方式: '',
       最终位置: '',
+      本楼开始,
     };
   }
   return {

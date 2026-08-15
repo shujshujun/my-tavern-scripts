@@ -29,10 +29,9 @@ require.cache[数据库桥路径] = {
 };
 
 const { Schema, 创建户节点 } = require('../../src/人妻公寓/schema.ts');
-const { 查性癖, 查特殊场景, 经济配置 } = require('../../src/人妻公寓/stageConfig.ts');
+const { 查特殊场景, 经济配置 } = require('../../src/人妻公寓/stageConfig.ts');
 const { 购买 } = require('../../src/人妻公寓/脚本/游戏逻辑/商店系统.ts');
 const { 使用运作 } = require('../../src/人妻公寓/脚本/游戏逻辑/经济系统.ts');
-const { 装载性癖 } = require('../../src/人妻公寓/脚本/游戏逻辑/性癖系统.ts');
 const { 请求晋阶 } = require('../../src/人妻公寓/脚本/游戏逻辑/结算系统.ts');
 const { 读取阶段线路审计矩阵 } = require('../../src/人妻公寓/脚本/游戏逻辑/阶段线路系统.ts');
 const { 六时段列表, 星期列表 } = require('../../src/人妻公寓/周作息.ts');
@@ -77,59 +76,20 @@ function 写入最终预约(data, 门牌, 目标阶段) {
   聊天变量 = { _场景: { 房间id: 预约.地点 } };
 }
 
-test('制服夜巡只允许深夜购买并即时开演，其他时段不扣款也不排事件', () => {
-  assert.deepEqual(查特殊场景('制服夜巡')?.允许时段, ['深夜']);
+test('制服夜巡改为待设计占位后，任何时段都不扣款也不排事件', () => {
+  assert.equal(查特殊场景('制服夜巡')?.待设计, true);
+  assert.equal(查特殊场景('制服夜巡')?.允许时段, undefined);
 
-  for (const 钟 of [0, 1, 2, 3, 4]) {
-    const 非深夜 = 建三户数据();
-    非深夜.系统._绝对时段 = 钟;
-    const 原样 = structuredClone(非深夜);
-    const 拒绝 = 购买(非深夜, '制服夜巡');
+  for (const 钟 of [0, 1, 2, 3, 4, 5]) {
+    const data = 建三户数据();
+    data.系统._绝对时段 = 钟;
+    const 原样 = structuredClone(data);
+    const 拒绝 = 购买(data, '制服夜巡');
 
     assert.equal(拒绝.成功, false);
-    assert.match(拒绝.提示, /深夜/);
-    assert.deepEqual(非深夜, 原样);
+    assert.match(拒绝.提示, /设计待完成/);
+    assert.deepEqual(data, 原样);
   }
-
-  const 深夜 = 建三户数据();
-  深夜.系统._绝对时段 = 5 + 42;
-  const 原现金 = 深夜.现金;
-  const 开演 = 购买(深夜, '制服夜巡');
-  assert.equal(开演.成功, true);
-  assert.equal(深夜.现金, 原现金 - 1700);
-  assert.match(深夜.系统._待发送事件, /特殊场景·制服夜巡/);
-});
-
-test('露出癖首次开幕只允许深夜，其他时段拒绝时完整保留道具和人物状态', () => {
-  assert.deepEqual(查性癖('露出癖')?.开幕允许时段, ['深夜']);
-
-  const data = 建单户数据();
-  data.背包.push('露出癖');
-  data.系统._绝对时段 = 4;
-  const 原样 = structuredClone(data);
-  const 拒绝 = 装载性癖(data, '露出癖', '101');
-
-  assert.equal(拒绝.成功, false);
-  assert.match(拒绝.提示, /深夜/);
-  assert.deepEqual(data, 原样);
-
-  data.系统._绝对时段 = 5 + 42;
-  const 开幕 = 装载性癖(data, '露出癖', '101');
-  assert.equal(开幕.成功, true);
-  assert.match(开幕.事件 ?? '', /性癖开幕·露出癖/);
-  assert.equal(data.背包.includes('露出癖'), false);
-  assert.equal(data.户['101'].妻.性癖装载.includes('露出癖'), true);
-});
-
-test('没有夜间设定的普通性癖可在白天开幕，提示不再误写“今晚”', () => {
-  const data = 建单户数据();
-  data.背包.push('淫语解禁');
-  data.系统._绝对时段 = 0;
-
-  const 开幕 = 装载性癖(data, '淫语解禁', '101');
-  assert.equal(开幕.成功, true);
-  assert.doesNotMatch(开幕.提示, /今晚/);
-  assert.match(开幕.提示, /第一次开幕/);
 });
 
 test('夜班内推只允许晚上使用，其他时段不消耗道具也不生成外出窗口', () => {
@@ -189,10 +149,10 @@ test('界面与后端使用同一夜间门：错误时段显示等待而不是�
   assert.doesNotMatch(App源, /选中首夜待晚上/);
   // A5a 拆分后三条 UI 断言随模板迁入组件：时段锁断言读背包源，商品锁定断言读商店源
   assert.match(背包源, /sending \|\| !夫\.时段可用/);
-  assert.match(背包源, /sending \|\| !妻\.时段可用/);
-  assert.match(商店源, /lockReasons\(项\)\.length > 0/);
+  assert.doesNotMatch(背包源, /可装载对象|emit\('load'/);
+  assert.match(商店源, /purchaseDisabled\(项\)/);
   assert.doesNotMatch(App源, /发送中 \|\| !夫\.时段可用/);
-  assert.doesNotMatch(App源, /发送中 \|\| !妻\.时段可用/);
+  assert.doesNotMatch(App源, /性癖装载|曾开发性癖/);
   assert.doesNotMatch(App源, /商品锁定原因\(项\)\.length > 0/);
   // 业务计算仍留 App：晋阶时段判断、锁定原因文案、购买文案的时段标签
   assert.match(App源, /须在.*允许时段\.join\('或'\).*开演/);

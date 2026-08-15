@@ -7,8 +7,11 @@ import { 列出待告知孕情, 怀孕微信键, type 怀孕送达凭据 } from 
 import { 姐妹群成员 } from '../雌竞系统';
 import { 已入住微信妻友门牌 } from '../微信好友规则';
 import { 创建手机时间线租约, 手机时间线租约仍有效 } from '../手机时间线租约';
-import type { 微信消息 } from './数据层';
-import { 读库, 写库增量 } from './数据层';
+import { 创建手机已读时锚, 手机记录晚于已读 } from '../手机已读水位';
+import { 家庭计划微信事件键 } from '../家庭计划系统';
+import { 是结构化报孕资料 } from '../孕产叙事系统';
+import { 列出预产通知, 预产微信键, type 生产通知凭据 } from '../生产系统';
+import { 读库, 写库增量, type 微信消息 } from './数据层';
 import { 当前手机绝对时段, 当前聊天ID, 末楼 } from './运行时上下文';
 import { 请求手机重绘, 请求刷新手机红点 } from './UI刷新';
 
@@ -97,11 +100,11 @@ export function 编译管理任务微信通知(data: SchemaType, 楼: number, �
   });
 }
 
-/** 孕情消息只读取时间事务已经冻结的文案；隐藏期不会出现在这里，也不调用 AI。 */
+/** 旧存档兼容：只有旧版已经冻结的真实台词才可直接投递；结构化资料绝不作为正文展示。 */
 export function 编译怀孕微信通知(data: SchemaType, 楼: number, 时: number): 微信消息[] {
   return 列出待告知孕情(data).flatMap(凭据 => {
     const 文 = data.户[凭据.门牌]?.妻._怀孕.告知文案.trim();
-    if (!文) return [];
+    if (!文 || 是结构化报孕资料(文)) return [];
     return [
       {
         楼,
@@ -116,9 +119,33 @@ export function 编译怀孕微信通知(data: SchemaType, 楼: number, 时: num
   });
 }
 
-function 通知孕情已送达(凭据们: readonly 怀孕送达凭据[]): void {
-  if (!凭据们.length) return;
-  eventEmit('人妻公寓:怀孕微信已送达', 凭据们);
+/** 必须由真实会话渲染写高已读水位后才返回 true；仅收到通知或打开手机都不算。 */
+export function 家庭计划微信已读(): boolean {
+  const 库 = 读库();
+  const 消息 = 库.消息.find(item => item.会话 === '101' && item.键 === 家庭计划微信事件键);
+  if (!消息) return false;
+  const 已读楼 = 库.读到['101'] ?? -1;
+  const 已读锚 = 库.读时['101'] ?? 创建手机已读时锚(已读楼, -1);
+  return !手机记录晚于已读(消息, 已读楼, 已读锚);
+}
+
+function 消息已读(会话: string, 键: string): boolean {
+  const 库 = 读库();
+  const 消息 = 库.消息.find(item => item.会话 === 会话 && item.键 === 键);
+  if (!消息) return false;
+  const 已读楼 = 库.读到[会话] ?? -1;
+  const 已读锚 = 库.读时[会话] ?? 创建手机已读时锚(已读楼, -1);
+  return !手机记录晚于已读(消息, 已读楼, 已读锚);
+}
+
+/** 只返回当前仍待确认且已经被真实会话页已读水位覆盖的孕情消息。 */
+export function 怀孕确认微信已读凭据(data: SchemaType): 怀孕送达凭据[] {
+  return 列出待告知孕情(data).filter(凭据 => 消息已读(凭据.门牌, 怀孕微信键(凭据.门牌, 凭据.场次标识)));
+}
+
+/** 预产消息即使在未读期间已经自动生产，之后真实读到仍能解锁医院与产后入口。 */
+export function 预产微信已读凭据(data: SchemaType): 生产通知凭据[] {
+  return 列出预产通知(data).filter(凭据 => 消息已读(凭据.门牌, 预产微信键(凭据)));
 }
 
 export async function 同步管理任务微信(data: SchemaType): Promise<boolean> {
@@ -128,25 +155,17 @@ export async function 同步管理任务微信(data: SchemaType): Promise<boolea
   if (!时间线租约) return false;
   const 库 = 读库();
   const 已有键 = new Set(库.消息.flatMap(消息 => (消息.键 ? [消息.键] : [])));
-  const 孕情凭据 = 列出待告知孕情(data);
-  const 已存在孕情 = 孕情凭据.filter(凭据 => 已有键.has(怀孕微信键(凭据.门牌, 凭据.场次标识)));
-  const 候选消息 = [...编译管理任务微信通知(data, 楼, 时), ...编译怀孕微信通知(data, 楼, 时)];
+  const 候选消息 = [
+    ...编译管理任务微信通知(data, 楼, 时),
+    ...编译怀孕微信通知(data, 楼, 时),
+  ];
   const 新消息 = 候选消息.filter(消息 => !已有键.has(消息.键 as string));
-  const 新消息键 = new Set(新消息.flatMap(消息 => (消息.键 ? [消息.键] : [])));
-  const 新增孕情 = 孕情凭据.filter(凭据 => 新消息键.has(怀孕微信键(凭据.门牌, 凭据.场次标识)));
-  if (!新消息.length) {
-    通知孕情已送达(已存在孕情);
-    return false;
-  }
+  if (!新消息.length) return false;
   const 时间线仍有效 = () => 手机时间线租约仍有效(时间线租约, 当前聊天ID(), SillyTavern.chat ?? [], 当前手机绝对时段());
   const 已写 = await 写库增量({ 新圈: [], 新消息, 节拍改: {} }, 时间线仍有效);
   if (已写) {
-    // 只确认数据库原本已有或本次真正写入的孕情键；其他楼务消息成功不能替空文案孕情“送达”。
-    通知孕情已送达([...已存在孕情, ...新增孕情]);
     请求刷新手机红点();
     请求手机重绘();
-  } else {
-    通知孕情已送达(已存在孕情);
   }
   return 已写;
 }

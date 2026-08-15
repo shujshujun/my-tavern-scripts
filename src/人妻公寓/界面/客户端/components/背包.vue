@@ -19,13 +19,6 @@ interface 可送对象项 {
   提示?: string;
 }
 
-interface 可装载对象项 {
-  门牌: 门牌;
-  妻名: string;
-  时段可用: boolean;
-  时段提示: string;
-}
-
 interface 背包展示项 {
   id: string;
   名称: string;
@@ -43,7 +36,6 @@ interface 背包展示项 {
   全局运作对象: readonly 阶段线路候选[];
   运作对象: readonly 运作对象项[];
   可送对象: readonly 可送对象项[];
-  可装载对象: readonly 可装载对象项[];
 }
 
 defineProps<{
@@ -64,7 +56,6 @@ const emit = defineEmits<{
   playTape: [];
   prepareMeeting: [];
   gift: [itemId: string, door: 门牌];
-  load: [itemId: string, door: 门牌];
 }>();
 </script>
 
@@ -141,16 +132,6 @@ const emit = defineEmits<{
             >
               <span>送给{{ 妻.妻名 }}</span>
               <small v-if="妻.提示">{{ 妻.提示 }}</small>
-            </button>
-            <button
-              v-for="妻 in 项.可装载对象"
-              :key="'载' + 妻.门牌"
-              class="btn mini"
-              :disabled="sending || !妻.时段可用"
-              :title="妻.时段提示"
-              @click="emit('load', 项.id, 妻.门牌)"
-            >
-              {{ 妻.时段可用 ? `装载给${妻.妻名}` : `${妻.时段提示}再装载` }}
             </button>
           </span>
         </div>

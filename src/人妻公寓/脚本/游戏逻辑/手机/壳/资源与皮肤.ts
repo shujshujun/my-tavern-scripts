@@ -12,8 +12,17 @@ export const ROOT_ID = 'rq-phone-root';
 // ⚠ 与 App.vue 素材基址同步：Discord 测试版发布 tag=rq0.55。
 export const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.55/dist/人妻公寓/素材';
 export const 成人素材基址 = 'https://testingcf.jsdelivr.net/gh/shujun8520-design/qgy-assets@cg2/cg1';
+export const 生产素材基址 =
+  'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.83/output/imagegen/production-system/final';
 
 export function 私聊图片地址(图: string): string {
+  if (图.startsWith('@production/')) {
+    return `${生产素材基址}/${图
+      .slice('@production/'.length)
+      .split('/')
+      .map(段 => encodeURIComponent(段))
+      .join('/')}.webp`;
+  }
   if (图.startsWith('@adult/')) {
     return `${成人素材基址}/${图
       .slice('@adult/'.length)
@@ -148,6 +157,8 @@ export const 手机CSS = `
 #${ROOT_ID} .rqp-row .mid i{font-style:normal;font-size:12px;color:#9b9b9b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;max-width:200px;margin-top:2px;}
 #${ROOT_ID} .rqp-row .dot{position:absolute;top:7px;left:50px;width:10px;height:10px;border-radius:50%;background:#fa5151;border:1.5px solid #fff;}
 #${ROOT_ID} .rqp-bubbles{padding:12px 10px;display:flex;flex-direction:column;gap:12px;}
+#${ROOT_ID} .rqp-more{align-self:center;border:none;background:transparent;color:#576b95;padding:5px 12px;font-size:12px;line-height:1.4;cursor:pointer;font-family:inherit;}
+#${ROOT_ID} .rqp-more:hover,#${ROOT_ID} .rqp-more:focus-visible{color:#32476f;text-decoration:underline;text-underline-offset:3px;}
 #${ROOT_ID} .rqp-line{display:flex;gap:9px;align-items:flex-start;}
 #${ROOT_ID} .rqp-line.me{flex-direction:row-reverse;}
 #${ROOT_ID} .rqp-line .rqp-ava{width:38px;height:38px;border-radius:4px;font-size:15px;}

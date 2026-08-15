@@ -183,9 +183,11 @@ test('早餐属于强制正文事件，空正文在固定0楼与原生逃生路�
   assert.equal(本轮事件可提交(冻结票据, 早餐票据, 28, true), true, '有效正文仍可正常提交早餐票据');
 
   const 回合Source = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/回合引擎.ts', import.meta.url), 'utf8');
+  const 固定零楼回合起点 = 回合Source.indexOf('export async function 执行回合');
+  const 固定零楼已清洗位置 = 回合Source.indexOf('const 已清洗正文 =', 固定零楼回合起点);
   const 固定零楼空正文门 = 回合Source.slice(
-    回合Source.indexOf('const 已清洗正文 ='),
-    回合Source.indexOf('const 基础正文 ='),
+    固定零楼已清洗位置,
+    回合Source.indexOf('const 基础正文 =', 固定零楼已清洗位置),
   );
   assert.match(固定零楼空正文门, /事件必须有正文\(本楼事件\)/);
   assert.match(固定零楼空正文门, /!已清洗正文/);

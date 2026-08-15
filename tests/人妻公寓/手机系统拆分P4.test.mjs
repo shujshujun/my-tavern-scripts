@@ -67,7 +67,7 @@ test('生成引擎真实拥有净化、路由、小生成、短文本/群文本�
 
 test('生成标记与手机小生成控制等由交互模块正确 import，内核仅 re-export 生成标记，旧门面 API 不变', () => {
   // P8:交互模块从生成引擎 import 生成能力并继续使用
-  assert.match(交互源码, /import \{[\s\S]*净化消息,[\s\S]*手机小生成仍有效,[\s\S]*type 手机小生成控制,[\s\S]*\} from '\.\.\/生成引擎';/);
+  assert.match(交互源码, /import \{[\s\S]*小生成,[\s\S]*微信短文本,[\s\S]*微信群文本,[\s\S]*手机小生成仍有效,[\s\S]*type 手机小生成控制,[\s\S]*\} from '\.\.\/生成引擎';/);
   assert.match(交互源码, /await 小生成\(/);
   assert.match(交互源码, /await 微信短文本\(/);
   assert.match(交互源码, /await 微信群文本\(/);

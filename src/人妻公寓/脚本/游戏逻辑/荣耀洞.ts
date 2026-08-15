@@ -8,6 +8,35 @@ export function 规范荣耀洞上次时段(记录: number, 当前绝对时段: 
   return !Number.isFinite(记录) || 记录 < 0 || 记录 > 当前绝对时段 ? -999 : 记录;
 }
 
+function 读取荣耀洞系统(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  const 系统 = (value as Record<string, unknown>).系统;
+  return 系统 && typeof 系统 === 'object' && !Array.isArray(系统) ? (系统 as Record<string, unknown>) : null;
+}
+
+/**
+ * 失败提示只能依据当前持久层，而不能依据可能已被推进过的调用栈 data。
+ * 同场但不同拍也不算“本拍已保留”，避免补偿失败时误导玩家重复已经提交的内容。
+ */
+export function 同一荣耀洞拍仍保留(当前持久数据: unknown, 本拍前数据: unknown): boolean {
+  const 当前 = 读取荣耀洞系统(当前持久数据);
+  const 基准 = 读取荣耀洞系统(本拍前数据);
+  if (!当前 || !基准) return false;
+
+  const 当前拍 = Number(当前._荣耀洞拍);
+  const 基准拍 = Number(基准._荣耀洞拍);
+  const 当前起时段 = Number(当前._荣耀洞起时段);
+  const 基准起时段 = Number(基准._荣耀洞起时段);
+  if (!Number.isInteger(当前拍) || 当前拍 < 0 || 当前拍 !== 基准拍) return false;
+  if (!Number.isInteger(当前起时段) || 当前起时段 < 0 || 当前起时段 !== 基准起时段) return false;
+  if (typeof 当前._荣耀洞门牌 !== 'string' || !当前._荣耀洞门牌 || 当前._荣耀洞门牌 !== 基准._荣耀洞门牌) {
+    return false;
+  }
+  if (typeof 当前._荣耀洞点破 !== 'boolean' || 当前._荣耀洞点破 !== 基准._荣耀洞点破) return false;
+  if (typeof 当前._荣耀洞夫 !== 'boolean' || 当前._荣耀洞夫 !== 基准._荣耀洞夫) return false;
+  return true;
+}
+
 /**
  * 荣耀洞(2026-07-19 用户点单):公共洗手间末隔间的洞。
  *

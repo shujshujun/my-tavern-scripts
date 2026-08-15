@@ -34,15 +34,16 @@ const 档案卡源码 = readFileSync(
   'utf8',
 );
 
-test('v0.82 接受 v0.80/v0.81 存档并拒绝未知版本与损坏结构', () => {
+test('v0.83 接受 v0.80-v0.82 存档并拒绝未知版本与损坏结构', () => {
   const { 当前MVU数据版本, 验证当前MVU存档版本 } = schema模块;
-  assert.equal(当前MVU数据版本, 8);
+  assert.equal(当前MVU数据版本, 9);
   assert.doesNotThrow(() => 验证当前MVU存档版本(initvar));
   assert.doesNotThrow(() => 验证当前MVU存档版本({}));
   assert.doesNotThrow(() => 验证当前MVU存档版本({ 系统: { _数据版本: 7 } }));
-  assert.throws(() => 验证当前MVU存档版本({ 系统: { _数据版本: 6 } }), /v0\.82 仅兼容数据版本 7 和 8/);
-  assert.throws(() => 验证当前MVU存档版本({ 系统: { _数据版本: 9 } }), /v0\.82 仅兼容数据版本 7 和 8/);
-  assert.throws(() => 验证当前MVU存档版本({ 系统: { _序章完成: true } }), /v0\.82 仅兼容数据版本 7 和 8/);
+  assert.doesNotThrow(() => 验证当前MVU存档版本({ 系统: { _数据版本: 8 } }));
+  assert.throws(() => 验证当前MVU存档版本({ 系统: { _数据版本: 6 } }), /数据版本 7、8 和 9/);
+  assert.throws(() => 验证当前MVU存档版本({ 系统: { _数据版本: 10 } }), /数据版本 7、8 和 9/);
+  assert.throws(() => 验证当前MVU存档版本({ 系统: { _序章完成: true } }), /数据版本 7、8 和 9/);
   for (const 坏存档 of [
     null,
     'v7',
@@ -60,7 +61,7 @@ test('v0.82 接受 v0.80/v0.81 存档并拒绝未知版本与损坏结构', () =
   assert.equal(schema模块.Schema.parse({}).系统._数据版本, 当前MVU数据版本, '内部默认 Schema 构造仍须合法');
 });
 
-test('v7→v8 迁移幂等补齐新机制字段且不改写原对象与原有数值', () => {
+test('v7→v9 迁移幂等补齐新机制字段且不改写原对象与原有数值', () => {
   const { Schema, 创建户节点, 迁移MVU存档到当前版本 } = schema模块;
   const v7 = Schema.parse({
     ...initvar,
@@ -83,8 +84,8 @@ test('v7→v8 迁移幂等补齐新机制字段且不改写原对象与原有数
   const data = Schema.parse(第一次);
 
   assert.deepEqual(v7, 原始副本, '迁移必须先复制，失败时不能留下半迁移原档');
-  assert.deepEqual(第二次, 第一次, '已经迁移到 v8 后重复执行不得产生新变化');
-  assert.equal(data.系统._数据版本, 8);
+  assert.deepEqual(第二次, 第一次, '已经迁移到 v9 后重复执行不得产生新变化');
+  assert.equal(data.系统._数据版本, 9);
   assert.equal(data.系统._上次性爱结果.场次标识, '旧场次');
   assert.equal(data.系统._上次性爱结果.收尾对象门牌, '');
   assert.deepEqual(data.系统._孕情初见评价楼, {});
@@ -98,6 +99,31 @@ test('v7→v8 迁移幂等补齐新机制字段且不改写原对象与原有数
     assert.equal(data.户[门牌].妻._怀孕.丈夫登门.状态, '无');
     assert.equal(data.户[门牌].妻._怀孕.丈夫登门.已结算, false);
   }
+});
+
+test('v0.82(v8)旧档缺少家庭计划时补为未开始，并保留已经存在的夏乔孕情', () => {
+  const { Schema, 创建户节点, 迁移MVU存档到当前版本 } = schema模块;
+  const v8 = Schema.parse({
+    ...initvar,
+    户: { 101: 创建户节点(12) },
+  });
+  v8.系统._数据版本 = 8;
+  delete v8.系统._家庭计划;
+  Object.assign(v8.户['101'].妻._怀孕, {
+    状态: '已受孕',
+    受孕绝对时段: 6,
+    预计告知绝对时段: 48,
+    受孕场次标识: 'rq082-existing-pregnancy',
+  });
+  const 原始副本 = structuredClone(v8);
+
+  const data = Schema.parse(迁移MVU存档到当前版本(v8));
+
+  assert.deepEqual(v8, 原始副本, 'v0.82 原档不得被原地改写');
+  assert.equal(data.系统._数据版本, 9);
+  assert.deepEqual(data.系统._家庭计划, { 阶段: '未开始', 最早继续日: -1, 完成楼层: -1 });
+  assert.equal(data.户['101'].妻._怀孕.状态, '已受孕', '兼容升级不能回滚玩家旧档中已经发生的孕情');
+  assert.equal(data.户['101'].妻._怀孕.受孕场次标识, 'rq082-existing-pregnancy');
 });
 
 test('启动链在监听挂载前把 v7 原子迁移并写回当前尾楼', () => {
@@ -130,7 +156,7 @@ test('派生显示字段不入存档，v0.80 阶段线路预约状态继续保�
   assert.equal(户._入住时段, 0);
   assert.equal(Object.hasOwn(data.系统, '_荣耀洞上次楼'), false);
   assert.equal(data.系统._荣耀洞上次时段, -999);
-  assert.equal(data.系统._数据版本, 8);
+  assert.equal(data.系统._数据版本, 9);
   assert.doesNotMatch(schema源码 + index源码 + 回合源码 + 客户端源码, /_时段偏移楼|_上次杀时间楼层|_入住楼层/);
   assert.match(时钟源码, /data\.系统\._绝对时段 = 旧时间\.绝对时段 \+ 时段数/);
   assert.match(入住源码, /创建户节点\(绝对时段\)/);

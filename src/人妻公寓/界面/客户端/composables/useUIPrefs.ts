@@ -37,6 +37,8 @@ function 创建UIPrefs(options: UIPrefs选项) {
   const 真全屏中 = ref(false);
   const 移动端媒体 = window.matchMedia('(max-width: 540px)');
   const 移动端 = ref(移动端媒体.matches);
+  const 成人CG双列媒体 = window.matchMedia('(min-width: 760px)');
+  const 成人CG双列 = ref(成人CG双列媒体.matches);
 
   const 读取移动端全屏选择 = (): boolean => {
     try {
@@ -63,6 +65,10 @@ function 创建UIPrefs(options: UIPrefs选项) {
 
   const 同步移动端断点 = (event: MediaQueryListEvent): void => {
     移动端.value = event.matches;
+  };
+
+  const 同步成人CG双列断点 = (event: MediaQueryListEvent): void => {
+    成人CG双列.value = event.matches;
   };
 
   const 应用画幅 = (开: boolean) => {
@@ -271,11 +277,13 @@ function 创建UIPrefs(options: UIPrefs选项) {
       应用画幅(true);
     }
     移动端媒体.addEventListener('change', 同步移动端断点);
+    成人CG双列媒体.addEventListener('change', 同步成人CG双列断点);
     for (const 事件名 of ['fullscreenchange', 'webkitfullscreenchange']) {
       document.addEventListener(事件名, 同步真全屏);
     }
     卸载监听 = () => {
       移动端媒体.removeEventListener('change', 同步移动端断点);
+      成人CG双列媒体.removeEventListener('change', 同步成人CG双列断点);
       for (const 事件名 of ['fullscreenchange', 'webkitfullscreenchange']) {
         document.removeEventListener(事件名, 同步真全屏);
       }
@@ -304,6 +312,7 @@ function 创建UIPrefs(options: UIPrefs选项) {
     全屏中,
     真全屏中,
     移动端,
+    成人CG双列,
     显示移动端全屏引导,
     切换主题,
     改设置,

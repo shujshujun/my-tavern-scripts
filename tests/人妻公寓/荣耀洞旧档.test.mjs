@@ -16,7 +16,7 @@ const require = createRequire(import.meta.url);
 require('ts-node/register/transpile-only');
 
 const { Schema } = require('../../src/人妻公寓/schema.ts');
-const { 使用荣耀洞, 规范荣耀洞上次时段 } = require('../../src/人妻公寓/脚本/游戏逻辑/荣耀洞.ts');
+const { 使用荣耀洞, 规范荣耀洞上次时段, 同一荣耀洞拍仍保留 } = require('../../src/人妻公寓/脚本/游戏逻辑/荣耀洞.ts');
 const 界面源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
 
 test('荣耀洞冷却起点会清理所有负值、非有限值和未来绝对时段戳', () => {
@@ -44,4 +44,40 @@ test('负值哨兵代表从未使用，绝对时段 0 不应被误判为冷却�
 test('荣耀洞界面与业务端共用同一时段水位归一函数', () => {
   assert.match(界面源, /import \{ 规范荣耀洞上次时段 \} from ['"]\.\.\/\.\.\/脚本\/游戏逻辑\/荣耀洞['"]/);
   assert.match(界面源, /const 记 = 规范荣耀洞上次时段\(系\._荣耀洞上次时段, 绝对时段\.value\)/);
+});
+
+test('荣耀洞空签生成失败后仍开放输入，允许重试同一空签而不重抽', () => {
+  const 输入门起 = 界面源.indexOf('const 可输入 = computed');
+  const 输入门止 = 界面源.indexOf("if (id === '302'", 输入门起);
+  assert.ok(输入门起 >= 0 && 输入门止 > 输入门起, '必须找到荣耀洞输入门');
+  const 输入门 = 界面源.slice(输入门起, 输入门止);
+  assert.match(输入门, /_荣耀洞拍 \?\? -1\) >= 0/, '只要荣耀洞仍在当前拍就必须允许输入重试');
+  assert.doesNotMatch(输入门, /_荣耀洞门牌 !== '空'/, '空签失败不能关闭唯一重试入口');
+});
+
+test('失败重试只认当前持久层仍是同一场同一拍的荣耀洞', () => {
+  const 基准 = Schema.parse({
+    系统: {
+      _荣耀洞门牌: '101',
+      _荣耀洞拍: 2,
+      _荣耀洞起时段: 18,
+      _荣耀洞点破: true,
+      _荣耀洞夫: true,
+    },
+  });
+  assert.equal(同一荣耀洞拍仍保留(structuredClone(基准), 基准), true, '补偿回本拍后允许提示重试');
+
+  for (const [字段, 值] of [
+    ['_荣耀洞拍', -1],
+    ['_荣耀洞拍', 3],
+    ['_荣耀洞起时段', 24],
+    ['_荣耀洞门牌', '102'],
+    ['_荣耀洞点破', false],
+    ['_荣耀洞夫', false],
+  ]) {
+    const 当前 = structuredClone(基准);
+    当前.系统[字段] = 值;
+    assert.equal(同一荣耀洞拍仍保留(当前, 基准), false, `${字段} 已变化时不得声称原拍仍保留`);
+  }
+  assert.equal(同一荣耀洞拍仍保留(null, 基准), false, '持久状态不可读时失败关闭');
 });

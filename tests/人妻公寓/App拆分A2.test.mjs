@@ -115,17 +115,23 @@ test('图库 state ownership：App 仅保留门牌开关与 open/close，阶段/
   assert.match(App源码, /:key="CG图库门牌"/, 'App 用门牌当 key 保证每次开不同角色都从头开始');
   assert.match(App源码, /@close="关闭CG图库"/, 'App 统一收组件 close');
 
-  assert.match(CG图库源码, /const 阶段 = ref<CG阶段>\('foreplay'\)/, '组件内阶段状态在组件');
+  assert.match(CG图库源码, /const 变体 = ref<CG变体>\('normal'\)/, '组件内普通/怀孕图库状态在组件');
+  assert.match(CG图库源码, /const 阶段 = ref<CG阶段>\('intro_no_contact'\)/, '组件内五阶段状态从亲密开场开始');
   assert.match(CG图库源码, /每页 = 15/, '组件内分页每页 15 保持');
   assert.match(CG图库源码, /const 预览 = ref<成人CG项 \| null>\(null\)/, '组件内大图预览在组件');
-  assert.match(CG图库源码, /Object\.keys\(阶段名\) as CG阶段\[\]/, '页签按固定三阶段迭代(unknown 无关)');
-  assert.match(CG图库源码, /unlocked\.has\(项\.id\)/, '未解锁判定在组件');
-  assert.match(CG图库源码, /v-if="unlocked\.has\(项\.id\)"/, '未解锁无 img');
+  assert.match(CG图库源码, /Object\.keys\(阶段名\) as CG阶段\[\]/, '页签按固定五阶段迭代(unknown 无关)');
+  assert.match(CG图库源码, /normal: '普通 CG'/, '图库保留普通 CG 顶层分类');
+  assert.match(CG图库源码, /pregnancy: '怀孕 CG'/, '图库预留怀孕 CG 顶层分类');
+  assert.match(CG图库源码, /CG项可查看\(props\.unlocked, 项\.id, CG全览模式\.value\)/, '未解锁与全览判定在组件');
+  assert.match(CG图库源码, /v-if="可查看CG\(项\)"/, '普通模式下未解锁无 img，全览模式下可以查看');
+  assert.match(CG图库源码, /@click="处理全览标题点击"/, '图库标题承接五连击入口');
+  assert.match(CG图库源码, /全览模式已开启/, '五连击成功应给出明确反馈');
   assert.match(CG图库源码, /Math\.min\(Math\.max\(页码\.value \+ 偏移, 1\), 总页数\.value\)/, '分页用纯 Math 逻辑');
   assert.match(CG图库源码, /from '\.\.\/assets'/, '组件从 ../assets 取素材');
 
-  // App 主舞台成人 CG 状态与加载流程不动
-  assert.match(App源码, /const 当前成人CG = ref<成人CG项 \| null>\(null\)/, '主舞台当前成人 CG 仍在');
+  // App 主舞台成人 CG 保留主图兼容读取，并将实际加载收敛为最多两槽
+  assert.match(App源码, /const 当前成人CG槽位 = ref<CG加载槽位<成人CG项>\[\]>\(\[\]\)/, '主舞台成人 CG 双槽状态仍在 App');
+  assert.match(App源码, /const 当前成人CG = computed/, '主图兼容读取仍在');
   assert.match(App源码, /const 当前成人CG地址 = computed/, '主舞台当前成人 CG 地址仍在');
   assert.match(App源码, /const 已解锁CG = ref<Set<string>>/, 'App 保留解锁集合');
   assert.match(App源码, /成人CG本次失效/, 'App 主舞台临时坏图集合仍在');

@@ -14,6 +14,12 @@ import { 查金币 } from '../../../脚本/游戏逻辑/经济系统';
 import { 列出地点管理任务, 管理任务选项 } from '../../../脚本/游戏逻辑/管理任务系统';
 import { 列出阶段线路候选详情, type 阶段线路候选 } from '../../../脚本/游戏逻辑/阶段线路系统';
 import { 玩家当前日 } from '../../../脚本/游戏逻辑/玩家资源系统';
+import { 阶段性癖可开启 } from '../../../脚本/游戏逻辑/阶段性癖状态';
+import {
+  家庭计划地点动作,
+  type 家庭计划地点动作ID,
+} from '../../../脚本/游戏逻辑/家庭计划系统';
+import { 生产地点动作, type 生产地点动作ID } from '../../../脚本/游戏逻辑/生产系统';
 import type { 卡动作, 客户端时间方式 } from '../types';
 
 /** 业务事件回调：App 在回调内保留原事件名与载荷，本模块不直连事件总线。 */
@@ -26,6 +32,9 @@ export interface 房间动作事件 {
   荣耀洞: () => void;
   捡金币: (房间id: string) => void;
   处理管理任务: (载荷: { 任务id: string; 选项id: string; 地点: string }) => void;
+  开启阶段性癖: (门牌号: 门牌) => void;
+  家庭计划动作: (动作: 家庭计划地点动作ID) => void;
+  生产动作: (载荷: { 门牌: 门牌; 动作: 生产地点动作ID; 预期绝对时段: number }) => void;
 }
 
 export interface 房间动作选项 {
@@ -121,6 +130,8 @@ export function useRoomActions(options: 房间动作选项) {
     const 房 = 查房间(id);
     const 动作: 卡动作[] = [];
     添加管理任务动作(动作, id);
+    添加家庭计划动作(动作, id);
+    添加生产动作(动作, id);
 
     if (id === '公寓外部') {
       if (当前房间.value !== id) {
@@ -457,6 +468,37 @@ export function useRoomActions(options: 房间动作选项) {
     }
   }
 
+  /** 家庭计划是实地五日流程；地图房卡只负责导航，到达后才展示可推进瓷砖。 */
+  function 添加家庭计划动作(动作: 卡动作[], 地点: string): void {
+    if (当前房间.value !== 地点) return;
+    for (const 候选 of 家庭计划地点动作(data.value, 地点)) {
+      动作.push({
+        kicker: 候选.kicker,
+        icon: 候选.icon,
+        文案: 候选.文案,
+        做: () => {
+          if (发送中.value || 当前房间.value !== 地点) return;
+          事件.家庭计划动作(候选.id);
+        },
+      });
+    }
+  }
+
+  function 添加生产动作(动作: 卡动作[], 地点: string): void {
+    if (当前房间.value !== 地点) return;
+    for (const 候选 of 生产地点动作(data.value, 地点)) {
+      动作.push({
+        kicker: 候选.kicker,
+        icon: 候选.icon,
+        文案: 候选.文案,
+        做: () => {
+          if (发送中.value || 当前房间.value !== 地点) return;
+          事件.生产动作({ 门牌: 候选.门牌, 动作: 候选.id, 预期绝对时段: 绝对时段.value });
+        },
+      });
+    }
+  }
+
   function 添加地点线路动作(动作: 卡动作[], 地点: string): void {
     const 户门牌 = 门牌列表.includes(地点 as 门牌) ? (地点 as 门牌) : undefined;
     const 候选们 = 列出阶段线路候选详情(data.value, {
@@ -478,6 +520,18 @@ export function useRoomActions(options: 房间动作选项) {
           if (当前房间.value === 地点) 启动阶段线路剧情(地点, 候选);
           else await 进入(地点);
         },
+      });
+    }
+    if (
+      当前房间.value === 地点 &&
+      (地点 === '302' || 地点 === '厨房') &&
+      阶段性癖可开启(data.value, '302')
+    ) {
+      动作.push({
+        kicker: 'STORY',
+        icon: 'favor',
+        文案: '开启「哺育主题」剧情',
+        做: () => 事件.开启阶段性癖('302'),
       });
     }
   }

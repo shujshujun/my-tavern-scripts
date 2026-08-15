@@ -9,6 +9,7 @@ import { 取会场私聊摘要提示 } from './手机系统';
 import { 登记脚本正增长候选 } from './冷落系统';
 import { 事件角色标记 } from './snapshotSystem';
 import { 特殊场景启动亲密门 } from './特殊场景策略';
+import { 读取医院内容策略 } from './生产系统';
 
 type 特殊场景状态 = SchemaType['系统']['_特殊场景'];
 
@@ -82,7 +83,12 @@ function 规范静音会议妻名单(原值: unknown): 静音会议候选门牌[
 export function 静音会议合资格妻(data: SchemaType): 静音会议候选门牌[] {
   return 静音会议候选门牌顺序.filter(门牌号 => {
     const 妻 = data.户[门牌号]?.妻;
-    return !!妻 && 妻.当前阶段 >= 4 && 妻.特殊.some(项 => 项.includes('遥控跳蛋'));
+    return (
+      !!妻 &&
+      妻.当前阶段 >= 4 &&
+      妻.特殊.some(项 => 项.includes('遥控跳蛋')) &&
+      读取医院内容策略(data, 门牌号).允许成人特殊场景
+    );
   });
 }
 
@@ -460,6 +466,9 @@ export function 开始录像带首送(data: SchemaType, 门牌号: '102' | '202'
   const 键 = 录像带前置键(门牌号);
   const 亲密阻断 = 特殊场景启动亲密门(data);
   if (亲密阻断) return { 成功: false, 提示: 亲密阻断 };
+  if (!读取医院内容策略(data, 门牌号).允许成人特殊场景) {
+    return { 成功: false, 提示: `${户静态表[门牌号].妻名}正在医院待产或恢复，这段前置暂时不能开始。` };
+  }
   // 正戏要求两位都到 L4(stageConfig 录像带前置),首送是同一条链的第一环:让低阶段的她
   // 答应给丈夫戴贞操带并交钥匙,人设上不成立,也会提前泄露正戏(2026-08-03 审计 L3)
   if ((data.户[门牌号]?.妻.当前阶段 ?? 0) < 4) {
@@ -483,6 +492,10 @@ export function 开始录像带首送(data: SchemaType, 门牌号: '102' | '202'
 export function 启动录像带(data: SchemaType, 楼层: number): { 成功: boolean; 提示: string } {
   const 亲密阻断 = 特殊场景启动亲密门(data);
   if (亲密阻断) return { 成功: false, 提示: 亲密阻断 };
+  const 住院妻 = (['102', '202'] as const).find(门牌号 => !读取医院内容策略(data, 门牌号).允许成人特殊场景);
+  if (住院妻) {
+    return { 成功: false, 提示: `${户静态表[住院妻].妻名}正在医院待产或恢复，录像带剧情暂时顺延。` };
+  }
   if (!特殊场景空闲(data)) return { 成功: false, 提示: '眼下已有一场特殊事件正在进行。' };
   if (data.系统._待发送事件) return { 成功: false, 提示: '眼下还有一段剧情没有演完。' };
   if ((data.户['102']?.妻.当前阶段 ?? 0) < 4 || (data.户['202']?.妻.当前阶段 ?? 0) < 4) {

@@ -27,6 +27,7 @@ import { 会话有未读, 玩家名, 写实时手机已读, 邀约节拍键 } fr
 import { 请求刷新手机红点 } from '../../UI刷新';
 import { 取渲染业务端口 } from './业务端口';
 import { 渲染头, type 渲染上下文 } from './共享';
+import { 取聊天显示页, 手机聊天每页条数 } from './分页';
 
 /** 单聊/群聊页：时间线过滤、气泡左右/撤回墓碑、长按撤回、图片/通话类型、
  *  草稿与焦点恢复、绿黄红灯、取消/立即发送、输入状态 interval/渲染世代护栏、邀约 + 菜单与会议硬门。 */
@@ -79,8 +80,25 @@ export function 渲染chat(上下文: 渲染上下文): void {
           ? '群'
           : (户静态表[会话 as 门牌]?.妻名 ?? 会话);
   let 上时间组 = '';
+  const 会话消息: Array<{ m: (typeof 库.消息)[number]; 消息索引: number }> = [];
   for (const [消息索引, m] of 库.消息.entries()) {
-    if (m.会话 !== 会话 || !在当前时间线(m)) continue;
+    if (m.会话 === 会话 && 在当前时间线(m)) 会话消息.push({ m, 消息索引 });
+  }
+  const 消息页 = 取聊天显示页(会话消息, 当前页.展开);
+  if (消息页.有更早) {
+    const 更早 = el('button', 'rqp-more', '查看更早消息');
+    更早.addEventListener('click', () => {
+      const 底距 = Math.max(0, 体.scrollHeight - 体.scrollTop);
+      上下文.写入当前页({
+        ...上下文.读取当前页(),
+        展开: 消息页.已加载 + 手机聊天每页条数,
+        底距,
+      });
+      上下文.重绘();
+    });
+    泡区.appendChild(更早);
+  }
+  for (const { 消息索引, m } of 消息页.条目) {
     const 时间组 = 手机消息时间组键(m.楼, m.时);
     if (时间组 !== 上时间组) {
       泡区.appendChild(el('div', 'rqp-b sys', 手机记录时间字(m.时)));
@@ -299,7 +317,14 @@ export function 渲染chat(上下文: 渲染上下文): void {
       屏.appendChild(面);
     }
   }
-  体.scrollTop = 体.scrollHeight;
+  if (typeof 当前页.底距 === 'number' && Number.isFinite(当前页.底距) && 当前页.底距 >= 0) {
+    体.scrollTop = Math.max(0, 体.scrollHeight - 当前页.底距);
+    const 页面 = { ...上下文.读取当前页() };
+    delete 页面.底距;
+    上下文.写入当前页(页面);
+  } else {
+    体.scrollTop = 体.scrollHeight;
+  }
   // v0.80 已读所有权回渲染层：只有手机仍开着、当前页仍是本会话且确有未读时，
   // 才异步确认已读并只刷新红点（不重绘，避免 渲染→已读写→重绘 无限循环）。
   // 从关闭状态重开并直接停留在本 chat 页也会在此确认已读；关闭、切联系人、

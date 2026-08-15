@@ -27,7 +27,14 @@ require.cache[数据库桥路径] = {
 };
 
 const { Schema, 创建户节点 } = require('../../src/人妻公寓/schema.ts');
-const { 查裂缝, 是母亲破墙服饰, 特殊场景表, 特殊场景锁定状态 } = require('../../src/人妻公寓/stageConfig.ts');
+const {
+  查裂缝,
+  是母亲破墙服饰,
+  道具表,
+  特殊场景表,
+  特殊场景占位ID列表,
+  特殊场景锁定状态,
+} = require('../../src/人妻公寓/stageConfig.ts');
 const { 取货架, 购买, 送礼 } = require('../../src/人妻公寓/脚本/游戏逻辑/商店系统.ts');
 const { 请求晋阶 } = require('../../src/人妻公寓/脚本/游戏逻辑/结算系统.ts');
 const { 等待晋阶镜像写入 } = require('../../src/人妻公寓/脚本/游戏逻辑/守护系统.ts');
@@ -49,25 +56,63 @@ test.beforeEach(() => {
   chatVars = {};
 });
 
-test('特殊场景页签展示全部九场，未满足前置时保留锁定原因且后端拒绝购买', () => {
+test('特殊剧情货架保留录像带、静音会议、肉偿账本，另外六场改为只读待设计占位', () => {
   const data = 建数据('101', '102', '201', '202', '301', '302');
   data.户['101'].妻.当前阶段 = 3;
   const 场景页 = 取货架(data).find(页 => 页.页签 === '特殊场景');
   const 九场 = Object.keys(特殊场景表);
+  const 保持现状 = ['录像带', '静音会议', '肉偿账本'];
 
   assert.ok(场景页);
+  assert.equal(九场.length, 9);
   assert.deepEqual(九场.filter(id => 场景页.商品.some(商品 => 商品.id === id)).sort(), [...九场].sort());
-  for (const id of 九场) {
-    const 状态 = 特殊场景锁定状态(data, id);
-    assert.equal(状态.已解锁, false, `${id} 在空前置存档中不应误解锁`);
-    assert.ok(状态.缺少.length > 0, `${id} 必须明确告诉玩家缺什么`);
+  assert.deepEqual([...特殊场景占位ID列表].sort(), ['大扫除日', '部位评比', '合拍', '家宴', '制服夜巡', '衣柜'].sort());
+
+  for (const id of 保持现状) {
+    const 配 = 特殊场景表[id];
+    assert.notEqual(配.待设计, true, `${id} 必须保持现状`);
+    assert.ok(配.价格 > 0, `${id} 必须保留原价`);
+    assert.ok(配.剧情, `${id} 必须保留现有剧情`);
+    assert.equal(道具表[id].特殊剧情占位, undefined);
   }
 
-  const 购买前现金 = data.现金;
-  const result = 购买(data, '大扫除日');
-  assert.equal(result.成功, false);
-  assert.match(result.提示, /还需|缺少|L4|沉沦/);
-  assert.equal(data.现金, 购买前现金);
+  for (const id of 特殊场景占位ID列表) {
+    const 配 = 特殊场景表[id];
+    assert.equal(配.待设计, true, `${id} 必须是待设计占位`);
+    assert.equal(配.价格, 0);
+    assert.equal(配.前置(data), false);
+    assert.deepEqual(配.参与(data), []);
+    assert.equal(配.剧情, '');
+    assert.equal(配.启动, undefined);
+    assert.equal(配.允许时段, undefined);
+    assert.equal(配.接入主线, undefined);
+    assert.equal(配.结算, undefined);
+    assert.equal(道具表[id].特殊剧情占位, true);
+
+    const 状态 = 特殊场景锁定状态(data, id);
+    assert.deepEqual(状态, { 已解锁: false, 缺少: ['特殊剧情正在重新设计'] });
+
+    const 原样 = structuredClone(data);
+    const result = 购买(data, id);
+    assert.equal(result.成功, false);
+    assert.match(result.提示, /设计待完成.*不会扣款、入包或启动剧情/);
+    assert.deepEqual(data, 原样, `${id} 占位购买不得产生任何变量副作用`);
+  }
+});
+
+test('肉偿账本保持原价、原结算与阶段线路接线所需完成标记', () => {
+  const data = 建数据('201');
+  data.户['201'].妻.当前阶段 = 4;
+  data.户['201']._欠租笔数 = 1;
+  const 原现金 = data.现金;
+
+  const result = 购买(data, '肉偿账本');
+
+  assert.equal(result.成功, true);
+  assert.equal(data.现金, 原现金 - 800);
+  assert.equal(data.户['201']._欠租笔数, 0);
+  assert.equal(data.系统._已完成特殊场景.includes('肉偿账本'), true);
+  assert.match(data.系统._待发送事件, /特殊场景·肉偿账本/);
 });
 
 test('母亲破墙礼物只追加自己的正戏，不覆盖已经排队的事件', async () => {

@@ -36,7 +36,7 @@ test('组件非空；App 真实 import Latin-first 别名并常驻渲染；组�
   assert.ok(!依赖.some(s => s.includes('store')), '组件不得导入 store');
 });
 
-test('App 不再内联档案卡大模板与九组档案派生状态；跨区块状态与业务动作仍留 App', () => {
+test('App 不再内联档案卡大模板与档案派生状态；仍在使用的跨区块业务动作留 App', () => {
   const 模板段 = 提取模板(App源码);
   assert.doesNotMatch(模板段, /class="sheet dossier"/, 'App 不应再内联档案卡大模板');
   for (const 声明 of [
@@ -60,7 +60,7 @@ test('App 不再内联档案卡大模板与九组档案派生状态；跨区块�
   assert.match(App源码, /function 关闭CG图库/, '关闭CG图库仍留 App');
   assert.match(App源码, /function 开口要钱/, '开口要钱仍留 App');
   assert.match(App源码, /function 晋阶\(/, '晋阶仍留 App');
-  assert.match(App源码, /function 卸载\(/, '卸载仍留 App');
+  assert.doesNotMatch(App源码, /function 卸载\(/, '下线的性癖卸载不应残留 App');
   assert.match(App源码, /const 裂缝证物槽 = computed/, '裂缝证物槽仍留 App');
   assert.match(App源码, /:evidence-slots="裂缝证物槽"/, '证物槽同时传档案与读信');
   assert.match(App源码, /const 已解锁CG = ref<Set<string>>/, '已解锁CG仍留 App');
@@ -90,8 +90,8 @@ test('组件拥有完整派生 imports/逻辑；App 仅档案 imports 移除但�
   );
   assert.match(
     档案卡源码,
-    /import \{ CG条目, 角色CG总数 \} from '\.\.\/\.\.\/\.\.\/脚本\/游戏逻辑\/成人CG系统'/,
-    '组件应从成人CG系统导入 CG条目/角色CG总数',
+    /import \{ CG条目, 角色CG总数全部变体 \} from '\.\.\/\.\.\/\.\.\/脚本\/游戏逻辑\/成人CG系统'/,
+    '组件应从成人CG系统导入 CG条目/跨变体总数',
   );
   assert.match(
     档案卡源码,
@@ -150,7 +150,7 @@ test('组件拥有完整派生 imports/逻辑；App 仅档案 imports 移除但�
     /已解锁: \[\.\.\.props\.unlockedCg\]\.filter\(id => CG条目\(id\)\?\.door === m\)\.length/,
     'CG 已解锁按门牌过滤',
   );
-  assert.match(档案卡源码, /总数: 角色CG总数\(m\)/, 'CG 总数');
+  assert.match(档案卡源码, /总数: 角色CG总数全部变体\(m\)/, 'CG 总数跨普通与怀孕图库合计');
   assert.match(档案卡源码, /可晋阶\(props\.data\.户\[m\]\.妻\)/, '可晋阶逻辑');
   assert.match(
     档案卡源码,
@@ -183,7 +183,7 @@ test('props/emits 与 App 接线完整；close/三类图片 error/CG/卸载/晋�
   const 模板段 = 提取模板(App源码);
   assert.match(
     模板段,
-    /<DossierPopup\b[\s\S]*?:door="选中门牌"[\s\S]*?:data="data"[\s\S]*?:ready="就绪"[\s\S]*?:current-room="当前房间"[\s\S]*?:absolute-period="绝对时段"[\s\S]*?:unlocked-cg="已解锁CG"[\s\S]*?:sending="发送中"[\s\S]*?:wife-nearby="选中门牌 \? 妻在玩家身边\(选中门牌\) : false"[\s\S]*?:evidence-slots="裂缝证物槽"[\s\S]*?:avatar-failed="头像失效"[\s\S]*?:portrait-failed="立绘失效"[\s\S]*?:item-failed="道具图失效"[\s\S]*?:avatar-image="头像图"[\s\S]*?:item-image="道具图"[\s\S]*?@close="选中门牌 = null"[\s\S]*?@avatar-error="头像失效\[\$event\] = true"[\s\S]*?@portrait-error="立绘失效\[\$event\] = true"[\s\S]*?@item-error="道具图失效\[\$event\] = true"[\s\S]*?@open-cg="打开CG图库"[\s\S]*?@unload="卸载"[\s\S]*?@advance="晋阶"[\s\S]*?@ask-money="开口要钱"[\s\S]*?\/>/,
+    /<DossierPopup\b[\s\S]*?:door="选中门牌"[\s\S]*?:data="data"[\s\S]*?:ready="就绪"[\s\S]*?:current-room="当前房间"[\s\S]*?:absolute-period="绝对时段"[\s\S]*?:unlocked-cg="已解锁CG"[\s\S]*?:sending="发送中"[\s\S]*?:wife-nearby="选中门牌 \? 妻在玩家身边\(选中门牌\) : false"[\s\S]*?:evidence-slots="裂缝证物槽"[\s\S]*?:avatar-failed="头像失效"[\s\S]*?:portrait-failed="立绘失效"[\s\S]*?:item-failed="道具图失效"[\s\S]*?:avatar-image="头像图"[\s\S]*?:item-image="道具图"[\s\S]*?@close="选中门牌 = null"[\s\S]*?@avatar-error="头像失效\[\$event\] = true"[\s\S]*?@portrait-error="立绘失效\[\$event\] = true"[\s\S]*?@item-error="道具图失效\[\$event\] = true"[\s\S]*?@open-cg="打开CG图库"[\s\S]*?@advance="晋阶"[\s\S]*?@ask-money="开口要钱"[\s\S]*?\/>/,
     '档案 tag 全部 props/emits 接线',
   );
   assert.match(
@@ -193,7 +193,7 @@ test('props/emits 与 App 接线完整；close/三类图片 error/CG/卸载/晋�
   );
   assert.match(
     档案卡源码,
-    /defineEmits<\{[\s\S]*?close: \[\][\s\S]*?avatarError: \[name: string\][\s\S]*?portraitError: \[url: string\][\s\S]*?itemError: \[id: string\][\s\S]*?openCg: \[door: 门牌\][\s\S]*?unload: \[door: 门牌, kinkId: string\][\s\S]*?advance: \[door: 门牌\][\s\S]*?askMoney: \[door: 门牌\][\s\S]*?\}>/,
+    /defineEmits<\{[\s\S]*?close: \[\][\s\S]*?avatarError: \[name: string\][\s\S]*?portraitError: \[url: string\][\s\S]*?itemError: \[id: string\][\s\S]*?openCg: \[door: 门牌\][\s\S]*?advance: \[door: 门牌\][\s\S]*?askMoney: \[door: 门牌\][\s\S]*?\}>/,
     '组件 emits 强类型契约',
   );
   assert.doesNotMatch(档案卡源码, /eventEmit\(|eventOn\(/, '组件不含事件总线写入');
@@ -208,7 +208,7 @@ test('props/emits 与 App 接线完整；close/三类图片 error/CG/卸载/晋�
   assert.match(档案卡源码, /@error="emit\('portraitError', 选中档案\.立绘图\)"/, '立绘失败 emit 立绘图');
   assert.match(档案卡源码, /@error="emit\('itemError', a\.图id\)"/, '道具图失败 emit 图id');
   assert.match(档案卡源码, /@click\.stop="emit\('openCg', 选中档案\.门牌\)"/, 'CG 按钮 emit 门牌');
-  assert.match(档案卡源码, /@click="emit\('unload', 选中档案\.门牌, k\.id\)"/, '卸载 emit 门牌+性癖id');
+  assert.doesNotMatch(档案卡源码, /unload|卸载|曾开发/, '档案不再提供旧性癖装卸入口');
   assert.match(档案卡源码, /@click="emit\('advance', 选中档案\.门牌\)"/, '晋阶 emit 门牌');
   assert.match(档案卡源码, /@click="emit\('askMoney', 选中档案\.门牌\)"/, '要钱 emit 门牌');
 });
@@ -247,15 +247,9 @@ test('档案模板关键契约全量保持：头像/立绘/三轴/心镜/仪容/
   assert.match(模板段, /<div v-if="选中档案\.妻\.当前阶段 >= 3" class="dev-grid">/, '身体开发数值仍从阶段3才显示');
   assert.match(模板段, /v-for="部位 in 选中档案\.开发"[\s\S]*?:key="部位\.名"/, '开发四部位循环');
   assert.match(模板段, /class="bar dev"[\s\S]*?:style="\{ width: 部位\.值 \+ '%' \}"/, '开发进度条');
-  assert.match(
-    模板段,
-    /v-if="选中档案\.妻\.当前阶段 >= 4 && \(选中档案\.性癖装载\.length \|\| 选中档案\.曾开发\.length\)"/,
-    '性癖阶段门',
-  );
-  assert.match(模板段, /性 癖\(\{\{ 选中档案\.性癖装载\.length \}\}\/3\)/, '性癖槽文案');
-  assert.match(模板段, /title="卸下\(她的身体不会忘\)"/, '卸载 title');
-  assert.match(模板段, /:disabled="sending"/, '卸载发送中禁用');
-  assert.match(模板段, /class="kink-chip was"[\s\S]*?title="曾开发过——重装免开幕,直接生效"/, '曾开发 chip');
+  assert.match(模板段, /v-if="选中档案\.阶段性癖"/, '阶段性癖完成后才显示');
+  assert.match(模板段, /阶 段 性 癖/, '阶段性癖只读标题');
+  assert.match(模板段, /class="kink-chip on">\{\{ 选中档案\.阶段性癖 \}\}/, '阶段性癖只读芯片');
   assert.match(模板段, /她 的 丈 夫/, '丈夫区块标题');
   assert.match(模板段, /v-if="!avatarFailed\['影子'\]"/, '丈夫头像失败门');
   assert.match(模板段, /:src="avatarImage\('影子'\)"/, '丈夫头像图');
@@ -350,8 +344,6 @@ test('档案专属 CSS 已从 App 移到组件；基础 popup scoped 引入；av
     '.axis-num {',
     '.kink-row {',
     '.kink-chip {',
-    '.kink-chip.was {',
-    '.kink-off {',
     '.hb-row {',
     '.avatar-glyph.hb {',
     '.hb-main {',

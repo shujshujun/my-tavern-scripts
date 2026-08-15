@@ -1,6 +1,10 @@
 import 数据库模板文本 from '../../人妻公寓数据库模板.json?raw';
 import { 提取数据库脚本版本 } from './数据库版本';
-import { 数据库时间线栅栏, type 数据库时间线持久状态 } from './数据库时间线栅栏';
+import {
+  数据库异步写栅栏,
+  数据库时间线栅栏,
+  type 数据库时间线持久状态,
+} from './数据库时间线栅栏';
 import { 全局数据库AI租约 } from './数据库AI租约';
 import { 胶囊预算选择 } from './胶囊预算';
 
@@ -470,6 +474,58 @@ function SQL写入已确认(result: SQL写入结果 | null): boolean {
   return Number(result.changes) >= 1;
 }
 
+interface SQLite失效补偿 {
+  描述: string;
+  执行: (api: 数据库API) => Promise<boolean>;
+}
+
+/**
+ * 在发起 UPSERT 前同步捕获唯一业务键的旧行。旧 SQL 若跨回档迟到，只能精确恢复这份
+ * before-image；查不到旧行则删除迟到插入。无法证明旧行时不猜测补偿，交给时间线栅栏
+ * 失败关闭，避免误删原分支中本来就存在的记录。
+ */
+function 构造SQLite唯一行失效补偿(参数: {
+  描述: string;
+  查询SQL: string;
+  查询参数: unknown[];
+  删除SQL: string;
+  恢复SQL: string;
+  恢复列: readonly string[];
+}): SQLite失效补偿 | null {
+  const 快照 = 执行SQLite查询(参数.查询SQL, 参数.查询参数, 1);
+  if (!快照) return null;
+  const rows = SQL结果对象行(快照);
+  if (rows === null) return null;
+  const 旧行 = rows[0] ? { ...rows[0] } : null;
+  return {
+    描述: 参数.描述,
+    执行: async api => {
+      if (取数据库API() !== api || typeof api.executeSqlMutation !== 'function') return false;
+      const sql = 旧行 ? 参数.恢复SQL : 参数.删除SQL;
+      const sql参数 = 旧行 ? 参数.恢复列.map(column => 旧行[column] ?? null) : 参数.查询参数;
+      try {
+        await Promise.resolve(api.executeSqlMutation(sql, sql参数));
+      } catch {
+        // mutation 可能已在插件内部提交后才抛错，下面仍以回读结果作为唯一判据。
+      }
+      if (取数据库API() !== api) return false;
+      const 核对 = 执行SQLite查询(参数.查询SQL, 参数.查询参数, 1);
+      if (!核对) return false;
+      const 核对行 = SQL结果对象行(核对);
+      if (核对行 === null) return false;
+      if (!旧行) return 核对行.length === 0;
+      const 当前 = 核对行[0];
+      if (!当前) return false;
+      return 参数.恢复列.every(column => {
+        const expected = 旧行[column];
+        const actual = 当前[column];
+        if (expected === null || expected === undefined || actual === null || actual === undefined) return expected == actual;
+        return typeof expected === 'number' ? Number(actual) === expected : String(actual) === String(expected);
+      });
+    },
+  };
+}
+
 type SQLite写入状态 = '未调用' | '已取消' | '已确认' | '已提交待定' | '需核对';
 
 async function 执行SQLite写入(
@@ -477,18 +533,50 @@ async function 执行SQLite写入(
   params: unknown[],
   预期聊天标识: string,
   额外提交校验: () => boolean = () => true,
+  失效补偿: SQLite失效补偿 | null = null,
 ): Promise<SQLite写入状态> {
   const api = 取数据库API();
-  if (!预期聊天标识 || !仍是同一聊天(预期聊天标识) || !额外提交校验()) return '已取消';
+  const 写租约 = 数据库异步写.捕获(预期聊天标识);
+  const 提交仍有效 = () =>
+    仍是同一聊天(预期聊天标识) &&
+    取数据库API() === api &&
+    额外提交校验() &&
+    数据库异步写.可提交(写租约) &&
+    数据库时间线允许新写(预期聊天标识);
+  if (!预期聊天标识 || !提交仍有效()) return '已取消';
   if (typeof api?.executeSqlMutation !== 'function' || !(await 探测数据库SQLite模式())) return '未调用';
   // SQLite 能力探测包含异步等待；真正提交 mutation 前必须重新核对聊天与 API 实例。
-  if (!仍是同一聊天(预期聊天标识) || 取数据库API() !== api || !额外提交校验()) return '已取消';
-  let mutation: Promise<SQL写入结果 | null>;
+  if (!提交仍有效()) return '已取消';
+  let 原mutation: Promise<SQL写入结果 | null>;
   try {
-    mutation = Promise.resolve(api.executeSqlMutation(sql, params));
+    原mutation = Promise.resolve(api.executeSqlMutation(sql, params));
   } catch {
     return '需核对';
   }
+  const mutation = 数据库异步写.登记(
+    写租约,
+    原mutation.then(
+      async result => {
+        if (!提交仍有效() && 仍是同一聊天(预期聊天标识)) {
+          const 已补偿 = (await 失效补偿?.执行(api)) === true;
+          if (!已补偿) {
+            数据库未补偿迟到写.add(预期聊天标识);
+            console.error(
+              `[人妻公寓·数据库] 旧时间线 SQL 已迟到结算，但${失效补偿?.描述 ?? '缺少可靠旧行'}补偿失败；数据库读取保持关闭。`,
+            );
+          }
+        }
+        return result;
+      },
+      async error => {
+        if (!提交仍有效() && 仍是同一聊天(预期聊天标识)) {
+          const 已补偿 = (await 失效补偿?.执行(api)) === true;
+          if (!已补偿) 数据库未补偿迟到写.add(预期聊天标识);
+        }
+        throw error;
+      },
+    ),
+  );
   let timer: ReturnType<typeof setTimeout> | undefined;
   const settled = await Promise.race([
     mutation.then(
@@ -505,7 +593,7 @@ async function 执行SQLite写入(
     // 不能只留一条告警就丢数据——现有调用方的 SQL 全是按主键 upsert(幂等)，且重试只在
     // 原 mutation 结算之后串行发起，不存在双写窗口；补一次仍失败才放弃(2026-08-03 审计 M6)。
     const 后台补写一次 = async (原因: string): Promise<void> => {
-      if (!仍是同一聊天(预期聊天标识) || 取数据库API() !== api || !额外提交校验()) {
+      if (!提交仍有效()) {
         console.warn(`[人妻公寓·数据库] SQLite后台写入${原因}，且时间线已变化，放弃补写。`);
         return;
       }
@@ -527,6 +615,7 @@ async function 执行SQLite写入(
     );
     return '已提交待定';
   }
+  if (!提交仍有效()) return '已取消';
   return settled.kind === 'done' ? (SQL写入已确认(settled.result) ? '已确认' : '需核对') : '需核对';
 }
 
@@ -629,12 +718,25 @@ try {
 时间线宿主.清理接线 = undefined;
 
 const 时间线栅栏 = new 数据库时间线栅栏();
+const 数据库异步写 = new 数据库异步写栅栏();
+/** 同聊天迟到 SQL 无法精确补偿时保持失败关闭；刷新脚本后仍会由持久时间线栅栏重新复验。 */
+const 数据库未补偿迟到写 = new Set<string>();
 const 时间线恢复任务 = new Map<string, { 令牌: string; promise: Promise<boolean> }>();
 const 时间线重试计时器 = new Map<string, ReturnType<typeof setTimeout>>();
 const 时间线重试间隔 = new Map<string, number>();
 const 时间线事件停止器: (() => void)[] = [];
 let 时间线回调API: 数据库API | null = null;
 let 时间线接线已清理 = false;
+
+function 数据库时间线允许新写(聊天标识: string): boolean {
+  return (
+    !!聊天标识 &&
+    !数据库未补偿迟到写.has(聊天标识) &&
+    数据库异步写.可开始新写(聊天标识) &&
+    !读取持久时间线状态(聊天标识) &&
+    时间线栅栏.可读取(聊天标识)
+  );
+}
 
 function 更新当前聊天驻留(): string {
   const id = 当前聊天标识();
@@ -741,6 +843,13 @@ async function 执行数据库时间线恢复(聊天标识: string, 令牌: stri
     if (!state?.待重建) {
       清除持久时间线状态(聊天标识, 令牌);
       return true;
+    }
+
+    // 玩家可能在脚本 SQL 已发出、数据库插件尚未持久化时删楼。必须等旧 mutation 以及
+    // before-image 补偿一起结束后再采样；否则会先把栅栏打开，迟到写随后落到存活楼。
+    if (数据库异步写.有已作废写入(聊天标识) || 数据库未补偿迟到写.has(聊天标识)) {
+      await new Promise<void>(resolve => setTimeout(resolve, 160));
+      continue;
     }
 
     const now = Date.now();
@@ -856,6 +965,8 @@ export function 标记数据库时间线将变更(目标楼层: number | null, �
   if (!数据库状态().已装游戏模板) return;
   const 聊天标识 = 更新当前聊天驻留();
   if (!聊天标识) return;
+  // 必须在任何删楼 await 之前同步推进；已经起跑的脚本 SQL 从这一拍开始只允许结算后补偿。
+  数据库异步写.作废(聊天标识);
   const 冻结楼层 = Number.isInteger(目标楼层) && Number(目标楼层) >= 0 ? Number(目标楼层) : 当前末楼();
   if (冻结楼层 === null) return;
   确保数据库时间线回调();
@@ -872,7 +983,9 @@ export function 标记数据库时间线将变更(目标楼层: number | null, �
 export async function 等待数据库时间线就绪(最长等待毫秒 = 3500): Promise<boolean> {
   const 聊天标识 = 更新当前聊天驻留();
   const persisted = 读取持久时间线状态(聊天标识);
-  if (!persisted) return true;
+  if (!persisted) {
+    return 数据库异步写.可开始新写(聊天标识) && !数据库未补偿迟到写.has(聊天标识);
+  }
   确保数据库时间线回调();
   const 已就绪 = await 启动数据库时间线恢复(聊天标识, 最长等待毫秒);
   if (!仍是同一聊天(聊天标识)) return false;
@@ -1317,8 +1430,11 @@ export async function 同步数据库回合(
       结果摘要: 规范事件摘要(event.结果摘要, event.玩家行动),
       事件编码: `RQ-${event.楼层}`,
     };
-    const SQL写入状态 = await 执行SQLite写入(
-      `INSERT INTO rq_events
+    const 查询SQL = `SELECT floor_no, time_text, location, participants, player_action, result_summary, event_code
+           FROM rq_events
+          WHERE floor_no = ?
+          LIMIT 1`;
+    const upsertSQL = `INSERT INTO rq_events
         (floor_no, time_text, location, participants, player_action, result_summary, event_code)
        VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(floor_no) DO UPDATE SET
@@ -1327,10 +1443,21 @@ export async function 同步数据库回合(
          participants = excluded.participants,
          player_action = excluded.player_action,
          result_summary = excluded.result_summary,
-          event_code = excluded.event_code`,
+         event_code = excluded.event_code`;
+    const 失效补偿 = 构造SQLite唯一行失效补偿({
+      描述: `回合事件 ${data.事件编码} 的旧行`,
+      查询SQL,
+      查询参数: [data.楼层],
+      删除SQL: 'DELETE FROM rq_events WHERE floor_no = ?',
+      恢复SQL: upsertSQL,
+      恢复列: ['floor_no', 'time_text', 'location', 'participants', 'player_action', 'result_summary', 'event_code'],
+    });
+    const SQL写入状态 = await 执行SQLite写入(
+      upsertSQL,
       [data.楼层, data.时间, data.地点, data.参与者, data.玩家行动, data.结果摘要, data.事件编码],
       聊天标识,
       额外提交校验,
+      失效补偿,
     );
     if (!仍是同一聊天(聊天标识) || !额外提交校验()) return false;
     if (SQL写入状态 === '已确认' || SQL写入状态 === '已提交待定') return true;
@@ -1338,10 +1465,7 @@ export async function 同步数据库回合(
       SQL写入状态 === '需核对' &&
       额外提交校验() &&
       核对SQLite记录(
-        `SELECT floor_no, time_text, location, participants, player_action, result_summary, event_code
-           FROM rq_events
-          WHERE floor_no = ?
-          LIMIT 1`,
+        查询SQL,
         [data.楼层],
         {
           floor_no: data.楼层,
@@ -1394,8 +1518,11 @@ export async function 同步社交轨迹(条目: 社交轨迹条目, 额外提�
       事件键: 条目.事件键,
     };
     if (!额外提交校验()) return false;
-    const SQL写入状态 = await 执行SQLite写入(
-      `INSERT INTO rq_social_history
+    const 查询SQL = `SELECT event_type, character_name, event_text, result, last_floor, event_key
+           FROM rq_social_history
+          WHERE event_key = ?
+          LIMIT 1`;
+    const upsertSQL = `INSERT INTO rq_social_history
         (event_type, character_name, event_text, result, last_floor, event_key)
        VALUES (?, ?, ?, ?, ?, ?)
        ON CONFLICT(event_key) DO UPDATE SET
@@ -1403,20 +1530,28 @@ export async function 同步社交轨迹(条目: 社交轨迹条目, 额外提�
          character_name = excluded.character_name,
          event_text = excluded.event_text,
          result = excluded.result,
-          last_floor = excluded.last_floor`,
+         last_floor = excluded.last_floor`;
+    const 失效补偿 = 构造SQLite唯一行失效补偿({
+      描述: `社交事件 ${data.事件键} 的旧行`,
+      查询SQL,
+      查询参数: [data.事件键],
+      删除SQL: 'DELETE FROM rq_social_history WHERE event_key = ?',
+      恢复SQL: upsertSQL,
+      恢复列: ['event_type', 'character_name', 'event_text', 'result', 'last_floor', 'event_key'],
+    });
+    const SQL写入状态 = await 执行SQLite写入(
+      upsertSQL,
       [data.类型, data.人物, data.事件, data.结果, data.最后楼层, data.事件键],
       聊天标识,
       额外提交校验,
+      失效补偿,
     );
     if (!仍是同一聊天(聊天标识) || !额外提交校验()) return false;
     if (SQL写入状态 === '已确认' || SQL写入状态 === '已提交待定') return true;
     if (
       SQL写入状态 === '需核对' &&
       核对SQLite记录(
-        `SELECT event_type, character_name, event_text, result, last_floor, event_key
-           FROM rq_social_history
-          WHERE event_key = ?
-          LIMIT 1`,
+        查询SQL,
         [data.事件键],
         {
           event_type: data.类型,
@@ -1654,7 +1789,12 @@ export function 读取数据库记忆胶囊(focusNames: readonly string[], 当�
   const 聊天标识 = 更新当前聊天驻留();
   const pending = 读取持久时间线状态(聊天标识);
   确保数据库时间线回调();
-  if (pending || !时间线栅栏.可读取(聊天标识)) {
+  if (
+    pending ||
+    !时间线栅栏.可读取(聊天标识) ||
+    !数据库异步写.可开始新写(聊天标识) ||
+    数据库未补偿迟到写.has(聊天标识)
+  ) {
     void 启动数据库时间线恢复(聊天标识, 3500);
     return '';
   }

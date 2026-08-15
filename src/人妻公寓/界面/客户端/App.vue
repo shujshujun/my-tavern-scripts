@@ -353,7 +353,7 @@
                 <b>自然平息</b><span>{{ 风闻自然平息提示 }}</span>
               </p>
               <p>
-                <b>住户聚餐</b><span>{{ 风闻聚餐提示 }}</span>
+                <b>住户公关</b><span>{{ 风闻公关提示 }}</span>
               </p>
             </div>
           </section>
@@ -404,6 +404,8 @@
               'portraits-many': 立绘列表.length >= 4,
               'story-glory': !!荣耀洞图,
               'story-adult-cg': 显示成人CG,
+              'story-family-plan': !!当前事件CG,
+              'story-family-plan-portrait': !!当前事件CG?.保留夏乔,
               'story-visual-only': 正文隐藏,
               'story-special-interaction': 录像带交互幕 || 静音会议交互幕,
               'story-mute-meeting': 静音会议显示组合图,
@@ -440,6 +442,15 @@
             :tap-count="录像带连点计数"
             :tap-target="录像带连点目标"
             :sending="发送中"
+          />
+          <FamilyPlanStage
+            :open="!!当前事件CG"
+            :image-url="当前事件CG地址"
+            :title="当前事件CG?.标题 ?? ''"
+            :kicker="当前生产CG ? 'PRODUCTION / 生产' : 'FAMILY PLAN'"
+            :close-label="当前生产CG ? '收起生产剧情画面' : '收起家庭计划画面'"
+            @close="关闭当前事件CG"
+            @image-error="当前事件CG加载失败"
           />
           <MuteMeetingInteraction
             :id="静音会议互动id"
@@ -480,22 +491,33 @@
             <div
               v-if="显示成人CG && !静音会议显示组合图"
               class="adult-cg-stage"
-              :class="{ loading: 成人CG加载中 }"
+              :class="{ 'adult-cg-stage-double': 当前成人CG显示槽位.length > 1 }"
               :style="{ '--adult-cg-img': `url(${当前成人CG地址})` }"
             >
-              <img
-                :key="`${当前成人CG?.id}:${当前成人CG请求epoch}`"
-                :src="当前成人CG地址"
-                :data-cg-id="当前成人CG?.id"
-                :data-cg-epoch="当前成人CG请求epoch"
-                alt=""
-                draggable="false"
-                @load="成人CG已加载"
-                @error="成人CG加载失败"
-              />
+              <div class="adult-cg-grid">
+                <div
+                  v-for="槽 in 当前成人CG显示槽位"
+                  :key="`${槽.项.id}:${槽.epoch}`"
+                  class="adult-cg-frame"
+                  :class="{ loading: 槽.加载中 }"
+                >
+                  <img
+                    :src="成人CG地址(槽.项)"
+                    :data-cg-id="槽.项.id"
+                    :data-cg-epoch="槽.epoch"
+                    alt=""
+                    draggable="false"
+                    @load="成人CG已加载"
+                    @error="成人CG加载失败"
+                  />
+                </div>
+              </div>
             </div>
           </Transition>
-          <TransitionGroup v-if="立绘显示 && !显示成人CG && !静音会议显示组合图" name="fade">
+          <TransitionGroup
+            v-if="立绘显示 && !显示成人CG && !静音会议显示组合图 && (!当前事件CG || 当前事件CG.保留夏乔)"
+            name="fade"
+          >
             <span
               v-for="绘 in 立绘列表"
               :key="绘.src"
@@ -516,7 +538,7 @@
           <!-- 正文卷轴:只演当前幕,且幕跟着房间走——人走了戏就收,回来戏还在(氛围色随位置)(A8a 迁入 components/正文卷轴.vue) -->
           <StoryScroll
             ref="正文卷轴"
-            :veiled="正文隐藏 || 录像带交互幕 || 静音会议交互幕"
+            :veiled="正文隐藏 || 录像带交互幕 || 静音会议交互幕 || !!当前事件CG"
             :in-scene="在幕中"
             :sending="发送中"
             :current-room="当前房间"
@@ -623,7 +645,7 @@
                   >
                 </div>
                 <p v-if="性爱待失控收尾" class="intimacy-warning">
-                  体力已经耗尽。本次会按当前行为在“{{ 性爱场景.待收尾位置 || 默认失控位置(性爱场景) }}”失控收尾。
+                  体力已经耗尽。本次会按当前行为在“{{ 失控收尾位置(data) }}”失控收尾。
                 </p>
                 <p v-else-if="data.玩家资源.体力.当前值 === 1" class="intimacy-warning">
                   继续一次将耗尽体力；若不主动收尾，将按当前行为失控结束。
@@ -857,6 +879,7 @@
           :failed-action="失败行动"
           :retry-action="待重试行动"
           :retrying="取消后自动重试"
+          :variable-regeneration-state="变量重生成状态"
           :video-active="录像带中"
           :period="时段"
           :current-period-label="当前时段显示"
@@ -869,6 +892,7 @@
           @reroll="重掷"
           @retry-failed="重试失败行动"
           @abandon-and-retry="放弃并重试"
+          @regenerate-variables="发起变量重生成"
           @advance-time="推进固定时段"
         />
 
@@ -933,6 +957,7 @@
         :period="时段"
         :lite="省流"
         :sending="发送中"
+        :hospital-visible="医院已解锁(data)"
         :avatar-failed="头像失效"
         :avatar-image="头像图"
         :avatar-name="头像名"
@@ -967,7 +992,6 @@
         @portrait-error="立绘失效[$event] = true"
         @item-error="道具图失效[$event] = true"
         @open-cg="打开CG图库"
-        @unload="卸载"
         @advance="晋阶"
         @ask-money="开口要钱"
       />
@@ -991,7 +1015,6 @@
         @play-tape="使用录像带"
         @prepare-meeting="打开静音会议筹备"
         @gift="送出"
-        @load="装载"
       />
 
       <!-- ═══════════ 静音会议：背包票只进入筹备；确认开始前不消耗 ═══════════ -->
@@ -1027,6 +1050,8 @@
         :item-visual="道具视觉信息"
         :lock-reasons="商品锁定原因"
         :purchase-label="商品购买文案"
+        :purchase-disabled="商品不可购买"
+        :price-label="商品价格文案"
         @close="显示商店 = false"
         @image-error="道具图失效[$event] = true"
         @buy="买"
@@ -1058,9 +1083,14 @@
           <p class="hint center">每段右下角的 ↺ 可以回到那一刻——点两次,之后的一切就没有发生过。</p>
           <button class="history-latest" title="跳到最新一段" @click="史册到最新">↓ 最新</button>
           <div ref="史册容器" class="sheet-body chronicle">
+            <div v-if="史册有更早" class="history-earlier-row">
+              <button class="history-earlier" :disabled="史册加载中" @click="加载更早史册">
+                {{ 史册加载中 ? '正在翻找…' : '翻看更早往事' }}
+              </button>
+            </div>
             <div
-              v-for="(条, i) in 卷轴"
-              :key="i"
+              v-for="条 in 卷轴"
+              :key="卷轴条稳定键(条)"
               class="story-entry chronicle-entry"
               :class="{ player: 条.谁 === '玩家' }"
             >
@@ -1138,6 +1168,7 @@ import {
   查房间,
   查性癖,
   查特殊场景,
+  查角色剧情占位,
   查裂缝,
   查道具,
   是母亲破墙服饰,
@@ -1154,10 +1185,20 @@ import { 解析绝对时段 } from '../../周作息';
 import { 丈夫在楼, 妻位置推算 } from '../../脚本/游戏逻辑/楼层时钟';
 import { 余波有冻结效力 } from '../../脚本/游戏逻辑/冷落系统';
 import { 怀孕已公开 } from '../../脚本/游戏逻辑/怀孕系统';
+import { 医院已解锁, 房间生产背景键, type 生产地点动作ID } from '../../脚本/游戏逻辑/生产系统';
 import { 安眠药可圆场, 丈夫登门药物窗口已开启 } from '../../脚本/游戏逻辑/丈夫登门系统';
+import { 全部阶段性癖已完成, 读取阶段性癖状态, 阶段性癖门牌 } from '../../脚本/游戏逻辑/阶段性癖状态';
 import { 列出地点管理任务 } from '../../脚本/游戏逻辑/管理任务系统';
 import { 规范荣耀洞上次时段 } from '../../脚本/游戏逻辑/荣耀洞';
 import { 列出阶段线路候选详情, type 阶段线路候选 } from '../../脚本/游戏逻辑/阶段线路系统';
+import {
+  家庭计划101背景文件,
+  家庭计划卡状态,
+  家庭计划套件ID,
+  家庭计划已上架,
+  type 家庭计划地点动作ID,
+} from '../../脚本/游戏逻辑/家庭计划系统';
+import { 角色剧情占位价格文案, 角色剧情占位已上架, 角色剧情占位锁定原因 } from '../../脚本/游戏逻辑/角色结局占位';
 // 客户端只需要无副作用的聊天身份读取；禁止经手机系统兼容门面把宿主渲染组合根打进 iframe。
 import { 当前聊天ID } from '../../脚本/游戏逻辑/手机/运行时上下文';
 // 纯函数模块：客户端直连可安全用于目标时段的地图赴约位置派生。
@@ -1175,20 +1216,27 @@ import {
   玩家资源已满,
   资源上限,
   资源等级,
-  默认失控位置,
+  失控收尾位置,
   亲密收尾选项 as 构造亲密收尾选项,
 } from '../../脚本/游戏逻辑/玩家资源系统';
 import {
   CG条目,
-  判定CG部位,
+  判定CG动作,
   判定CG阶段,
+  当前CG可沿用,
   应保留成人CG,
-  选择成人CG,
+  选择成人CG组,
   type CG回合信号,
   type 成人CG项,
 } from '../../脚本/游戏逻辑/成人CG系统';
 import { useDataStore } from './store';
-import { CG加载事件属于当前请求 } from './cgLoadState';
+import {
+  创建CG加载槽位,
+  完成CG槽位加载,
+  选择CG显示槽位,
+  替换失败CG槽位,
+  type CG加载槽位,
+} from './cgLoadState';
 import { 计算场景同步, type 场景聊天状态 } from './场景状态同步';
 import {
   创建正文幕归属,
@@ -1233,6 +1281,7 @@ import MuteMeetingAfter from './components/静音会议会后.vue';
 import RoundInput from './components/回合输入.vue';
 import StoryScroll from './components/正文卷轴.vue';
 import RoomActionsDrawer from './components/房内操作抽屉.vue';
+import FamilyPlanStage from './components/家庭计划演出.vue';
 import {
   公寓外部背景图,
   晨跑公园背景图,
@@ -1244,6 +1293,8 @@ import {
   安全套道具图,
   专注训练手册道具图,
   蛋白粉道具图,
+  家庭计划图片,
+  生产图片,
   素材基址,
   角色立绘候选,
   成人CG基址,
@@ -1262,6 +1313,7 @@ import type {
   全屏文档,
   酒馆原生提示词模块,
 } from './types';
+import { 卷轴条稳定键, 合并卷轴页, 更早楼层范围, 末页楼层范围, type 楼层范围 } from './卷轴分页';
 
 const store = useDataStore();
 // defineMvuDataStore 的 Pinia 泛型在 SFC 里推断失败(已知误报,见 ShopPanel 先例),显式标回
@@ -1348,11 +1400,11 @@ const 风闻自然平息提示 = computed(() => {
   const 下限 = 风闻账.value.危机活跃 ? 50 : 当前投诉存在.value ? 25 : 0;
   return `完整一天没有新增来源时降低 ${每日降低} 点${下限 > 0 ? `；当前事件未处理前不得低于 ${下限}` : ''}。`;
 });
-const 风闻聚餐提示 = computed(() => {
+const 风闻公关提示 = computed(() => {
   const 冷却至 = 风闻账.value.聚餐冷却至;
-  if (冷却至 < 0 || 绝对时段.value >= 冷却至) return '聚餐调节已经可用，触发入口以地图或事件提示为准。';
+  if (冷却至 < 0 || 绝对时段.value >= 冷却至) return '聚餐或答谢会已经可以安排；两者共享冷却。';
   const 信息 = 解析绝对时段(冷却至);
-  return `仍在冷却，第 ${信息.天数} 天 ${信息.星期} ${信息.时段} 后可再次安排。`;
+  return `聚餐与答谢会共享冷却，第 ${信息.天数} 天 ${信息.星期} ${信息.时段} 后可再次安排。`;
 });
 
 function 风闻事件位置(事件: 风闻事件视图): string {
@@ -1413,6 +1465,7 @@ watch(
     性爱场景.value.有效楼数,
     性爱场景.value.当前行为,
     性爱场景.value.保护状态,
+    性爱场景.value.主焦点门牌,
   ],
   (新值, 旧值) => {
     待确认收尾位置.value = '';
@@ -1450,7 +1503,7 @@ const 性爱结果参与者列表 = computed(() =>
     ...项,
   })),
 );
-const 收尾选项 = computed(() => 构造亲密收尾选项(性爱场景.value));
+const 收尾选项 = computed(() => 构造亲密收尾选项(data.value));
 const 资源详情 = computed(() => {
   const 种类 = 显示资源详情.value ?? '精力';
   const 资源 = data.value.玩家资源[种类];
@@ -1601,7 +1654,9 @@ async function 写场景(房间id: string | null, 破门 = false, 待提交状�
     { type: 'chat' },
   );
   if (旧房间 !== 房间id) {
-    当前成人CG.value = null;
+    清空当前成人CG();
+    当前家庭计划CG.value = null;
+    当前生产CG.value = null;
     最近CG信号 = null;
   }
 }
@@ -1650,6 +1705,10 @@ async function 确认亲密离场(): Promise<boolean> {
 
 async function 进入(房间id: string, 破门 = false, 保持地图 = false): Promise<boolean> {
   if (场景移动中) return false;
+  if (房间id === '医院' && !医院已解锁(data.value)) {
+    弹提示('先读取她发来的预产消息，才知道该去医院。', 4200);
+    return false;
+  }
   // 地图上重复点当前房间只是“确认留在这里”：不算重新进门，也不能刷新由头配额/进房楼戳。
   if (房间id === 当前房间.value) {
     if (!保持地图) 关地图();
@@ -1829,8 +1888,9 @@ const 可输入 = computed(() => {
   if (录像带中.value) {
     return id === '管理员室' && 录像带阶段.value !== '等待102' && 录像带阶段.value !== '等待202';
   }
-  // 荣耀洞摇到真人后开放输入,让玩家亲自推进余下3~5拍；空军演完即清场,不会走到这里。
-  if (id === '洗手间' && (data.value?.系统?._荣耀洞拍 ?? -1) >= 0 && data.value?.系统?._荣耀洞门牌 !== '空') {
+  // 荣耀洞进入当前拍后开放输入：真人让玩家推进余下拍；空签正常演完会清场，若生成失败则
+  // 必须保留输入入口重试同一签，不能因禁止重抽而把玩家永久锁在隔间。
+  if (id === '洗手间' && (data.value?.系统?._荣耀洞拍 ?? -1) >= 0) {
     return true;
   }
   if (id === '302' || id === '管理员室') return true;
@@ -1873,7 +1933,7 @@ async function 从地图外出(): Promise<void> {
 
 function 发起时间推进(方式: 客户端时间方式): void {
   if (发送中.value) return;
-  // 小憩直接结算；晨跑、健身与睡眠先生成不入正文记忆的独立反馈。两条路径都要锁住
+  // 小憩、晨跑与健身直接结算；只有睡眠先生成不入正文记忆的独立反馈。两条路径都要锁住
   // 地图、输入和回档按钮，直到脚本明确回报结束。
   发送中.value = true;
   运行阶段.value =
@@ -2104,7 +2164,7 @@ const 荣耀洞图 = computed(() => {
 });
 
 /** 荣耀洞拥有独立三拍CG；渲染层硬互斥，普通成人CG永远不能盖住它。 */
-const 显示成人CG = computed(() => Boolean(当前成人CG.value && !荣耀洞图.value));
+const 显示成人CG = computed(() => Boolean(当前成人CG.value && !荣耀洞图.value && !当前事件CG.value));
 
 /** 洞戏立绘件:undefined=不在洞戏;''=本拍无件(空军/匿名收尾);否则=件地址 */
 const 荣耀洞件 = computed<string | undefined>(() => {
@@ -2127,15 +2187,52 @@ watch(当前房间, 房 => {
   if (房 !== '洗手间' && (data.value?.系统?._荣耀洞拍 ?? -1) >= 0) eventEmit('人妻公寓:荣耀洞离场');
 });
 
-const 当前成人CG = ref<成人CG项 | null>(null);
-const 成人CG加载中 = ref(false);
+const 当前成人CG槽位 = ref<CG加载槽位<成人CG项>[]>([]);
+const 当前成人CG = computed(() => 当前成人CG槽位.value[0]?.项 ?? null);
+interface 家庭计划CG载荷 {
+  文件: string;
+  标题: string;
+  保留夏乔?: boolean;
+}
+const 当前家庭计划CG = ref<家庭计划CG载荷 | null>(null);
+interface 生产CG载荷 {
+  文件: string;
+  标题: string;
+}
+const 当前生产CG = ref<生产CG载荷 | null>(null);
+const 当前事件CG = computed(() => 当前生产CG.value ?? 当前家庭计划CG.value);
+const 当前家庭计划CG地址 = computed(() => (当前家庭计划CG.value ? 家庭计划图片(当前家庭计划CG.value.文件) : ''));
+const 当前事件CG地址 = computed(() => (当前生产CG.value ? 生产图片(当前生产CG.value.文件) : 当前家庭计划CG地址.value));
+function 关闭当前事件CG(): void {
+  if (当前生产CG.value) 当前生产CG.value = null;
+  else 当前家庭计划CG.value = null;
+}
+function 当前事件CG加载失败(): void {
+  const 类型 = 当前生产CG.value ? '生产' : '家庭计划';
+  关闭当前事件CG();
+  弹提示(`${类型}画面加载失败，任务进度不受影响。`, 4200);
+}
 const 成人CG本次失效 = new Set<string>();
 const 已解锁CG = ref<Set<string>>(new Set());
 let 最近CG信号: CG回合信号 | null = null;
 let 当前成人CG展示键 = '';
-const 当前成人CG请求epoch = ref(0);
+let 成人CG请求epoch = 0;
 
 const 当前成人CG地址 = computed(() => (当前成人CG.value ? `${成人CG基址}/${当前成人CG.value.path}` : ''));
+
+function 成人CG地址(项: 成人CG项): string {
+  return `${成人CG基址}/${项.path}`;
+}
+
+function 新建成人CG槽位(项: 成人CG项): CG加载槽位<成人CG项> {
+  成人CG请求epoch += 1;
+  return 创建CG加载槽位(项, 成人CG请求epoch);
+}
+
+function 清空当前成人CG(): void {
+  当前成人CG槽位.value = [];
+  当前成人CG展示键 = '';
+}
 
 function 读取CG解锁(): void {
   try {
@@ -2146,50 +2243,69 @@ function 读取CG解锁(): void {
   }
 }
 
-function 处理CG回合信号(信号: CG回合信号, 是加载重试 = false): void {
+function 处理CG回合信号(
+  信号: CG回合信号,
+  是加载重试 = false,
+  失败身份?: { id: string; epoch: string | undefined },
+): void {
   if (!是加载重试) {
     // 这里只屏蔽同一信号内已经失败的候选；新回合应重新尝试，避免一次瞬时断网永久封图。
     成人CG本次失效.clear();
   }
   最近CG信号 = 信号;
   const 阶段 = 判定CG阶段(信号);
-  const 部位 = 判定CG部位(`${信号.行动}\n${信号.正文}`, 信号.亲密);
-  const 展示键 = 阶段 && 信号.门牌 ? `${信号.门牌}:${阶段}:${部位 ?? 'any'}` : '';
-  if (当前成人CG.value && 应保留成人CG(信号) && 展示键 && 展示键 === 当前成人CG展示键) {
-    成人CG加载中.value = false;
+  const 动作 = 阶段 ? 判定CG动作(信号, 阶段) : null;
+  // 展示键包含图库/门牌/阶段/动作：图库切换必然改变展示键，旧图库画面不能沿用。
+  const 目标图库 = 信号.variant ?? 'normal';
+  const 展示键 = 阶段 && 信号.门牌 ? `${目标图库}:${信号.门牌}:${阶段}:${动作 ?? 'any'}` : '';
+  if (是加载重试 && 失败身份) {
+    const 候选 = 选择成人CG组(信号, 已解锁CG.value, 成人CG本次失效);
+    成人CG请求epoch += 1;
+    const 结果 = 替换失败CG槽位(
+      当前成人CG槽位.value,
+      失败身份.id,
+      失败身份.epoch,
+      候选,
+      成人CG请求epoch,
+    );
+    if (!结果.已处理) return;
+    当前成人CG槽位.value = 结果.槽位;
+    if (!结果.槽位.length) 当前成人CG展示键 = '';
     return;
   }
-  const 下一张 = 选择成人CG(信号, 已解锁CG.value, 成人CG本次失效);
-  if (下一张) {
-    当前成人CG请求epoch.value += 1;
-    当前成人CG.value = 下一张;
-    当前成人CG展示键 = 展示键;
-    成人CG加载中.value = true;
-  } else if (!应保留成人CG(信号)) {
-    当前成人CG.value = null;
-    当前成人CG展示键 = '';
-    成人CG加载中.value = false;
-  } else {
-    // 场内的委婉/对话楼没有新候选时沿用当前 CG，不能掉回普通立绘。
-    成人CG加载中.value = false;
+  if (当前成人CG.value && 应保留成人CG(信号) && 展示键 && 展示键 === 当前成人CG展示键) {
+    return;
   }
+  const 下一组 = 选择成人CG组(信号, 已解锁CG.value, 成人CG本次失效);
+  if (下一组.length) {
+    当前成人CG槽位.value = 下一组.map(新建成人CG槽位);
+    当前成人CG展示键 = 展示键;
+  } else if (!应保留成人CG(信号)) {
+    清空当前成人CG();
+  } else if (当前成人CG.value && !当前CG可沿用(当前成人CG.value, 信号, 阶段, 动作)) {
+    // 角色/图库/阶段不符，或 active/aftermath 强语义动作不符：找不到新图时必须清掉
+    // 旧图，不能跨角色/图库/阶段或强语义动作沿用（含真实孕态切换后目标图库为空的情况）。
+    清空当前成人CG();
+  }
+  // 场内的委婉/对话楼或软阶段同角色同图库同阶段没有新候选时沿用当前 CG，不能掉回普通立绘。
 }
 
 /** 回档/撤回把产生 CG 的楼层删掉后，画面不能继续停留在被抹去的成人场景上(2026-08-03 审计 M10)。
  * 正常回合的 CG 信号楼层 ≤ 末楼，此检查恒为无害幂等。 */
 function 清理越界成人CG(): void {
   if (!最近CG信号 || 最近CG信号.楼层 <= getLastMessageId()) return;
-  当前成人CG.value = null;
-  当前成人CG展示键 = '';
-  成人CG加载中.value = false;
+  清空当前成人CG();
   最近CG信号 = null;
 }
 
 function 成人CG已加载(事件: Event): void {
   const 图片 = 事件.currentTarget as HTMLImageElement | null;
   const 事件id = 图片?.dataset.cgId;
-  if (!CG加载事件属于当前请求(当前成人CG.value?.id, 当前成人CG请求epoch.value, 事件id, 图片?.dataset.cgEpoch)) return;
-  成人CG加载中.value = false;
+  const 事件epoch = 图片?.dataset.cgEpoch;
+  if (!当前成人CG显示槽位.value.some(槽 => 槽.项.id === 事件id && String(槽.epoch) === 事件epoch)) return;
+  const 结果 = 完成CG槽位加载(当前成人CG槽位.value, 事件id, 事件epoch);
+  if (!结果.已处理) return;
+  当前成人CG槽位.value = 结果.槽位;
   const id = 事件id;
   if (!id || 已解锁CG.value.has(id)) return;
   const next = new Set(已解锁CG.value);
@@ -2205,12 +2321,12 @@ function 成人CG已加载(事件: Event): void {
 function 成人CG加载失败(事件: Event): void {
   const 图片 = 事件.currentTarget as HTMLImageElement | null;
   const id = 图片?.dataset.cgId;
-  if (!CG加载事件属于当前请求(当前成人CG.value?.id, 当前成人CG请求epoch.value, id, 图片?.dataset.cgEpoch)) return;
-  成人CG本次失效.add(id!);
-  当前成人CG.value = null;
-  成人CG加载中.value = false;
-  // 失败集合保证每张图只尝试一次；选择器返回 null 即候选池真正耗尽，无需固定次数上限。
-  if (最近CG信号) 处理CG回合信号(最近CG信号, true);
+  const epoch = 图片?.dataset.cgEpoch;
+  if (!id || !当前成人CG显示槽位.value.some(槽 => 槽.项.id === id && String(槽.epoch) === epoch)) return;
+  成人CG本次失效.add(id);
+  // 失败集合保证每张图只尝试一次；只补失败槽，另一张已显示的图不跳变。
+  // 选择器返回不足两张时自动降级，候选池耗尽后无需固定次数上限。
+  if (最近CG信号) 处理CG回合信号(最近CG信号, true, { id, epoch });
 }
 
 function 头像图(名: string): string {
@@ -2278,6 +2394,8 @@ function 立绘槽(n: number, i: number): Record<string, string> {
 
 const 立绘列表 = computed<立绘项[]>(() => {
   if (!当前房间.value) return [];
+  // 产科使用待产／产后专属整幅画面；公共医院底图下不叠普通或孕态立绘。
+  if (当前房间.value === '医院') return [];
   // 荣耀洞戏中:立绘槽由洞件接管(匿名性:常规妻立绘一律不入画)
   const 洞件 = 荣耀洞件.value;
   if (洞件 !== undefined) {
@@ -2290,9 +2408,7 @@ const 立绘列表 = computed<立绘项[]>(() => {
       const 妻名 = 户静态表[m].妻名;
       const 穿着 = data.value.户[m]?.妻._穿着SKU;
       const sku = 穿着?._立绘 ?? 穿着?.内衣 ?? 穿着?.外装;
-      return (
-        角色立绘候选(妻名, sku, 怀孕已公开(data.value, m)).find(src => !立绘失效.value[src]) ?? ''
-      );
+      return 角色立绘候选(妻名, sku, 怀孕已公开(data.value, m)).find(src => !立绘失效.value[src]) ?? '';
     })
     .filter(src => !立绘失效.value[src])
     .slice(0, 6);
@@ -2307,6 +2423,15 @@ function 背景图(房间id: string | null): string {
     健身房: 健身房背景图,
   };
   if (房间id && 本地背景[房间id]) return 本地背景[房间id]!;
+  if (房间id === '医院') return 生产图片('医院/医院_通用地点背景');
+  if (房间id && 门牌列表.includes(房间id as 门牌)) {
+    const 文件 = 房间生产背景键(data.value, 房间id as 门牌);
+    if (文件) return 生产图片(文件);
+  }
+  if (房间id === '101') {
+    const 文件 = 家庭计划101背景文件(data.value);
+    if (文件) return 家庭计划图片(文件);
+  }
   // 楼道没有专属图,借楼梯间的(同一栋楼的筒子间气质)
   return `${素材基址}/背景/${房间id && 房间色[房间id] ? 房间id : '楼梯间'}.webp`;
 }
@@ -2363,6 +2488,8 @@ const 头像列表 = computed(() =>
 
 const 输入文本 = ref('');
 const 发送中 = ref(false);
+type 变量重生成状态值 = '不可用' | '未配置' | '可用' | '进行中' | '已完成';
+const 变量重生成状态 = ref<变量重生成状态值>('不可用');
 watch(发送中, 正在生成 => {
   if (正在生成) 亲密抽屉展开.value = false;
 });
@@ -2395,6 +2522,10 @@ const { 房间动作, 当前房间动作, 普通房间动作, 确认已到达动
     荣耀洞: () => eventEmit('人妻公寓:荣耀洞'),
     捡金币: id => eventEmit('人妻公寓:捡金币', id),
     处理管理任务: ({ 任务id, 选项id, 地点 }) => eventEmit('人妻公寓:处理管理任务', { 任务id, 选项id, 地点 }),
+    开启阶段性癖: m => eventEmit('人妻公寓:开启阶段性癖', m),
+    家庭计划动作: (动作: 家庭计划地点动作ID) => eventEmit('人妻公寓:家庭计划动作', 动作),
+    生产动作: (载荷: { 门牌: 门牌; 动作: 生产地点动作ID; 预期绝对时段: number }) =>
+      eventEmit('人妻公寓:生产动作', 载荷),
   },
 });
 // 保留 App 对组合器完整返回契约的接线；当前模板只直接消费普通房间动作。
@@ -2678,7 +2809,7 @@ function 确认亲密收尾(): void {
 
 function 确认失控收尾(): void {
   if (发送中.value || !性爱待失控收尾.value) return;
-  const 位置 = 性爱场景.value.待收尾位置 || 默认失控位置(性爱场景.value);
+  const 位置 = 失控收尾位置(data.value);
   发出(`【失控收尾】体力耗尽，按当前行为在${位置}失控结束。`);
 }
 
@@ -2769,6 +2900,17 @@ function 重掷() {
   if (卷轴.value.at(-1)?.谁 === '叙事') 卷轴.value.pop();
   void 滚到底();
   eventEmit(隔离可重掷.value ? '人妻公寓:隔离事件重掷' : '人妻公寓:重掷');
+}
+
+/** 只重算最近一回合的变量；脚本收到事件后还会按消息令牌和时间线做第二道校验。 */
+function 发起变量重生成() {
+  if (发送中.value || 变量重生成状态.value !== '可用') return;
+  发送中.value = true;
+  变量重生成状态.value = '进行中';
+  运行阶段.value = '正在重新生成变量';
+  流式段.value = [];
+  开始生成计时();
+  eventEmit('人妻公寓:重新生成变量');
 }
 
 /** 撤回本回合:删掉你的行动与 AI 回应,回到落笔之前 */
@@ -2892,6 +3034,8 @@ function 信物门牌(名: string): 门牌 | null {
 /** 134张道具不再都伪装成同一种商品缩略图：按真实用途进入四套卡片语法。 */
 function 道具视觉信息(配?: 道具配置, 可读信 = false): { 类: 道具视觉类型; 标: string; 图: string } {
   if (可读信) return { 类: 'evidence', 标: '证物', 图: 'letter' };
+  if (配?.剧情占位) return { 类: 'scene', 标: '路线占位', 图: 'scene' };
+  if (配?.特殊剧情占位) return { 类: 'scene', 标: '场景占位', 图: 'scene' };
   if (配?.类别 === '特殊场景') return { 类: 'scene', 标: '场景票', 图: 'scene' };
   if (配 && ['工具', '补给', '运作', '药物', '性癖'].includes(配.类别)) return { 类: 'action', 标: '操作', 图: 'tool' };
   return { 类: 'product', 标: '物品', 图: 配?.类别 === '服饰' ? 'dress' : 'gift' };
@@ -2900,7 +3044,6 @@ function 道具视觉信息(配?: 道具配置, 可读信 = false): { 类: 道�
 const 背包列表 = computed(() =>
   (data.value?.背包 ?? []).map(id => {
     const 配 = 查道具(id);
-    const 性 = 配?.类别 === '性癖' ? 查性癖(id) : undefined;
     const 信门牌 = 信物门牌(id);
     const 房 = 当前房间.value ? 查房间(当前房间.value) : undefined;
     const 在户内 = !!房 && 房.类型 === '户' && 房.id !== '302' && Boolean(data.value.户[房.id]);
@@ -2955,7 +3098,7 @@ const 背包列表 = computed(() =>
       // 安全套只允许在空闲时为下一场准备；进行中不展示一个注定会被后端拒绝的按钮。
       可用资源: !!配?.资源效果 && !(id === '安全套' && 性爱进行中.value),
       // 礼物等可送出:须与她同处一室；普通药物不走“送”，安眠药只在丈夫登门圆场窗口例外。
-      // 性癖=装载；302特例:回家时可送妈东西——破妈妈墙的唯一入口,入列前也通。
+      // 阶段性癖不会进入背包；302特例仍允许回家时给妈送破墙服饰。
       可送对象:
         id === '安眠药'
           ? 安眠药圆场对象
@@ -2972,39 +3115,7 @@ const 背包列表 = computed(() =>
                 ...(当前房间.value === '302' && 母亲赠送项 ? [母亲赠送项] : []),
               ].filter((v, i, a) => a.findIndex(x => x.门牌 === v.门牌) === i)
             : [],
-      // 性癖装载(P5):对象=阶段够档且槽未满的妻(不必同室,装载是管理动作)
-      可装载对象:
-        配?.类别 === '性癖'
-          ? 可见门牌.value
-              .filter(m => {
-                const 妻 = data.value.户[m]?.妻;
-                if (!性 || !妻) return false;
-                if (性.限定户 && !性.限定户.includes(m)) return false;
-                const 母亲终局开幕窗口 =
-                  m === '302' &&
-                  id === 户静态表['302'].招牌性癖 &&
-                  妻.当前阶段 === 4 &&
-                  妻._阶段线路.目标阶段 === 5 &&
-                  妻._阶段线路.活跃节点 === 1;
-                return (
-                  (妻.当前阶段 >= (性.档 === 5 ? 5 : 4) || 母亲终局开幕窗口) &&
-                  妻.性癖装载.length < 3 &&
-                  !妻.性癖装载.includes(id)
-                );
-              })
-              .map(m => {
-                const 妻 = data.value.户[m]!.妻;
-                const 时段可用 =
-                  妻.曾开发性癖.includes(id) || !性?.开幕允许时段 || 性.开幕允许时段.includes(时段.value);
-                return {
-                  门牌: m,
-                  妻名: 户静态表[m].妻名,
-                  时段可用,
-                  时段提示: 时段可用 ? '' : 性!.开幕允许时段!.join('或'),
-                };
-              })
-          : [],
-      // 运作道具(P3):全局四件直接"使用";户向四件按丈夫点名(须该户已入住且有夫)
+      // 运作道具(P3):全局运作直接“使用”；户向四件按丈夫点名（须该户已入住且有夫）。
       可用运作: 配?.类别 === '运作' && !是户向运作 && 全局运作候选.length <= 1,
       全局线路候选,
       全局运作对象: 全局运作候选.length > 1 ? 全局运作候选 : [],
@@ -3032,21 +3143,14 @@ function 用资源道具(道具id: string) {
   eventEmit('人妻公寓:使用资源道具', 道具id);
 }
 
-function 装载(道具id: string, 门牌号: 门牌) {
-  显示背包.value = false;
-  eventEmit('人妻公寓:装载性癖', { 道具id, 门牌: 门牌号 });
-}
-
-function 卸载(门牌号: 门牌, 性癖id: string) {
-  eventEmit('人妻公寓:卸载性癖', { 门牌: 门牌号, 性癖id });
-}
-
 // ── 商店(P3 八页签框架:工具/人情/运作常驻,余者随进度亮起——商店自己就是进度条) ──
 
 const 显示商店 = ref(false);
 
 const 货架 = computed(() => {
-  const 全部 = Object.values(道具表).filter(d => (d.价格 ?? 0) > 0);
+  const 全部 = Object.values(道具表).filter(
+    d => (d.价格 ?? 0) > 0 || d.特殊剧情占位 || (!!d.剧情占位 && 角色剧情占位已上架(data.value, d.id)),
+  );
   const 按类 = (类: 道具配置['类别']) => 全部.filter(d => d.类别 === 类);
   const 户们 = Object.values(data.value?.户 ?? {});
   const 最高阶段 = 户们.reduce((高, 节点) => Math.max(高, 节点.妻.当前阶段), 0);
@@ -3065,14 +3169,20 @@ const 货架 = computed(() => {
       商品: 按类('服饰').filter(d => (d.服饰?.档 ?? 9) <= Math.min(5, 最高阶段 + 1)),
       空文案: '新一季衣装正在打包发货——很快上架。',
     });
-  // 特殊场景：九场始终可见，前置不足显示锁定条件；男用贞操带等无场景配置商品常驻。
+  // 特殊场景：三个现有场景与六个待设计占位始终可见；男用贞操带等无场景配置商品常驻。
   if (最高阶段 >= 3)
     架.push({
       页签: '特殊场景',
-      商品: 按类('特殊场景'),
+      商品: 按类('特殊场景').filter(d => d.id !== 家庭计划套件ID || 家庭计划已上架(data.value)),
       空文案: '有些节目要等合适的人到齐才开演。',
     });
-  if (最高阶段 >= 4) 架.push({ 页签: '性癖', 商品: 按类('性癖'), 空文案: '这一栏的货,认人。到货会通知你。' });
+  if (最高阶段 >= 4 && !全部阶段性癖已完成(data.value)) {
+    架.push({
+      页签: '性癖',
+      商品: Object.values(道具表).filter(d => d.类别 === '性癖'),
+      空文案: '六段关系主题会随各自的 L4→L5 线路开放。',
+    });
+  }
   // 药物页签不常驻(P5):母亲首夜线路或丈夫登门圆场窗口开启时才展示。
   if (
     (data.value?.系统?._母亲入列 && (data.value.户['302']?.妻.当前阶段 ?? 0) >= 2) ||
@@ -3084,6 +3194,13 @@ const 货架 = computed(() => {
 });
 
 function 商品锁定原因(商品: 道具配置): string[] {
+  if (商品.剧情占位) return 角色剧情占位锁定原因(商品.id);
+  if (商品.特殊剧情占位) return [];
+  const 性癖门牌 = 阶段性癖门牌(商品.id);
+  if (性癖门牌) {
+    const 状态 = 读取阶段性癖状态(data.value, 性癖门牌);
+    return 状态.状态 === '未解锁' ? [`${户静态表[性癖门牌].妻名}的 L4→L5 阶段入口尚未开放`] : [];
+  }
   const 场景 = 查特殊场景(商品.id);
   if (!场景) return [];
   const 前置 = 特殊场景锁定状态(data.value as never, 商品.id);
@@ -3093,11 +3210,57 @@ function 商品锁定原因(商品: 道具配置): string[] {
 }
 
 function 商品购买文案(商品: 道具配置): string {
+  if (商品.剧情占位) return '设计待完成';
+  if (商品.特殊剧情占位) return '设计待完成';
+  if (商品.id === 家庭计划套件ID) {
+    const 状态 = 家庭计划卡状态(data.value);
+    if (状态 !== '可购买') return 状态;
+  }
+  const 性癖门牌 = 阶段性癖门牌(商品.id);
+  if (性癖门牌) {
+    const 状态 = 读取阶段性癖状态(data.value, 性癖门牌).状态;
+    if (状态 === '可开启') return data.value.现金 < (商品.价格 ?? 0) ? '钱不够' : '开启';
+    if (状态 === '已支付可开启') return '已支付·开启';
+    return 状态;
+  }
+  if (商品锁定原因(商品).length) return '未解锁';
+  if (data.value.现金 < (商品.价格 ?? 0)) return '钱不够';
   const 允许 = 查特殊场景(商品.id)?.允许时段;
   return 允许 && !允许.includes(时段.value) ? `${允许.join('或')}开演` : '买下';
 }
 
+function 商品不可购买(商品: 道具配置): boolean {
+  if (商品.剧情占位) return true;
+  if (商品.特殊剧情占位) return true;
+  if (商品.id === 家庭计划套件ID && 家庭计划卡状态(data.value) !== '可购买') return true;
+  const 性癖门牌 = 阶段性癖门牌(商品.id);
+  if (性癖门牌) {
+    const 状态 = 读取阶段性癖状态(data.value, 性癖门牌).状态;
+    if (状态 === '已支付可开启') return false;
+    if (状态 !== '可开启') return true;
+  }
+  return 商品锁定原因(商品).length > 0 || data.value.现金 < (商品.价格 ?? 0);
+}
+
+function 商品价格文案(商品: 道具配置): string {
+  const 路线占位 = 查角色剧情占位(商品.id);
+  if (路线占位) return 角色剧情占位价格文案(路线占位);
+  if (商品.特殊剧情占位) return '特殊剧情占位';
+  if (商品.id === 家庭计划套件ID && 家庭计划卡状态(data.value) !== '可购买') return '已购买';
+  const 性癖门牌 = 阶段性癖门牌(商品.id);
+  if (性癖门牌) {
+    const 状态 = 读取阶段性癖状态(data.value, 性癖门牌).状态;
+    if (状态 === '剧情获得') return '剧情获得';
+    if (状态 === '已支付可开启') return '已支付';
+    if (状态 === '已完成') return '永久完成';
+  }
+  return `¥${商品.价格 ?? 0}`;
+}
+
 function 买(道具id: string) {
+  if (查角色剧情占位(道具id)) return;
+  if (查道具(道具id)?.特殊剧情占位) return;
+  if (查性癖(道具id)) 显示商店.value = false;
   eventEmit('人妻公寓:购买', 道具id);
 }
 
@@ -3212,6 +3375,9 @@ type 正文卷轴公开接口 = { 滚到底: () => void };
 const 正文卷轴 = ref<正文卷轴公开接口 | null>(null);
 const 显示史册 = ref(false);
 const 史册容器 = ref<HTMLElement | null>(null);
+const 史册最早楼 = ref(0);
+const 史册加载中 = ref(false);
+const 史册有更早 = computed(() => 史册最早楼.value > 0);
 const 事件提示词文本 = ref('');
 
 function 打开事件提示词(提示词: string) {
@@ -3405,71 +3571,107 @@ async function 滚到底() {
 
 let 卷轴请求序号 = 0;
 
-async function 取卷轴() {
+async function 读取卷轴范围(范围: 楼层范围, 当前末楼: number): Promise<卷轴条[]> {
+  const 消息组 = (await getChatMessages(`${范围.起楼}-${范围.末楼}`)) ?? [];
+  const 条目: 卷轴条[] = [];
+  for (const 消息 of 消息组) {
+    const 是玩家 = 消息.role === 'user';
+    const 原文 = 消息.message ?? '';
+    const 净文 = 清洗(过酒馆正则(原文, 是玩家 ? 'user_input' : 'ai_output', 当前末楼 - 消息.message_id));
+    if (!净文) continue;
+    // 0 楼藏着界面占位标记,整楼写回会砸掉客户端,不开放编辑
+    const 可编辑 = 消息.message_id > 0 ? { 原文 } : {};
+    if (是玩家) {
+      条目.push({
+        谁: '玩家',
+        文本: [净文.replace(/\n+/g, ' ')],
+        楼: 消息.message_id,
+        _排序: 消息.message_id * 10000,
+        ...可编辑,
+      });
+    } else {
+      条目.push({
+        谁: '叙事',
+        文本: 净文
+          .split(/\n+/)
+          .map(s => s.trim())
+          .filter(Boolean),
+        楼: 消息.message_id,
+        _排序: 消息.message_id * 10000,
+        可回档: 消息.message_id > 0 && 消息.message_id < 当前末楼,
+        ...可编辑,
+      });
+    }
+  }
+  const 事件日志 = _.get(getVariables({ type: 'chat' }), '_隔离事件.日志');
+  if (Array.isArray(事件日志)) {
+    for (const 原 of 事件日志) {
+      const 锚楼 = Number(原?.锚楼 ?? -1);
+      if (锚楼 < 范围.起楼 || 锚楼 > 范围.末楼) continue;
+      if (!原 || (原.谁 !== '玩家' && 原.谁 !== '叙事') || typeof 原.文本 !== 'string') continue;
+      const 净文 = 清洗(过酒馆正则(原.文本, 原.谁 === '玩家' ? 'user_input' : 'ai_output', 0));
+      if (!净文) continue;
+      条目.push({
+        谁: 原.谁,
+        文本:
+          原.谁 === '玩家'
+            ? [净文.replace(/\n+/g, ' ')]
+            : 净文
+                .split(/\n+/)
+                .map((s: string) => s.trim())
+                .filter(Boolean),
+        事件id: String(原.id ?? ''),
+        事件提示词: typeof 原.提示词 === 'string' ? 原.提示词 : undefined,
+        _排序: 锚楼 * 10000 + 100 + Number(原.序 ?? 0),
+      });
+    }
+  }
+  条目.sort((a, b) => (a._排序 ?? 0) - (b._排序 ?? 0));
+  return 条目;
+}
+
+/** 正常回合只重建固定末页；编辑已展开的旧楼时，保留玩家主动翻开的范围。 */
+async function 取卷轴(保留已加载史册 = false) {
   const 请求序号 = ++卷轴请求序号;
+  史册加载中.value = false;
   try {
     刷新玩家正则();
     const 末楼 = getLastMessageId();
-    const 消息组 = (await getChatMessages(`0-${末楼}`)) ?? [];
+    const 范围 = 保留已加载史册 ? { 起楼: Math.max(0, Math.min(史册最早楼.value, 末楼)), 末楼 } : 末页楼层范围(末楼);
+    const 条目 = await 读取卷轴范围(范围, 末楼);
     if (请求序号 !== 卷轴请求序号) return;
     末楼号.value = 末楼;
-    const 条目: 卷轴条[] = [];
-    for (const 消息 of 消息组) {
-      const 是玩家 = 消息.role === 'user';
-      const 原文 = 消息.message ?? '';
-      const 净文 = 清洗(过酒馆正则(原文, 是玩家 ? 'user_input' : 'ai_output', 末楼 - 消息.message_id));
-      if (!净文) continue;
-      // 0 楼藏着界面占位标记,整楼写回会砸掉客户端,不开放编辑
-      const 可编辑 = 消息.message_id > 0 ? { 原文 } : {};
-      if (是玩家) {
-        条目.push({
-          谁: '玩家',
-          文本: [净文.replace(/\n+/g, ' ')],
-          楼: 消息.message_id,
-          _排序: 消息.message_id * 10000,
-          ...可编辑,
-        });
-      } else {
-        条目.push({
-          谁: '叙事',
-          文本: 净文
-            .split(/\n+/)
-            .map(s => s.trim())
-            .filter(Boolean),
-          楼: 消息.message_id,
-          _排序: 消息.message_id * 10000,
-          可回档: 消息.message_id > 0 && 消息.message_id < 末楼,
-          ...可编辑,
-        });
-      }
-    }
-    const 事件日志 = _.get(getVariables({ type: 'chat' }), '_隔离事件.日志');
-    if (Array.isArray(事件日志)) {
-      for (const 原 of 事件日志) {
-        if (!原 || (原.谁 !== '玩家' && 原.谁 !== '叙事') || typeof 原.文本 !== 'string') continue;
-        const 净文 = 清洗(过酒馆正则(原.文本, 原.谁 === '玩家' ? 'user_input' : 'ai_output', 0));
-        if (!净文) continue;
-        条目.push({
-          谁: 原.谁,
-          文本:
-            原.谁 === '玩家'
-              ? [净文.replace(/\n+/g, ' ')]
-              : 净文
-                  .split(/\n+/)
-                  .map((s: string) => s.trim())
-                  .filter(Boolean),
-          事件id: String(原.id ?? ''),
-          事件提示词: typeof 原.提示词 === 'string' ? 原.提示词 : undefined,
-          _排序: Number(原.锚楼 ?? 0) * 10000 + 100 + Number(原.序 ?? 0),
-        });
-      }
-    }
-    条目.sort((a, b) => (a._排序 ?? 0) - (b._排序 ?? 0));
+    史册最早楼.value = 范围.起楼;
     卷轴.value = 条目;
     待回档楼.value = null;
     await 滚到底();
   } catch (e) {
     console.error('[人妻公寓客户端] 取卷轴失败:', e);
+  }
+}
+
+async function 加载更早史册() {
+  if (史册加载中.value) return;
+  const 范围 = 更早楼层范围(史册最早楼.value);
+  if (!范围) return;
+  const 请求序号 = ++卷轴请求序号;
+  const 容器 = 史册容器.value;
+  const 原高度 = 容器?.scrollHeight ?? 0;
+  const 原位置 = 容器?.scrollTop ?? 0;
+  史册加载中.value = true;
+  try {
+    刷新玩家正则();
+    const 当前末楼 = getLastMessageId();
+    const 新页 = await 读取卷轴范围(范围, 当前末楼);
+    if (请求序号 !== 卷轴请求序号) return;
+    卷轴.value = 合并卷轴页(卷轴.value, 新页);
+    史册最早楼.value = 范围.起楼;
+    await nextTick();
+    if (容器) 容器.scrollTop = 原位置 + Math.max(0, 容器.scrollHeight - 原高度);
+  } catch (e) {
+    console.error('[人妻公寓客户端] 加载更早往事失败:', e);
+  } finally {
+    if (请求序号 === 卷轴请求序号) 史册加载中.value = false;
   }
 }
 
@@ -3508,7 +3710,7 @@ async function 存编辑() {
   if (楼 === null || !文) return;
   try {
     await setChatMessages([{ message_id: 楼, message: 文 }], { refresh: 'none' });
-    await 取卷轴();
+    await 取卷轴(true);
   } catch (e) {
     错误信息.value = '改写失败:' + (e instanceof Error ? e.message : String(e));
   }
@@ -3520,6 +3722,7 @@ const {
   设置开,
   暗色,
   移动端,
+  成人CG双列,
   全屏中,
   显示移动端全屏引导,
   切换主题,
@@ -3538,6 +3741,11 @@ const {
     错误信息.value = 消息;
   },
 });
+
+/** 760px 以上才真正挂载第二张；窄窗与手机不下载、也不误计第二张解锁。 */
+const 当前成人CG显示槽位 = computed(() =>
+  选择CG显示槽位(当前成人CG槽位.value, 成人CG双列.value),
+);
 
 /** 同源浏览器 Window 在运行时暴露 eval，可动态 import 酒馆正在运行的模块实例；标准 Window 类型未声明该成员，此处局部做结构扩展，不改全局 Window。 */
 type 宿主窗口接口 = Window & { eval: (source: string) => unknown };
@@ -3678,6 +3886,7 @@ const 重开确认 = ref(false);
 // 弹窗一关就撤销"待确认"武装态,防下次误触(轮询生命周期由设置弹窗组件 watch 设置开 自理)
 watch(设置开, 开 => {
   if (!开) 重开确认.value = false;
+  if (!开) eventEmit('人妻公寓:查询变量重生成状态');
 });
 
 function 点重开() {
@@ -3879,6 +4088,37 @@ onMounted(() => {
     拾获卡.value = '';
     if (静音会议中.value) 同步静音会议界面();
   });
+  eventOn('人妻公寓:变量重生成状态', (载荷: { 状态?: 变量重生成状态值 }) => {
+    if (载荷?.状态) 变量重生成状态.value = 载荷.状态;
+  });
+  eventOn('人妻公寓:变量重生成开始', () => {
+    发送中.value = true;
+    变量重生成状态.value = '进行中';
+    运行阶段.value = '正在重新生成变量';
+    流式段.value = [];
+    开始生成计时();
+  });
+  eventOn(
+    '人妻公寓:变量重生成结束',
+    async (载荷: { 成功?: boolean; 取消?: boolean; 状态?: 变量重生成状态值; 提示?: string }) => {
+      停止生成计时();
+      发送中.value = false;
+      运行阶段.value = '';
+      流式段.value = [];
+      变量重生成状态.value = 载荷?.状态 ?? (载荷?.成功 ? '已完成' : '可用');
+      if (载荷?.成功) {
+        await 取卷轴();
+        try {
+          await Promise.resolve((store as unknown as { pull?: () => void | Promise<void> }).pull?.());
+        } catch {
+          /* store 未带 pull 时靠轮询兜底 */
+        }
+        await nextTick();
+        刷新在场();
+      }
+      if (载荷?.提示) 弹提示(载荷.提示, 载荷.成功 ? 3600 : 5200);
+    },
+  );
   eventOn('人妻公寓:流式', (文本: string) => {
     if (!运行阶段.value.startsWith('数据库')) 运行阶段.value = 'AI正在生成正文';
     // 流式半截文本只走本卡清洗,不过玩家正则(闭合标记未到会整段吞空)
@@ -3909,12 +4149,25 @@ onMounted(() => {
   });
   eventOn('人妻公寓:CG回合信号', (信号: CG回合信号) => {
     // 荣耀洞拥有独立三拍画面；这里仍可接收事件，但渲染层与解锁层均不采用普通CG。
-    if (荣耀洞图.value) {
-      当前成人CG.value = null;
+    // 医院同样只允许生产系统的非成人画面；不能把正文尺度误判生成的成人CG藏在生产图后。
+    if (荣耀洞图.value || 当前房间.value === '医院' || 当前生产CG.value) {
+      清空当前成人CG();
       最近CG信号 = null;
       return;
     }
     处理CG回合信号(信号);
+  });
+  eventOn('人妻公寓:家庭计划CG', (载荷: 家庭计划CG载荷) => {
+    if (!载荷?.文件) return;
+    清空当前成人CG();
+    当前生产CG.value = null;
+    当前家庭计划CG.value = 载荷;
+  });
+  eventOn('人妻公寓:生产CG', (载荷: 生产CG载荷) => {
+    if (!载荷?.文件) return;
+    清空当前成人CG();
+    当前家庭计划CG.value = null;
+    当前生产CG.value = 载荷;
   });
   eventOn('人妻公寓:回合完成', async (选项?: 回合完成正文选项) => {
     停止生成计时();
@@ -3943,6 +4196,7 @@ onMounted(() => {
       刷新行动选项();
       刷新偷窥待选();
       同步静音会议界面();
+      eventEmit('人妻公寓:查询变量重生成状态');
     } finally {
       发送中.value = false;
       运行阶段.value = '';
@@ -4028,6 +4282,8 @@ onMounted(() => {
   eventOn('人妻公寓:手机状态', (状: { 未读?: boolean }) => {
     时间撤销刷新版本.value += 1;
     手机未读.value = !!状?.未读;
+    eventEmit('人妻公寓:同步孕产微信已读');
+    eventEmit('人妻公寓:同步家庭计划微信已读');
     刷赴约(); // 约出来是纯手机操作不产楼,靠这条通知让地图位置即时跟上
     if (当前房间.value) {
       在场.value = {
@@ -4082,6 +4338,9 @@ onMounted(() => {
 
   // 恢复界面偏好 + media/fullscreen 监听 + 移动端默认 CSS 画幅（useUIPrefs 单例统一初始化）
   初始化();
+  eventEmit('人妻公寓:查询变量重生成状态');
+  eventEmit('人妻公寓:同步孕产微信已读');
+  eventEmit('人妻公寓:同步家庭计划微信已读');
 
   // 脚本心跳检测
   const 心跳tick = () => {
@@ -4547,7 +4806,7 @@ onUnmounted(() => {
   background: #0d1117;
 }
 
-/* 成人CG：一套竖图同时服务手机与桌面。完整图 contain；桌面余白由同图模糊铺底。 */
+/* 成人CG：窄窗单图、宽桌面最多双图。两槽等权 contain；余白由首图统一模糊铺底。 */
 .adult-cg-stage {
   position: absolute;
   inset: 0;
@@ -4574,9 +4833,26 @@ onUnmounted(() => {
   background: linear-gradient(90deg, rgba(8, 7, 12, 0.22), transparent 28% 72%, rgba(8, 7, 12, 0.22));
 }
 
+.adult-cg-grid {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  box-sizing: border-box;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+.adult-cg-frame {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .adult-cg-stage img {
-  /* 脱离 grid 的固有尺寸计算：竖图若作为 grid item，会先按 2:3 宽度撑高再被舞台裁掉，
-     导致桌面窗口虽然声明 contain，实际仍只显示中段。钉住四边后 contain 才以舞台为画框。 */
+  /* 脱离 grid 的固有尺寸计算：每张竖图都以自己的等权槽位为完整 contain 画框。 */
   position: absolute;
   inset: 0;
   z-index: 1;
@@ -4587,8 +4863,16 @@ onUnmounted(() => {
   filter: drop-shadow(0 10px 28px rgba(0, 0, 0, 0.42));
 }
 
-.adult-cg-stage.loading img {
+.adult-cg-frame.loading img {
   opacity: 0;
+}
+
+@media (min-width: 760px) {
+  .adult-cg-stage-double .adult-cg-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(8px, 1.1vw, 14px);
+    padding: 0 clamp(6px, 0.8vw, 10px);
+  }
 }
 
 /* 纯画面欣赏(正文隐藏)+成人CG:仅两者同时成立才把 CG 提到亲密底栏(z12)之上完整展示,
@@ -4620,6 +4904,10 @@ onUnmounted(() => {
     width 0.35s ease,
     height 0.35s ease,
     opacity 0.35s ease;
+}
+
+.story-wrap.story-family-plan-portrait .portrait-slot {
+  z-index: 2;
 }
 
 .portrait {
@@ -5783,6 +6071,31 @@ onUnmounted(() => {
   border: 1px solid var(--line-soft);
   border-radius: 999px;
   cursor: pointer;
+}
+
+.history-earlier-row {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 12px;
+  background: linear-gradient(var(--paper, #fff) 65%, transparent);
+}
+
+.history-earlier {
+  padding: 7px 14px;
+  color: var(--ink-soft);
+  font: 600 0.76em/1.2 inherit;
+  background: var(--glass);
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.history-earlier:disabled {
+  cursor: wait;
+  opacity: 0.58;
 }
 
 /* 手机 dock 钮(P4):来电=铃振跳动,未读=红点 */

@@ -100,14 +100,63 @@ test('坏图会遍历候选池直到真正耗尽，不保留固定次数截断',
 });
 
 test('同一CG id 的迟到回调还必须匹配本次请求 epoch', () => {
-  const { CG加载事件属于当前请求 } = require('../../src/人妻公寓/界面/客户端/cgLoadState.ts');
+  const {
+    CG加载事件属于当前请求,
+    创建CG加载槽位,
+    完成CG槽位加载,
+    选择CG显示槽位,
+    替换失败CG槽位,
+  } = require('../../src/人妻公寓/界面/客户端/cgLoadState.ts');
   assert.equal(CG加载事件属于当前请求('101-active-1', 8, '101-active-1', '8'), true);
   assert.equal(CG加载事件属于当前请求('101-active-1', 8, '101-active-1', '7'), false);
   assert.equal(CG加载事件属于当前请求('101-active-1', 8, '101-active-2', '8'), false);
   assert.equal(CG加载事件属于当前请求('101-active-1', 8, '101-active-1', '坏值'), false);
 
-  assert.match(App源码, /:key="`\$\{当前成人CG\?\.id\}:\$\{当前成人CG请求epoch\}`"/);
-  assert.match(App源码, /:data-cg-epoch="当前成人CG请求epoch"/);
+  const 甲 = { id: '101-active-1' };
+  const 乙 = { id: '101-active-2' };
+  const 丙 = { id: '101-active-3' };
+  const 初始 = [创建CG加载槽位(甲, 8), 创建CG加载槽位(乙, 9)];
+  assert.deepEqual(选择CG显示槽位(初始, false).map(槽 => 槽.项.id), [甲.id], '窄窗只挂载第一槽');
+  assert.deepEqual(选择CG显示槽位(初始, true).map(槽 => 槽.项.id), [甲.id, 乙.id], '宽窗挂载两槽');
+
+  const 甲完成 = 完成CG槽位加载(初始, 甲.id, '8');
+  assert.equal(甲完成.已处理, true);
+  assert.equal(甲完成.槽位[0].加载中, false);
+  assert.equal(甲完成.槽位[1].加载中, true, '第一张完成不能替第二张结束 loading');
+  const 双完成 = 完成CG槽位加载(甲完成.槽位, 乙.id, '9');
+  assert.equal(双完成.槽位[0].加载中, false);
+  assert.equal(双完成.槽位[1].加载中, false, '第二张成功应独立完成自己的 loading');
+
+  const 乙失败 = 替换失败CG槽位(甲完成.槽位, 乙.id, '9', [甲, 丙], 10);
+  assert.equal(乙失败.已处理, true);
+  assert.equal(乙失败.槽位[0], 甲完成.槽位[0], '失败补位不能重建已经显示的另一槽');
+  assert.equal(乙失败.槽位[1].项.id, 丙.id);
+  assert.equal(乙失败.槽位[1].epoch, 10);
+  assert.equal(乙失败.槽位[1].加载中, true);
+
+  const 迟到乙 = 替换失败CG槽位(乙失败.槽位, 乙.id, '9', [甲], 11);
+  assert.equal(迟到乙.已处理, false, '旧槽迟到 error 不得删除新补位');
+  assert.deepEqual(迟到乙.槽位, 乙失败.槽位);
+
+  const 丙耗尽 = 替换失败CG槽位(乙失败.槽位, 丙.id, '10', [甲], 12);
+  assert.equal(丙耗尽.已处理, true);
+  assert.deepEqual(丙耗尽.槽位.map(槽 => 槽.项.id), [甲.id], '补位耗尽自动降级单图');
+
+  assert.match(App源码, /v-for="槽 in 当前成人CG显示槽位"/);
+  assert.match(App源码, /:key="`\$\{槽\.项\.id\}:\$\{槽\.epoch\}`"/);
+  assert.match(App源码, /:data-cg-epoch="槽\.epoch"/);
+});
+
+test('回档、离房与专属事件画面会原子清理整组成人 CG', () => {
+  const 清空函数 = App源码.match(/function 清空当前成人CG\(\)[\s\S]*?\n\}/)?.[0] ?? '';
+  assert.match(清空函数, /当前成人CG槽位\.value = \[\]/);
+  assert.match(清空函数, /当前成人CG展示键 = ''/);
+
+  const 回档清理 = App源码.match(/function 清理越界成人CG\(\)[\s\S]*?\n\}/)?.[0] ?? '';
+  assert.match(回档清理, /清空当前成人CG\(\)/, '回档越界必须清整组而非只清第一张');
+  assert.match(App源码, /if \(旧房间 !== 房间id\) \{[\s\S]{0,120}清空当前成人CG\(\)/, '离房清整组');
+  assert.match(App源码, /eventOn\('人妻公寓:家庭计划CG'[\s\S]{0,180}清空当前成人CG\(\)/, '家庭计划画面互斥');
+  assert.match(App源码, /eventOn\('人妻公寓:生产CG'[\s\S]{0,180}清空当前成人CG\(\)/, '生产画面互斥');
 });
 
 test('普通toast不会取消性爱结果卡自己的隐藏计时', () => {

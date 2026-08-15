@@ -35,6 +35,8 @@ const 图标库: Record<string, string> = {
   search:
     '<circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/><path class="ic-gem" d="M8 10h5M10.5 7.5v5"/>',
   rewind: '<path d="m11 7-5 5 5 5"/><path d="M6 12h7a6 6 0 0 1 6 6v1"/>',
+  refresh:
+    '<path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M6.1 8.5A7 7 0 0 1 18.8 7L20 11M4 13l1.2 4A7 7 0 0 0 17.9 15.5"/>',
   dice: '<rect x="3" y="3" width="18" height="18" rx="5"/><circle class="ic-gem" cx="8" cy="8" r="1"/><circle class="ic-gem" cx="16" cy="8" r="1"/><circle class="ic-gem" cx="12" cy="12" r="1"/><circle class="ic-gem" cx="8" cy="16" r="1"/><circle class="ic-gem" cx="16" cy="16" r="1"/>',
   dress: '<path d="M9 3h6l1 5-2 2 5 11H5l5-11-2-2 1-5Z"/><path class="ic-gem" d="M9 3c.5 2 5.5 2 6 0"/>',
   drug: '<path d="M8.5 4.5a4.2 4.2 0 0 1 6 0l5 5a4.2 4.2 0 0 1-6 6l-5-5a4.2 4.2 0 0 1 0-6Z"/><path d="m10 12 6-6"/><path class="ic-gem" d="M6 17h5M8.5 14.5v5"/>',

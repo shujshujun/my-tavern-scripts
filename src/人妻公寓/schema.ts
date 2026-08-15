@@ -1,7 +1,35 @@
 import { z } from 'zod';
 
-export const 当前MVU数据版本 = 8;
-const 可迁移MVU数据版本 = 7;
+export const 当前MVU数据版本 = 9;
+const 可迁移MVU数据版本 = [7, 8] as const;
+
+const 阶段性癖按门牌 = {
+  '101': '孕欲',
+  '102': '视奸欲',
+  '201': '交易快感',
+  '202': '独占印记',
+  '301': '镜头高潮',
+  '302': '哺育癖',
+} as const;
+
+const 旧性癖ID = new Set([
+  '露出癖',
+  '淫语解禁',
+  '拍摄癖',
+  '受虐渴望',
+  '口奴体质',
+  '后穴开发',
+  '潮喷体质',
+  '阿黑颜',
+  '中出执念',
+  '隐奸癖',
+  '物化认知',
+  '窒息快感',
+  '尿饮嗜好',
+  '舔肛嗜好',
+  '寝取展示',
+  ...Object.values(阶段性癖按门牌),
+]);
 
 type 原始记录 = Record<string, unknown>;
 
@@ -13,7 +41,7 @@ function 是记录(value: unknown): value is 原始记录 {
   return 原型 === null || Object.getPrototypeOf(原型) === null;
 }
 
-/** v0.82 接受 v0.80(v7) 与 v0.81/v0.82(v8)；更早或未来版本继续硬拒绝。 */
+/** v0.83 接受 v0.80(v7) 与 v0.81/v0.82(v8)；更早或未来版本继续硬拒绝。 */
 export function 验证当前MVU存档版本(input: unknown): void {
   if (!是记录(input)) {
     throw new Error('人妻公寓存档结构损坏：stat_data 必须是对象。请新建聊天开始游戏。');
@@ -24,20 +52,20 @@ export function 验证当前MVU存档版本(input: unknown): void {
   if (
     !系统 ||
     !Object.prototype.hasOwnProperty.call(系统, '_数据版本') ||
-    (版本 !== 可迁移MVU数据版本 && 版本 !== 当前MVU数据版本)
+    (!可迁移MVU数据版本.includes(版本 as (typeof 可迁移MVU数据版本)[number]) && 版本 !== 当前MVU数据版本)
   ) {
     const 显示版本 = typeof 版本 === 'number' && Number.isInteger(版本) ? String(版本) : '未知';
     throw new Error(
-      `v0.82 仅兼容数据版本 7 和 8：当前存档版本为 ${显示版本}。v0.80/v0.81 存档可直接继承；其他版本请新建聊天开始游戏。`,
+      `v0.83 仅兼容数据版本 7、8 和 9：当前存档版本为 ${显示版本}。v0.80/v0.81/v0.82 存档可直接继承；其他版本请新建聊天开始游戏。`,
     );
   }
 }
 
-/** 空 Schema 构造不是外部存档；其余合法输入只有 v7 需要一次性迁移。 */
+/** 空 Schema 构造不是外部存档；其余合法输入中 v7/v8 需要一次性迁移。 */
 export function 需要迁移MVU存档(input: unknown): boolean {
   验证当前MVU存档版本(input);
   if (!是记录(input) || Object.keys(input).length === 0) return false;
-  return 是记录(input.系统) && input.系统._数据版本 === 可迁移MVU数据版本;
+  return 是记录(input.系统) && input.系统._数据版本 !== 当前MVU数据版本;
 }
 
 function 仅在缺失时写入(记录: 原始记录, 键: string, 值: unknown): void {
@@ -66,40 +94,140 @@ function 创建未孕默认值(): 原始记录 {
   };
 }
 
+function 创建生产默认值(): 原始记录 {
+  return {
+    状态: '无',
+    本胎序号: 0,
+    家庭计划知情: false,
+    确认已读绝对时段: -1,
+    预产绝对时段: -1,
+    自动生产绝对时段: -1,
+    预产通知文案: '',
+    预产通知已读: false,
+    产前看望: false,
+    陪产已选择: false,
+    生产结算标识: '',
+    生产叙事已完成: false,
+    实际生产绝对时段: -1,
+    住院结束绝对时段: -1,
+    结果: '未定',
+    产后看望: false,
+    获知生产路径: '',
+  };
+}
+
+function 原始字符串数组(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((项): 项 is string => typeof 项 === 'string') : [];
+}
+
+function 旧阶段性癖节点已完成(门牌: string, 妻: 原始记录): boolean {
+  const 当前阶段 = Number(妻.当前阶段);
+  if (Number.isFinite(当前阶段) && 当前阶段 >= 5) return true;
+  if (!是记录(妻._阶段线路)) return false;
+  const 线路 = 妻._阶段线路;
+  if (Number(线路.目标阶段) !== 5) return false;
+  const 节点 = 门牌 === '302' ? 1 : 0;
+  const 位图 = Number(线路.完成位图);
+  const 活跃节点 = Number(线路.活跃节点);
+  return (Number.isFinite(位图) && (Math.floor(位图) & (1 << 节点)) !== 0) ||
+    (Number.isFinite(活跃节点) && Math.floor(活跃节点) > 节点);
+}
+
+function 迁移阶段性癖(已迁移: 原始记录): void {
+  const 背包 = 原始字符串数组(已迁移.背包);
+  if (Array.isArray(已迁移.背包)) 已迁移.背包 = 背包.filter(id => !旧性癖ID.has(id));
+  if (!是记录(已迁移.户)) return;
+
+  for (const [门牌, 户] of Object.entries(已迁移.户)) {
+    if (!是记录(户) || !是记录(户.妻)) continue;
+    const 妻 = 户.妻;
+    const 专属 = 阶段性癖按门牌[门牌 as keyof typeof 阶段性癖按门牌];
+    const 旧装载 = 原始字符串数组(妻.性癖装载);
+    const 旧开发 = 原始字符串数组(妻.曾开发性癖);
+    const 已完成 = !!专属 && 旧阶段性癖节点已完成(门牌, 妻);
+    const 已支付证据 = !!专属 && (背包.includes(专属) || 旧装载.includes(专属) || 旧开发.includes(专属));
+
+    妻.阶段性癖 = 已完成 ? 专属 : '';
+    妻._阶段性癖已支付 = 门牌 !== '302' && !已完成 && 已支付证据;
+    delete 妻.性癖装载;
+    delete 妻.曾开发性癖;
+  }
+}
+
 /**
- * 把 v0.80 的 v7 原始数据迁到当前 v8。先深拷贝、后逐字段补缺，保证失败不污染原档；
- * v8 原样返回，因此重复调用幂等。最终类型归一仍统一交给当前 Schema。
+ * 把 v0.80(v7) 或 v0.81/v0.82(v8) 原始数据迁到当前 v9。先深拷贝、后逐字段补缺与清洗，
+ * 保证失败不污染原档；v9 原样返回，因此重复调用幂等。最终类型归一仍统一交给当前 Schema。
  */
 export function 迁移MVU存档到当前版本(input: unknown): unknown {
   if (!需要迁移MVU存档(input)) return input;
 
   const 已迁移 = _.cloneDeep(input) as 原始记录;
   const 系统 = 已迁移.系统 as 原始记录;
-  系统._数据版本 = 当前MVU数据版本;
-  仅在缺失时写入(系统, '_孕情初见评价楼', {});
+  const 原版本 = Number(系统._数据版本);
+  if (原版本 === 7) {
+    仅在缺失时写入(系统, '_孕情初见评价楼', {});
 
-  if (!是记录(系统._上次性爱结果)) 系统._上次性爱结果 = {};
-  仅在缺失时写入(系统._上次性爱结果 as 原始记录, '收尾对象门牌', '');
+    if (!是记录(系统._上次性爱结果)) 系统._上次性爱结果 = {};
+    仅在缺失时写入(系统._上次性爱结果 as 原始记录, '收尾对象门牌', '');
 
-  if (是记录(已迁移.户)) {
-    for (const 户 of Object.values(已迁移.户)) {
-      if (!是记录(户) || !是记录(户.妻)) continue;
-      const 妻 = 户.妻;
-      if (!是记录(妻._冷落余波)) 妻._冷落余波 = {};
-      仅在缺失时写入(妻._冷落余波 as 原始记录, '送礼安抚日', -1);
-      仅在缺失时写入(妻._冷落余波 as 原始记录, '当日送礼安抚次数', 0);
-      if (!是记录(妻._怀孕)) 妻._怀孕 = 创建未孕默认值();
+    if (是记录(已迁移.户)) {
+      for (const 户 of Object.values(已迁移.户)) {
+        if (!是记录(户) || !是记录(户.妻)) continue;
+        const 妻 = 户.妻;
+        if (!是记录(妻._冷落余波)) 妻._冷落余波 = {};
+        仅在缺失时写入(妻._冷落余波 as 原始记录, '送礼安抚日', -1);
+        仅在缺失时写入(妻._冷落余波 as 原始记录, '当日送礼安抚次数', 0);
+        if (!是记录(妻._怀孕)) 妻._怀孕 = 创建未孕默认值();
+      }
     }
   }
+  迁移阶段性癖(已迁移);
+  系统._数据版本 = 当前MVU数据版本;
   return 已迁移;
 }
 
 /** Schema 的局部构造允许省略版本；显式 v7 会先迁移，显式未知版本会硬拒绝。 */
-function 迁移显式MVU版本(input: unknown): unknown {
-  if (是记录(input) && 是记录(input.系统) && Object.prototype.hasOwnProperty.call(input.系统, '_数据版本')) {
-    return 迁移MVU存档到当前版本(input);
+function 补全生产旧档(input: unknown): unknown {
+  if (!是记录(input) || !是记录(input.系统) || !是记录(input.户)) return input;
+  const 当前绝对时段 = Math.max(0, Math.floor(Number(input.系统._绝对时段) || 0));
+  const 家庭文档 = 是记录(input.系统._家庭文档) ? input.系统._家庭文档 : undefined;
+  const 孩子 = Array.isArray(家庭文档?.孩子) ? 家庭文档.孩子 : [];
+  let 输出 = input;
+  let 已复制 = false;
+  const 确保副本 = (): 原始记录 => {
+    if (!已复制) {
+      输出 = _.cloneDeep(input) as 原始记录;
+      已复制 = true;
+    }
+    return 输出 as 原始记录;
+  };
+
+  for (const [门牌, 户] of Object.entries(input.户)) {
+    if (!是记录(户) || !是记录(户.妻) || !是记录(户.妻._怀孕) || 户.妻._怀孕.状态 !== '已告知') continue;
+    const 生产 = 是记录(户.妻._生产) ? 户.妻._生产 : undefined;
+    if (生产 && 生产.状态 !== '无' && Number(生产.确认已读绝对时段) >= 0) continue;
+    const 已生 = 孩子.filter(项 => 是记录(项) && 项.母亲门牌 === 门牌).length;
+    const 副本 = 确保副本();
+    const 妻副本 = ((副本.户 as 原始记录)[门牌] as 原始记录).妻 as 原始记录;
+    妻副本._生产 = {
+      ...创建生产默认值(),
+      状态: '孕期',
+      本胎序号: Math.min(3, 已生 + 1),
+      // 旧档没有“受孕时已知情”的稳定证据；宁可走通用路线，也不能事后伪造陆嘉明同意。
+      家庭计划知情: false,
+      确认已读绝对时段: 当前绝对时段,
+      预产绝对时段: 当前绝对时段 + 126,
+    };
   }
-  return input;
+  return 输出;
+}
+
+function 迁移显式MVU版本(input: unknown): unknown {
+  const 已迁移 =
+    是记录(input) && 是记录(input.系统) && Object.prototype.hasOwnProperty.call(input.系统, '_数据版本')
+      ? 迁移MVU存档到当前版本(input)
+      : input;
+  return 补全生产旧档(已迁移);
 }
 
 /**
@@ -219,9 +347,10 @@ const 妻状态 = z
     // ── 身体开发(仅性场景楼 AI 可 +3,不可衰退,上限挂阶段) ──
     身体开发,
 
-    // ── 性癖槽(P5 启用;3 槽装载中 + 档案卡永久"曾开发"记录) ──
-    性癖装载: z.array(z.string()).catch([]).prefault([]),
-    曾开发性癖: z.array(z.string()).catch([]).prefault([]),
+    // ── 唯一阶段性癖：有效开幕正文成功后永久登记；不再有槽位、卸载或曾开发列表 ──
+    阶段性癖: z.string().prefault(''),
+    /** 旧档或当前入口已经支付但尚未完成开幕；成功提交后清空，302剧情获得始终不用此字段。 */
+    _阶段性癖已支付: z.coerce.boolean().catch(false).prefault(false),
 
     // ── 脚本管字段 ──
     上次互动楼层: nonNegInt(0), // 当前正文互动楼；供雌竞争冷落距离使用
@@ -269,7 +398,7 @@ const 妻状态 = z
           .catch(0)
           .transform(v => (isNaN(v) ? 0 : _.clamp(Math.floor(v), 0, 2)))
           .prefault(0),
-        /** 到期瞬间按当时阶段与关系数值冻结；只供确定性微信通知使用。 */
+        /** 到期瞬间冻结报孕生成资料；新档存结构化数据，旧档可保留已冻结的可见文案。 */
         告知文案: z.string().prefault(''),
         /** 高风闻下孕情已成为公开硬证据；持久保存，避免风闻事件账裁剪后错误恢复为私密认知。 */
         已曝光: z.boolean().catch(false).prefault(false),
@@ -285,6 +414,37 @@ const 妻状态 = z
             已结算: z.boolean().catch(false).prefault(false),
           })
           .prefault({}),
+      })
+      .prefault({}),
+    /** 本胎生产硬账与 `_怀孕` 分离：实际生产后孕肚状态立即关闭，但住院、通知与幂等票据继续存在。 */
+    _生产: z
+      .object({
+        状态: z
+          .enum(['无', '孕期', '待产通知', '待产', '陪产中', '住院中', '已出院'])
+          .catch('无')
+          .prefault('无'),
+        本胎序号: z.coerce
+          .number()
+          .catch(0)
+          .transform(v => (isNaN(v) ? 0 : _.clamp(Math.floor(v), 0, 3)))
+          .prefault(0),
+        /** 只冻结本次受孕发生时陆嘉明是否已经知情；不得用当前家庭计划状态事后改写旧孕情。 */
+        家庭计划知情: z.coerce.boolean().catch(false).prefault(false),
+        确认已读绝对时段: floorMark(-1),
+        预产绝对时段: floorMark(-1),
+        自动生产绝对时段: floorMark(-1),
+        预产通知文案: z.string().prefault(''),
+        预产通知已读: z.coerce.boolean().catch(false).prefault(false),
+        产前看望: z.coerce.boolean().catch(false).prefault(false),
+        陪产已选择: z.coerce.boolean().catch(false).prefault(false),
+        /** 每胎稳定票据；孩子追加与世界时间推进只认此票据，AI 文案失败不得重新结算。 */
+        生产结算标识: z.string().prefault(''),
+        生产叙事已完成: z.coerce.boolean().catch(false).prefault(false),
+        实际生产绝对时段: floorMark(-1),
+        住院结束绝对时段: floorMark(-1),
+        结果: z.enum(['未定', '陪产', '仅产前看望', '完全缺席']).catch('未定').prefault('未定'),
+        产后看望: z.coerce.boolean().catch(false).prefault(false),
+        获知生产路径: z.enum(['', '陪产', '姐妹群', '私聊', '产后看望']).catch('').prefault(''),
       })
       .prefault({}),
     /** 当前阶段攻略线路：每户只保存一条活动线路，不为24条路线扩散布尔变量。完成位图低4位对应四个固定节点。 */
@@ -537,6 +697,25 @@ const 胜任记分列表 = z
     });
   });
 
+/** 孩子只记录生产系统已经提交的稳定事实；同一母亲同一胎次由业务层幂等追加。 */
+const 家庭孩子档案 = z.object({
+  id: z.string().prefault(''),
+  母亲门牌: z.string().prefault(''),
+  胎次: z.coerce
+    .number()
+    .catch(0)
+    .transform(v => (isNaN(v) ? 0 : _.clamp(Math.floor(v), 0, 3)))
+    .prefault(0),
+  性别: z.enum(['男', '女']).catch('女').prefault('女'),
+  出生绝对时段: floorMark(-1),
+  结果: z.enum(['陪产', '仅产前看望', '完全缺席']).catch('完全缺席').prefault('完全缺席'),
+  玩家产后看望: z.coerce.boolean().catch(false).prefault(false),
+  获知生产路径: z.enum(['陪产', '姐妹群', '私聊', '产后看望']).catch('私聊').prefault('私聊'),
+  叙事最小年龄: nonNegInt(0),
+  年龄阶段: z.enum(['新生儿', '一岁以上', '两岁以上']).catch('新生儿').prefault('新生儿'),
+  出生场次标识: z.string().prefault(''),
+});
+
 const 当前Schema = z.object({
   /** 门牌号 → 户;未入住无键(休眠),Zod record 容忍缺键(防护10-②) */
   户: z.record(z.string(), 户节点).prefault({}),
@@ -578,7 +757,7 @@ const 当前Schema = z.object({
 
   系统: z
     .object({
-      /** 当前存档契约版本；v0.80(v7) 由入口一次性迁到 v8。 */
+      /** 当前存档契约版本；v0.80(v7) 与 v0.81/v0.82(v8) 由入口一次性迁到 v9。 */
       _数据版本: z.literal(当前MVU数据版本).prefault(当前MVU数据版本),
       _坏结局: z.string().prefault(''), // 单向锁:非空=全冻结,快照只注入终局指引
       /** 一次性剧情事件队列(| 分隔;写阶段转存 _已注入事件 供同楼重roll重放,防护10) */
@@ -633,6 +812,34 @@ const 当前Schema = z.object({
           /** 静音会议微信旁路只向下一正文暴露低信息摘要，不把私聊原文写入正文历史。 */
           会场私聊摘要: z.record(z.string(), z.string()).catch({}).prefault({}),
           会场私聊摘要楼层: floorMark(-1),
+        })
+        .prefault({}),
+      /** 夏乔家庭计划：五日筹备、微信已读与一次性赴约共用的硬生命周期。 */
+      _家庭计划: z
+        .object({
+          阶段: z
+            .enum([
+              '未开始',
+              '待安装',
+              '待投资料',
+              '待观察资料',
+              '待写磁贴',
+              '待送磁贴',
+              '待确认人选',
+              '待微信',
+              '待赴约',
+              '已完成',
+            ])
+            .catch('未开始')
+            .prefault('未开始'),
+          最早继续日: floorMark(-1),
+          完成楼层: floorMark(-1),
+        })
+        .prefault({}),
+      /** 生产完成后追加的家庭文档；不覆盖旧孩子，也不按世界钟逐时段成长。 */
+      _家庭文档: z
+        .object({
+          孩子: z.array(家庭孩子档案).catch([]).prefault([]),
         })
         .prefault({}),
       // 摄像头布设名单(2026-07-17 从 chat 变量迁入:与背包同一本账,重掷/撤回删楼时消耗与布设同生共死,

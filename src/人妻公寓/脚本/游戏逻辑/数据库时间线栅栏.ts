@@ -3,6 +3,70 @@ interface 数据表快照 {
   content?: unknown;
 }
 
+export interface 数据库异步写租约 {
+  聊天标识: string;
+  世代: number;
+}
+
+interface 数据库异步写任务 {
+  租约: 数据库异步写租约;
+  任务: Promise<unknown>;
+}
+
+/**
+ * 脚本直发的 SQL mutation 可能在玩家删楼之后才完成。数据库插件会在真正持久化时解析
+ * `targetMessageIndex=-1`；同聊天回档/同楼 swipe 不改变聊天标识，因此仅靠插件的聊天隔离
+ * 不能证明这笔旧写仍属于当前分支。本栅栏让回档同步作废旧租约，并一直等待“旧 mutation +
+ * 必要补偿”全部结算；在此之前既不开放数据库读取，也不允许新时间线继续混写。
+ */
+export class 数据库异步写栅栏 {
+  private readonly 世代 = new Map<string, number>();
+  private readonly 任务 = new Set<数据库异步写任务>();
+
+  捕获(聊天标识: string): 数据库异步写租约 {
+    return { 聊天标识, 世代: this.当前世代(聊天标识) };
+  }
+
+  作废(聊天标识: string): number {
+    if (!聊天标识) return 0;
+    const next = this.当前世代(聊天标识) + 1;
+    this.世代.set(聊天标识, next);
+    return next;
+  }
+
+  可提交(租约: 数据库异步写租约): boolean {
+    return (
+      !!租约.聊天标识 &&
+      租约.世代 === this.当前世代(租约.聊天标识) &&
+      !this.有已作废写入(租约.聊天标识)
+    );
+  }
+
+  可开始新写(聊天标识: string): boolean {
+    return !!聊天标识 && !this.有已作废写入(聊天标识);
+  }
+
+  登记<T>(租约: 数据库异步写租约, 任务: Promise<T>): Promise<T> {
+    const entry: 数据库异步写任务 = { 租约: { ...租约 }, 任务: Promise.resolve() };
+    const tracked = Promise.resolve(任务).finally(() => {
+      this.任务.delete(entry);
+    });
+    entry.任务 = tracked;
+    this.任务.add(entry);
+    return tracked;
+  }
+
+  有已作废写入(聊天标识: string): boolean {
+    if (!聊天标识) return false;
+    const current = this.当前世代(聊天标识);
+    return [...this.任务].some(entry => entry.租约.聊天标识 === 聊天标识 && entry.租约.世代 < current);
+  }
+
+  private 当前世代(聊天标识: string): number {
+    return this.世代.get(聊天标识) ?? 0;
+  }
+}
+
 export interface 数据库时间线持久状态 {
   版本: 2;
   聊天标识: string;

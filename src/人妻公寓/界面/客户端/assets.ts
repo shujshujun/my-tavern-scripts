@@ -7,7 +7,7 @@
 //   本地 src/人妻公寓/素材 也仅含该增量集合。
 // - 素材基址固定使用含完整 720 个文件的 rq0.55 不可变快照，供头像/立绘等完整旧素材使用；
 //   代码版本 Tag 不再承担素材仓职责。
-// 成人 CG 仍来自独立 qgy-assets@cg1/cg1，与两套普通素材无关。
+// 成人 CG 来自独立 qgy-assets@cg3/cg1；cg3 同时承载普通/孕肚五阶段图库，与两套普通素材无关。
 export const 版本素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.70/src/人妻公寓/素材';
 export const 录像带双屏关闭图 = `${版本素材基址}/特殊场景/录像带/01_双屏关闭.png`;
 export const 录像带左屏亮起图 = `${版本素材基址}/特殊场景/录像带/02_左屏亮起.png`;
@@ -22,6 +22,18 @@ export const 强效营养剂道具图 = `${版本素材基址}/道具/强效营�
 export const 安全套道具图 = `${版本素材基址}/道具/安全套.webp`;
 export const 专注训练手册道具图 = `${版本素材基址}/道具/专注训练手册.webp`;
 export const 蛋白粉道具图 = `${版本素材基址}/道具/蛋白粉.webp`;
+/** 家庭计划九张专属画面随 v0.83 发布，不并入客户端模块。 */
+export const 家庭计划素材基址 =
+  'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.83/output/imagegen/family-plan';
+export const 家庭计划图片 = (文件: string): string => `${家庭计划素材基址}/${文件}.webp`;
+/** 生产／医院73张非成人图片随 v0.83 发布，与普通素材及成人CG仓隔离。 */
+export const 生产素材基址 =
+  'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.83/output/imagegen/production-system/final';
+export const 生产图片 = (文件: string): string =>
+  `${生产素材基址}/${文件
+    .split('/')
+    .map(段 => encodeURIComponent(段))
+    .join('/')}.webp`;
 export const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.55/dist/人妻公寓/素材';
 /**
  * 与孕态服装发布记录保持同一命名契约：approved/<角色>/服装_<商店 SKU>_孕态.webp。
@@ -62,5 +74,6 @@ export function 角色立绘候选(妻名: string, sku: string | undefined, 怀�
   const 候选 = [孕态服装立绘, 常规服装立绘, 基础立绘];
   return [...new Set(候选.filter(Boolean))];
 }
-export const 成人CG基址 = 'https://testingcf.jsdelivr.net/gh/shujun8520-design/qgy-assets@cg1/cg1';
+export const 成人CG基址 = 'https://testingcf.jsdelivr.net/gh/shujun8520-design/qgy-assets@cg3/cg1';
+// 存储键保持 cg1，兼容旧档已经解锁的稳定 CG ID；资源标签升级不能清空玩家进度。
 export const CG解锁存储键 = '人妻公寓_成人CG解锁_cg1';

@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { 规范变量解析通道, 读取变量解析通道, 选择变量解析通道 } from '../../src/人妻公寓/MVU解析模式.ts';
+import { 规范OpenAI兼容API地址, 规范变量解析通道, 读取变量解析通道, 选择变量解析通道 } from '../../src/人妻公寓/MVU解析模式.ts';
 
 const 读 = 路径 => readFileSync(new URL(`../../${路径}`, import.meta.url), 'utf8');
 const 引擎源码 = 读('src/人妻公寓/脚本/游戏逻辑/回合引擎.ts');
@@ -23,6 +23,38 @@ test('路由矩阵：显式自定义配置完整才走自定义，配置不完�
   assert.equal(选择变量解析通道('自定义', true, true), '自定义');
   assert.equal(选择变量解析通道('自定义', true, false), null);
   assert.equal(选择变量解析通道('自定义', false, false), null);
+});
+
+test('规范OpenAI兼容API地址：裸域名补 /v1', () => {
+  assert.equal(规范OpenAI兼容API地址('https://api.example.com'), 'https://api.example.com/v1');
+});
+
+test('规范OpenAI兼容API地址：首尾空格与尾斜杠被清理', () => {
+  assert.equal(规范OpenAI兼容API地址('  https://api.example.com///  '), 'https://api.example.com/v1');
+  assert.equal(规范OpenAI兼容API地址('https://api.example.com/'), 'https://api.example.com/v1');
+});
+
+test('规范OpenAI兼容API地址：已是 /vN 版本路径原样保留', () => {
+  assert.equal(规范OpenAI兼容API地址('https://api.example.com/v1'), 'https://api.example.com/v1');
+  assert.equal(规范OpenAI兼容API地址('https://api.example.com/v2'), 'https://api.example.com/v2');
+  // /models 终端路径剥离后版本号仍保留
+  assert.equal(规范OpenAI兼容API地址('https://api.example.com/v2/models'), 'https://api.example.com/v2');
+});
+
+test('规范OpenAI兼容API地址：/v1/models 与 /v1/chat/completions 去掉终端路径', () => {
+  assert.equal(规范OpenAI兼容API地址('https://api.example.com/v1/models'), 'https://api.example.com/v1');
+  assert.equal(规范OpenAI兼容API地址('https://api.example.com/v1/chat/completions'), 'https://api.example.com/v1');
+});
+
+test('规范OpenAI兼容API地址：空白配置返回空字符串，绝不补成 /v1', () => {
+  assert.equal(规范OpenAI兼容API地址(''), '');
+  assert.equal(规范OpenAI兼容API地址('   '), '');
+});
+
+test('规范OpenAI兼容API地址：已规范地址幂等', () => {
+  const 已规范 = 'https://api.example.com/v1';
+  assert.equal(规范OpenAI兼容API地址(已规范), 已规范);
+  assert.equal(规范OpenAI兼容API地址('https://api.example.com/v1'), 'https://api.example.com/v1');
 });
 
 test('旧偏好 正文 与非法值统一规范为 自动，读取默认也落回 自动', () => {
@@ -134,5 +166,22 @@ test('读取中禁用按钮；读取失败与保存失败都有可见反馈；�
   assert.match(设置源码, /已保存并启用/, '保存成功有可见反馈');
   assert.match(设置源码, /安全错误反馈\(e, key\)/, '宿主错误反馈先按当前 Key 脱敏');
   assert.match(设置源码, /\.split\(密钥\)\.join\('\*\*\*'\)/, '错误文本不会把 API Key 回显到界面');
-  assert.match(设置源码, /const 地址 = 解析API表单\.api地址\.trim\(\)\.replace\(\/\\\/\+\$\/, ''\)/, '保存与读取统一去掉末尾斜杠');
+  assert.match(设置源码, /const 地址 = 规范OpenAI兼容API地址\(解析API表单\.api地址\)/, '保存并启用统一使用规范函数');
+});
+
+test('设置页读取模型、保存并启用与回合引擎自定义请求都复用同一规范纯函数，不各写一套正则', () => {
+  const 函数名 = '规范OpenAI兼容API地址';
+  // 读取模型（草稿输入）用规范 base 请求 getModelList
+  const 读取模型段 = 设置源码.slice(设置源码.indexOf('async function 读取模型'), 设置源码.indexOf('function 保存并启用'));
+  assert.match(读取模型段, new RegExp(`const base = ${函数名}\\(解析API表单\\.api地址\\)`), '读取模型使用规范函数');
+  assert.doesNotMatch(读取模型段, /api地址\.trim\(\)\.replace/, '读取模型不再单独去尾斜杠');
+  // 保存并启用写穿规范地址，游戏内置解析立即读到可用地址
+  const 保存段 = 设置源码.slice(设置源码.indexOf('function 保存并启用'), 设置源码.indexOf('</script>'));
+  assert.match(保存段, new RegExp(`const 地址 = ${函数名}\\(解析API表单\\.api地址\\)`), '保存并启用写入规范地址');
+  assert.doesNotMatch(保存段, /api地址\.trim\(\)\.replace/, '保存不再单独去尾斜杠');
+  // 回合引擎自定义变量请求复用同一函数
+  assert.match(引擎源码, new RegExp(`apiurl: ${函数名}\\(配置\\.api地址\\)`), '引擎自定义请求复用同一规范函数');
+  assert.doesNotMatch(引擎源码, /配置\.api地址\.trim\(\)\.replace/, '引擎不再单独去尾斜杠');
+  // 三个调用点必须来自同一导出，而不是各自实现
+  assert.ok(读('src/人妻公寓/MVU解析模式.ts').includes(`export function ${函数名}`), '规范函数在 MVU解析模式 中导出');
 });
