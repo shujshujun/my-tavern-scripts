@@ -134,14 +134,14 @@
     "uid": "sheet_rq_social_history",
     "name": "RQ_社交轨迹",
     "sourceData": {
-      "note": "记录会影响社交连续性的微信、朋友圈、邀约和赠礼结果。只保留有后续意义的事件；普通寒暄和同质化动态不入表。\n【本表写摘要，不写原文】事件与结果两列必须是你自己概括出的结论，禁止粘贴聊天原文、朋友圈原文或正文对话；不保留表情、语气词与逐句往来，只留“谁对谁做了什么、关系预期变成了什么”。\n【脚本行保护】事件键以RQP-开头的行（微信进展、来电、邀约、赠礼等脚本直写行）由游戏脚本直写维护，禁止修改或删除；新插入的行事件键不得使用RQP-前缀。类型为“微信进展”或“来电”的行是脚本按聊天分支保存的结构化摘要/固定结论版本，只含派生内容、不含聊天原文；填表AI不得改写这些脚本行。\n【列定义】\n- 列1: 类型 - 填表AI只能填“微信”“朋友圈”“邀约”“赠礼”之一；“微信进展”与“来电”为游戏脚本专用类型，填表AI不得使用。\n- 列2: 人物 - 对方的《人妻公寓》已有姓名，只填一人。\n- 列3: 事件 - 一句话概括发生了什么，不超过50字，不含原文引用。\n- 列4: 结果 - 一句话概括对关系预期的影响，不超过30字；尚无结果时留空。\n- 列5: 时间 - 事件发生或本版摘要形成时的完整游戏时间，固定写“第N天 时段”；本批无法确认时留空，禁止只填时段。\n- 列6: 最后楼层 - 本条最后一次更新所对应的楼层号，纯数字。\n- 列7: 事件键 - 稳定业务键，格式“类型-人物-短标签”，全表唯一，如“邀约-夏乔-周末看房”。",
+      "note": "记录会影响社交连续性的微信、朋友圈、邀约和赠礼结果。只保留有后续意义的事件；普通寒暄和同质化动态不入表。\n【本表写摘要，不写原文】事件与结果两列必须是你自己概括出的结论，禁止粘贴聊天原文、朋友圈原文或正文对话；不保留表情、语气词与逐句往来，只留“谁对谁做了什么、关系预期变成了什么”。\n【脚本行保护】事件键以RQP-开头的行（微信进展、来电、邀约、赠礼等脚本直写行）由游戏脚本直写维护，禁止修改或删除；新插入的行事件键不得使用RQP-前缀。类型为“微信进展”或“来电”的行是脚本按聊天分支保存的结构化摘要/固定结论版本，只含派生内容、不含聊天原文；填表AI不得改写这些脚本行。\n【列定义】\n- 列1: 类型 - 填表AI只能填“微信”“朋友圈”“邀约”“赠礼”之一；“微信进展”与“来电”为游戏脚本专用类型，填表AI不得使用。\n- 列2: 人物 - 对方的《人妻公寓》已有姓名，只填一人。\n- 列3: 事件 - 一句话概括发生了什么，不超过50字，不含原文引用。\n- 列4: 结果 - 一句话概括对关系预期的影响，不超过30字；尚无结果时留空。\n- 列5: 游戏时间 - 事件发生或本版摘要形成时的完整游戏时间，固定写“第N天 时段”；本批无法确认时留空，禁止只填时段。\n- 列6: 最后楼层 - 本条最后一次更新所对应的楼层号，纯数字。\n- 列7: 事件键 - 稳定业务键，格式“类型-人物-短标签”，全表唯一，如“邀约-夏乔-周末看房”。",
       "initNode": "无重要社交事件时保持空表。",
       "deleteNode": "禁止删除；过时内容更新状态。",
-      "updateNode": "同一事件产生后续时更新结果、时间与最后楼层。结果列只保留最新一句概括，覆盖旧值，禁止把历次往来追加拼接成越来越长的原文堆积；必须按事件键精确定位。\nSQL示例: UPDATE rq_social_history SET result = '她确认周末会按约定到场。', game_time = '第4天 早上', last_floor = 18 WHERE event_key = '邀约-夏乔-周末看房';",
-      "insertNode": "出现明确改变关系预期的社交事件时插入；同一事件键不得重复建行。时间必须来自本批明确的游戏时间，无法确认时留空。\nSQL示例: INSERT INTO rq_social_history (event_type, character_name, event_text, result, game_time, last_floor, event_key) VALUES ('邀约', '夏乔', '玩家约她周末一起去看新房源，她犹豫后答应。', '她默认两人可以单独外出，下次约更容易。', '第3天 傍晚', 12, '邀约-夏乔-周末看房');",
-      "ddl": "CREATE TABLE rq_social_history (\n  row_id INTEGER PRIMARY KEY, -- row_id\n  event_type TEXT NOT NULL, -- 类型\n  character_name TEXT NOT NULL, -- 人物\n  event_text TEXT NOT NULL, -- 事件\n  result TEXT, -- 结果\n  game_time TEXT, -- 时间\n  last_floor INTEGER, -- 最后楼层\n  event_key TEXT NOT NULL UNIQUE -- 事件键\n);"
+      "updateNode": "同一事件产生后续时更新结果、游戏时间与最后楼层。结果列只保留最新一句概括，覆盖旧值，禁止把历次往来追加拼接成越来越长的原文堆积；必须按事件键精确定位。\nSQL示例: UPDATE rq_social_history SET result = '她确认周末会按约定到场。', game_time = '第4天 早上', last_floor = 18 WHERE event_key = '邀约-夏乔-周末看房';",
+      "insertNode": "出现明确改变关系预期的社交事件时插入；同一事件键不得重复建行。游戏时间必须来自本批明确的游戏时间，无法确认时留空。\nSQL示例: INSERT INTO rq_social_history (event_type, character_name, event_text, result, game_time, last_floor, event_key) VALUES ('邀约', '夏乔', '玩家约她周末一起去看新房源，她犹豫后答应。', '她默认两人可以单独外出，下次约更容易。', '第3天 傍晚', 12, '邀约-夏乔-周末看房');",
+      "ddl": "CREATE TABLE rq_social_history (\n  row_id INTEGER PRIMARY KEY, -- row_id\n  event_type TEXT NOT NULL, -- 类型\n  character_name TEXT NOT NULL, -- 人物\n  event_text TEXT NOT NULL, -- 事件\n  result TEXT, -- 结果\n  game_time TEXT, -- 游戏时间\n  last_floor INTEGER, -- 最后楼层\n  event_key TEXT NOT NULL UNIQUE -- 事件键\n);"
     },
-    "content": [["row_id", "类型", "人物", "事件", "结果", "时间", "最后楼层", "事件键"]],
+    "content": [["row_id", "类型", "人物", "事件", "结果", "游戏时间", "最后楼层", "事件键"]],
     "updateConfig": {
       "uiSentinel": -1,
       "contextDepth": 12,

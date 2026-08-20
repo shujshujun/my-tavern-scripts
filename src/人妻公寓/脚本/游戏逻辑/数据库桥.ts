@@ -98,7 +98,7 @@ const 游戏表头: Record<(typeof 游戏表名)[number], readonly string[]> = {
   RQ_剧情事件: ['row_id', '楼层', '时间', '地点', '参与者', '玩家行动', '结果摘要', '事件编码'],
   RQ_人物长期记忆: ['row_id', '人物', '主题', '记忆', '未来影响', '最后时间', '最后楼层', '可信度'],
   RQ_承诺与伏笔: ['row_id', '事项', '相关人物', '内容', '状态', '最后进展', '最后时间', '最后楼层'],
-  RQ_社交轨迹: ['row_id', '类型', '人物', '事件', '结果', '时间', '最后楼层', '事件键'],
+  RQ_社交轨迹: ['row_id', '类型', '人物', '事件', '结果', '游戏时间', '最后楼层', '事件键'],
   纪要表: ['row_id', '编码索引', '时间跨度', '概览', '纪要', '重要对话'],
 };
 
@@ -235,31 +235,45 @@ function 迁移官方纪要表内容(旧表: 数据表, 新表: 数据表): bool
   return true;
 }
 
-const 旧版无完整时间表头: Partial<Record<(typeof 游戏表名)[number], readonly string[]>> = {
-  RQ_人物长期记忆: ['row_id', '人物', '主题', '记忆', '未来影响', '最后楼层', '可信度'],
-  RQ_承诺与伏笔: ['row_id', '事项', '相关人物', '内容', '状态', '最后进展', '最后楼层'],
-  RQ_社交轨迹: ['row_id', '类型', '人物', '事件', '结果', '最后楼层', '事件键'],
+const 旧版游戏记忆表头候选: Partial<Record<(typeof 游戏表名)[number], readonly (readonly string[])[]>> = {
+  RQ_人物长期记忆: [['row_id', '人物', '主题', '记忆', '未来影响', '最后楼层', '可信度']],
+  RQ_承诺与伏笔: [['row_id', '事项', '相关人物', '内容', '状态', '最后进展', '最后楼层']],
+  RQ_社交轨迹: [
+    ['row_id', '类型', '人物', '事件', '结果', '最后楼层', '事件键'],
+    ['row_id', '类型', '人物', '事件', '结果', '时间', '最后楼层', '事件键'],
+  ],
 };
 
 /**
- * 为三张已有游戏记忆表补充人类可读时间列。旧行没有保存世界绝对时段，不能根据消息楼
- * 猜“第几天”；迁移只按列名原样搬运旧值，新时间列留空，从更新后的下一条记录开始精确写入。
+ * 为三张已有游戏记忆表补充人类可读时间列，并兼容 v0.84 社交表把“时间”改名为“游戏时间”。
+ * 旧行没有保存世界绝对时段时不能根据消息楼猜“第几天”；已有时间值则按列别名原样搬运。
  */
 export function 迁移游戏记忆表时间列(旧表: 数据表, 新表: 数据表): boolean {
   const 表名 = String(新表.name ?? 旧表.name ?? '') as (typeof 游戏表名)[number];
-  const 旧目标表头 = 旧版无完整时间表头[表名];
+  const 旧目标表头候选 = 旧版游戏记忆表头候选[表名];
   const 新目标表头 = 游戏表头[表名];
   const 旧内容 = 旧表.content ?? [];
   const 新表头 = (新表.content?.[0] ?? []).map(String);
-  if (!旧目标表头 || !新目标表头 || !旧内容.length) return false;
+  if (!旧目标表头候选 || !新目标表头 || !旧内容.length) return false;
   const 旧表头 = 旧内容[0].map(String);
   const 相同表头 = (left: readonly string[], right: readonly string[]) =>
     left.length === right.length && left.every((列名, index) => 列名 === right[index]);
-  if (!相同表头(旧表头, 旧目标表头) || !相同表头(新表头, 新目标表头)) return false;
+  if (!旧目标表头候选.some(候选 => 相同表头(旧表头, 候选)) || !相同表头(新表头, 新目标表头)) {
+    return false;
+  }
   const 旧索引 = new Map(旧表头.map((列名, index) => [列名, index]));
+  const 取旧列索引 = (列名: string): number | undefined => {
+    if (表名 === 'RQ_社交轨迹' && 列名 === '游戏时间') return 旧索引.get('游戏时间') ?? 旧索引.get('时间');
+    return 旧索引.get(列名);
+  };
   新表.content = [
     新表头,
-    ...旧内容.slice(1).map(row => 新表头.map(列名 => (旧索引.has(列名) ? row[旧索引.get(列名)!] : ''))),
+    ...旧内容.slice(1).map(row =>
+      新表头.map(列名 => {
+        const index = 取旧列索引(列名);
+        return index === undefined ? '' : row[index];
+      }),
+    ),
   ];
   return true;
 }

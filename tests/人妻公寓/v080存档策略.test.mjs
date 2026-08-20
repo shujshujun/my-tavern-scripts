@@ -44,7 +44,7 @@ const 档案卡源码 = readFileSync(
   'utf8',
 );
 
-test('v0.84 接受 v0.80-v0.83 存档并拒绝未知版本与损坏结构', () => {
+test('v0.85 接受 v0.80-v0.84 存档并拒绝未知版本与损坏结构', () => {
   const { 当前MVU数据版本, 验证当前MVU存档版本 } = schema模块;
   assert.equal(当前MVU数据版本, 9);
   assert.doesNotThrow(() => 验证当前MVU存档版本(initvar));

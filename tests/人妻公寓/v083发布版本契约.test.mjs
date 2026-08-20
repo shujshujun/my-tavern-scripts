@@ -23,7 +23,7 @@ test('v0.83 历史素材契约：家庭计划、生产与孕态资源继续固�
   assert.match(客户端资源, /@rq0\.82\/output\/imagegen\/rqgy-reset\/pregnancy-portraits\/approved/);
 });
 
-test('v0.83 数据版本 9 继续作为 v0.84 的直接兼容基线', () => {
+test('v0.83 数据版本 9 继续作为 v0.85 的直接兼容基线', () => {
   const initvar = YAML.parse(读('src/人妻公寓/世界书/变量/initvar.yaml'));
   const schemaJSON = JSON.parse(读('src/人妻公寓/schema.json'));
 

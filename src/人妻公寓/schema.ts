@@ -41,7 +41,7 @@ function 是记录(value: unknown): value is 原始记录 {
   return 原型 === null || Object.getPrototypeOf(原型) === null;
 }
 
-/** v0.84 接受 v0.80(v7)、v0.81/v0.82(v8) 与 v0.83(v9)；更早或未来数据版本继续硬拒绝。 */
+/** v0.85 接受 v0.80(v7)、v0.81/v0.82(v8) 与 v0.83/v0.84(v9)；更早或未来数据版本继续硬拒绝。 */
 export function 验证当前MVU存档版本(input: unknown): void {
   if (!是记录(input)) {
     throw new Error('人妻公寓存档结构损坏：stat_data 必须是对象。请新建聊天开始游戏。');
@@ -56,13 +56,13 @@ export function 验证当前MVU存档版本(input: unknown): void {
   ) {
     const 显示版本 = typeof 版本 === 'number' && Number.isInteger(版本) ? String(版本) : '未知';
     throw new Error(
-      `v0.84 仅兼容数据版本 7、8 和 9：当前存档版本为 ${显示版本}。v0.80/v0.81/v0.82/v0.83 存档可直接继承；其他版本请新建聊天开始游戏。`,
+      `v0.85 仅兼容数据版本 7、8 和 9：当前存档版本为 ${显示版本}。v0.80/v0.81/v0.82/v0.83/v0.84 存档可直接继承；其他版本请新建聊天开始游戏。`,
     );
   }
 }
 
 /**
- * rq0.80-rq0.84 发布初始值共同拥有的稳定持久契约。
+ * rq0.80-rq0.85 发布初始值共同拥有的稳定持久契约。
  *
  * `Schema.parse({})` 必须继续可用于内部默认构造，因此不能把所有字段改成 zod required；
  * 真实聊天快照则必须先过这道门，防止非空截断对象被 prefault/catch 补成“看似完整的新局”。
@@ -80,7 +80,7 @@ const 可继续存档玩家资源字段 = [
 ] as const;
 const 可继续存档资源节点字段 = ['当前值', '训练经验', '永久上限加成'] as const;
 const 可继续存档户字段 = ['妻', '夫', '_入住时段', '_上次收租期', '_欠租笔数'] as const;
-// 只取 rq0.80-rq0.84 从一开始就存在的交集；缺失任一叶都不能交给 Schema 默认重建。
+// 只取 rq0.80-rq0.85 从一开始就存在的交集；缺失任一叶都不能交给 Schema 默认重建。
 const 可继续存档妻核心字段 = [
   '好感值',
   '堕落值',

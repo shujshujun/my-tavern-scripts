@@ -78,18 +78,31 @@ test('聊天模板固定为五张有用记忆表，七张默认硬状态/选项�
     '人物',
     '事件',
     '结果',
-    '时间',
+    '游戏时间',
     '最后楼层',
     '事件键',
   ]);
   assert.match(取('RQ_剧情事件').sourceData.note, /固定写“第N天 时段”/);
   assert.match(取('RQ_人物长期记忆').sourceData.ddl, /last_time TEXT, -- 最后时间/);
   assert.match(取('RQ_承诺与伏笔').sourceData.ddl, /last_time TEXT, -- 最后时间/);
-  assert.match(取('RQ_社交轨迹').sourceData.ddl, /game_time TEXT, -- 时间/);
+  assert.match(取('RQ_社交轨迹').sourceData.ddl, /game_time TEXT, -- 游戏时间/);
   for (const name of ['RQ_人物长期记忆', 'RQ_承诺与伏笔', 'RQ_社交轨迹']) {
     assert.match(取(name).sourceData.updateNode, /SQL示例: UPDATE[\s\S]* WHERE /, `${name} 的 UPDATE 示例必须带业务键 WHERE`);
   }
   assert.match(取('RQ_人物长期记忆').sourceData.deleteNode, /DELETE[\s\S]*WHERE character_name[\s\S]*topic/);
+});
+
+test('spv8.9.1 模板导入不会再把“事件”和社交“游戏时间”映射成同一 shi_jian 物理候选', () => {
+  const 模板 = JSON.parse(读('src/人妻公寓/人妻公寓数据库模板.json'));
+  const 表头 = 模板.sheet_rq_social_history.content[0];
+  const spv891候选 = 列名 =>
+    ({ 事件: 'shi_jian', 时间: 'shi_jian', 游戏时间: 'you_xi_shi_jian' })[列名] ?? String(列名);
+
+  const 旧版候选 = ['事件', '时间'].map(spv891候选);
+  assert.equal(new Set(旧版候选).size, 1, '回归夹具必须重现 0.84 的 shi_jian 冲突');
+  const 当前候选 = [表头[3], 表头[5]].map(spv891候选);
+  assert.deepEqual(当前候选, ['shi_jian', 'you_xi_shi_jian']);
+  assert.equal(new Set(当前候选).size, 当前候选.length, '当前模板不得再被数据库插件预检拒绝');
 });
 
 test('摘要边界拒绝正文截断、多块、漏块和超限值，合规短摘要保持原样', () => {
@@ -143,9 +156,16 @@ test('旧版三张记忆表按列名保留全部旧行，只把无法可靠推�
     {
       名: 'RQ_社交轨迹',
       旧表头: ['row_id', '类型', '人物', '事件', '结果', '最后楼层', '事件键'],
-      新表头: ['row_id', '类型', '人物', '事件', '结果', '时间', '最后楼层', '事件键'],
+      新表头: ['row_id', '类型', '人物', '事件', '结果', '游戏时间', '最后楼层', '事件键'],
       旧行: [9, '邀约', '夏乔', '约她看房。', '她答应了。', 22, '邀约-夏乔-看房'],
       新行: [9, '邀约', '夏乔', '约她看房。', '她答应了。', '', 22, '邀约-夏乔-看房'],
+    },
+    {
+      名: 'RQ_社交轨迹',
+      旧表头: ['row_id', '类型', '人物', '事件', '结果', '时间', '最后楼层', '事件键'],
+      新表头: ['row_id', '类型', '人物', '事件', '结果', '游戏时间', '最后楼层', '事件键'],
+      旧行: [10, '微信进展', '夏乔', '整理了最近私聊。', '她愿意继续聊看房。', '第4天 早上', 24, 'RQP-微信进展-101'],
+      新行: [10, '微信进展', '夏乔', '整理了最近私聊。', '她愿意继续聊看房。', '第4天 早上', 24, 'RQP-微信进展-101'],
     },
   ];
   for (const 案例项 of 案例) {

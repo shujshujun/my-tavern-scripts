@@ -82,30 +82,30 @@ test('数据库最新版只从 spv 稳定标签中选择最高数字版本', () 
   assert.equal(选择最新数据库稳定版本({ versions: ['test29', 'xingv5.2'] }), '');
 });
 
-test('游戏当前版本固定为 0.84，最新版只接受官方 rq 稳定标签', () => {
+test('游戏当前版本固定为 0.85，最新版只接受官方 rq 稳定标签', () => {
   const { 当前游戏版本, 选择最新游戏稳定版本 } = 载入TypeScript('src/人妻公寓/脚本/游戏逻辑/依赖版本.ts');
   const 组卡源码 = 读('src/人妻公寓/组卡.mjs');
   const 组卡版本 = 组卡源码.match(/const 版本 = '([^']+)'/)?.[1];
   const 组卡标签 = 组卡源码.match(/const TAG = 'rq([^']+)'/)?.[1];
-  assert.equal(当前游戏版本, '0.84', '下一次发布必须显式更新游戏本体版本');
+  assert.equal(当前游戏版本, '0.85', '下一次发布必须显式更新游戏本体版本');
   assert.equal(当前游戏版本, 组卡版本, '游戏检测版本必须与角色卡展示版本一致');
   assert.equal(当前游戏版本, 组卡标签, '游戏检测版本必须与角色卡资源标签一致');
   assert.equal(
     选择最新游戏稳定版本({
-      versions: ['xdy0.99', 'v9.0', '0.90', 'rq0.82', 'rq0.83', 'rq0.84', 'rq0.85-beta', 'rq0.9'],
+      versions: ['xdy0.99', 'v9.0', '0.90', 'rq0.83', 'rq0.84', 'rq0.85', 'rq0.86-beta', 'rq0.9'],
     }),
-    '0.84',
+    '0.85',
   );
   assert.equal(
     选择最新游戏稳定版本([
       { ref: 'refs/tags/rq0.80' },
       { ref: 'refs/tags/xdy9.0' },
-      { ref: 'refs/tags/rq0.84' },
+      { ref: 'refs/tags/rq0.85' },
       { ref: 'refs/heads/rq99.0' },
     ]),
-    '0.84',
+    '0.85',
   );
-  assert.equal(选择最新游戏稳定版本({ versions: ['xdy0.99', 'v0.84', 'rq0.84-beta'] }), '');
+  assert.equal(选择最新游戏稳定版本({ versions: ['xdy0.99', 'v0.85', 'rq0.85-beta'] }), '');
 });
 
 test('稳定版本解析严格区分正式版、预发布版与当前高于远端缓存的状态', () => {
@@ -115,10 +115,10 @@ test('稳定版本解析严格区分正式版、预发布版与当前高于远�
   for (const 非稳定版本 of ['4.10.0-beta', '4.10.0-rc.1', 'dev4.10.0', 'xdy4.10', '4.9.1 extra', '', '   ']) {
     assert.equal(提取稳定数字版本(非稳定版本), '', `${非稳定版本 || '<空>'} 不得冒充稳定版`);
   }
-  assert.equal(比较稳定版本('0.84', '0.84'), '相同');
-  assert.equal(比较稳定版本('0.85', '0.84'), '当前较新');
+  assert.equal(比较稳定版本('0.85', '0.85'), '相同');
+  assert.equal(比较稳定版本('0.86', '0.85'), '当前较新');
   assert.equal(比较稳定版本('0.9', '0.10'), '当前较旧', '版本必须按数字段比较，而不是按十进制或字符串比较');
-  assert.equal(比较稳定版本('0.85-beta', '0.84'), '无法确认');
+  assert.equal(比较稳定版本('0.86-beta', '0.85'), '无法确认');
 });
 
 test('酒馆助手最新版跳过 beta/rc/dev manifest，并只接受镜像中的正式稳定版本', async () => {
@@ -158,9 +158,9 @@ test('版本请求的超时覆盖 response.json，底层忽略 AbortSignal 时�
         json: () => new Promise(resolve => setTimeout(() => resolve({ versions: ['rq99.0'] }), 45)),
       };
     }
-    return { ok: true, json: async () => ({ versions: ['rq0.84'] }) };
+    return { ok: true, json: async () => ({ versions: ['rq0.85'] }) };
   }, 10);
-  assert.equal(版本, '0.84');
+  assert.equal(版本, '0.85');
   assert.equal(请求数, 2, '第一源超时后必须切到第二候选地址');
   assert.equal(第一源已收到中止, true);
   await new Promise(resolve => setTimeout(resolve, 55));
@@ -186,10 +186,10 @@ test('远端检测使用 no-store、超时信号并支持酒馆助手官方源�
     if (游戏请求.length === 1) return { ok: false, status: 503, json: async () => ({}) };
     return {
       ok: true,
-      json: async () => [{ ref: 'refs/tags/rq0.82' }, { ref: 'refs/tags/rq0.84' }, { ref: 'refs/tags/v9.0' }],
+      json: async () => [{ ref: 'refs/tags/rq0.83' }, { ref: 'refs/tags/rq0.85' }, { ref: 'refs/tags/v9.0' }],
     };
   });
-  assert.equal(游戏版本, '0.84');
+  assert.equal(游戏版本, '0.85');
   assert.equal(游戏请求.length, 2);
   assert.match(游戏请求[0].url, /data\.jsdelivr\.com\/v1\/package\/gh\/shujshujun\/my-tavern-scripts/);
   assert.match(游戏请求[1].url, /api\.github\.com\/repos\/shujshujun\/my-tavern-scripts\/git\/matching-refs\/tags\/rq/);

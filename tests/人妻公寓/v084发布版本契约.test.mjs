@@ -10,22 +10,15 @@ require('ts-node/register/transpile-only');
 globalThis._ = require('lodash');
 const YAML = require('yaml');
 const { Schema, 当前MVU数据版本, 验证当前MVU存档版本 } = require('../../src/人妻公寓/schema.ts');
-const { 当前游戏版本 } = require('../../src/人妻公寓/脚本/游戏逻辑/依赖版本.ts');
-
 const 读 = 路径 => readFileSync(new URL(`../../${路径}`, import.meta.url), 'utf8');
 
-test('v0.84 发布契约：游戏检测、角色卡展示与代码资源统一锁定 rq0.84', () => {
-  const 组卡 = 读('src/人妻公寓/组卡.mjs');
+test('v0.84 历史发布契约：发布说明保留不可变分支、标签与验证快照', () => {
+  const 发布说明 = 读('src/人妻公寓/发布说明_v0.84_2026-08-20.md');
 
-  assert.equal(当前游戏版本, '0.84');
-  assert.match(组卡, /const TAG = 'rq0\.84'/);
-  assert.match(组卡, /const 版本 = '0\.84'/);
-  assert.match(组卡, /支持继承 v0\.80／v0\.81／v0\.82／v0\.83 存档/);
-  assert.match(组卡, /v0\.83 可直接继续/);
-  assert.match(组卡, /const BASE = `https:\/\/testingcf\.jsdelivr\.net\/gh\/shujshujun\/my-tavern-scripts@\$\{TAG\}`/);
-  assert.match(组卡, /\$\{BASE\}\/dist\/人妻公寓\/界面\/客户端\/index\.html/);
-  assert.match(组卡, /BASE \+ "\/dist\/人妻公寓\/脚本\/游戏逻辑\/index\.js/);
-  assert.doesNotMatch(组卡, /@rq0\.83\/dist\/人妻公寓\//, '0.84 卡体不得继续加载 0.83 代码产物');
+  assert.match(发布说明, /发布分支：`release\/rq084`/);
+  assert.match(发布说明, /发布标签：`rq0\.84`/);
+  assert.match(发布说明, /184 个测试文件，1637／1637 项通过/);
+  assert.match(发布说明, /代码入口统一指向不可变标签 `rq0\.84`/);
 });
 
 test('v0.84 发布契约：数据版本保持 9，v0.83 存档直接继续', () => {
