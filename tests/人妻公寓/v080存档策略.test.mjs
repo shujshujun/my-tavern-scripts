@@ -13,6 +13,16 @@ require('ts-node/register/transpile-only');
 
 const YAML = require('yaml');
 const schema模块 = require('../../src/人妻公寓/schema.ts');
+// ts-node 的 CommonJS 扩展名解析会把 `../../schema` 优先指向同名 schema.json；
+// 生产 bundler 按 TypeScript 模块解析。这里只拦截 mvuIO 的该依赖，保证行为测试命中真实 schema.ts 导出。
+const Module = require('node:module');
+const 原加载 = Module._load;
+Module._load = function 测试加载(request, parent, isMain) {
+  if (request === '../../schema' && String(parent?.filename ?? '').endsWith('mvuIO.ts')) return schema模块;
+  return 原加载.call(this, request, parent, isMain);
+};
+const { 读最近有效stat } = require('../../src/人妻公寓/脚本/游戏逻辑/mvuIO.ts');
+Module._load = 原加载;
 const { 同步阶段线路 } = require('../../src/人妻公寓/脚本/游戏逻辑/阶段线路系统.ts');
 const initvar = YAML.parse(readFileSync(new URL('../../src/人妻公寓/世界书/变量/initvar.yaml', import.meta.url), 'utf8'));
 const schema源码 = readFileSync(new URL('../../src/人妻公寓/schema.ts', import.meta.url), 'utf8');
@@ -34,7 +44,7 @@ const 档案卡源码 = readFileSync(
   'utf8',
 );
 
-test('v0.83 接受 v0.80-v0.82 存档并拒绝未知版本与损坏结构', () => {
+test('v0.84 接受 v0.80-v0.83 存档并拒绝未知版本与损坏结构', () => {
   const { 当前MVU数据版本, 验证当前MVU存档版本 } = schema模块;
   assert.equal(当前MVU数据版本, 9);
   assert.doesNotThrow(() => 验证当前MVU存档版本(initvar));
@@ -59,6 +69,159 @@ test('v0.83 接受 v0.80-v0.82 存档并拒绝未知版本与损坏结构', () =
     assert.throws(() => 验证当前MVU存档版本(坏存档), /存档结构损坏|不兼容其他版本存档/);
   }
   assert.equal(schema模块.Schema.parse({}).系统._数据版本, 当前MVU数据版本, '内部默认 Schema 构造仍须合法');
+});
+
+test('非空但截断的受支持版本存档必须拒绝，不能被 Schema 默认值伪装成新局', () => {
+  const { 验证可继续MVU存档结构 } = schema模块;
+  assert.equal(typeof 验证可继续MVU存档结构, 'function', '版本兼容与可继续结构必须是两道独立门');
+  assert.doesNotThrow(() => 验证可继续MVU存档结构(initvar));
+  assert.throws(
+    () => 验证可继续MVU存档结构({ 系统: { _数据版本: 9 } }),
+    /结构损坏|缺少.*户|不完整/,
+    '仅剩版本号的截断 v9 不能把现金、户、资源、背包和世界钟全部补回默认值',
+  );
+});
+
+test('可继续存档结构覆盖玩家资源与已入住户，不能让子树截断后被默认重建', () => {
+  const { Schema, 创建户节点, 验证可继续MVU存档结构 } = schema模块;
+  const 完整 = Schema.parse({ ...initvar, 户: { 101: 创建户节点(0) } });
+  assert.doesNotThrow(() => 验证可继续MVU存档结构(完整));
+
+  const 截断样本 = [
+    ['玩家资源.精力', data => delete data.玩家资源.精力],
+    ['玩家资源.精力.当前值', data => delete data.玩家资源.精力.当前值],
+    ['户.101.妻', data => delete data.户['101'].妻],
+    ['户.101.妻.好感值', data => delete data.户['101'].妻.好感值],
+    ['户.101.夫.疑心值', data => delete data.户['101'].夫.疑心值],
+    ['户.101._入住时段', data => delete data.户['101']._入住时段],
+  ];
+  for (const [路径, 截断] of 截断样本) {
+    const data = structuredClone(完整);
+    截断(data);
+    assert.throws(
+      () => 验证可继续MVU存档结构(data),
+      /结构损坏|缺少|不完整/,
+      `${路径} 缺失时不能交给 Schema 默认重建`,
+    );
+  }
+});
+
+test('可继续存档结构不抢 Schema 的明确数值字符串归一职责', () => {
+  const { Schema, 验证可继续MVU存档结构 } = schema模块;
+  const data = structuredClone(initvar);
+  data.现金 = '500';
+  data.胜任度 = '80';
+  data.风闻 = '0';
+  data.玩家资源.精力.当前值 = '8';
+  data.系统._绝对时段 = '0';
+
+  assert.doesNotThrow(() => 验证可继续MVU存档结构(data));
+  const parsed = Schema.parse(data);
+  assert.equal(parsed.现金, 500);
+  assert.equal(parsed.胜任度, 80);
+  assert.equal(parsed.风闻, 0);
+  assert.equal(parsed.玩家资源.精力.当前值, 8);
+  assert.equal(parsed.系统._绝对时段, 0);
+});
+
+test('最近有效读取会跳过截断尾楼并回退完整快照，不能让非空毒快照挡住真值', () => {
+  const 原Mvu存在 = Object.prototype.hasOwnProperty.call(globalThis, 'Mvu');
+  const 原Mvu = globalThis.Mvu;
+  const 原ST存在 = Object.prototype.hasOwnProperty.call(globalThis, 'SillyTavern');
+  const 原ST = globalThis.SillyTavern;
+  const 完整 = structuredClone(initvar);
+  const 截断 = { 系统: { _数据版本: 9 } };
+  try {
+    globalThis.SillyTavern = { chat: [{}, {}] };
+    globalThis.Mvu = {
+      getMvuData: ({ message_id }) => ({ stat_data: message_id === 1 ? 截断 : 完整 }),
+    };
+    assert.equal(读最近有效stat(), 完整, '尾楼损坏时必须继续向前找，而不是返回会被默认化的截断对象');
+  } finally {
+    if (原Mvu存在) globalThis.Mvu = 原Mvu;
+    else delete globalThis.Mvu;
+    if (原ST存在) globalThis.SillyTavern = 原ST;
+    else delete globalThis.SillyTavern;
+  }
+});
+
+test('最近十楼只有非空损坏快照时硬拒绝，不能静默当作全新对话', () => {
+  const 原Mvu存在 = Object.prototype.hasOwnProperty.call(globalThis, 'Mvu');
+  const 原Mvu = globalThis.Mvu;
+  const 原ST存在 = Object.prototype.hasOwnProperty.call(globalThis, 'SillyTavern');
+  const 原ST = globalThis.SillyTavern;
+  try {
+    globalThis.SillyTavern = { chat: [{}] };
+    globalThis.Mvu = { getMvuData: () => ({ stat_data: { 系统: { _数据版本: 9 } } }) };
+    assert.throws(() => 读最近有效stat(), /只找到损坏|结构损坏/);
+  } finally {
+    if (原Mvu存在) globalThis.Mvu = 原Mvu;
+    else delete globalThis.Mvu;
+    if (原ST存在) globalThis.SillyTavern = 原ST;
+    else delete globalThis.SillyTavern;
+  }
+});
+
+test('尾楼明确为未来版本时硬拒绝，不能回退旧楼伪装成兼容存档', () => {
+  const 原Mvu存在 = Object.prototype.hasOwnProperty.call(globalThis, 'Mvu');
+  const 原Mvu = globalThis.Mvu;
+  const 原ST存在 = Object.prototype.hasOwnProperty.call(globalThis, 'SillyTavern');
+  const 原ST = globalThis.SillyTavern;
+  const 未来版本 = structuredClone(initvar);
+  未来版本.系统._数据版本 = 10;
+  try {
+    globalThis.SillyTavern = { chat: [{}, {}] };
+    globalThis.Mvu = {
+      getMvuData: ({ message_id }) => ({ stat_data: message_id === 1 ? 未来版本 : initvar }),
+    };
+    assert.throws(
+      () => 读最近有效stat(),
+      /仅兼容数据版本 7、8 和 9|当前存档版本为 10/,
+      '明确未来版本可能含当前代码不知道的新语义，不能静默回退并允许旧代码覆盖它',
+    );
+  } finally {
+    if (原Mvu存在) globalThis.Mvu = 原Mvu;
+    else delete globalThis.Mvu;
+    if (原ST存在) globalThis.SillyTavern = 原ST;
+    else delete globalThis.SillyTavern;
+  }
+});
+
+test('v7/v8 旧档的布尔字符串与 1/0 按字面归一，false 不得反转为 true', () => {
+  const v7 = {
+    系统: {
+      _数据版本: 7,
+      _序章完成: 'false',
+      _母亲入列: 'false',
+      _母亲首夜第二幕: 'false',
+      _荣耀洞点破: 'true',
+      _荣耀洞夫: '1',
+      _待接来电: { 紧急: '0' },
+      _摄像头布设: { 垃圾房: 'false' },
+    },
+    玩家资源: { 保护准备: 'false' },
+    户: {
+      101: {
+        妻: {
+          裂缝: { 已确认: 'false' },
+          _阶段性癖已支付: 'false',
+        },
+      },
+    },
+  };
+
+  const data = schema模块.Schema.parse(v7);
+
+  assert.equal(data.系统._序章完成, false);
+  assert.equal(data.系统._母亲入列, false);
+  assert.equal(data.系统._母亲首夜第二幕, false);
+  assert.equal(data.系统._荣耀洞点破, true);
+  assert.equal(data.系统._荣耀洞夫, true);
+  assert.equal(data.系统._待接来电.紧急, false);
+  assert.equal(data.系统._摄像头布设.垃圾房, false);
+  assert.equal(data.玩家资源.保护准备, false);
+  assert.equal(data.户['101'].妻.裂缝.已确认, false);
+  assert.equal(data.户['101'].妻._阶段性癖已支付, false);
 });
 
 test('v7→v9 迁移幂等补齐新机制字段且不改写原对象与原有数值', () => {
@@ -124,6 +287,24 @@ test('v0.82(v8)旧档缺少家庭计划时补为未开始，并保留已经存�
   assert.deepEqual(data.系统._家庭计划, { 阶段: '未开始', 最早继续日: -1, 完成楼层: -1 });
   assert.equal(data.户['101'].妻._怀孕.状态, '已受孕', '兼容升级不能回滚玩家旧档中已经发生的孕情');
   assert.equal(data.户['101'].妻._怀孕.受孕场次标识, 'rq082-existing-pregnancy');
+});
+
+test('启动链冻结聊天身份并注册 MVU 提交校验，切聊时旧启动任务不得写入新聊天', () => {
+  const 启动起 = index源码.indexOf('$(() => {');
+  const 挂载起 = index源码.indexOf('function 挂载监听()', 启动起);
+  const 启动段 = index源码.slice(启动起, 挂载起);
+  assert.ok(启动起 >= 0 && 挂载起 > 启动起);
+  assert.match(启动段, /const 启动聊天ID = 当前聊天ID\(\)/);
+  assert.match(启动段, /const 启动聊天引用 = SillyTavern\.chat/);
+  assert.match(启动段, /const 启动时间线世代 = 当前时间线切换世代\(\)/);
+  assert.match(启动段, /登记MVU提交校验\(启动仍有效\)/);
+  assert.match(
+    启动段,
+    /finally \{\s*if \(!启动已完成\) 停止当前脚本心跳\(\);\s*取消启动提交校验\(\)/,
+    '启动失败先撤销本实例心跳，再无条件注销 MVU 提交校验；成功启动保留唯一心跳所有者',
+  );
+  assert.match(启动段, /同步入住世界书条目\(data, 启动仍有效\)/);
+  assert.match(启动段, /同步整表视图\(data, 启动仍有效\)/);
 });
 
 test('启动链在监听挂载前把 v7 原子迁移并写回当前尾楼', () => {

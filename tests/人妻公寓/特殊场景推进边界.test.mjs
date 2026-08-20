@@ -36,6 +36,7 @@ const { 结算隔离脚本成长 } = require('../../src/人妻公寓/脚本/游�
 Module._load = 原加载;
 const indexSource = readFileSync('src/人妻公寓/脚本/游戏逻辑/index.ts', 'utf8');
 const engineSource = readFileSync('src/人妻公寓/脚本/游戏逻辑/回合引擎.ts', 'utf8');
+const meetingUiSource = readFileSync('src/人妻公寓/界面/客户端/composables/useMuteMeeting.ts', 'utf8');
 
 function 建录像带状态(阶段) {
   const data = Schema.parse({
@@ -61,6 +62,51 @@ test('所有已实现特殊场景启动口都拒绝与普通亲密场景重叠',
   assert.deepEqual(启动静音会议(data, ['102', '202'], '公共设施维修', '管理员室', 10), 预期);
   assert.deepEqual(开始录像带首送(data, '102', 10), 预期);
   assert.deepEqual(启动录像带(data, 10), 预期);
+});
+
+test('父亲电话未挂断时不能启动新的录像带或静音会议场景', () => {
+  const data = Schema.parse({ 户: { 102: 创建户节点(0), 202: 创建户节点(0) } });
+  data.户['102'].妻.当前阶段 = 4;
+  data.户['202'].妻.当前阶段 = 4;
+  data.系统._父亲通话.标识 = 'call-special-lock';
+  data.系统._父亲通话.状态 = '通话中';
+  const 提示 = '请先完成并挂断父亲电话，再启动特殊场景。';
+
+  assert.deepEqual(打开静音会议筹备(data, '管理员室'), { 成功: false, 提示 });
+  assert.deepEqual(启动静音会议(data, ['102', '202'], '公共设施维修', '管理员室', 10), { 成功: false, 提示 });
+  assert.deepEqual(开始录像带首送(data, '102', 10), { 成功: false, 提示 });
+  assert.deepEqual(启动录像带(data, 10), { 成功: false, 提示 });
+});
+
+test('静音会议脚本终审与界面共用 L4、遥控跳蛋和医院硬锁资格', () => {
+  const 建候选 = () => {
+    const data = Schema.parse({ 户: { 101: 创建户节点(0), 102: 创建户节点(0) }, 背包: ['静音会议'] });
+    for (const 门牌 of ['101', '102']) {
+      data.户[门牌].妻.当前阶段 = 4;
+      data.户[门牌].妻.特殊 = ['遥控跳蛋'];
+    }
+    return data;
+  };
+
+  const 合法 = 建候选();
+  assert.equal(打开静音会议筹备(合法, '管理员室').成功, true);
+  assert.equal(启动静音会议(合法, ['101', '102'], '公共设施维修', '管理员室', 10).成功, true, '完整资格应能启动');
+
+  for (const [说明, 修改] of [
+    ['阶段不足', data => (data.户['101'].妻.当前阶段 = 3)],
+    ['未装载遥控跳蛋', data => (data.户['101'].妻.特殊 = [])],
+    ['医院硬锁', data => (data.户['101'].妻._生产.状态 = '住院中')],
+  ]) {
+    const data = 建候选();
+    assert.equal(打开静音会议筹备(data, '管理员室').成功, true, `${说明}发生前应能进入筹备态`);
+    修改(data); // 模拟筹备页打开后状态变化或陈旧 UI 提交
+    const result = 启动静音会议(data, ['101', '102'], '公共设施维修', '管理员室', 10);
+    assert.equal(result.成功, false, 说明);
+    assert.equal(data.系统._特殊场景.阶段, '筹备', `${说明}不得从筹备态进入正式场景`);
+    assert.equal(data.背包.includes('静音会议'), true, `${说明}不得消耗入场票`);
+  }
+
+  assert.match(meetingUiSource, /处于医院硬锁/, '界面候选必须提前禁用医院角色，不能等提交后才报资格变化');
 });
 
 test('录像带旧标签不能跨房间、跨拍推进或提前结算', () => {
@@ -231,6 +277,20 @@ test('录像带与会议的原生等待阶段由统一许可门拒绝', () => {
   assert.equal(会议.系统._特殊场景.阶段, '筹备');
 });
 
+test('录像带前置与正式录像带都严格校验当前地点，楼道/空地点不能绕过锁场', () => {
+  const 前置 = Schema.parse({ 户: { 102: 创建户节点(0) } });
+  前置.户['102'].妻.当前阶段 = 4;
+  assert.equal(开始录像带首送(前置, '102', 10).成功, true);
+  assert.equal(特殊场景玩家行动前(前置, null).成功, false);
+  assert.equal(特殊场景玩家行动前(前置, '202').成功, false);
+  assert.equal(特殊场景玩家行动前(前置, '102').成功, true);
+
+  const 正式 = 建录像带状态('202-2');
+  assert.equal(特殊场景玩家行动前(正式, null).成功, false);
+  assert.equal(特殊场景玩家行动前(正式, '102').成功, false);
+  assert.equal(特殊场景玩家行动前(正式, '管理员室').成功, true);
+});
+
 test('录像带合法固定拍通过原生许可门时只编译当前拍', () => {
   const data = 建录像带状态('202-2');
 
@@ -244,10 +304,10 @@ test('原生特殊场景输入检查许可失败并停止本轮生成', () => {
   const updateStart = indexSource.lastIndexOf('Mvu.events.VARIABLE_UPDATE_ENDED');
   const prompt = indexSource.slice(promptStart, updateStart);
   const 原生门 = prompt.indexOf('if (data.系统._特殊场景.id)');
-  const 调用点 = prompt.indexOf('特殊场景玩家行动前(data)', 原生门);
+  const 调用点 = prompt.indexOf('特殊场景玩家行动前(data, 读场景().房间id)', 原生门);
   assert.ok(调用点 >= 0, '原生入口必须调用特殊场景许可门');
   const 许可段 = prompt.slice(Math.max(0, 调用点 - 160), 调用点 + 1_200);
-  assert.match(许可段, /const\s+\S*结果\s*=\s*特殊场景玩家行动前\(data\)/);
+  assert.match(许可段, /const\s+\S*结果\s*=\s*特殊场景玩家行动前\(data, 读场景\(\)\.房间id\)/);
   assert.match(许可段, /if\s*\(!\S*结果\.成功\)/);
   assert.match(许可段, /stopGeneration\(\)/);
   assert.match(许可段, /return/);

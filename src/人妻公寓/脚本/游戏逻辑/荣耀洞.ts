@@ -2,6 +2,7 @@ import type { SchemaType } from '../../schema';
 import { 荣耀洞丈夫在场率, 荣耀洞冷却时段, 荣耀洞表, 户静态表, type 门牌 } from '../../stageConfig';
 import { 登记脚本正增长候选 } from './冷落系统';
 import { seededRandom, 取绝对时段, 疑心冻结中 } from './楼层时钟';
+import { 处于医院硬锁 } from './生产系统';
 
 /** 所有负值和未来时段都不得制造假冷却。 */
 export function 规范荣耀洞上次时段(记录: number, 当前绝对时段: number): number {
@@ -135,7 +136,7 @@ export function 使用荣耀洞(
   for (const m of 门牌序) {
     const 配 = 荣耀洞表[m];
     const 节点 = data.户[m];
-    if (!配 || !节点) continue;
+    if (!配 || !节点 || 处于医院硬锁(data, m)) continue;
     if (节点.妻.当前阶段 < 配.门槛) continue;
     if (seededRandom(绝对时段, m, '荣耀洞') < 配.几率) {
       命中 = m;

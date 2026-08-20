@@ -6,14 +6,16 @@ export function 规范AI表现文本(输入: unknown, 最大长度 = 240): strin
   if (typeof 输入 !== 'string') return '';
   const 无控制字符 = Array.from(输入, 字符 => {
     const 字符码 = 字符.charCodeAt(0);
-    return 字符码 <= 0x1f || 字符码 === 0x7f ? ' ' : 字符;
+    return 字符码 <= 0x1f || (字符码 >= 0x7f && 字符码 <= 0x9f) ? ' ' : 字符;
   }).join('');
-  return 无控制字符
+  const 规范 = 无控制字符
     .replace(/</g, '‹')
     .replace(/>/g, '›')
     .replace(/【/g, '〔')
     .replace(/】/g, '〕')
     .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 最大长度);
+    .trim();
+  const 上限 = Number.isFinite(最大长度) ? Math.max(0, Math.floor(最大长度)) : 240;
+  // String.slice 按 UTF-16 码元截断，恰好卡在 emoji 中间会持久化孤立代理项。
+  return Array.from(规范).slice(0, 上限).join('');
 }

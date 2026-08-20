@@ -1,20 +1,16 @@
 ---
 变量输出格式:
   rule:
-    - you must output the update analysis and the actual update commands at once in the end of the next reply
+    - you must output exactly one update block at the end of the next reply; do not add analysis, labels, or prose inside it
     - 'the update commands must strictly follow the **JSON Patch (RFC 6902)** standard and may only use `replace` on writable existing paths; the value must be the final value, not a delta'
+    - 'preserve every value''s native JSON type: numbers are unquoted, strings are quoted, and booleans/null use JSON literals'
     - 'only paths actually present under <status_current_variable> are writable in this turn; if its 户 object is empty, output an empty JSON Patch array'
     - don't update field names starts with `_` as they are readonly, such as `_变量`
   format: |-
-
     <UpdateVariable>
-    <Analysis>$(IN ENGLISH, no more than 80 words)
-    - ${check only the writable variables for characters explicitly present in the current reply}
-    - ${briefly explain each actual change from current-reply evidence; do not infer elapsed time or authorize milestone changes}
-    </Analysis>
     <JSONPatch>
     [
-      { "op": "replace", "path": "${/户/真实门牌/妻/允许字段}", "value": "${new_value}" }
+      { "op": "replace", "path": "${/户/真实门牌/妻/允许字段}", "value": ${new_value_as_json_literal} }
     ]
     </JSONPatch>
     </UpdateVariable>

@@ -88,6 +88,35 @@ test('首次满足 手机+有房间+有动作+未抑制 自动展开 5 秒，计
   assert.equal(状态.展开, false, '5 秒后收起');
 });
 
+test('房间状态先到、动作异步后到时，第一次真正可用仍自动展开而不是只闪新增提示', () => {
+  const { clock, 状态, 机器 } = 新建机器();
+  机器.更新({ mobile: true, roomId: '101', actionCount: 0, suppressed: false });
+  assert.equal(状态.展开, false);
+  assert.equal(clock.待办数(), 0);
+
+  // 场景同步通常先于 store/action 刷新；同房稍后出现的首批动作仍属于“首次满足”。
+  机器.更新({ mobile: true, roomId: '101', actionCount: 2, suppressed: false });
+  assert.equal(状态.展开, true, '首批动作迟到不能被误判为普通新增提示');
+  assert.equal(状态.新增提示, false);
+  assert.equal(clock.待办数(), 1);
+  clock.前进(首次自动展开时长);
+  assert.equal(状态.展开, false);
+});
+
+test('第一次进入时若被生成或键盘抑制，解除抑制后的首次真正可用仍自动展开 5 秒', () => {
+  const { clock, 状态, 机器 } = 新建机器();
+  机器.更新({ mobile: true, roomId: '101', actionCount: 2, suppressed: true });
+  assert.equal(状态.展开, false, '抑制期间必须隐藏');
+  assert.equal(clock.待办数(), 0);
+
+  机器.更新({ mobile: true, roomId: '101', actionCount: 2, suppressed: false });
+  assert.equal(状态.展开, true, '首次真正满足未抑制条件时仍应给玩家看见入口');
+  assert.equal(状态.新增提示, false);
+  assert.equal(clock.待办数(), 1);
+  clock.前进(首次自动展开时长);
+  assert.equal(状态.展开, false);
+});
+
 test('后续真实换房自动展开 3 秒；重复同房不重启计时', () => {
   const { clock, 状态, 机器 } = 新建机器();
   机器.更新({ mobile: true, roomId: '垃圾房', actionCount: 2, suppressed: false });

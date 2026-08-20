@@ -19,6 +19,7 @@ const {
   构造转正更新负载,
   校验转正候选,
   持久写入转正标记,
+  构造临时楼继承容器,
 } = require('../../src/人妻公寓/脚本/游戏逻辑/临时回合楼.ts');
 const { 数据库快照未越过楼层 } = require('../../src/人妻公寓/脚本/游戏逻辑/数据库时间线栅栏.ts');
 
@@ -32,6 +33,7 @@ const 回档 = engine.slice(engine.indexOf('export async function 回档至'), e
 
 const 令牌 = `${合法回合令牌前缀}1-123-456`;
 const 令牌B = `${合法回合令牌前缀}2-999-888`;
+const 回合在场妻键 = '_rqgy回合在场妻';
 
 let 楼序号 = 0;
 function 建消息(extra, 正文 = '正文') {
@@ -45,6 +47,31 @@ const 用户extra = (令牌值, 角色 = 'user', 临时 = true) => ({
 });
 
 // ── A:精确定位语义(纯函数动态测试) ──────────────────────────────
+
+test('A0 末楼 stat 尚未继承时，临时楼容器必须保留非 stat 字段并使用已验证完整快照', () => {
+  assert.equal(typeof 构造临时楼继承容器, 'function');
+  const 尾楼空壳 = {
+    stat_data: {},
+    delta_data: { 旧差分: 1 },
+    display_data: { 旧显示: '保留' },
+  };
+  const 完整真值 = { 现金: 777, 系统: { _数据版本: 9, _绝对时段: 29 } };
+  const 继承 = 构造临时楼继承容器(尾楼空壳, 完整真值);
+
+  assert.notStrictEqual(继承, 尾楼空壳, '不能原地污染当前尾楼容器');
+  assert.deepEqual(继承.delta_data, 尾楼空壳.delta_data);
+  assert.deepEqual(继承.display_data, 尾楼空壳.display_data);
+  assert.deepEqual(继承.stat_data, 完整真值, '临时 user 楼必须继承回退校验后的完整 stat，而不是尾楼空壳');
+  assert.notStrictEqual(继承.stat_data, 完整真值, '后续合并不得反向修改已验证读快照');
+  const 继承位 = 主回合.indexOf('构造临时楼继承容器(');
+  const 临时用户位 = 主回合.indexOf("role: 'user'", 继承位);
+  assert.ok(继承位 >= 0 && 临时用户位 > 继承位, '执行回合必须在创建临时 user 楼前使用完整回退真值覆盖尾楼 stat');
+  assert.match(
+    主回合.slice(继承位, 临时用户位),
+    /Mvu\.getMvuData[\s\S]*?data/,
+    '只保留当前尾楼容器元数据，stat_data 必须来自已验证的 data',
+  );
+});
 
 test('A1 登记楼层仍是同一对象时直接接受,不扫描不比较文本', () => {
   const 旧楼 = 建消息({});
@@ -153,7 +180,7 @@ test('A8 命中去重并按楼层降序,避免删第一条后第二条移位', (
 test('B1 构造转正更新负载:保留每条已有 extra,只把临时标记改为 false', () => {
   const 旧楼 = 建消息({});
   const user = 建消息(用户extra(令牌, 'user'), '行动');
-  const assistant = 建消息(用户extra(令牌, 'assistant'));
+  const assistant = 建消息({ ...用户extra(令牌, 'assistant'), [回合在场妻键]: ['101', '102'] });
   const 表 = [旧楼, user, assistant];
   const 命中 = 定位本轮临时楼(表, 令牌, [
     { 楼层: 1, 引用: user, 角色: 'user' },
@@ -172,6 +199,7 @@ test('B1 构造转正更新负载:保留每条已有 extra,只把临时标记改
   assert.equal(负载[0].extra[回合令牌键], 令牌);
   assert.equal(负载[0].extra[回合角色键], 'user');
   assert.equal(负载[0].extra[临时楼标记键], false);
+  assert.deepEqual(负载[1].extra[回合在场妻键], ['101', '102'], '转正必须保留角色级近期正文凭据');
 });
 
 test('B2 转正校验:user/assistant 两条必须齐,少任一条即拒绝', () => {
@@ -410,7 +438,12 @@ test('C3 恢复入口组合:异常历史失败关闭；安全命中才冻结→�
   );
   assert.match(恢复函数, /判定可自动清理的遗留临时楼/);
   assert.match(恢复函数, /if \(判定\.拒绝原因\)/, '异常标记必须先失败关闭，不能继续删楼');
-  assert.match(恢复函数, /if \(!待删\.length\) return 0/, '没有命中必须零写入');
+  assert.match(
+    恢复函数,
+    /if \(判定\.拒绝原因\)[\s\S]{0,260}throw new Error\(提示\)/,
+    '异常历史必须向启动／执行回合上抛，不能提示后 return 0 继续建新楼',
+  );
+  assert.match(恢复函数, /if \(!待删\.length\) return 0/, '真正没有命中才允许零写入继续');
   assert.match(恢复函数, /标记数据库时间线将变更/);
   assert.match(恢复函数, /内部删除聊天消息/);
   assert.match(恢复函数, /等待数据库时间线就绪/);
@@ -489,9 +522,12 @@ test('E1 自定义输入框全链:组件 submit → App 发送/发出 → 玩家
   const 回合输入 = readFileSync('src/人妻公寓/界面/客户端/components/回合输入.vue', 'utf8');
   const app = readFileSync('src/人妻公寓/界面/客户端/App.vue', 'utf8');
 
-  // 组件层:纯展示+纯 emit,submit 由 Enter 与发送按钮触发,组件不自发游戏事件
+  // 组件层:纯展示+纯 emit；普通 Enter 经输入法安全门提交，发送按钮仍直接 submit。
   assert.match(回合输入, /defineEmits<[\s\S]*submit/, '组件必须声明 submit 事件');
-  assert.match(回合输入, /@keydown\.enter\.exact\.prevent="emit\('submit'\)"/, 'Enter 发送走 emit(submit)');
+  assert.match(回合输入, /@compositionstart="组合输入中 = true"/);
+  assert.match(回合输入, /@compositionend="组合输入中 = false"/);
+  assert.match(回合输入, /@keydown="尝试提交"/, 'Enter 必须先经过输入法组合态门');
+  assert.match(回合输入, /event\.preventDefault\(\);\s*emit\('submit'\);/, '合法 Enter 仍走 emit(submit)');
   assert.match(回合输入, /@click="emit\('submit'\)"/, '发送按钮走 emit(submit)');
   assert.doesNotMatch(回合输入, /\beventEmit\s*\(/, '组件不得直接调用发游戏事件(注释里提及 eventEmit 不算)');
 
@@ -522,13 +558,13 @@ test('E3 同步数据库回合禁止普通 insertRow 兜底,只走 SQLite mutati
   const 同步函数 = 数据库桥.slice(数据库桥.indexOf('export async function 同步数据库回合'), 数据库桥.indexOf('export interface 社交轨迹条目'));
   assert.match(同步函数, /执行SQLite写入\(/, '回合事件只走 SQLite mutation 路径');
   assert.doesNotMatch(同步函数, /insertRow/, '普通行 API 兜底被禁止(回档后旧消息存活会把记录挂错楼)');
-  assert.match(同步函数, /return false/, '非 SQLite 模式失败闭合');
+  assert.match(同步函数, /return '失败'/, '非 SQLite 模式以显式失败态闭合');
 });
 
 test('E4 临时失败清理/重掷/回档都是 先标记冻结目标→物理删楼→等待数据库时间线', () => {
   // 主回合 finally 清理窄切片:未转正分支到快照恢复之间,必须 标记→删楼→等待 完整顺序
   const 未转正位置 = 主回合.indexOf('if (!临时用户已转正)');
-  const finally清理 = 主回合.slice(未转正位置, 主回合.indexOf('恢复回合变量快照(chat快照)', 未转正位置));
+  const finally清理 = 主回合.slice(未转正位置, 主回合.indexOf('恢复回合变量快照(chat快照, 本轮时间线仍有效)', 未转正位置));
   const 标记1 = finally清理.indexOf('标记数据库时间线将变更');
   const 删楼1 = finally清理.indexOf('内部删除聊天消息');
   const 等待1 = finally清理.indexOf('等待数据库时间线就绪');

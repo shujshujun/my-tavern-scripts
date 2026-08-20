@@ -26,7 +26,11 @@ test('修1:预设期望标签缺失时回退通用清洗，不得整篇清空正
 
 test('修2:完整空JSONPatch是合法完成信号，不让无变化回合白等120秒', () => {
   assert.match(回合源码, /function 取变量块\(文本: string\)/);
-  assert.match(回合源码, /if \(完整\) return 完整;/, '完整标签块包含空数组时也应被提取');
+  assert.match(
+    回合源码,
+    /if \(完整\) \{[\s\S]{0,180}规范变量协议候选\(完整\)[\s\S]{0,100}if \(规范块\) return 规范块;/,
+    '完整标签块必须先规范并校验；标准空 JSONPatch 仍作为合法完成信号',
+  );
   assert.match(回合源码, /Date\.now\(\) < 外置解析截止 &&\s*!取变量块\(外置后正文\) &&/);
   assert.doesNotMatch(回合源码, /function 有可用变量命令|function 含可改变量命令/);
 });
@@ -37,7 +41,7 @@ test('修3:变量块被未闭合思考段连坐吞掉时启用防过删兜底', 
   assert.match(回合源码, /function 清除变量禁区\(文本: string, 吞未闭合尾段 = true\)/);
   assert.match(
     回合源码,
-    /兜底④[\s\S]{0,260}宽松提取完整变量块\(文本, 可解析文本\)/,
+    /兜底③[\s\S]{0,360}宽松提取完整变量块\(文本, 可解析文本\)/,
     '取变量块 的最后一道兜底必须走宽松提取',
   );
   assert.match(
@@ -74,6 +78,24 @@ test('修5:外置解析走轮询等待，不得在跨脚本桥返回后立即读
     回合源码,
     /await new Promise\(resolve => setTimeout\(resolve, 500\)\);\s*确认本轮事务有效\(\);/,
     '每拍轮询都要复核事务有效性，玩家中途回档时立即放弃',
+  );
+});
+
+test('外置解析的完成门只认变量块或 stat_data 变化，插件先写元数据不能提前收口旧数值', () => {
+  assert.match(
+    回合源码,
+    /const 外置解析基准stat = _.cloneDeep\(_.get\(变量失败回退基准, 'stat_data'\)\);/,
+    '轮询前必须冻结可信 stat_data 基准',
+  );
+  assert.match(
+    回合源码,
+    /_.isEqual\(_.get\(外置后数据, 'stat_data'\), 外置解析基准stat\)/,
+    '只有游戏变量本体变化才可作为无文本变量块的完成信号',
+  );
+  assert.doesNotMatch(
+    回合源码,
+    /_.isEqual\(外置后数据, 变量失败回退基准\)/,
+    '不得把 display_data、delta_data 或解析标记等外围元数据变化误判成变量完成',
   );
 });
 

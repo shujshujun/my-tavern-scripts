@@ -644,7 +644,8 @@ test('界面、回合引擎与楼务结算保持单次原子接线', () => {
   assert.match(合成, /事件\.处理管理任务\(\{ 任务id: 任务\.id, 选项id: 选项\.id, 地点 \}\)/);
   assert.match(
     app,
-    /处理管理任务: \(\{ 任务id, 选项id, 地点 \}\) => eventEmit\('人妻公寓:处理管理任务', \{ 任务id, 选项id, 地点 \}\)/,
+    /处理管理任务: \(\{ 任务id, 选项id, 地点 \}\) =>[\s\S]{0,180}?提交界面事务\(\(\) => eventEmit\('人妻公寓:处理管理任务', \{ 任务id, 选项id, 地点 \}\)\)/,
+    '楼务瓷砖先占客户端同步提交门，再发唯一业务事件',
   );
   assert.match(index, /eventOn\('人妻公寓:处理管理任务'/);
   assert.match(
@@ -736,11 +737,13 @@ test('楼务硬事实走系统注入且入口拒绝冲突状态', () => {
   assert.doesNotMatch(handler, /执行回合\(`\$\{预检\.行动\}\\n/);
   assert.match(handler, /_时间推进中/);
   assert.ok((handler.match(/_时间推进中/g) ?? []).length >= 2, '排队前和安全操作真正执行时都要检查时间推进');
-  // v0.80 的 _待发送事件 只存强剧情；楼务入口对真实队列做普通强阻塞。
-  assert.match(handler, /取阻塞时间的待发送事件\(data\.系统\._待发送事件\)/, '楼务入口必须经归一化队列识别阻塞事件');
-  assert.match(handler, /if \(阻塞事件\)/, '楼务入口必须只被队列里的阻塞事件拒绝');
-  assert.match(handler, /描述待发送事件\(阻塞事件\)/, '拒绝提示必须描述过滤结果而非原始整串');
-  assert.doesNotMatch(handler, /if \(data\.系统\._待发送事件\)/, '楼务入口不得再对原始队列做无语义判断');
+  // 场景剧情改为地点所有权：安全操作统一拒绝活动票与已经抵达本地点的等待票，
+  // 目标在别处的预约不能反向冻结当前楼务，也不能在这里跨场演出。
+  assert.match(index, /const 活动剧情 = 读取活动场景剧情\(有效\.data\)/);
+  assert.match(index, /const 等待剧情已到场 =/);
+  assert.match(index, /活动剧情 \|\| 等待剧情已到场/);
+  assert.match(handler, /目标在其他场景的[\s\S]{0,120}不得反向冻结这里的楼务/);
+  assert.doesNotMatch(handler, /if \(data\.系统\._待发送事件\)/, '楼务入口不得再对原始队列做无地点语义判断');
   assert.match(handler, /_特殊场景\.id/);
   assert.match(handler, /隔离事件进行中\(\)/);
 });

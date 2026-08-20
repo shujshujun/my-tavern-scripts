@@ -79,11 +79,11 @@ test('App 不再持有录像带局部状态机/计时器/提交/连点/补偿函
     /return \{[\s\S]*?录像带阶段,[\s\S]*?录像带中,[\s\S]*?录像带本地结果,[\s\S]*?录像带连点目标,[\s\S]*?录像带连点计数,[\s\S]*?录像带补偿可用,[\s\S]*?录像带交互幕,[\s\S]*?请求使用录像带,[\s\S]*?打开102录像,[\s\S]*?连续点击202录像,[\s\S]*?自动重连202,[\s\S]*?重置录像带界面,[\s\S]*?\}/,
     'composable 应返回完整 API',
   );
-  // App 只保留跨区块 wrapper：关背包后请求使用
+  // App 只保留跨区块 wrapper：先占同步提交门，再关背包并请求使用
   assert.match(
     App源码,
-    /function 使用录像带\(\) \{[\s\S]*?显示背包\.value = false;[\s\S]*?请求使用录像带\(\);[\s\S]*?\}/,
-    'App 使用录像带 wrapper 关背包并请求使用',
+    /function 使用录像带\(\) \{[\s\S]*?提交界面事务\(\(\) => \{[\s\S]*?请求使用录像带\(\);[\s\S]*?\}\)[\s\S]*?显示背包\.value = false;[\s\S]*?\}/,
+    'App 使用录像带 wrapper 先占同步提交门，再关背包并请求使用',
   );
 });
 
@@ -146,10 +146,28 @@ test('舞台组件：素材导入、图选择、三段说明、进度条、alt/d
   assert.match(舞台源码, /'102室录像已结束。连续点击，让第二台显示器接通信号。'/, '等待202 说明原文');
   assert.match(舞台源码, /'两台显示器仍是黑的。先调取102室录像。'/, '默认说明原文');
   assert.match(舞台源码, /<div v-if="open" class="special-interaction-stage">/, '舞台根自持 v-if="open"');
-  assert.match(舞台源码, /alt="管理员室双显示器" draggable="false"/, 'alt 与 draggable 保持');
+  assert.match(舞台源码, /alt="管理员室双显示器"[\s\S]{0,80}draggable="false"/, 'alt 与 draggable 保持');
   assert.match(舞台源码, /tapCount > 0 && stage === '等待202'/, '只在计数>0且等待202显示进度');
   assert.match(舞台源码, /\{\{ tapCount \}\}\/\{\{ tapTarget \}\}/, '计数/目标插值');
   assert.doesNotMatch(舞台源码, /\?url/, '无 ?url 位图导入');
+});
+
+test('录像带素材失败只淘汰自己的请求并显示可继续操作的本地占位', () => {
+  assert.match(舞台源码, /const 失效图 = ref\(''\)/, '舞台必须持有本地素材失败态');
+  assert.match(舞台源码, /data-video-src/, '图片节点必须携带请求地址身份');
+  assert.match(
+    舞台源码,
+    /if \(地址 && 地址 === 当前图\.value\) 失效图\.value = 地址/,
+    '旧图迟到 error 不得淘汰当前新图',
+  );
+  assert.match(
+    舞台源码,
+    /if \(地址 && 地址 === 当前图\.value && 失效图\.value === 地址\) 失效图\.value = ''/,
+    '只有当前请求的 load 才能恢复当前图',
+  );
+  assert.match(舞台源码, /v-if="失效图 !== 当前图"[\s\S]*?@load="图片加载成功"[\s\S]*?@error="图片加载失败"/, '正常图按身份接 load/error');
+  assert.match(舞台源码, /v-else class="video-tape-fallback" role="img"/, '图片失败显示语义占位');
+  assert.match(舞台源码, /画面暂时无法加载[\s\S]*?操作进度已经保留，可以继续完成当前录像带互动/, '呈现失败不得冒充业务失败');
 });
 
 test('操作组件：props/emits、三瓷砖、frozen/disabled、计数插值、补偿条件、Ic 导入完整', () => {

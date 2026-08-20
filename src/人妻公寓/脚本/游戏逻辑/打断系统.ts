@@ -2,9 +2,11 @@ import type { SchemaType, 户节点Type } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
 import { 户静态表, 查房间 } from '../../stageConfig';
 import { 丈夫在楼, 取绝对时段, 妻位置推算, 疑心冻结中, seededRandom } from './楼层时钟';
-import { 标余波, 读余波, 余波已发酵 } from './雌竞系统';
+import { 标记指定余波, 读余波, 余波已发酵 } from './雌竞系统';
 import { 事件角色标记, 读场景 } from './snapshotSystem';
 import { 登记胜任变动 } from './胜任系统';
+import { 有场景剧情阻塞 } from './场景剧情事务';
+import { 亲密强制中止事件标记 } from './玩家资源系统';
 
 /**
  * 丈夫打断系统(2026-07-19 用户提案拍板,顺序3>1>2的第一件):
@@ -67,7 +69,7 @@ function 三级文案(妻名: string, 夫名: string, 在她家: boolean): strin
     ? `${夫名}来电说这就到家——留给她的时间只够把屋里恢复成"什么都没发生过"`
     : `${夫名}电话里语气不对,勒令她马上回家`;
   return (
-    `【被迫收场】${收法}。${妻名}的这场戏被迫收尾:慌乱、抱歉、来不及说完的话,` +
+    `${亲密强制中止事件标记}【被迫收场】${收法}。${妻名}的这场戏被迫收尾:慌乱、抱歉、来不及说完的话,` +
     `在本轮内把告别演完,人必须走。不要拖到下一轮,也不要让{{user}}强行挽留成功`
   );
 }
@@ -89,7 +91,7 @@ function 反讽文案(妻名: string, 夫名: string): string {
  * 只在"妻子在场与{{user}}互动 且 丈夫不在场"时有意义;排队走 系统._待发送事件。
  */
 function 取丈夫打断候选(data: SchemaType, 焦点: readonly 门牌[]) {
-  if (data.系统._待发送事件) return; // 事件通道已占用,不叠
+  if (有场景剧情阻塞(data)) return; // 事件通道已占用,不叠
   const 门牌号 = 焦点[0];
   if (!门牌号 || 门牌号 === '302') return; // 母亲户:父亲永远不知道(spec)
   const 节点 = data.户[门牌号];
@@ -114,6 +116,9 @@ export function 丈夫打断会读取疑心(data: SchemaType, 焦点: readonly �
 }
 
 export function 打断检测(data: SchemaType, 焦点: 门牌[], _消息楼层: number): void {
+  // 当前已有活动票或等待票时，丈夫打断只能延后。直接赋值会覆盖入住、关系线路等
+  // 更早产生的强剧情，造成队首丢失和状态先结算后无处演出的永久分叉。
+  if (有场景剧情阻塞(data)) return;
   const 候选 = 取丈夫打断候选(data, 焦点);
   if (!候选) return;
   const { 门牌号, 配, 夫, 档号 } = 候选;
@@ -153,7 +158,7 @@ export function 处于反讽格(节点: 户节点Type): boolean {
 const 父亲来电概率 = 0.18; // 〔调参〕每时段档一掷
 
 export function 父亲来电打断(data: SchemaType, 焦点: 门牌[], _消息楼层: number): void {
-  if (data.系统._待发送事件) return;
+  if (有场景剧情阻塞(data)) return;
   if (焦点[0] !== '302') return;
   const 节点 = data.户['302'];
   if (!节点 || 节点.妻.当前阶段 < 3) return; // 破了首夜那道坎,电话才有"打断"的意义
@@ -218,7 +223,7 @@ export function 母亲撞见检测(
   当前地点 = '',
 ): void {
   if (!门牌号 || 门牌号 === '302' || 本楼堕落增量 <= 0) return;
-  if (data.系统._待发送事件) return;
+  if (有场景剧情阻塞(data)) return;
   const 妻 = data.户[门牌号]?.妻;
   if (!妻 || 妻.当前阶段 < 2) return;
   const 档号 = 取绝对时段(data);
@@ -267,23 +272,25 @@ export function 母亲撞见检测(
 const 换装疑心增量 = 3;
 const 换装起疑概率 = 0.35;
 
-export function 换装起疑(data: SchemaType, 楼层: number): void {
-  if (data.系统._待发送事件) return; // 账与戏一起走:通道占用就等下一楼
+export function 换装起疑(data: SchemaType, 楼层: number): (() => Promise<boolean>) | null {
+  if (有场景剧情阻塞(data)) return null; // 账与戏一起走:通道占用就等下一楼
   const 波 = 读余波(楼层);
-  if (!波 || 波.疑记 || !余波已发酵(楼层, 波.起楼)) return;
+  if (!波 || 波.疑记 || !余波已发酵(楼层, 波.起楼)) return null;
   const 节点 = data.户[波.门牌];
   const 配 = 户静态表[波.门牌];
-  if (!节点 || !配?.夫名 || 波.门牌 === '302') return;
+  if (!节点 || !配?.夫名 || 波.门牌 === '302') return null;
   const 绝对时段 = 取绝对时段(data);
-  if (疑心冻结中(节点.夫, 绝对时段)) return; // 钓鱼券窗口:他满脑子鱼塘
-  if (丈夫在楼(节点, 波.门牌, 绝对时段) !== '在家') return;
-  if (seededRandom(绝对时段, 波.门牌, '换装起疑') >= 换装起疑概率) return;
+  if (疑心冻结中(节点.夫, 绝对时段)) return null; // 钓鱼券窗口:他满脑子鱼塘
+  if (丈夫在楼(节点, 波.门牌, 绝对时段) !== '在家') return null;
+  if (seededRandom(绝对时段, 波.门牌, '换装起疑') >= 换装起疑概率) return null;
   节点.夫.疑心值 = _.clamp(节点.夫.疑心值 + 换装疑心增量, 0, 100);
   data.系统._待发送事件 =
     事件角色标记({ 关联妻: [波.门牌], 关联夫: [波.门牌] }) +
     (波.私密
       ? `【丈夫起疑】${配.夫名}最近觉得${配.妻名}不太一样——说不上来哪里,像是有什么心事把她养得水灵。他多看了她两眼,没说什么。这份没说出口的注意,让她后背发紧`
       : `【丈夫起疑】${配.夫名}盯着${配.妻名}身上的新东西看了两眼:"这哪来的?"——她怎么圆由她的性格与心虚程度决定,这一问落在家里的空气里`);
-  标余波({ 疑记: true });
   console.info(`[人妻公寓·打断] ${波.门牌} 换装起疑:疑心+${换装疑心增量}(${节点.夫.疑心值})`);
+  // 事件与疑心先随核心 MVU 原子提交；只有核心成功后才把聊天余波标成已消费。
+  // 预期对象带事件 ID，后提交迟到时不会误伤后来产生的新余波。
+  return () => 标记指定余波(波, { 疑记: true });
 }

@@ -215,6 +215,47 @@ test('部分旧档已有孩子但仍停在陪产中时，以硬事实零时段�
   assert.equal(data.户['101'].妻._怀孕.状态, '未孕');
 });
 
+test('旧档孩子硬事实会恢复陪产与产后看望历史，不得重新开放已完成动作', () => {
+  const data = 建数据(['101'], 80);
+  到预产(data, '101', 'restore-visit-history');
+  assert.equal(提交留下陪产(data, '101').成功, true);
+  const 出生时段 = data.系统._绝对时段;
+  data.系统._家庭文档.孩子.push({
+    id: '生产:101:1:restore-visit-history',
+    母亲门牌: '101',
+    胎次: 1,
+    性别: '女',
+    出生绝对时段: 出生时段,
+    结果: '陪产',
+    玩家产后看望: true,
+    获知生产路径: '陪产',
+    叙事最小年龄: 0,
+    年龄阶段: '新生儿',
+    出生场次标识: 'restore-visit-history',
+  });
+  const 生产 = data.户['101'].妻._生产;
+  生产.预产通知已读 = false;
+  生产.陪产已选择 = false;
+  生产.产后看望 = false;
+  生产.生产结算标识 = '';
+
+  const 结果 = 结算实际生产(data, '101', '陪产', 出生时段);
+  assert.equal(结果.成功, true);
+  assert.equal(结果.变动, true);
+  assert.equal(生产.预产通知已读, true, '实际陪产已经证明玩家读过预产通知');
+  assert.equal(生产.陪产已选择, true, '孩子结果为陪产时必须恢复陪产选择硬事实');
+  assert.equal(生产.产后看望, true, '孩子档案是产后看望的不可逆来源');
+  assert.equal(
+    读取生产事件快照(data, { 门牌: '101', 胎次: 1, 场次标识: 'restore-visit-history' })?.产后看望,
+    true,
+  );
+  assert.deepEqual(
+    生产地点动作(data, '医院').map(项 => 项.id),
+    ['重试生产叙事'],
+    '已完成产后看望不能因部分旧档恢复而重新出现',
+  );
+});
+
 test('未陪产在预产窗口后2时段自动生产，住院42时段后恢复普通位置与再次受孕资格', () => {
   const data = 建数据(['102'], 0);
   到预产(data, '102', 'auto-1');

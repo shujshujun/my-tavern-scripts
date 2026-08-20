@@ -17,6 +17,7 @@ defineProps<{
   entries: readonly 卷轴条[];
   editingFloor: number | null;
   editingText: string;
+  editingSaving: boolean;
   streamSegments: readonly string[];
   runtimeStage: string;
   waitSeconds: number;
@@ -75,10 +76,18 @@ defineExpose({ 滚到底 });
     </div>
     <div v-for="(条, i) in inScene ? entries : []" :key="i" class="story-entry">
       <template v-if="条.楼 !== undefined && 条.楼 === editingFloor">
-        <textarea :value="editingText" class="edit-area" rows="8" @input="编辑输入"></textarea>
+        <textarea
+          :value="editingText"
+          :disabled="editingSaving"
+          class="edit-area"
+          rows="8"
+          @input="编辑输入"
+        ></textarea>
         <div class="edit-acts">
-          <button class="btn" :disabled="!editingText.trim()" @click="emit('saveEdit')">落笔</button>
-          <button class="btn" @click="emit('cancelEdit')">作罢</button>
+          <button class="btn" :disabled="editingSaving || !editingText.trim()" @click="emit('saveEdit')">
+            {{ editingSaving ? '落笔中…' : '落笔' }}
+          </button>
+          <button class="btn" :disabled="editingSaving" @click="emit('cancelEdit')">作罢</button>
         </div>
       </template>
       <template v-else>

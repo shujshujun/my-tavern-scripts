@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 回合输入(App A8b 从 App.vue 等价外移):游戏输入框、撤回/重演与失败行动重试、推进时间三块连续区域。
 // 纯展示 + 纯 emit:可输入/资源/重掷/时段等全部来自 App props,文本经 update:text 回 App,原 handler 一律留在 App。
-// 唯一本地状态是 textarea DOM ref,经 defineExpose 公开聚焦供 App/useMuteMeeting 调用。
+// 本地只持 textarea DOM ref 与浏览器输入法组合态；经 defineExpose 公开聚焦供 App/useMuteMeeting 调用。
 // 不得 import App/store/eventEmit/composable,不得调用酒馆 API。
 import { ref } from 'vue';
 import Ic from './Icon.vue';
@@ -47,7 +47,20 @@ function 更新文本(e: Event) {
   emit('updateText', (e.target as HTMLTextAreaElement).value);
 }
 
-// ── 唯一本地 ref:textarea DOM,供 App 经公开接口聚焦 ──
+/**
+ * 中文／日文输入法用 Enter 确认候选时会先触发 keydown；标准 isComposing、Safari 的
+ * composition 生命周期与旧 WebView 的 keyCode=229 三路同时失败关闭，避免半截文本被发送。
+ */
+const 组合输入中 = ref(false);
+function 尝试提交(event: KeyboardEvent): void {
+  if (event.key !== 'Enter') return;
+  if (event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) return;
+  if (event.isComposing || 组合输入中.value || event.keyCode === 229) return;
+  event.preventDefault();
+  emit('submit');
+}
+
+// ── 本地 DOM ref:textarea,供 App 经公开接口聚焦 ──
 const 输入框 = ref<HTMLTextAreaElement | null>(null);
 
 function 聚焦() {
@@ -64,7 +77,9 @@ defineExpose({ 聚焦 });
       :disabled="sending || prefaceWriting"
       rows="2"
       placeholder="你的言行……(Enter 发送,Shift+Enter 换行)"
-      @keydown.enter.exact.prevent="emit('submit')"
+      @compositionstart="组合输入中 = true"
+      @compositionend="组合输入中 = false"
+      @keydown="尝试提交"
       @input="更新文本"
       @focus="emit('focus')"
       @blur="emit('blur')"

@@ -10,6 +10,7 @@ import { 登记脚本正增长候选 } from './冷落系统';
 import { 事件角色标记 } from './snapshotSystem';
 import { 特殊场景启动亲密门 } from './特殊场景策略';
 import { 读取医院内容策略 } from './生产系统';
+import { 有场景剧情阻塞, 有普通场景剧情阻塞 } from './场景剧情事务';
 
 type 特殊场景状态 = SchemaType['系统']['_特殊场景'];
 
@@ -253,14 +254,13 @@ export interface 特殊场景操作结果 {
   提示: string;
 }
 
-export function 打开静音会议筹备(
-  data: SchemaType,
-  当前地点: string,
-): 特殊场景操作结果 {
+export function 打开静音会议筹备(data: SchemaType, 当前地点: string): 特殊场景操作结果 {
   const 亲密阻断 = 特殊场景启动亲密门(data);
   if (亲密阻断) return { 成功: false, 提示: 亲密阻断 };
   if (!特殊场景空闲(data)) return { 成功: false, 提示: '眼下已有一场特殊事件正在进行。' };
-  if (data.系统._待发送事件) return { 成功: false, 提示: '眼下还有一段剧情没有演完。' };
+  if (有场景剧情阻塞(data)) {
+    return { 成功: false, 提示: '还有一段普通场景剧情在等待，不能同时开启另一场连场剧情。' };
+  }
   if (当前地点 !== '管理员室') return { 成功: false, 提示: '静音会议只能在管理员室筹备。' };
   if (data.系统._已完成特殊场景.includes('静音会议')) {
     return { 成功: false, 提示: '这场静音会议已经完成过了。' };
@@ -301,7 +301,10 @@ export function 启动静音会议(
     return { 成功: false, 提示: '请先从背包打开静音会议筹备表。' };
   }
   if (当前地点 !== '管理员室') return { 成功: false, 提示: '会议只能从管理员室开始。' };
-  if (data.系统._待发送事件) return { 成功: false, 提示: '眼下还有一段剧情没有演完。' };
+  // 当前本身已经处于静音会议筹备态；这里只复核普通场景票，不能把筹备态自己当成阻塞。
+  if (有普通场景剧情阻塞(data)) {
+    return { 成功: false, 提示: '还有一段普通场景剧情在等待，不能同时开启另一场连场剧情。' };
+  }
   if (data.系统._已完成特殊场景.includes('静音会议')) {
     return { 成功: false, 提示: '这场静音会议已经完成过了。' };
   }
@@ -476,6 +479,9 @@ export function 开始录像带首送(data: SchemaType, 门牌号: '102' | '202'
   }
   if (data.系统._特殊场景前置.includes(键)) return { 成功: false, 提示: '这件事已经答应过了。' };
   if (!特殊场景空闲(data)) return { 成功: false, 提示: '眼下已有一场特殊事件正在进行。' };
+  if (有场景剧情阻塞(data)) {
+    return { 成功: false, 提示: '还有一段普通场景剧情在等待，不能同时开启另一场连场剧情。' };
+  }
   data.系统._特殊场景 = {
     ...空特殊场景状态(),
     id: '录像带前置',
@@ -497,7 +503,9 @@ export function 启动录像带(data: SchemaType, 楼层: number): { 成功: boo
     return { 成功: false, 提示: `${户静态表[住院妻].妻名}正在医院待产或恢复，录像带剧情暂时顺延。` };
   }
   if (!特殊场景空闲(data)) return { 成功: false, 提示: '眼下已有一场特殊事件正在进行。' };
-  if (data.系统._待发送事件) return { 成功: false, 提示: '眼下还有一段剧情没有演完。' };
+  if (有场景剧情阻塞(data)) {
+    return { 成功: false, 提示: '还有一段普通场景剧情在等待，不能同时开启另一场连场剧情。' };
+  }
   if ((data.户['102']?.妻.当前阶段 ?? 0) < 4 || (data.户['202']?.妻.当前阶段 ?? 0) < 4) {
     return { 成功: false, 提示: '沈静仪和周小满还没有都走到能面对这两盘录像的阶段。' };
   }
@@ -527,9 +535,21 @@ export function 通过录像带互动(data: SchemaType, 房间: '102' | '202'): 
   return { 成功: true, 提示: `${房间}室录像开始载入。` };
 }
 
-export function 特殊场景玩家行动前(data: SchemaType): 特殊场景操作结果 {
+export function 特殊场景玩家行动前(data: SchemaType, 当前地点?: string | null): 特殊场景操作结果 {
   const 场 = data.系统._特殊场景;
+  const 已提供地点 = 当前地点 !== undefined;
+  const 当前位置 = String(当前地点 ?? '').trim();
+  if (场.id === '录像带前置') {
+    if (已提供地点 && 当前位置 !== 场.地点) {
+      return { 成功: false, 提示: `这段前置必须留在${场.地点}室继续，不能换到其他地点。` };
+    }
+    准备当前特殊场景节拍(data);
+    return { 成功: true, 提示: '' };
+  }
   if (场.id === '静音会议') {
+    if (已提供地点 && 当前位置 !== '管理员室') {
+      return { 成功: false, 提示: '静音会议必须留在管理员室继续。' };
+    }
     if (场.阶段 === '筹备') return { 成功: false, 提示: '请先在筹备表里确认参会名单与议题。' };
     const 许可 = 静音会议玩家行动许可(data);
     if (!许可.成功) return 许可;
@@ -538,6 +558,9 @@ export function 特殊场景玩家行动前(data: SchemaType): 特殊场景操�
     return { 成功: true, 提示: '' };
   }
   if (场.id === '录像带') {
+    if (已提供地点 && 当前位置 !== '管理员室') {
+      return { 成功: false, 提示: '录像带剧情必须留在管理员室继续。' };
+    }
     if (场.阶段 === '等待102' || 场.阶段 === '等待202') {
       return { 成功: false, 提示: '先操作桌上的监控瓷砖。' };
     }

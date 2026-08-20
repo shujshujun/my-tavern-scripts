@@ -643,6 +643,135 @@ export async function 顺序提交隔离事件(参数: 顺序提交隔离事件�
   }
 }
 
+export interface 撤销已完成隔离事件事务参数 {
+  /** 撤销开始前的当前 MVU；中断或失败时恢复它，让撤销本身保持原子。 */
+  当前数据: SchemaType;
+  /** 被撤销事件开始前的目标 MVU。 */
+  目标数据: SchemaType;
+  /** 当前 `_上次隔离回合` 必须仍与它完全一致，防止旧按钮撤错另一拍。 */
+  当前记录: unknown;
+  /** 被撤销事件开始前的四键精确聊天快照。 */
+  目标聊天: 精确聊天快照;
+  身份: 隔离时间线身份;
+  操作仍有效: () => boolean;
+  写目标核心: () => void | Promise<unknown>;
+  恢复当前核心: () => void | Promise<unknown>;
+}
+
+function 核对已完成隔离记录(vars: unknown, 预期记录: unknown): void {
+  if (!vars || typeof vars !== 'object') throw new Error('聊天变量缺失，不能撤销隔离事件');
+  const 当前记录 = (vars as Record<string, unknown>)._上次隔离回合;
+  if (时间状态指纹(当前记录) !== 时间状态指纹(预期记录)) {
+    throw new Error('隔离回合记录已经变化，不能撤销另一拍');
+  }
+}
+
+/**
+ * 已完成隔离事件的撤销/重掷前置恢复也是一次反向双存储事务：
+ * 1. 先把“撤销开始前”的当前 MVU 与四键聊天持久放进 `_隔离事件事务`；
+ * 2. 写回事件前目标 MVU；
+ * 3. 在同一 chat updater 内复核身份、事务 ID 与当前回合记录，精确恢复事件前四键并删事务。
+ *
+ * 任一步失败且仍在原时间线时，补偿回撤销开始前的当前 MVU/聊天；切换聊天或刷新时不跨
+ * 时间线写回，持久事务留在原聊天，由启动恢复把“半撤销”取消。这样不会出现数值已退回、
+ * 但隔离日志/场景/侦探状态仍停在事件后的半状态。
+ */
+export async function 撤销已完成隔离事件事务(参数: 撤销已完成隔离事件事务参数): Promise<void> {
+  复核隔离时间线身份(参数.身份, 参数.操作仍有效);
+  if (!隔离聊天快照包含键(参数.目标聊天, 隔离恢复聊天键)) {
+    throw new Error('隔离回合缺少完整的事件前聊天快照，不能安全撤销');
+  }
+  // 两份数据都先过当前 Schema；损坏旧记录绝不能在写核心后才暴露。
+  Schema.parse(_.cloneDeep(参数.当前数据));
+  Schema.parse(_.cloneDeep(参数.目标数据));
+
+  const 当前变量 = getVariables({ type: 'chat' });
+  核对已完成隔离记录(当前变量, 参数.当前记录);
+  const 当前聊天 = 捕获精确聊天快照(当前变量 as Record<string, unknown>, 隔离恢复聊天键);
+  const 已准备 = await 准备隔离事件事务({
+    身份: 参数.身份,
+    操作仍有效: 参数.操作仍有效,
+    提交前数据: 参数.当前数据,
+    提交前聊天: 当前聊天,
+  });
+  const 事务ID = 已准备.记录.事务ID;
+  let 核心已开始 = false;
+  let 最终已执行 = false;
+  const 仍在本时间线 = () => 参数.操作仍有效() && 当前聊天ID() === 参数.身份.聊天ID;
+
+  try {
+    // 准备事务后、真正回写 stat 前再复核一次，堵住持久记录落盘后的并发按钮/分支变化。
+    复核隔离时间线身份(参数.身份, 参数.操作仍有效);
+    const 当前事务 = 读取隔离事件事务记录(getVariables({ type: 'chat' })[隔离事件事务键]);
+    if (!当前事务 || 当前事务.事务ID !== 事务ID) throw new Error('隔离事件事务记录已经变化');
+    核对已完成隔离记录(getVariables({ type: 'chat' }), 参数.当前记录);
+
+    核心已开始 = true;
+    await 参数.写目标核心();
+    await Promise.resolve(
+      updateVariablesWith(
+        vars => {
+          复核隔离时间线身份(参数.身份, 参数.操作仍有效);
+          if (!vars || typeof vars !== 'object') throw new Error('聊天变量缺失，不能撤销隔离事件');
+          const 事务 = 读取隔离事件事务记录(vars[隔离事件事务键]);
+          if (!事务 || 事务.事务ID !== 事务ID) throw new Error('隔离事件事务记录已经变化');
+          核对隔离业务快照(vars as Record<string, unknown>, 当前聊天);
+          核对已完成隔离记录(vars, 参数.当前记录);
+          恢复精确聊天快照(vars as Record<string, unknown>, 参数.目标聊天, 隔离恢复聊天键);
+          delete vars[隔离事件事务键];
+          最终已执行 = true;
+          return vars;
+        },
+        { type: 'chat' },
+      ),
+    );
+  } catch (error) {
+    const 补偿错误: string[] = [];
+    try {
+      if (!核心已开始 || !仍在本时间线()) {
+        throw new Error('撤销核心尚未开始或时间线已变化，事务记录留在原聊天等待恢复');
+      }
+      await 参数.恢复当前核心();
+    } catch (补偿) {
+      补偿错误.push(`MVU 回滚失败:${补偿 instanceof Error ? 补偿.message : String(补偿)}`);
+    }
+    try {
+      if (!仍在本时间线()) throw new Error('聊天或分支已经变化，不能跨时间线补偿撤销');
+      await Promise.resolve(
+        updateVariablesWith(
+          vars => {
+            if (!仍在本时间线()) throw new Error('聊天或分支已经变化，不能跨时间线补偿撤销');
+            if (!vars || typeof vars !== 'object') throw new Error('聊天变量缺失，不能补偿隔离事件撤销');
+            const 事务 = 读取隔离事件事务记录(vars[隔离事件事务键]);
+            if (事务) {
+              if (事务.事务ID !== 事务ID) throw new Error('隔离事件事务记录已经变化');
+              恢复精确聊天快照(vars as Record<string, unknown>, 当前聊天, 隔离恢复聊天键);
+              delete vars[隔离事件事务键];
+            } else if (最终已执行) {
+              // 最终 updater 已同步恢复目标四键并删事务，宿主随后才报错。
+              恢复精确聊天快照(vars as Record<string, unknown>, 当前聊天, 隔离恢复聊天键);
+            } else if (Object.prototype.hasOwnProperty.call(vars, 隔离事件事务键)) {
+              throw new Error('隔离事件事务记录损坏，不能猜测为本事务补偿');
+            } else {
+              throw new Error('隔离事件事务记录缺失，不能猜测为本事务补偿');
+            }
+            return vars;
+          },
+          { type: 'chat' },
+        ),
+      );
+    } catch (补偿) {
+      补偿错误.push(`聊天回滚失败:${补偿 instanceof Error ? 补偿.message : String(补偿)}`);
+    }
+    if (补偿错误.length) {
+      throw new Error(`${error instanceof Error ? error.message : String(error)}；${补偿错误.join('；')}`, {
+        cause: error,
+      });
+    }
+    throw error;
+  }
+}
+
 /** 回滚前对当前聊天快照做严格事务核对：键存在、记录有效、事务 ID 相同，任一不满足抛错。 */
 function 核对回滚前隔离事务(事务: 隔离事件事务记录): void {
   const vars = getVariables({ type: 'chat' });
@@ -839,6 +968,6 @@ export async function 恢复中断隔离提交(
       { type: 'chat' },
     ),
   );
-  console.warn('[人妻公寓·隔离] 已恢复上次因切换聊天或刷新而中断的隔离事件，未发放奖励。');
+  console.warn('[人妻公寓·隔离] 已恢复上次因切换聊天或刷新而中断的隔离事务，已回到该操作开始前状态。');
   return true;
 }

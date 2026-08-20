@@ -37,7 +37,7 @@ test('App 不再内联标题模板与难度局部状态；组件拥有 选中难
   assert.match(标题源码, /import \{ 难度表 \} from '\.\.\/\.\.\/\.\.\/stageConfig'/, '组件应从 stageConfig 正确相对路径导入难度表');
 });
 
-test('App 分支顺序保持，props/emits 接线正确；开始考验(难度) 守卫→发送中→event 顺序保持', () => {
+test('App 分支顺序保持，props/emits 接线正确；开始考验只在脚本存活时进入发送态', () => {
   const 模板段 = App源码.slice(App源码.indexOf('<template>'), App源码.lastIndexOf('</template>'));
   const 未就绪 = 模板段.indexOf('<template v-if="!就绪">');
   const 坏结局 = 模板段.indexOf('<template v-else-if="data.系统._坏结局">');
@@ -58,8 +58,8 @@ test('App 分支顺序保持，props/emits 接线正确；开始考验(难度) �
   assert.match(App源码, /const 脚本存活 = ref\(true\)/, '脚本存活仍留 App');
   assert.match(
     App源码,
-    /function 开始考验\(难度: string\) \{[\s\S]*?if \(!难度 \|\| 发送中\.value\) return;[\s\S]*?发送中\.value = true;[\s\S]*?eventEmit\('人妻公寓:开始新游戏', 难度\);/,
-    '开始考验(难度) 空值/发送中守卫→发送中=true→开始新游戏 顺序保持',
+    /function 开始考验\(难度: string\) \{[\s\S]*?if \(!难度 \|\| 发送中\.value \|\| !脚本存活\.value\) return;[\s\S]*?发送中\.value = true;[\s\S]*?eventEmit\('人妻公寓:开始新游戏', 难度\);/,
+    '开始考验(难度) 空值/发送中/脚本心跳守卫→发送中=true→开始新游戏 顺序保持',
   );
 });
 
@@ -73,9 +73,13 @@ test('组件三个 emit；无 eventEmit/useUIPrefs/App import；返回清选择�
   assert.doesNotMatch(标题源码, /发送中/, '组件不写 App 侧 发送中状态');
 
   assert.match(标题源码, /class="btn ghost"[\s\S]*?难度展开 = false;[\s\S]*?选中难度 = '';/, '返回仍同时收起难度并清空选择');
-  assert.match(标题源码, /class="btn rite" :disabled="!选中难度 \|\| sending"/, '确认按钮未选/发送中 disabled');
+  assert.match(
+    标题源码,
+    /class="btn rite" :disabled="!选中难度 \|\| sending \|\| !scriptAlive"/,
+    '确认按钮未选/发送中/脚本未存活时 disabled',
+  );
   assert.match(标题源码, /sending \? '电话接通中……' : '接起父亲的电话'/, '发送中文案保持');
-  assert.match(标题源码, /class="plaque main" :disabled="sending"/, '开始游戏木牌发送中 disabled');
+  assert.match(标题源码, /class="plaque main" :disabled="sending \|\| !scriptAlive"/, '开始游戏木牌发送中或脚本未存活时 disabled');
   assert.match(标题源码, /class="heartbeat title-beat" :class="\{ dead: !scriptAlive \}"/, '心跳 class 保持');
   assert.match(标题源码, /scriptAlive \? '✓ 游戏逻辑脚本心跳正常' : '✗ 未检测到游戏逻辑脚本\(请确认脚本已启用\)'/, '心跳文案保持');
 });

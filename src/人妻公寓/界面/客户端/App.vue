@@ -549,6 +549,7 @@
             :entries="当前幕"
             :editing-floor="编辑中楼"
             :editing-text="编辑文本"
+            :editing-saving="编辑保存中"
             :stream-segments="流式段"
             :runtime-stage="运行阶段"
             :wait-seconds="生成等待秒"
@@ -557,7 +558,7 @@
             :avatar-name="头像名"
             :avatar-image="头像图"
             @update-editing-text="编辑文本 = $event"
-            @cancel-edit="编辑中楼 = null"
+            @cancel-edit="取消编辑"
             @save-edit="存编辑"
             @open-floor-prompt="打开楼层提示词"
             @open-event-prompt="打开事件提示词"
@@ -680,7 +681,7 @@
                       :disabled="发送中"
                       @click="确认亲密收尾"
                     >
-                      确认 · {{ 待确认收尾位置 }}
+                      确认 · {{ 性爱主焦点?.妻名 || '当前主焦点' }} · {{ 待确认收尾位置 }}
                     </button>
                   </template>
                 </div>
@@ -725,14 +726,84 @@
           <button
             v-if="当前房间 && !录像带中"
             class="btn icon"
-            :disabled="发送中 || 静音会议正式中"
-            :title="静音会议正式中 ? '会议进行中，无法离开管理员室' : '离开当前房间'"
+            :disabled="发送中 || 静音会议正式中 || 场景剧情移动锁"
+            :title="
+              静音会议正式中
+                ? '会议进行中，无法离开管理员室'
+                : 场景剧情移动锁
+                  ? `「${场景剧情状态?.标题 ?? 录像带前置标题 ?? '当前剧情'}」尚未完成，当前场景已锁定`
+                  : '离开当前房间'
+            "
             @click="离开房间"
           >
             <Ic n="exit" />离开
           </button>
         </div>
         <MuteMeetingLockNote :open="静音会议正式中" />
+        <section
+          v-if="场景剧情状态"
+          class="scene-story-lock"
+          :class="{ active: 场景剧情活动, waiting: !场景剧情活动 }"
+          role="status"
+          aria-live="polite"
+        >
+          <header>
+            <span><small>SCENE EVENT</small><b>{{ 场景剧情状态.标题 }}</b></span>
+            <em>{{ 场景剧情活动 ? '场景已锁定' : `等待 ${场景剧情目标名}` }}</em>
+          </header>
+          <p>{{ 场景剧情锁定说明 }}</p>
+          <div class="scene-story-lock-actions">
+            <button
+              v-if="场景剧情旧档入住等待"
+              type="button"
+              class="btn"
+              :disabled="发送中 || 界面事务提交中"
+              @click="检查入住登场地点"
+            >
+              检查登场地点
+            </button>
+            <span v-else-if="场景剧情等待回应" class="scene-story-response-hint">请在下方输入你的具体回应</span>
+            <button
+              v-else-if="场景剧情在目标地点"
+              type="button"
+              class="btn primary"
+              :disabled="发送中 || 界面事务提交中"
+              @click="继续场景剧情"
+            >
+              {{ 发送中 ? '剧情生成中…' : 场景剧情活动 ? '重试本段剧情' : '开始本段剧情' }}
+            </button>
+            <button
+              v-else-if="场景剧情旧档可认领"
+              type="button"
+              class="btn"
+              :disabled="发送中 || 界面事务提交中"
+              @click="恢复旧场景剧情"
+            >
+              旧档：在当前位置恢复
+            </button>
+            <button
+              v-else-if="场景剧情活动 && 场景剧情目标 !== null"
+              type="button"
+              class="btn"
+              :disabled="发送中"
+              @click="返回场景剧情地点"
+            >
+              返回{{ 场景剧情目标名 }}
+            </button>
+          </div>
+        </section>
+        <section
+          v-else-if="录像带前置中"
+          class="scene-story-lock active"
+          role="status"
+          aria-live="polite"
+        >
+          <header>
+            <span><small>SCENE EVENT</small><b>{{ 录像带前置标题 }}</b></span>
+            <em>场景已锁定</em>
+          </header>
+          <p>这段前置必须留在{{ 录像带前置场景名 }}继续。请在输入框回应当前人物；生成失败时仍在原地重试，不能切换地点。</p>
+        </section>
 
         <transition name="scene-result">
           <section v-if="显示性爱结果卡 && !性爱进行中" class="scene-result-card" role="status" aria-live="polite">
@@ -798,7 +869,13 @@
               <h3>翻谁家的垃圾</h3>
               <p>认准门牌。每只袋子只通向对应住户的线索。</p>
               <div class="garbage-grid">
-                <button v-for="袋 in 垃圾袋列表" :key="袋.门牌" class="garbage-tile" @click="选垃圾袋(袋.门牌)">
+                <button
+                  v-for="袋 in 垃圾袋列表"
+                  :key="袋.门牌"
+                  class="garbage-tile"
+                  :disabled="场景操作锁"
+                  @click="选垃圾袋(袋.门牌)"
+                >
                   <img
                     v-if="!头像失效[袋.妻名]"
                     :src="头像图(袋.妻名)"
@@ -815,7 +892,7 @@
         </transition>
         <!-- 偷窥余像:"你注意到了什么?"(摄像头渠道,选对收进线索板;选项走 gal 纸条样式与行动选项同款) -->
         <div
-          v-if="!静音会议正式中 && 偷窥待选 && !发送中"
+          v-if="!静音会议正式中 && !场景剧情锁定 && 偷窥待选 && !发送中"
           class="peep-card"
           :style="{ '--opt-img': `url(${素材基址}/界面/选项条.webp)` }"
         >
@@ -827,6 +904,7 @@
 
         <!-- 行动选项(AI 每轮给 4 条,点了直接发送;gal 式居中选择条,纸条底=AI 水彩件) -->
         <ActionOptions
+          :key="行动选项世代"
           :open="显示选项 && !录像带中 && !静音会议交互幕 && !静音会议待散会选择 && !静音会议自由待选择"
           :options="行动选项"
           @select="点选项"
@@ -866,7 +944,7 @@
           ref="回合输入"
           :open="可输入"
           :text="输入文本"
-          :sending="发送中"
+          :sending="发送中 || Boolean(场景剧情准备锁)"
           :preface-writing="由头写入中"
           :can-submit="当前行动可提交"
           :send-label="发送按钮文案"
@@ -900,16 +978,30 @@
         <nav v-if="!录像带中" class="dock" :class="{ 'mute-meeting-dock': 静音会议正式中 }">
           <button
             class="dock-btn primary"
-            :disabled="发送中 || 静音会议正式中"
-            :title="静音会议正式中 ? '会议进行中，地图已锁定' : '打开地图'"
+            :disabled="发送中 || 静音会议正式中 || 场景剧情移动锁"
+            :title="
+              静音会议正式中
+                ? '会议进行中，地图已锁定'
+                : 场景剧情移动锁
+                  ? '当前强制剧情尚未完成，不能离开场景'
+                  : '打开地图'
+            "
             @click="显示地图 = true"
           >
             <Ic n="map" /><span>地图</span>
           </button>
           <button
             class="dock-btn"
-            :disabled="静音会议正式中"
-            :title="静音会议正式中 ? '会议期间不能打开商店' : '网购商城,小时达,本时段内送到管理员室'"
+            :disabled="发送中 || 静音会议正式中 || 场景剧情锁定"
+            :title="
+              发送中
+                ? '当前内容正在生成，商店暂不可用'
+                : 静音会议正式中
+                  ? '会议期间不能打开商店'
+                  : 场景剧情锁定
+                    ? '当前强制剧情尚未完成，商店暂不可用'
+                    : '网购商城,小时达,本时段内送到管理员室'
+            "
             @click="显示商店 = true"
           >
             <Ic n="cart" /><span>商店</span>
@@ -922,20 +1014,24 @@
               'meeting-live': 静音会议手机已开放,
               'meeting-frozen': 静音会议正式中 && !静音会议手机可打开,
             }"
-            :disabled="静音会议正式中 && !静音会议手机可打开"
-            :title="静音会议手机标题"
+            :disabled="(静音会议正式中 && !静音会议手机可打开) || (场景剧情锁定 && !data.系统._父亲通话.标识)"
+            :title="场景剧情锁定 && !data.系统._父亲通话.标识 ? '当前强制剧情尚未完成，手机暂不可用' : 静音会议手机标题"
             @click="开手机"
           >
             <Ic n="phone" /><span>手机</span>
           </button>
-          <button class="dock-btn" :disabled="静音会议正式中 || !背包列表.length" @click="显示背包 = true">
+          <button
+            class="dock-btn"
+            :disabled="发送中 || 静音会议正式中 || 场景剧情锁定 || !背包列表.length"
+            @click="显示背包 = true"
+          >
             <Ic n="bag" /><span>背包</span>
           </button>
           <button
             v-if="监控列表.length"
             class="dock-btn"
-            :disabled="静音会议正式中"
-            title="你装下的眼睛"
+            :disabled="发送中 || 静音会议正式中 || 场景剧情锁定"
+            :title="发送中 ? '当前内容正在生成，监控暂不可用' : 场景剧情锁定 ? '当前强制剧情尚未完成，监控暂不可用' : '你装下的眼睛'"
             @click="显示监控 = true"
           >
             <Ic n="cctv" /><span>监控</span>
@@ -956,7 +1052,7 @@
         :weekday="星期"
         :period="时段"
         :lite="省流"
-        :sending="发送中"
+        :sending="发送中 || 场景剧情移动锁"
         :hospital-visible="医院已解锁(data)"
         :avatar-failed="头像失效"
         :avatar-image="头像图"
@@ -979,7 +1075,7 @@
         :current-room="当前房间"
         :absolute-period="绝对时段"
         :unlocked-cg="已解锁CG"
-        :sending="发送中"
+        :sending="场景操作锁"
         :wife-nearby="选中门牌 ? 妻在玩家身边(选中门牌) : false"
         :evidence-slots="裂缝证物槽"
         :avatar-failed="头像失效"
@@ -1003,7 +1099,7 @@
       <InventoryPopup
         :open="显示背包"
         :items="背包列表"
-        :sending="发送中"
+        :sending="场景操作锁"
         :item-failed="道具图失效"
         :item-image="道具图"
         @close="显示背包 = false"
@@ -1043,7 +1139,7 @@
       <ShopPopup
         :open="显示商店"
         :cash="data.现金"
-        :sending="发送中"
+        :sending="场景操作锁"
         :shelves="货架"
         :item-failed="道具图失效"
         :item-image="道具图"
@@ -1061,7 +1157,7 @@
       <MonitorPopup
         v-if="显示监控"
         :rooms="监控列表"
-        :sending="发送中"
+        :sending="场景操作锁"
         :avatar-failed="头像失效"
         :background-url="背景图"
         :avatar-url="头像图"
@@ -1096,10 +1192,12 @@
             >
               <span class="chronicle-mark"><Ic :n="条.谁 === '玩家' ? 'coin' : 'book'" /></span>
               <template v-if="条.楼 !== undefined && 条.楼 === 编辑中楼">
-                <textarea v-model="编辑文本" class="edit-area" rows="8"></textarea>
+                <textarea v-model="编辑文本" class="edit-area" rows="8" :disabled="编辑保存中"></textarea>
                 <div class="edit-acts">
-                  <button class="btn" :disabled="!编辑文本.trim()" @click="存编辑">落笔</button>
-                  <button class="btn" @click="编辑中楼 = null">作罢</button>
+                  <button class="btn" :disabled="编辑保存中 || !编辑文本.trim()" @click="存编辑">
+                    {{ 编辑保存中 ? '落笔中…' : '落笔' }}
+                  </button>
+                  <button class="btn" :disabled="编辑保存中" @click="取消编辑">作罢</button>
                 </div>
               </template>
               <template v-else>
@@ -1153,12 +1251,14 @@
 
       <!-- ═══════════ 提示 toast + 拾获卡(2026-07-17 用户反馈:翻出东西不能一闪而过) ═══════════
            带【】的重要提示(线索/收获类)升级成点击才收下的 gal 卡,普通提示仍走 toast -->
-      <FeedbackOverlay :toast="提示文本" :loot="拾获卡" :sending="发送中" @dismiss-loot="拾获卡 = ''" />
+      <FeedbackOverlay :toast="提示文本" :loot="拾获卡" :sending="发送中" @dismiss-loot="收下拾获卡" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { 场景剧情楼道, 读取场景剧情状态, 读取队首场景剧情 } from '../../脚本/游戏逻辑/场景剧情事务';
+import { 是入住登场事件 } from '../../脚本/游戏逻辑/入住触发门';
 import type { SchemaType } from '../../schema';
 import {
   由头每日次数,
@@ -1185,12 +1285,16 @@ import { 解析绝对时段 } from '../../周作息';
 import { 丈夫在楼, 妻位置推算 } from '../../脚本/游戏逻辑/楼层时钟';
 import { 余波有冻结效力 } from '../../脚本/游戏逻辑/冷落系统';
 import { 怀孕已公开 } from '../../脚本/游戏逻辑/怀孕系统';
-import { 医院已解锁, 房间生产背景键, type 生产地点动作ID } from '../../脚本/游戏逻辑/生产系统';
+import { 处于医院硬锁, 医院已解锁, 房间生产背景键, type 生产地点动作ID } from '../../脚本/游戏逻辑/生产系统';
 import { 安眠药可圆场, 丈夫登门药物窗口已开启 } from '../../脚本/游戏逻辑/丈夫登门系统';
 import { 全部阶段性癖已完成, 读取阶段性癖状态, 阶段性癖门牌 } from '../../脚本/游戏逻辑/阶段性癖状态';
 import { 列出地点管理任务 } from '../../脚本/游戏逻辑/管理任务系统';
 import { 规范荣耀洞上次时段 } from '../../脚本/游戏逻辑/荣耀洞';
-import { 列出阶段线路候选详情, type 阶段线路候选 } from '../../脚本/游戏逻辑/阶段线路系统';
+import {
+  列出阶段线路候选详情,
+  母亲药物窗口已开启,
+  type 阶段线路候选,
+} from '../../脚本/游戏逻辑/阶段线路系统';
 import {
   家庭计划101背景文件,
   家庭计划卡状态,
@@ -1201,8 +1305,10 @@ import {
 import { 角色剧情占位价格文案, 角色剧情占位已上架, 角色剧情占位锁定原因 } from '../../脚本/游戏逻辑/角色结局占位';
 // 客户端只需要无副作用的聊天身份读取；禁止经手机系统兼容门面把宿主渲染组合根打进 iframe。
 import { 当前聊天ID } from '../../脚本/游戏逻辑/手机/运行时上下文';
+import { MVU操作进行中 } from '../../脚本/游戏逻辑/mvuIO';
+import { 当前时间线切换世代 } from '../../脚本/游戏逻辑/时间线切换协调';
 // 纯函数模块：客户端直连可安全用于目标时段的地图赴约位置派生。
-import { 手机邀约计划状态, type 手机邀约计划 } from '../../脚本/游戏逻辑/手机/邀约计划';
+import { 手机邀约计划成员, 手机邀约计划状态, type 手机邀约计划 } from '../../脚本/游戏逻辑/手机/邀约计划';
 import { 手机锚消息签名 } from '../../脚本/游戏逻辑/手机时间线租约';
 import { 判定时间撤销点, 是时间撤销地点, 时间撤销点键 } from '../../脚本/游戏逻辑/时间撤销系统';
 import { 风闻事件安全摘要 } from '../../脚本/游戏逻辑/风闻系统';
@@ -1222,7 +1328,7 @@ import {
 import {
   CG条目,
   判定CG动作,
-  判定CG阶段,
+  判定亲密场景CG阶段,
   当前CG可沿用,
   应保留成人CG,
   选择成人CG组,
@@ -1427,6 +1533,27 @@ const 就绪 = computed(() => Boolean(data.value?.系统 && data.value?.户));
 const 脚本存活 = ref(true);
 let 心跳timer: ReturnType<typeof setInterval> | undefined;
 
+// App 级延迟任务统一登记。Vue 组件可能在同一 iframe 内热重载；只靠文档销毁不会取消
+// 键盘三拍、自动重试、场景续票或心跳宽限这些已经排队的回调。
+const 客户端延迟任务 = new Set<ReturnType<typeof setTimeout>>();
+function 安排客户端延迟(任务: () => void, 毫秒: number): ReturnType<typeof setTimeout> {
+  const 句柄 = setTimeout(() => {
+    客户端延迟任务.delete(句柄);
+    任务();
+  }, 毫秒);
+  客户端延迟任务.add(句柄);
+  return 句柄;
+}
+function 取消客户端延迟(句柄: ReturnType<typeof setTimeout> | undefined): void {
+  if (句柄 === undefined) return;
+  clearTimeout(句柄);
+  客户端延迟任务.delete(句柄);
+}
+function 清空客户端延迟任务(): void {
+  for (const 句柄 of 客户端延迟任务) clearTimeout(句柄);
+  客户端延迟任务.clear();
+}
+
 // ── 世界周历与消息历史 ──
 
 const 末楼号 = ref(0);
@@ -1476,9 +1603,9 @@ watch(
   () => 上次性爱结果.value.场次标识,
   (新标识, 旧标识) => {
     if (!新标识 || 新标识 === 旧标识) return;
-    clearTimeout(性爱结果timer);
+    取消客户端延迟(性爱结果timer);
     显示性爱结果卡.value = true;
-    性爱结果timer = setTimeout(() => (显示性爱结果卡.value = false), 8000);
+    性爱结果timer = 安排客户端延迟(() => (显示性爱结果卡.value = false), 8000);
   },
   { flush: 'post' },
 );
@@ -1567,34 +1694,36 @@ function 刷粘滞() {
   }
 }
 
-/** 赴约显示(微信"+"约出来):旧即时赴约=有效期内她在玩家身边;v0.80 新预约计划=目标时段她在约定地点。回档/过期自动失效 */
-const 赴约妻 = ref<{ m: string; 地点: string } | null>(null);
+/** 赴约显示：旧即时赴约仍是一人跟随；新共同计划在目标时段把全部实际接受成员放到约定地点。 */
+const 赴约妻们 = ref<Array<{ m: 门牌; 地点: string }>>([]);
 function 刷赴约() {
   try {
     const 变量 = getVariables({ type: 'chat' });
-    const p = _.get(变量, '_赴约') as { m?: string; 起楼?: number; 至楼?: number } | null;
+    const p = _.get(变量, '_赴约') as { m?: 门牌; 起楼?: number; 至楼?: number } | null;
     const 楼 = 末楼号.value;
     if (p?.m && (p.起楼 ?? 0) <= 楼 && (p.至楼 ?? -1) >= 楼) {
-      // 旧即时赴约:她的位置=玩家所在。
-      赴约妻.value = { m: p.m, 地点: 当前房间.value ?? '大堂' };
+      // 旧即时赴约：她的位置=玩家所在。
+      赴约妻们.value = [{ m: p.m, 地点: 当前房间.value ?? '大堂' }];
       return;
     }
-    // v0.80 新预约计划:只有赴约时段(当前钟===目标钟)才在约定地点现身;
-    // 待赴约/已过期/创建点在回档后失效的都按固定作息显示,不提前现身。
+    // 新共同计划只有在赴约时段才把接受成员放到约定地点；待赴约/过期/回档失效不提前现身。
     const 计划 = _.get(变量, '_手机邀约计划') as 手机邀约计划 | null;
     if (手机邀约计划状态(计划, 绝对时段.value, 楼) === '赴约中') {
-      赴约妻.value = { m: 计划!.m, 地点: 计划!.地点 };
+      赴约妻们.value = 手机邀约计划成员(计划)
+        .filter(m => !处于医院硬锁(data.value, m))
+        .map(m => ({ m, 地点: 计划!.地点 }));
       return;
     }
-    赴约妻.value = null;
+    赴约妻们.value = [];
   } catch {
-    赴约妻.value = null;
+    赴约妻们.value = [];
   }
 }
 /** 妻位置显示统一口：特殊场景、赴约、连续对话优先，最后才读取固定周作息。 */
 function 妻现位(m: 门牌): string {
   if (静音会议正式中.value && 是静音会议候选门牌(m) && 静音会议演出妻.value.includes(m)) return '管理员室';
-  if (赴约妻.value?.m === m) return 赴约妻.value.地点;
+  const 赴约 = 赴约妻们.value.find(项 => 项.m === m);
+  if (赴约) return 赴约.地点;
   if (粘滞在场.value.位置 && 粘滞在场.value.们.includes(m)) return 粘滞在场.value.位置;
   return 妻位置推算(m, 绝对时段.value, data.value.户[m]);
 }
@@ -1611,7 +1740,23 @@ interface 待提交场景状态 {
   非法进入: boolean;
 }
 
-async function 写场景(房间id: string | null, 破门 = false, 待提交状态?: 待提交场景状态): Promise<void> {
+interface 客户端时间线身份 {
+  世代: number;
+  聊天ID: string;
+}
+
+function 捕获客户端时间线身份(): 客户端时间线身份 {
+  return { 世代: 当前时间线切换世代(), 聊天ID: 当前聊天ID() };
+}
+
+function 客户端时间线仍有效(身份: 客户端时间线身份): boolean {
+  return 身份.世代 === 当前时间线切换世代() && 身份.聊天ID === 当前聊天ID();
+}
+
+let 场景同步时间线世代 = 当前时间线切换世代();
+
+async function 写场景(房间id: string | null, 破门 = false, 待提交状态?: 待提交场景状态): Promise<boolean> {
+  const 写入身份 = 捕获客户端时间线身份();
   const 变量 = getVariables({ type: 'chat' });
   const 旧场景 = (_.get(变量, '_场景') as 场景聊天状态 | null | undefined) ?? null;
   const 旧房间 = 旧场景?.房间id ?? null;
@@ -1636,6 +1781,7 @@ async function 写场景(房间id: string | null, 破门 = false, 待提交状�
       非法进入: !!(旧场景?.非法进入 || 已破门进入.value),
     };
   }
+  if (!客户端时间线仍有效(写入身份)) return false;
   await insertOrAssignVariables(
     {
       _场景: 房间id
@@ -1653,12 +1799,14 @@ async function 写场景(房间id: string | null, 破门 = false, 待提交状�
     },
     { type: 'chat' },
   );
+  if (!客户端时间线仍有效(写入身份)) return false;
   if (旧房间 !== 房间id) {
     清空当前成人CG();
     当前家庭计划CG.value = null;
     当前生产CG.value = null;
     最近CG信号 = null;
   }
+  return true;
 }
 
 function 启动阶段线路剧情(房间id: string, 候选: 阶段线路候选): void {
@@ -1703,8 +1851,38 @@ async function 确认亲密离场(): Promise<boolean> {
   }
 }
 
+function 确认离开等待场景剧情(): boolean {
+  if (!场景剧情等待当前处理.value) return true;
+  return window.confirm(
+    `「${场景剧情状态.value?.标题 ?? '当前剧情'}」已经抵达设计地点。现在离开只会让它留在原地等待，不会改到新地点演出。仍要离开吗？`,
+  );
+}
+
 async function 进入(房间id: string, 破门 = false, 保持地图 = false): Promise<boolean> {
   if (场景移动中) return false;
+  const 移动身份 = 捕获客户端时间线身份();
+  const 准备锁 = 场景剧情准备锁.value;
+  if (准备锁) {
+    const 当前 = 当前房间.value ?? 场景剧情楼道;
+    if (房间id !== 当前) {
+      弹提示(`正在触发「${准备锁.标题}」，场景正在锁定，请勿切换地点。`, 4400);
+      return false;
+    }
+  }
+  if (录像带前置中.value && 房间id !== 录像带前置场景.value) {
+    弹提示(`「${录像带前置标题.value}」还没有完成，必须留在${录像带前置场景名.value}继续。`, 4400);
+    return false;
+  }
+  if (场景剧情等待当前处理.value && 房间id !== 当前房间.value && !确认离开等待场景剧情()) {
+    return false;
+  }
+  if (场景剧情活动.value) {
+    const 目标 = 场景剧情目标.value;
+    if (目标 === null || 目标 === 场景剧情楼道 || 房间id !== 目标) {
+      弹提示(`「${场景剧情状态.value?.标题 ?? '当前剧情'}」尚未完成，场景已锁定在${场景剧情目标名.value}。`, 4400);
+      return false;
+    }
+  }
   if (房间id === '医院' && !医院已解锁(data.value)) {
     弹提示('先读取她发来的预产消息，才知道该去医院。', 4200);
     return false;
@@ -1713,11 +1891,16 @@ async function 进入(房间id: string, 破门 = false, 保持地图 = false): P
   if (房间id === 当前房间.value) {
     if (!保持地图) 关地图();
     闪转场(查房间(房间id)?.名称 ?? 房间id);
+    eventEmit('人妻公寓:检查场景剧情', 房间id);
     return true;
   }
   场景移动中 = true;
   try {
     if (!(await 确认亲密离场())) return false;
+    if (!客户端时间线仍有效(移动身份)) {
+      同步场景自变量();
+      return false;
+    }
     const 无耗时拜访 =
       (_.get(getVariables({ type: 'chat' }), '_无耗时拜访') as 无耗时拜访记录 | null | undefined) ?? null;
     const 续接同次拜访 =
@@ -1732,11 +1915,20 @@ async function 进入(房间id: string, 破门 = false, 保持地图 = false): P
     }
     const 新由头已用 = 续接同次拜访 ? 无耗时拜访.由头已用 : false;
     const 新非法进入 = 破门 || (续接同次拜访 && !!无耗时拜访?.非法进入);
-    await 写场景(房间id, 破门, {
-      进房末楼: 新进房末楼,
-      由头已用: 新由头已用,
-      非法进入: 新非法进入,
-    });
+    if (
+      !(await 写场景(房间id, 破门, {
+        进房末楼: 新进房末楼,
+        由头已用: 新由头已用,
+        非法进入: 新非法进入,
+      }))
+    ) {
+      同步场景自变量();
+      return false;
+    }
+    if (!客户端时间线仍有效(移动身份)) {
+      同步场景自变量();
+      return false;
+    }
     当前房间.value = 房间id;
     进房末楼.value = 新进房末楼;
     本次入房由头已用.value = 新由头已用;
@@ -1748,6 +1940,7 @@ async function 进入(房间id: string, 破门 = false, 保持地图 = false): P
     闪转场(查房间(房间id)?.名称 ?? 房间id);
     // 头像即时点亮(走到谁身边谁亮;回合结束后脚本按位置系统重算)
     在场.value = { 焦点: 可见门牌.value.filter(m => 妻现位(m) === 房间id), 在场: [] };
+    eventEmit('人妻公寓:检查场景剧情', 房间id);
     return true;
   } finally {
     场景移动中 = false;
@@ -1756,10 +1949,35 @@ async function 进入(房间id: string, 破门 = false, 保持地图 = false): P
 
 async function 离开房间(): Promise<void> {
   if (场景移动中) return;
+  const 移动身份 = 捕获客户端时间线身份();
+  if (场景剧情准备锁.value) {
+    弹提示(`正在触发「${场景剧情准备锁.value.标题}」，场景正在锁定，请勿离开。`, 4400);
+    return;
+  }
+  if (录像带前置中.value) {
+    弹提示(`「${录像带前置标题.value}」还没有完成，不能离开${录像带前置场景名.value}。`, 4400);
+    return;
+  }
+  if (场景剧情等待当前处理.value && !确认离开等待场景剧情()) return;
+  if (场景剧情活动.value && 场景剧情目标.value !== 场景剧情楼道) {
+    弹提示(`「${场景剧情状态.value?.标题 ?? '当前剧情'}」尚未完成，不能离开${场景剧情目标名.value}。`, 4400);
+    return;
+  }
   场景移动中 = true;
   try {
     if (!(await 确认亲密离场())) return;
-    await 写场景(null);
+    if (!客户端时间线仍有效(移动身份)) {
+      同步场景自变量();
+      return;
+    }
+    if (!(await 写场景(null))) {
+      同步场景自变量();
+      return;
+    }
+    if (!客户端时间线仍有效(移动身份)) {
+      同步场景自变量();
+      return;
+    }
     当前房间.value = null;
     本次入房由头已用.value = false;
     粘滞在场.value = { 位置: null, 们: [] };
@@ -1768,6 +1986,7 @@ async function 离开房间(): Promise<void> {
     闪转场('楼道');
     在场.value = { 焦点: [], 在场: [] }; // 身边已无人,头像随之熄灭
     显示地图.value = true; // 走出房门=站上楼道,顺手展开地图选下一处
+    eventEmit('人妻公寓:检查场景剧情', '楼道');
   } finally {
     场景移动中 = false;
   }
@@ -1781,6 +2000,9 @@ async function 离开房间(): Promise<void> {
  */
 function 同步场景自变量() {
   try {
+    const 本次时间线世代 = 当前时间线切换世代();
+    const 时间线变化 = 本次时间线世代 !== 场景同步时间线世代;
+    场景同步时间线世代 = 本次时间线世代;
     const 场景 = _.get(getVariables({ type: 'chat' }), '_场景') as 场景聊天状态 | null;
     let 缺省末楼 = 末楼号.value;
     try {
@@ -1802,9 +2024,13 @@ function 同步场景自变量() {
     已破门进入.value = 下一状态.非法进入;
     本次入房由头已用.value = 下一状态.由头已用;
     进房末楼.value = 下一状态.进房末楼;
-    if (下一状态.房间变化) {
+    if (下一状态.房间变化 || 时间线变化) {
       粘滞在场.value = { 位置: null, 们: [] };
       正文幕归属状态.value = 作废正文幕归属(正文幕归属状态.value);
+      清空当前成人CG();
+      当前家庭计划CG.value = null;
+      当前生产CG.value = null;
+      最近CG信号 = null;
     }
   } catch (e) {
     console.error('[人妻公寓客户端] 场景同步失败:', e);
@@ -1818,8 +2044,8 @@ let 转场计时: ReturnType<typeof setTimeout> | undefined;
 
 function 闪转场(名称: string) {
   转场.value = 名称;
-  clearTimeout(转场计时);
-  转场计时 = setTimeout(() => (转场.value = ''), 1200);
+  取消客户端延迟(转场计时);
+  转场计时 = 安排客户端延迟(() => (转场.value = ''), 1200);
 }
 
 /** 本次进入是否撬门而入(撬进空屋才有事可做;敲门无人应=还站在门外) */
@@ -1867,6 +2093,9 @@ const 可用由头 = computed(() => {
 });
 
 const 可输入 = computed(() => {
+  if (场景剧情活动.value || 场景剧情旧档可认领.value) return false;
+  // 只有明确要求玩家回应的等待票开放输入；其余到场票使用专用“开始本段剧情”按钮。
+  if (场景剧情等待当前处理.value) return 场景剧情等待回应.value;
   const id = 当前房间.value;
   if (!id) return false;
   if (静音会议中.value) {
@@ -1916,7 +2145,7 @@ const 幕房间 = computed(() => 正文幕归属状态.value.房间);
 const 在幕中 = computed(() => 正文幕属于当前房间(正文幕归属状态.value, 当前房间.value));
 
 const 显示选项 = computed(() => {
-  if (发送中.value || !行动选项.value.length) return false;
+  if (发送中.value || 场景剧情锁定.value || !行动选项.value.length) return false;
   if (!当前房间.value) return 在幕中.value && 幕房间.value === null; // 楼道态:序章引导等
   return 可输入.value && 在幕中.value;
 });
@@ -2010,6 +2239,15 @@ const 手机未读 = ref(false);
 let 收手机回全屏 = false;
 
 async function 开手机() {
+  const 父亲通话已接通 = Boolean(data.value?.系统?._父亲通话.标识);
+  if (场景剧情活动.value && !父亲通话已接通) {
+    弹提示(`「${场景剧情状态.value?.标题 ?? '当前剧情'}」还没有完成。请使用“重试本段剧情”。`, 5200);
+    return;
+  }
+  if (场景剧情等待当前处理.value && !父亲通话已接通) {
+    弹提示(`「${场景剧情状态.value?.标题 ?? '当前剧情'}」已到触发地点，请先单独开始这一幕。`, 5200);
+    return;
+  }
   if (静音会议正式中.value && !静音会议手机可打开.value) {
     弹提示(静音会议手机标题.value);
     return;
@@ -2198,6 +2436,8 @@ const 当前家庭计划CG = ref<家庭计划CG载荷 | null>(null);
 interface 生产CG载荷 {
   文件: string;
   标题: string;
+  /** 与家庭计划载荷共享事件 CG 渲染形状；生产画面默认不保留立绘。 */
+  保留夏乔?: boolean;
 }
 const 当前生产CG = ref<生产CG载荷 | null>(null);
 const 当前事件CG = computed(() => 当前生产CG.value ?? 当前家庭计划CG.value);
@@ -2207,7 +2447,9 @@ function 关闭当前事件CG(): void {
   if (当前生产CG.value) 当前生产CG.value = null;
   else 当前家庭计划CG.value = null;
 }
-function 当前事件CG加载失败(): void {
+function 当前事件CG加载失败(失败地址: string): void {
+  // 图片请求可能在家庭计划节点切换或生产画面抢占后才迟到失败；只允许仍是当前地址的请求收口。
+  if (!失败地址 || 失败地址 !== 当前事件CG地址.value) return;
   const 类型 = 当前生产CG.value ? '生产' : '家庭计划';
   关闭当前事件CG();
   弹提示(`${类型}画面加载失败，任务进度不受影响。`, 4200);
@@ -2253,7 +2495,7 @@ function 处理CG回合信号(
     成人CG本次失效.clear();
   }
   最近CG信号 = 信号;
-  const 阶段 = 判定CG阶段(信号);
+  const 阶段 = 判定亲密场景CG阶段(信号);
   const 动作 = 阶段 ? 判定CG动作(信号, 阶段) : null;
   // 展示键包含图库/门牌/阶段/动作：图库切换必然改变展示键，旧图库画面不能沿用。
   const 目标图库 = 信号.variant ?? 'normal';
@@ -2488,6 +2730,189 @@ const 头像列表 = computed(() =>
 
 const 输入文本 = ref('');
 const 发送中 = ref(false);
+const 场景剧情状态 = computed(() => (data.value?.系统 ? 读取场景剧情状态(data.value) : null));
+/**
+ * 业务已经在脚本候选中建立场景票、但 MVU 尚未完成持久写回的极短窗口。
+ * 这层锁不充当第二份真值，只负责在持久活动票可见前阻止快速换房；写回成功后由活动票接管。
+ */
+const 场景剧情准备锁 = ref<{ 标题: string; 目标场景: string } | null>(null);
+let 场景剧情准备事件序号 = 0;
+const 场景剧情活动 = computed(() => 场景剧情状态.value?.活动 === true);
+const 等待场景剧情状态 = computed(() =>
+  场景剧情状态.value && !场景剧情状态.value.活动 ? 场景剧情状态.value : null,
+);
+const 场景剧情队首 = computed(() => 读取队首场景剧情(data.value.系统._待发送事件));
+const 场景剧情是入住等待 = computed(() =>
+  Boolean(等待场景剧情状态.value && 场景剧情队首.value && 是入住登场事件(场景剧情队首.value.内容)),
+);
+const 场景剧情旧档入住等待 = computed(() =>
+  Boolean(场景剧情是入住等待.value && 场景剧情队首.value?.目标场景 === null),
+);
+const 场景剧情旧档可认领 = computed(() =>
+  Boolean(
+    等待场景剧情状态.value &&
+      场景剧情队首.value?.目标场景 === null &&
+      !场景剧情是入住等待.value,
+  ),
+);
+const 当前场景剧情标识 = computed(() => 当前房间.value ?? 场景剧情楼道);
+const 场景剧情目标 = computed(() => 场景剧情状态.value?.目标场景 ?? null);
+const 场景剧情在目标地点 = computed(() => {
+  const 目标 = 场景剧情目标.value;
+  return 目标 !== null && 目标 === 当前场景剧情标识.value;
+});
+const 场景剧情等待当前处理 = computed(() =>
+  Boolean(等待场景剧情状态.value && 场景剧情在目标地点.value),
+);
+const 场景剧情等待回应 = computed(() =>
+  Boolean(场景剧情等待当前处理.value && 等待场景剧情状态.value?.需要玩家回应),
+);
+const 场景剧情未知旧档等待 = computed(() =>
+  Boolean(等待场景剧情状态.value?.目标场景 === null && !场景剧情是入住等待.value),
+);
+const 录像带前置场景 = computed(() =>
+  data.value.系统._特殊场景.id === '录像带前置' ? data.value.系统._特殊场景.地点 : '',
+);
+const 录像带前置中 = computed(() => Boolean(录像带前置场景.value));
+const 录像带前置场景名 = computed(() => 查房间(录像带前置场景.value)?.名称 ?? 录像带前置场景.value);
+const 录像带前置标题 = computed(() => {
+  const 门牌号 = data.value.系统._特殊场景.参与妻[0] as 门牌 | undefined;
+  return 门牌号 && 户静态表[门牌号] ? `${户静态表[门牌号].妻名}的录像带前置` : '录像带前置剧情';
+});
+/**
+ * 功能锁与移动锁分开：活动票在错误地点恢复时必须允许玩家打开地图并返回目标；
+ * 活动票到场后硬锁移动。尚未激活的等待票只锁其他会改状态的入口，离开前明确确认，
+ * 离开后仍固定在原目标等待，绝不能跟随玩家改演到新地点。
+ */
+const 普通场景剧情功能锁 = computed(
+  () =>
+    Boolean(场景剧情准备锁.value) ||
+    场景剧情活动.value ||
+    场景剧情等待当前处理.value ||
+    场景剧情未知旧档等待.value,
+);
+const 普通场景剧情移动锁 = computed(
+  () => Boolean(场景剧情准备锁.value) || (场景剧情活动.value && 场景剧情在目标地点.value),
+);
+/** 录像带首送有自己的两拍状态机：同样锁场和其他功能，但保留输入框回应当前拍。 */
+const 场景剧情锁定 = computed(() => 普通场景剧情功能锁.value || 录像带前置中.value);
+const 场景剧情移动锁 = computed(() => 普通场景剧情移动锁.value || 录像带前置中.value);
+// 商店、背包、档案与房内动作的脚本 listener 会同步把整表事务排入 MVU 队列，但脚本的
+// 生成/准备事件要到后续任务拍才会把 发送中 点亮。此本地门覆盖两次 click 之间的缝隙。
+const 界面事务提交中 = ref(false);
+let 界面事务提交世代 = 0;
+let 界面事务观察timer: ReturnType<typeof setInterval> | undefined;
+const 场景操作锁 = computed(() => 发送中.value || 场景剧情锁定.value || 界面事务提交中.value);
+
+function 释放界面事务提交(世代 = 界面事务提交世代): void {
+  if (世代 !== 界面事务提交世代) return;
+  clearInterval(界面事务观察timer);
+  界面事务观察timer = undefined;
+  界面事务提交中.value = false;
+}
+
+function 观察界面事务收口(本次世代: number): void {
+  const 检查 = () => {
+    if (本次世代 !== 界面事务提交世代) return;
+    // 生成开始后由 发送中 接管；无生成的即时业务则等同步入队的 MVU 事务真正归零。
+    if (发送中.value || !MVU操作进行中()) 释放界面事务提交(本次世代);
+  };
+  检查();
+  if (!界面事务提交中.value || 本次世代 !== 界面事务提交世代) return;
+  clearInterval(界面事务观察timer);
+  界面事务观察timer = setInterval(检查, 50);
+}
+
+/** 纯 UI 业务的唯一同步提交门：先占门，再把事件交给脚本同步入队。 */
+function 提交界面事务(任务: () => void | Promise<void>, 允许场景剧情锁 = false): boolean {
+  if (
+    发送中.value ||
+    界面事务提交中.value ||
+    (!允许场景剧情锁 && 场景剧情锁定.value) ||
+    场景移动中
+  )
+    return false;
+  if (MVU操作进行中()) {
+    弹提示('另一项操作正在保存，请等它完成后再试。');
+    return false;
+  }
+  const 本次世代 = ++界面事务提交世代;
+  界面事务提交中.value = true;
+  let 派发结果: void | Promise<void>;
+  try {
+    派发结果 = 任务();
+  } catch (error) {
+    释放界面事务提交(本次世代);
+    throw error;
+  }
+  // eventEmit 返回 Promise，并保证所有 listener 收口后才完成。必须等派发 Promise 至少
+  // 启动/完成一轮，再观察 MVU 队列；否则监听若在微任务中入队，这里会误见“队列为空”而提前解锁。
+  void Promise.resolve(派发结果).then(
+    () => 观察界面事务收口(本次世代),
+    error => {
+      释放界面事务提交(本次世代);
+      console.error('[人妻公寓客户端] 界面业务事件派发失败:', error);
+      弹提示(`操作没有提交：${error instanceof Error ? error.message : String(error)}`, 5200);
+    },
+  );
+  return true;
+}
+const 场景剧情目标名 = computed(() => {
+  const 目标 = 场景剧情目标.value;
+  if (目标 === null) return '原触发场景';
+  if (目标 === 场景剧情楼道) return '楼道';
+  return 查房间(目标)?.名称 ?? 目标;
+});
+const 场景剧情锁定说明 = computed(() => {
+  const 状态 = 场景剧情状态.value;
+  if (!状态) return '';
+  if (状态.活动) {
+    return 场景剧情在目标地点.value
+      ? `正在处理「${状态.标题}」。生成失败也会保留在这里，请重试本段剧情，完成前不要离开场景。`
+      : `「${状态.标题}」必须回到${场景剧情目标名.value}继续；旧请求不会在其他地点改演。`;
+  }
+  if (状态.目标场景 === null) return `旧记录「${状态.标题}」没有可靠的原场景，系统不会擅自改演。`;
+  if (场景剧情等待回应.value)
+    return `「${状态.标题}」已到触发地点，正在等你的具体回应；也可以确认离开，让它留在原地等待。`;
+  if (场景剧情在目标地点.value)
+    return `「${状态.标题}」已到触发地点，请单独完成这一段；离开只会让它留在原地，不会改演到别处。`;
+  return `「${状态.标题}」正在等待${场景剧情目标名.value}；当前互动不会被它插入。`;
+});
+
+function 继续场景剧情() {
+  if (发送中.value || !场景剧情状态.value || !场景剧情在目标地点.value) return;
+  void 提交界面事务(() => eventEmit('人妻公寓:继续场景剧情'), true);
+}
+
+function 检查入住登场地点() {
+  if (发送中.value || !场景剧情旧档入住等待.value) return;
+  void 提交界面事务(() => eventEmit('人妻公寓:继续场景剧情', { 尝试入住: true }), true);
+}
+
+function 恢复旧场景剧情() {
+  const 状态 = 场景剧情状态.value;
+  if (发送中.value || !状态 || 状态.活动 || !场景剧情旧档可认领.value) return;
+  const 确认 = window.confirm(
+    `旧存档里的「${状态.标题}」没有保存原触发地点，系统不能安全猜测。是否由你确认把它绑定到当前地点“${当前房间名.value || '楼道'}”并在这里完成？`,
+  );
+  if (!确认) return;
+  void 提交界面事务(() => eventEmit('人妻公寓:继续场景剧情', { 认领旧档: true }), true);
+}
+
+async function 返回场景剧情地点(): Promise<void> {
+  if (发送中.value || !场景剧情活动.value) return;
+  const 目标 = 场景剧情目标.value;
+  if (目标 === null) {
+    弹提示('这条旧剧情没有可靠的原场景记录，系统不会擅自换地点演出。', 5200);
+    return;
+  }
+  if (目标 === 场景剧情楼道) {
+    if (当前房间.value) await 离开房间();
+    return;
+  }
+  if (当前房间.value !== 目标) await 进入(目标);
+}
+/** 场景剧情待重试时只保留专用开始/重试入口；其他状态入口由统一门控暂停。 */
 type 变量重生成状态值 = '不可用' | '未配置' | '可用' | '进行中' | '已完成';
 const 变量重生成状态 = ref<变量重生成状态值>('不可用');
 watch(发送中, 正在生成 => {
@@ -2501,7 +2926,7 @@ const { 房间动作, 当前房间动作, 普通房间动作, 确认已到达动
   当前房间,
   时段,
   绝对时段,
-  发送中,
+  发送中: 场景操作锁,
   时间撤销可用,
   已破门进入,
   荣耀洞可用,
@@ -2514,18 +2939,21 @@ const { 房间动作, 当前房间动作, 普通房间动作, 确认已到达动
   发起时间撤销,
   启动阶段线路剧情,
   事件: {
-    对饮: id => eventEmit('人妻公寓:对饮', id),
-    丈夫礼物: ({ 门牌, 道具id }) => eventEmit('人妻公寓:丈夫礼物', { 门牌, 道具id }),
-    催租: ({ 门牌, 选择 }) => eventEmit('人妻公寓:催租', { 门牌, 选择 }),
-    空房偷窃: id => eventEmit('人妻公寓:空房偷窃', id),
-    打听: m => eventEmit('人妻公寓:打听', m),
-    荣耀洞: () => eventEmit('人妻公寓:荣耀洞'),
-    捡金币: id => eventEmit('人妻公寓:捡金币', id),
-    处理管理任务: ({ 任务id, 选项id, 地点 }) => eventEmit('人妻公寓:处理管理任务', { 任务id, 选项id, 地点 }),
-    开启阶段性癖: m => eventEmit('人妻公寓:开启阶段性癖', m),
-    家庭计划动作: (动作: 家庭计划地点动作ID) => eventEmit('人妻公寓:家庭计划动作', 动作),
+    对饮: id => void 提交界面事务(() => eventEmit('人妻公寓:对饮', id)),
+    丈夫礼物: ({ 门牌, 道具id }) =>
+      void 提交界面事务(() => eventEmit('人妻公寓:丈夫礼物', { 门牌, 道具id })),
+    催租: ({ 门牌, 选择 }) => void 提交界面事务(() => eventEmit('人妻公寓:催租', { 门牌, 选择 })),
+    空房偷窃: id => void 提交界面事务(() => eventEmit('人妻公寓:空房偷窃', id)),
+    打听: m => void 提交界面事务(() => eventEmit('人妻公寓:打听', m)),
+    荣耀洞: () => void 提交界面事务(() => eventEmit('人妻公寓:荣耀洞')),
+    捡金币: id => void 提交界面事务(() => eventEmit('人妻公寓:捡金币', id)),
+    处理管理任务: ({ 任务id, 选项id, 地点 }) =>
+      void 提交界面事务(() => eventEmit('人妻公寓:处理管理任务', { 任务id, 选项id, 地点 })),
+    开启阶段性癖: m => void 提交界面事务(() => eventEmit('人妻公寓:开启阶段性癖', m)),
+    家庭计划动作: (动作: 家庭计划地点动作ID) =>
+      void 提交界面事务(() => eventEmit('人妻公寓:家庭计划动作', 动作)),
     生产动作: (载荷: { 门牌: 门牌; 动作: 生产地点动作ID; 预期绝对时段: number }) =>
-      eventEmit('人妻公寓:生产动作', 载荷),
+      void 提交界面事务(() => eventEmit('人妻公寓:生产动作', 载荷)),
   },
 });
 // 保留 App 对组合器完整返回契约的接线；当前模板只直接消费普通房间动作。
@@ -2561,8 +2989,13 @@ const {
 });
 
 function 使用录像带() {
-  显示背包.value = false;
-  请求使用录像带();
+  if (
+    提交界面事务(() => {
+      请求使用录像带();
+    })
+  ) {
+    显示背包.value = false;
+  }
 }
 
 const 运行阶段 = ref('');
@@ -2577,15 +3010,33 @@ const 键盘打开 = ref(false);
 const 当前资源门槛 = computed(() => {
   const 文本 = 输入文本.value.trim();
   const 系统 = data.value.系统;
-  const 免资源 = Boolean(系统._待发送事件 || 系统._特殊场景.id || 静音会议正式中.value);
+  const 免资源 = Boolean(
+    场景剧情活动.value || 场景剧情等待当前处理.value || 系统._特殊场景.id || 静音会议正式中.value,
+  );
   return 免资源 || !文本 ? { 可行动: true, 种类: '精力' as const, 提示: '' } : 行动资源门槛(data.value, 文本);
 });
 const 当前行动可提交 = computed(
   () =>
-    !!输入文本.value.trim() && 当前资源门槛.value.可行动 && (!静音会议待散会选择.value || 静音会议会后选择合法.value),
+    !!输入文本.value.trim() &&
+    当前资源门槛.value.可行动 &&
+    !场景剧情活动.value &&
+    !场景剧情准备锁.value &&
+    !场景剧情未知旧档等待.value &&
+    (!场景剧情等待当前处理.value || 场景剧情等待回应.value) &&
+    (!静音会议待散会选择.value || 静音会议会后选择合法.value),
 );
 const 发送按钮文案 = computed(() =>
-  静音会议待散会选择.value ? '宣布散会' : 性爱待失控收尾.value ? '演出收尾' : '行动',
+  场景剧情活动.value
+    ? '使用重试按钮'
+    : 场景剧情等待当前处理.value
+      ? '回应剧情'
+      : 场景剧情准备锁.value
+        ? '正在准备剧情'
+        : 静音会议待散会选择.value
+      ? '宣布散会'
+      : 性爱待失控收尾.value
+        ? '演出收尾'
+        : '行动',
 );
 /** 回合输入组件公开接口:App 不再持有 textarea DOM,聚焦经组件 defineExpose 转发 */
 type 回合输入公开接口 = { 聚焦: () => void };
@@ -2619,7 +3070,12 @@ function 当前回合恢复上下文(): 回合恢复上下文 | null {
   } catch {
     锚楼 = Math.max(0, (SillyTavern.chat?.length ?? 1) - 1);
   }
-  return { 聊天ID, 锚楼, 锚签名: 手机锚消息签名(SillyTavern.chat?.[锚楼]) };
+  return {
+    聊天ID,
+    锚楼,
+    锚签名: 手机锚消息签名(SillyTavern.chat?.[锚楼]),
+    时间线世代: 当前时间线切换世代(),
+  };
 }
 
 function 保存待恢复行动(行动: string): void {
@@ -2724,17 +3180,17 @@ function 让输入露出() {
 
 function 输入聚焦() {
   键盘打开.value = true;
-  clearTimeout(键盘定位timer);
+  取消客户端延迟(键盘定位timer);
   // TT 的原生 WindowInsets 回调可能晚于 focus；分三拍读取，最后一拍会拿到
-  // #sheld 上更新后的 --tt-ime-bottom。
-  键盘定位timer = setTimeout(让输入露出, 180);
-  setTimeout(让输入露出, 480);
-  setTimeout(让输入露出, 820);
+  // #sheld 上更新后的 --tt-ime-bottom。三拍都登记进 App 生命周期，卸载时不会迟到写 DOM。
+  键盘定位timer = 安排客户端延迟(让输入露出, 180);
+  安排客户端延迟(让输入露出, 480);
+  安排客户端延迟(让输入露出, 820);
 }
 
 function 输入失焦() {
-  clearTimeout(键盘定位timer);
-  键盘定位timer = setTimeout(() => {
+  取消客户端延迟(键盘定位timer);
+  键盘定位timer = 安排客户端延迟(() => {
     键盘打开.value = false;
     document.documentElement.style.removeProperty('--keyboard-inset');
   }, 160);
@@ -2778,12 +3234,20 @@ function 选项移动目标(文本: string): string | null {
 }
 
 async function 点选项(文本: string) {
+  const 本次选项世代 = 行动选项世代.value;
+  if (!行动选项仍有效(文本, 本次选项世代)) return;
+  if (发送中.value || 场景移动中) return;
   if (静音会议正式中.value) {
     发出(文本);
     return;
   }
   const 目标 = 选项移动目标(文本);
-  if (目标 && 目标 !== 当前房间.value && !(await 进入(目标))) return;
+  if (目标 && 目标 !== 当前房间.value) {
+    if (!(await 进入(目标))) return;
+    // 移动期间可能发生切聊、swipe、回档或新回合；旧按钮即使仍在事件栈中也不得启动。
+    if (!行动选项仍有效(文本, 本次选项世代)) return;
+  }
+  if (!行动选项仍有效(文本, 本次选项世代)) return;
   发出(文本);
 }
 
@@ -2816,7 +3280,16 @@ function 确认失控收尾(): void {
 /** 发出一条行动(输入框与行动选项按钮共用) */
 function 发出(文本: string) {
   文本 = 文本.trim();
-  if (!文本 || 发送中.value) return;
+  if (!文本 || 发送中.value || 场景移动中) return;
+  if (场景剧情准备锁.value || 场景剧情活动.value) {
+    弹提示('当前场景剧情已经开始，请使用“重试本段剧情”继续，不要用新行动改写它。');
+    return;
+  }
+  if (场景剧情等待当前处理.value && !场景剧情等待回应.value) {
+    弹提示('这段剧情已经到达设计地点，请使用“开始本段剧情”按钮，不要用普通行动替代。');
+    return;
+  }
+  const 是场景剧情回应 = 场景剧情等待回应.value;
   const 系统 = data.value.系统;
   if (!系统._待发送事件 && !系统._特殊场景.id && !静音会议正式中.value) {
     const 门槛 = 行动资源门槛(data.value, 文本);
@@ -2842,7 +3315,9 @@ function 发出(文本: string) {
   // 乐观渲染:玩家行动先上卷轴,回合完成后由楼层数据重建
   卷轴.value.push({ 谁: '玩家', 文本: [文本.replace(/\n+/g, ' ')] });
   void 滚到底();
-  if (静音会议待散会选择.value) {
+  if (是场景剧情回应) {
+    eventEmit('人妻公寓:继续场景剧情', { 行动: 文本 });
+  } else if (静音会议待散会选择.value) {
     eventEmit('人妻公寓:静音会议散会', {
       行动: 文本,
       会后妻: [...静音会议会后选择.value],
@@ -2854,8 +3329,14 @@ function 发出(文本: string) {
 
 async function 发送() {
   let 文本 = 输入文本.value.trim();
-  if (!文本 || 发送中.value || 由头写入中.value || !当前行动可提交.value) return;
+  if (!文本 || 发送中.value || 由头写入中.value || 场景移动中 || !当前行动可提交.value) return;
+  const 提交时间线身份 = 当前行动选项时间线身份();
+  const 提交房间 = 当前房间.value;
   输入文本.value = '';
+  if (场景剧情等待当前处理.value) {
+    发出(文本);
+    return;
+  }
   // 静默由头(2026-08-04 用户拍板):进未攻破户不再显示、不再表演修理借口——修理叙事
   // 已由楼务系统承担,借口戏只会让玩家整天都在修水管。次数照旧在后台限制(工具箱在包
   // +每户每天3次),记录沿用 _工具由头 的 {日,已用[]} 形状:工具名退化为内部计数令牌,
@@ -2867,6 +3348,8 @@ async function 发送() {
     const 旧 = 工具由头记录.value[门牌号];
     const 已用 = 旧?.日 === 今日 && Array.isArray(旧.已用) ? [...旧.已用] : [];
     const 新记录 = { 日: 今日, 已用: [...new Set([...已用, 用])] };
+    // 异步预写前先把原行动存进按聊天/锚楼/消息签名隔离的恢复缓存；切聊后只允许旧聊天恢复。
+    保存待恢复行动(文本);
     由头写入中.value = true;
     try {
       const 更新 = _.set({}, `_工具由头.${门牌号}`, 新记录);
@@ -2878,11 +3361,19 @@ async function 发送() {
         由头已用: true,
       });
       await insertOrAssignVariables(更新, { type: 'chat' });
+      if (提交时间线身份 !== 当前行动选项时间线身份() || 当前房间.value !== 提交房间) {
+        // 旧请求只允许留在原聊天恢复缓存；不得把旧输入或旧成功态写进新聊天界面。
+        return;
+      }
       工具由头记录.value = { ...工具由头记录.value, [门牌号]: 新记录 };
       本次入房由头已用.value = true;
     } catch (e) {
-      输入文本.value = 文本;
-      弹提示(`工具箱使用记录没有保存：${e instanceof Error ? e.message : String(e)}`);
+      if (提交时间线身份 === 当前行动选项时间线身份() && 当前房间.value === 提交房间) {
+        输入文本.value = 文本;
+        弹提示(`工具箱使用记录没有保存：${e instanceof Error ? e.message : String(e)}`);
+      } else {
+        console.warn('[人妻公寓客户端] 工具由头写入返回时聊天或场景已变化，旧输入只保留在原聊天恢复缓存:', e);
+      }
       return;
     } finally {
       由头写入中.value = false;
@@ -2950,16 +3441,42 @@ function 重试失败行动() {
 // ── 行动选项(脚本每回合从 <options> 块提取,存 chat 变量) ──
 
 const 行动选项 = ref<string[]>([]);
+const 行动选项世代 = ref(0);
+let 行动选项时间线身份 = '';
+let 行动选项内容签名 = '';
+
+function 当前行动选项时间线身份(): string {
+  const 上下文 = 当前回合恢复上下文();
+  return 上下文
+    ? `${上下文.时间线世代}\u0000${上下文.聊天ID}\u0000${上下文.锚楼}\u0000${上下文.锚签名}`
+    : '';
+}
+
+function 行动选项仍有效(文本: string, 世代: number): boolean {
+  return (
+    世代 === 行动选项世代.value &&
+    行动选项时间线身份 === 当前行动选项时间线身份() &&
+    行动选项.value.includes(文本)
+  );
+}
 
 function 刷新行动选项() {
   const v = _.get(getVariables({ type: 'chat' }), '_行动选项');
-  行动选项.value = Array.isArray(v) ? (v as string[]).filter(x => typeof x === 'string' && x.trim()) : [];
+  const 新选项 = Array.isArray(v) ? (v as string[]).filter(x => typeof x === 'string' && x.trim()) : [];
+  const 新时间线身份 = 当前行动选项时间线身份();
+  const 新内容签名 = JSON.stringify(新选项);
+  if (新时间线身份 !== 行动选项时间线身份 || 新内容签名 !== 行动选项内容签名) {
+    行动选项世代.value += 1;
+    行动选项时间线身份 = 新时间线身份;
+    行动选项内容签名 = 新内容签名;
+  }
+  行动选项.value = 新选项;
 }
 
 // ── 序章:开始新游戏(A4 难度三档局部状态已移入 序章标题屏.vue,App 只留业务接线) ──
 
 function 开始考验(难度: string) {
-  if (!难度 || 发送中.value) return;
+  if (!难度 || 发送中.value || !脚本存活.value) return;
   发送中.value = true;
   eventEmit('人妻公寓:开始新游戏', 难度);
 }
@@ -3012,12 +3529,11 @@ function 关闭CG图库(): void {
 }
 
 function 开口要钱(门牌号: 门牌) {
-  eventEmit('人妻公寓:要钱', 门牌号);
+  提交界面事务(() => eventEmit('人妻公寓:要钱', 门牌号));
 }
 
 function 晋阶(门牌号: 门牌) {
-  eventEmit('人妻公寓:请求晋阶', 门牌号);
-  选中门牌.value = null;
+  if (提交界面事务(() => eventEmit('人妻公寓:请求晋阶', 门牌号))) 选中门牌.value = null;
 }
 
 // ── 背包(道具可用:布设/送礼/读信) ──
@@ -3129,18 +3645,22 @@ const 背包列表 = computed(() =>
 );
 
 function 用运作(道具id: string, 门牌号?: 门牌, 候选?: 阶段线路候选) {
-  显示背包.value = false;
-  eventEmit('人妻公寓:使用运作', {
-    道具id,
-    门牌: 门牌号,
-    预期目标阶段: 候选?.目标阶段,
-    预期节点: 候选?.节点,
-  });
+  if (
+    提交界面事务(() =>
+      eventEmit('人妻公寓:使用运作', {
+        道具id,
+        门牌: 门牌号,
+        预期目标阶段: 候选?.目标阶段,
+        预期节点: 候选?.节点,
+      }),
+    )
+  ) {
+    显示背包.value = false;
+  }
 }
 
 function 用资源道具(道具id: string) {
-  显示背包.value = false;
-  eventEmit('人妻公寓:使用资源道具', 道具id);
+  if (提交界面事务(() => eventEmit('人妻公寓:使用资源道具', 道具id))) 显示背包.value = false;
 }
 
 // ── 商店(P3 八页签框架:工具/人情/运作常驻,余者随进度亮起——商店自己就是进度条) ──
@@ -3184,10 +3704,7 @@ const 货架 = computed(() => {
     });
   }
   // 药物页签不常驻(P5):母亲首夜线路或丈夫登门圆场窗口开启时才展示。
-  if (
-    (data.value?.系统?._母亲入列 && (data.value.户['302']?.妻.当前阶段 ?? 0) >= 2) ||
-    丈夫登门药物窗口已开启(data.value)
-  ) {
+  if (母亲药物窗口已开启(data.value) || 丈夫登门药物窗口已开启(data.value)) {
     架.push({ 页签: '药物', 商品: 按类('药物'), 空文案: '柜台下面的东西,问了才有。' });
   }
   return 架;
@@ -3260,13 +3777,11 @@ function 商品价格文案(商品: 道具配置): string {
 function 买(道具id: string) {
   if (查角色剧情占位(道具id)) return;
   if (查道具(道具id)?.特殊剧情占位) return;
-  if (查性癖(道具id)) 显示商店.value = false;
-  eventEmit('人妻公寓:购买', 道具id);
+  if (提交界面事务(() => eventEmit('人妻公寓:购买', 道具id)) && 查性癖(道具id)) 显示商店.value = false;
 }
 
 function 送出(道具id: string, 门牌号: 门牌) {
-  显示背包.value = false;
-  eventEmit('人妻公寓:送礼', { 道具id, 门牌: 门牌号 });
+  if (提交界面事务(() => eventEmit('人妻公寓:送礼', { 道具id, 门牌: 门牌号 }))) 显示背包.value = false;
 }
 
 // ── 侦探:翻垃圾 / 摄像头 / 偷窥选细节 / 读信 ──
@@ -3274,25 +3789,23 @@ function 送出(道具id: string, 门牌号: 门牌) {
 const 垃圾袋列表 = computed(() => 可见门牌.value.map(m => ({ 门牌: m, 妻名: 户静态表[m].妻名 })));
 const 垃圾选择开 = ref(false);
 
-function 翻(门牌号: 门牌) {
-  eventEmit('人妻公寓:翻垃圾', 门牌号);
-}
-
-async function 选垃圾袋(门牌号: 门牌) {
-  垃圾选择开.value = false;
-  const 变量 = getVariables({ type: 'chat' });
-  const 旧轨迹 = (_.get(变量, '_地图轨迹') as string[] | undefined) ?? [];
-  await insertOrAssignVariables(
-    { _地图轨迹: [...旧轨迹, `在垃圾房翻查${门牌号}室的垃圾`].slice(-8) },
-    { type: 'chat' },
-  );
-  翻(门牌号);
+function 选垃圾袋(门牌号: 门牌) {
+  // 轨迹是翻查提示的输入，不是可提前乐观写入的装饰：与业务事件共用同一门，写失败保留弹窗重试。
+  提交界面事务(async () => {
+    const 变量 = getVariables({ type: 'chat' });
+    const 旧轨迹 = (_.get(变量, '_地图轨迹') as string[] | undefined) ?? [];
+    await insertOrAssignVariables(
+      { _地图轨迹: [...旧轨迹, `在垃圾房翻查${门牌号}室的垃圾`].slice(-8) },
+      { type: 'chat' },
+    );
+    垃圾选择开.value = false;
+    await eventEmit('人妻公寓:翻垃圾', 门牌号);
+  });
 }
 
 function 布设() {
   if (!当前房间.value) return;
-  显示背包.value = false;
-  eventEmit('人妻公寓:布设摄像头', 当前房间.value);
+  if (提交界面事务(() => eventEmit('人妻公寓:布设摄像头', 当前房间.value!))) 显示背包.value = false;
 }
 
 const 显示监控 = ref(false);
@@ -3308,11 +3821,11 @@ const 监控列表 = computed<门牌[]>(() => {
 });
 
 async function 看监控(门牌号: 门牌) {
-  显示监控.value = false;
+  if (场景操作锁.value || 场景移动中) return;
   // 2026-07-17 用户拍板:看监控=回302自己屋里看,再跑偷窥AI回合出正文,完成后弹选择。
   // 先完成真实移动；取消亲密离场或场景写入失败时，不能提前消耗监控冷却或开启演出。
   if (!(await 确认已到达动作地点('302'))) return;
-  eventEmit('人妻公寓:查看摄像头', 门牌号);
+  if (提交界面事务(() => eventEmit('人妻公寓:查看摄像头', 门牌号))) 显示监控.value = false;
 }
 
 const 偷窥待选 = ref<{ 门牌: 门牌; 拍: number; 选项: string[] } | null>(null);
@@ -3330,8 +3843,9 @@ function 刷新偷窥待选() {
 function 选细节(i: number) {
   if (!偷窥待选.value) return;
   const 门牌号 = 偷窥待选.value.门牌;
-  偷窥待选.value = null;
-  eventEmit('人妻公寓:偷窥选细节', { 门牌: 门牌号, 选项: i });
+  if (提交界面事务(() => eventEmit('人妻公寓:偷窥选细节', { 门牌: 门牌号, 选项: i }))) {
+    偷窥待选.value = null;
+  }
 }
 
 const 读信门牌 = ref<门牌 | null>(null);
@@ -3343,8 +3857,8 @@ function 打开信(门牌号: 门牌) {
 
 function 合上信() {
   const m = 读信门牌.value;
-  读信门牌.value = null;
-  if (m) eventEmit('人妻公寓:读信', m);
+  if (!m) return;
+  if (提交界面事务(() => eventEmit('人妻公寓:读信', m))) 读信门牌.value = null;
 }
 
 // ── 档案卡:线索列表与裂缝节 ──
@@ -3633,18 +4147,22 @@ async function 读取卷轴范围(范围: 楼层范围, 当前末楼: number): P
 /** 正常回合只重建固定末页；编辑已展开的旧楼时，保留玩家主动翻开的范围。 */
 async function 取卷轴(保留已加载史册 = false) {
   const 请求序号 = ++卷轴请求序号;
+  const 请求时间线世代 = 当前时间线切换世代();
   史册加载中.value = false;
   try {
     刷新玩家正则();
     const 末楼 = getLastMessageId();
     const 范围 = 保留已加载史册 ? { 起楼: Math.max(0, Math.min(史册最早楼.value, 末楼)), 末楼 } : 末页楼层范围(末楼);
     const 条目 = await 读取卷轴范围(范围, 末楼);
-    if (请求序号 !== 卷轴请求序号) return;
+    if (请求序号 !== 卷轴请求序号 || 请求时间线世代 !== 当前时间线切换世代()) return;
+    if (编辑开始时间线世代 >= 0 && 编辑开始时间线世代 !== 请求时间线世代) 清空编辑状态();
     末楼号.value = 末楼;
     史册最早楼.value = 范围.起楼;
     卷轴.value = 条目;
     待回档楼.value = null;
-    await 滚到底();
+    await nextTick();
+    if (请求时间线世代 !== 当前时间线切换世代()) return;
+    正文卷轴.value?.滚到底();
   } catch (e) {
     console.error('[人妻公寓客户端] 取卷轴失败:', e);
   }
@@ -3655,6 +4173,7 @@ async function 加载更早史册() {
   const 范围 = 更早楼层范围(史册最早楼.value);
   if (!范围) return;
   const 请求序号 = ++卷轴请求序号;
+  const 请求时间线世代 = 当前时间线切换世代();
   const 容器 = 史册容器.value;
   const 原高度 = 容器?.scrollHeight ?? 0;
   const 原位置 = 容器?.scrollTop ?? 0;
@@ -3663,15 +4182,16 @@ async function 加载更早史册() {
     刷新玩家正则();
     const 当前末楼 = getLastMessageId();
     const 新页 = await 读取卷轴范围(范围, 当前末楼);
-    if (请求序号 !== 卷轴请求序号) return;
+    if (请求序号 !== 卷轴请求序号 || 请求时间线世代 !== 当前时间线切换世代()) return;
     卷轴.value = 合并卷轴页(卷轴.value, 新页);
     史册最早楼.value = 范围.起楼;
     await nextTick();
+    if (请求时间线世代 !== 当前时间线切换世代()) return;
     if (容器) 容器.scrollTop = 原位置 + Math.max(0, 容器.scrollHeight - 原高度);
   } catch (e) {
     console.error('[人妻公寓客户端] 加载更早往事失败:', e);
   } finally {
-    if (请求序号 === 卷轴请求序号) 史册加载中.value = false;
+    if (请求序号 === 卷轴请求序号 && 请求时间线世代 === 当前时间线切换世代()) 史册加载中.value = false;
   }
 }
 
@@ -3696,23 +4216,64 @@ function 点回档(楼: number | undefined) {
 
 const 编辑中楼 = ref<number | null>(null);
 const 编辑文本 = ref('');
+const 编辑保存中 = ref(false);
+let 编辑开始时间线世代 = -1;
+
+function 清空编辑状态(): void {
+  编辑中楼.value = null;
+  编辑文本.value = '';
+  编辑开始时间线世代 = -1;
+}
+
+function 取消编辑(): void {
+  if (编辑保存中.value) return;
+  清空编辑状态();
+}
 
 function 开编辑(条: 卷轴条) {
-  if (发送中.value || 条.楼 === undefined || 条.原文 === undefined) return;
+  if (发送中.value || 编辑保存中.value || 条.楼 === undefined || 条.原文 === undefined) return;
   编辑中楼.value = 条.楼;
   编辑文本.value = 条.原文;
+  编辑开始时间线世代 = 当前时间线切换世代();
 }
 
 async function 存编辑() {
+  if (编辑保存中.value) return;
+  if (编辑开始时间线世代 !== 当前时间线切换世代()) {
+    取消编辑();
+    弹提示('消息分支已经变化，请重新打开要改写的内容。', 4200);
+    return;
+  }
   const 楼 = 编辑中楼.value;
-  const 文 = 编辑文本.value.trim();
-  编辑中楼.value = null;
+  const 原草稿 = 编辑文本.value;
+  const 文 = 原草稿.trim();
   if (楼 === null || !文) return;
+  const 保存时间线世代 = 编辑开始时间线世代;
+  编辑保存中.value = true;
+  错误信息.value = '';
   try {
     await setChatMessages([{ message_id: 楼, message: 文 }], { refresh: 'none' });
+    if (保存时间线世代 !== 当前时间线切换世代()) {
+      清空编辑状态();
+      return;
+    }
     await 取卷轴(true);
+    if (保存时间线世代 !== 当前时间线切换世代()) {
+      清空编辑状态();
+      return;
+    }
+    if (编辑中楼.value === 楼 && 编辑文本.value === 原草稿 && 编辑开始时间线世代 === 保存时间线世代) {
+      清空编辑状态();
+    }
   } catch (e) {
-    错误信息.value = '改写失败:' + (e instanceof Error ? e.message : String(e));
+    if (保存时间线世代 === 当前时间线切换世代()) {
+      错误信息.value = '改写失败:' + (e instanceof Error ? e.message : String(e));
+    } else {
+      清空编辑状态();
+      console.warn('[人妻公寓客户端] 改写返回时消息时间线已经变化，旧结果不写入新界面:', e);
+    }
+  } finally {
+    编辑保存中.value = false;
   }
 }
 
@@ -3906,14 +4467,29 @@ function 点重开() {
 // ── 提示 toast ──
 
 const 提示文本 = ref('');
-/** 拾获卡:带【】的重要提示(线索/收获)驻留展示,点击收下;开新回合自动收 */
-const 拾获卡 = ref('');
+/** 带【】的重要反馈按 FIFO 驻留；发送中只暂时隐藏，绝不替玩家自动吞掉。 */
+const 拾获卡队列 = ref<string[]>([]);
+const 拾获卡 = computed(() => 拾获卡队列.value[0] ?? '');
 let 提示timer: ReturnType<typeof setTimeout> | undefined;
 
 function 弹提示(文本: string, 时长 = 2600) {
   提示文本.value = 文本;
-  clearTimeout(提示timer);
-  提示timer = setTimeout(() => (提示文本.value = ''), 时长);
+  取消客户端延迟(提示timer);
+  提示timer = 安排客户端延迟(() => (提示文本.value = ''), 时长);
+}
+
+function 追加拾获提示(现有: readonly string[], 原文: unknown): string[] {
+  const 文本 = typeof 原文 === 'string' ? 原文.trim() : '';
+  if (!文本 || !文本.startsWith('【') || 现有.includes(文本)) return [...现有];
+  return [...现有, 文本];
+}
+
+function 收下首条拾获提示(现有: readonly string[]): string[] {
+  return 现有.slice(1);
+}
+
+function 收下拾获卡(): void {
+  拾获卡队列.value = 收下首条拾获提示(拾获卡队列.value);
 }
 
 // ── 特殊场景「静音会议」完整状态域(App A7b2 迁入 composables/useMuteMeeting.ts) ──
@@ -3987,6 +4563,7 @@ const {
   切换静音会议会后妻,
   继续静音会议会后活动,
   请求结束静音会议,
+  重置静音会议时间线界面,
   同步静音会议界面,
   处理静音会议回合完成前,
   处理静音会议回合失败前,
@@ -4029,7 +4606,9 @@ const {
 // 普通动作只在 !录像带中 时计入;垃圾入口保持原 v-if 语义(垃圾房且有袋,不受录像带门控)。
 const 垃圾入口可见 = computed(() => 当前房间.value === '垃圾房' && 垃圾袋列表.value.length > 0);
 const 普通动作可见数 = computed(() => (录像带中.value ? 0 : 普通房间动作.value.length));
-const 可见房内动作数 = computed(() => 普通动作可见数.value + (垃圾入口可见.value ? 1 : 0));
+const 可见房内动作数 = computed(() =>
+  场景剧情锁定.value ? 0 : 普通动作可见数.value + (垃圾入口可见.value ? 1 : 0),
+);
 // 发送中 / 静音会议在桌面与手机都抑制；键盘门只在手机生效——桌面输入框 focus 时 键盘打开
 // 不隐藏房内动作(桌面行为原样),与旧 keyboard-open CSS 仅在 max-width:540px 媒体内命中等价。
 const 房内操作抑制 = computed(() => 发送中.value || 静音会议正式中.value || (移动端.value && 键盘打开.value));
@@ -4037,8 +4616,13 @@ const 房内操作抑制 = computed(() => 发送中.value || 静音会议正式�
 /** 背包票进入筹备(A5a 契约)：guard 与关背包顺序保留，重置/使用事件/800ms pull/sync 在 composable 请求打开。 */
 function 打开静音会议筹备() {
   if (发送中.value || 静音会议中.value) return;
-  显示背包.value = false;
-  请求打开静音会议筹备();
+  if (
+    提交界面事务(() => {
+      请求打开静音会议筹备();
+    })
+  ) {
+    显示背包.value = false;
+  }
 }
 
 // ── 错误护栏 ──
@@ -4049,6 +4633,122 @@ onErrorCaptured(err => {
   console.error('[人妻公寓客户端]', err);
   return false;
 });
+
+/** 宿主完成聊天替换后，只允许捕获该次共享世代的重建任务写回界面。 */
+async function 重建客户端聊天界面(切换世代: number): Promise<void> {
+  if (切换世代 !== 当前时间线切换世代()) return;
+  try {
+    await Promise.resolve((store as unknown as { pull?: () => void | Promise<void> }).pull?.());
+  } catch (error) {
+    if (切换世代 === 当前时间线切换世代()) {
+      console.warn('[人妻公寓客户端] 切换聊天后暂时无法拉取新 Store，等待宿主后续刷新:', error);
+    }
+    return;
+  }
+  if (切换世代 !== 当前时间线切换世代()) return;
+  await nextTick();
+  if (切换世代 !== 当前时间线切换世代()) return;
+  同步场景自变量();
+  await 取卷轴();
+  if (切换世代 !== 当前时间线切换世代()) return;
+  刷新可重掷();
+  刷赴约();
+  刷新在场();
+  刷新行动选项();
+  刷新待办();
+  刷新偷窥待选();
+  同步静音会议界面();
+  恢复失败行动();
+  eventEmit('人妻公寓:查询变量重生成状态');
+  eventEmit('人妻公寓:同步孕产微信已读');
+  eventEmit('人妻公寓:同步家庭计划微信已读');
+}
+
+/**
+ * CHAT_CHANGED 可能在同一 iframe 内 A→B→A。聊天 ID、楼号甚至文本都可恢复同值，
+ * 因此当拍先作废全部客户端瞬态，再到下一任务拍按共享时间线世代重建。
+ */
+function 客户端聊天切换(): void {
+  卷轴请求序号 += 1;
+  行动选项世代.value += 1;
+  行动选项.value = [];
+  行动选项时间线身份 = '';
+  行动选项内容签名 = '';
+  场景剧情准备事件序号 += 1;
+  场景剧情准备锁.value = null;
+  清空客户端延迟任务();
+  停止生成计时();
+  界面事务提交世代 += 1;
+  释放界面事务提交(界面事务提交世代);
+  发送中.value = false;
+  由头写入中.value = false;
+  运行阶段.value = '';
+  流式段.value = [];
+  输入文本.value = '';
+  待重试行动.value = '';
+  失败行动.value = '';
+  取消后自动重试.value = false;
+  可重掷.value = false;
+  隔离可重掷.value = false;
+  变量重生成状态.value = '不可用';
+  生成等待秒.value = 0;
+  键盘打开.value = false;
+  document.documentElement.style.removeProperty('--keyboard-inset');
+  重置录像带界面();
+  重置静音会议时间线界面();
+  清空当前成人CG();
+  当前家庭计划CG.value = null;
+  当前生产CG.value = null;
+  最近CG信号 = null;
+  当前房间.value = null;
+  进房末楼.value = 0;
+  本次入房由头已用.value = false;
+  已破门进入.value = false;
+  粘滞在场.value = { 位置: null, 们: [] };
+  赴约妻们.value = [];
+  在场.value = { 焦点: [], 在场: [] };
+  工具由头记录.value = {};
+  正文幕归属状态.value = 创建正文幕归属(null);
+  卷轴.value = [];
+  末楼号.value = 0;
+  史册最早楼.value = 0;
+  史册加载中.value = false;
+  清空编辑状态();
+  显示地图.value = false;
+  显示商店.value = false;
+  显示背包.value = false;
+  显示监控.value = false;
+  显示史册.value = false;
+  选中门牌.value = null;
+  CG图库门牌.value = null;
+  垃圾选择开.value = false;
+  读信门牌.value = null;
+  事件提示词文本.value = '';
+  显示资源详情.value = null;
+  显示胜任详情.value = false;
+  显示风闻详情.value = false;
+  显示性爱结果卡.value = false;
+  待确认收尾位置.value = '';
+  亲密抽屉展开.value = false;
+  正文隐藏.value = false;
+  设置开.value = false;
+  首次说明开.value = false;
+  重开确认.value = false;
+  转场.value = '';
+  提示文本.value = '';
+  拾获卡队列.value = [];
+  错误信息.value = '';
+  偷窥待选.value = null;
+  待办勾.value = {};
+  待办已划掉.value = false;
+  手机未读.value = false;
+  时间撤销刷新版本.value += 1;
+
+  安排客户端延迟(() => {
+    const 切换世代 = 当前时间线切换世代();
+    void 重建客户端聊天界面(切换世代);
+  }, 0);
+}
 
 // ── 挂载:事件接线 + 状态恢复 ──
 
@@ -4061,6 +4761,8 @@ onMounted(() => {
   刷新行动选项();
   刷新待办();
   刷新偷窥待选();
+  eventOn(tavern_events.CHAT_CHANGED, 客户端聊天切换);
+
   for (const 视口 of [
     window.visualViewport,
     (() => {
@@ -4077,15 +4779,66 @@ onMounted(() => {
     视口.addEventListener('scroll', 让输入露出);
   }
 
+  eventOn('人妻公寓:场景剧情状态', async () => {
+    try {
+      await Promise.resolve((store as unknown as { pull?: () => void | Promise<void> }).pull?.());
+    } catch {
+      /* store 未带 pull 时靠轮询兜底 */
+    }
+    await nextTick();
+    同步场景自变量();
+    刷新行动选项();
+  });
+  eventOn(
+    '人妻公寓:场景剧情准备状态',
+    async (载荷: { 进行中?: boolean; 标题?: string; 目标场景?: string; 显示提示?: boolean }) => {
+      const 本次序号 = ++场景剧情准备事件序号;
+      if (!载荷?.进行中) {
+        try {
+          await Promise.resolve((store as unknown as { pull?: () => void | Promise<void> }).pull?.());
+        } catch {
+          /* store 未带 pull 时靠轮询兜底；临时锁仍在本次序号复核后释放 */
+        }
+        await nextTick();
+        if (本次序号 !== 场景剧情准备事件序号) return;
+        场景剧情准备锁.value = null;
+        同步场景自变量();
+        return;
+      }
+      场景剧情准备锁.value = {
+        标题: String(载荷.标题 ?? '正在触发场景剧情'),
+        目标场景: String(载荷.目标场景 ?? ''),
+      };
+      // 准备窗口发生在业务 await 与持久活动票之间；立即收起所有可改状态的旧弹窗，
+      // 防止玩家在商店、背包、监控或地图的陈旧按钮上并发提交第二笔业务。
+      显示地图.value = false;
+      显示商店.value = false;
+      显示背包.value = false;
+      显示监控.value = false;
+      选中门牌.value = null;
+      CG图库门牌.value = null;
+      垃圾选择开.value = false;
+      读信门牌.value = null;
+      if (载荷.显示提示 !== false) {
+        弹提示(`正在触发「${场景剧情准备锁.value.标题}」，请勿退出或切换当前场景。`, 4200);
+      }
+    },
+  );
   eventOn('人妻公寓:生成开始', () => {
-    // 脚本侧发起的回合(查看监控等)也要锁输入+亮书写态;驻留的拾获卡顺手收掉不挡戏
+    场景剧情准备事件序号 += 1;
+    场景剧情准备锁.value = null;
+    // 脚本侧发起的回合(查看监控等)也要锁输入+亮书写态；重要反馈由发送中门暂时隐藏，结束后继续展示。
     刷新当前预设正文标签();
     // “保留最后有效流”只能发生在同一次生成内，绝不把上一回合正文带进新 generation。
     流式段.value = [];
     发送中.value = true;
     运行阶段.value = '正在准备本回合';
+    // 脚本忙门会拒绝并行业务；界面同时收起已经打开的旧弹窗，避免玩家点击后只收到失败提示。
+    显示地图.value = false;
+    显示商店.value = false;
+    显示背包.value = false;
+    显示监控.value = false;
     开始生成计时();
-    拾获卡.value = '';
     if (静音会议中.value) 同步静音会议界面();
   });
   eventOn('人妻公寓:变量重生成状态', (载荷: { 状态?: 变量重生成状态值 }) => {
@@ -4095,6 +4848,10 @@ onMounted(() => {
     发送中.value = true;
     变量重生成状态.value = '进行中';
     运行阶段.value = '正在重新生成变量';
+    显示地图.value = false;
+    显示商店.value = false;
+    显示背包.value = false;
+    显示监控.value = false;
     流式段.value = [];
     开始生成计时();
   });
@@ -4170,6 +4927,7 @@ onMounted(() => {
     当前生产CG.value = 载荷;
   });
   eventOn('人妻公寓:回合完成', async (选项?: 回合完成正文选项) => {
+    场景剧情准备锁.value = null;
     停止生成计时();
     try {
       清除待恢复行动();
@@ -4196,20 +4954,35 @@ onMounted(() => {
       刷新行动选项();
       刷新偷窥待选();
       同步静音会议界面();
+      const 后续场景剧情 = 场景剧情状态.value;
+      if (
+        后续场景剧情 &&
+        !后续场景剧情.活动 &&
+        后续场景剧情.目标场景 !== null &&
+        后续场景剧情.可在当前场景开始(当前房间.value)
+      ) {
+        // 前一回合的生成租约会在当前事件退栈后释放；下一帧再尝试，确保同地点后续票逐张连续演出。
+        安排客户端延迟(() => eventEmit('人妻公寓:检查场景剧情', 当前房间.value || '楼道'), 0);
+      }
       eventEmit('人妻公寓:查询变量重生成状态');
     } finally {
       发送中.value = false;
       运行阶段.value = '';
     }
   });
-  eventOn('人妻公寓:隔离事件完成', async () => {
+  eventOn('人妻公寓:隔离事件完成', async (载荷?: { 类型?: string }) => {
     发送中.value = false;
     运行阶段.value = '';
     停止生成计时();
     流式段.value = [];
     同步场景自变量(); // 隔离撤回会把 _场景 恢复成事件前旧值(审计 C2)
     清理越界成人CG(); // 撤回删楼后同样不得残留成人画面(审计 M10)
-    正文幕归属状态.value = 创建正文幕归属(当前房间.value);
+    // 撤回物理删除了刚才的独立演出；客户端没有足够的持久凭据证明存活旧楼属于当前房间，
+    // 因而只能作废当前幕，不能仅凭恢复后的房间名把旧正文冒充成这一条时间线的新幕。
+    正文幕归属状态.value =
+      载荷?.类型 === '撤回'
+        ? 作废正文幕归属(正文幕归属状态.value)
+        : 创建正文幕归属(当前房间.value);
     await 取卷轴();
     刷新可重掷();
     try {
@@ -4224,10 +4997,14 @@ onMounted(() => {
     刷新偷窥待选();
   });
   eventOn('人妻公寓:回合失败', async (原因: string) => {
-    发送中.value = false;
+    场景剧情准备锁.value = null;
+    // 先维持输入/移动锁，等消息、MVU 与场景事务重新拉齐后再开放界面；否则活动剧情
+    // 刚失败的瞬间会短暂露出“离开”按钮，让玩家抢在事务卡刷新前逃离原场景。
     运行阶段.value = '';
     停止生成计时();
     处理静音会议回合失败前();
+    // 互动事件已经失败，持久阶段仍是可重试真值；本地“已接通”画面、连点数与 5 秒窗必须作废。
+    重置录像带界面();
     同步场景自变量(); // 监控回合失败时脚本已把 _场景 回滚,画面跟着回原位(审计 C4)
     const 待重试 = 待重试行动.value.trim() || 读取待恢复行动();
     const 将自动重试 = 取消后自动重试.value && !!待重试;
@@ -4237,26 +5014,39 @@ onMounted(() => {
     流式段.value = [];
     偷窥待选.value = null; // 偷窥回合没演成,挂起的选择卡一并作废(脚本侧同步清账)
     // 回合失败=这一轮没发生,是提示不是事故——走可消散 toast,不占常驻错误横幅(2026-07-17 用户反馈)
-    if (!原因.startsWith('已取消')) 弹提示(`回合失败,这一轮没有发生:${原因}`, 6000);
+    if (!原因.startsWith('已取消')) {
+      const 活动剧情 = data.value.系统._场景剧情事务;
+      弹提示(
+        活动剧情.id
+          ? `「${活动剧情.标题 || '当前场景剧情'}」的触发结果已经保存，但正文没有完成：${原因}。请留在原场景重试。`
+          : `回合失败,这一轮没有发生:${原因}`,
+        6000,
+      );
+    }
     // 引擎只在临时楼删除与 chat 快照恢复完成后广播失败；这里仍完整重拉
     // 消息/MVU/在场三路真值，不能保留生成期间 store 曾观察到的临时 assistant 快照。
-    await 取卷轴();
-    刷新可重掷();
     try {
-      await Promise.resolve((store as unknown as { pull?: () => void | Promise<void> }).pull?.());
-    } catch {
-      /* store 未带 pull 时靠轮询兜底 */
+      await 取卷轴();
+      刷新可重掷();
+      try {
+        await Promise.resolve((store as unknown as { pull?: () => void | Promise<void> }).pull?.());
+      } catch {
+        /* store 未带 pull 时靠轮询兜底 */
+      }
+      await nextTick();
+      刷赴约();
+      刷新在场();
+      刷新行动选项();
+    } finally {
+      发送中.value = false;
     }
-    await nextTick();
-    刷赴约();
-    刷新在场();
-    刷新行动选项();
     if (将自动重试) {
       取消后自动重试.value = false;
       // 等回滚后的消息、MVU 与 Vue 画面都重新对齐，再重发原行动。
-      setTimeout(() => {
+      安排客户端延迟(() => {
         失败行动.value = '';
-        发出(待重试);
+        if (场景剧情活动.value) eventEmit('人妻公寓:继续场景剧情');
+        else 发出(待重试);
       }, 0);
     } else {
       取消后自动重试.value = false;
@@ -4306,11 +5096,12 @@ onMounted(() => {
   });
   eventOn('人妻公寓:提示', (消息: string) => {
     处理静音会议提示();
+    const 文本 = typeof 消息 === 'string' ? 消息.trim() : '';
     // 地图行动卡开着:结果以"线索卡"翻出(动画),不走 toast(组件内守 open+房卡)
-    if (!地图弹窗.value?.显示结果(消息)) {
-      // 带【】的重要提示(线索/收获)=拾获卡驻留,点击才收下(2026-07-17 用户反馈:出货不能一闪而过)
-      if (消息.startsWith('【')) 拾获卡.value = 消息;
-      else 弹提示(消息);
+    if (文本 && !地图弹窗.value?.显示结果(文本)) {
+      // 连续结算可能同步发出多条【】提示；按 FIFO 去重入队，当前卡未收下时后续项不得覆盖它。
+      if (文本.startsWith('【')) 拾获卡队列.value = 追加拾获提示(拾获卡队列.value, 文本);
+      else 弹提示(文本);
     }
     // 侦探/商店操作是纯 UI 回合(不产楼):软计数即时刷新,store 拉新(监控列表是 computed 自动跟)
     刷新偷窥待选();
@@ -4352,19 +5143,19 @@ onMounted(() => {
       脚本存活.value = true; // 跨域读不到就不误报
     }
   };
-  setTimeout(心跳tick, 3000);
+  安排客户端延迟(心跳tick, 3000);
   心跳timer = setInterval(心跳tick, 5000);
 });
 
 onUnmounted(() => {
   销毁();
+  // eventOn 只会在整个 iframe 关闭时自动卸载；Vue/HMR 重挂载仍在同一 iframe，必须主动清空旧回调。
+  eventClearAll();
   clearInterval(心跳timer);
   clearInterval(生成等待timer);
+  释放界面事务提交();
   window.clearInterval(原生弹窗轮询);
-  clearTimeout(转场计时);
-  clearTimeout(提示timer);
-  clearTimeout(性爱结果timer);
-  clearTimeout(键盘定位timer);
+  清空客户端延迟任务();
   for (const 视口 of 键盘视口们) {
     视口.removeEventListener('resize', 让输入露出);
     视口.removeEventListener('scroll', 让输入露出);
@@ -5243,6 +6034,61 @@ onUnmounted(() => {
   gap: 10px;
   font-size: 0.8em;
   padding: 6px 2px 0;
+}
+
+.scene-story-lock {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 7px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--yellow) 48%, var(--line));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--yellow) 12%, var(--surface-sheet));
+  box-shadow: 0 6px 18px rgba(74, 58, 28, 0.08);
+}
+
+.scene-story-lock-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.scene-story-lock-copy small {
+  color: var(--ink-faint);
+  font: 700 0.65em/1.3 var(--font-mono);
+  letter-spacing: 0.08em;
+}
+
+.scene-story-lock-copy b {
+  color: var(--ink);
+  font-size: 0.88em;
+}
+
+.scene-story-lock-copy p {
+  margin: 1px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.74em;
+  line-height: 1.5;
+}
+
+.scene-story-retry {
+  flex: none;
+  min-height: 36px;
+  padding: 7px 12px;
+  border: 1px solid color-mix(in srgb, var(--blue) 45%, var(--line));
+  border-radius: 9px;
+  background: var(--surface-sheet);
+  color: var(--blue);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.scene-story-retry:disabled {
+  cursor: wait;
+  opacity: 0.58;
 }
 
 /* 亲密场景占用正文舞台：平时只露出底栏，管理时从舞台底边向上展开。 */
@@ -7602,6 +8448,19 @@ button.battery:focus-visible {
     padding: 4px 2px 0;
   }
 
+  .scene-story-lock {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 7px;
+    margin-top: 5px;
+    padding: 8px 9px;
+  }
+
+  .scene-story-retry {
+    width: 100%;
+    min-height: 34px;
+  }
+
   .intimacy-panel,
   .scene-result-card {
     margin-top: 3px;
@@ -7689,14 +8548,6 @@ button.battery:focus-visible {
     padding: 5px 9px;
   }
 
-  /* 软键盘弹起后把非输入功能收起，配合把宿主 iframe 底边滚入可视区。
-     房内动作已收成 房内操作抽屉.vue，命中其根 .in-room-acts（把手+面板整体隐藏）。 */
-  .keyboard-open .dock,
-  .keyboard-open .in-room-acts,
-  .keyboard-open .peep-card {
-    display: none;
-  }
-
   /* 底部 dock:图标 26→20px,整体半高 */
   .dock {
     gap: 4px;
@@ -7748,6 +8599,87 @@ button.battery:focus-visible {
     color: #147048;
     background: rgba(59, 195, 126, 0.2);
     box-shadow: inset 0 0 0 1px rgba(57, 173, 116, 0.25);
+  }
+}
+
+
+.scene-plot-lock {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(222, 170, 70, 0.55);
+  border-radius: 12px;
+  background: rgba(248, 225, 164, 0.18);
+  box-shadow: 0 8px 24px rgba(24, 18, 10, 0.1);
+}
+
+.scene-plot-lock__mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  min-width: 42px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(222, 170, 70, 0.22);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.scene-plot-lock__copy {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 2px;
+}
+
+.scene-plot-lock__copy small {
+  font-size: 10px;
+  opacity: 0.72;
+}
+
+.scene-plot-lock__copy b {
+  font-size: 13px;
+}
+
+.scene-plot-lock__copy p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: 0.86;
+}
+
+.scene-plot-lock__actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+}
+
+.scene-plot-lock__actions em {
+  font-size: 11px;
+  font-style: normal;
+  opacity: 0.72;
+}
+
+@media (max-width: 540px) {
+  /* 软键盘弹起后把非输入功能收起，配合把宿主 iframe 底边滚入可视区。 */
+  .keyboard-open .dock,
+  .keyboard-open .in-room-acts,
+  .keyboard-open .peep-card {
+    display: none;
+  }
+
+  .scene-plot-lock {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .scene-plot-lock__actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 }
 </style>

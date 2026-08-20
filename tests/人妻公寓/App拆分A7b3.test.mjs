@@ -79,8 +79,9 @@ test('App 四段原模板确实迁出(不只是复制)：关键 DOM/文案/条�
   assert.match(舞台模板, /:key="imageUrl"/, '图 key 保持');
   assert.match(舞台模板, /:alt="`静音会议\$\{visualState\}会场全景`"/, '图 alt 保持');
   assert.match(舞台模板, /draggable="false"/, 'draggable 保持');
-  assert.match(舞台模板, /@load="emit\('imageLoad'\)"/, '加载只 emit');
-  assert.match(舞台模板, /@error="emit\('imageError'\)"/, '失败只 emit');
+  assert.match(舞台模板, /:data-image-url="imageUrl"/, '图片节点携带自身请求身份');
+  assert.match(舞台模板, /@load="图片加载成功"/, '加载经请求身份转发');
+  assert.match(舞台模板, /@error="图片加载失败"/, '失败经请求身份转发');
   assert.match(舞台模板, /梧桐里公寓 · 管理员室/, 'fallback 文案一');
   assert.match(舞台模板, /楼务会议进行中/, 'fallback 文案二');
   // 互动：根/header/候选/模式/三按钮/结果/重试/补偿
@@ -143,6 +144,22 @@ test('App 四段原模板确实迁出(不只是复制)：关键 DOM/文案/条�
   assert.match(会后模板, /重新生成最终收尾/, '收尾按钮文案');
 });
 
+test('静音会议旧组合图的迟到 load/error 只处理自己的 URL，不得改写新拍回退序号', () => {
+  assert.match(舞台源码, /imageLoad: \[imageUrl: string\]/, 'load 必须携带真实请求 URL');
+  assert.match(舞台源码, /imageError: \[imageUrl: string\]/, 'error 必须携带真实请求 URL');
+  assert.match(舞台源码, /dataset\.imageUrl/, '回调必须读取 DOM 自身身份而非已经切换的新 prop');
+  assert.match(
+    composable源码,
+    /function 静音会议图加载成功\(加载地址: string\)[\s\S]{0,120}加载地址 !== 静音会议当前图地址\.value[\s\S]{0,80}return/,
+    '旧图 load 不得认领当前画面',
+  );
+  assert.match(
+    composable源码,
+    /function 静音会议图加载失败\(失败地址: string\)[\s\S]{0,120}失败地址 !== 静音会议当前图地址\.value[\s\S]{0,80}return/,
+    '旧图 error 不得推进当前图的回退序号',
+  );
+});
+
 test('舞台 props/emits 完整且 App 接线一一对应；track/Transition/image/fallback 完整；只展示、无状态', () => {
   const 舞台props = 舞台源码.slice(舞台源码.indexOf('defineProps<{'), 舞台源码.indexOf('}>()', 舞台源码.indexOf('defineProps<{')));
   for (const 字段 of ['formal', 'interactionOpen', 'phaseName', 'shotLabel', 'topic', 'visualOpen', 'visualState', 'imageUrl']) {
@@ -151,7 +168,7 @@ test('舞台 props/emits 完整且 App 接线一一对应；track/Transition/ima
   assert.match(舞台props, /visualState: 静音会议画面状态;/, 'visualState 强类型为 静音会议画面状态');
   const 舞台emits = 舞台源码.slice(舞台源码.indexOf('defineEmits<{'), 舞台源码.indexOf('}>();', 舞台源码.indexOf('defineEmits<{')));
   for (const 事件 of ['imageLoad', 'imageError']) {
-    assert.match(舞台emits, new RegExp(`\\b${事件}:`), `舞台 emits 应含 ${事件}`);
+    assert.match(舞台emits, new RegExp(`\\b${事件}: \\[imageUrl: string\\]`), `舞台 emits 应携带 ${事件} 请求 URL`);
   }
   const App模板 = 提取模板(App源码);
   const 接线 = [

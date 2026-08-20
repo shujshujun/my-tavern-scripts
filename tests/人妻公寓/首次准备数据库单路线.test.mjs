@@ -13,17 +13,17 @@ test('首次准备页只保留数据库路线，不再暴露或检测智脑兼�
   assert.match(准备页, /一键安装游戏记忆/);
   assert.doesNotMatch(准备页, /智脑|记忆方案|二选一|zhino/i);
   assert.doesNotMatch(数据库桥, /智脑状态|zhino-root|zhino-panel/i);
-  assert.match(
-    准备页,
-    /const 数据库准备完成 = computed\(\(\) => 数据库检测\.value\.已安装 && 数据库检测\.value\.已装游戏模板\)/,
-  );
+  assert.match(准备页, /const 数据库准备完成 = computed\(/);
+  assert.match(准备页, /数据库检测\.value\.已安装/);
+  assert.match(准备页, /数据库检测\.value\.已装游戏模板/);
+  assert.match(准备页, /数据库脚本写入能力\.value\?\.可写 === true/);
   assert.match(
     准备页,
     /const 首次准备完成 = computed\(\(\) => 酒馆助手已安装\.value && 提示词已确认\.value && 数据库准备完成\.value\)/,
   );
 });
 
-test('SQLite 手动切换提醒进入折叠高级区，游戏无法代替自动切换', () => {
+test('SQLite 实际不可写时进入主步骤，并保留高级诊断与手动切换说明', () => {
   const 准备页 = 读('src/人妻公寓/界面/客户端/components/首次准备.vue');
 
   assert.match(准备页, /<details class="setup-advanced">/);
@@ -34,7 +34,10 @@ test('SQLite 手动切换提醒进入折叠高级区，游戏无法代替自动�
     准备页,
     /首次说明存储键\s*=\s*'人妻公寓_首次游玩说明_database_sql_mode_20260803'/,
   );
-  assert.doesNotMatch(准备页, /class="setup-sql-reminder"/, 'SQLite 提醒不再醒目常驻首屏');
+  assert.match(准备页, /v-else-if="数据库脚本写入检测中 \|\| !数据库脚本写入能力\?\.可写"/);
+  assert.match(准备页, /开启 SQLite（SQL）存储/);
+  assert.match(准备页, /重新检测写入能力/);
+  assert.match(准备页, /脚本写入：/);
 });
 
 test('首次准备页说明游戏默认使用外置模型解析，正文只负责故事', () => {

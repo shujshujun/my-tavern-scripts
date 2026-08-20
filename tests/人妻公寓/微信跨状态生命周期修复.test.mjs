@@ -318,12 +318,85 @@ test('邀约原子提交后先核心刷新，再 void 同步社交轨迹（可�
   assert.doesNotMatch(邀约段, /await 同步社交轨迹/, '邀约不得 await 同步社交轨迹（6 秒策略不得拖住核心）');
   assert.match(邀约段, /void 同步社交轨迹\(/, '数据库同步必须是 fire-and-forget');
   assert.match(邀约段, /排队刷新微信进展摘要\(m\)/, '微信进展摘要仍照常排队');
-  assert.match(邀约段, /事件键: `RQP-约-\$\{m\}-\$\{楼\}`/, '邀约社交轨迹事件键保留');
+  assert.match(邀约段, /事件键: 邀约社交轨迹事件键\(m, 楼, 钟\)/, '邀约社交轨迹键冻结创建楼与世界钟');
 });
 
 // ============================================
-// 数据层真实回调：写库增量 在回调内只给实际插入记录分配单调序
+// 数据层真实回调：坏旧库归一 + 写库增量单调序
 // ============================================
+
+test('无 Schema 的旧手机库缺评论或顶层数组损坏时只丢坏子字段，读写入口仍可恢复', async () => {
+  const 原updateVariablesWith = globalThis.updateVariablesWith;
+  const 原getLastMessageId = globalThis.getLastMessageId;
+  const 原SillyTavern = globalThis.SillyTavern;
+  const 原Mvu = globalThis.Mvu;
+  const 原getVariables = globalThis.getVariables;
+  const 测试聊天变量 = {
+    _微信: {
+      消息: { 损坏: true },
+      圈: [{ 楼: 0, 时: 0, 谁: '夏乔', 文: '旧动态缺评论数组' }, null],
+      读到: null,
+      读时: '损坏',
+      圈读到: -1,
+      圈读时: null,
+      节拍: '损坏',
+      已发私聊图: 7,
+    },
+  };
+  globalThis.updateVariablesWith = async cb => {
+    cb(测试聊天变量);
+  };
+  globalThis.getLastMessageId = () => 0;
+  globalThis.SillyTavern = { chat: [{ mes: '锚0', is_user: true, swipe_id: 0 }] };
+  globalThis.Mvu = { getMvuData: () => ({ stat_data: { 系统: { _绝对时段: 0 } } }) };
+  globalThis.getVariables = () => 测试聊天变量;
+  try {
+    const { 读库, 写库增量, 规范微信消息容器 } = require('../../src/人妻公寓/脚本/游戏逻辑/手机/数据层.ts');
+    assert.deepEqual(规范微信消息容器('损坏消息容器'), [], '直接写者也必须复用同一消息容器边界');
+    const 旧库 = 读库();
+    assert.deepEqual(旧库.消息, []);
+    assert.equal(旧库.圈.length, 1);
+    assert.deepEqual(旧库.圈[0].评, [], '缺失评论数组按空数组兼容，合法正文继续保留');
+    assert.deepEqual(旧库.节拍, {});
+
+    测试聊天变量._微信.消息 = [
+      { 楼: 0, 时: 0, 会话: '101', 发: '对方', 文: '合法回复' },
+      { 楼: 0, 时: 0, 会话: '101', 发: '坏发送者', 文: '不能保留' },
+      { 楼: 0, 时: 0, 会话: '101', 发: '对方', 文: null },
+      null,
+    ];
+    测试聊天变量._微信.圈 = [
+      { 楼: 0, 时: 0, 谁: '夏乔', 文: '合法动态', 评: [] },
+      { 楼: 0, 时: 0, 谁: '夏乔', 文: null, 评: [] },
+      { 楼: 0, 时: 0, 谁: 7, 文: '坏发布者', 评: [] },
+    ];
+    测试聊天变量._微信.节拍 = { '私:101': '损坏', 群: 3 };
+    const 单条损坏库 = 读库();
+    assert.deepEqual(单条损坏库.消息.map(消息 => 消息.文), ['合法回复'], '坏消息记录失败关闭');
+    assert.deepEqual(单条损坏库.圈.map(动态 => 动态.文), ['合法动态'], '坏朋友圈记录失败关闭');
+    assert.deepEqual(单条损坏库.节拍, { 群: 3 }, '坏节拍值不得让单个入口永久静默');
+
+    // 再把两条顶层记录都损坏，证明实际增量回调不依赖一次只读归一也能自修并写入新内容。
+    测试聊天变量._微信.消息 = '损坏消息容器';
+    测试聊天变量._微信.圈 = { 损坏: true };
+    const 已写 = await 写库增量({
+      新圈: [{ 楼: 0, 时: 0, 谁: '夏乔', 文: '新动态', 评: [] }],
+      新消息: [{ 楼: 0, 时: 0, 会话: '101', 发: '对方', 文: '新回复' }],
+      节拍改: { '私:101': 0 },
+    });
+    assert.equal(已写, true);
+    assert.equal(Array.isArray(测试聊天变量._微信.消息), true);
+    assert.equal(Array.isArray(测试聊天变量._微信.圈), true);
+    assert.equal(测试聊天变量._微信.消息[0].文, '新回复');
+    assert.equal(测试聊天变量._微信.圈[0].文, '新动态');
+  } finally {
+    globalThis.updateVariablesWith = 原updateVariablesWith;
+    globalThis.getLastMessageId = 原getLastMessageId;
+    globalThis.SillyTavern = 原SillyTavern;
+    globalThis.Mvu = 原Mvu;
+    globalThis.getVariables = 原getVariables;
+  }
+});
 
 test('写库增量 在最近回调内只给实际插入消息分配比存活更大的序；去重不重复落库', async () => {
   const 原updateVariablesWith = globalThis.updateVariablesWith;

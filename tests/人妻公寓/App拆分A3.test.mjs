@@ -83,7 +83,9 @@ test('App 不再内联设置/首次准备大模板与专属状态/检测/解析�
 });
 
 test('useUIPrefs 单例状态/存储键/合并写/容错/CSS 变量与类/跟随/全屏 fallback/可卸载监听/导出进真全屏', () => {
-  assert.match(偏好源码, /单例 \?\?= 创建UIPrefs\(options \?\? \{\}\)/, '模块级单例');
+  assert.match(偏好源码, /if \(!单例\) 单例 = 创建UIPrefs\(options \?\? \{\}\)/, '模块级单例只创建一份共享状态');
+  assert.match(偏好源码, /const 当前选项 = shallowRef\(options\)/, '跨 App 重挂载依赖以可替换 shallowRef 持有');
+  assert.match(偏好源码, /else if \(options\) 单例\.更新选项\(options\)/, 'App 重挂载必须把依赖所有权交给新实例');
   assert.match(偏好源码, /'人妻公寓_夜间模式'/, '夜间模式存储键');
   assert.match(偏好源码, /'人妻公寓_界面偏好'/, '界面偏好存储键');
   assert.match(偏好源码, /'rqgy-mobile-fullscreen-guide-v1'/, '移动端引导存储键');
@@ -99,16 +101,16 @@ test('useUIPrefs 单例状态/存储键/合并写/容错/CSS 变量与类/跟随
   assert.match(偏好源码, /'rqgy-full'/, 'rqgy-full 全屏类仍由 composable 应用');
   assert.match(
     偏好源码,
-    /时段偏暗 = computed\(\(\) => options\.timePeriod\?\.value === '晚上' \|\| options\.timePeriod\?\.value === '深夜'\)/,
-    '跟随按游戏时段 晚上/深夜 判暗',
+    /当前选项\.value\.timePeriod\?\.value === '晚上' \|\| 当前选项\.value\.timePeriod\?\.value === '深夜'/,
+    '跟随按当前 App 注入的游戏时段 晚上/深夜 判暗',
   );
   assert.match(偏好源码, /主题模式\.value = 暗色\.value \? '日间' : '夜间'/, '日月快捷钮显式切档');
   assert.match(偏好源码, /requestFullscreen/, '真全屏走 Fullscreen API');
   assert.match(偏好源码, /webkitRequestFullscreen/, 'webkit fallback 保留');
   assert.match(
     偏好源码,
-    /reportFullscreenError\?\.\('浏览器拒绝进入全屏，请允许网页全屏后再点一次'\)/,
-    '全屏失败文案走错误回调写回 App',
+    /当前选项\.value\.reportFullscreenError\?\.\('浏览器拒绝进入全屏，请允许网页全屏后再点一次'\)/,
+    '全屏失败文案走当前 App 的错误回调写回',
   );
   assert.match(偏好源码, /addEventListener\('change', 同步移动端断点\)/, 'media 监听绑定');
   assert.match(偏好源码, /removeEventListener\('change', 同步移动端断点\)/, 'media 监听可卸载');
@@ -145,8 +147,8 @@ test('设置组件拥有全部可见设置文案、UI prefs 共享、MVU 外置�
   assert.match(设置源码, /点击「保存并启用」后写入 MVU 变量框架的「额外模型解析配置」/, 'API 表单提示保持');
   assert.match(设置源码, /setInterval\(刷新MVU解析状态, 1500\)/, '1500ms 轮询在组件');
   assert.match(设置源码, /clearInterval\(MVU解析刷新timer\)/, '关闭/卸载清轮询');
-  assert.match(设置源码, /JSON\.stringify\(\{\s*\.\.\.已存,/, '解析字段持久化合并写');
-  assert.match(设置源码, /内置变量解析: 内置变量解析\.value,/, '合并写包含内置解析');
+  assert.match(设置源码, /return 写入变量解析偏好\(\{[\s\S]*?内置变量解析: 内置变量解析\.value,[\s\S]*?严格变量审计: 严格变量审计\.value,/, '解析开关通过共享父页持久层合并写并报告结果');
+  assert.match(设置源码, /const 偏好 = 读取变量解析偏好\(\)/, '解析开关恢复复用统一默认值与存储锚点');
   assert.match(设置源码, /from '\.\.\/\.\.\/\.\.\/MVU解析模式'/, '组件从 MVU解析模式 正确相对路径导入');
   assert.match(设置源码, /from '\.\.\/composables\/useUIPrefs'/, '组件从 composables 导入共享单例');
   assert.match(设置源码, /defineEmits<\{ restart: \[\] \}>/, '仅 emit restart');
@@ -170,12 +172,18 @@ test('首次准备组件拥有新手向导模板、三准备项、渐进披露�
   assert.match(准备源码, /<template v-else-if="!提示词已确认">/, '提示词确认分支保持');
   assert.match(准备源码, /<template v-else-if="!数据库检测\.已安装">/, '缺数据库插件分支保持');
   assert.match(准备源码, /<template v-else-if="!数据库检测\.已装游戏模板">/, '缺游戏模板分支保持');
+  assert.match(
+    准备源码,
+    /<template v-else-if="数据库脚本写入检测中 \|\| !数据库脚本写入能力\?\.可写">/,
+    '五表存在但 SQLite 不可写时必须进入独立修复分支',
+  );
   assert.match(准备源码, /class="setup-confirm"/, '提示词勾选确认操作保持');
   assert.match(准备源码, /一键安装游戏记忆/, '模板安装主按钮保持');
   assert.match(准备源码, /稍后处理/, '稍后处理入口保持');
   assert.match(准备源码, /<details class="setup-advanced">/, '折叠高级区保持');
   assert.match(准备源码, /遇到问题？高级检查/, '高级区标题保持');
-  assert.match(准备源码, /SQLite（SQL）/, 'SQLite 提醒保持(在高级区)');
+  assert.match(准备源码, /SQLite（SQL）/, 'SQLite 提醒与主修复步骤保持');
+  assert.match(准备源码, /重新检测写入能力/, 'SQLite 切换后可直接复检');
   assert.match(准备源码, /游戏无法代替你自动切换/, 'SQLite 手动切换提醒保持');
   assert.match(准备源码, /游戏默认使用外置模型解析，正文只负责故事/, '外置解析一句保持');
   assert.match(准备源码, /五张游戏记忆表/, '五表诊断保持(在高级区)');
@@ -187,7 +195,9 @@ test('首次准备组件拥有新手向导模板、三准备项、渐进披露�
     '镜像 manifest URL 保持',
   );
   assert.match(依赖版本源码, /cache: 'no-store'/, '版本检测 no-store 保持');
-  assert.match(准备源码, /compare\(当前版本, 最新版本, '>='\)/, '版本 compare 保持');
+  assert.match(准备源码, /比较稳定版本\(/, '当前、相同、较新与较旧统一走严格稳定版本关系');
+  assert.match(准备源码, /高于目前查询到的官方稳定版/, '本地版本高于远端缓存时不得冒充“官方最新版”或建议降级');
+  assert.match(准备源码, /无法确认.*正式稳定版本/, '预发布或损坏版本必须显示无法确认');
   assert.match(准备源码, /'人妻公寓_首次游玩说明_database_sql_mode_20260803'/, '版本化 storage key 保持');
   assert.match(准备源码, /'人妻公寓_提示词已确认_20260808'/, '提示词确认持久化键保持');
   assert.match(准备源码, /confirm\('将《人妻公寓》的五张游戏记忆表应用到当前聊天/, '安装模板 confirm 保持');
@@ -199,10 +209,10 @@ test('首次准备组件拥有新手向导模板、三准备项、渐进披露�
     /酒馆助手已安装\.value && 提示词已确认\.value && 数据库准备完成\.value/,
     '完成=酒馆助手已装且提示词已确认且数据库就绪',
   );
-  // 默认首屏(折叠高级区之前)不得出现开发术语与诊断细节。
+  // 默认首屏只允许玩家可操作的 SQLite 名称，不暴露表名、DDL、API 等开发细节。
   const 模板段 = 准备源码.slice(准备源码.indexOf('<template>'), 准备源码.indexOf('</template>'));
   const 首屏段 = 模板段.slice(0, 模板段.indexOf('<details'));
-  assert.doesNotMatch(首屏段, /RQ_|DDL|callAI|SQLite|FIRST RUN|运行环境|setup-sql-reminder/, '默认首屏无开发术语');
+  assert.doesNotMatch(首屏段, /RQ_|DDL|callAI|FIRST RUN|运行环境|setup-sql-reminder/, '默认首屏无内部开发术语');
   assert.match(准备源码, /emit\('toast'/, '轻提示 emit toast');
   assert.match(准备源码, /emit\('update:open'/, '开关 emit update:open');
   assert.match(准备源码, /v-if="open"/, '内部 v-if=open 展示');
@@ -220,7 +230,8 @@ test('首次准备组件拥有新手向导模板、三准备项、渐进披露�
     '移动端状态项字号提升到 0.8em',
   );
   assert.match(准备源码, /from '\.\.\/\.\.\/\.\.\/脚本\/游戏逻辑\/数据库桥'/, '组件从数据库桥正确相对路径导入');
-  assert.match(准备源码, /from 'compare-versions'/, '组件自行导入 compare-versions');
+  assert.match(准备源码, /比较稳定版本,[\s\S]*?from '\.\.\/\.\.\/\.\.\/脚本\/游戏逻辑\/依赖版本'/, '组件复用依赖版本模块的严格比较事实源');
+  assert.doesNotMatch(准备源码, /from 'compare-versions'/, '组件不得自行用 >= 合并相同版与本地较新版');
   assert.match(App源码, /v-model:open="首次说明开"/, 'App 用 v-model 接首次说明开关');
   assert.match(App源码, /:auto-open="就绪 && !data\.系统\._序章完成"/, 'App 传 autoOpen');
   assert.match(App源码, /:script-alive="脚本存活"/, 'App 传脚本心跳');

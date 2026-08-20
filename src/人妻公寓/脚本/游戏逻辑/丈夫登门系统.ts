@@ -1,3 +1,4 @@
+import { 追加等待场景剧情 } from './场景剧情事务';
 import type { SchemaType } from '../../schema';
 import { 户静态表, 门牌列表, type 门牌 } from '../../stageConfig';
 import { 读取世界时间 } from './楼层时钟';
@@ -193,7 +194,7 @@ export function 读取待触发丈夫登门(data: SchemaType): 门牌 | null {
 }
 
 /** 睡眠按钮在真正推进时间前调用；返回事件即拦截本次睡眠并立即开演第一拍。 */
-export function 准备睡前丈夫登门(data: SchemaType, 地点: string): 丈夫登门操作结果 | null {
+export function 准备睡前丈夫登门(data: SchemaType, 地点: string, 目标场景: string): 丈夫登门操作结果 | null {
   同步丈夫登门排期(data);
   const 门牌号 = 读取待触发丈夫登门(data);
   if (!门牌号) return null;
@@ -202,7 +203,7 @@ export function 准备睡前丈夫登门(data: SchemaType, 地点: string): 丈�
   账.变体标识 = 解析当前变体(data, 门牌号);
   账.当前拍 = 1;
   const 事件 = 构造丈夫登门节拍(data, 门牌号, 地点, 1);
-  data.系统._待发送事件 = 事件;
+  追加等待场景剧情(data, 事件, 目标场景, '丈夫登门');
   return {
     成功: true,
     提示: `刚准备休息，${户静态表[门牌号].夫名}却找上了门。今晚得先处理这次登门。`,
@@ -213,7 +214,12 @@ export function 准备睡前丈夫登门(data: SchemaType, 地点: string): 丈�
 }
 
 /** 成功演完一拍后调用；中途失败、取消或重掷不会消费，也不会提前结算。 */
-export function 推进丈夫登门(data: SchemaType, 已演事件: string, 地点 = '管理员室'): 丈夫登门操作结果 | null {
+export function 推进丈夫登门(
+  data: SchemaType,
+  已演事件: string,
+  地点 = '管理员室',
+  目标场景 = '',
+): 丈夫登门操作结果 | null {
   const 匹配 = 已演事件.match(/【丈夫登门:(\d{3}):([^:】]+):(\d+)】/);
   if (!匹配 || !是门牌(匹配[1])) return null;
   const 门牌号 = 匹配[1];
@@ -224,7 +230,8 @@ export function 推进丈夫登门(data: SchemaType, 已演事件: string, 地�
   if (账.当前拍 < 总拍) {
     账.当前拍 += 1;
     const 事件 = 构造丈夫登门节拍(data, 门牌号, 地点, 账.当前拍);
-    data.系统._待发送事件 = 事件;
+    // 同一登门的下一拍必须连续，优先于本楼结算顺带产生的其他等待事件；仍是一张独立票，绝不混入同楼。
+    追加等待场景剧情(data, 事件, 目标场景, '丈夫登门', true);
     return { 成功: true, 提示: '丈夫登门事件仍在继续。', 变动: true, 事件, 门牌: 门牌号 };
   }
 

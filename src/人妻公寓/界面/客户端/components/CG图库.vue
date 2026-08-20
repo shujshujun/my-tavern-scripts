@@ -1,10 +1,15 @@
 <script setup lang="ts">
 // 角色CG图库：已解锁显示缩略图，未解锁不泄露画面。图库/阶段/页码/页签/大图预览均为图库内部状态；
 // App 只保留 CG图库门牌 开关与 打开/关闭 两个跨区块动作（用 :key="门牌" 每次开不同角色都从头开始）。
-// 顶层按 普通CG/怀孕CG 分线，每线内部用五阶段页签；总数与已解锁都按 图库+阶段 计算。
+// 顶层按 普通CG/怀孕CG 分线，每线内部用亲密场景五阶段页签；总数与已解锁都按 图库+阶段 计算。
 import { computed, onBeforeUnmount, ref } from 'vue';
 import { 户静态表, type 门牌 } from '../../../stageConfig';
-import { 角色CG列表, type CG变体, type CG阶段, type 成人CG项 } from '../../../脚本/游戏逻辑/成人CG系统';
+import {
+  角色CG列表,
+  type CG变体,
+  type 亲密场景CG阶段,
+  type 成人CG项,
+} from '../../../脚本/游戏逻辑/成人CG系统';
 import { 成人CG基址 } from '../assets';
 import { CG全览模式, CG项可查看, 创建CG全览连击状态, 记录CG全览标题点击 } from './CG图库全览';
 import Ic from './Icon.vue';
@@ -17,15 +22,17 @@ const props = defineProps<{
 const emit = defineEmits<{ close: [] }>();
 
 const 变体 = ref<CG变体>('normal');
-const 阶段 = ref<CG阶段>('intro_no_contact');
+const 阶段 = ref<亲密场景CG阶段>('intro_no_contact');
 const 页码 = ref(1);
 const 每页 = 15;
 const 预览 = ref<成人CG项 | null>(null);
+/** 本次图库实例的素材失败表；关闭重开即可重新尝试，不污染真实解锁集合。 */
+const 失效CG = ref<ReadonlySet<string>>(new Set());
 const 全览点击状态 = ref(创建CG全览连击状态());
 const 全览提示 = ref('');
 let 全览提示计时器: ReturnType<typeof setTimeout> | null = null;
 
-const 阶段名: Record<CG阶段, string> = {
+const 阶段名: Record<亲密场景CG阶段, string> = {
   intro_no_contact: '亲密开场',
   light_contact: '普通接触',
   deep_foreplay: '深度前戏',
@@ -46,7 +53,7 @@ const 当前项 = computed(() => {
   return 阶段全部项.value.slice(起点, 起点 + 每页);
 });
 const 页签 = computed(() =>
-  (Object.keys(阶段名) as CG阶段[]).map(值 => {
+  (Object.keys(阶段名) as 亲密场景CG阶段[]).map(值 => {
     const 项 = 全部项.value.filter(item => item.stage === 值);
     return {
       值,
@@ -68,6 +75,12 @@ function 成人CG地址(项: 成人CG项): string {
 
 function 可查看CG(项: 成人CG项): boolean {
   return CG项可查看(props.unlocked, 项.id, CG全览模式.value);
+}
+
+function 标记CG失效(id: string): void {
+  if (!id || 失效CG.value.has(id)) return;
+  失效CG.value = new Set([...失效CG.value, id]);
+  if (预览.value?.id === id) 预览.value = null;
 }
 
 function 处理全览标题点击(): void {
@@ -92,7 +105,7 @@ function 切换变体(变体值: CG变体): void {
   页码.value = 1;
 }
 
-function 切换阶段(阶段值: CG阶段): void {
+function 切换阶段(阶段值: 亲密场景CG阶段): void {
   阶段.value = 阶段值;
   页码.value = 1;
 }
@@ -145,12 +158,20 @@ onBeforeUnmount(() => {
           v-for="项 in 当前项"
           :key="项.id"
           class="cg-tile"
-          :class="{ locked: !可查看CG(项) }"
-          :disabled="!可查看CG(项)"
-          :title="可查看CG(项) ? '查看大图' : '尚未解锁'"
+          :class="{ locked: !可查看CG(项), broken: 失效CG.has(项.id) }"
+          :disabled="!可查看CG(项) || 失效CG.has(项.id)"
+          :title="!可查看CG(项) ? '尚未解锁' : 失效CG.has(项.id) ? '图片加载失败，关闭图库后可重试' : '查看大图'"
           @click="预览 = 项"
         >
-          <img v-if="可查看CG(项)" :src="成人CG地址(项)" alt="" loading="lazy" draggable="false" />
+          <img
+            v-if="可查看CG(项) && !失效CG.has(项.id)"
+            :src="成人CG地址(项)"
+            alt=""
+            loading="lazy"
+            draggable="false"
+            @error="标记CG失效(项.id)"
+          />
+          <span v-else-if="可查看CG(项)" class="cg-broken"><Ic n="refresh" /><small>加载失败</small></span>
           <span v-else class="cg-lock"><Ic n="lock" /></span>
         </button>
       </div>
@@ -165,7 +186,7 @@ onBeforeUnmount(() => {
   <div v-if="预览" class="mask cg-preview-mask" @click.self="预览 = null">
     <button class="sheet-close cg-preview-close" @click="预览 = null">✕</button>
     <div class="cg-preview-scroller" @click.self="预览 = null">
-      <img :src="成人CG地址(预览)" alt="" draggable="false" />
+      <img :src="成人CG地址(预览)" alt="" draggable="false" @error="标记CG失效(预览.id)" />
     </div>
   </div>
 </template>
@@ -297,12 +318,14 @@ onBeforeUnmount(() => {
   transform: scale(1.035);
 }
 
-.cg-tile.locked {
+.cg-tile.locked,
+.cg-tile.broken {
   cursor: default;
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.055), transparent), rgba(28, 26, 36, 0.94);
 }
 
-.cg-lock {
+.cg-lock,
+.cg-broken {
   display: grid;
   width: 100%;
   height: 100%;
@@ -311,9 +334,20 @@ onBeforeUnmount(() => {
   color: rgba(255, 255, 255, 0.78);
 }
 
-.cg-lock .ic {
+.cg-lock .ic,
+.cg-broken .ic {
   width: 24px;
   height: 24px;
+}
+
+.cg-broken {
+  align-content: center;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.74);
+}
+
+.cg-broken small {
+  font-size: 0.68em;
 }
 
 .cg-preview-mask {

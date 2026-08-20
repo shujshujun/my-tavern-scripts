@@ -126,8 +126,8 @@ test('组件拥有完整派生 imports/逻辑；App 仅档案 imports 移除但�
   );
   assert.match(
     App源码,
-    /import \{ 列出阶段线路候选详情, type 阶段线路候选 \} from '\.\.\/\.\.\/脚本\/游戏逻辑\/阶段线路系统'/,
-    '阶段线路候选仍在 App',
+    /import\s*\{[^;]*列出阶段线路候选详情[^;]*type 阶段线路候选[^;]*\}\s*from '\.\.\/\.\.\/脚本\/游戏逻辑\/阶段线路系统';/s,
+    '阶段线路候选仍在 App；同模块新增消费者不得因 import 换行或成员扩展造成误报',
   );
   assert.match(
     App源码,
@@ -183,7 +183,7 @@ test('props/emits 与 App 接线完整；close/三类图片 error/CG/卸载/晋�
   const 模板段 = 提取模板(App源码);
   assert.match(
     模板段,
-    /<DossierPopup\b[\s\S]*?:door="选中门牌"[\s\S]*?:data="data"[\s\S]*?:ready="就绪"[\s\S]*?:current-room="当前房间"[\s\S]*?:absolute-period="绝对时段"[\s\S]*?:unlocked-cg="已解锁CG"[\s\S]*?:sending="发送中"[\s\S]*?:wife-nearby="选中门牌 \? 妻在玩家身边\(选中门牌\) : false"[\s\S]*?:evidence-slots="裂缝证物槽"[\s\S]*?:avatar-failed="头像失效"[\s\S]*?:portrait-failed="立绘失效"[\s\S]*?:item-failed="道具图失效"[\s\S]*?:avatar-image="头像图"[\s\S]*?:item-image="道具图"[\s\S]*?@close="选中门牌 = null"[\s\S]*?@avatar-error="头像失效\[\$event\] = true"[\s\S]*?@portrait-error="立绘失效\[\$event\] = true"[\s\S]*?@item-error="道具图失效\[\$event\] = true"[\s\S]*?@open-cg="打开CG图库"[\s\S]*?@advance="晋阶"[\s\S]*?@ask-money="开口要钱"[\s\S]*?\/>/,
+    /<DossierPopup\b[\s\S]*?:door="选中门牌"[\s\S]*?:data="data"[\s\S]*?:ready="就绪"[\s\S]*?:current-room="当前房间"[\s\S]*?:absolute-period="绝对时段"[\s\S]*?:unlocked-cg="已解锁CG"[\s\S]*?:sending="场景操作锁"[\s\S]*?:wife-nearby="选中门牌 \? 妻在玩家身边\(选中门牌\) : false"[\s\S]*?:evidence-slots="裂缝证物槽"[\s\S]*?:avatar-failed="头像失效"[\s\S]*?:portrait-failed="立绘失效"[\s\S]*?:item-failed="道具图失效"[\s\S]*?:avatar-image="头像图"[\s\S]*?:item-image="道具图"[\s\S]*?@close="选中门牌 = null"[\s\S]*?@avatar-error="头像失效\[\$event\] = true"[\s\S]*?@portrait-error="立绘失效\[\$event\] = true"[\s\S]*?@item-error="道具图失效\[\$event\] = true"[\s\S]*?@open-cg="打开CG图库"[\s\S]*?@advance="晋阶"[\s\S]*?@ask-money="开口要钱"[\s\S]*?\/>/,
     '档案 tag 全部 props/emits 接线',
   );
   assert.match(
@@ -199,8 +199,8 @@ test('props/emits 与 App 接线完整；close/三类图片 error/CG/卸载/晋�
   assert.doesNotMatch(档案卡源码, /eventEmit\(|eventOn\(/, '组件不含事件总线写入');
   assert.match(
     App源码,
-    /function 晋阶\(门牌号: 门牌\) \{\s*eventEmit\('人妻公寓:请求晋阶', 门牌号\);\s*选中门牌\.value = null;\s*\}/,
-    '晋阶仍 发事件后清 选中门牌',
+    /function 晋阶\(门牌号: 门牌\) \{\s*if \(提交界面事务\(\(\) => eventEmit\('人妻公寓:请求晋阶', 门牌号\)\)\) 选中门牌\.value = null;\s*\}/,
+    '晋阶先经同步事务门发事件，只有成功受理后才清选中门牌',
   );
   assert.match(档案卡源码, /@click\.self="emit\('close'\)"/, 'mask.self 只 emit close');
   assert.match(档案卡源码, /@error="emit\('avatarError', 选中档案\.妻名\)"/, '头像失败 emit 妻名');

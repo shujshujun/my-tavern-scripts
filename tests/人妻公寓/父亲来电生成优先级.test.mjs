@@ -25,6 +25,10 @@ const 节拍源码 = readFileSync(
   new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/节拍引擎.ts', import.meta.url),
   'utf8',
 );
+const 父亲通话源码 = readFileSync(
+  new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/交互/父亲通话.ts', import.meta.url),
+  'utf8',
+);
 
 function 手机父亲状态(待接期 = -1, 活动 = {}) {
   return {
@@ -49,4 +53,16 @@ test('手机节拍先落确定性楼务通知，再在任何自动AI入口前给
   const 父亲门 = 节拍.indexOf('父亲通话占用自动节拍(data)');
   const 首个自动AI = 节拍.indexOf('await 冷落预警节拍()');
   assert.ok(确定性同步 >= 0 && 父亲门 > 确定性同步 && 首个自动AI > 父亲门);
+});
+
+test('正常例行联络走生活化父子主题，不再因期限内楼务强制逐项报告', () => {
+  const 主题段 = 父亲通话源码.slice(
+    父亲通话源码.indexOf('function 父亲通话主题'),
+    父亲通话源码.indexOf('/**\n * 所有活动通话修改'),
+  );
+  assert.match(主题段, /通话\.报表\.startsWith\('例行联络：'\)/);
+  assert.match(主题段, /问问儿子最近吃住和身体怎么样/);
+  assert.match(主题段, /说两句自己在海外的生意近况/);
+  assert.doesNotMatch(主题段, /尚余\\d\+时段.*追问/);
+  assert.match(父亲通话源码, /不得强迫儿子逐项报告楼务/);
 });

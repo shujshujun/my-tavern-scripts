@@ -16,9 +16,21 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{
-  imageLoad: [];
-  imageError: [];
+  imageLoad: [imageUrl: string];
+  imageError: [imageUrl: string];
 }>();
+
+function 图片请求地址(event: Event): string {
+  return (event.currentTarget as HTMLImageElement).dataset.imageUrl ?? '';
+}
+
+function 图片加载成功(event: Event): void {
+  emit('imageLoad', 图片请求地址(event));
+}
+
+function 图片加载失败(event: Event): void {
+  emit('imageError', 图片请求地址(event));
+}
 </script>
 
 <template>
@@ -33,10 +45,11 @@ const emit = defineEmits<{
         v-if="imageUrl"
         :key="imageUrl"
         :src="imageUrl"
+        :data-image-url="imageUrl"
         :alt="`静音会议${visualState}会场全景`"
         draggable="false"
-        @load="emit('imageLoad')"
-        @error="emit('imageError')"
+        @load="图片加载成功"
+        @error="图片加载失败"
       />
       <div v-else class="mute-meeting-visual-fallback">
         <span>梧桐里公寓 · 管理员室</span>

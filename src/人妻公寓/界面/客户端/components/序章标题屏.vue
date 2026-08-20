@@ -38,7 +38,7 @@ const 难度卡 = Object.values(难度表);
     <!-- 菜单:木牌按钮融进画面。难度未选=展开难度选择,已选=显主菜单 -->
     <div class="title-menu" :style="{ '--plaque': `url(${素材基址}/界面/按钮底.webp)` }">
       <template v-if="!难度展开">
-        <button class="plaque main" :disabled="sending" @click="难度展开 = true">
+        <button class="plaque main" :disabled="sending || !scriptAlive" @click="难度展开 = true">
           <span class="pl-main">开始游戏</span>
           <span class="pl-sub">START</span>
         </button>
@@ -75,7 +75,7 @@ const 难度卡 = Object.values(难度表);
           >
             返回
           </button>
-          <button class="btn rite" :disabled="!选中难度 || sending" @click="emit('start', 选中难度)">
+          <button class="btn rite" :disabled="!选中难度 || sending || !scriptAlive" @click="emit('start', 选中难度)">
             {{ sending ? '电话接通中……' : '接起父亲的电话' }}
           </button>
         </div>

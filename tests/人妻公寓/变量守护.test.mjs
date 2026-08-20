@@ -108,6 +108,40 @@ test('Schema 前的 999 原候选不会伪装成合法 +1', () => {
   assert.deepEqual(结果.合法正候选门牌, []);
 });
 
+test('官方外置补丁删除可写叶子时，Schema 默认值不能冒充合法候选', () => {
+  const base = 建数据();
+  base.户['101'].妻.当前阶段 = 5;
+  base.户['101'].妻.好感值 = 2;
+  base.户['101'].妻.当前心理想法 = '保留原想法';
+  base.户['101'].妻.当前情绪 = '紧张';
+  const raw候选 = lodash.cloneDeep(base);
+  delete raw候选.户['101'].妻.好感值;
+  delete raw候选.户['101'].妻.当前心理想法;
+  delete raw候选.户['101'].妻.当前情绪;
+  const ai = Schema.parse(raw候选);
+
+  const 结果 = 守护(base, ai, raw候选);
+
+  assert.equal(ai.户['101'].妻.好感值, 2, '缺失数值叶不能借默认 0 伪装成合法 -2');
+  assert.equal(ai.户['101'].妻.当前心理想法, '保留原想法');
+  assert.equal(ai.户['101'].妻.当前情绪, '紧张');
+  assert.deepEqual(结果.合法正候选, {});
+});
+
+test('原始候选的字符串数值不能借 Schema 强转取得写权', () => {
+  const base = 建数据();
+  base.户['101'].妻.当前阶段 = 5;
+  base.户['101'].妻.好感值 = 10;
+  const raw候选 = lodash.cloneDeep(base);
+  raw候选.户['101'].妻.好感值 = '13';
+  const ai = Schema.parse(raw候选);
+
+  const 结果 = 守护(base, ai, raw候选);
+
+  assert.equal(ai.户['101'].妻.好感值, 10);
+  assert.deepEqual(结果.合法正候选, {});
+});
+
 test('手动重新处理变量把 Schema 前原候选和冻结末楼交给守护', () => {
   assert.match(indexSource, /const 手动范围 = 读取AI可写变量范围\(末楼层\)/);
   assert.match(indexSource, /回滚保护字段\(restored, 手动焦点, 手动范围, 末楼层, rawStat\)/);

@@ -20,8 +20,9 @@ function 是门牌(value: string): value is 门牌 {
 
 function 场景焦点(data: SchemaType): 门牌 | null {
   const 场景 = data.系统._性爱场景;
-  if (是门牌(场景.主焦点门牌)) return 场景.主焦点门牌;
-  return Object.keys(场景.参与者).find(是门牌) ?? null;
+  if (是门牌(场景.主焦点门牌) && 场景.参与者[场景.主焦点门牌]?.已退出 !== true) return 场景.主焦点门牌;
+  const 候选 = Object.entries(场景.参与者).find(([门牌号, 项]) => 是门牌(门牌号) && 项.已退出 !== true)?.[0];
+  return 候选 && 是门牌(候选) ? 候选 : null;
 }
 
 function 首名参与者(参与者: Record<string, unknown>): 门牌 | null {
@@ -48,11 +49,17 @@ function 行为接触部位(行为: string): string {
 export function 构造CG亲密上下文(旧值: SchemaType, 新值: SchemaType, 性爱结束: boolean): CG亲密上下文 {
   const 旧场景 = 旧值.系统._性爱场景;
   const 新场景 = 新值.系统._性爱场景;
+  const 旧焦点 = 旧场景.状态 !== '空闲' ? 场景焦点(旧值) : null;
+  // 正常自动轮焦仍使用本楼开始时的旧焦点；只有该角色在本楼明确独立退出时，
+  // 才切到结算后仍实际参与的新焦点，避免把拒绝楼的 CG 继续画给退出者。
+  const 旧焦点本楼已退出 = Boolean(旧焦点 && 新场景.参与者[旧焦点]?.已退出 === true);
   const 本楼焦点 =
     旧场景.状态 !== '空闲'
-      ? 场景焦点(旧值)
+      ? 旧焦点本楼已退出
+        ? 场景焦点(新值)
+        : 旧焦点
       : 新场景.状态 !== '空闲'
-        ? 首名参与者(新场景.参与者)
+        ? 场景焦点(新值)
         : 首名参与者(新值.系统._上次性爱结果.参与者);
   const 本楼开始 = !性爱结束 && 旧场景.状态 === '空闲' && 新场景.状态 === '进行中';
   if (性爱结束) {

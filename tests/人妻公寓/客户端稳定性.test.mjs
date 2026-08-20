@@ -7,8 +7,11 @@ import test from 'node:test';
 const require = createRequire(import.meta.url);
 process.env.TS_NODE_COMPILER_OPTIONS = JSON.stringify({ module: 'CommonJS', moduleResolution: 'node' });
 require('ts-node/register/transpile-only');
+const ts = require('typescript');
 
 const App源码 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
+const 客户端入口源码 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/index.ts', import.meta.url), 'utf8');
+const 游戏逻辑源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
 const 静音会议源码 = readFileSync(
   new URL('../../src/人妻公寓/界面/客户端/composables/useMuteMeeting.ts', import.meta.url),
   'utf8',
@@ -16,6 +19,19 @@ const 静音会议源码 = readFileSync(
 const 反馈提示源码 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/components/反馈提示.vue', import.meta.url), 'utf8');
 const 客户端模板 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/index.html', import.meta.url), 'utf8');
 const 客户端产物 = readFileSync(new URL('../../dist/人妻公寓/界面/客户端/index.html', import.meta.url), 'utf8');
+
+function 载入纯函数片段(源码, 起始标记, 结束标记, 导出名) {
+  const 起点 = 源码.indexOf(起始标记);
+  const 终点 = 源码.indexOf(结束标记, 起点);
+  assert.ok(起点 >= 0 && 终点 > 起点, `无法定位行为片段：${起始标记}`);
+  const 片段 = 源码.slice(起点, 终点);
+  const js = ts.transpileModule(`${片段}\nmodule.exports = { ${导出名.join(', ')} };`, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  const 模块 = { exports: {} };
+  Function('module', 'exports', js)(模块, 模块.exports);
+  return 模块.exports;
+}
 
 test('客户端启动等待覆盖 MVU 成功、拒绝、超时与 stat_data 缺失', async () => {
   const { 等待客户端启动依赖 } = require('../../src/人妻公寓/界面/客户端/启动等待.ts');
@@ -59,6 +75,146 @@ test('客户端启动等待覆盖 MVU 成功、拒绝、超时与 stat_data 缺�
   assert.equal(存档缺失.mvu就绪, true);
   assert.equal(存档缺失.statData就绪, false);
   assert.equal(存档缺失.statData错误, 存档错误);
+});
+
+test('客户端切聊天同步作废旧界面，下一任务拍只从新聊天重建场景、卷轴与特殊场景', () => {
+  assert.match(App源码, /eventOn\(tavern_events\.CHAT_CHANGED, 客户端聊天切换\)/, 'App 必须拥有独立切聊消费者');
+  const 起点 = App源码.indexOf('function 客户端聊天切换()');
+  const 终点 = App源码.indexOf('// ── 挂载:事件接线', 起点);
+  assert.ok(起点 >= 0 && 终点 > 起点, '必须能定位客户端切聊收口函数');
+  const 段 = App源码.slice(起点, 终点);
+  for (const 清理 of [
+    '卷轴请求序号 += 1',
+    '行动选项世代.value += 1',
+    '场景剧情准备事件序号 += 1',
+    '停止生成计时()',
+    '重置录像带界面()',
+    '重置静音会议时间线界面()',
+    '清空当前成人CG()',
+    '当前家庭计划CG.value = null',
+    '当前生产CG.value = null',
+    '显示地图.value = false',
+    '显示商店.value = false',
+    '显示背包.value = false',
+    '显示监控.value = false',
+    '显示史册.value = false',
+    '设置开.value = false',
+    '首次说明开.value = false',
+    '清空编辑状态()',
+  ]) {
+    assert.match(段, new RegExp(清理.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `切聊当拍应执行 ${清理}`);
+  }
+  assert.match(段, /安排客户端延迟\(\(\) => \{[\s\S]*?void 重建客户端聊天界面\(切换世代\);[\s\S]*?\}, 0\)/, '宿主完成 chat 替换后再重建');
+  assert.match(App源码, /async function 重建客户端聊天界面\(切换世代: number\)/, '重建函数冻结共享时间线世代');
+  const 重建起点 = App源码.indexOf('async function 重建客户端聊天界面(');
+  const 重建终点 = App源码.indexOf('function 客户端聊天切换()', 重建起点);
+  const 重建段 = App源码.slice(重建起点, 重建终点);
+  assert.match(重建段, /await Promise\.resolve\([\s\S]*?pull\?\.\(\)/, '先拉新聊天 Store');
+  assert.match(重建段, /if \(切换世代 !== 当前时间线切换世代\(\)\) return;/, '每个异步阶段后复核共享世代');
+  for (const 重建 of [
+    '同步场景自变量()',
+    'await 取卷轴()',
+    '刷新可重掷()',
+    '刷赴约()',
+    '刷新在场()',
+    '刷新行动选项()',
+    '刷新待办()',
+    '刷新偷窥待选()',
+    '同步静音会议界面()',
+    '恢复失败行动()',
+  ]) {
+    assert.match(重建段, new RegExp(重建.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), `新聊天必须重建 ${重建}`);
+  }
+});
+
+test('可选启动步骤只降级当前世代错误，失效世代必须交回总启动闸门', () => {
+  const { 处理可降级启动错误 } = 载入纯函数片段(
+    游戏逻辑源码,
+    'export function 处理可降级启动错误(',
+    'function 停止本模块脚本心跳()',
+    ['处理可降级启动错误'],
+  );
+  const 普通错误 = new Error('worldbook unavailable');
+  const 已报告 = [];
+  处理可降级启动错误(() => true, 普通错误, 错误 => 已报告.push(错误));
+  assert.deepEqual(已报告, [普通错误]);
+
+  const 世代错误 = new Error('__RQGY_TIMELINE_CHANGED__');
+  let 被误报告 = false;
+  assert.throws(
+    () => 处理可降级启动错误(() => false, 世代错误, () => (被误报告 = true)),
+    错误 => 错误 === 世代错误,
+  );
+  assert.equal(被误报告, false);
+  assert.match(游戏逻辑源码, /catch \(e\) \{\s*处理可降级启动错误\(启动仍有效, e,/);
+
+  const 引导失败处理位 = 游戏逻辑源码.indexOf("处理可降级启动错误(启动仍有效, e, 错误 => console.error('[人妻公寓] 首批入住引导失败:'");
+  const 最终复核位 = 游戏逻辑源码.indexOf('确认启动仍有效();', 引导失败处理位);
+  const 心跳位 = 游戏逻辑源码.indexOf('停止当前脚本心跳 = 注册单例脚本心跳', 最终复核位);
+  const 监听位 = 游戏逻辑源码.indexOf('挂载监听();', 心跳位);
+  assert.ok(
+    引导失败处理位 >= 0 && 最终复核位 > 引导失败处理位 && 心跳位 > 最终复核位 && 监听位 > 心跳位,
+    '可取消启动同步完成并最终复核世代后，才对外声明心跳和挂载业务监听',
+  );
+});
+
+test('游戏逻辑热重载只保留一个脚本心跳所有者，旧 interval 迟到不得继续续命', () => {
+  const { 注册单例脚本心跳 } = 载入纯函数片段(
+    游戏逻辑源码,
+    'export function 注册单例脚本心跳(',
+    'function 停止本模块脚本心跳()',
+    ['注册单例脚本心跳'],
+  );
+  const 所有者 = {};
+  const 周期任务 = new Map();
+  const 已清除 = [];
+  let 下个句柄 = 1;
+  const 建立周期 = (任务, 毫秒) => {
+    const 句柄 = 下个句柄++;
+    周期任务.set(句柄, { 任务, 毫秒 });
+    return 句柄;
+  };
+  const 清除周期 = 句柄 => {
+    已清除.push(句柄);
+    周期任务.delete(句柄);
+  };
+  let 甲心跳 = 0;
+  const 停甲 = 注册单例脚本心跳(所有者, () => (甲心跳 += 1), 5000, 建立周期, 清除周期);
+  const 甲任务 = 周期任务.get(1).任务;
+  assert.equal(甲心跳, 1, '注册时立即写一次，客户端无需空等首个周期');
+  assert.equal(周期任务.get(1).毫秒, 5000);
+
+  let 乙心跳 = 0;
+  const 停乙 = 注册单例脚本心跳(所有者, () => (乙心跳 += 1), 5000, 建立周期, 清除周期);
+  assert.deepEqual(已清除, [1], '新实例必须先清掉旧 interval');
+  assert.equal(乙心跳, 1);
+  甲任务();
+  assert.equal(甲心跳, 1, '即使旧宿主回调已经排队，失去所有权后也不得继续续命');
+  周期任务.get(2).任务();
+  assert.equal(乙心跳, 2);
+
+  停甲();
+  assert.equal(typeof 所有者.__rqgyGameHeartbeatStop, 'function', '旧停止器迟到不得删除新实例所有权');
+  停乙();
+  assert.deepEqual(已清除, [1, 2]);
+  assert.equal(所有者.__rqgyGameHeartbeatStop, undefined);
+  assert.match(游戏逻辑源码, /停止本模块脚本心跳\(\);[\s\S]{0,500}\$\(\(\) => \{/, '新启动任务登记前先撤销旧心跳');
+});
+
+test('客户端入口重复执行会先注销旧全局监听、画幅生命周期与待启动挂载', () => {
+  assert.match(客户端入口源码, /__rqgyClientEntryCleanup/, '入口必须在 window 保存唯一清理句柄');
+  assert.match(客户端入口源码, /入口全局\.__rqgyClientEntryCleanup\?\.\(\)/, '新入口启动前先清旧实例');
+  assert.match(客户端入口源码, /window\.removeEventListener\('error', 窗口错误处理\)/, '错误监听必须具名并可移除');
+  assert.match(
+    客户端入口源码,
+    /window\.removeEventListener\('unhandledrejection', 未处理拒绝处理\)/,
+    'Promise 拒绝监听必须具名并可移除',
+  );
+  assert.match(客户端入口源码, /const 注销画幅生命周期 = 注册画幅页面生命周期\(\)/, '画幅生命周期清理句柄不得丢弃');
+  assert.match(客户端入口源码, /注销画幅生命周期\(\)/, '重复执行或销毁时释放跨窗口监听');
+  assert.match(客户端入口源码, /let 入口已作废 = false/, '异步启动必须有失效门');
+  assert.match(客户端入口源码, /if \(入口已作废\) return;/, '旧启动等待返回后不得重新挂载');
+  assert.match(客户端入口源码, /已挂载应用\?\.unmount\(\)/, '重复入口必须卸载旧 Vue 应用');
 });
 
 test('客户端不得从手机兼容门面引入宿主渲染副作用', () => {
@@ -159,11 +315,45 @@ test('回档、离房与专属事件画面会原子清理整组成人 CG', () =>
   assert.match(App源码, /eventOn\('人妻公寓:生产CG'[\s\S]{0,180}清空当前成人CG\(\)/, '生产画面互斥');
 });
 
+test('App 重挂载前显式清空本 iframe 事件订阅，并取消所有尚未触发的延迟任务', () => {
+  const 卸载函数 = App源码.match(/onUnmounted\(\(\) => \{[\s\S]*?\n\}\);/)?.[0] ?? '';
+  assert.match(卸载函数, /eventClearAll\(\)/, 'Vue 卸载不等于 iframe 关闭，旧 eventOn 回调必须显式注销');
+  assert.match(App源码, /function 安排客户端延迟\(/, '所有 App 级延迟回调应进入统一生命周期登记');
+  assert.match(卸载函数, /清空客户端延迟任务\(\)/, '卸载时必须取消键盘、自动重试、心跳等迟到回调');
+});
+
+test('重要反馈按 FIFO 驻留：连续结算不互相覆盖、重复项不刷屏、发送中后仍可继续收取', () => {
+  const { 追加拾获提示, 收下首条拾获提示 } = 载入纯函数片段(
+    App源码,
+    'function 追加拾获提示(',
+    '// ── 特殊场景「静音会议」完整状态域',
+    ['追加拾获提示', '收下首条拾获提示'],
+  );
+  let 队列 = [];
+  队列 = 追加拾获提示(队列, '【线索】第一条');
+  队列 = 追加拾获提示(队列, '【房租】第二条');
+  队列 = 追加拾获提示(队列, '【线索】第一条');
+  队列 = 追加拾获提示(队列, '   ');
+  assert.deepEqual(队列, ['【线索】第一条', '【房租】第二条']);
+  assert.equal(队列[0], '【线索】第一条');
+  队列 = 收下首条拾获提示(队列);
+  assert.deepEqual(队列, ['【房租】第二条'], '手动收下第一条后必须展示下一条');
+
+  const 生成开始段 = App源码.slice(
+    App源码.indexOf("eventOn('人妻公寓:生成开始'"),
+    App源码.indexOf("eventOn('人妻公寓:变量重生成状态'"),
+  );
+  assert.doesNotMatch(生成开始段, /拾获卡(?:队列)?\.value\s*=\s*(?:''|\[\])/, '发送中只能暂时隐藏，不得自动吞掉重要提示');
+  const 切聊段 = App源码.slice(App源码.indexOf('function 客户端聊天切换()'), App源码.indexOf('// ── 挂载:事件接线'));
+  assert.match(切聊段, /拾获卡队列\.value = \[\]/, '切聊天必须清掉上一聊天的反馈队列');
+});
+
 test('普通toast不会取消性爱结果卡自己的隐藏计时', () => {
   const toast函数 = App源码.match(/function 弹提示\([\s\S]*?\n\}/)?.[0] ?? '';
   assert.doesNotMatch(toast函数, /性爱结果timer/);
+  assert.match(App源码, /性爱结果timer = 安排客户端延迟\(/, '性爱结果卡仍使用自己的独立句柄');
   const 卸载函数 = App源码.match(/onUnmounted\(\(\) => \{[\s\S]*?\n\}\);/)?.[0] ?? '';
-  assert.match(卸载函数, /clearTimeout\(性爱结果timer\)/);
+  assert.match(卸载函数, /清空客户端延迟任务\(\)/, '统一生命周期清理必须包含性爱结果卡计时');
 });
 
 test('移动端点击反馈保留换行且不会横向溢出画幅', () => {

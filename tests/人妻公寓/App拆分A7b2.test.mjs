@@ -31,7 +31,11 @@ test('composable 非空；App 真实 import 并恰好调用一次、解构完整
   assert.match(App源码, /import \{ useMuteMeeting \} from '\.\/composables\/useMuteMeeting';/, 'App 应导入 useMuteMeeting');
   assert.strictEqual((App源码.match(/useMuteMeeting\(/g) ?? []).length, 1, 'App 应恰好调用一次 useMuteMeeting');
   assert.match(App源码, /\} = useMuteMeeting\(\{[\s\S]*?\n {2}data,[\s\S]*?\n\}\);/, 'App 应解构消费 API 并注入 data');
-  assert.match(App源码, /function 打开静音会议筹备\(\) \{[\s\S]*?请求打开静音会议筹备\(\);[\s\S]*?\}/, 'App 应保留背包 wrapper');
+  assert.match(
+    App源码,
+    /function 打开静音会议筹备\(\) \{[\s\S]*?提交界面事务\(\(\) => \{[\s\S]*?请求打开静音会议筹备\(\);[\s\S]*?\}\)[\s\S]*?\}/,
+    'App 应保留带同步提交门的背包 wrapper',
+  );
   const 依赖 = 提取导入specifier(composable源码);
   assert.ok(!依赖.some(s => s.includes('App.vue') || s === './App' || s === '../App'), 'composable 不得反向导入 App');
   assert.ok(!依赖.some(s => s.includes('store')), 'composable 不得导入 store');
@@ -98,7 +102,11 @@ test('App 不再声明 meeting 空状态/refs/computed/timers/Pointer/组合图/
   assert.doesNotMatch(App源码, /清理静音会议互动现场\(\)/, 'App 不应再清理互动现场');
   // App 只保留背包 wrapper 与跨区块接线
   assert.match(App源码, /function 打开静音会议筹备\(\)/, 'App 保留 打开静音会议筹备 wrapper');
-  assert.match(App源码, /if \(发送中\.value \|\| 静音会议中\.value\) return;\n {2}显示背包\.value = false;\n {2}请求打开静音会议筹备\(\)/, 'wrapper 保 guard 与关背包顺序');
+  assert.match(
+    App源码,
+    /if \(发送中\.value \|\| 静音会议中\.value\) return;[\s\S]*?提交界面事务\(\(\) => \{[\s\S]*?请求打开静音会议筹备\(\);[\s\S]*?\}\)[\s\S]*?显示背包\.value = false/,
+    'wrapper 保 guard，并在关背包前占同步提交门',
+  );
   assert.match(App源码, /@prepare-meeting="打开静音会议筹备"/, 'InventoryPopup 背包票仍接 wrapper');
 });
 
@@ -227,8 +235,8 @@ test('组合图状态：版本素材基址、回退序列、图地址与 load/er
     'const 静音会议图已加载 = ref(false)',
     'const 静音会议图状态序列 = computed',
     'const 静音会议当前图地址 = computed',
-    'function 静音会议图加载成功()',
-    'function 静音会议图加载失败()',
+    'function 静音会议图加载成功(加载地址: string)',
+    'function 静音会议图加载失败(失败地址: string)',
   ]) {
     assert.match(composable源码, new RegExp(转义(段)), `composable 应声明 ${段}`);
   }
@@ -237,7 +245,9 @@ test('组合图状态：版本素材基址、回退序列、图地址与 load/er
   assert.match(composable源码, /获取静音会议素材相对路径/, '主仓相对路径');
   assert.match(composable源码, /获取静音会议回退状态序列/, '回退序列');
   assert.match(composable源码, /`\$\{版本素材基址\}\/\$\{相对路径\}`/, '图地址拼基址');
-  assert.match(composable源码, /静音会议图回退序号\.value < 静音会议图状态序列\.value\.length\) 静音会议图回退序号\.value \+= 1/, 'error 推进回退序号');
+  assert.match(composable源码, /加载地址 !== 静音会议当前图地址\.value\) return;/, '旧图 load 不得认领新拍');
+  assert.match(composable源码, /失败地址 !== 静音会议当前图地址\.value\) return;/, '旧图 error 不得推进新拍');
+  assert.match(composable源码, /静音会议图回退序号\.value < 静音会议图状态序列\.value\.length\) 静音会议图回退序号\.value \+= 1/, '当前图 error 推进回退序号');
   assert.match(composable源码, /静音会议图回退序号\.value = 0;\n {6}静音会议图已加载\.value = false;/, '状态切换复位回退');
 });
 

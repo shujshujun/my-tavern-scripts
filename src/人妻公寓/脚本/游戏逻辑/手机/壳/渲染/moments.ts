@@ -5,7 +5,7 @@ import { 列出阶段线路候选详情 } from '../../../阶段线路系统';
 import { 手机记录时间字 } from '../../../手机时间显示';
 import { 朋友圈有未读, 写实时手机已读 } from '../../数据层';
 import { 请求刷新手机红点 } from '../../UI刷新';
-import { 头像块, el, 手机图标, 素材基址 } from '../资源与皮肤';
+import { 头像块, el, 手机图标, 朋友圈图片地址 } from '../资源与皮肤';
 import { 渲染底栏, 渲染头, type 渲染上下文 } from './共享';
 import { 取朋友圈显示页, 手机朋友圈每页条数 } from './分页';
 
@@ -39,9 +39,9 @@ export function 渲染moments(上下文: 渲染上下文): void {
       `${头像块(c.谁)}<div class="rqw-r"><span class="rqw-name">${_.escape(c.谁)}${c.私 ? `<i class="rqw-only">${手机图标('lock')}仅你可见</i>` : ''}</span>` +
         `<div class="rqw-text">${正文}</div>` +
         (c.私
-          ? `<span class="rqw-photo private"><img class="rqw-img" src="${素材基址}/微信圈/仅你可见/${encodeURIComponent(c.谁)}_${c.私.图序}.webp" loading="lazy" onerror="this.parentElement.remove()"/></span>`
+          ? `<span class="rqw-photo private"><img class="rqw-img" src="${朋友圈图片地址(`仅你可见/${c.谁}_${c.私.图序}`)}" loading="lazy" onerror="this.parentElement.remove()"/></span>`
           : c.图
-            ? `<span class="rqw-photo current"><img class="rqw-img" src="${素材基址}/微信圈/${c.图}.webp" loading="lazy" onerror="this.parentElement.remove()"/></span>`
+            ? `<span class="rqw-photo current"><img class="rqw-img" src="${朋友圈图片地址(c.图)}" loading="lazy" onerror="this.parentElement.remove()"/></span>`
             : '') +
         `<div class="rqw-foot"><span class="rqw-time">${手机记录时间字(c.时)}</span><span class="rqw-dots">••</span></div>` +
         盒 +
@@ -94,7 +94,7 @@ export function 渲染moments(上下文: 渲染上下文): void {
         })[0]
       : undefined;
     const 图块 = 条.图
-      ? `<span class="rqw-photo history"><img class="rqw-img" src="${素材基址}/微信圈/${条.图}.webp" loading="lazy" onerror="this.parentElement.remove()"/></span>`
+      ? `<span class="rqw-photo history"><img class="rqw-img" src="${朋友圈图片地址(条.图)}" loading="lazy" onerror="this.parentElement.remove()"/></span>`
       : '';
     const 卡 = el(
       'div',

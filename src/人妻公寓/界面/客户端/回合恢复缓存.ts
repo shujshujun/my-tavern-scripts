@@ -15,10 +15,12 @@ export interface 回合恢复记录 {
   行动: string;
   锚楼: number;
   锚签名: string;
+  /** 共享时间线世代；切聊／swipe／删楼即使回到同楼同文本也会变化。 */
+  时间线世代: number;
   记录时间: number;
 }
 
-export type 回合恢复上下文 = Pick<回合恢复记录, '聊天ID' | '锚楼' | '锚签名'>;
+export type 回合恢复上下文 = Pick<回合恢复记录, '聊天ID' | '锚楼' | '锚签名' | '时间线世代'>;
 
 export const 回合恢复缓存键 = '人妻公寓_回合恢复_v1';
 const 回合恢复有效期毫秒 = 24 * 60 * 60 * 1000;
@@ -38,10 +40,12 @@ function 规范记录(值: unknown): 回合恢复记录 | null {
   const 行动 = typeof 值.行动 === 'string' ? 值.行动.trim() : '';
   const 锚楼 = 值.锚楼;
   const 锚签名 = typeof 值.锚签名 === 'string' ? 值.锚签名 : '';
+  const 时间线世代 = 值.时间线世代;
   const 记录时间 = 值.记录时间;
   if (!聊天ID || !行动 || typeof 锚楼 !== 'number' || !Number.isInteger(锚楼) || 锚楼 < 0) return null;
+  if (typeof 时间线世代 !== 'number' || !Number.isInteger(时间线世代) || 时间线世代 < 0) return null;
   if (typeof 记录时间 !== 'number' || !Number.isFinite(记录时间) || 记录时间 < 0) return null;
-  return { 聊天ID, 行动, 锚楼, 锚签名, 记录时间 };
+  return { 聊天ID, 行动, 锚楼, 锚签名, 时间线世代, 记录时间 };
 }
 
 function 读缓存表(存储: 回合恢复存储): 回合恢复缓存表 {
@@ -98,7 +102,12 @@ export function 读取回合恢复记录(
     写缓存表(存储, 表);
     return null;
   }
-  if (记录.锚楼 !== 上下文.锚楼 || 记录.锚签名 !== 上下文.锚签名) return null;
+  if (
+    记录.锚楼 !== 上下文.锚楼 ||
+    记录.锚签名 !== 上下文.锚签名 ||
+    记录.时间线世代 !== 上下文.时间线世代
+  )
+    return null;
   return 记录;
 }
 

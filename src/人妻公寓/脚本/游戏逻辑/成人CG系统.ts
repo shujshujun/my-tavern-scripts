@@ -5,8 +5,8 @@ import type { CG亲密上下文 } from './CG亲密上下文';
 export { 构造CG亲密上下文 } from './CG亲密上下文';
 export type { CG亲密上下文, CG亲密状态 } from './CG亲密上下文';
 
-/** 五阶段运行模式：开场(无男方接触) → 普通接触 → 深度前戏 → 进行中(进入前后穴) → 事后。 */
-export type CG阶段 =
+/** 亲密场景五阶段：开场(无男方接触) → 普通接触 → 深度前戏 → 进行中(进入前后穴) → 事后。 */
+export type 亲密场景CG阶段 =
   | 'intro_no_contact'
   | 'light_contact'
   | 'deep_foreplay'
@@ -62,13 +62,12 @@ export interface 成人CG项 {
   width: number;
   height: number;
   variant: CG变体;
-  stage: CG阶段;
+  stage: 亲密场景CG阶段;
   action: CG动作;
 }
 
 export interface CG回合信号 {
   门牌: 门牌 | null;
-  角色阶段: number | null;
   行为等级: number | null;
   正文: string;
   行动: string;
@@ -96,7 +95,10 @@ const 否定阶段事实 = new RegExp(
   `(?:明确)?(?:拒绝|不愿意|不愿|不肯|不接受|不同意)(?:(?:再|继续|接受|进行|让你|被你|与你|你|去|真的|真正|实际))*${阶段行为词}(?:[、/或和]${阶段行为词})*|(?:没有|并未|并没有|未曾|不曾|尚未)(?:(?:真正|真的|实际|达到|发生|出现|进行|继续))*${阶段行为词}(?:[、/或和]${阶段行为词})*`,
   'g',
 );
-const 正戏事件词 = /【(?:转折正戏|药物首夜|性癖开幕)/;
+/** 阶段 0→1 的关系破冰演出不是亲密场景；普通户走开门正戏，母亲线走破墙。 */
+const 非亲密开门事件词 = /【(?:开门正戏|破墙)】/;
+/** 只有明确含成人事实的强制剧情才可作为亲密开场证据；普通关系晋阶不属于亲密场景 CG 五阶段。 */
+const 成人正戏事件词 = /【药物首夜】|【性癖开幕(?:·[^】]+)?】|【转折正戏】[\s\S]*这是她的第一夜/;
 
 function 哈希(text: string): number {
   let value = 2166136261;
@@ -108,7 +110,9 @@ function 哈希(text: string): number {
 }
 
 /** 结构化场景真值优先于文本：当前行为/接触部位直接决定进行中与深度前戏。 */
-function 判定行为阶段(亲密?: CG亲密上下文): { 阶段: CG阶段; 动作: CG动作 | null } | null {
+function 判定结构化亲密行为阶段(
+  亲密?: CG亲密上下文,
+): { 阶段: 亲密场景CG阶段; 动作: CG动作 | null } | null {
   if (!亲密) return null;
   const 行为 = 亲密.当前行为;
   const 部位 = 亲密.当前接触部位;
@@ -135,7 +139,7 @@ function 是成功结束(亲密?: CG亲密上下文): boolean {
   return /脸部|小嘴|口中|胸部|胸前|小屄|阴道内|后穴|肛内|体内|体外|附近|床|地面|枕/.test(最终位置);
 }
 
-function 判定文本阶段(文本: string): CG阶段 | null {
+function 判定亲密场景文本阶段(文本: string): 亲密场景CG阶段 | null {
   const 已发生文本 = 去除否定阶段事实(文本);
   // 手指/手指插入一律深度前戏，绝不能被“插入”误判为进行中。
   if (/手指.*(?:插入|进入|抠弄|探入)|(?:插入|进入).*手指/.test(已发生文本)) return 'deep_foreplay';
@@ -151,40 +155,50 @@ function 去除否定阶段事实(文本: string): string {
   return 文本.replace(否定阶段事实, '');
 }
 
-/** 场外文本必须已有尺度证据；场内由结构化场景真值兜底，不卡等级。 */
-function 等级达标(候选: CG阶段, 角色阶段: number | null, 行为等级: number | null): boolean {
-  const 最低 = 候选 === 'active' ? 3 : 候选 === 'deep_foreplay' ? 2 : 1;
-  return (角色阶段 ?? 0) >= 最低 && (行为等级 ?? 0) >= 最低;
+/**
+ * 玩家行动只是请求，必须由本轮实际尺度佐证后才能作为场内文本兜底。
+ * 明确成人强制剧情缺少结构化上下文时，也只允许用“实际尺度 >= 3”作旧链路兼容。
+ */
+function 尺度证据达标(候选: 亲密场景CG阶段, 行为等级: number | null): boolean {
+  const 最低实际尺度 = 候选 === 'active' ? 3 : 2;
+  return (行为等级 ?? 0) >= 最低实际尺度;
 }
 
-export function 判定CG阶段(信号: CG回合信号): CG阶段 | null {
+export function 判定亲密场景CG阶段(信号: CG回合信号): 亲密场景CG阶段 | null {
   if (!信号.门牌) return null;
   const 亲密 = 信号.亲密;
+  // 亲密场景 CG 五阶段描述一次亲密场景的内部进程，不是角色关系的五个阶段。对症礼/母亲破墙
+  // 只推进关系 0→1；其固定演出在结构化亲密场景为空闲时必须隔离于 CG 状态机，不能让
+  // “解开票封”“邀请看现场”“换上衣服”等概率性正文措辞误点亮 intro_no_contact。
+  if ((!亲密 || 亲密.状态 === '空闲') && 非亲密开门事件词.test(信号.事件)) return null;
   // 已结束只认结构化成功收尾（主动收尾/体力耗尽/脚本收尾且最终位置能证明射精）；
   // 角色中止、突然离场、停下并收尾、安全套内一律不显示任何 CG。
   if (亲密?.状态 === '已结束') return 是成功结束(亲密) ? 'aftermath' : null;
+  const 是场内 = Boolean(亲密 && 亲密.状态 !== '空闲');
+  // 亲密场景 CG 五阶段只负责描述已经成立的亲密场景，不能反过来靠“拥抱/亲吻/脱衣”等文本和
+  // AI 自报尺度创建场景。场景准入以成功结算后的结构化亲密账本为真值；仅为旧链路保留
+  // 明确成人强制剧情 + 实际尺度 3 的开场兼容，并与首楼一样优先展示无接触开场图。
+  if (!是场内) {
+    return 成人正戏事件词.test(信号.事件) && 尺度证据达标('active', 信号.行为等级)
+      ? 'intro_no_contact'
+      : null;
+  }
   // 首楼开场优先显示一次：从空闲进入进行中的首个成功楼。
   if (亲密?.本楼开始) return 'intro_no_contact';
-  const 结构化 = 判定行为阶段(亲密);
+  const 结构化 = 判定结构化亲密行为阶段(亲密);
   if (结构化) return 结构化.阶段;
-  const 是场内 = Boolean(亲密 && 亲密.状态 !== '空闲');
-  const 可采用 = (候选: CG阶段 | null): CG阶段 | null =>
-    候选 && (是场内 || 等级达标(候选, 信号.角色阶段, 信号.行为等级)) ? 候选 : null;
-  const 正文阶段 = 可采用(判定文本阶段(信号.正文));
+  const 正文阶段 = 判定亲密场景文本阶段(信号.正文);
   if (正文阶段) return 正文阶段;
   // 玩家行动只是请求。即使已经身处亲密场景，也只有本楼实际尺度达到该层级时，
   // 才允许把行动文本当有限兜底，避免把正文拒绝的新动作当成已经发生。
-  const 行动候选 = 判定文本阶段(信号.行动);
-  const 行动阶段 =
-    行动候选 && 等级达标(行动候选, 信号.角色阶段, 信号.行为等级) ? 行动候选 : null;
+  const 行动候选 = 判定亲密场景文本阶段(信号.行动);
+  const 行动阶段 = 行动候选 && 尺度证据达标(行动候选, 信号.行为等级) ? 行动候选 : null;
   if (行动阶段) return 行动阶段;
-  if (正戏事件词.test(信号.事件) && (是场内 || 等级达标('intro_no_contact', 信号.角色阶段, 信号.行为等级))) {
-    return 'intro_no_contact';
-  }
+  if (成人正戏事件词.test(信号.事件)) return 'intro_no_contact';
   return null;
 }
 
-function 判定文本动作(阶段: CG阶段, 文本: string): CG动作 | null {
+function 判定文本动作(阶段: 亲密场景CG阶段, 文本: string): CG动作 | null {
   const 已发生文本 = 去除否定阶段事实(文本);
   if (阶段 === 'intro_no_contact') {
     if (/展示身体|身体展示|裸露|赤裸|全裸|展示.*(?:胸|乳|体)|露出.*(?:胸|乳|腿)/.test(已发生文本)) return 'body_display';
@@ -237,9 +251,9 @@ function 判定事后动作(亲密?: CG亲密上下文): CG动作 {
   return 'other_or_unspecified';
 }
 
-export function 判定CG动作(信号: CG回合信号, 阶段: CG阶段): CG动作 | null {
+export function 判定CG动作(信号: CG回合信号, 阶段: 亲密场景CG阶段): CG动作 | null {
   const 亲密 = 信号.亲密;
-  const 结构化 = 判定行为阶段(亲密);
+  const 结构化 = 判定结构化亲密行为阶段(亲密);
   if (阶段 === 'active' || 阶段 === 'deep_foreplay') {
     // 进行中四池和口交/乳交/玩具等深度前戏优先采用结构化真值。
     if (结构化?.阶段 === 阶段) return 结构化.动作;
@@ -248,9 +262,7 @@ export function 判定CG动作(信号: CG回合信号, 阶段: CG阶段): CG动�
   if (阶段 === 'aftermath') return 判定事后动作(亲密);
   const 正文动作 = 判定文本动作(阶段, 信号.正文);
   if (正文动作) return 正文动作;
-  return 等级达标(阶段, 信号.角色阶段, 信号.行为等级)
-    ? 判定文本动作(阶段, 信号.行动)
-    : null;
+  return 尺度证据达标(阶段, 信号.行为等级) ? 判定文本动作(阶段, 信号.行动) : null;
 }
 
 /** 场内未命中新图时保留当前 CG；成功结束楼也保留新选出的事后图到下一次场外回合；
@@ -267,7 +279,7 @@ export function 应保留成人CG(信号: CG回合信号): boolean {
 export function 当前CG可沿用(
   当前: 成人CG项 | null,
   信号: CG回合信号,
-  阶段: CG阶段 | null,
+  阶段: 亲密场景CG阶段 | null,
   动作: CG动作 | null,
 ): boolean {
   if (!当前 || !信号.门牌) return false;
@@ -297,8 +309,8 @@ export function 角色CG列表(门牌号: 门牌, variant: CG变体 = 'normal'):
 function 构造成人CG候选池(
   信号: CG回合信号,
   不可用: ReadonlySet<string> = new Set(),
-): { 池: 成人CG项[]; 阶段: CG阶段; 动作: CG动作 | null; variant: CG变体 } | null {
-  const 阶段 = 判定CG阶段(信号);
+): { 池: 成人CG项[]; 阶段: 亲密场景CG阶段; 动作: CG动作 | null; variant: CG变体 } | null {
+  const 阶段 = 判定亲密场景CG阶段(信号);
   if (!阶段 || !信号.门牌) return null;
   const variant = 信号.variant ?? 'normal';
   // 先按门牌 + 图库 + 阶段硬过滤，再按动作匹配；绝不跨图库回退。

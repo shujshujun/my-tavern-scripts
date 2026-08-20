@@ -37,6 +37,21 @@ test('撤回(回档到上次回合前末楼)必须按回合快照恢复场景过
   );
 });
 
+test('回档后补写保留场景时必须在变量回调内部复核时间线，旧回档不得写进新分支', () => {
+  const 回档起 = 回合源码.indexOf('export async function 回档至');
+  const 开局起 = 回合源码.indexOf('export async function 开始新游戏', 回档起);
+  const 回档段 = 回合源码.slice(回档起, 开局起);
+  const 补写起 = 回档段.indexOf('if (回档前场景)');
+  const 补写止 = 回档段.indexOf('console.info', 补写起);
+  assert.ok(补写起 >= 0 && 补写止 > 补写起, '必须能定位回档后的场景补写段');
+  const 补写段 = 回档段.slice(补写起, 补写止);
+  assert.match(
+    补写段,
+    /vars => \{\s*确认回档仍有效\(\);\s*_\.set\(vars, '_场景', 回档前场景\)/,
+    '异步等待期间若切聊或 swipe，回调必须在写入新分支之前失败关闭',
+  );
+});
+
 test('协调已删时间线的恢复分支要能消费上次回合记录,通用分支仍整体清场', () => {
   assert.match(回合源码, /if \(选项\.清上次回合\) _\.set\(vars, '_上次回合', null\);/);
   assert.match(

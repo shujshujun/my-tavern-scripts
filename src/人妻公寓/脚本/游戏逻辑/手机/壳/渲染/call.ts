@@ -22,7 +22,7 @@ export function 渲染call(上下文: 渲染上下文): void {
     .join('；');
   区.innerHTML = `${头像块('父亲')}<b>爸</b><i>${_.escape(来电说明 || '邀请你进行语音通话…')}</i><div class="acts"><button class="no" title="挂断">${手机图标('no')}</button><button class="ok" title="接听">${手机图标('ok')}</button></div>`;
   (区.querySelector('.no') as HTMLButtonElement).addEventListener('click', () => {
-    // 挂断=未接红点继续挂着,下一期被覆盖时照扣(经济系统规则)
+    // 挂断=未接红点继续挂着；短账期不会重复扣，下一次真实联络周期仍未接才结算责任。
     上下文.写入当前页({ 名: 'chats' });
     上下文.重绘();
   });

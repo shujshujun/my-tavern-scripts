@@ -103,6 +103,12 @@ export function 读取世界时间(input: 世界时间输入): 世界时间快�
   };
 }
 
+/** 给数据库、人类日志与提示统一使用的游戏时间；不得退化为只有“早上/傍晚”的半截时间。 */
+export function 格式化游戏内时间(input: 世界时间输入): string {
+  const 时间 = 读取世界时间(input);
+  return `第${时间.天数}天 ${时间.时段}`;
+}
+
 /** 世界时间的唯一推进原语；消息楼参数不参与计算。 */
 export function 推进时段(data: 世界时间载体, 时段数 = 1): 时段推进结果 {
   if (!Number.isInteger(时段数) || 时段数 < 0) {

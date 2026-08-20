@@ -250,8 +250,12 @@ function 读取原始数值候选(raw候选: unknown, 路径: readonly string[])
   const statData = _.get(raw候选, 'stat_data') ?? _.get(raw候选, 'data.stat_data');
   const 根 = statData ?? raw候选;
   if (!_.has(根, 路径)) return { 提供: false, 有效: false, 值: 0 };
-  const 值 = Number(_.get(根, 路径));
-  return { 提供: true, 有效: Number.isFinite(值), 值 };
+  const 原值 = _.get(根, 路径);
+  return {
+    提供: true,
+    有效: typeof 原值 === 'number' && Number.isFinite(原值),
+    值: typeof 原值 === 'number' ? 原值 : 0,
+  };
 }
 
 function 候选差值(
@@ -262,7 +266,23 @@ function 候选差值(
 ): { 有效: boolean; 差值: number } {
   const 原始 = 读取原始数值候选(raw候选, 路径);
   if (原始.提供) return { 有效: 原始.有效, 差值: 原始.值 - 快照值 };
+  // 调用方已经提供原始候选时，路径缺失代表 remove/损坏结构；不能退回 Schema 默认值
+  // 继续计算，否则删除好感、堕落或身体叶子会被默认值伪装成合法变化。
+  if (raw候选 !== undefined) return { 有效: false, 差值: 0 };
   return { 有效: Number.isFinite(解析后值), 差值: 解析后值 - 快照值 };
+}
+
+/**
+ * 原始候选存在时，文本白名单也必须确认该叶子真实存在且类型就是 string。Schema 会给被
+ * remove 的文本补空串，也可能把错误原始类型转换成表面合法值；两者都必须恢复可信快照。
+ * 返回 null 表示旧调用未提供 raw 候选，沿用解析后文本的兼容路径。
+ */
+function 原始文本候选有效(raw候选: unknown, 路径: readonly string[]): boolean | null {
+  if (raw候选 === undefined) return null;
+  const statData = _.get(raw候选, 'stat_data') ?? _.get(raw候选, 'data.stat_data');
+  const 根 = statData ?? raw候选;
+  if (!_.has(根, 路径)) return false;
+  return typeof _.get(根, 路径) === 'string';
 }
 
 /**
@@ -442,7 +462,10 @@ function 回滚户字段(
     for (const 槽 of ['外装', '内衣', '妆容'] as const) {
       if (妻快照._穿戴锁.includes(槽)) 妻[槽] = 妻快照[槽];
     }
-    for (const 字段 of 妻文本白名单) 妻[字段] = 规范AI表现文本(妻[字段]);
+    for (const 字段 of 妻文本白名单) {
+      const 原始有效 = 原始文本候选有效(raw候选, ['户', 门牌号, '妻', 字段]);
+      妻[字段] = 原始有效 === false ? 妻快照[字段] : 规范AI表现文本(妻[字段]);
+    }
     妻._穿戴锁 = [...妻快照._穿戴锁];
     妻._穿着SKU = { ...妻快照._穿着SKU };
     妻._阶段线路 = _.cloneDeep(妻快照._阶段线路);
@@ -473,7 +496,10 @@ function 回滚户字段(
     夫.当前心理想法 = 夫快照.当前心理想法;
     夫.当前情绪 = 夫快照.当前情绪;
   } else {
-    for (const 字段 of 夫文本白名单) 夫[字段] = 规范AI表现文本(夫[字段]);
+    for (const 字段 of 夫文本白名单) {
+      const 原始有效 = 原始文本候选有效(raw候选, ['户', 门牌号, '夫', 字段]);
+      夫[字段] = 原始有效 === false ? 夫快照[字段] : 规范AI表现文本(夫[字段]);
+    }
   }
   夫.疑心值 = 夫快照.疑心值;
   夫.信任值 = 夫快照.信任值;

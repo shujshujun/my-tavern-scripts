@@ -7,6 +7,13 @@ import {
 } from './数据库时间线栅栏';
 import { 全局数据库AI租约 } from './数据库AI租约';
 import { 胶囊预算选择 } from './胶囊预算';
+import {
+  判定数据库脚本写入能力,
+  type 数据库脚本写入能力结果,
+  type 数据库脚本写入静态能力,
+} from './数据库脚本写入能力';
+
+export type { 数据库脚本写入能力结果 } from './数据库脚本写入能力';
 
 type 数据库消息 = { role: 'system' | 'user' | 'assistant'; content: string };
 
@@ -89,9 +96,9 @@ const 数据库旗 = '__ACU_STAR_DB_III_LOADED__';
 const 游戏表名 = ['RQ_剧情事件', 'RQ_人物长期记忆', 'RQ_承诺与伏笔', 'RQ_社交轨迹', '纪要表'] as const;
 const 游戏表头: Record<(typeof 游戏表名)[number], readonly string[]> = {
   RQ_剧情事件: ['row_id', '楼层', '时间', '地点', '参与者', '玩家行动', '结果摘要', '事件编码'],
-  RQ_人物长期记忆: ['row_id', '人物', '主题', '记忆', '未来影响', '最后楼层', '可信度'],
-  RQ_承诺与伏笔: ['row_id', '事项', '相关人物', '内容', '状态', '最后进展', '最后楼层'],
-  RQ_社交轨迹: ['row_id', '类型', '人物', '事件', '结果', '最后楼层', '事件键'],
+  RQ_人物长期记忆: ['row_id', '人物', '主题', '记忆', '未来影响', '最后时间', '最后楼层', '可信度'],
+  RQ_承诺与伏笔: ['row_id', '事项', '相关人物', '内容', '状态', '最后进展', '最后时间', '最后楼层'],
+  RQ_社交轨迹: ['row_id', '类型', '人物', '事件', '结果', '时间', '最后楼层', '事件键'],
   纪要表: ['row_id', '编码索引', '时间跨度', '概览', '纪要', '重要对话'],
 };
 
@@ -228,6 +235,41 @@ function 迁移官方纪要表内容(旧表: 数据表, 新表: 数据表): bool
   return true;
 }
 
+const 旧版无完整时间表头: Partial<Record<(typeof 游戏表名)[number], readonly string[]>> = {
+  RQ_人物长期记忆: ['row_id', '人物', '主题', '记忆', '未来影响', '最后楼层', '可信度'],
+  RQ_承诺与伏笔: ['row_id', '事项', '相关人物', '内容', '状态', '最后进展', '最后楼层'],
+  RQ_社交轨迹: ['row_id', '类型', '人物', '事件', '结果', '最后楼层', '事件键'],
+};
+
+/**
+ * 为三张已有游戏记忆表补充人类可读时间列。旧行没有保存世界绝对时段，不能根据消息楼
+ * 猜“第几天”；迁移只按列名原样搬运旧值，新时间列留空，从更新后的下一条记录开始精确写入。
+ */
+export function 迁移游戏记忆表时间列(旧表: 数据表, 新表: 数据表): boolean {
+  const 表名 = String(新表.name ?? 旧表.name ?? '') as (typeof 游戏表名)[number];
+  const 旧目标表头 = 旧版无完整时间表头[表名];
+  const 新目标表头 = 游戏表头[表名];
+  const 旧内容 = 旧表.content ?? [];
+  const 新表头 = (新表.content?.[0] ?? []).map(String);
+  if (!旧目标表头 || !新目标表头 || !旧内容.length) return false;
+  const 旧表头 = 旧内容[0].map(String);
+  const 相同表头 = (left: readonly string[], right: readonly string[]) =>
+    left.length === right.length && left.every((列名, index) => 列名 === right[index]);
+  if (!相同表头(旧表头, 旧目标表头) || !相同表头(新表头, 新目标表头)) return false;
+  const 旧索引 = new Map(旧表头.map((列名, index) => [列名, index]));
+  新表.content = [
+    新表头,
+    ...旧内容.slice(1).map(row => 新表头.map(列名 => (旧索引.has(列名) ? row[旧索引.get(列名)!] : ''))),
+  ];
+  return true;
+}
+
+/** 旧 RQ 事件只有半截时段时保留已知部分并明确标记天数未知，绝不按消息楼猜世界日期。 */
+export function 规范旧数据库时间文本(value: unknown): string {
+  const 旧时间 = String(value ?? '').replace(/\s+/g, ' ').trim();
+  return /^(?:早上|中午|下午|傍晚|晚上|深夜)$/.test(旧时间) ? `旧记录（第几天未知）·${旧时间}` : 旧时间;
+}
+
 export interface 微信进展数据 {
   v: 1;
   f: string[];
@@ -326,41 +368,83 @@ function 宿主窗口(): Window & Record<string, unknown> {
   }
 }
 
+const 数据库API能力权重 = {
+  callAI: 8,
+  getUpdateConfigParams: 2,
+  setUpdateConfigParams: 2,
+  importTemplateFromData: 8,
+  exportTableAsJson: 5,
+  insertRow: 3,
+  updateRow: 3,
+  querySql: 6,
+  executeSqlQuery: 6,
+  executeSqlMutation: 8,
+  registerTableUpdateCallback: 4,
+  unregisterTableUpdateCallback: 4,
+  openSettings: 1,
+  openVisualizer: 1,
+  getTableTemplate: 5,
+} as const;
+
+function 数据库API能力分数(value: unknown): number {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return 0;
+  const api = value as Record<string, unknown>;
+  return Object.entries(数据库API能力权重).reduce(
+    (总数, [能力, 权重]) => 总数 + (typeof api[能力] === 'function' ? 权重 : 0),
+    0,
+  );
+}
+
 export function 取数据库API(): 数据库API | null {
-  type 数据库宿主 = Window & { AutoCardUpdaterAPI?: 数据库API; autoCardUpdaterAPI?: 数据库API };
-  const 候选: 数据库宿主[] = [];
-  const 加入 = (scope: Window | null | undefined) => {
-    if (scope && !候选.includes(scope as 数据库宿主)) 候选.push(scope as 数据库宿主);
+  type 数据库宿主 = Window & { AutoCardUpdaterAPI?: unknown; autoCardUpdaterAPI?: unknown };
+  const 当前层级候选: 数据库宿主[] = [];
+  const 加入当前层级 = (scope: Window | null | undefined) => {
+    if (scope && !当前层级候选.includes(scope as 数据库宿主)) 当前层级候选.push(scope as 数据库宿主);
   };
   try {
-    加入(window);
+    加入当前层级(window);
   } catch {
     /* ignore */
   }
   try {
-    加入(window.parent);
+    加入当前层级(window.parent);
   } catch {
     /* ignore */
   }
   try {
-    加入(window.top);
+    加入当前层级(window.top);
   } catch {
     /* ignore */
   }
-  try {
-    加入(window.opener);
-  } catch {
-    /* ignore */
-  }
-  for (const scope of 候选) {
-    try {
-      const api = scope.AutoCardUpdaterAPI ?? scope.autoCardUpdaterAPI;
-      if (api && typeof api === 'object') return api;
-    } catch {
-      /* 跨域候选不可读时继续检查下一个。 */
+  const 从候选选择 = (候选: readonly 数据库宿主[]): 数据库API | null => {
+    let 最佳API: 数据库API | null = null;
+    let 最佳分数 = 0;
+    for (const scope of 候选) {
+      try {
+        // 两个历史别名逐项检查，并在同一浏览上下文层级中选择公开能力最完整的实例：
+        // 某个 iframe 可能残留空壳或只带 openSettings 的半初始化代理，不能遮住父页面真 API。
+        for (const api of [scope.AutoCardUpdaterAPI, scope.autoCardUpdaterAPI]) {
+          const 分数 = 数据库API能力分数(api);
+          if (分数 > 最佳分数) {
+            最佳API = api as 数据库API;
+            最佳分数 = 分数;
+          }
+        }
+      } catch {
+        /* 跨域候选不可读时继续检查下一个。 */
+      }
     }
+    return 最佳API;
+  };
+  const 当前API = 从候选选择(当前层级候选);
+  if (当前API) return 当前API;
+  // opener 只在当前窗口、父页与顶层都没有任何可用实例时兜底；不能让另一个酒馆窗口
+  // 的完整 API 因“能力更多”覆盖当前聊天上下文。
+  try {
+    return window.opener ? 从候选选择([window.opener as 数据库宿主]) : null;
+  } catch {
+    return null;
   }
-  return null;
 }
 
 const SQLite探测缓存时长 = 30_000;
@@ -792,8 +876,31 @@ function 读取持久时间线状态(聊天标识: string): 数据库时间线�
     return null;
   }
   时间线栅栏.恢复(selected, 聊天标识);
-  时间线宿主.待重建[聊天标识] = selected;
-  return selected;
+  const canonical = 时间线栅栏.导出持久状态(聊天标识);
+  if (!canonical) {
+    delete 时间线宿主.待重建[聊天标识];
+    if (Object.prototype.hasOwnProperty.call(sessionRecords, 聊天标识)) {
+      delete sessionRecords[聊天标识];
+      写会话时间线集合(sessionRecords);
+    }
+    return null;
+  }
+
+  // 同毫秒双镜像发生令牌歧义时，以栅栏失败关闭后的规范状态回写两处镜像；
+  // 后续恢复任务必须拿同一令牌，不能继续围绕旧 session 令牌反复起停。
+  时间线宿主.待重建[聊天标识] = canonical;
+  if (
+    !fromSession ||
+    fromSession.令牌 !== canonical.令牌 ||
+    fromSession.目标楼层 !== canonical.目标楼层 ||
+    fromSession.标记时间 !== canonical.标记时间 ||
+    fromSession.最早校验时间 !== canonical.最早校验时间 ||
+    fromSession.原因 !== canonical.原因
+  ) {
+    sessionRecords[聊天标识] = canonical;
+    写会话时间线集合(sessionRecords);
+  }
+  return canonical;
 }
 
 function 持久化时间线状态(state: 数据库时间线持久状态): void {
@@ -1107,6 +1214,7 @@ export function 数据库状态(): {
   可调用AI: boolean;
   可写表格: boolean;
   有SQL接口: boolean;
+  有SQL写入接口: boolean;
   已装游戏模板: boolean;
   版本: string;
   填表最短回复: number | null;
@@ -1134,12 +1242,32 @@ export function 数据库状态(): {
       (typeof api?.insertRow === 'function' && typeof api?.updateRow === 'function') ||
       typeof api?.executeSqlMutation === 'function',
     有SQL接口: !!api && !!取SQL查询方法(api),
+    有SQL写入接口: typeof api?.executeSqlMutation === 'function',
     已装游戏模板,
     版本: 读取数据库脚本版本(),
     填表最短回复: 填表参数.最短回复,
     填表最大尝试: 填表参数.最大尝试,
     可设置填表参数: typeof api?.setUpdateConfigParams === 'function',
   };
+}
+
+/**
+ * 检测 RQ_剧情事件等脚本直写表的真实可写条件。静态接口缺失时立即返回；
+ * 条件齐全后再用无副作用 SELECT 探测当前 SQLite 运行时，避免把“API 存在”误报成“已启用”。
+ */
+export async function 检测数据库脚本写入能力(): Promise<数据库脚本写入能力结果> {
+  const 状态 = 数据库状态();
+  const 静态能力: 数据库脚本写入静态能力 = {
+    已安装: 状态.已安装,
+    已装游戏模板: 状态.已装游戏模板,
+    有SQL接口: 状态.有SQL接口,
+    有SQL写入接口: 状态.有SQL写入接口,
+  };
+  if (!静态能力.已安装 || !静态能力.已装游戏模板 || !静态能力.有SQL接口 || !静态能力.有SQL写入接口) {
+    return 判定数据库脚本写入能力(静态能力, false);
+  }
+  const SQLite已启用 = await 探测数据库SQLite模式();
+  return 判定数据库脚本写入能力(静态能力, SQLite已启用);
 }
 
 /**
@@ -1246,6 +1374,7 @@ function 迁移旧RQ事件数据(rq事件表: 数据表, 纪要表: 数据表 | 
   if (content.length < 2) return;
   const headers = content[0].map(String);
   const 楼层列 = headers.indexOf('楼层');
+  const 时间列 = headers.indexOf('时间');
   const 玩家行动列 = headers.indexOf('玩家行动');
   const 结果摘要列 = headers.indexOf('结果摘要');
   if (楼层列 < 0 || 玩家行动列 < 0 || 结果摘要列 < 0) return;
@@ -1255,6 +1384,7 @@ function 迁移旧RQ事件数据(rq事件表: 数据表, 纪要表: 数据表 | 
   // 只有总行数一一对应时才允许按顺序复用纪要；数量不等通常意味着纪要跨回合合并或缺行。
   const 可按序匹配纪要 = 纪要概览列 >= 0 && 纪要行.length === 事件行.length;
   for (const [index, row] of 事件行.entries()) {
+    if (时间列 >= 0) row[时间列] = 规范旧数据库时间文本(row[时间列]);
     const 行动 = String(row[玩家行动列] ?? '');
     row[玩家行动列] = 规范玩家行动(行动);
     const 结果 = String(row[结果摘要列] ?? '');
@@ -1338,6 +1468,8 @@ export async function 安装人妻公寓数据库模板(): Promise<{ success: bo
       const 旧表 = sheet.name ? 旧游戏表.get(sheet.name) : undefined;
       if (旧表?.content?.length && sheet.content?.length && _.isEqual(旧表.content[0], sheet.content[0])) {
         sheet.content = _.cloneDeep(旧表.content);
+      } else if (旧表 && 迁移游戏记忆表时间列(旧表, sheet)) {
+        // 旧版三张记忆表只缺人类可读时间列；逐列搬运，绝不根据消息楼伪造第几天。
       } else if (sheet.name === '纪要表' && 旧表) {
         迁移官方纪要表内容(旧表, sheet);
       }
@@ -1411,12 +1543,14 @@ export interface 数据库回合事件 {
   结果摘要: string;
 }
 
+export type 数据库回合写入结果 = '已确认' | '待确认' | '失败';
+
 export async function 同步数据库回合(
   event: 数据库回合事件,
   额外提交校验: () => boolean = () => true,
-): Promise<boolean> {
+): Promise<数据库回合写入结果> {
   const api = 取数据库API();
-  if (!api || !数据库状态().已装游戏模板 || !额外提交校验()) return false;
+  if (!api || !数据库状态().已装游戏模板 || !额外提交校验()) return '失败';
   const 聊天标识 = 当前聊天标识();
   try {
     // 最后边界：玩家行动 ≤40 字；结果摘要必须是真实短摘要，收到长正文时改为安全短句，
@@ -1459,8 +1593,9 @@ export async function 同步数据库回合(
       额外提交校验,
       失效补偿,
     );
-    if (!仍是同一聊天(聊天标识) || !额外提交校验()) return false;
-    if (SQL写入状态 === '已确认' || SQL写入状态 === '已提交待定') return true;
+    if (!仍是同一聊天(聊天标识) || !额外提交校验()) return '失败';
+    if (SQL写入状态 === '已确认') return '已确认';
+    if (SQL写入状态 === '已提交待定') return '待确认';
     if (
       SQL写入状态 === '需核对' &&
       额外提交校验() &&
@@ -1478,14 +1613,14 @@ export async function 同步数据库回合(
         },
       ) === true
     ) {
-      return true;
+      return '已确认';
     }
     // 普通行 API 会把这次写入挂到更早的可追加消息；回档后该旧消息可能仍存活。
     // 因此脚本事件只允许 SQLite 的“最新 AI 消息 mutation”路径，非 SQLite 模式失败闭合。
-    return false;
+    return '失败';
   } catch (error) {
     console.warn('[人妻公寓·数据库] 回合事件同步失败(不影响游戏):', error);
-    return false;
+    return '失败';
   }
 }
 
@@ -1494,42 +1629,52 @@ export interface 社交轨迹条目 {
   人物: string;
   事件: string;
   结果: string;
+  /** 由脚本世界钟冻结的完整时间，格式“第N天 时段”；不能用消息楼推算。 */
+  时间: string;
   楼层: number;
   事件键: string;
 }
 
+export type 数据库社交写入结果 = '已确认' | '待确认' | '失败';
+
 /**
  * 手机/商店硬事件与微信分支摘要版本直写社交轨迹。硬事件使用固定措辞；
  * 微信行只保存通过结构校验的派生数据，不保存聊天原文。两者都不受填表字数门槛影响。
+ * 返回三态，避免把“已交给 SQLite、但尚未确认”误当成已持久化完成。
  */
-export async function 同步社交轨迹(条目: 社交轨迹条目, 额外提交校验: () => boolean = () => true): Promise<boolean> {
+export async function 同步社交轨迹(
+  条目: 社交轨迹条目,
+  额外提交校验: () => boolean = () => true,
+): Promise<数据库社交写入结果> {
   const api = 取数据库API();
-  if (!api || !数据库状态().已装游戏模板 || !额外提交校验()) return false;
+  if (!api || !数据库状态().已装游戏模板 || !额外提交校验()) return '失败';
   const 聊天标识 = 当前聊天标识();
   try {
     const 微信数据 = 条目.类型 === '微信进展' ? 解析微信进展数据(条目.结果) : null;
-    if (条目.类型 === '微信进展' && !微信数据) return false;
+    if (条目.类型 === '微信进展' && !微信数据) return '失败';
     const data: Record<string, unknown> = {
       类型: 条目.类型,
       人物: 条目.人物,
       事件: 条目.事件.slice(0, 200),
       结果: 微信数据 ? JSON.stringify(微信数据) : 条目.结果.replace(/\s+/g, ' ').slice(0, 300),
+      时间: 条目.时间.replace(/\s+/g, ' ').trim().slice(0, 30),
       最后楼层: 条目.楼层,
       事件键: 条目.事件键,
     };
-    if (!额外提交校验()) return false;
-    const 查询SQL = `SELECT event_type, character_name, event_text, result, last_floor, event_key
+    if (!额外提交校验()) return '失败';
+    const 查询SQL = `SELECT event_type, character_name, event_text, result, game_time, last_floor, event_key
            FROM rq_social_history
           WHERE event_key = ?
           LIMIT 1`;
     const upsertSQL = `INSERT INTO rq_social_history
-        (event_type, character_name, event_text, result, last_floor, event_key)
-       VALUES (?, ?, ?, ?, ?, ?)
+        (event_type, character_name, event_text, result, game_time, last_floor, event_key)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(event_key) DO UPDATE SET
          event_type = excluded.event_type,
          character_name = excluded.character_name,
          event_text = excluded.event_text,
          result = excluded.result,
+         game_time = excluded.game_time,
          last_floor = excluded.last_floor`;
     const 失效补偿 = 构造SQLite唯一行失效补偿({
       描述: `社交事件 ${data.事件键} 的旧行`,
@@ -1537,17 +1682,18 @@ export async function 同步社交轨迹(条目: 社交轨迹条目, 额外提�
       查询参数: [data.事件键],
       删除SQL: 'DELETE FROM rq_social_history WHERE event_key = ?',
       恢复SQL: upsertSQL,
-      恢复列: ['event_type', 'character_name', 'event_text', 'result', 'last_floor', 'event_key'],
+      恢复列: ['event_type', 'character_name', 'event_text', 'result', 'game_time', 'last_floor', 'event_key'],
     });
     const SQL写入状态 = await 执行SQLite写入(
       upsertSQL,
-      [data.类型, data.人物, data.事件, data.结果, data.最后楼层, data.事件键],
+      [data.类型, data.人物, data.事件, data.结果, data.时间, data.最后楼层, data.事件键],
       聊天标识,
       额外提交校验,
       失效补偿,
     );
-    if (!仍是同一聊天(聊天标识) || !额外提交校验()) return false;
-    if (SQL写入状态 === '已确认' || SQL写入状态 === '已提交待定') return true;
+    if (!仍是同一聊天(聊天标识) || !额外提交校验()) return '失败';
+    if (SQL写入状态 === '已确认') return '已确认';
+    if (SQL写入状态 === '已提交待定') return '待确认';
     if (
       SQL写入状态 === '需核对' &&
       核对SQLite记录(
@@ -1558,18 +1704,19 @@ export async function 同步社交轨迹(条目: 社交轨迹条目, 额外提�
           character_name: data.人物,
           event_text: data.事件,
           result: data.结果,
+          game_time: data.时间,
           last_floor: data.最后楼层,
           event_key: data.事件键,
         },
       ) === true
     ) {
-      return true;
+      return '已确认';
     }
     // 普通行回退没有“写到当前 AI 消息”的保证，脚本社交记录在非 SQLite 模式不直写。
-    return false;
+    return '失败';
   } catch (error) {
     console.warn('[人妻公寓·数据库] 社交轨迹同步失败(不影响游戏):', error);
-    return false;
+    return '失败';
   }
 }
 
@@ -1693,7 +1840,7 @@ function 读取SQLite记忆表(
   if (!focusNames.length) return null;
   const 人物占位 = focusNames.map(() => '?').join(', ');
   const 人物结果 = 执行SQLite查询(
-    `SELECT row_id, character_name, topic, memory_text, future_impact, last_floor, confidence
+    `SELECT row_id, character_name, topic, memory_text, future_impact, last_time, last_floor, confidence
        FROM rq_character_memory
       WHERE character_name IN (${人物占位})
         AND (last_floor IS NULL OR last_floor <= ?)
@@ -1706,7 +1853,7 @@ function 读取SQLite记忆表(
 
   const 伏笔人物条件 = focusNames.map(() => `instr(COALESCE(related_characters, ''), ?) > 0`).join(' OR ');
   const 伏笔结果 = 执行SQLite查询(
-    `SELECT row_id, title, related_characters, detail, status, last_progress, last_floor
+    `SELECT row_id, title, related_characters, detail, status, last_progress, last_time, last_floor
        FROM rq_promises
       WHERE (${伏笔人物条件})
         AND status NOT IN ('已兑现', '已作废')
@@ -1719,7 +1866,7 @@ function 读取SQLite记忆表(
   if (!伏笔结果) return null;
 
   const 社交结果 = 执行SQLite查询(
-    `SELECT row_id, event_type, character_name, event_text, result, last_floor, event_key
+    `SELECT row_id, event_type, character_name, event_text, result, game_time, last_floor, event_key
        FROM rq_social_history
       WHERE character_name IN (${人物占位})
         AND event_type <> '微信进展'
@@ -1734,19 +1881,19 @@ function 读取SQLite记忆表(
   const 人物表 = SQL结果转表(
     'RQ_人物长期记忆',
     游戏表头.RQ_人物长期记忆,
-    ['row_id', 'character_name', 'topic', 'memory_text', 'future_impact', 'last_floor', 'confidence'],
+    ['row_id', 'character_name', 'topic', 'memory_text', 'future_impact', 'last_time', 'last_floor', 'confidence'],
     人物结果,
   );
   const 伏笔表 = SQL结果转表(
     'RQ_承诺与伏笔',
     游戏表头.RQ_承诺与伏笔,
-    ['row_id', 'title', 'related_characters', 'detail', 'status', 'last_progress', 'last_floor'],
+    ['row_id', 'title', 'related_characters', 'detail', 'status', 'last_progress', 'last_time', 'last_floor'],
     伏笔结果,
   );
   const 社交表 = SQL结果转表(
     'RQ_社交轨迹',
     游戏表头.RQ_社交轨迹,
-    ['row_id', 'event_type', 'character_name', 'event_text', 'result', 'last_floor', 'event_key'],
+    ['row_id', 'event_type', 'character_name', 'event_text', 'result', 'game_time', 'last_floor', 'event_key'],
     社交结果,
   );
   return 人物表 && 伏笔表 && 社交表 ? { 人物表, 伏笔表, 社交表 } : null;

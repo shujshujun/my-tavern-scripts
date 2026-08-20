@@ -177,6 +177,64 @@ test('配置.ts 迁移行为:旧 base/key/model 三件套完整时迁移为自�
   }
 });
 
+test('配置.ts 损坏旧存储不会把非法枚举和非标量值泄漏给生成、摘要与节拍消费者', () => {
+  const 片段 = 截源(配置源码, 'const 配置KEY =', 'export function 存配置');
+  const { 读配置 } = 执行TS片段(片段, ['读配置']);
+  const 存储 = new Map();
+  const 原window = globalThis.window;
+  globalThis.window = {
+    parent: {
+      localStorage: {
+        getItem: k => (存储.has(k) ? 存储.get(k) : null),
+        setItem: (k, v) => 存储.set(k, v),
+      },
+    },
+  };
+  try {
+    存储.set(
+      '人妻公寓_手机配置',
+      JSON.stringify({
+        ai来源: '未知来源',
+        微信进展摘要: 'false',
+        base: 123,
+        key: null,
+        model: { id: 'bad' },
+        频率: '极速',
+      }),
+    );
+    assert.deepEqual(读配置(), {
+      ai来源: '自动',
+      微信进展摘要: true,
+      base: '',
+      key: '',
+      model: '',
+      频率: '普通',
+    });
+
+    存储.set(
+      '人妻公寓_手机配置',
+      JSON.stringify({
+        ai来源: '自定义',
+        微信进展摘要: false,
+        base: 'https://api.example.com/v1',
+        key: 'secret',
+        model: 'gpt-x',
+        频率: '关',
+      }),
+    );
+    assert.deepEqual(读配置(), {
+      ai来源: '自定义',
+      微信进展摘要: false,
+      base: 'https://api.example.com/v1',
+      key: 'secret',
+      model: 'gpt-x',
+      频率: '关',
+    });
+  } finally {
+    globalThis.window = 原window;
+  }
+});
+
 test('配置.ts 世界书人设:剥外貌段并按 3000 字截断', async () => {
   const 片段 = 截源(配置源码, 'const _人设缓存 =', 'export async function 人设段');
   const { 妻人设 } = 执行TS片段(片段, ['妻人设']);

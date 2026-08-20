@@ -54,7 +54,11 @@ test('亲密状态栏显示偏好命中，并在结束后短暂展示逐角色�
   assert.match(App源, /duration-过久/);
   assert.doesNotMatch(App源, /duration-超满意/);
   assert.match(App源, /显示性爱结果卡\.value = true/);
-  assert.match(App源, /setTimeout\(\(\) => \(显示性爱结果卡\.value = false\), 8000\)/);
+  assert.match(
+    App源,
+    /安排客户端延迟\(\(\) => \(显示性爱结果卡\.value = false\), 8000\)/,
+    '结果卡自动收起必须进入 App 生命周期可取消延迟表',
+  );
   assert.match(快照源, /判定角色性爱结果/);
   assert.doesNotMatch(快照源, /本楼后达标|本楼后仍未达标/);
 });

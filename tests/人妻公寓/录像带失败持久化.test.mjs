@@ -65,6 +65,14 @@ test('非录像带等待202状态不允许记账', () => {
   assert.equal(推进录像带连点失败({ id: '', 阶段: '', 交互: {} }), null);
 });
 
+test('录像带互动回合失败必须清掉本地接通画面与连点窗口，允许按持久阶段干净重试', () => {
+  const 起点 = appSource.indexOf("eventOn('人妻公寓:回合失败'");
+  const 终点 = appSource.indexOf("eventOn('人妻公寓:已重开'", 起点);
+  assert.ok(起点 >= 0 && 终点 > 起点, '回合失败处理器必须存在');
+  const 失败收口 = appSource.slice(起点, 终点);
+  assert.match(失败收口, /重置录像带界面\(\)/, '失败不能保留本地结果、连点计数或迟到的 5 秒计时器');
+});
+
 test('App 只把完整失败尝试写入 MVU，单次点击进度仍留在前端内存', () => {
   // 单击进度是 composable 的前端内存 ref，App 不再声明局部状态机
   assert.match(composableSource, /const 录像带连点计数 = ref\(0\)/);

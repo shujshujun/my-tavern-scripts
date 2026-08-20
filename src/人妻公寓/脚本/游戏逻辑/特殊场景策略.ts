@@ -15,5 +15,9 @@ export function 普通亲密场景进行中(data: SchemaType): boolean {
 }
 
 export function 特殊场景启动亲密门(data: SchemaType): string {
-  return 普通亲密场景进行中(data) ? '请先结束当前亲密场景，再启动特殊场景。' : '';
+  if (普通亲密场景进行中(data)) return '请先结束当前亲密场景，再启动特殊场景。';
+  if (data.系统._父亲通话.标识 || data.系统._父亲通话.状态) {
+    return '请先完成并挂断父亲电话，再启动特殊场景。';
+  }
+  return '';
 }

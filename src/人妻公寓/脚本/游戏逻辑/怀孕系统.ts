@@ -270,7 +270,10 @@ export function 提交孕情初见评价(data: SchemaType, 已注入提示: stri
     const 匹配 = 键.match(/^(\d{3})>(\d{3})>(.+)$/u);
     if (!匹配 || !是门牌(匹配[1]) || !是门牌(匹配[2])) continue;
     const [, 观察者, 孕妇] = 匹配;
-    if (!data.户[观察者] || !data.户[孕妇] || 孕情初见配对键(data, 观察者, 孕妇) !== 键) continue;
+    if (观察者 === 孕妇 || !data.户[观察者] || !data.户[孕妇]) continue;
+    const 观察者孕态 = data.户[观察者].妻._怀孕.状态;
+    if (!怀孕已公开(data, 孕妇) || (观察者孕态 !== '未孕' && 观察者孕态 !== '已告知')) continue;
+    if (孕情初见配对键(data, 观察者, 孕妇) !== 键) continue;
     data.系统._孕情初见评价楼[键] = 楼层;
     已提交.push(键);
   }

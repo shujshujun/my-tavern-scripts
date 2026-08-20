@@ -23,8 +23,9 @@ export function 收集当前正文模型线索(上下文: unknown): string[] {
     let 模型 = '';
     try {
       const 取模型 = ctx.getChatCompletionModel;
-      // ST 1.15+ 接收完整 settings；旧版调用失败/返回空时再走当前来源字段回退。
-      if (typeof 取模型 === 'function') 模型 = 取字符串(取模型(设置));
+      // SillyTavern 公开 getter 接收当前 chat completion source；连接管理器可能把真实
+      // 选中模型保存在运行态而非旧 settings 字段，因此必须先按来源查询。
+      if (typeof 取模型 === 'function') 模型 = 取字符串(取模型.call(ctx, 来源));
     } catch {
       /* 旧版酒馆助手可能没有可调用的模型读取器，下面回退到当前来源对应字段。 */
     }

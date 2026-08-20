@@ -22,6 +22,7 @@ const require = createRequire(import.meta.url);
 const { 安全父亲台词, 是父亲旧固定兜底台词, 验收群聊隐私 } = require(
   '../../src/人妻公寓/脚本/游戏逻辑/手机输出安全.ts'
 );
+const { 头像块, 朋友圈图片地址 } = require('../../src/人妻公寓/脚本/游戏逻辑/手机/壳/资源与皮肤.ts');
 // P6:父亲生产已迁至 ./手机/交互/父亲通话；朋友圈/评论/仅你可见迁至 ./手机/节拍引擎。
 const 父亲通话源码 = readFileSync(
   new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/交互/父亲通话.ts', import.meta.url),
@@ -90,6 +91,23 @@ test('群聊输出逐条拒绝私聊、亲密和婚姻隐私，失败时整批�
   assert.doesNotMatch(输出安全源码, /群聊安全回退/);
   assert.doesNotMatch(生成引擎源码, /群聊安全回退/);
   assert.match(生成引擎源码, /没有可安全写入的真实模型输出，本轮不写群聊/);
+});
+
+test('头像和朋友圈持久图片键只进入编码后的URL，不生成动态内联事件属性', () => {
+  const 注入名 = `x" onerror="globalThis.__rq=1`;
+  const 头像 = 头像块(注入名);
+  assert.equal((头像.match(/\sonerror=/g) ?? []).length, 1, '只能保留资源失败用的常量事件属性');
+  assert.match(头像, /onerror="this\.remove\(\);this\.parentElement\.textContent='\?'"/);
+  assert.doesNotMatch(头像, /" onerror="globalThis/);
+  assert.match(头像, /x%22%20onerror%3D%22globalThis/);
+
+  const 公开图 = 朋友圈图片地址(`夏乔/日常.webp" onerror="globalThis.__rq=2`);
+  const 私密图 = 朋友圈图片地址(`仅你可见/${注入名}_1`);
+  for (const 地址 of [公开图, 私密图]) {
+    assert.doesNotMatch(地址, /["<>]/);
+    assert.doesNotMatch(地址, /globalThis\.__rq=/);
+    assert.match(地址, /%22/);
+  }
 });
 
 test('公开朋友圈正文和评论复用楼务隐私门，仅你可见不套公开过滤', () => {

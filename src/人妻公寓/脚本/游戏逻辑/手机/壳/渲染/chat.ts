@@ -304,8 +304,20 @@ export function 渲染chat(上下文: 渲染上下文): void {
       const 冷 = 当前绝对时段 - (库.节拍[邀约节拍键(会话)] ?? -999) < 旧钟楼跨度转时段(8);
       const 赴约条 = 取渲染业务端口()?.读赴约条(上下文.楼) ?? null;
       const 已约 = !!赴约条;
+      const 赴约人数 = 赴约条?.成员.length ?? 0;
+      const 赴约状态 = 赴约条?.待赴约
+        ? 赴约人数 > 1
+          ? `·${赴约人数}人已约好`
+          : '·已约好时段'
+        : 已约
+          ? 赴约人数 > 1
+            ? `·${赴约人数}人已到场`
+            : '·已在身边'
+          : 冷
+            ? '·刚约过'
+            : '';
       const 面 = el('div', 'rqp-plus');
-      const b = el('button', '', `<i>📍</i>约出来${赴约条?.待赴约 ? '·已约好时段' : 已约 ? '·已在身边' : 冷 ? '·刚约过' : ''}`) as HTMLButtonElement;
+      const b = el('button', '', `<i>📍</i>约出来${赴约状态}`) as HTMLButtonElement;
       b.disabled = 冷 || 已约;
       b.addEventListener('click', () => {
         // v0.80:点"约出来"只进安排邀约页(微信内置网页/设置页样式),不发送、不进冷却;

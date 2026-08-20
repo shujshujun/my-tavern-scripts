@@ -16,7 +16,7 @@ function 载入摘要纯函数() {
   assert.notEqual(起, -1);
   assert.notEqual(止, -1);
   const ts片段 = `${数据库源.slice(起, 止)}
-module.exports = { 规范玩家行动, 保守回合摘要, 判断结果摘要为正文, 规范事件摘要, 提取回合事件摘要, 迁移官方纪要表内容 };`;
+module.exports = { 规范玩家行动, 保守回合摘要, 判断结果摘要为正文, 规范事件摘要, 提取回合事件摘要, 迁移官方纪要表内容, 迁移游戏记忆表时间列, 规范旧数据库时间文本 };`;
   const js = ts.transpileModule(ts片段, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText;
@@ -36,6 +36,9 @@ test('聊天模板固定为五张有用记忆表，七张默认硬状态/选项�
     assert.equal(表.some(sheet => sheet.name === name), false, `${name} 不应继续安装`);
   }
   const 取 = name => 表.find(sheet => sheet.name === name);
+  for (const sheet of 表) {
+    assert.ok(sheet.content[0].length <= 8, `${sheet.name} 不得超过数据库官方建议的 7～8 列上限`);
+  }
   assert.equal(取('RQ_剧情事件').updateConfig.updateFrequency, 0);
   assert.equal(取('纪要表').updateConfig.updateFrequency, 3);
   assert.equal(取('纪要表').updateConfig.batchSize, 3);
@@ -49,6 +52,44 @@ test('聊天模板固定为五张有用记忆表，七张默认硬状态/选项�
   assert.equal(取('纪要表').updateConfig.sendLatestRows, undefined);
   assert.match(取('纪要表').sourceData.initNode, /本批处理范围/);
   assert.equal(取('纪要表').exportConfig.keywords, '编码索引');
+  assert.deepEqual(取('RQ_人物长期记忆').content[0], [
+    'row_id',
+    '人物',
+    '主题',
+    '记忆',
+    '未来影响',
+    '最后时间',
+    '最后楼层',
+    '可信度',
+  ]);
+  assert.deepEqual(取('RQ_承诺与伏笔').content[0], [
+    'row_id',
+    '事项',
+    '相关人物',
+    '内容',
+    '状态',
+    '最后进展',
+    '最后时间',
+    '最后楼层',
+  ]);
+  assert.deepEqual(取('RQ_社交轨迹').content[0], [
+    'row_id',
+    '类型',
+    '人物',
+    '事件',
+    '结果',
+    '时间',
+    '最后楼层',
+    '事件键',
+  ]);
+  assert.match(取('RQ_剧情事件').sourceData.note, /固定写“第N天 时段”/);
+  assert.match(取('RQ_人物长期记忆').sourceData.ddl, /last_time TEXT, -- 最后时间/);
+  assert.match(取('RQ_承诺与伏笔').sourceData.ddl, /last_time TEXT, -- 最后时间/);
+  assert.match(取('RQ_社交轨迹').sourceData.ddl, /game_time TEXT, -- 时间/);
+  for (const name of ['RQ_人物长期记忆', 'RQ_承诺与伏笔', 'RQ_社交轨迹']) {
+    assert.match(取(name).sourceData.updateNode, /SQL示例: UPDATE[\s\S]* WHERE /, `${name} 的 UPDATE 示例必须带业务键 WHERE`);
+  }
+  assert.match(取('RQ_人物长期记忆').sourceData.deleteNode, /DELETE[\s\S]*WHERE character_name[\s\S]*topic/);
 });
 
 test('摘要边界拒绝正文截断、多块、漏块和超限值，合规短摘要保持原样', () => {
@@ -72,6 +113,47 @@ test('摘要边界拒绝正文截断、多块、漏块和超限值，合规短�
   assert.equal(规范事件摘要('夏乔交付房租并提到停水。', '去收租'), '夏乔交付房租并提到停水。');
   assert.match(保守回合摘要('去收租'), /玩家尝试「去收租」；本轮结果未取得可靠摘要/);
   assert.ok(Array.from(保守回合摘要('行'.repeat(80))).length <= 60);
+});
+
+test('旧 RQ 事件只有半截时段时明确标记第几天未知，不能根据消息楼伪造日期', () => {
+  const { 规范旧数据库时间文本 } = 载入摘要纯函数();
+  assert.equal(规范旧数据库时间文本('傍晚'), '旧记录（第几天未知）·傍晚');
+  assert.equal(规范旧数据库时间文本(' 第3天 晚上 '), '第3天 晚上', '已经完整的游戏时间必须保持原样');
+  assert.equal(规范旧数据库时间文本(''), '');
+  assert.match(数据库源, /row\[时间列\] = 规范旧数据库时间文本\(row\[时间列\]\)/);
+});
+
+test('旧版三张记忆表按列名保留全部旧行，只把无法可靠推算的完整时间留空', () => {
+  const { 迁移游戏记忆表时间列 } = 载入摘要纯函数();
+  const 案例 = [
+    {
+      名: 'RQ_人物长期记忆',
+      旧表头: ['row_id', '人物', '主题', '记忆', '未来影响', '最后楼层', '可信度'],
+      新表头: ['row_id', '人物', '主题', '记忆', '未来影响', '最后时间', '最后楼层', '可信度'],
+      旧行: [7, '夏乔', '可乐偏好', '她开始主动备可乐。', '下次会先递可乐。', 12, '明确'],
+      新行: [7, '夏乔', '可乐偏好', '她开始主动备可乐。', '下次会先递可乐。', '', 12, '明确'],
+    },
+    {
+      名: 'RQ_承诺与伏笔',
+      旧表头: ['row_id', '事项', '相关人物', '内容', '状态', '最后进展', '最后楼层'],
+      新表头: ['row_id', '事项', '相关人物', '内容', '状态', '最后进展', '最后时间', '最后楼层'],
+      旧行: [3, '修水管', '夏乔', '约好带工具再上门。', '待处理', '', 18],
+      新行: [3, '修水管', '夏乔', '约好带工具再上门。', '待处理', '', '', 18],
+    },
+    {
+      名: 'RQ_社交轨迹',
+      旧表头: ['row_id', '类型', '人物', '事件', '结果', '最后楼层', '事件键'],
+      新表头: ['row_id', '类型', '人物', '事件', '结果', '时间', '最后楼层', '事件键'],
+      旧行: [9, '邀约', '夏乔', '约她看房。', '她答应了。', 22, '邀约-夏乔-看房'],
+      新行: [9, '邀约', '夏乔', '约她看房。', '她答应了。', '', 22, '邀约-夏乔-看房'],
+    },
+  ];
+  for (const 案例项 of 案例) {
+    const 旧表 = { name: 案例项.名, content: [案例项.旧表头, 案例项.旧行] };
+    const 新表 = { name: 案例项.名, content: [案例项.新表头] };
+    assert.equal(迁移游戏记忆表时间列(旧表, 新表), true, 案例项.名);
+    assert.deepEqual(新表.content, [案例项.新表头, 案例项.新行], 案例项.名);
+  }
 });
 
 test('spv8.9.1 基础版纪要表按列名迁移，不因表头顺序与地点列差异丢行', () => {
@@ -107,6 +189,14 @@ test('安装器只改当前聊天，以完整快照 replace，并校验运行态
   assert.doesNotMatch(数据库源, /scope:\s*'global'/);
   assert.doesNotMatch(数据库源, /\.slice\(0, 800\)|\.slice\(0, 500\)/);
   assert.match(数据库源, /游戏表名 = \['RQ_剧情事件',[\s\S]*?'纪要表'\]/);
+});
+
+test('回合数据库时间由世界绝对时段统一格式化，不能再只写早上/傍晚', () => {
+  assert.match(回合源, /import \{[^\n]*格式化游戏内时间[^\n]*\} from '.\/楼层时钟'/);
+  assert.match(回合源, /时间: 格式化游戏内时间\(data\)/);
+  assert.doesNotMatch(回合源, /时间: 当前时段\(data\.系统\._绝对时段\)/);
+  assert.match(数据库源, /game_time = excluded\.game_time/);
+  assert.match(数据库源, /SELECT event_type, character_name, event_text, result, game_time, last_floor, event_key/);
 });
 
 test('最终采用稿提取机器摘要；清洗不放回残缺标签；固定序章不用正文冒充摘要', () => {

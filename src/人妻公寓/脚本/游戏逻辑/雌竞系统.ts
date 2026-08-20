@@ -143,26 +143,33 @@ export function 读余波(当前楼: number): 换装余波 | null {
   return p;
 }
 
-/** 标记余波某消费口已用(防重复议论) */
-export function 标余波(补: Partial<换装余波>): void {
-  const p = (_.get(getVariables({ type: 'chat' }), '_换装余波') ?? null) as 换装余波 | null;
-  if (!p) return;
-  const 预期: Partial<换装余波> = {
-    事件ID: p.事件ID,
-    门牌: p.门牌,
-    起楼: p.起楼,
-    物: p.物,
-    私密: !!p.私密,
-  };
-  void Promise.resolve(
+/**
+ * 精确标记调用方冻结的那一条余波。用于“核心 MVU 先提交、聊天消费旗后提交”的事务；
+ * 若期间已经产生另一条同字段余波，CAS 失败且绝不把新事件误标成已消费。
+ */
+export async function 标记指定余波(
+  预期: Partial<换装余波>,
+  补: Partial<换装余波>,
+): Promise<boolean> {
+  let 已标记 = false;
+  await Promise.resolve(
     updateVariablesWith(
       vars => {
         const 当前 = (_.get(vars, '_换装余波') ?? null) as 换装余波 | null;
         if (!同一换装余波事件(预期, 当前)) return vars;
         _.set(vars, '_换装余波', { ...当前, ...补, 事件ID: 当前?.事件ID });
+        已标记 = true;
         return vars;
       },
       { type: 'chat' },
     ),
-  ).catch((e: unknown) => console.error('[人妻公寓·雌竞] 余波标记失败', e));
+  );
+  return 已标记;
+}
+
+/** 标记余波某消费口已用(防重复议论)。旧调用保持 fire-and-forget，但仍走精确 CAS。 */
+export function 标余波(补: Partial<换装余波>): void {
+  const p = (_.get(getVariables({ type: 'chat' }), '_换装余波') ?? null) as 换装余波 | null;
+  if (!p) return;
+  void 标记指定余波(p, 补).catch((e: unknown) => console.error('[人妻公寓·雌竞] 余波标记失败', e));
 }

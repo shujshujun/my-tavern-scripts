@@ -35,6 +35,18 @@ test('原生 swipe/删楼都进入带世代的统一时间线协调，并只停�
   assert.doesNotMatch(index, /eventClearEvent\(tavern_events\.MESSAGE_(?:SWIPED|DELETED)/);
 });
 
+test('切聊天同步推进统一时间线世代，切走再切回同一聊天不能让旧异步通过 ABA', () => {
+  const start = index.indexOf('const 聊天切换监听 = eventOn(tavern_events.CHAT_CHANGED');
+  const end = index.indexOf('游戏逻辑全局.__rqgyGameTimelineListenerStops', start);
+  const handler = index.slice(start, end);
+
+  assert.ok(start >= 0 && end > start, '必须存在本模块独立 CHAT_CHANGED 监听');
+  assert.match(handler, /作废当前时间线切换世代\(\)/, '切聊天必须同步作废全部共享时间线租约');
+  assert.match(handler, /作废当前手机时间线租约世代\(\)/);
+  assert.match(handler, /取消隔离事件\(\)/);
+  assert.match(handler, /取消变量重生成\(\)/);
+});
+
 test('统一时间线协调会作废保护与晋阶镜像，并清未来过程状态后同步当前真值', () => {
   const start = engine.indexOf('export async function 协调原生时间线切换');
   assert.ok(start >= 0, '回合引擎必须提供统一的原生时间线协调入口');
@@ -142,7 +154,7 @@ test('运行中的主回合捕获时间线世代，分支变化后跳过旧快�
   assert.match(主回合, /定位本轮临时楼\(/);
   assert.match(主回合, /临时楼降序楼层\(/);
   assert.doesNotMatch(主回合, /SillyTavern\.chat\?\.\[楼层\] === 引用/);
-  assert.match(主回合, /if \(!时间线已改变 && chat快照\)/);
+  assert.match(主回合, /if \(本轮时间线仍有效\(\) && chat快照\)/);
   assert.match(主回合, /await updateVariablesWith\([\s\S]*_上次回合[\s\S]*确认本轮事务有效/);
 });
 
@@ -174,6 +186,35 @@ test('重掷、回档与重开先作废旧手机和时间线世代，失效后�
   assert.ok(重开.indexOf('await 脚本写入') < 重开.indexOf('镜像直写'), '出厂 stat 提交前不得先污染晋阶镜像');
 });
 
+test('重开出厂 stat 一旦提交，镜像／世界书后处理失败仍按已重开收口', () => {
+  const 重开 = engine.slice(engine.indexOf('export async function 重开一局'));
+  const 核心写 = 重开.indexOf('await 脚本写入');
+  const 核心标记 = 重开.indexOf('重开核心已提交 = true', 核心写);
+  const 派生写 =重开.indexOf('镜像直写', 核心写);
+  assert.ok(核心写 >= 0 && 核心标记 > 核心写 && 派生写 > 核心标记, '核心提交标记必须位于 stat 写回确认后、派生镜像前');
+  const catch段 = 重开.slice(重开.indexOf('} catch (e) {'));
+  assert.match(
+    catch段,
+    /if \(重开核心已提交\)[\s\S]*eventEmit\('人妻公寓:已重开'\)[\s\S]*return;/,
+    '核心已提交后的派生失败不能伪报重开失败或把界面留在旧局',
+  );
+});
+
+test('序章行动选项的成功写入与失败恢复都在变量回调内部复核开局时间线', () => {
+  const 开局 = engine.slice(engine.indexOf('export async function 开始新游戏'), engine.indexOf('/**\n * 重开一局'));
+  assert.match(
+    开局,
+    /updateVariablesWith\(\s*vars => \{\s*确认开局仍有效\(\);\s*_\.set\(vars, '_行动选项', 序章行动选项\)/,
+    '序章成功选项不得在等待期间迟到写入新分支',
+  );
+  assert.match(
+    开局,
+    /vars => \{\s*if \(!开局仍属原聊天\(\)\) throw new Error\('__RQGY_TIMELINE_CHANGED__'\);\s*_\.set\(vars, '_行动选项', 开局前行动选项 \?\? null\)/,
+    '失败恢复旧选项也必须在真正写回时复核共享世代',
+  );
+  assert.doesNotMatch(开局, /insertOrAssignVariables\(\{ _行动选项: 序章行动选项 \}/);
+});
+
 test('序章开局用唯一消息令牌认领迟到楼，并在失败时只清理精确引用', () => {
   const 开局 = engine.slice(engine.indexOf('export async function 开始新游戏'), engine.indexOf('/**\n * 重开一局'));
   assert.match(开局, /const 开局结果 = await 排队MVU操作/);
@@ -183,4 +224,10 @@ test('序章开局用唯一消息令牌认领迟到楼，并在失败时只清�
   assert.match(开局, /SillyTavern\.chat\?\.\[开局消息楼层\] === 开局消息引用/);
   assert.match(开局, /记录数据库回合\([\s\S]*开局仍有效/);
   assert.match(开局, /广播生成完成事件\(开局仍有效\)/);
+  assert.match(开局, /开局前保护数据 = _\.cloneDeep\(data\)/, '变更序章字段前必须冻结原保护基准');
+  assert.match(
+    开局,
+    /if \(!开局已提交 && 开局前保护数据 && 开局仍属原聊天\(\)\)[\s\S]{0,120}捕获保护快照\(开局前保护数据, false\)/,
+    '序章后续失败并清掉消息时，模块内保护快照必须恢复到开局前，不能保留幽灵新局状态',
+  );
 });

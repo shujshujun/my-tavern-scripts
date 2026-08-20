@@ -37,6 +37,16 @@ test('最终返回本身含有效正文时不让较早的流式片段覆盖它',
 test('最终 Promise 失败时只保留已经自然收句的完整流式正文', () => {
   const 完整 = '夏乔看着修好的水管，终于舒了口气。\n<UpdateVariable>[]</UpdateVariable>';
   assert.equal(生成失败时可保留的流式正文(完整, 严格清除协议残留), 完整);
+  assert.equal(
+    生成失败时可保留的流式正文('The repair is complete.', 严格清除协议残留),
+    'The repair is complete.',
+    '英文或使用半角句号的完整正文也必须被视为自然收句',
+  );
+  assert.equal(
+    生成失败时可保留的流式正文('She nodded and said, “It is done.”', 严格清除协议残留),
+    'She nodded and said, “It is done.”',
+    '句末标点后的半角引号不能让完整流式正文被误判为半句',
+  );
   assert.equal(生成失败时可保留的流式正文('夏乔看着修好的水管，正要', 严格清除协议残留), '');
   assert.equal(生成失败时可保留的流式正文('<JSONPatch>[]</JSONPatch>', 严格清除协议残留), '');
 });
@@ -87,11 +97,13 @@ test('迟到的纯协议流式事件不得覆盖最后一份有效正文', () =>
   assert.equal(清洗次数, 0, '单调增长的累计流不应每个 token 都重跑全文清洗');
 });
 
-test('流式尚未进入正文时，半截标签不能成为兜底正文', () => {
-  for (const 半截 of ['<', '<Upd', '<JSONP', '<think']) {
+test('流式尚未进入正文时，半截标签及未闭合属性不能成为兜底正文', () => {
+  for (const 半截 of ['<', '<Upd', '<JSONP', '<think', '<尺度判定 模式="', '<UpdateVariable foo="', '<JSONPatch mode="', '<think class="']) {
     assert.equal(更新有效流式正文('', 半截, 严格清除协议残留), '', 半截);
     assert.equal(选择正文生成原文('<JSONPatch>[]</JSONPatch>', 半截, 严格清除协议残留), '<JSONPatch>[]</JSONPatch>');
   }
+  assert.equal(严格清除协议残留('正文已经完整。\n<尺度判定 模式="'), '正文已经完整。');
+  assert.equal(严格清除协议残留('正文已经完整。\n<UpdateVariable foo="'), '正文已经完整。');
   assert.equal(更新有效流式正文('', '<3', 严格清除协议残留), '<3', '爱心写法不是协议标签');
   assert.equal(更新有效流式正文('', '<10厘米的距离也让她紧张。', 严格清除协议残留), '<10厘米的距离也让她紧张。');
 });

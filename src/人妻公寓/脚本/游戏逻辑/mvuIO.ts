@@ -1,8 +1,9 @@
-import { Schema, type SchemaType, 验证当前MVU存档版本 } from '../../schema';
+import { Schema, type SchemaType, 验证可继续MVU存档结构, 验证当前MVU存档版本 } from '../../schema';
 import { 门牌列表, type 门牌 } from '../../stageConfig';
 import { 冻结全楼余波堕落, 记录全楼有效成长, type 合法正候选表 } from './冷落系统';
 import { 取绝对时段 } from './楼层时钟';
 import { 当前时间线切换世代 } from './时间线切换协调';
+import { 同步场景剧情事务 } from './场景剧情事务';
 import { 规范AI表现文本 } from './AI表现文本安全';
 
 /**
@@ -24,6 +25,15 @@ let 待完成写入数 = 0;
  * 发生不可重入的自等待。
  */
 let MVU操作队列: Promise<void> = Promise.resolve();
+let 待处理MVU操作数 = 0;
+
+/**
+ * 从调用栈内同步入队起，到该事务成功或失败最终收口前都返回 true。
+ * 主回合据此避免在普通整表业务已经排队、但 Promise 微任务尚未真正开跑的缝隙读取旧基准。
+ */
+export function MVU操作进行中(): boolean {
+  return 待处理MVU操作数 > 0;
+}
 
 /**
  * 活动整表事务的提交守卫。任务可以在 await 前读到旧分支；宿主 swipe/delete 会同步
@@ -49,6 +59,8 @@ function 确认MVU提交仍有效(): void {
 
 export function 排队MVU操作<T>(任务: () => Promise<T> | T): Promise<T> {
   const 入队时间线世代 = 当前时间线切换世代();
+  // 必须在任何 Promise.then 之前同步标忙；否则同一调用栈紧接着发起的正文会先读旧整表。
+  待处理MVU操作数 += 1;
   const 本次 = MVU操作队列.catch(() => undefined).then(async () => {
     const 取消提交校验 = 登记MVU提交校验(() => 入队时间线世代 === 当前时间线切换世代());
     try {
@@ -58,18 +70,21 @@ export function 排队MVU操作<T>(任务: () => Promise<T> | T): Promise<T> {
       取消提交校验();
     }
   });
-  MVU操作队列 = 本次.then(
+  const 已收口 = 本次.finally(() => {
+    待处理MVU操作数 = Math.max(0, 待处理MVU操作数 - 1);
+  });
+  MVU操作队列 = 已收口.then(
     () => undefined,
     () => undefined,
   );
-  return 本次;
+  return 已收口;
 }
 
 /** 读最新楼 stat_data(经 schema 消毒;毒快照场景请先用 读最近有效stat 判存在性) */
 export function 读取(): { raw: object; data: SchemaType } {
   const raw = Mvu.getMvuData({ type: 'message', message_id: -1 }) as object;
   const stat = _.get(raw, 'stat_data') ?? {};
-  验证当前MVU存档版本(stat);
+  验证可继续MVU存档结构(stat);
   const data = Schema.parse(stat);
   return { raw, data };
 }
@@ -81,11 +96,35 @@ export interface 脚本写入选项 {
   当前绝对时段?: number;
   /** 供“合法正候选被上限截住”的脚本入口显式补充，普通UI写入无需提供。 */
   合法正候选?: 合法正候选表;
+  /** 时间事务等会先算候选、后切换 chat 场景；此时必须显式提供剧情实际发生地点。 */
+  场景剧情场景?: string;
+  场景剧情标题?: string;
+  场景剧情来源?: string;
+  场景剧情楼层?: number;
+  /** 精确恢复旧快照时可关闭自动补票；当前版本正常玩法写入保持开启。 */
+  同步场景剧情?: boolean;
 }
 
 function 写入绝对时段(data: SchemaType, 显式时段?: number): number {
   if (Number.isFinite(显式时段)) return Math.max(0, Math.floor(显式时段!));
   return 取绝对时段(data);
+}
+
+function 当前聊天场景(): string {
+  try {
+    return String(_.get(getVariables({ type: 'chat' }), '_场景.房间id') ?? '').trim();
+  } catch {
+    return '';
+  }
+}
+
+function 当前消息楼层(): number {
+  try {
+    const floor = getLastMessageId();
+    return Number.isSafeInteger(floor) ? floor : -1;
+  } catch {
+    return -1;
+  }
 }
 
 /**
@@ -107,6 +146,22 @@ export async function 脚本写入(raw: object, data?: SchemaType, 选项: 脚�
       } catch (e) {
         // 成长账是附加机制；当前快照异常时不能阻断原 UI 操作。
         console.warn('[人妻公寓] 脚本写入的成长识别失败，本次仅保留原操作:', e);
+      }
+    }
+    if (选项.同步场景剧情 !== false) {
+      const 待发送 = String(data.系统._待发送事件 ?? '').trim();
+      const 已有活动票 = Boolean(data.系统._场景剧情事务.id);
+      // 所有新生产者必须在调用写入前通过 激活新增/追加等待/绑定新增 明确建立场景票。
+      // 这里仅复核活动事务或处理“队列已被成功消费”的清空状态；绝不能因一次无关脚本写
+      // 把旧档未知地点的 pending 偷偷绑定到玩家此刻所在房间。
+      if (!待发送 || 已有活动票) {
+        同步场景剧情事务(data, {
+          当前场景:
+            typeof 选项.场景剧情场景 === 'string' ? 选项.场景剧情场景 : 当前聊天场景(),
+          当前楼层: 选项.场景剧情楼层 ?? 当前消息楼层(),
+          标题: 选项.场景剧情标题,
+          来源: 选项.场景剧情来源,
+        });
       }
     }
     _.set(raw, 'stat_data', data);
@@ -178,8 +233,15 @@ export function 构造AI可写变量范围(
   if (选项.只读) return { ...空AI可写变量范围 };
   const 妻 = _.uniq(焦点.filter(m => 妻在场.includes(m)));
   const 夫 = _.uniq(焦点.filter(m => 夫在场.includes(m)));
+  // “详判”只代表本轮存在亲密风险，不代表角色已经参与。空闲场景的候选可见性由
+  // `解析候选亲密妻` 单独提供；最终精确权限必须等稽查确认逐角色实际>=1后再补入。
+  // 已进行中的场景才沿用脚本账本里已经确认的参与者，保证持续亲密原路径不被打断。
   const 亲密参与者 = new Set(
-    stat.系统._性爱场景.状态 === '空闲' ? 妻 : (Object.keys(stat.系统._性爱场景.参与者) as 门牌[]),
+    stat.系统._性爱场景.状态 === '空闲'
+      ? []
+      : (Object.entries(stat.系统._性爱场景.参与者)
+          .filter(([, 项]) => 项.已退出 !== true)
+          .map(([门牌号]) => 门牌号) as 门牌[]),
   );
   const 亲密妻 = 选项.亲密场景 ? 妻.filter(m => 亲密参与者.has(m)) : [];
   return { 妻, 夫, 亲密妻 };
@@ -321,16 +383,40 @@ export async function 同步整表视图(
  */
 export function 读最近有效stat(): unknown {
   const last = (SillyTavern.chat?.length ?? 0) - 1;
+  let 最近损坏: { 楼层: number; 错误: unknown } | null = null;
   for (let id = last; id >= 0 && id > last - 10; id--) {
+    let raw: unknown;
     try {
-      const raw = _.get(Mvu.getMvuData({ type: 'message', message_id: id }), 'stat_data');
-      if (raw && !_.isEmpty(raw)) {
-        if (id !== last) console.info(`[人妻公寓] 末楼 stat_data 未就绪,回退取 ${id} 楼数据(末楼 ${last})`);
-        return raw;
-      }
+      raw = _.get(Mvu.getMvuData({ type: 'message', message_id: id }), 'stat_data');
     } catch {
-      /* 单楼读取异常继续往前找 */
+      // 宿主单楼读取异常不代表存档本身损坏，继续找前一楼。
+      continue;
     }
+    if (!raw || _.isEmpty(raw)) continue;
+
+    try {
+      验证当前MVU存档版本(raw);
+    } catch (e) {
+      const 显式版本 = _.get(raw, '系统._数据版本');
+      // 明确的整数版本号代表真实不兼容存档，不能静默回退到旧楼伪装成可继续。
+      if (typeof 显式版本 === 'number' && Number.isInteger(显式版本)) throw e;
+      最近损坏 ??= { 楼层: id, 错误: e };
+      console.warn(`[人妻公寓] ${id} 楼 stat_data 缺少有效版本，已跳过并继续寻找完整快照:`, e);
+      continue;
+    }
+
+    try {
+      验证可继续MVU存档结构(raw);
+      if (id !== last) console.info(`[人妻公寓] 末楼 stat_data 未就绪或损坏,回退取 ${id} 楼数据(末楼 ${last})`);
+      return raw;
+    } catch (e) {
+      最近损坏 ??= { 楼层: id, 错误: e };
+      console.warn(`[人妻公寓] ${id} 楼 stat_data 结构不完整，已跳过并继续寻找完整快照:`, e);
+    }
+  }
+  if (最近损坏) {
+    const 原因 = 最近损坏.错误 instanceof Error ? 最近损坏.错误.message : String(最近损坏.错误);
+    throw new Error(`最近 10 楼只找到损坏的人妻公寓存档（最近损坏楼层 ${最近损坏.楼层}）：${原因}`);
   }
   return undefined;
 }
@@ -342,7 +428,7 @@ export function 读最近有效stat(): unknown {
 export function 读取最近有效(): { raw: object; data: SchemaType } | undefined {
   const rawStat = 读最近有效stat();
   if (!rawStat) return undefined;
-  验证当前MVU存档版本(rawStat);
+  验证可继续MVU存档结构(rawStat);
   const raw = Mvu.getMvuData({ type: 'message', message_id: -1 }) as object;
   return { raw, data: Schema.parse(rawStat) as SchemaType };
 }

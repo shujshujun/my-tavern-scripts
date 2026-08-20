@@ -34,9 +34,16 @@ type MVU设置 = {
   };
 };
 
+const 内置解析等待宿主刷新字段 = '__人妻公寓_内置解析等待宿主刷新';
+
+/**
+ * 该运行期闸门只挂在酒馆父页面内存上：子 iframe 热重载不会误清，完整宿主刷新会自然清除。
+ * 这样持久设置已改、MVU Pinia 副本尚未重载的窗口期内，游戏内置解析会失败关闭。
+ */
 type 宿主窗口类型 = Window & {
   Mvu?: unknown;
   SillyTavern?: ST接口;
+  [内置解析等待宿主刷新字段]?: boolean;
 };
 
 type ST接口 = {
@@ -142,9 +149,11 @@ function 偏好存储(): Storage | undefined {
   }
 }
 
+const 界面偏好存储键 = '人妻公寓_界面偏好';
+
 function 读界面偏好(): Record<string, unknown> {
   try {
-    const raw = 偏好存储()?.getItem('人妻公寓_界面偏好');
+    const raw = 偏好存储()?.getItem(界面偏好存储键);
     if (!raw) return {};
     const 值 = JSON.parse(raw) as unknown;
     return 值 && typeof 值 === 'object' ? (值 as Record<string, unknown>) : {};
@@ -153,22 +162,104 @@ function 读界面偏好(): Record<string, unknown> {
   }
 }
 
-function 写界面偏好(补丁: Record<string, unknown>): void {
+function 写界面偏好(补丁: Record<string, unknown>): boolean {
   try {
-    偏好存储()?.setItem('人妻公寓_界面偏好', JSON.stringify({ ...读界面偏好(), ...补丁 }));
+    const 存储 = 偏好存储();
+    if (!存储) {
+      console.warn('[人妻公寓] 写界面偏好失败:拿不到可写 localStorage');
+      return false;
+    }
+    存储.setItem(界面偏好存储键, JSON.stringify({ ...读界面偏好(), ...补丁 }));
+    return true;
   } catch (e) {
     console.warn('[人妻公寓] 写界面偏好失败:', e);
+    return false;
   }
 }
 
-/** 游戏偏好里的“内置变量解析”开关；未设置过时默认开。 */
+export type 变量解析偏好 = {
+  内置变量解析: boolean;
+  严格变量审计: boolean;
+};
+
+/** 设置页与游戏逻辑共用同一父页存储锚点和默认值，不各自直接碰 iframe localStorage。 */
+export function 读取变量解析偏好(): 变量解析偏好 {
+  const 偏好 = 读界面偏好();
+  return {
+    内置变量解析: 偏好.内置变量解析 !== false,
+    严格变量审计: 偏好.严格变量审计 === true,
+  };
+}
+
+/** 合并写入解析开关并报告真实持久化结果；调用方据此决定是否更新页面选中态。 */
+export function 写入变量解析偏好(补丁: Partial<变量解析偏好>): boolean {
+  return 写界面偏好(补丁);
+}
+
+/** 当前父页面是否正等待一次完整刷新，以让 MVU 的 Pinia 设置副本重新载入。 */
+export function 内置变量解析等待宿主刷新(): boolean {
+  try {
+    return 宿主窗口()[内置解析等待宿主刷新字段] === true;
+  } catch {
+    try {
+      return (window as 宿主窗口类型)[内置解析等待宿主刷新字段] === true;
+    } catch {
+      return false;
+    }
+  }
+}
+
+/**
+ * 立即挂起游戏内置变量解析，直到整个酒馆父页面刷新。完整刷新会重建 Window，闸门自然消失；
+ * 仅刷新 0 楼 iframe 不会清除父页标记，避免 MVU 仍持旧 Pinia 副本时提前恢复双解析。
+ */
+export function 挂起内置变量解析直至宿主刷新(): void {
+  try {
+    宿主窗口()[内置解析等待宿主刷新字段] = true;
+    return;
+  } catch {
+    /* 跨域父页不可写时，至少在当前 iframe 失败关闭。 */
+  }
+  try {
+    (window as 宿主窗口类型)[内置解析等待宿主刷新字段] = true;
+  } catch {
+    /* 极端宿主限制下由启动调用方停止挂载。 */
+  }
+}
+
+/**
+ * 酒馆的 saveSettingsDebounced 固定延迟约 1 秒；给持久请求额外收口时间后刷新父页面。
+ * 若父页不可刷新，运行期闸门仍保持，玩家手动完整刷新前不会启用游戏内置解析。
+ */
+export function 安排宿主刷新以应用MVU设置(延迟毫秒 = 2200): boolean {
+  挂起内置变量解析直至宿主刷新();
+  try {
+    const host = 宿主窗口();
+    // 提前读取并绑定 reload：跨域父页会在这里同步失败，让调用方能显示“手动刷新”提示，
+    // 而不是两秒后才只在控制台报错。
+    const reload = host.location.reload.bind(host.location);
+    setTimeout(() => {
+      try {
+        reload();
+      } catch (e) {
+        console.error('[人妻公寓] 自动刷新酒馆页面失败，请手动完整刷新页面:', e);
+      }
+    }, Math.max(0, 延迟毫秒));
+    return true;
+  } catch (e) {
+    console.error('[人妻公寓] 无法安排酒馆页面刷新，请手动完整刷新页面:', e);
+    return false;
+  }
+}
+
+/** 游戏偏好里的“内置变量解析”开关；未设置过时默认开。等待父页刷新时失败关闭。 */
 export function 内置变量解析开启(): boolean {
-  return 读界面偏好().内置变量解析 !== false;
+  return 读取变量解析偏好().内置变量解析 && !内置变量解析等待宿主刷新();
 }
 
 /** 严格变量审计是可选增强；未设置时保持关闭。 */
 export function 严格变量审计开启(): boolean {
-  return 读界面偏好().严格变量审计 === true;
+  return 读取变量解析偏好().严格变量审计;
 }
 
 /**
@@ -253,17 +344,35 @@ export function 规范OpenAI兼容API地址(原地址: string): string {
  * 返回 true 表示本次确实代关了（调用方据此弹 toast）。
  */
 export function 自动代关MVU自动请求(): boolean {
+  if (!内置变量解析开启()) return false;
+  const 设置 = 读MVU设置();
+  if (设置?.更新方式 !== '额外模型解析') return false;
+
+  // MVU 旧版把自动请求放在顶层，新版迁入额外模型配置。读取状态已用“新键 ?? 旧键”兼容，
+  // 启动自愈也必须同时关掉仍为 true 的实际键；否则旧配置会继续和游戏内置解析双发。
+  const 新键原值 = 设置.额外模型解析配置?.启用自动请求;
+  const 旧键原值 = 设置.自动触发额外模型解析;
+  // MVU 的当前 schema 将缺键默认为 true；因此“两个键都缺失”也必须显式写 false。
+  const 缺键采用默认开启 = 新键原值 === undefined && 旧键原值 === undefined;
+  if (新键原值 !== true && 旧键原值 !== true && !缺键采用默认开启) return false;
+
+  const st = 取ST();
+  const 根 = st?.extensionSettings;
+  const 保存 = st?.saveSettingsDebounced;
+  if (!根 || typeof 保存 !== 'function') {
+    throw new Error('关闭 MVU 自动请求失败：拿不到 extensionSettings 或 saveSettingsDebounced');
+  }
+  const 快照 = 捕获MVU设置快照(根);
   try {
-    if (!内置变量解析开启()) return false;
-    const 设置 = 读MVU设置();
-    if (设置?.更新方式 !== '额外模型解析') return false;
-    const 配置 = 设置.额外模型解析配置;
-    if (!配置 || 配置.启用自动请求 !== true) return false;
-    配置.启用自动请求 = false;
-    取ST()?.saveSettingsDebounced?.();
+    if (新键原值 === true || 缺键采用默认开启) (设置.额外模型解析配置 ??= {}).启用自动请求 = false;
+    if (旧键原值 === true) 设置.自动触发额外模型解析 = false;
+    // 只有宿主明确受理保存后才挂刷新闸门；保存同步失败必须回滚并交给调用方停止启动或回退开关。
+    保存.call(st);
+    挂起内置变量解析直至宿主刷新();
     return true;
-  } catch {
-    return false;
+  } catch (e) {
+    恢复MVU设置快照(根, 快照);
+    throw e;
   }
 }
 
@@ -301,11 +410,11 @@ export function 读取变量解析通道(): 变量解析通道类型 {
   return 规范变量解析通道(读界面偏好().变量解析通道);
 }
 
-export function 写入变量解析通道(通道: 变量解析通道类型): void {
-  写界面偏好({ 变量解析通道: 通道 });
-  // 只有明确选择自定义时才把 MVU 的模型来源写成自定义；自动绝不触碰 MVU 配置，
-  // 避免把已填写的自定义 API 改到不可用（模型来源变成"与插头相同"会让"自定义可用"判否）。
-  if (通道 === '自定义') 写入MVU设置({ 模型来源: '自定义' });
+export function 写入变量解析通道(通道: 变量解析通道类型): boolean {
+  // 自动只改游戏偏好，不触碰玩家已经填写的 MVU 自定义配置。
+  if (通道 === '自动') return 写界面偏好({ 变量解析通道: 通道 });
+  // 明确选择自定义时，模型来源与游戏通道必须同成同败，不能留下半启用状态。
+  return 提交变量解析设置事务({ 模型来源: '自定义' }, '自定义');
 }
 
 export type MVU设置补丁 = {
@@ -322,6 +431,131 @@ export type MVU设置补丁 = {
 
 const MVU外置配置键 = ['模型来源', 'api地址', '密钥', '模型名称', '温度', 'top_p', '最大回复token数', '启用自动请求'] as const;
 
+type MVU设置事务快照 = {
+  根原值存在: boolean;
+  根原值: unknown;
+  设置引用?: Record<string, unknown>;
+  设置浅副本?: Record<string, unknown>;
+  配置引用?: Record<string, unknown>;
+  配置浅副本?: Record<string, unknown>;
+};
+
+function 是记录(值: unknown): 值 is Record<string, unknown> {
+  return Boolean(值) && typeof 值 === 'object' && !Array.isArray(值);
+}
+
+function 捕获MVU设置快照(根: Record<string, unknown>): MVU设置事务快照 {
+  const 根原值存在 = Object.prototype.hasOwnProperty.call(根, 'mvu_settings');
+  const 根原值 = 根.mvu_settings;
+  if (!是记录(根原值)) return { 根原值存在, 根原值 };
+  const 设置引用 = 根原值;
+  const 配置原值 = 设置引用.额外模型解析配置;
+  return {
+    根原值存在,
+    根原值,
+    设置引用,
+    设置浅副本: { ...设置引用 },
+    配置引用: 是记录(配置原值) ? 配置原值 : undefined,
+    配置浅副本: 是记录(配置原值) ? { ...配置原值 } : undefined,
+  };
+}
+
+function 原位恢复记录(目标: Record<string, unknown>, 快照: Record<string, unknown>): void {
+  for (const 键 of Object.keys(目标)) delete 目标[键];
+  Object.assign(目标, 快照);
+}
+
+function 恢复MVU设置快照(根: Record<string, unknown>, 快照: MVU设置事务快照): void {
+  if (!快照.根原值存在) {
+    delete 根.mvu_settings;
+    return;
+  }
+  根.mvu_settings = 快照.根原值;
+  if (!快照.设置引用 || !快照.设置浅副本) return;
+  原位恢复记录(快照.设置引用, 快照.设置浅副本);
+  if (快照.配置引用 && 快照.配置浅副本) {
+    原位恢复记录(快照.配置引用, 快照.配置浅副本);
+    快照.设置引用.额外模型解析配置 = 快照.配置引用;
+  }
+}
+
+function 取或建MVU设置(根: Record<string, unknown>): MVU设置 {
+  if (是记录(根.mvu_settings)) return 根.mvu_settings as MVU设置;
+  const 设置: MVU设置 = {};
+  根.mvu_settings = 设置;
+  return 设置;
+}
+
+function 应用MVU设置补丁(设置: MVU设置, 补丁: MVU设置补丁): void {
+  if (补丁.更新方式 !== undefined) 设置.更新方式 = 补丁.更新方式;
+  if (!MVU外置配置键.some(键 => 补丁[键] !== undefined)) return;
+  const 原配置 = 设置.额外模型解析配置;
+  const 配置 = 是记录(原配置) ? 原配置 : ((设置.额外模型解析配置 = {}) as Record<string, unknown>);
+  for (const 键 of MVU外置配置键) if (补丁[键] !== undefined) 配置[键] = 补丁[键];
+}
+
+function 解析偏好原文(原文: string | null): Record<string, unknown> {
+  if (!原文) return {};
+  try {
+    const 值 = JSON.parse(原文) as unknown;
+    return 是记录(值) ? 值 : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * MVU 配置与游戏解析通道跨两个持久层；先冻结两边原值，再提交并只调用一次宿主保存。
+ * localStorage、extensionSettings 或 saveSettingsDebounced 任一步同步失败，都原位恢复旧对象与旧偏好。
+ */
+function 提交变量解析设置事务(补丁: MVU设置补丁, 通道: 变量解析通道类型): boolean {
+  const st = 取ST();
+  const 根 = st?.extensionSettings;
+  const 保存 = st?.saveSettingsDebounced;
+  const 存储 = 偏好存储();
+  if (!根 || typeof 保存 !== 'function' || !存储) {
+    console.warn('[人妻公寓] 提交变量解析设置失败:缺少 extensionSettings、saveSettingsDebounced 或 localStorage');
+    return false;
+  }
+
+  let 原偏好: string | null;
+  try {
+    原偏好 = 存储.getItem(界面偏好存储键);
+  } catch (e) {
+    console.warn('[人妻公寓] 提交变量解析设置失败:无法读取旧偏好:', e);
+    return false;
+  }
+  const MVU快照 = 捕获MVU设置快照(根);
+  let 偏好已写 = false;
+  try {
+    应用MVU设置补丁(取或建MVU设置(根), 补丁);
+    存储.setItem(
+      界面偏好存储键,
+      JSON.stringify({ ...解析偏好原文(原偏好), 变量解析通道: 通道 }),
+    );
+    偏好已写 = true;
+    保存.call(st);
+    return true;
+  } catch (e) {
+    恢复MVU设置快照(根, MVU快照);
+    if (偏好已写) {
+      try {
+        if (原偏好 === null) 存储.removeItem(界面偏好存储键);
+        else 存储.setItem(界面偏好存储键, 原偏好);
+      } catch (回滚错误) {
+        console.error('[人妻公寓] 解析设置事务失败且偏好回滚受阻:', 回滚错误);
+      }
+    }
+    console.warn('[人妻公寓] 提交变量解析设置失败，已回滚:', e);
+    return false;
+  }
+}
+
+/** 自定义 API 表单的唯一提交入口：模型配置与“自定义”通道同成同败。 */
+export function 保存自定义变量解析设置(补丁: Omit<MVU设置补丁, '模型来源'>): boolean {
+  return 提交变量解析设置事务({ ...补丁, 模型来源: '自定义' }, '自定义');
+}
+
 /**
  * 游戏设置页写穿 MVU 持久层（extensionSettings + saveSettingsDebounced）。
  * 玩家从此不必打开 MVU 变量框架面板。注意 MVU 运行时的 Pinia 副本改不动：
@@ -329,23 +563,21 @@ const MVU外置配置键 = ['模型来源', 'api地址', '密钥', '模型名称
  * mvu_settings 缺失时按需创建——MVU 的 zod schema 各字段均有默认值，残缺对象能被正常补全。
  */
 export function 写入MVU设置(补丁: MVU设置补丁): boolean {
+  const st = 取ST();
+  const 根 = st?.extensionSettings;
+  const 保存 = st?.saveSettingsDebounced;
+  if (!根 || typeof 保存 !== 'function') {
+    console.warn('[人妻公寓] 写入MVU设置失败:拿不到 extensionSettings 或 saveSettingsDebounced');
+    return false;
+  }
+  const 快照 = 捕获MVU设置快照(根);
   try {
-    const st = 取ST();
-    const 根 = st?.extensionSettings;
-    if (!根) {
-      console.warn('[人妻公寓] 写入MVU设置失败:拿不到 SillyTavern.extensionSettings');
-      return false;
-    }
-    const 设置 = (根.mvu_settings ??= {}) as MVU设置;
-    if (补丁.更新方式 !== undefined) 设置.更新方式 = 补丁.更新方式;
-    if (MVU外置配置键.some(键 => 补丁[键] !== undefined)) {
-      const 配置 = (设置.额外模型解析配置 ??= {}) as Record<string, unknown>;
-      for (const 键 of MVU外置配置键) if (补丁[键] !== undefined) 配置[键] = 补丁[键];
-    }
-    st?.saveSettingsDebounced?.();
+    应用MVU设置补丁(取或建MVU设置(根), 补丁);
+    保存.call(st);
     return true;
   } catch (e) {
-    console.warn('[人妻公寓] 写入MVU设置失败:', e);
+    恢复MVU设置快照(根, 快照);
+    console.warn('[人妻公寓] 写入MVU设置失败，已回滚:', e);
     return false;
   }
 }

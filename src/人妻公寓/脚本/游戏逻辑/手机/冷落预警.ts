@@ -5,7 +5,15 @@ import { 当前时段, 取绝对时段 } from '../楼层时钟';
 import { 妻状态包 } from '../snapshotSystem';
 import { 读最近有效stat } from '../mvuIO';
 import { 创建手机时间线租约, 手机时间线租约仍有效 } from '../手机时间线租约';
-import { 计算妻冷落消息档, 冷落私聊方向, 冷落语义指纹, 余波有冻结效力 } from '../冷落系统';
+import { 等待场景剧情阻塞当前场景, 读取活动场景剧情, 读取队首场景剧情 } from '../场景剧情事务';
+import {
+  构造冷落预警去重键,
+  计算妻冷落消息档,
+  冷落私聊方向,
+  冷落语义指纹,
+  余波有冻结效力,
+} from '../冷落系统';
+import { 构造微信联系保护表 } from '../微信每日联系';
 import type { 微信库 } from './数据层';
 import { 读库, 手机可见单条硬上限, 私聊节拍键, 写库增量 } from './数据层';
 import { 人设段 } from './配置';
@@ -40,7 +48,12 @@ function 取指纹冷落钟楼数(data: SchemaType, 门牌号: 门牌, 钟: numb
 }
 
 export function 冷落指纹相同(a: 冷落指纹, b: 冷落指纹): boolean {
-  return a.成长轮次 === b.成长轮次 && a.当前档 === b.当前档 && a.余波状态 === b.余波状态;
+  return (
+    a.成长轮次 === b.成长轮次 &&
+    a.当前档 === b.当前档 &&
+    a.余波状态 === b.余波状态 &&
+    a.冷落周期锚 === b.冷落周期锚
+  );
 }
 
 export function 扫描冷落私聊(
@@ -54,6 +67,7 @@ export function 扫描冷落私聊(
 } {
   const 冷落中门牌 = new Set<门牌>();
   const 待发候选: 冷落预警候选[] = [];
+  const 微信联系保护 = 构造微信联系保护表(库.消息, 钟);
   const 妻好友 = new Set(
     微信好友(data)
       .filter(好友 => 好友.类 === '妻')
@@ -64,7 +78,7 @@ export function 扫描冷落私聊(
     const 节点 = data.户[门牌号];
     const 配 = 户静态表[门牌号];
     if (!节点 || !妻好友.has(门牌号) || (配.隐身 && !data.系统._母亲入列)) continue;
-    const 档 = 计算妻冷落消息档(data, 门牌号);
+    const 档 = 计算妻冷落消息档(data, 门牌号, 微信联系保护);
     // 仍具冷落资格的安抚中不再发催促预警，但关系尚未恢复，普通暧昧/热络主动私聊继续压住。
     // 阶段0/1或未入列302的遗留余波已经失效，不能在下一次结算清账前短暂屏蔽普通私聊。
     if (档 === 0) {
@@ -73,10 +87,18 @@ export function 扫描冷落私聊(
     }
     冷落中门牌.add(门牌号);
 
-    const 指纹 = 冷落语义指纹(data, 门牌号);
+    const 指纹 = 冷落语义指纹(data, 门牌号, 微信联系保护);
     if (!指纹) continue;
-    const 键 = `冷落:${门牌号}:${指纹.成长轮次}:${档}`;
-    const 已发 = 库.消息.some(消息 => 消息.键 === 键 && 消息.楼 <= 楼);
+    const 键 = 构造冷落预警去重键(门牌号, 指纹.成长轮次, 档, 指纹.冷落周期锚);
+    // rq0.83 旧键没有周期锚：仅当本轮锚仍等于真实成长时点时兼容识别，避免更新后
+    // 同一冷落周期重复推送；微信已经开启新周期后绝不能让旧键压住新的合法预警。
+    const 上次成长锚 = Number.isFinite(节点.妻._成长账.上次有效成长钟楼)
+      ? Math.floor(节点.妻._成长账.上次有效成长钟楼)
+      : -1;
+    const 兼容旧键 = 指纹.冷落周期锚 === 上次成长锚 ? `冷落:${门牌号}:${指纹.成长轮次}:${档}` : '';
+    const 已发 = 库.消息.some(
+      消息 => (消息.键 === 键 || (兼容旧键 !== '' && 消息.键 === 兼容旧键)) && 消息.楼 <= 楼,
+    );
     if (已发) continue;
     待发候选.push({
       门牌: 门牌号,
@@ -97,7 +119,7 @@ export function 当前冷落指纹(门牌号: 门牌): 冷落指纹 | null {
   try {
     const data = Schema.parse(rawStat) as SchemaType;
     if (!data.户[门牌号]) return null;
-    return 冷落语义指纹(data, 门牌号);
+    return 冷落语义指纹(data, 门牌号, 构造微信联系保护表(读库().消息, 当前手机绝对时段()));
   } catch {
     return null;
   }
@@ -121,6 +143,17 @@ export async function 冷落预警节拍(): Promise<void> {
     if (!rawStat) return;
     const data = Schema.parse(rawStat) as SchemaType;
     if (data.系统._坏结局 || data.系统._特殊场景.id) return;
+    // 活动剧情、同场等待票与目标未知的旧票都不能让预警私聊抢生成通道；明确在远处
+    // 等待的结构票不占当前场景，不能让冷落预警永久沉默。
+    const 活动场景剧情 = 读取活动场景剧情(data);
+    const 等待剧情 = 读取队首场景剧情(data.系统._待发送事件);
+    let 当前场景: string | null = null;
+    try {
+      当前场景 = (_.get(getVariables({ type: 'chat' }), '_场景.房间id') as string | null | undefined) ?? null;
+    } catch {
+      /* 聊天场景不可读时只用活动票硬门；结构票不会被猜成已经到场。 */
+    }
+    if (活动场景剧情 || 等待场景剧情阻塞当前场景(等待剧情, 当前场景)) return;
 
     const 楼 = 末楼();
     const 钟 = 取绝对时段(data);

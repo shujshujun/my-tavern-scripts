@@ -29,3 +29,10 @@ test('普通商品购买分支扣款后立即入包，不写配送队列', () =>
   assert.match(普通购买分支, /return \{ 成功: true,[^\n]+变动: true \};/);
   assert.doesNotMatch(商店源, /配送队列\s*[=:]|_待配送|_配送中/);
 });
+
+test('药物页签与后端购买复用同一母亲线路窗口，不把阶段大于等于2误当成已解锁', () => {
+  assert.match(商店源, /母亲药物窗口已开启\(data\) \|\| 丈夫登门药物窗口已开启\(data\)/);
+  assert.match(App源, /import \{[^}]*母亲药物窗口已开启[^}]*\} from '\.\.\/\.\.\/脚本\/游戏逻辑\/阶段线路系统';/s);
+  assert.match(App源, /母亲药物窗口已开启\(data\.value\) \|\|\s*丈夫登门药物窗口已开启\(data\.value\)/);
+  assert.doesNotMatch(App源, /_母亲入列\s*&&\s*\(data\.value\.户\['302'\]\?\.妻\.当前阶段 \?\? 0\) >= 2/);
+});

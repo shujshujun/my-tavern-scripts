@@ -1,5 +1,6 @@
 <script setup lang="ts">
 // 监控弹窗：只展示列表并 emit 关闭/选择/头像失败；业务状态(显示监控/监控列表/看监控)留在 App。
+import { ref } from 'vue';
 import { 户静态表, type 门牌 } from '../../../stageConfig';
 
 defineProps<{
@@ -11,6 +12,13 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{ close: []; select: [门牌]; avatarError: [string] }>();
+
+/** 房间缩略图只是导航呈现；单图失败显示本地占位，不影响监控事务与头像。 */
+const 背景失效 = ref<ReadonlySet<string>>(new Set());
+function 标记背景失效(url: string): void {
+  if (!url || 背景失效.value.has(url)) return;
+  背景失效.value = new Set([...背景失效.value, url]);
+}
 </script>
 
 <template>
@@ -24,7 +32,14 @@ const emit = defineEmits<{ close: []; select: [门牌]; avatarError: [string] }>
       </div>
       <div class="sheet-body">
         <button v-for="m in rooms" :key="m" class="cam-row" :disabled="sending" @click="emit('select', m)">
-          <img class="cam-room" :src="backgroundUrl(m)" :alt="m + '室监控背景'" />
+          <img
+            v-if="!背景失效.has(backgroundUrl(m))"
+            class="cam-room"
+            :src="backgroundUrl(m)"
+            :alt="m + '室监控背景'"
+            @error="标记背景失效(backgroundUrl(m))"
+          />
+          <span v-else class="cam-room fb" role="img" :aria-label="m + '室监控背景加载失败'">{{ m }}</span>
           <img
             v-if="!avatarFailed[户静态表[m].妻名]"
             class="cam-face"
@@ -91,6 +106,14 @@ const emit = defineEmits<{ close: []; select: [门牌]; avatarError: [string] }>
   border-radius: 7px;
   filter: saturate(0.72) contrast(1.04);
   box-shadow: 0 2px 8px rgba(25, 24, 34, 0.18);
+}
+
+.cam-room.fb {
+  display: grid;
+  place-items: center;
+  color: var(--ink-faint);
+  font: 700 0.72em/1 var(--font-mono);
+  background: linear-gradient(135deg, rgba(140, 115, 255, 0.12), rgba(74, 183, 255, 0.12));
 }
 
 .cam-face {

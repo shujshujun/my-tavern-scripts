@@ -14,7 +14,7 @@ export function 渲染talk(上下文: 渲染上下文): void {
   const 体 = el('div', 'rqp-body');
   const 泡区 = el('div', 'rqp-bubbles');
   const 圆场说明 = 母亲圆场手机提示(父亲通话.母亲圆场);
-  if (圆场说明) 泡区.appendChild(el('div', 'rqp-b sys', 圆场说明));
+  if (圆场说明) 泡区.appendChild(el('div', 'rqp-b sys', _.escape(圆场说明)));
   for (const t of 父亲通话.记录) {
     const 我方 = t.谁 === '我';
     const 行 = el('div', `rqp-line ${我方 ? 'me' : 'ta'}`);

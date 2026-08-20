@@ -108,7 +108,9 @@ test('App 不再内联 option-row/quill/reroll/global-time 模板；两组件拥
   assert.match(回合输入模板, /rows="2"/, 'textarea rows=2');
   assert.match(回合输入模板, /placeholder="你的言行……\(Enter 发送,Shift\+Enter 换行\)"/, 'placeholder 原样');
   assert.match(回合输入模板, /:disabled="sending \|\| prefaceWriting"/, 'textarea disabled 看 sending/prefaceWriting');
-  assert.match(回合输入模板, /@keydown\.enter\.exact\.prevent="emit\('submit'\)"/, 'Enter 只 emit submit');
+  assert.match(回合输入模板, /@compositionstart="组合输入中 = true"/, '输入法组合开始必须占门');
+  assert.match(回合输入模板, /@compositionend="组合输入中 = false"/, '输入法组合结束必须释放门');
+  assert.match(回合输入模板, /@keydown="尝试提交"/, 'Enter 统一进入组合输入安全提交函数');
   assert.match(回合输入模板, /@focus="emit\('focus'\)"/, 'focus 只 emit');
   assert.match(回合输入模板, /@blur="emit\('blur'\)"/, 'blur 只 emit');
   assert.match(回合输入模板, /class="btn rite quill-btn"/, '发送按钮 class 保持');
@@ -138,6 +140,23 @@ test('App 不再内联 option-row/quill/reroll/global-time 模板；两组件拥
   assert.match(回合输入模板, /请回管理员室或 302 睡觉/, '深夜文案原样');
   assert.match(回合输入模板, /currentPeriodLabel \}\} → 推进到\{\{ nextPeriodLabel \}\}/, '非深夜时段文案');
   assert.match(回合输入模板, /@click="emit\('advanceTime'\)"/, '推进时间只 emit advanceTime');
+});
+
+test('中文／日文输入法确认候选时不提交半截文本，普通 Enter 仍只触发一次提交', () => {
+  assert.match(回合输入源码, /const 组合输入中 = ref\(false\)/, '组件保存浏览器组合输入状态');
+  assert.match(回合输入源码, /function 尝试提交\(event: KeyboardEvent\)/, '键盘提交必须走显式 handler');
+  assert.match(
+    回合输入源码,
+    /event\.isComposing \|\| 组合输入中\.value \|\| event\.keyCode === 229/,
+    '标准 composing、Safari 本地状态与旧 WebView 229 都必须拒绝',
+  );
+  assert.match(
+    回合输入源码,
+    /event\.shiftKey \|\| event\.altKey \|\| event\.ctrlKey \|\| event\.metaKey/,
+    'Shift+Enter 与其他修饰键保持不提交',
+  );
+  assert.match(回合输入源码, /event\.preventDefault\(\);\s*emit\('submit'\);/, '合法 Enter 才阻止换行并提交一次');
+  assert.doesNotMatch(回合输入源码, /@keydown\.enter\.exact\.prevent="emit\('submit'\)"/, '不得绕过组合输入门直接 emit');
 });
 
 test('props/emits 强类型完整，App 逐项接线存在，所有 handler 参数/无参事件保持', () => {
@@ -268,8 +287,8 @@ test('textarea DOM ref 已从 App 迁出，defineExpose 公开聚焦；App 明�
   );
   assert.match(
     App源码,
-    /function 输入失焦\(\) \{[\s\S]*?clearTimeout\(键盘定位timer\);[\s\S]*?键盘打开\.value = false;/,
-    '输入失焦实现未改',
+    /function 输入失焦\(\) \{[\s\S]*?取消客户端延迟\(键盘定位timer\);[\s\S]*?键盘打开\.value = false;/,
+    '输入失焦继续走统一客户端延迟生命周期',
   );
   assert.match(App源码, /function 让输入露出\(\) \{[\s\S]*?--keyboard-inset/, '让输入露出仍设 keyboard-inset');
   assert.match(App源码, /虚拟键盘\?\.boundingRect/, 'VisualViewport 兜底仍在 App');

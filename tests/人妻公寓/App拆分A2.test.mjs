@@ -45,8 +45,8 @@ test('六个 A2 文件非空；App 导入/渲染五组件；新模块无真实�
   );
   assert.match(
     App源码,
-    /<FeedbackOverlay\b[\s\S]*?@dismiss-loot="拾获卡 = ''"[\s\S]*?\/>/,
-    'App 模板应挂载 FeedbackOverlay',
+    /<FeedbackOverlay\b[\s\S]*?@dismiss-loot="收下拾获卡"[\s\S]*?\/>/,
+    'App 模板应挂载 FeedbackOverlay，并由具名 handler 顺序收取驻留反馈',
   );
   for (const [名, 源码] of 组件源码们) {
     const 依赖 = 提取导入specifier(源码);
@@ -108,22 +108,34 @@ test('图库 state ownership：App 仅保留门牌开关与 open/close，阶段/
     'App 不应再保留图库派生状态',
   );
   assert.doesNotMatch(App源码, /CG预览/, 'App 不应再保留大图预览状态');
-  assert.doesNotMatch(App源码, /CG阶段名/, 'App 不应再有阶段名表');
+  assert.doesNotMatch(App源码, /CG阶段名|亲密场景CG阶段名/, 'App 不应再有阶段名表');
   assert.doesNotMatch(App源码, /切换CG图库阶段|翻CG图库页/, 'App 不应再保留图库切页函数');
   assert.doesNotMatch(App源码, /角色CG列表/, 'App 不再 import 角色CG列表');
-  assert.doesNotMatch(App源码, /type CG阶段/, 'App 不再 import CG阶段 type');
+  assert.doesNotMatch(App源码, /type 亲密场景CG阶段/, 'App 不再 import 亲密场景CG阶段 type');
   assert.match(App源码, /:key="CG图库门牌"/, 'App 用门牌当 key 保证每次开不同角色都从头开始');
   assert.match(App源码, /@close="关闭CG图库"/, 'App 统一收组件 close');
 
   assert.match(CG图库源码, /const 变体 = ref<CG变体>\('normal'\)/, '组件内普通/怀孕图库状态在组件');
-  assert.match(CG图库源码, /const 阶段 = ref<CG阶段>\('intro_no_contact'\)/, '组件内五阶段状态从亲密开场开始');
+  assert.match(
+    CG图库源码,
+    /const 阶段 = ref<亲密场景CG阶段>\('intro_no_contact'\)/,
+    '组件内亲密场景五阶段状态从亲密开场开始',
+  );
   assert.match(CG图库源码, /每页 = 15/, '组件内分页每页 15 保持');
   assert.match(CG图库源码, /const 预览 = ref<成人CG项 \| null>\(null\)/, '组件内大图预览在组件');
-  assert.match(CG图库源码, /Object\.keys\(阶段名\) as CG阶段\[\]/, '页签按固定五阶段迭代(unknown 无关)');
+  assert.match(
+    CG图库源码,
+    /Object\.keys\(阶段名\) as 亲密场景CG阶段\[\]/,
+    '页签按固定亲密场景五阶段迭代(unknown 无关)',
+  );
   assert.match(CG图库源码, /normal: '普通 CG'/, '图库保留普通 CG 顶层分类');
   assert.match(CG图库源码, /pregnancy: '怀孕 CG'/, '图库预留怀孕 CG 顶层分类');
   assert.match(CG图库源码, /CG项可查看\(props\.unlocked, 项\.id, CG全览模式\.value\)/, '未解锁与全览判定在组件');
-  assert.match(CG图库源码, /v-if="可查看CG\(项\)"/, '普通模式下未解锁无 img，全览模式下可以查看');
+  assert.match(
+    CG图库源码,
+    /v-if="可查看CG\(项\) && !失效CG\.has\(项\.id\)"/,
+    '普通模式下未解锁无 img，全览模式下可以查看；坏图不重复挂载破图',
+  );
   assert.match(CG图库源码, /@click="处理全览标题点击"/, '图库标题承接五连击入口');
   assert.match(CG图库源码, /全览模式已开启/, '五连击成功应给出明确反馈');
   assert.match(CG图库源码, /Math\.min\(Math\.max\(页码\.value \+ 偏移, 1\), 总页数\.value\)/, '分页用纯 Math 逻辑');
@@ -150,8 +162,8 @@ test('读信：组件内三条路径 emit close，App 统一 @close="合上信"�
   assert.match(App源码, /const 裂缝证物槽 = computed/, '证物槽计算逻辑留 App');
   assert.match(
     App源码,
-    /function 合上信\(\) \{\s*const m = 读信门牌\.value;\s*读信门牌\.value = null;\s*if \(m\) eventEmit\('人妻公寓:读信', m\);\s*\}/,
-    '合上信仍 取门牌→清门牌→发业务事件',
+    /function 合上信\(\) \{\s*const m = 读信门牌\.value;\s*if \(!m\) return;\s*if \(提交界面事务\(\(\) => eventEmit\('人妻公寓:读信', m\)\)\) 读信门牌\.value = null;\s*\}/,
+    '合上信先占同步提交门，只有事件受理才关闭读信弹窗',
   );
 });
 
@@ -161,9 +173,12 @@ test('监控：组件只 emit close/select/avatarError；App 看监控顺序保�
   assert.doesNotMatch(监控源码, /eventEmit|eventOn/, '监控组件不含事件总线写入');
   assert.match(
     App源码,
-    /async function 看监控\(门牌号: 门牌\) \{[\s\S]*?显示监控\.value = false;[\s\S]*?确认已到达动作地点\('302'\)[\s\S]*?eventEmit\('人妻公寓:查看摄像头', 门牌号\);/,
-    '看监控 关闭→确认302→发事件 顺序保持',
+    /async function 看监控\(门牌号: 门牌\) \{[\s\S]*?确认已到达动作地点\('302'\)[\s\S]*?提交界面事务\(\(\) => eventEmit\('人妻公寓:查看摄像头', 门牌号\)\)[\s\S]*?显示监控\.value = false;/,
+    '看监控先确认真实到达 302，再占同步提交门，受理后才关闭',
   );
+  assert.match(监控源码, /const 背景失效 = ref<ReadonlySet<string>>\(new Set\(\)\)/, '房间缩略图失败只保存在组件实例');
+  assert.match(监控源码, /@error="标记背景失效\(backgroundUrl\(m\)\)"/, '缩略图失败按当前 URL 登记');
+  assert.match(监控源码, /v-else class="cam-room fb" role="img"/, '缩略图失败显示可读门牌占位');
   assert.match(App源码, /@select="看监控"/, 'App 选择监控行仍走看监控');
   assert.match(App源码, /@avatar-error="头像失效\[\$event\] = true"/, 'App 用极小 handler 记头像失效');
   assert.match(App源码, /v-if="监控列表\.length"/, 'dock 监控按钮仍按列表长度显示');
@@ -175,11 +190,13 @@ test('事件/反馈业务状态与 timer 留 App，组件只展示/emit；unmoun
   assert.match(App源码, /function 打开事件提示词/, '打开事件提示词仍留 App');
   assert.match(App源码, /@close="事件提示词文本 = ''"/, 'App 关事件提示词直接清文本');
   assert.match(App源码, /const 提示文本 = ref\(''\)/, '提示文本仍留 App');
-  assert.match(App源码, /const 拾获卡 = ref\(''\)/, '拾获卡仍留 App');
+  assert.match(App源码, /const 拾获卡队列 = ref<string\[\]>\(\[\]\)/, '重要反馈 FIFO 队列仍留 App');
+  assert.match(App源码, /const 拾获卡 = computed\(\(\) => 拾获卡队列\.value\[0\] \?\? ''\)/, '组件只读取队首驻留卡');
   assert.match(App源码, /let 提示timer/, '提示timer 仍留 App');
   assert.match(App源码, /function 弹提示\(文本: string, 时长 = 2600\)/, '弹提示仍留 App');
-  assert.match(App源码, /clearTimeout\(提示timer\)/, 'unmount 仍清 提示timer');
-  assert.match(App源码, /@dismiss-loot="拾获卡 = ''"/, 'App 收下拾获卡直接清空');
+  assert.match(App源码, /取消客户端延迟\(提示timer\)/, '提示 timer 继续走统一客户端生命周期清理');
+  assert.match(App源码, /@dismiss-loot="收下拾获卡"/, 'App 收下当前拾获卡走具名 FIFO handler');
+  assert.match(App源码, /function 收下拾获卡\(\): void \{\s*拾获卡队列\.value = 收下首条拾获提示\(拾获卡队列\.value\);\s*\}/, '收下当前卡后推进到下一条');
 
   assert.match(事件提示词源码, /defineProps<\{ text: string \}>/, '事件提示词仅展示 text');
   assert.match(事件提示词源码, /defineEmits<\{ close: \[\] \}>/, '事件提示词仅 emit close');

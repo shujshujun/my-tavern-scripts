@@ -61,6 +61,25 @@ test('无参数调用预设破限段维持原有宏展开行为', () => {
   assert.equal(前[0].content, `${旧楼指令} 收尾。`);
 });
 
+test('正文模型识别按当前来源调用宿主 getter，不被来源字段中的旧模型误导', () => {
+  const { 收集当前正文模型线索, 模型线索指向DeepSeek } = require('../../src/人妻公寓/脚本/游戏逻辑/正文模型识别.ts');
+  const 调用参数 = [];
+  const 线索 = 收集当前正文模型线索({
+    mainApi: 'openai',
+    chatCompletionSettings: {
+      chat_completion_source: 'openrouter',
+      openrouter_model: 'openai/gpt-4o-mini', // 模拟设置对象里尚未刷新的旧字段
+    },
+    getChatCompletionModel: 来源 => {
+      调用参数.push(来源);
+      return 来源 === 'openrouter' ? 'deepseek/deepseek-chat' : '';
+    },
+  });
+
+  assert.deepEqual(调用参数, ['openrouter']);
+  assert.equal(模型线索指向DeepSeek(线索), true);
+});
+
 test('日常三类型明确排除数据库分支，预设破限段收到本拍行动，荣耀洞/监控数据库条件仍存在', () => {
   // 类型判定必须显式列出晨跑/健身/睡眠，且与荣耀洞/监控的数据库代发分支分开。
   assert.match(

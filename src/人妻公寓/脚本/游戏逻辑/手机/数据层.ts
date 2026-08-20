@@ -18,8 +18,16 @@ import { 验收单条群消息 } from '../手机群聊格式';
 import { 规范手机单气泡 } from '../手机文本格式';
 import { 创建手机时间线租约, 手机时间线租约仍有效 } from '../手机时间线租约';
 import { 合并微信撤回状态, type 微信消息记录 } from '../微信消息撤回';
+import { 构造微信联系保护表, type 微信联系保护表 } from '../微信每日联系';
 import { 压缩微信会话消息 } from '../微信消息压缩';
-import { 手机邀约计划可提交, 手机邀约计划键, 手机邀约计划占用中, type 手机邀约计划 } from './邀约计划';
+import {
+  多人邀约地点合法,
+  合并手机邀约计划,
+  手机邀约计划可提交,
+  手机邀约计划成员,
+  手机邀约计划键,
+  type 手机邀约计划,
+} from './邀约计划';
 import { 末楼, 当前聊天ID, 当前手机绝对时段 } from './运行时上下文';
 import { 请求刷新手机红点 } from './UI刷新';
 import type { 朋友圈主题 } from './内容素材表';
@@ -183,14 +191,148 @@ export function 朋友圈有未读(库: 微信库, 当前楼: number, 当前绝�
   return 库.圈.some(c => 手机记录在当前时间线(c, 当前楼, 当前绝对时段) && 手机记录晚于已读(c, 库.圈读到, 库.圈读时));
 }
 
+function 是普通对象(值: unknown): 值 is Record<string, unknown> {
+  if (值 === null || typeof 值 !== 'object' || Array.isArray(值)) return false;
+  const 原型 = Object.getPrototypeOf(值);
+  return 原型 === Object.prototype || 原型 === null;
+}
+
+function 数组或空<T>(值: unknown): T[] {
+  return Array.isArray(值) ? (值 as T[]) : [];
+}
+
+function 对象或空<T extends object>(值: unknown): T {
+  return (是普通对象(值) ? 值 : {}) as T;
+}
+
+/** `_微信` 单条时间记录的共同边界：坏容器/坏条目失败关闭，合法扩展字段原样保留。 */
+function 是手机时间记录(值: unknown): 值 is Record<string, unknown> & { 楼: number; 时: number } {
+  return (
+    是普通对象(值) &&
+    typeof 值.楼 === 'number' &&
+    Number.isFinite(值.楼) &&
+    typeof 值.时 === 'number' &&
+    Number.isFinite(值.时)
+  );
+}
+
+function 手机时间记录数组<T extends { 楼: number; 时: number }>(值: unknown): T[] {
+  return 数组或空<unknown>(值).filter((记录): 记录 is T => 是手机时间记录(记录));
+}
+
+function 清理消息可选字段(原: Record<string, unknown>): 微信消息 {
+  const 消息 = { ...原 } as unknown as 微信消息;
+  if (原.类 !== undefined && !['文本', '照片', '撤回', '通话'].includes(String(原.类))) delete 消息.类;
+  for (const 字段 of ['键', '图', '标识', '锚签名'] as const) {
+    if (原[字段] !== undefined && typeof 原[字段] !== 'string') delete 消息[字段];
+  }
+  if (原.引用 !== undefined) {
+    if (!是普通对象(原.引用)) {
+      delete 消息.引用;
+    } else {
+      const 标识 = typeof 原.引用.标识 === 'string' && 原.引用.标识 ? 原.引用.标识 : undefined;
+      const 序 =
+        typeof 原.引用.序 === 'number' && 原.引用.序 >= 0 && Number.isSafeInteger(原.引用.序)
+          ? 原.引用.序
+          : undefined;
+      if (标识 === undefined && 序 === undefined) delete 消息.引用;
+      else 消息.引用 = { ...(标识 !== undefined ? { 标识 } : {}), ...(序 !== undefined ? { 序 } : {}) };
+    }
+  }
+  return 消息;
+}
+
+/**
+ * 直接写消息的通话/撤回入口也必须复用此边界，不能各自把 `_微信.消息` 强转成数组。
+ * 非法顺序值继续原样保留，由顺序比较器按“无序旧记录”处理，避免读库顺手改档。
+ */
+export function 规范微信消息容器(值: unknown): 微信消息[] {
+  return 数组或空<unknown>(值).flatMap(记录 => {
+    if (
+      !是手机时间记录(记录) ||
+      typeof 记录.会话 !== 'string' ||
+      !记录.会话 ||
+      !['我', '对方', '系统'].includes(String(记录.发)) ||
+      typeof 记录.文 !== 'string'
+    )
+      return [];
+    return [清理消息可选字段(记录)];
+  });
+}
+
+function 规范朋友圈容器(值: unknown): 朋友圈条[] {
+  return 数组或空<unknown>(值).flatMap(记录 => {
+    if (!是手机时间记录(记录) || typeof 记录.谁 !== 'string' || !记录.谁 || typeof 记录.文 !== 'string') return [];
+    const 动态 = { ...记录 } as unknown as 朋友圈条;
+    if (记录.图 !== undefined && typeof 记录.图 !== 'string') delete 动态.图;
+    return [动态];
+  });
+}
+
+function 有限数字映射(值: unknown): Record<string, number> {
+  const 结果: Record<string, number> = {};
+  for (const [键, 项] of Object.entries(对象或空<Record<string, unknown>>(值))) {
+    if (typeof 项 === 'number' && Number.isFinite(项)) 结果[键] = 项;
+  }
+  return 结果;
+}
+
+function 已读时锚映射(值: unknown): Record<string, 手机已读时锚> {
+  const 结果: Record<string, 手机已读时锚> = {};
+  for (const [键, 项] of Object.entries(对象或空<Record<string, unknown>>(值))) {
+    if (是普通对象(项)) 结果[键] = 项 as unknown as 手机已读时锚;
+  }
+  return 结果;
+}
+
+function 已发图片映射(值: unknown): 已发私聊图缓存 {
+  const 结果: 已发私聊图缓存 = {};
+  for (const [键, 项] of Object.entries(对象或空<Record<string, unknown>>(值))) {
+    if (Array.isArray(项)) 结果[键 as 门牌] = 项.filter((id): id is string => typeof id === 'string');
+  }
+  return 结果;
+}
+
+type 已归一微信原始库 = Partial<微信库> &
+  Pick<微信库, '消息' | '圈' | '读到' | '读时' | '节拍' | '已发私聊图'>;
+
+/**
+ * `_微信` 没有 Schema 保护，所有读写入口都先在浅拷贝上归一 JSON-like 容器。
+ * 这样不会在只读时偷偷迁移存档，也不会丢掉第三方扩展的未知顶层字段。
+ */
+function 归一微信原始库(值: unknown): 已归一微信原始库 {
+  const 原 = { ...对象或空<Partial<微信库>>(值) };
+  return {
+    ...原,
+    消息: 规范微信消息容器(原.消息),
+    圈: 规范朋友圈容器(原.圈),
+    读到: 有限数字映射(原.读到),
+    读时: 已读时锚映射(原.读时),
+    圈读到: typeof 原.圈读到 === 'number' && Number.isFinite(原.圈读到) ? 原.圈读到 : undefined,
+    圈读时: 是普通对象(原.圈读时) ? (原.圈读时 as unknown as 手机已读时锚) : undefined,
+    节拍: 有限数字映射(原.节拍),
+    已发私聊图: 已发图片映射(原.已发私聊图),
+  };
+}
+
 function 筛当前手机时间线<T extends { 楼: number; 时: number }>(
   记录们: readonly T[],
+  当前楼: number,
+  当前绝对时段: number,
+): T[];
+function 筛当前手机时间线<T extends { 楼: number; 时: number }>(
+  记录们: unknown,
+  当前楼: number,
+  当前绝对时段: number,
+): T[];
+function 筛当前手机时间线<T extends { 楼: number; 时: number }>(
+  记录们: unknown,
   当前楼: number,
   当前绝对时段: number,
 ): T[] {
   // 未就绪哨兵 -1 由 手机记录在当前时间线 内部识别：只放弃时轴比较，楼轴与
   // 分支过滤始终执行——未就绪不清屏，但未来楼/错误分支仍不可见。
-  return 记录们.filter(
+  return 手机时间记录数组<T>(记录们).filter(
     记录 => 手机记录在当前时间线(记录, 当前楼, 当前绝对时段) && 手机记录属于当前分支(记录, SillyTavern.chat ?? []),
   );
 }
@@ -212,15 +354,15 @@ export async function 隔离当前手机分支(切分支楼 = 末楼(), 允许�
       // 排队收口与实际改写之间仍可能切聊/回档/再次 swipe：在离提交最近的位置复核，
       // 不能只依赖调用前的瞬时检查。
       if (!允许写入()) return vars;
-      const v = (_.get(vars, '_微信') ?? {}) as Partial<微信库>;
+      const v = 归一微信原始库(_.get(vars, '_微信'));
       const 聊天 = SillyTavern.chat ?? [];
-      v.消息 = 裁同楼切分支记录(v.消息 ?? [], 切分支楼, 聊天);
+      v.消息 = 裁同楼切分支记录(v.消息, 切分支楼, 聊天);
       // 朋友圈没有玩家手动输入例外；无锚同楼动态按隐私优先一律裁掉。
-      v.圈 = 裁同楼切分支记录(v.圈 ?? [], 切分支楼, 聊天);
+      v.圈 = 裁同楼切分支记录(v.圈, 切分支楼, 聊天);
       const 当前楼 = 末楼();
       const 当前绝对时段 = 当前手机绝对时段();
-      const 读到 = { ...(v.读到 ?? {}) };
-      const 读时 = { ...(v.读时 ?? {}) };
+      const 读到 = { ...v.读到 };
+      const 读时 = { ...v.读时 };
       for (const 会话 of new Set([...Object.keys(读到), ...Object.keys(读时)])) {
         const 锚 = 手机分支变更后已读时锚(
           读到[会话],
@@ -249,11 +391,11 @@ export async function 隔离当前手机分支(切分支楼 = 末楼(), 允许�
 }
 
 export function 读库(): 微信库 {
-  const v = (_.get(getVariables({ type: 'chat' }), '_微信') ?? {}) as Partial<微信库>;
+  const v = 归一微信原始库(_.get(getVariables({ type: 'chat' }), '_微信'));
   const 当前楼 = 末楼();
   const 当前绝对时段 = 当前手机绝对时段();
   const 合法群成员 = new Set(门牌列表.map(m => 户静态表[m].妻名));
-  const 消息 = 筛当前手机时间线(v.消息 ?? [], 当前楼, 当前绝对时段).filter(
+  const 消息 = 筛当前手机时间线(v.消息, 当前楼, 当前绝对时段).filter(
     m =>
       m.类 === '撤回' ||
       m.发 !== '对方' ||
@@ -263,22 +405,33 @@ export function 读库(): 微信库 {
           ? 验收单条群消息(m.文, 合法群成员, 手机可见单条硬上限) !== null
           : 验收短文本(m.文, 手机可见单条硬上限) !== null),
   );
-  const 圈 = 筛当前手机时间线(v.圈 ?? [], 当前楼, 当前绝对时段)
+  const 圈 = 筛当前手机时间线(v.圈, 当前楼, 当前绝对时段)
     .filter(x => 验收短文本(x.文, 手机可见单条硬上限) !== null)
-    .map(x => ({ ...x, 评: x.评.filter(p => 验收短文本(p.文, 手机可见单条硬上限) !== null) }));
+    .map(x => ({
+      ...x,
+      评: 数组或空<{ 谁: string; 文: string }>(x.评).filter(
+        p => 是普通对象(p) && 验收短文本(p.文, 手机可见单条硬上限) !== null,
+      ),
+    }));
   const 库: 微信库 = {
     消息,
     圈,
-    读到: { ...(v.读到 ?? {}) },
-    读时: { ...(v.读时 ?? {}) },
+    读到: { ...v.读到 },
+    读时: { ...v.读时 },
     圈读到: v.圈读到 ?? -1,
     // 尚无辅助锚时使用失配哨兵，下方会从当前时间线的朋友圈记录重建。
     圈读时: v.圈读时 ?? 创建手机已读时锚(-1, -1),
-    节拍: v.节拍 ?? {},
+    节拍: v.节拍,
     已发私聊图: 按消息重建已发私聊图(消息, 当前楼),
   };
   规范已读水位(库, 当前绝对时段);
   return 库;
+}
+
+/** 当前聊天、当前楼层、当前分支中真实存活的玩家一对一私聊所形成的每日联系保护。 */
+export function 当前微信联系保护表(): 微信联系保护表 {
+  const 当前绝对时段 = 当前手机绝对时段();
+  return 构造微信联系保护表(读库().消息, 当前绝对时段);
 }
 
 /** 读取 `_手机邀约计划` 原始记录；损坏/旧形状安全返回 null（v0.80 不做旧档迁移）。
@@ -301,13 +454,18 @@ export function 读手机邀约计划(): 手机邀约计划 | null {
     ) {
       return null;
     }
-    return {
+    const 计划: 手机邀约计划 = {
       m: p.m as 门牌,
       创建楼: p.创建楼!,
       创建绝对时段: p.创建绝对时段!,
       目标绝对时段: p.目标绝对时段!,
       地点: p.地点,
+      ...(p.版本 === 2 ? { 版本: 2 as const } : {}),
+      ...(p.成员 !== undefined ? { 成员: Array.isArray(p.成员) ? [...p.成员] : ([] as 门牌[]) } : {}),
     };
+    const 成员 = 手机邀约计划成员(计划);
+    if (!成员.length || !多人邀约地点合法(计划.地点, 成员)) return null;
+    return 计划;
   } catch {
     return null;
   }
@@ -329,9 +487,8 @@ export async function 写库增量(
     /** 与接受回复在同一个 chat 变量回调里提交的单例赴约 CAS。 */
     赴约提交?: 手机赴约提交;
     /**
-     * v0.80 定时定点邀约：与接受回复在同一个 chat 变量回调里提交的新预约计划 CAS。
-     * 已有待赴约/赴约中计划或仍活动的旧 `_赴约` 时整次回调不写微信，
-     * 调用方改落固定拒绝回复；已过期/无效计划不阻塞下一份。
+     * 定时定点邀约：与接受回复在同一个 chat 变量回调里提交。仍活动的旧 `_赴约` 会拒绝；
+     * 同一批、同锚、同时间地点的多人邀请则把本名接受者原子追加进共同计划。
      */
     邀约计划提交?: 手机邀约计划;
   },
@@ -345,6 +502,7 @@ export async function 写库增量(
       if (!允许写入()) return vars;
       const 当前楼 = 末楼();
       const 当前绝对时段 = 当前手机绝对时段();
+      let 合并后邀约计划: 手机邀约计划 | null = null;
       if (增.赴约提交) {
         const 当前赴约 = (_.get(vars, '_赴约') ?? null) as Partial<手机赴约提交> | null;
         // 接受回复与单例赴约必须同成同败。已有仍活动的赴约时整次回调不写微信，
@@ -356,13 +514,9 @@ export async function 写库增量(
         const 当前计划 = (_.get(vars, 手机邀约计划键) ?? null) as 手机邀约计划 | null;
         // 新计划与仍活动的旧 `_赴约` 必须互斥：旧赴约只在 赴约提交 分支里检查，
         // 这里必须在同一回调内自己重读兜底——业务层预检不能替代最终 CAS。
-        // 占用则整次回调不写微信、不写计划，调用方改落固定拒绝。
         if (赴约仍活动(当前赴约, 当前楼)) return vars;
-        // 已有待赴约/赴约中计划时同样整次回调不写微信，绝不留下“两个都说好”。
-        if (手机邀约计划占用中(当前计划, 当前绝对时段, 当前楼)) return vars;
-        // 防御性最终校验：不能只信 UI/业务层——门牌/一致性/地点白名单/安全整数/
-        // 当前周目标之外，创建锚必须严格等于最终回调可见的当前真值，调用者不得
-        // 伪造未来或过去锚点；不满足则整次回调不写。
+        // 防御性最终校验：不能只信 UI/业务层——门牌/共同地点/安全整数/当前周目标之外，
+        // 同一批成员必须共享精确创建锚。这样接受回复和成员追加仍然同成同败。
         const 计划 = 增.邀约计划提交;
         if (
           !手机邀约计划可提交(计划, 计划.m, 当前绝对时段, 当前楼) ||
@@ -371,22 +525,24 @@ export async function 写库增量(
         ) {
           return vars;
         }
+        合并后邀约计划 = 合并手机邀约计划(当前计划, 计划, 当前绝对时段, 当前楼);
+        if (!合并后邀约计划) return vars;
       }
       const 当前余波 = (_.get(vars, '_换装余波') ?? null) as 换装余波 | null;
       if (增.余波消费) {
         if (!余波身份相同(当前余波, 增.余波消费.预期)) return vars;
         if (Object.keys(增.余波消费.标记).some(键 => !!当前余波?.[键 as keyof 换装余波])) return vars;
       }
-      const v = (_.get(vars, '_微信') ?? {}) as Partial<微信库>;
+      const v = 归一微信原始库(_.get(vars, '_微信'));
       const 新鲜: 微信库 = {
-        消息: 筛当前手机时间线(v.消息 ?? [], 当前楼, 当前绝对时段),
-        圈: 筛当前手机时间线(v.圈 ?? [], 当前楼, 当前绝对时段),
-        读到: { ...(v.读到 ?? {}) },
-        读时: { ...(v.读时 ?? {}) },
+        消息: 筛当前手机时间线(v.消息, 当前楼, 当前绝对时段),
+        圈: 筛当前手机时间线(v.圈, 当前楼, 当前绝对时段),
+        读到: { ...v.读到 },
+        读时: { ...v.读时 },
         圈读到: v.圈读到 ?? -1,
         圈读时: v.圈读时 ?? 创建手机已读时锚(-1, -1),
-        节拍: v.节拍 ?? {},
-        已发私聊图: v.已发私聊图 ?? {},
+        节拍: v.节拍,
+        已发私聊图: v.已发私聊图,
       };
       // 只能用本次增量到来前已存在的记录校准已读时锚。
       规范已读水位(新鲜, 当前绝对时段);
@@ -441,7 +597,7 @@ export async function 写库增量(
         _.set(vars, '_换装余波', { ...当前余波, ...增.余波消费.标记 });
       }
       if (增.赴约提交) _.set(vars, '_赴约', { ...增.赴约提交 });
-      if (增.邀约计划提交) _.set(vars, 手机邀约计划键, { ...增.邀约计划提交 });
+      if (合并后邀约计划) _.set(vars, 手机邀约计划键, 合并后邀约计划);
       已写 = true;
       return vars;
     },
@@ -468,17 +624,17 @@ export async function 压缩微信会话记录(
       if (!允许写入()) return vars;
       const 当前楼 = 末楼();
       const 当前绝对时段 = 当前手机绝对时段();
-      const v = (_.get(vars, '_微信') ?? {}) as Partial<微信库>;
-      const 原消息 = 筛当前手机时间线(v.消息 ?? [], 当前楼, 当前绝对时段);
+      const v = 归一微信原始库(_.get(vars, '_微信'));
+      const 原消息 = 筛当前手机时间线(v.消息, 当前楼, 当前绝对时段);
       const 水位库: 微信库 = {
         消息: 原消息,
-        圈: 筛当前手机时间线(v.圈 ?? [], 当前楼, 当前绝对时段),
-        读到: { ...(v.读到 ?? {}) },
-        读时: { ...(v.读时 ?? {}) },
+        圈: 筛当前手机时间线(v.圈, 当前楼, 当前绝对时段),
+        读到: { ...v.读到 },
+        读时: { ...v.读时 },
         圈读到: v.圈读到 ?? -1,
         圈读时: v.圈读时 ?? 创建手机已读时锚(-1, -1),
-        节拍: v.节拍 ?? {},
-        已发私聊图: v.已发私聊图 ?? {},
+        节拍: v.节拍,
+        已发私聊图: v.已发私聊图,
       };
       规范已读水位(水位库, 当前绝对时段);
       // 图片轮换由消息事件日志重建。保留“该户图库容量+1”只最近图库气泡，既足以还原最近一次
@@ -492,11 +648,17 @@ export async function 压缩微信会话记录(
           })
           .slice(-(图池容量 + 1)),
       );
+      // 冷落保护只需要每户最后一条玩家私聊。显式保留它，避免长期摘要压缩后
+      // 当天已经完成的联系从权威消息日志消失、随后被错误追算成冷落。
+      const 最新玩家联系 = [...原消息].reverse().find(消息 => 消息.会话 === 会话 && 消息.发 === '我');
       const 新消息 = 压缩微信会话消息(
         原消息,
         会话,
         普通气泡上限,
-        消息 => 会话消息未读(水位库, 消息, 当前楼, 当前绝对时段) || 图片轮换保护.has(消息),
+        消息 =>
+          会话消息未读(水位库, 消息, 当前楼, 当前绝对时段) ||
+          图片轮换保护.has(消息) ||
+          消息 === 最新玩家联系,
       );
       有变化 = 新消息.length !== 原消息.length;
       if (有变化) {

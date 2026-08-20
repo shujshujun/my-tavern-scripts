@@ -120,6 +120,21 @@ test('跨胎父亲认知保留历史，并为每一胎保留独立私聊事件�
   );
 });
 
+test('孕产姐妹群1至4条合法残稿在任何消息与事件键写入前整批拒绝', () => {
+  const 根 = new URL('../../src/人妻公寓/脚本/游戏逻辑/', import.meta.url);
+  const 节拍源码 = readFileSync(new URL('./手机/节拍引擎.ts', 根), 'utf8');
+  const 下限声明 = 节拍源码.indexOf('const 专场AI气泡下限 = 5;');
+  const 残稿拒绝 = 节拍源码.indexOf('合法消息们.length < 专场AI气泡下限');
+  const 首次消息写入 = 节拍源码.indexOf('库.消息.push({', 残稿拒绝);
+  const 事件键写入 = 节拍源码.indexOf('键: 选项.引用约束?.跟聊角色', 残稿拒绝);
+
+  assert.ok(下限声明 >= 0);
+  assert.ok(残稿拒绝 > 下限声明);
+  assert.ok(首次消息写入 > 残稿拒绝, '专场下限必须在第一条可见消息写入前关闭整批');
+  assert.ok(事件键写入 > 残稿拒绝, '事件键只能随通过整批验收的消息一起写入');
+  assert.match(节拍源码.slice(残稿拒绝 - 180, 残稿拒绝 + 180), /return false/u);
+});
+
 test('报孕、姐妹群和群后私聊消费统一数据，正文只由AI生成且失败后可重试', () => {
   const 根 = new URL('../../src/人妻公寓/脚本/游戏逻辑/', import.meta.url);
   const 节拍源码 = readFileSync(new URL('./手机/节拍引擎.ts', 根), 'utf8');

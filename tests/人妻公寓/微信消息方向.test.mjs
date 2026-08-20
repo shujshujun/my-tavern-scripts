@@ -37,3 +37,10 @@ test('父亲微信通话沿用同一行布局，不让玩家与父亲气泡挤�
   assert.match(通话, /`rqp-line \$\{我方 \? 'me' : 'ta'\}`/);
   assert.match(通话, /`rqp-b \$\{我方 \? 'me' : 'ta'\}`/);
 });
+
+test('父亲通话的母亲圆场提示进入 innerHTML 前必须转义', () => {
+  const 通话 = 截片段(通话页源码, 'export function 渲染talk', 'for (const t of 父亲通话.记录)');
+  assert.match(资源与皮肤源码, /if \(html !== undefined\) e\.innerHTML = html/);
+  assert.match(通话, /el\('div', 'rqp-b sys', _\.escape\(圆场说明\)\)/);
+  assert.doesNotMatch(通话, /el\('div', 'rqp-b sys', 圆场说明\)/);
+});

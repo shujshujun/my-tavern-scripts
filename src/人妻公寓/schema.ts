@@ -41,7 +41,7 @@ function 是记录(value: unknown): value is 原始记录 {
   return 原型 === null || Object.getPrototypeOf(原型) === null;
 }
 
-/** v0.83 接受 v0.80(v7) 与 v0.81/v0.82(v8)；更早或未来版本继续硬拒绝。 */
+/** v0.84 接受 v0.80(v7)、v0.81/v0.82(v8) 与 v0.83(v9)；更早或未来数据版本继续硬拒绝。 */
 export function 验证当前MVU存档版本(input: unknown): void {
   if (!是记录(input)) {
     throw new Error('人妻公寓存档结构损坏：stat_data 必须是对象。请新建聊天开始游戏。');
@@ -56,9 +56,181 @@ export function 验证当前MVU存档版本(input: unknown): void {
   ) {
     const 显示版本 = typeof 版本 === 'number' && Number.isInteger(版本) ? String(版本) : '未知';
     throw new Error(
-      `v0.83 仅兼容数据版本 7、8 和 9：当前存档版本为 ${显示版本}。v0.80/v0.81/v0.82 存档可直接继承；其他版本请新建聊天开始游戏。`,
+      `v0.84 仅兼容数据版本 7、8 和 9：当前存档版本为 ${显示版本}。v0.80/v0.81/v0.82/v0.83 存档可直接继承；其他版本请新建聊天开始游戏。`,
     );
   }
+}
+
+/**
+ * rq0.80-rq0.84 发布初始值共同拥有的稳定持久契约。
+ *
+ * `Schema.parse({})` 必须继续可用于内部默认构造，因此不能把所有字段改成 zod required；
+ * 真实聊天快照则必须先过这道门，防止非空截断对象被 prefault/catch 补成“看似完整的新局”。
+ * 这里只要求历代共同存在的骨架，不要求 v9 新字段，旧档仍可由迁移和 Schema 安全补齐。
+ */
+const 可继续存档顶层字段 = ['户', '现金', '胜任度', '风闻', '玩家资源', '背包', '系统'] as const;
+const 可继续存档玩家资源字段 = [
+  '精力',
+  '体力',
+  '保护准备',
+  '_晨跑训练日',
+  '_体力训练日',
+  '_小憩日',
+  '_已使用永久道具',
+] as const;
+const 可继续存档资源节点字段 = ['当前值', '训练经验', '永久上限加成'] as const;
+const 可继续存档户字段 = ['妻', '夫', '_入住时段', '_上次收租期', '_欠租笔数'] as const;
+// 只取 rq0.80-rq0.84 从一开始就存在的交集；缺失任一叶都不能交给 Schema 默认重建。
+const 可继续存档妻核心字段 = [
+  '好感值',
+  '堕落值',
+  '婚姻值',
+  '当前阶段',
+  '裂缝',
+  '当前心理想法',
+  '当前情绪',
+  '外装',
+  '内衣',
+  '妆容',
+  '_穿戴锁',
+  '特殊',
+  '身体开发',
+  '上次互动楼层',
+  '_上次结算楼层',
+  '_成长账',
+  '_冷落余波',
+  '_堕落日账',
+  '_阶段线路',
+  '_穿着SKU',
+  '_要钱次数',
+  '_上次要钱楼层',
+] as const;
+const 可继续存档夫核心字段 = [
+  '疑心值',
+  '信任值',
+  '状态',
+  '结局轨道',
+  '当前心理想法',
+  '当前情绪',
+  '_疑心冻结至',
+  '_外出至',
+  '_上次出差楼',
+  '_上次打断档',
+] as const;
+const 可继续存档系统字段 = [
+  '_上次上交期',
+  '_上次性爱结果',
+  '_上次撞见档',
+  '_坏结局',
+  '_已完成特殊场景',
+  '_已注入事件',
+  '_序章完成',
+  '_待发送事件',
+  '_待接来电',
+  '_性爱场景',
+  '_提示刷新态',
+  '_摄像头布设',
+  '_数据版本',
+  '_母亲入列',
+  '_母亲撞见次数',
+  '_母亲首夜第二幕',
+  '_父亲通话',
+  '_特殊场景',
+  '_特殊场景前置',
+  '_管理考核',
+  '_绝对时段',
+  '_荣耀洞上次时段',
+  '_荣耀洞动态时段',
+  '_荣耀洞动态门牌',
+  '_荣耀洞夫',
+  '_荣耀洞拍',
+  '_荣耀洞点破',
+  '_荣耀洞起时段',
+  '_荣耀洞门牌',
+  '_通牒期',
+  '_难度',
+  '_风闻账',
+] as const;
+function 缺少自有字段(value: Record<string, unknown>, fields: readonly string[]): string[] {
+  return fields.filter(field => !Object.prototype.hasOwnProperty.call(value, field));
+}
+
+function 要求记录骨架(value: unknown, label: string, fields: readonly string[]): 原始记录 {
+  if (!是记录(value)) throw new Error(`人妻公寓存档结构损坏：${label}不是普通对象。`);
+  const 缺失 = 缺少自有字段(value, fields);
+  if (缺失.length) throw new Error(`人妻公寓存档结构损坏：${label}缺少稳定字段 ${缺失.join('、')}。`);
+  return value;
+}
+
+function 是可归一有限数值(value: unknown): boolean {
+  if (typeof value === 'number') return Number.isFinite(value);
+  return typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value));
+}
+
+/**
+ * 验证真实持久快照是否足以继续游戏。与“版本是否受支持”分离，供启动与最近有效楼读取使用；
+ * 内部单元测试／局部工厂仍可直接 `Schema.parse({})`。
+ */
+export function 验证可继续MVU存档结构(input: unknown): void {
+  验证当前MVU存档版本(input);
+  if (!是记录(input) || Object.keys(input).length === 0) {
+    throw new Error('人妻公寓存档结构损坏：真实 stat_data 为空，不能按新局默认值继续。');
+  }
+
+  const 顶层缺失 = 缺少自有字段(input, 可继续存档顶层字段);
+  if (顶层缺失.length) {
+    throw new Error(`人妻公寓存档结构损坏：缺少稳定顶层字段 ${顶层缺失.join('、')}。`);
+  }
+  const 户表 = 要求记录骨架(input.户, '户', []);
+  const 玩家资源 = 要求记录骨架(input.玩家资源, '玩家资源', 可继续存档玩家资源字段);
+  if (!Array.isArray(input.背包)) throw new Error('人妻公寓存档结构损坏：背包不是数组。');
+  if (!Array.isArray(玩家资源._已使用永久道具)) {
+    throw new Error('人妻公寓存档结构损坏：玩家资源._已使用永久道具不是数组。');
+  }
+  for (const 资源名 of ['精力', '体力'] as const) {
+    const 资源 = 要求记录骨架(玩家资源[资源名], `玩家资源.${资源名}`, 可继续存档资源节点字段);
+    for (const field of 可继续存档资源节点字段) {
+      if (!是可归一有限数值(资源[field])) {
+        throw new Error(`人妻公寓存档结构损坏：玩家资源.${资源名}.${field}不是可归一的有限数值。`);
+      }
+    }
+  }
+
+  for (const [门牌, 原始户] of Object.entries(户表)) {
+    const 户 = 要求记录骨架(原始户, `户.${门牌}`, 可继续存档户字段);
+    const 妻 = 要求记录骨架(户.妻, `户.${门牌}.妻`, 可继续存档妻核心字段);
+    const 夫 = 要求记录骨架(户.夫, `户.${门牌}.夫`, 可继续存档夫核心字段);
+    if (!Array.isArray(妻._穿戴锁) || !Array.isArray(妻.特殊)) {
+      throw new Error(`人妻公寓存档结构损坏：户.${门牌}.妻的穿戴列表不是数组。`);
+    }
+    for (const field of ['裂缝', '身体开发', '_成长账', '_冷落余波', '_堕落日账', '_阶段线路', '_穿着SKU'] as const) {
+      if (!是记录(妻[field])) throw new Error(`人妻公寓存档结构损坏：户.${门牌}.妻.${field}不是普通对象。`);
+    }
+    for (const field of ['_入住时段', '_上次收租期', '_欠租笔数'] as const) {
+      if (!是可归一有限数值(户[field])) {
+        throw new Error(`人妻公寓存档结构损坏：户.${门牌}.${field}不是可归一的有限数值。`);
+      }
+    }
+    for (const [label, value] of [
+      ['妻.好感值', 妻.好感值],
+      ['妻.堕落值', 妻.堕落值],
+      ['妻.婚姻值', 妻.婚姻值],
+      ['妻.当前阶段', 妻.当前阶段],
+      ['夫.疑心值', 夫.疑心值],
+      ['夫.信任值', 夫.信任值],
+    ] as const) {
+      if (!是可归一有限数值(value)) {
+        throw new Error(`人妻公寓存档结构损坏：户.${门牌}.${label}不是可归一的有限数值。`);
+      }
+    }
+  }
+  for (const field of ['现金', '胜任度', '风闻'] as const) {
+    if (!是可归一有限数值(input[field])) {
+      throw new Error(`人妻公寓存档结构损坏：${field}不是可归一的有限数值。`);
+    }
+  }
+
+  要求记录骨架(input.系统, '系统', 可继续存档系统字段);
 }
 
 /** 空 Schema 构造不是外部存档；其余合法输入中 v7/v8 需要一次性迁移。 */
@@ -287,6 +459,26 @@ const floorMark = (def: number) =>
     .transform(v => (isNaN(v) ? def : Math.max(Math.min(-1, def), Math.round(v))))
     .prefault(def);
 
+/**
+ * 兼容旧 YAML／MVU 遗留布尔：只接受语义明确的 boolean、true/false、1/0。
+ * 不能使用 z.coerce.boolean()，因为 JavaScript 会把任何非空字符串（包括 "false"）转成 true。
+ */
+const bool = (def = false) =>
+  z
+    .preprocess(value => {
+      if (typeof value === 'boolean') return value;
+      if (value === 1) return true;
+      if (value === 0) return false;
+      if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+        if (normalized === 'true' || normalized === '1') return true;
+        if (normalized === 'false' || normalized === '0') return false;
+      }
+      return value;
+    }, z.boolean())
+    .catch(def)
+    .prefault(def);
+
 // ============================================
 // 妻(每户人妻状态单)
 // ============================================
@@ -309,7 +501,7 @@ const 裂缝 = z
       .transform(v => (isNaN(v) ? 0 : _.clamp(Math.floor(v), 0, 4)))
       .prefault(0),
     /** 一次性单向锁(防护4):集齐 4 碎片翻真,永不回落 */
-    已确认: z.coerce.boolean().catch(false).prefault(false),
+    已确认: bool(),
   })
   .prefault({});
 
@@ -350,7 +542,7 @@ const 妻状态 = z
     // ── 唯一阶段性癖：有效开幕正文成功后永久登记；不再有槽位、卸载或曾开发列表 ──
     阶段性癖: z.string().prefault(''),
     /** 旧档或当前入口已经支付但尚未完成开幕；成功提交后清空，302剧情获得始终不用此字段。 */
-    _阶段性癖已支付: z.coerce.boolean().catch(false).prefault(false),
+    _阶段性癖已支付: bool(),
 
     // ── 脚本管字段 ──
     上次互动楼层: nonNegInt(0), // 当前正文互动楼；供雌竞争冷落距离使用
@@ -401,7 +593,7 @@ const 妻状态 = z
         /** 到期瞬间冻结报孕生成资料；新档存结构化数据，旧档可保留已冻结的可见文案。 */
         告知文案: z.string().prefault(''),
         /** 高风闻下孕情已成为公开硬证据；持久保存，避免风闻事件账裁剪后错误恢复为私密认知。 */
-        已曝光: z.boolean().catch(false).prefault(false),
+        已曝光: bool(),
         /** 曝光后的丈夫登门由脚本独立排期；变体标识保持字符串，给后续丈夫结局注册新演法。 */
         丈夫登门: z
           .object({
@@ -410,8 +602,8 @@ const 妻状态 = z
             变体标识: z.string().prefault(''),
             当前拍: nonNegInt(0),
             /** 玩家在登门开始前把安神助眠剂交给妻子后置真；过程不进入正文。 */
-            隐藏圆场: z.boolean().catch(false).prefault(false),
-            已结算: z.boolean().catch(false).prefault(false),
+            隐藏圆场: bool(),
+            已结算: bool(),
           })
           .prefault({}),
       })
@@ -429,21 +621,21 @@ const 妻状态 = z
           .transform(v => (isNaN(v) ? 0 : _.clamp(Math.floor(v), 0, 3)))
           .prefault(0),
         /** 只冻结本次受孕发生时陆嘉明是否已经知情；不得用当前家庭计划状态事后改写旧孕情。 */
-        家庭计划知情: z.coerce.boolean().catch(false).prefault(false),
+        家庭计划知情: bool(),
         确认已读绝对时段: floorMark(-1),
         预产绝对时段: floorMark(-1),
         自动生产绝对时段: floorMark(-1),
         预产通知文案: z.string().prefault(''),
-        预产通知已读: z.coerce.boolean().catch(false).prefault(false),
-        产前看望: z.coerce.boolean().catch(false).prefault(false),
-        陪产已选择: z.coerce.boolean().catch(false).prefault(false),
+        预产通知已读: bool(),
+        产前看望: bool(),
+        陪产已选择: bool(),
         /** 每胎稳定票据；孩子追加与世界时间推进只认此票据，AI 文案失败不得重新结算。 */
         生产结算标识: z.string().prefault(''),
-        生产叙事已完成: z.coerce.boolean().catch(false).prefault(false),
+        生产叙事已完成: bool(),
         实际生产绝对时段: floorMark(-1),
         住院结束绝对时段: floorMark(-1),
         结果: z.enum(['未定', '陪产', '仅产前看望', '完全缺席']).catch('未定').prefault('未定'),
-        产后看望: z.coerce.boolean().catch(false).prefault(false),
+        产后看望: bool(),
         获知生产路径: z.enum(['', '陪产', '姐妹群', '私聊', '产后看望']).catch('').prefault(''),
       })
       .prefault({}),
@@ -546,7 +738,7 @@ const 管理任务 = z.object({
   门牌: z.string().prefault(''),
   创建时段: absolutePeriod(0),
   截止时段: absolutePeriod(0),
-  逾期已扣: z.coerce.boolean().catch(false).prefault(false),
+  逾期已扣: bool(),
   /** 风闻投诉复用楼务任务壳；普通任务保持空字符串。 */
   来源事件: z.string().prefault(''),
   /** 只允许进入投诉瓷砖与手机通知的公开事实，不包含私密攻略内容。 */
@@ -665,7 +857,7 @@ const 管理任务完成摘要 = z.object({
   级别: z.enum(['日常', '重要', '紧急']).catch('日常').prefault('日常'),
   地点: z.string().prefault(''),
   门牌: z.string().prefault(''),
-  按期: z.coerce.boolean().catch(false).prefault(false),
+  按期: bool(),
   方式: z.string().prefault(''),
 });
 
@@ -709,7 +901,7 @@ const 家庭孩子档案 = z.object({
   性别: z.enum(['男', '女']).catch('女').prefault('女'),
   出生绝对时段: floorMark(-1),
   结果: z.enum(['陪产', '仅产前看望', '完全缺席']).catch('完全缺席').prefault('完全缺席'),
-  玩家产后看望: z.coerce.boolean().catch(false).prefault(false),
+  玩家产后看望: bool(),
   获知生产路径: z.enum(['陪产', '姐妹群', '私聊', '产后看望']).catch('私聊').prefault('私聊'),
   叙事最小年龄: nonNegInt(0),
   年龄阶段: z.enum(['新生儿', '一岁以上', '两岁以上']).catch('新生儿').prefault('新生儿'),
@@ -743,7 +935,7 @@ const 当前Schema = z.object({
         })
         .prefault({}),
       /** 背包中安全套被主动拆封后，保留到下一场亲密场景开始；入场时转入场景保护状态。 */
-      保护准备: z.coerce.boolean().catch(false).prefault(false),
+      保护准备: bool(),
       _晨跑训练日: floorMark(-1),
       /** 健身与当天首次圆满场景共享这一常规体力训练日账。 */
       _体力训练日: floorMark(-1),
@@ -760,8 +952,29 @@ const 当前Schema = z.object({
       /** 当前存档契约版本；v0.80(v7) 与 v0.81/v0.82(v8) 由入口一次性迁到 v9。 */
       _数据版本: z.literal(当前MVU数据版本).prefault(当前MVU数据版本),
       _坏结局: z.string().prefault(''), // 单向锁:非空=全冻结,快照只注入终局指引
-      /** 一次性剧情事件队列(| 分隔;写阶段转存 _已注入事件 供同楼重roll重放,防护10) */
+      /**
+       * 普通强制剧情的等待队列。每张新票带结构化场景标记；同一时间最多一张活动票，
+       * 后续票只等待到达设计地点，绝不能插入当前不相关互动或与队首混演。
+       */
       _待发送事件: z.string().prefault(''),
+      _场景剧情序号: nonNegInt(0),
+      /**
+       * 当前已经在设计地点触发的唯一场景剧情。生成失败、超时或取消时随 MVU 留在原分支，
+       * 玩家只能在冻结地点重试；旧 v9 存档缺字段时由 prefault 补空，不需要抬数据版本。
+       */
+      _场景剧情事务: z
+        .object({
+          id: z.string().prefault(''),
+          标题: z.string().prefault(''),
+          目标场景: z.string().prefault(''),
+          行动: z.string().prefault(''),
+          内容: z.string().prefault(''),
+          触发绝对时段: floorMark(-1),
+          触发楼层: floorMark(-1),
+          请求世代: nonNegInt(0),
+          状态: z.string().prefault(''),
+        })
+        .prefault({}),
       _已注入事件: z
         .object({
           楼层: floorMark(-1),
@@ -772,13 +985,13 @@ const 当前Schema = z.object({
       _孕情初见评价楼: z.record(z.string(), floorMark(-1)).catch({}).prefault({}),
       _母亲撞见次数: nonNegInt(0), // 静默暗账:母亲入列时折算初始堕落+破墙正戏差分
       /** P5 母亲入列(2026-07-19):301 到阶段2 时置真——地图头像亮起,302 从背景板转攻略对象 */
-      _母亲入列: z.coerce.boolean().catch(false).prefault(false),
+      _母亲入列: bool(),
       /** P5 母亲药物首夜第二幕:首夜正戏后置真,玩家推进到次日早上时排队早饭桌戏 */
-      _母亲首夜第二幕: z.coerce.boolean().catch(false).prefault(false),
+      _母亲首夜第二幕: bool(),
       /** P5 撞见系统频控:上次母亲撞见的时段档号(同时段最多一次) */
       _上次撞见档: z.coerce.number().int().catch(-1).prefault(-1),
       _难度: z.string().prefault('标准'), // 开局三档(轻松/标准/严苛),效果查 stageConfig.难度表
-      _序章完成: z.coerce.boolean().catch(false).prefault(false), // 单向语义随楼层快照走(回档到0=重开序章)
+      _序章完成: bool(), // 单向语义随楼层快照走(回档到0=重开序章)
       /** 一次性特殊正戏完成表：供商店防重复与阶段路线判定共用，不为每场戏增设独立布尔值。 */
       _已完成特殊场景: z.array(z.string()).catch([]).prefault([]),
       /** 特殊场景通用前置记录；使用 `场景id:门牌` 短键，避免每场每人扩散布尔字段。 */
@@ -806,7 +1019,7 @@ const 当前Schema = z.object({
               类型: z.string().prefault(''),
               状态: z.string().prefault(''),
               失败次数: nonNegInt(0),
-              补偿可用: z.coerce.boolean().catch(false).prefault(false),
+              补偿可用: bool(),
             })
             .prefault({}),
           /** 静音会议微信旁路只向下一正文暴露低信息摘要，不把私聊原文写入正文历史。 */
@@ -844,7 +1057,7 @@ const 当前Schema = z.object({
         .prefault({}),
       // 摄像头布设名单(2026-07-17 从 chat 变量迁入:与背包同一本账,重掷/撤回删楼时消耗与布设同生共死,
       // 否则"背包里的摄像头随楼层复活+chat 侧已装记录还在"=一次购买无限装)
-      _摄像头布设: z.record(z.string(), z.coerce.boolean()).catch({}).prefault({}),
+      _摄像头布设: z.record(z.string(), bool()).catch({}).prefault({}),
       /**
        * 唯一持久世界时钟：0=第1天早上，每 +1 推进一个六时段档。消息楼只负责正文
        * 时间线、回档和重掷，严禁参与日期、作息、冷却或随机种子的计算。
@@ -896,7 +1109,12 @@ const 当前Schema = z.object({
                 满意度: nonNegInt(0),
                 满意目标: nonNegInt(3),
                 偏好命中: z.array(z.string()).catch([]).prefault([]),
-                等级加成已用: z.coerce.boolean().catch(false).prefault(false),
+                等级加成已用: bool(),
+                /** 本人真实参与的楼数；旧档缺失时由全场历史楼数保守补齐。 */
+                有效楼数: z.number().int().nonnegative().optional(),
+                /** 多人场景中可独立退出；旧档缺失视为仍在场。 */
+                已退出: z.boolean().optional(),
+                退出方式: z.enum(['角色中止']).optional(),
               }),
             )
             .catch({})
@@ -920,6 +1138,10 @@ const 当前Schema = z.object({
                 满意度: nonNegInt(0),
                 满意目标: nonNegInt(0),
                 偏好命中: z.array(z.string()).catch([]).prefault([]),
+                /** 参与者自己的实际楼数，不能用全场时长覆盖中途加入／退出者。 */
+                有效楼数: z.number().int().nonnegative().optional(),
+                /** 允许多人场景中某一角色先行退出，最终仍保留她的独立结论。 */
+                结束方式: z.string().optional(),
                 时长评价: z.enum(['太短', '合适', '过久', '失控']).catch('太短').prefault('太短'),
                 结局态度: z.string().prefault(''),
               }),
@@ -986,11 +1208,11 @@ const 当前Schema = z.object({
           /** 当前绝对时段攻略基础风闻的独立额度账，不依赖会裁剪的最近事件。 */
           攻略计数时段: floorMark(-1),
           攻略计数: nonNegInt(0),
-          投诉跨线锁: z.coerce.boolean().catch(false).prefault(false),
-          危机跨线锁: z.coerce.boolean().catch(false).prefault(false),
+          投诉跨线锁: bool(),
+          危机跨线锁: bool(),
           当前投诉事件: z.string().prefault(''),
           待转投诉事件: z.string().prefault(''),
-          危机活跃: z.coerce.boolean().catch(false).prefault(false),
+          危机活跃: bool(),
           去重票据: z.array(z.string()).catch([]).prefault([]),
           最近事件: 风闻事件列表.prefault([]),
         })
@@ -1015,24 +1237,24 @@ const 当前Schema = z.object({
       _荣耀洞门牌: z.string().prefault(''), // ''=未进行;'空'=空军单拍;门牌=对面是她
       _荣耀洞拍: z.coerce.number().int().catch(-1).prefault(-1), // -1=未进行;0/1/2=三拍进行位
       _荣耀洞起时段: floorMark(-1), // 回档自净:起始时段晚于当前世界时钟时作废
-      _荣耀洞点破: z.coerce.boolean().catch(false).prefault(false), // 她阶段够高=可亮明身份+专属CG
-      _荣耀洞夫: z.coerce.boolean().catch(false).prefault(false), // 复合事件:丈夫恰好在隔间外(铁律不知真相)
+      _荣耀洞点破: bool(), // 她阶段够高=可亮明身份+专属CG
+      _荣耀洞夫: bool(), // 复合事件:丈夫恰好在隔间外(铁律不知真相)
       _荣耀洞动态门牌: z.string().prefault(''), // 真人完整服务后留给朋友圈事件钩子
       _荣耀洞动态时段: floorMark(-1), // 绝对时段去重；中途离场/空军不写
-      /** 待接来电(收租/上交日结算生成;P4 手机接听,覆盖=扣胜任度) */
+      /** 待接来电：周度例行联络或真实问责／危机生成；持续未接只在下一次真实联络周期记责。 */
       _待接来电: z
         .object({
           期: floorMark(-1), // -1=无来电
           分数段: z.string().prefault(''),
           报表: z.string().prefault(''),
-          通牒: z.coerce.boolean().catch(false).prefault(false),
-          紧急: z.coerce.boolean().catch(false).prefault(false),
+          通牒: bool(),
+          紧急: bool(),
           母亲圆场: z
             .object({
-              触发: z.coerce.boolean().catch(false).prefault(false),
+              触发: bool(),
               事件ID: z.string().prefault(''),
               摘要: z.string().prefault(''),
-              仅剧情: z.coerce.boolean().catch(false).prefault(false),
+              仅剧情: bool(),
             })
             .prefault({}),
         })
@@ -1048,14 +1270,14 @@ const 当前Schema = z.object({
           期: floorMark(-1),
           分数段: z.string().prefault(''),
           报表: z.string().prefault(''),
-          通牒: z.coerce.boolean().catch(false).prefault(false),
-          紧急: z.coerce.boolean().catch(false).prefault(false),
+          通牒: bool(),
+          紧急: bool(),
           母亲圆场: z
             .object({
-              触发: z.coerce.boolean().catch(false).prefault(false),
+              触发: bool(),
               事件ID: z.string().prefault(''),
               摘要: z.string().prefault(''),
-              仅剧情: z.coerce.boolean().catch(false).prefault(false),
+              仅剧情: bool(),
             })
             .prefault({}),
           主题: z.string().prefault(''),

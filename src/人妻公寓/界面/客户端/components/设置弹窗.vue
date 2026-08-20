@@ -4,16 +4,22 @@
 // "重开一局"只 emit restart，真正的 发送中=true + 业务事件仍在 App 点重开()。
 import { onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import {
+  保存自定义变量解析设置,
   写入MVU设置,
+  写入变量解析偏好,
   写入变量解析通道,
   读取MVU外置模型配置,
   读取MVU解析状态,
+  读取变量解析偏好,
   读取变量解析通道,
+  安排宿主刷新以应用MVU设置,
+  挂起内置变量解析直至宿主刷新,
+  自动代关MVU自动请求,
   规范OpenAI兼容API地址,
   type MVU解析状态,
   type 变量解析通道类型,
 } from '../../../MVU解析模式';
-import { useUIPrefs, 设置存储键 } from '../composables/useUIPrefs';
+import { useUIPrefs } from '../composables/useUIPrefs';
 
 defineProps<{
   ready: boolean;
@@ -59,11 +65,28 @@ const 解析API表单 = reactive({ api地址: '', 密钥: '', 模型名称: '', 
 /** 模型读取结果与读取中状态：只写本组件草稿内存，绝不直接写 MVU 配置。 */
 const 模型列表 = ref<string[]>([]);
 const 读取模型中 = ref(false);
+/** 每次读取冻结一个单调世代；关闭、切通道或改连接信息都会让旧结果失去写权。 */
+let 模型读取世代 = 0;
+
+function 作废模型读取(): void {
+  模型读取世代 += 1;
+  读取模型中.value = false;
+}
+
+function 模型读取仍有效(本次世代: number, base: string, key: string): boolean {
+  if (本次世代 !== 模型读取世代) return false;
+  if (!设置开.value || 解析通道.value !== '自定义') return false;
+  if (规范OpenAI兼容API地址(解析API表单.api地址) !== base) return false;
+  if (解析API表单.密钥.trim() !== key) return false;
+  return true;
+}
+
 /** 自定义表单可见反馈（读取/保存结果，绝不包含 Key 内容）。 */
 const 自定义反馈 = ref('');
 const 自定义反馈类型 = ref<'ok' | 'err'>('ok');
 
 function 载入解析API表单() {
+  作废模型读取();
   const 配置 = 读取MVU外置模型配置();
   解析API表单.api地址 = 配置?.api地址 ?? '';
   解析API表单.密钥 = 配置?.密钥 ?? '';
@@ -84,15 +107,22 @@ function 选择解析路线() {
 
 function 选择解析通道(通道: 变量解析通道类型) {
   if (通道 === 解析通道.value) return;
-  解析通道.value = 通道;
+  作废模型读取();
   自定义反馈.value = '';
   自定义反馈类型.value = 'ok';
   if (通道 === '自定义') {
+    // 进入表单只改页面草稿；完整配置与通道必须由“保存并启用”原子提交。
+    解析通道.value = 通道;
     载入解析API表单();
-  } else {
-    // 回自动只写通道偏好（不动 MVU 配置）；进自定义必须完整填表+保存才写自定义通道。
-    写入变量解析通道('自动');
+    return;
   }
+  // 回自动只写通道偏好（不动 MVU 配置）；持久化失败时保持当前真实通道，不显示假切换。
+  if (!写入变量解析通道('自动')) {
+    自定义反馈.value = '切换失败：浏览器未能保存解析通道，请检查隐私模式或存储权限。';
+    自定义反馈类型.value = 'err';
+    return;
+  }
+  解析通道.value = 通道;
 }
 
 function 安全错误反馈(e: unknown, 密钥: string): string {
@@ -111,11 +141,13 @@ async function 读取模型() {
     自定义反馈类型.value = 'err';
     return;
   }
+  const 本次世代 = ++模型读取世代;
   读取模型中.value = true;
   自定义反馈.value = '读取中…';
   自定义反馈类型.value = 'ok';
   try {
     const 模型们 = await getModelList({ apiurl: base, key });
+    if (!模型读取仍有效(本次世代, base, key)) return;
     模型列表.value = [
       ...new Set(模型们.map(String).map(模型 => 模型.trim()).filter(Boolean)),
     ].sort((a, b) => a.localeCompare(b));
@@ -127,15 +159,16 @@ async function 读取模型() {
       自定义反馈类型.value = 'ok';
     }
   } catch (e) {
+    if (!模型读取仍有效(本次世代, base, key)) return;
     自定义反馈.value = `读取模型失败：${安全错误反馈(e, key)}（可手填模型名称）`;
     自定义反馈类型.value = 'err';
   } finally {
-    读取模型中.value = false;
+    if (本次世代 === 模型读取世代) 读取模型中.value = false;
   }
 }
 
-/** 显式提交自定义解析配置：先 trim 地址/Key/模型并校验，再写 MVU 配置；
- * 只有写入成功才切自定义通道、刷新真实状态并显示成功。失败保持草稿与现有通道不变。
+/** 显式提交自定义解析配置：先 trim 地址/Key/模型并校验，再把 MVU 配置与游戏通道原子提交；
+ * 只有两边都持久化成功才刷新真实状态并显示成功。失败回滚旧配置、保留草稿与现有通道。
  * 数值留空=不覆盖、沿用 MVU 现值；非空但不是有限数字必须指出字段，不得静默当空。 */
 function 保存并启用() {
   const 地址 = 规范OpenAI兼容API地址(解析API表单.api地址);
@@ -174,8 +207,7 @@ function 保存并启用() {
     自定义反馈类型.value = 'err';
     return;
   }
-  const 成功 = 写入MVU设置({
-    模型来源: '自定义',
+  const 成功 = 保存自定义变量解析设置({
     api地址: 地址,
     密钥,
     模型名称: 模型,
@@ -184,12 +216,12 @@ function 保存并启用() {
     最大回复token数,
   });
   if (成功) {
-    写入变量解析通道('自定义');
+    解析通道.value = '自定义';
     刷新MVU解析状态();
     自定义反馈.value = '已保存并启用：本轮起变量走此自定义模型。';
     自定义反馈类型.value = 'ok';
   } else {
-    自定义反馈.value = '保存失败：未能写入 MVU 配置，草稿已保留。';
+    自定义反馈.value = '保存失败：模型配置或解析通道未能完整持久化，已回滚旧设置；草稿仍保留。';
     自定义反馈类型.value = 'err';
   }
 }
@@ -199,54 +231,70 @@ function 刷新MVU解析状态() {
   MVU解析.value = 读取MVU解析状态();
 }
 
-/** 解析字段持久化：读取并合并现有 人妻公寓_界面偏好 JSON，绝不整体覆盖 UI 或脚本字段。 */
-function 持久化解析字段() {
-  try {
-    let 已存: Record<string, unknown> = {};
-    try {
-      const raw = localStorage.getItem(设置存储键);
-      const 值 = raw ? JSON.parse(raw) : null;
-      if (值 && typeof 值 === 'object') 已存 = 值;
-    } catch {
-      /* 坏 JSON 当空处理 */
-    }
-    localStorage.setItem(
-      设置存储键,
-      JSON.stringify({
-        ...已存,
-        内置变量解析: 内置变量解析.value,
-        严格变量审计: 严格变量审计.value,
-      }),
-    );
-  } catch {
-    /* 隐私模式等存不了就不记 */
-  }
+/** 解析字段持久化统一走父页锚点，并把存储失败返回给按钮状态机。 */
+function 持久化解析字段(): boolean {
+  return 写入变量解析偏好({
+    内置变量解析: 内置变量解析.value,
+    严格变量审计: 严格变量审计.value,
+  });
 }
 
 function 切换内置变量解析() {
-  内置变量解析.value = !内置变量解析.value;
+  const 原值 = 内置变量解析.value;
+  内置变量解析.value = !原值;
   改设置();
-  持久化解析字段();
+  // 自愈函数从持久偏好读取开关，必须先把新值落盘；落盘失败就恢复页面选中态，绝不假装已启用。
+  if (!持久化解析字段()) {
+    内置变量解析.value = 原值;
+    改设置();
+    自定义反馈.value = '切换失败：浏览器未能保存内置变量解析开关，请检查隐私模式或存储权限。';
+    自定义反馈类型.value = 'err';
+    刷新MVU解析状态();
+    return;
+  }
+
+  try {
+    const 需要刷新宿主 = 内置变量解析.value && 自动代关MVU自动请求();
+    if (需要刷新宿主) {
+      const 已安排 = 安排宿主刷新以应用MVU设置();
+      自定义反馈.value = 已安排
+        ? '已关闭 MVU 自动请求，正在刷新酒馆页面以安全启用内置解析…'
+        : '已关闭 MVU 自动请求；请手动完整刷新酒馆页面后再继续游戏。';
+      自定义反馈类型.value = 已安排 ? 'ok' : 'err';
+      刷新MVU解析状态();
+      return;
+    }
+  } catch {
+    // 第二步宿主设置保存失败：恢复刚写入的游戏开关；若连回滚也被浏览器拒绝，
+    // 当前页面立即挂运行期闸门，且下次启动会在自愈失败处硬停，绝不进入双解析。
+    内置变量解析.value = 原值;
+    改设置();
+    const 已回滚 = 持久化解析字段();
+    if (!已回滚) 挂起内置变量解析直至宿主刷新();
+    自定义反馈.value = 已回滚
+      ? '启用失败：未能保存 MVU 设置，已恢复原来的解析开关。'
+      : '启用失败且浏览器拒绝恢复开关；当前解析已安全停用，请检查存储权限并完整刷新酒馆页面。';
+    自定义反馈类型.value = 'err';
+    刷新MVU解析状态();
+    return;
+  }
   刷新MVU解析状态();
 }
 
 function 切换严格变量审计() {
-  严格变量审计.value = !严格变量审计.value;
-  持久化解析字段();
+  const 原值 = 严格变量审计.value;
+  严格变量审计.value = !原值;
+  if (持久化解析字段()) return;
+  严格变量审计.value = 原值;
+  自定义反馈.value = '切换失败：浏览器未能保存严格变量审计开关，请检查隐私模式或存储权限。';
+  自定义反馈类型.value = 'err';
 }
 
 /** 恢复解析字段(纯 UI 字段由 useUIPrefs.恢复设置 负责)；挂载与 global_Mvu_initialized 后都刷真实状态。 */
 function 恢复解析字段() {
-  try {
-    const raw = localStorage.getItem(设置存储键);
-    if (raw) {
-      const s = JSON.parse(raw);
-      if (typeof s.内置变量解析 === 'boolean') 内置变量解析.value = s.内置变量解析;
-      if (typeof s.严格变量审计 === 'boolean') 严格变量审计.value = s.严格变量审计;
-    }
-  } catch {
-    /* 读不到就用默认 */
-  }
+  const 偏好 = 读取变量解析偏好();
+  内置变量解析.value = 偏好.内置变量解析;
+  严格变量审计.value = 偏好.严格变量审计;
   刷新MVU解析状态();
 }
 
@@ -256,10 +304,19 @@ function 重置偏好() {
   刷新MVU解析状态();
 }
 
+watch(
+  () => [解析API表单.api地址, 解析API表单.密钥] as const,
+  () => {
+    if (读取模型中.value) 作废模型读取();
+  },
+  { flush: 'sync' },
+);
+
 // 弹窗一关就撤销轮询(重开武装态由 App watch 设置开 清掉,防下次误触)
 watch(设置开, 开 => {
   clearInterval(MVU解析刷新timer);
   MVU解析刷新timer = undefined;
+  if (!开) 作废模型读取();
   if (开) {
     刷新MVU解析状态();
     // 通道与自定义 API 表单只在打开时载入一次，输入过程中绝不被轮询覆盖。
@@ -277,6 +334,7 @@ onMounted(() => {
   停止MVU初始化监听 = eventOn('global_Mvu_initialized', 刷新MVU解析状态).stop;
 });
 onUnmounted(() => {
+  作废模型读取();
   clearInterval(MVU解析刷新timer);
   MVU解析刷新timer = undefined;
   停止MVU初始化监听?.();

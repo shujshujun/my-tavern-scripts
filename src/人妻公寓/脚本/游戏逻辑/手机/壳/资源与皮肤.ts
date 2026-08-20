@@ -15,25 +15,26 @@ export const 成人素材基址 = 'https://testingcf.jsdelivr.net/gh/shujun8520-
 export const 生产素材基址 =
   'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.83/output/imagegen/production-system/final';
 
-export function 私聊图片地址(图: string): string {
-  if (图.startsWith('@production/')) {
-    return `${生产素材基址}/${图
-      .slice('@production/'.length)
-      .split('/')
-      .map(段 => encodeURIComponent(段))
-      .join('/')}.webp`;
-  }
-  if (图.startsWith('@adult/')) {
-    return `${成人素材基址}/${图
-      .slice('@adult/'.length)
-      .split('/')
-      .map(段 => encodeURIComponent(段))
-      .join('/')}`;
-  }
-  return `${素材基址}/微信圈/${图
+/** 持久图片键只能成为 URL 路径段；引号、尖括号和斜杠外的属性语法均百分号编码。 */
+function 编码资源路径(value: unknown): string {
+  return String(value ?? '')
     .split('/')
     .map(段 => encodeURIComponent(段))
-    .join('/')}.webp`;
+    .join('/');
+}
+
+export function 朋友圈图片地址(图: unknown): string {
+  return `${素材基址}/微信圈/${编码资源路径(图)}.webp`;
+}
+
+export function 私聊图片地址(图: string): string {
+  if (图.startsWith('@production/')) {
+    return `${生产素材基址}/${编码资源路径(图.slice('@production/'.length))}.webp`;
+  }
+  if (图.startsWith('@adult/')) {
+    return `${成人素材基址}/${编码资源路径(图.slice('@adult/'.length))}`;
+  }
+  return 朋友圈图片地址(图);
 }
 
 /** 手机挂在酒馆父页面，所有 DOM 一律在父文档上创建。 */
@@ -299,7 +300,9 @@ export function 头像块(名: string): string {
         : 文件 === '群' || 文件 === '姐妹群'
           ? ' avatar-group'
           : '';
-  return `<span class="rqp-ava${语义框}"><img src="${素材基址}/头像/${文件}.webp" onerror="this.remove();this.parentElement.textContent='${名[0] ?? '?'}'"/></span>`;
+  // 头像名通常来自静态表，但朋友圈旧档仍可能携带任意字符串。文件段必须编码；错误回退
+  // 使用常量文本，不能把持久字符串再次拼进内联事件属性。
+  return `<span class="rqp-ava${语义框}"><img src="${素材基址}/头像/${encodeURIComponent(String(文件))}.webp" onerror="this.remove();this.parentElement.textContent='?'"/></span>`;
 }
 
 /** 群消息正文以「发言人:内容」保存；气泡头像必须跟发言人走，不能永远显示群头像。 */

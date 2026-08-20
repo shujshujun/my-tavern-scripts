@@ -50,7 +50,7 @@ test('组合动作只有确认成功到达目标地点后才继续执行，翻�
   assert.doesNotMatch(组合动作源码, /确认已到达动作地点\('垃圾房'\)/, '地图房卡不得再远程一键翻垃圾');
   assert.match(
     App源码,
-    /const 垃圾入口可见 = computed\(\(\) => 当前房间\.value === '垃圾房' && 垃圾袋列表\.value\.length > 0\);/,
+    /const 垃圾入口可见 = computed\([\s\S]{0,240}当前房间\.value === '垃圾房'[\s\S]{0,80}垃圾袋列表\.value\.length > 0/,
     'App 必须以玩家真实身处垃圾房为前提计算翻垃圾入口',
   );
   assert.match(App源码, /:garbage-visible="垃圾入口可见"/, 'App 必须把地点门结果交给房内操作抽屉');

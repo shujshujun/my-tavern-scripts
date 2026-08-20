@@ -13,14 +13,27 @@ withDefaults(
   },
 );
 
-const emit = defineEmits<{ close: []; imageError: [] }>();
+const emit = defineEmits<{ close: []; imageError: [imageUrl: string] }>();
+
+/** 失败事件携带触发它的真实 DOM 请求地址；切节点后不得临时读取已经更新的新 prop。 */
+function 图片加载失败(event: Event): void {
+  const imageUrl = (event.currentTarget as HTMLImageElement).dataset.imageUrl ?? '';
+  emit('imageError', imageUrl);
+}
 </script>
 
 <template>
   <Transition name="family-plan-fade">
     <section v-if="open" class="family-plan-stage" :style="{ '--family-plan-img': `url(${imageUrl})` }">
       <div class="family-plan-backdrop" aria-hidden="true"></div>
-      <img :src="imageUrl" :alt="title" draggable="false" @error="emit('imageError')" />
+      <img
+        :key="imageUrl"
+        :src="imageUrl"
+        :data-image-url="imageUrl"
+        :alt="title"
+        draggable="false"
+        @error="图片加载失败"
+      />
       <div class="family-plan-caption">
         <span>{{ kicker }}</span>
         <b>{{ title }}</b>

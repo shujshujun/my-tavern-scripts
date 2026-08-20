@@ -137,5 +137,5 @@ export function 生成失败时可保留的流式正文(流式缓存: unknown, �
   const 原文 = typeof 流式缓存 === 'string' ? 流式缓存 : '';
   if (!有有效正文(原文, 清洗正文)) return '';
   const 净文 = 清洗正文(原文).trim();
-  return /[。！？!?…」』”’）)]$/.test(净文) ? 原文 : '';
+  return /[。！？!?….](?:[」』”’"'）)\]】》〕〉]*)$/.test(净文) ? 原文 : '';
 }

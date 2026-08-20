@@ -15,6 +15,10 @@ const 节拍源 = readFileSync(new URL('./节拍引擎.ts', 手机根), 'utf8');
 const 摘要源 = readFileSync(new URL('./摘要系统.ts', 手机根), 'utf8');
 const 记忆源 = readFileSync(new URL('./微信记忆上下文.ts', 手机根), 'utf8');
 const 数据源 = readFileSync(new URL('./数据层.ts', 手机根), 'utf8');
+const 数据库桥源 = readFileSync(
+  new URL('../../src/人妻公寓/脚本/游戏逻辑/数据库桥.ts', import.meta.url),
+  'utf8',
+);
 
 test('私聊摘要不再只填事实：双方确认、本人边界和待续话题各归自己的有界槽位', () => {
   const 约定 = 合并本地微信进展摘要('', '夏乔', [
@@ -142,7 +146,24 @@ test('正文尾巴只能授权给最近一楼真正在场的本人', () => {
   assert.match(编译本人见证正文('102', ['102'], chat), /林悦把信封收进抽屉/);
 });
 
-test('三条生成路径共用同一知识边界，摘要成功后才按48/60条安全压缩', () => {
+test('SQLite 摘要只有获得确认后才压缩原始消息；后台待确认保持原文且不误判数据库不可用', () => {
+  const 社交起点 = 数据库桥源.indexOf('export async function 同步社交轨迹');
+  const 社交终点 = 数据库桥源.indexOf('function 取表', 社交起点);
+  assert.ok(社交起点 >= 0 && 社交终点 > 社交起点, '必须能定位社交轨迹写入函数');
+  const 社交函数 = 数据库桥源.slice(社交起点, 社交终点);
+
+  assert.match(社交函数, /Promise<数据库社交写入结果>/);
+  assert.match(社交函数, /SQL写入状态 === '已确认'[^\n]*return '已确认'/);
+  assert.match(社交函数, /SQL写入状态 === '已提交待定'[^\n]*return '待确认'/);
+  assert.doesNotMatch(社交函数, /SQL写入状态 === '已确认' \|\| SQL写入状态 === '已提交待定'[^\n]*return true/);
+
+  assert.equal((摘要源.match(/写入结果 === '已确认'/g) ?? []).length, 2, '私聊与群聊都只在确认后压缩');
+  assert.equal((摘要源.match(/写入结果 === '待确认'/g) ?? []).length, 2, '私聊与群聊都单独处理后台待确认');
+  assert.match(摘要源, /待确认[\s\S]{0,260}原始消息保持不动/);
+  assert.doesNotMatch(摘要源, /if \(写入结果\)[\s\S]{0,240}压缩微信会话记录/);
+});
+
+test('三条生成路径共用同一知识边界，摘要确认成功后才按48/60条安全压缩', () => {
   assert.doesNotMatch(交互源, /function 最近正文\(/);
   assert.match(交互源, /读取私聊记忆上下文/);
   assert.match(节拍源, /读取私聊记忆上下文/);
@@ -152,7 +173,7 @@ test('三条生成路径共用同一知识边界，摘要成功后才按48/60条
   assert.match(摘要源, /export function 排队刷新群聊进展摘要/);
   assert.match(摘要源, /私聊原始消息上限\s*=\s*48/);
   assert.match(摘要源, /群聊原始消息上限\s*=\s*60/);
-  assert.match(摘要源, /if \(已写入\)[\s\S]{0,240}压缩微信会话记录/);
+  assert.match(摘要源, /写入结果 === '已确认'[\s\S]{0,240}压缩微信会话记录/);
   assert.match(数据源, /图池容量\s*=\s*私聊图库清单/);
   assert.match(数据源, /图片轮换保护\.has\(消息\)/);
 });

@@ -90,7 +90,7 @@ interface 时间线状态 extends 数据库时间线持久状态 {
 export interface 主动快照选项 {
   /**
    * 没有可信回调时的保守恢复口。调用方必须先确认当前聊天已持续稳定足够久；
-   * 此路径只允许在聊天仍停留于原目标楼层时使用。
+   * 当前聊天可以已经产生新楼，但数据库快照仍必须严格停留在原冻结目标以内。
    */
   允许无回调恢复?: boolean;
 }
@@ -233,14 +233,42 @@ export class 数据库时间线栅栏 {
     const restored = 解析数据库时间线持久状态(value, 预期聊天标识);
     if (!restored) return false;
     const current = this.状态.get(restored.聊天标识);
-    if (
-      current &&
-      (current.标记时间 > restored.标记时间 ||
-        (current.标记时间 === restored.标记时间 && current.令牌 === restored.令牌))
-    ) {
-      return current.令牌 === restored.令牌;
+    if (!current) {
+      this.状态.set(restored.聊天标识, this.创建内存状态(restored));
+      return true;
     }
-    this.状态.set(restored.聊天标识, this.创建内存状态(restored));
+
+    // 宿主镜像与 sessionStorage 不是原子写；同毫秒连续删楼可能留下不同令牌。
+    // 时间戳相同无法证明谁更新，只能保留当前事务身份并合并成更严格的冻结边界。
+    // 更旧镜像也不得让调用方把仍有效的当前内存状态误判成“恢复失败”。
+    if (current.标记时间 > restored.标记时间) return true;
+    const 收窄目标 =
+      current.目标楼层 === null || restored.目标楼层 === null
+        ? null
+        : Math.min(current.目标楼层, restored.目标楼层);
+    const 最晚校验时间 = Math.max(current.最早校验时间, restored.最早校验时间);
+    if (current.标记时间 === restored.标记时间) {
+      const 约束变化 = current.目标楼层 !== 收窄目标 || current.最早校验时间 !== 最晚校验时间;
+      current.目标楼层 = 收窄目标;
+      current.最早校验时间 = 最晚校验时间;
+      if (约束变化) {
+        current.回调指纹 = null;
+        current.回调楼层 = null;
+        current.回调时间 = -1;
+        this.重置稳定采样(current);
+      }
+      return true;
+    }
+
+    // 新镜像可以推进令牌与标记时间，但同一未完成生命周期的目标仍只能收窄。
+    this.状态.set(
+      restored.聊天标识,
+      this.创建内存状态({
+        ...restored,
+        目标楼层: 收窄目标,
+        最早校验时间: 最晚校验时间,
+      }),
+    );
     return true;
   }
 
@@ -258,8 +286,9 @@ export class 数据库时间线栅栏 {
     const state = this.状态.get(聊天标识);
     if (!state?.待重建 || !聊天上下文稳定) return false;
     const 楼层 = 规范楼层(当前楼层);
-    // 栅栏验证目标在标记时冻结；等待期间楼层增长不能拿更宽的当前楼层替代。
-    if (楼层 === null || state.目标楼层 === null || 楼层 !== state.目标楼层) return false;
+    // 栅栏验证目标在标记时冻结；等待期间聊天可以继续增长，但绝不能拿更宽的当前楼层
+    // 替代数据库边界。下面的四表校验始终使用 state.目标楼层。
+    if (楼层 === null || state.目标楼层 === null || 楼层 < state.目标楼层) return false;
     if (!数据库快照未越过楼层(data, state.目标楼层)) return false;
     const fingerprint = 数据库游戏表快照指纹(data);
     if (fingerprint === null) return false;
@@ -284,7 +313,7 @@ export class 数据库时间线栅栏 {
     const state = this.状态.get(聊天标识);
     if (!state?.待重建 || 现在 < state.最早校验时间) return false;
     const 楼层 = 规范楼层(当前楼层);
-    if (楼层 === null || state.目标楼层 === null || 楼层 !== state.目标楼层) return false;
+    if (楼层 === null || state.目标楼层 === null || 楼层 < state.目标楼层) return false;
     if (!数据库快照未越过楼层(data, state.目标楼层)) {
       this.重置稳定采样(state);
       return false;
@@ -295,7 +324,12 @@ export class 数据库时间线栅栏 {
       return false;
     }
 
-    const 有匹配回调 = state.回调指纹 === fingerprint && state.回调楼层 === 楼层 && state.回调时间 >= state.标记时间;
+    const 有匹配回调 =
+      state.回调指纹 === fingerprint &&
+      state.回调楼层 !== null &&
+      state.回调楼层 >= state.目标楼层 &&
+      state.回调楼层 <= 楼层 &&
+      state.回调时间 >= state.标记时间;
     const 可保守恢复 = options.允许无回调恢复 === true && !/切换消息分支|swipe/i.test(state.原因);
     if (!有匹配回调 && !可保守恢复) {
       this.重置稳定采样(state);

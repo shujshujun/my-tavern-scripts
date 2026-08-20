@@ -17,6 +17,10 @@ const {
 } = require('../../src/人妻公寓/脚本/游戏逻辑/手机/壳/渲染/分页.ts');
 
 const App源码 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
+const 正文卷轴源码 = readFileSync(
+  new URL('../../src/人妻公寓/界面/客户端/components/正文卷轴.vue', import.meta.url),
+  'utf8',
+);
 const 微信渲染源码 = readFileSync(
   new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/壳/渲染/chat.ts', import.meta.url),
   'utf8',
@@ -84,6 +88,89 @@ test('正文热路径不再请求 0 到末楼，旧楼只由史册按钮按范�
   assert.match(App源码, /@click="加载更早史册"/);
   assert.match(App源码, /卷轴\.value = 合并卷轴页\(卷轴\.value, 新页\)/);
   assert.match(App源码, /await 取卷轴\(true\)/, '编辑旧楼后应保留玩家已经主动展开的史册范围');
+});
+
+test('卷轴读取、向前分页与编辑回调冻结共享时间线世代，旧聊天返回零写入新界面', () => {
+  const 取卷轴起点 = App源码.indexOf('async function 取卷轴(');
+  const 加载起点 = App源码.indexOf('async function 加载更早史册()');
+  const 编辑起点 = App源码.indexOf('const 编辑中楼 = ref');
+  assert.ok(取卷轴起点 >= 0 && 加载起点 > 取卷轴起点 && 编辑起点 > 加载起点, '必须能定位三条异步链');
+  const 取卷轴段 = App源码.slice(取卷轴起点, 加载起点);
+  const 加载段 = App源码.slice(加载起点, 编辑起点);
+  const 编辑段 = App源码.slice(编辑起点, App源码.indexOf('// ── 界面偏好', 编辑起点));
+
+  assert.match(取卷轴段, /const 请求时间线世代 = 当前时间线切换世代\(\)/, '末页读取冻结共享世代');
+  assert.match(
+    取卷轴段,
+    /if \(请求序号 !== 卷轴请求序号 \|\| 请求时间线世代 !== 当前时间线切换世代\(\)\) return/,
+    '末页返回后同时复核请求序号与共享世代',
+  );
+  const 末页赋值位置 = 取卷轴段.indexOf('卷轴.value = 条目');
+  const 末页复核位置 = 取卷轴段.indexOf('请求时间线世代 !== 当前时间线切换世代()');
+  assert.ok(末页复核位置 >= 0 && 末页赋值位置 > 末页复核位置, '旧末页不得先写新聊天卷轴');
+
+  assert.match(加载段, /const 请求时间线世代 = 当前时间线切换世代\(\)/, '向前分页冻结共享世代');
+  assert.match(
+    加载段,
+    /if \(请求序号 !== 卷轴请求序号 \|\| 请求时间线世代 !== 当前时间线切换世代\(\)\) return/,
+    '旧历史页返回后零合并',
+  );
+  assert.match(
+    加载段,
+    /await nextTick\(\);[\s\S]*?if \(请求时间线世代 !== 当前时间线切换世代\(\)\) return;[\s\S]*?容器\.scrollTop/,
+    '下一帧滚动锚也必须重新复核世代',
+  );
+
+  assert.match(编辑段, /let 编辑开始时间线世代 = -1/, '编辑器记录打开时的共享世代');
+  assert.match(编辑段, /编辑开始时间线世代 = 当前时间线切换世代\(\)/, '打开编辑时冻结世代');
+  assert.match(
+    编辑段,
+    /if \(编辑开始时间线世代 !== 当前时间线切换世代\(\)\) \{[\s\S]*?取消编辑\(\);[\s\S]*?return;/,
+    '旧分支编辑器在写入前失败关闭',
+  );
+  assert.match(
+    编辑段,
+    /await setChatMessages[\s\S]*?if \(保存时间线世代 !== 当前时间线切换世代\(\)\) \{[\s\S]*?return;/,
+    '宿主写入返回后旧世代不得刷新新聊天',
+  );
+  assert.match(
+    编辑段,
+    /catch \(e\) \{[\s\S]*?if \(保存时间线世代 === 当前时间线切换世代\(\)\)[\s\S]*?错误信息\.value = '改写失败:'/,
+    '旧聊天写入失败不得把错误横幅写进新聊天',
+  );
+});
+
+test('正文改写只在宿主写入成功后退出编辑，失败保留草稿且保存中拒绝重复提交', () => {
+  assert.match(App源码, /const 编辑保存中 = ref\(false\)/, '正文改写必须有独立同步保存门');
+  const 起点 = App源码.indexOf('async function 存编辑()');
+  const 终点 = App源码.indexOf('// ── 界面偏好', 起点);
+  assert.ok(起点 >= 0 && 终点 > 起点, '必须能定位正文改写函数');
+  const 保存段 = App源码.slice(起点, 终点);
+  assert.match(保存段, /if \(编辑保存中\.value\) return;/, '双击保存必须在第一次 await 前失败关闭');
+  assert.match(
+    保存段,
+    /编辑保存中\.value = true;[\s\S]*?await setChatMessages\(\[\{ message_id: 楼, message: 文 \}\], \{ refresh: 'none' \}\);/,
+    '必须先占保存门，再调用宿主写入',
+  );
+  const 写入位置 = 保存段.indexOf('await setChatMessages');
+  assert.doesNotMatch(保存段.slice(0, 写入位置), /编辑中楼\.value = null/, '宿主写入成功前不得关闭编辑器');
+  assert.match(
+    保存段,
+    /await setChatMessages[\s\S]*?await 取卷轴\(true\);[\s\S]*?编辑中楼\.value === 楼[\s\S]*?清空编辑状态\(\);/,
+    '核心写入及显示刷新成功、且仍是同一草稿后才清编辑状态',
+  );
+  assert.match(保存段, /catch \(e\) \{[\s\S]*?错误信息\.value = '改写失败:'/, '失败只报错，不清编辑状态');
+  assert.match(保存段, /finally \{[\s\S]*?编辑保存中\.value = false;/, '成功失败都必须释放保存门');
+  assert.match(App源码, /:editing-saving="编辑保存中"/, '正文卷轴必须获得保存中状态');
+  assert.match(App源码, /@cancel-edit="取消编辑"/, '取消入口必须走函数级保存门');
+  assert.match(正文卷轴源码, /editingSaving: boolean;/, '正文卷轴声明保存中 prop');
+  assert.match(正文卷轴源码, /:disabled="editingSaving"[\s\S]*?class="edit-area"/, '保存中禁用正文编辑框');
+  assert.match(
+    正文卷轴源码,
+    /:disabled="editingSaving \|\| !editingText\.trim\(\)"[\s\S]*?\{\{ editingSaving \? '落笔中…' : '落笔' \}\}/,
+    '保存按钮必须禁重复点击并显示进行中状态',
+  );
+  assert.match(正文卷轴源码, /:disabled="editingSaving" @click="emit\('cancelEdit'\)"/, '保存中不能取消并丢失请求上下文');
 });
 
 test('微信引用仍读取完整库，裂缝考古层不参与普通朋友圈分页', () => {

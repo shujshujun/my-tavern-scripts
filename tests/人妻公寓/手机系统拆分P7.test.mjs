@@ -66,6 +66,7 @@ test('壳/资源与皮肤 真实拥有全部资源定义，内核无重复声明
     资源与皮肤源码,
     /export const 成人素材基址 = 'https:\/\/testingcf\.jsdelivr\.net\/gh\/shujun8520-design\/qgy-assets@cg2\/cg1';/,
   );
+  assert.match(资源与皮肤源码, /export function 朋友圈图片地址\(图: unknown\): string \{/);
   assert.match(资源与皮肤源码, /export function 私聊图片地址\(图: string\): string \{/);
   assert.match(资源与皮肤源码, /export function 根文档\(\): Document \{/);
   assert.match(资源与皮肤源码, /export function el\(tag: string, cls: string, html\?: string\): HTMLElement \{/);
@@ -80,6 +81,7 @@ test('壳/资源与皮肤 真实拥有全部资源定义，内核无重复声明
     /const ROOT_ID = 'rq-phone-root';/,
     /const 素材基址 = /,
     /const 成人素材基址 = /,
+    /function 朋友圈图片地址\(/,
     /function 私聊图片地址\(/,
     /function 根文档\(/,
     /function el\(tag: string/,
@@ -121,7 +123,7 @@ test('资源符号由真实消费者 import：内核/挂载/红点/共享/六页
   // 六页面各自消费所需资源符号
   assert.match(渲染chats源码, /import \{ 头像块, el \} from '\.\.\/资源与皮肤';/);
   assert.match(渲染chat源码, /import \{ 头像块, el, 根文档, 群消息头像名, 私聊图片地址 \} from '\.\.\/资源与皮肤';/);
-  assert.match(渲染moments源码, /import \{ 头像块, el, 手机图标, 素材基址 \} from '\.\.\/资源与皮肤';/);
+  assert.match(渲染moments源码, /import \{ 头像块, el, 手机图标, 朋友圈图片地址 \} from '\.\.\/资源与皮肤';/);
   assert.match(渲染call源码, /import \{ 头像块, el, 手机图标 \} from '\.\.\/资源与皮肤';/);
   assert.match(渲染talk源码, /import \{ el \} from '\.\.\/资源与皮肤';/);
   assert.match(渲染settings源码, /import \{ el \} from '\.\.\/资源与皮肤';/);
@@ -130,7 +132,9 @@ test('资源符号由真实消费者 import：内核/挂载/红点/共享/六页
   assert.match(渲染chat源码, /群消息头像名\(会话, m\.文, 对方头像名\)/);
   assert.match(渲染chat源码, /根文档\(\)\.activeElement === ta/);
   assert.match(渲染chats源码, /头像块\(友\.类 === '群'/);
-  assert.match(渲染moments源码, /素材基址\}\/微信圈\//);
+  assert.match(渲染moments源码, /朋友圈图片地址\(c\.图\)/);
+  assert.match(渲染moments源码, /朋友圈图片地址\(`仅你可见\/\$\{c\.谁\}_\$\{c\.私\.图序\}`\)/);
+  assert.match(渲染moments源码, /朋友圈图片地址\(条\.图\)/);
   assert.match(渲染moments源码, /手机图标\('lock'\)/);
   assert.match(渲染call源码, /头像块\('父亲'\)/);
   assert.match(渲染talk源码, /el\('div', `rqp-line/);
@@ -139,7 +143,7 @@ test('资源符号由真实消费者 import：内核/挂载/红点/共享/六页
   const 全消费者 =
     `${资源与皮肤源码}\n${内核源码}\n${挂载源码}\n${红点开合源码}\n${渲染共享源码}\n` +
     `${渲染chats源码}\n${渲染chat源码}\n${渲染moments源码}\n${渲染call源码}\n${渲染talk源码}\n${渲染settings源码}`;
-  for (const 符号 of ['ROOT_ID', '素材基址', '成人素材基址', '私聊图片地址', '手机图标路径', '手机图标', '手机CSS', '头像块', '群消息头像名', '根文档', 'el']) {
+  for (const 符号 of ['ROOT_ID', '素材基址', '成人素材基址', '朋友圈图片地址', '私聊图片地址', '手机图标路径', '手机图标', '手机CSS', '头像块', '群消息头像名', '根文档', 'el']) {
     assert.ok(全消费者.includes(符号), `资源符号 ${符号} 应有真实消费者`);
   }
 });
@@ -154,7 +158,12 @@ test('资源与皮肤 不反向 import 内核/门面，只依赖 stageConfig 叶
 });
 
 test('两个素材基址版本与 @adult/、普通微信圈地址编码/后缀规则保持', () => {
-  const { 私聊图片地址, 素材基址, 成人素材基址 } = 执行TS片段(资源主体(), ['私聊图片地址', '素材基址', '成人素材基址']);
+  const { 朋友圈图片地址, 私聊图片地址, 素材基址, 成人素材基址 } = 执行TS片段(资源主体(), [
+    '朋友圈图片地址',
+    '私聊图片地址',
+    '素材基址',
+    '成人素材基址',
+  ]);
   assert.equal(素材基址, 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.55/dist/人妻公寓/素材');
   assert.equal(成人素材基址, 'https://testingcf.jsdelivr.net/gh/shujun8520-design/qgy-assets@cg2/cg1');
 
@@ -168,6 +177,11 @@ test('两个素材基址版本与 @adult/、普通微信圈地址编码/后缀�
     `${素材基址}/微信圈/${encodeURIComponent('名字 带空格')}/${encodeURIComponent('相')}.webp`,
   );
   assert.equal(私聊图片地址('纯一级'), `${素材基址}/微信圈/${encodeURIComponent('纯一级')}.webp`);
+  assert.equal(朋友圈图片地址('夏乔/美食_2'), 私聊图片地址('夏乔/美食_2'));
+  assert.equal(
+    朋友圈图片地址('坏图.webp" onerror="x=1'),
+    `${素材基址}/微信圈/${encodeURIComponent('坏图.webp" onerror="x=1')}.webp`,
+  );
   // 成人：@adult/ 前缀剥除，逐段编码，无 .webp 后缀
   assert.equal(
     私聊图片地址('@adult/苏晚/夜色'),
@@ -235,24 +249,27 @@ test('头像块父亲/丈夫影子规则、姐妹群/群头像规则保持', () 
   const { 头像块 } = 执行TS片段(资源主体(), ['头像块']);
   // 父亲与丈夫共用柯南影子头像
   assert.match(头像块('父亲'), /avatar-shadow/, '父亲头像应使用影子语义框');
-  assert.match(头像块('父亲'), /头像\/影子\.webp/, '父亲头像应指向 影子.webp');
+  assert.match(decodeURIComponent(头像块('父亲')), /头像\/影子\.webp/, '父亲头像应指向 影子.webp');
   assert.match(头像块('阿远'), /avatar-shadow/, '丈夫头像应使用影子语义框');
   assert.match(头像块('大刘'), /avatar-shadow/);
-  assert.match(头像块('阿远'), /头像\/影子\.webp/);
+  assert.match(decodeURIComponent(头像块('阿远')), /头像\/影子\.webp/);
   // 妻子（非夫非父）走本人图，无影子
   assert.doesNotMatch(头像块('夏乔'), /avatar-/);
-  assert.match(头像块('夏乔'), /头像\/夏乔\.webp/);
+  assert.match(decodeURIComponent(头像块('夏乔')), /头像\/夏乔\.webp/);
   // 主角特殊框、群/姐妹群群像框
   assert.match(头像块('主角'), /avatar-main/);
   assert.match(头像块('群'), /avatar-group/);
-  assert.match(头像块('群'), /头像\/群\.webp/);
+  assert.match(decodeURIComponent(头像块('群')), /头像\/群\.webp/);
   assert.match(头像块('姐妹群'), /avatar-group/);
-  assert.match(头像块('姐妹群'), /头像\/姐妹群\.webp/);
+  assert.match(decodeURIComponent(头像块('姐妹群')), /头像\/姐妹群\.webp/);
   // 陌生名字回退本人图而非影子
   assert.doesNotMatch(头像块('路人'), /avatar-/);
-  assert.match(头像块('路人'), /头像\/路人\.webp/);
-  // 图挂了回退首字符兜底保留
-  assert.match(头像块('夏乔'), /this\.parentElement\.textContent='夏'/, '头像 onerror 回退首字符保留');
+  assert.match(decodeURIComponent(头像块('路人')), /头像\/路人\.webp/);
+  // 图挂了只用常量纯文本回退；不得把持久角色名拼进内联事件属性。
+  assert.match(头像块('夏乔'), /this\.parentElement\.textContent='\?'/, '头像 onerror 使用常量回退');
+  const 异常头像 = 头像块(`x" onerror="globalThis.__rq=1`);
+  assert.equal((异常头像.match(/\sonerror=/g) ?? []).length, 1);
+  assert.doesNotMatch(异常头像, /onerror="[^"]*globalThis/);
 });
 
 test('群消息合法发言人白名单与头像归属规则保持', () => {
@@ -272,7 +289,7 @@ test('群消息合法发言人白名单与头像归属规则保持', () => {
 
 test('门面仍纯 re-export，无资源定义残留', () => {
   assert.match(门面源码, /export \* from '\.\/手机\/内核';/);
-  for (const 模式 of [/const ROOT_ID/, /const 素材基址/, /const 成人素材基址/, /const 手机CSS/, /function 头像块/, /function 群消息头像名/, /function 私聊图片地址/, /function 手机图标/]) {
+  for (const 模式 of [/const ROOT_ID/, /const 素材基址/, /const 成人素材基址/, /const 手机CSS/, /function 头像块/, /function 群消息头像名/, /function 朋友圈图片地址/, /function 私聊图片地址/, /function 手机图标/]) {
     assert.doesNotMatch(门面源码, 模式, `门面不应定义:${模式}`);
   }
 });
@@ -709,13 +726,13 @@ test('渲染模块均不反向 import 内核/门面，子页不 import 调度器
   }
   // 业务端口四回调唯一 + P8:交互模块注册（内核只做副作用接线）
   assert.match(业务端口源码, /export interface 手机渲染业务端口 \{/);
-  for (const 职责 of ['绑定玩家微信撤回', '读赴约条', '约出来', '发消息']) {
+  for (const 职责 of ['绑定玩家微信撤回', '读赴约条', '约多人出来', '发消息']) {
     assert.ok(业务端口源码.includes(职责), `业务端口应覆盖:${职责}`);
   }
   assert.match(交互源码, /注册手机渲染业务端口\(\{/);
   assert.match(交互源码, /绑定玩家微信撤回,/);
   assert.match(交互源码, /读赴约条,/);
-  assert.match(交互源码, /约出来,/);
+  assert.match(交互源码, /约多人出来,/);
   assert.match(交互源码, /发消息,/);
   assert.doesNotMatch(内核源码, /注册手机渲染业务端口\(/);
   // 页面经 取渲染业务端口 使用，不直接 import 内核
@@ -724,7 +741,8 @@ test('渲染模块均不反向 import 内核/门面，子页不 import 调度器
   assert.match(渲染chat源码, /取渲染业务端口\(\)\?\.读赴约条/);
   // v0.80:发送入口从单聊"+"面板迁到安排邀约页(WeUI 设置页),仍经同一业务端口发起。
   const 渲染invite源码 = readFileSync(new URL('./壳/渲染/invite.ts', 手机目录), 'utf8');
-  assert.match(渲染invite源码, /取渲染业务端口\(\)\?\.约出来\(m, 计划\)/);
+  assert.match(渲染invite源码, /const 端口 = 取渲染业务端口\(\)/);
+  assert.match(渲染invite源码, /void 端口\.约多人出来\(邀请成员, 共享安排\)/);
 });
 
 test('调度器保持 -1 未就绪语义、时间线放行、渲染世代/批次清理、父亲/会议页面合法化与六页分派', () => {

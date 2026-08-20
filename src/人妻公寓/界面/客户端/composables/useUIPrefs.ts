@@ -8,7 +8,7 @@
  * 边界：只承载纯 UI/浏览器状态。MVU/模型解析业务设置（更新路线、内置解析、解析通道、
  * 自定义 API 表单）留在 设置弹窗.vue，不进入本文件。
  */
-import { computed, ref, watchEffect, type Ref } from 'vue';
+import { computed, ref, shallowRef, watchEffect, type Ref } from 'vue';
 import { 同步画幅 as 默认同步画幅 } from '../viewport';
 import type { 移动端全屏选择, 全屏根, 全屏文档 } from '../types';
 
@@ -27,6 +27,12 @@ const 主题存储键 = '人妻公寓_夜间模式';
 const 移动端全屏引导存储键 = 'rqgy-mobile-fullscreen-guide-v1';
 
 function 创建UIPrefs(options: UIPrefs选项) {
+  // 单例会跨 Vue App 重挂载复用；依赖必须可替换，不能永久捕获第一次 App 的 refs/回调。
+  const 当前选项 = shallowRef(options);
+  const 更新选项 = (新选项: UIPrefs选项): void => {
+    当前选项.value = 新选项;
+  };
+
   // ── 设置开关 ──
 
   const 设置开 = ref(false);
@@ -73,7 +79,7 @@ function 创建UIPrefs(options: UIPrefs选项) {
 
   const 应用画幅 = (开: boolean) => {
     document.documentElement.classList.toggle('rqgy-full', 开);
-    (options.syncViewport ?? 默认同步画幅)();
+    (当前选项.value.syncViewport ?? 默认同步画幅)();
   };
 
   const 进真全屏 = async () => {
@@ -89,7 +95,7 @@ function 创建UIPrefs(options: UIPrefs选项) {
       await 进真全屏();
     } catch (e) {
       console.warn('[人妻公寓客户端] 移动端真全屏失败:', e);
-      options.reportFullscreenError?.('浏览器拒绝进入全屏，请允许网页全屏后再点一次');
+      当前选项.value.reportFullscreenError?.('浏览器拒绝进入全屏，请允许网页全屏后再点一次');
       全屏中.value = true;
       应用画幅(true);
     }
@@ -193,23 +199,37 @@ function 创建UIPrefs(options: UIPrefs选项) {
 
   /** 恢复界面偏好(主题三档/字号/垫板/省流/减动效/立绘)；只读纯 UI 字段,解析字段由设置组件恢复。 */
   function 恢复设置() {
+    // 每次挂载先回到合法默认，避免坏 JSON、缺字段或上一个 App 的内存值污染新实例。
+    主题模式.value = '日间';
+    字号档.value = '中';
+    正文字色.value = '';
+    垫板浓度.value = 0.66;
+    省流.value = false;
+    减动效.value = false;
+    立绘显示.value = true;
+
     try {
+      const 旧主题 = localStorage.getItem(主题存储键) === '1' ? '夜间' : '日间';
+      主题模式.value = 旧主题;
       const raw = localStorage.getItem(设置存储键);
       if (raw) {
-        const s = JSON.parse(raw);
-        if (s.主题模式) 主题模式.value = s.主题模式;
-        else 主题模式.value = localStorage.getItem(主题存储键) === '1' ? '夜间' : '日间'; // 旧键迁移
-        if (s.字号档) 字号档.value = s.字号档;
-        if (typeof s.正文字色 === 'string') 正文字色.value = s.正文字色;
-        if (typeof s.垫板浓度 === 'number') 垫板浓度.value = s.垫板浓度;
-        省流.value = !!s.省流;
-        减动效.value = !!s.减动效;
+        const s = JSON.parse(raw) as Record<string, unknown>;
+        if (s.主题模式 === '日间' || s.主题模式 === '夜间' || s.主题模式 === '跟随') {
+          主题模式.value = s.主题模式;
+        }
+        if (s.字号档 === '小' || s.字号档 === '中' || s.字号档 === '大') 字号档.value = s.字号档;
+        if (typeof s.正文字色 === 'string' && /^(?:#[\da-fA-F]{6})?$/.test(s.正文字色)) {
+          正文字色.value = s.正文字色;
+        }
+        if (typeof s.垫板浓度 === 'number' && Number.isFinite(s.垫板浓度)) {
+          垫板浓度.value = Math.min(1, Math.max(0.2, s.垫板浓度));
+        }
+        if (typeof s.省流 === 'boolean') 省流.value = s.省流;
+        if (typeof s.减动效 === 'boolean') 减动效.value = s.减动效;
         if (typeof s.立绘显示 === 'boolean') 立绘显示.value = s.立绘显示;
-      } else {
-        主题模式.value = localStorage.getItem(主题存储键) === '1' ? '夜间' : '日间';
       }
     } catch {
-      /* 读不到就用默认 */
+      /* 读不到或 JSON 损坏时沿用上方合法默认 */
     }
     应用界面偏好();
   }
@@ -242,7 +262,9 @@ function 创建UIPrefs(options: UIPrefs选项) {
   };
 
   /** 主题「跟随」时按游戏时段推日夜(晚上/深夜=暗) */
-  const 时段偏暗 = computed(() => options.timePeriod?.value === '晚上' || options.timePeriod?.value === '深夜');
+  const 时段偏暗 = computed(
+    () => 当前选项.value.timePeriod?.value === '晚上' || 当前选项.value.timePeriod?.value === '深夜',
+  );
 
   // 主题结算全响应式：挂载恢复、切档或显式世界时段更新后，跟随模式同步日夜配色。
   // 任何一路动到依赖都立刻重算,不再依赖手工调用点的时序
@@ -326,13 +348,15 @@ function 创建UIPrefs(options: UIPrefs选项) {
     初始化,
     销毁,
     设置存储键,
+    更新选项,
   };
 }
 
 let 单例: ReturnType<typeof 创建UIPrefs> | undefined;
 
-/** 模块级单例：App 首次带选项调用，设置弹窗组件后续无参调用拿到同一组状态。 */
+/** 模块级单例：组件无参调用共享状态；App 每次重挂载带选项时更新依赖所有权。 */
 export function useUIPrefs(options?: UIPrefs选项) {
-  单例 ??= 创建UIPrefs(options ?? {});
+  if (!单例) 单例 = 创建UIPrefs(options ?? {});
+  else if (options) 单例.更新选项(options);
   return 单例;
 }

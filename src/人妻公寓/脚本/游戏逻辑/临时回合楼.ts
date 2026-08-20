@@ -54,6 +54,17 @@ export interface 遗留临时楼恢复判定 {
 export type 转正更新负载 = Array<{ message_id: number; message: string; extra: Record<string, unknown> }>;
 export type 写入转正消息 = (负载: 转正更新负载, 选项: { refresh: 'none' | 'all' }) => void | Promise<void>;
 
+/**
+ * 临时楼既要保留当前尾楼容器里的 display/delta 等 MVU 元数据，又必须使用调用方已经
+ * 通过“最近有效楼”回退与结构闸门验证的完整 stat。末楼自身可能正处于 MVU 异步继承
+ * 窗口，直接解析它的空 `stat_data` 会被 Schema 默认成新局并污染整轮基准。
+ */
+export function 构造临时楼继承容器<T extends Record<string, unknown>>(当前容器: T, 完整stat: unknown): T {
+  const 继承 = structuredClone(当前容器) as Record<string, unknown>;
+  继承['stat_data'] = structuredClone(完整stat);
+  return 继承 as T;
+}
+
 function 消息extra(消息: unknown): Record<string, unknown> | null {
   const extra = (消息 as { extra?: unknown } | null)?.extra;
   return extra && typeof extra === 'object' && !Array.isArray(extra) ? (extra as Record<string, unknown>) : null;

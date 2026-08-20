@@ -96,7 +96,7 @@ test('props/emits 接线、ref 公开接口完整；显示结果严格守 open &
   const 模板段 = 提取模板(App源码);
   assert.match(
     模板段,
-    /<MapPopup\b[\s\S]*?:open="显示地图 && 就绪"[\s\S]*?:data="data"[\s\S]*?:current-room="当前房间"[\s\S]*?:day="天数"[\s\S]*?:weekday="星期"[\s\S]*?:period="时段"[\s\S]*?:lite="省流"[\s\S]*?:sending="发送中"[\s\S]*?:avatar-failed="头像失效"[\s\S]*?:avatar-image="头像图"[\s\S]*?:avatar-name="头像名"[\s\S]*?:room-people="房内的人"[\s\S]*?:window-lit="窗灯"[\s\S]*?:management-badge="管理任务角标"[\s\S]*?:rent-owed="欠租中"[\s\S]*?:room-actions="房间动作"[\s\S]*?@close="关地图"[\s\S]*?@outing="从地图外出"[\s\S]*?@avatar-error="头像失效\[\$event\] = true"[\s\S]*?\/>/,
+    /<MapPopup\b[\s\S]*?:open="显示地图 && 就绪"[\s\S]*?:data="data"[\s\S]*?:current-room="当前房间"[\s\S]*?:day="天数"[\s\S]*?:weekday="星期"[\s\S]*?:period="时段"[\s\S]*?:lite="省流"[\s\S]*?:sending="发送中 \|\| 场景剧情移动锁"[\s\S]*?:avatar-failed="头像失效"[\s\S]*?:avatar-image="头像图"[\s\S]*?:avatar-name="头像名"[\s\S]*?:room-people="房内的人"[\s\S]*?:window-lit="窗灯"[\s\S]*?:management-badge="管理任务角标"[\s\S]*?:rent-owed="欠租中"[\s\S]*?:room-actions="房间动作"[\s\S]*?@close="关地图"[\s\S]*?@outing="从地图外出"[\s\S]*?@avatar-error="头像失效\[\$event\] = true"[\s\S]*?\/>/,
     'MapPopup tag 全部 props/emits 接线',
   );
   assert.match(
@@ -119,8 +119,13 @@ test('props/emits 接线、ref 公开接口完整；显示结果严格守 open &
   );
   assert.match(地图源码, /defineExpose\(\{ 显示结果 \}\)/, 'defineExpose 显示结果');
   assert.doesNotMatch(App源码, /if \(显示地图\.value && 房卡\.value\) 结果卡\.value = 消息;/, 'App 不再直写结果卡');
-  assert.match(App源码, /if \(!地图弹窗\.value\?\.显示结果\(消息\)\) \{/, '独立事件反馈改调公开接口');
-  assert.match(App源码, /if \(消息\.startsWith\('【'\)\) 拾获卡\.value = 消息;[\s\S]{0,80}else 弹提示\(消息\);/, '拾获/toast 分支保留');
+  assert.match(App源码, /const 文本 = typeof 消息 === 'string' \? 消息\.trim\(\) : '';/, '独立事件先规范空白与非字符串输入');
+  assert.match(App源码, /if \(文本 && !地图弹窗\.value\?\.显示结果\(文本\)\) \{/, '规范后的独立事件反馈改调公开接口');
+  assert.match(
+    App源码,
+    /if \(文本\.startsWith\('【'\)\) 拾获卡队列\.value = 追加拾获提示\(拾获卡队列\.value, 文本\);[\s\S]{0,80}else 弹提示\(文本\);/,
+    '重要反馈进入 FIFO 队列，普通反馈仍走 toast',
+  );
   assert.doesNotMatch(地图源码, /eventEmit\(|eventOn\(/, '组件不含事件总线写入');
 });
 
@@ -220,6 +225,14 @@ test('组件局部状态/派生完整；素材来自 ../assets，无 ?url；关�
   assert.match(地图源码, /\{ id: '管理员室', 名: '管理员室', x: 37, y: 74 \}/, '点位坐标数值');
   assert.match(地图源码, /const 底层公共 = \[[\s\S]*?\{ id: '垃圾房', 名称: '垃圾房' \}/, '底层公共区');
   assert.doesNotMatch(地图源码, /(?:png|webp)\?url/, '组件不得出现 png?url / webp?url');
+});
+
+test('房卡遮罩层必须压过医院与外出入口，打开弹窗后底部导航不可穿透误触', () => {
+  const 外出层 = 地图源码.match(/\.outing-launch,[\s\S]*?z-index:\s*(\d+);/)?.[1];
+  const 房卡层 = 地图源码.match(/\.rc-mask\s*\{[\s\S]*?z-index:\s*(\d+);/)?.[1];
+  assert.ok(外出层, '必须能读取医院／外出入口层级');
+  assert.ok(房卡层, '必须能读取房卡遮罩层级');
+  assert.ok(Number(房卡层) > Number(外出层), '房卡打开后必须覆盖并拦截医院／外出入口');
 });
 
 test('地图专属 CSS 已从 App 移除且在组件；组件引基础 CSS 并复制共享规则；App 仍保留共享规则', () => {

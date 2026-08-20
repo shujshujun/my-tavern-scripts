@@ -15,7 +15,9 @@ process.env.TS_NODE_COMPILER_OPTIONS = JSON.stringify({
 const require = createRequire(import.meta.url);
 require('ts-node/register/transpile-only');
 
-const { Schema } = require('../../src/人妻公寓/schema.ts');
+const { Schema, 创建户节点 } = require('../../src/人妻公寓/schema.ts');
+const { 荣耀洞表 } = require('../../src/人妻公寓/stageConfig.ts');
+const { seededRandom } = require('../../src/人妻公寓/脚本/游戏逻辑/楼层时钟.ts');
 const { 使用荣耀洞, 规范荣耀洞上次时段, 同一荣耀洞拍仍保留 } = require('../../src/人妻公寓/脚本/游戏逻辑/荣耀洞.ts');
 const 界面源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
 
@@ -39,6 +41,22 @@ test('负值哨兵代表从未使用，绝对时段 0 不应被误判为冷却�
   assert.equal(result.变动, true);
   assert.doesNotMatch(result.提示, /今天已经用过/);
   assert.equal(data.系统._荣耀洞上次时段, 0);
+});
+
+test('医院硬锁中的妻子不得进入荣耀洞签筒', () => {
+  const 时段 = Array.from({ length: 500 }, (_, index) => index).find(
+    value => seededRandom(value, '101', '荣耀洞') < 荣耀洞表['101'].几率,
+  );
+  assert.notEqual(时段, undefined, '测试窗口内必须存在 101 原本会命中的稳定时段');
+  const 节点 = 创建户节点(0);
+  节点.妻.当前阶段 = 5;
+  节点.妻._生产.状态 = '住院中';
+  const data = Schema.parse({ 户: { 101: 节点 }, 系统: { _绝对时段: 时段 } });
+
+  const result = 使用荣耀洞(data, 时段);
+
+  assert.equal(result.变动, true);
+  assert.equal(data.系统._荣耀洞门牌, '空', '住院角色不能被传送到公共洗手间参加成人特殊场景');
 });
 
 test('荣耀洞界面与业务端共用同一时段水位归一函数', () => {

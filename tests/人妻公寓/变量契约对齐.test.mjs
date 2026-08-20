@@ -12,8 +12,10 @@ const require = createRequire(import.meta.url);
 require('ts-node/register/transpile-only');
 
 const YAML = require('yaml');
+const z = require('zod');
 const { Schema, 当前MVU数据版本, 验证当前MVU存档版本 } = require('../../src/人妻公寓/schema.ts');
 
+const schemaJSON路径 = new URL('../../src/人妻公寓/schema.json', import.meta.url);
 const initvar路径 = new URL('../../src/人妻公寓/世界书/变量/initvar.yaml', import.meta.url);
 const 更新规则路径 = new URL('../../src/人妻公寓/世界书/变量/变量更新规则.yaml', import.meta.url);
 const 输出格式路径 = new URL('../../src/人妻公寓/世界书/变量/变量输出格式.yaml', import.meta.url);
@@ -33,12 +35,20 @@ function 对象路径(value, prefix = '') {
   });
 }
 
-test('initvar 与 Schema 默认结构逐键一致，动态户表除外', () => {
-  const Schema默认 = Schema.parse(initvar);
+test('initvar 与 Schema 默认结构及默认值完整一致，动态户表除外', () => {
+  const Schema默认 = Schema.parse({});
   const 过滤户 = paths => paths.filter(path => path !== '户' && !path.startsWith('户.')).sort();
 
   assert.deepEqual(过滤户(对象路径(initvar)), 过滤户(对象路径(Schema默认)));
+  assert.deepEqual(initvar, Schema默认);
   assert.equal(initvar.系统._数据版本, 当前MVU数据版本);
+});
+
+test('schema.json 与 Schema 当前输入契约完整一致', () => {
+  const 现有JSONSchema = JSON.parse(readFileSync(schemaJSON路径, 'utf8'));
+  const 运行时生成 = z.toJSONSchema(Schema, { io: 'input', reused: 'ref' });
+
+  assert.deepEqual(现有JSONSchema, 运行时生成);
 });
 
 test('v9 新局契约移除系统操作中字段，并迁移 v7/v8 存档', () => {

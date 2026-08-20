@@ -844,7 +844,8 @@ const 地图点位 = computed(() =>
 .rc-mask {
   position: absolute;
   inset: 0;
-  z-index: 3;
+  /* 必须压过 z-index:5 的医院／外出入口；房卡打开时底部导航不可穿透。 */
+  z-index: 8;
   display: grid;
   place-items: center;
   padding: 14px;

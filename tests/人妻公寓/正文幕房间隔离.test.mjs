@@ -44,10 +44,24 @@ test('无新正文的时间推进保持旧幕失效；有独立演出或普通�
   assert.equal(正文幕属于当前房间(普通回合后, '管理员室'), true, '未带选项的既有回合保持原绑定语义');
 });
 
+test('独立事件撤回删除演出后必须作废当前幕，不能把存活旧楼冒充本房间新正文', () => {
+  const 处理起点 = App源码.indexOf("eventOn('人妻公寓:隔离事件完成'");
+  const 处理终点 = App源码.indexOf("eventOn('人妻公寓:回合失败'", 处理起点);
+  const 处理段 = App源码.slice(处理起点, 处理终点);
+
+  assert.match(处理段, /async \(载荷\?[^)]*\) =>/);
+  assert.match(处理段, /载荷\?\.类型 === '撤回'[\s\S]*?作废正文幕归属/);
+  assert.doesNotMatch(处理段, /正文幕归属状态\.value = 创建正文幕归属\(当前房间\.value\);/);
+});
+
 test('App 与时间事务按是否真正产生正文更新幕归属', () => {
   assert.match(App源码, /eventOn\('人妻公寓:回合完成', async \(选项\?[^)]*\) => \{/);
   assert.match(App源码, /应用回合完成正文幕\([\s\S]*?选项[\s\S]*?\)/);
-  assert.match(App源码, /if \(下一状态\.房间变化\)[\s\S]*?作废正文幕归属/);
+  assert.match(
+    App源码,
+    /if \(下一状态\.房间变化 \|\| 时间线变化\)[\s\S]*?作废正文幕归属/,
+    '换房或同房间切分支都必须作废旧幕',
+  );
 
   const 时间段 = 游戏入口源码.slice(
     游戏入口源码.indexOf('function 处理时间推进('),

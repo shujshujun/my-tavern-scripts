@@ -599,6 +599,52 @@
           "default": "",
           "type": "string"
         },
+        "_场景剧情序号": {
+          "default": 0,
+          "type": "number"
+        },
+        "_场景剧情事务": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "id": {
+              "default": "",
+              "type": "string"
+            },
+            "标题": {
+              "default": "",
+              "type": "string"
+            },
+            "目标场景": {
+              "default": "",
+              "type": "string"
+            },
+            "行动": {
+              "default": "",
+              "type": "string"
+            },
+            "内容": {
+              "default": "",
+              "type": "string"
+            },
+            "触发绝对时段": {
+              "default": -1,
+              "type": "number"
+            },
+            "触发楼层": {
+              "default": -1,
+              "type": "number"
+            },
+            "请求世代": {
+              "default": 0,
+              "type": "number"
+            },
+            "状态": {
+              "default": "",
+              "type": "string"
+            }
+          }
+        },
         "_已注入事件": {
           "default": {},
           "type": "object",
@@ -890,6 +936,7 @@
             "type": "string"
           },
           "additionalProperties": {
+            "default": false,
             "type": "boolean"
           }
         },
@@ -1022,6 +1069,20 @@
                   "等级加成已用": {
                     "default": false,
                     "type": "boolean"
+                  },
+                  "有效楼数": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "已退出": {
+                    "type": "boolean"
+                  },
+                  "退出方式": {
+                    "type": "string",
+                    "enum": [
+                      "角色中止"
+                    ]
                   }
                 }
               }
@@ -1083,6 +1144,14 @@
                     "items": {
                       "type": "string"
                     }
+                  },
+                  "有效楼数": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "结束方式": {
+                    "type": "string"
                   },
                   "时长评价": {
                     "default": "太短",

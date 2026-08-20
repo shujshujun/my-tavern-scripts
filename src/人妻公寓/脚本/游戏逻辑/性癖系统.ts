@@ -4,6 +4,7 @@ import { 提交阶段性癖线路节点 } from './阶段线路系统';
 import { 阶段性癖可开启, 阶段性癖已完成, 阶段性癖门牌 } from './阶段性癖状态';
 import { 事件角色标记 } from './snapshotSystem';
 import { 读取医院内容策略 } from './生产系统';
+import { 有场景剧情阻塞 } from './场景剧情事务';
 
 export interface 阶段性癖结果 {
   成功: boolean;
@@ -38,7 +39,7 @@ export function 准备开启阶段性癖(data: SchemaType, 门牌号: 门牌): �
   if (阶段性癖已完成(data, 门牌号)) return { 成功: false, 提示: `「${id}」已经永久完成。` };
   if (已有同一开幕事件(data, 门牌号, id)) return { 成功: false, 提示: `「${id}」已经在等待演出。` };
   if (data.系统._特殊场景.id) return { 成功: false, 提示: '眼下已有一场特殊事件正在进行。' };
-  if (data.系统._待发送事件) return { 成功: false, 提示: '眼下已有一桩事在发生——先把它演完。' };
+  if (有场景剧情阻塞(data)) return { 成功: false, 提示: '眼下已有一桩事在发生——先把它演完。' };
   if (!阶段性癖可开启(data, 门牌号)) return { 成功: false, 提示: '她的阶段线路还没有走到这次开幕。' };
   if (!读取医院内容策略(data, 门牌号).允许普通阶段推进) {
     return { 成功: false, 提示: '她目前正在医院，阶段开幕要等出院后再继续。' };

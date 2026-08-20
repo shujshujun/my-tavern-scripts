@@ -57,7 +57,7 @@ export function 是入住登场事件(事件: string): boolean {
   return 识别入住登场预约(事件) !== null;
 }
 
-export type 本轮事件来源 = '重放' | '待发送' | '入住延期' | '无';
+export type 本轮事件来源 = '重放' | '待发送' | '入住延期' | '场景延期' | '无';
 
 export interface 本轮事件冻结 {
   楼层: number;
@@ -72,6 +72,25 @@ export interface 本轮事件选择输入 {
   已注入?: { 楼层?: number; 内容?: string } | null;
   待发送?: string;
   入住场景可用: boolean;
+}
+
+/**
+ * 这里只需要冻结队首逻辑票，不能为了一个纯门函数反向依赖完整场景事务模块：
+ * 部分 Node 测试以原生 ESM 直接加载本文件，扩展名解析与浏览器打包器不同。
+ */
+function 读取队首场景剧情内容(value: string): string {
+  const items = String(value ?? '')
+    .split('|')
+    .map(item => item.trim())
+    .filter(Boolean);
+  if (!items.length) return '';
+  const 取ID = (item: string) => item.match(/【场景剧情:v1:([^:】]*):[^】]*】/)?.[1] ?? '';
+  const firstID = 取ID(items[0]);
+  let count = 1;
+  if (firstID) {
+    while (count < items.length && 取ID(items[count]) === firstID) count += 1;
+  }
+  return items.slice(0, count).join('|');
 }
 
 /**
@@ -95,7 +114,8 @@ export function 选择本轮事件(输入: 本轮事件选择输入): 本轮事�
     return { 楼层: 输入.楼层, 内容: '', 来源: '无', 待发送快照: '' };
   }
 
-  if (是入住登场事件(待发送) && !输入.入住场景可用) {
+  const 队首 = 读取队首场景剧情内容(待发送);
+  if (是入住登场事件(队首) && !输入.入住场景可用) {
     return {
       楼层: 输入.楼层,
       内容: '',
@@ -106,7 +126,7 @@ export function 选择本轮事件(输入: 本轮事件选择输入): 本轮事�
 
   return {
     楼层: 输入.楼层,
-    内容: 待发送,
+    内容: 队首,
     来源: '待发送',
     待发送快照: 待发送,
   };
@@ -127,7 +147,7 @@ export function 事件必须有正文(事件: string): boolean {
   return (
     是入住登场事件(事件) ||
     带阶段性癖开幕标记(事件) ||
-    /【(?:特殊场景·|丈夫登门:|转折正戏】|药物首夜】|早饭桌】|破墙】)/.test(事件) ||
+    /【(?:特殊场景·|丈夫登门:|转折正戏】|药物首夜】|早饭桌】|破墙】|场景行动】)/.test(事件) ||
     /【阶段线路剧情:\d{3}:\d+:\d+:[^】]+】/.test(事件) ||
     /【阶段线路演出:\d{3}:\d+:\d+:[^:】]*:[^】]*】/.test(事件)
   );
@@ -140,6 +160,8 @@ export function 事件必须有正文(事件: string): boolean {
 export function 本轮事件可提交(冻结: 本轮事件冻结, 当前待发送: string, 实际楼层: number, 有效正文: boolean): boolean {
   if (冻结.来源 !== '待发送') return false;
   if (冻结.楼层 !== 实际楼层) return false;
-  if (!冻结.待发送快照 || 当前待发送 !== 冻结.待发送快照) return false;
+  if (!冻结.待发送快照) return false;
+  const 当前队首 = 读取队首场景剧情内容(当前待发送);
+  if (!当前队首 || 当前队首 !== 冻结.内容) return false;
   return !事件必须有正文(冻结.内容) || 有效正文;
 }

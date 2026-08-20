@@ -2,11 +2,282 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { 规范OpenAI兼容API地址, 规范变量解析通道, 读取变量解析通道, 选择变量解析通道 } from '../../src/人妻公寓/MVU解析模式.ts';
+import * as MVU解析模式 from '../../src/人妻公寓/MVU解析模式.ts';
+import {
+  写入变量解析偏好,
+  写入变量解析通道,
+  内置变量解析开启,
+  内置变量解析等待宿主刷新,
+  规范OpenAI兼容API地址,
+  规范变量解析通道,
+  读取MVU解析状态,
+  读取变量解析偏好,
+  读取变量解析通道,
+  安排宿主刷新以应用MVU设置,
+  选择变量解析通道,
+  自动代关MVU自动请求,
+} from '../../src/人妻公寓/MVU解析模式.ts';
 
 const 读 = 路径 => readFileSync(new URL(`../../${路径}`, import.meta.url), 'utf8');
 const 引擎源码 = 读('src/人妻公寓/脚本/游戏逻辑/回合引擎.ts');
+const 入口源码 = 读('src/人妻公寓/脚本/游戏逻辑/index.ts');
 const 设置源码 = 读('src/人妻公寓/界面/客户端/components/设置弹窗.vue');
+
+test('旧版 MVU 顶层自动请求键也会被启动自愈关闭，避免与游戏内置解析双发', () => {
+  const 原window存在 = Object.prototype.hasOwnProperty.call(globalThis, 'window');
+  const 原window = globalThis.window;
+  const 原SillyTavern存在 = Object.prototype.hasOwnProperty.call(globalThis, 'SillyTavern');
+  const 原SillyTavern = globalThis.SillyTavern;
+  const 存储 = new Map();
+  let 保存次数 = 0;
+  const localStorage = {
+    getItem: key => (存储.has(key) ? 存储.get(key) : null),
+    setItem: (key, value) => 存储.set(key, String(value)),
+  };
+  const mvu设置 = {
+    更新方式: '额外模型解析',
+    自动触发额外模型解析: true,
+  };
+  const 宿主 = {
+    localStorage,
+    SillyTavern: {
+      extensionSettings: { mvu_settings: mvu设置 },
+      saveSettingsDebounced: () => {
+        保存次数 += 1;
+      },
+    },
+  };
+
+  try {
+    globalThis.window = { parent: 宿主, localStorage };
+    delete globalThis.SillyTavern;
+    assert.equal(读取MVU解析状态().自动请求, true, '前置条件：状态读取确实兼容旧键');
+    assert.equal(自动代关MVU自动请求(), true, '内置解析开启时旧键也必须真正关闭');
+    assert.equal(mvu设置.自动触发额外模型解析, false);
+    assert.equal(读取MVU解析状态().自动请求, false);
+    assert.equal(内置变量解析等待宿主刷新(), true, '持久层已改但 MVU Pinia 未重载时必须挂运行期闸门');
+    assert.equal(内置变量解析开启(), false, '等待父页刷新期间游戏内置解析失败关闭，不能和旧 MVU 副本双发');
+    assert.equal(保存次数, 1, '持久设置只保存一次');
+  } finally {
+    if (原window存在) globalThis.window = 原window;
+    else delete globalThis.window;
+    if (原SillyTavern存在) globalThis.SillyTavern = 原SillyTavern;
+    else delete globalThis.SillyTavern;
+  }
+});
+
+test('MVU 自动请求键缺失时按上游默认开启处理，自愈必须显式写 false', () => {
+  const 原window存在 = Object.prototype.hasOwnProperty.call(globalThis, 'window');
+  const 原window = globalThis.window;
+  const 原SillyTavern存在 = Object.prototype.hasOwnProperty.call(globalThis, 'SillyTavern');
+  const 原SillyTavern = globalThis.SillyTavern;
+  const 存储 = new Map();
+  let 保存次数 = 0;
+  const localStorage = {
+    getItem: key => (存储.has(key) ? 存储.get(key) : null),
+    setItem: (key, value) => 存储.set(key, String(value)),
+  };
+  const mvu设置 = { 更新方式: '额外模型解析' };
+  const 宿主 = {
+    localStorage,
+    SillyTavern: {
+      extensionSettings: { mvu_settings: mvu设置 },
+      saveSettingsDebounced: () => {
+        保存次数 += 1;
+      },
+    },
+  };
+
+  try {
+    globalThis.window = { parent: 宿主, localStorage };
+    delete globalThis.SillyTavern;
+    assert.equal(读取MVU解析状态().自动请求, true, '缺键按 MVU 当前默认值视为开启');
+    assert.equal(自动代关MVU自动请求(), true);
+    assert.equal(mvu设置.额外模型解析配置.启用自动请求, false, '必须创建最小覆盖值显式关闭默认开启');
+    assert.equal(保存次数, 1);
+    assert.equal(内置变量解析开启(), false, 'MVU 运行时副本刷新前继续失败关闭');
+  } finally {
+    if (原window存在) globalThis.window = 原window;
+    else delete globalThis.window;
+    if (原SillyTavern存在) globalThis.SillyTavern = 原SillyTavern;
+    else delete globalThis.SillyTavern;
+  }
+});
+
+test('启动自愈保存失败必须原位回滚并抛错，不能挂着刷新闸门继续进入双解析风险态', () => {
+  const 原window存在 = Object.prototype.hasOwnProperty.call(globalThis, 'window');
+  const 原window = globalThis.window;
+  const 原SillyTavern存在 = Object.prototype.hasOwnProperty.call(globalThis, 'SillyTavern');
+  const 原SillyTavern = globalThis.SillyTavern;
+  const localStorage = { getItem: () => null, setItem: () => undefined };
+  const 外置配置 = { 启用自动请求: true, 模型来源: '自定义' };
+  const mvu设置 = {
+    更新方式: '额外模型解析',
+    自动触发额外模型解析: true,
+    额外模型解析配置: 外置配置,
+  };
+  const 宿主 = {
+    localStorage,
+    SillyTavern: {
+      extensionSettings: { mvu_settings: mvu设置 },
+      saveSettingsDebounced() {
+        assert.equal(this, 宿主.SillyTavern, '宿主保存必须保留方法 this');
+        throw new Error('settings save rejected');
+      },
+    },
+  };
+  const 原设置引用 = mvu设置;
+  const 原配置引用 = 外置配置;
+
+  try {
+    globalThis.window = { parent: 宿主, localStorage };
+    delete globalThis.SillyTavern;
+    assert.throws(() => 自动代关MVU自动请求(), /settings save rejected|保存/);
+    assert.equal(宿主.SillyTavern.extensionSettings.mvu_settings, 原设置引用, 'MVU 设置对象必须原位恢复');
+    assert.equal(mvu设置.额外模型解析配置, 原配置引用, '嵌套配置对象也必须原位恢复');
+    assert.equal(mvu设置.额外模型解析配置.启用自动请求, true);
+    assert.equal(mvu设置.自动触发额外模型解析, true);
+    assert.equal(内置变量解析等待宿主刷新(), false, '保存失败不得留下永久等待刷新闸门');
+    assert.equal(内置变量解析开启(), true, '失败后状态应保持原样，由调用方明确停止或回退开关');
+  } finally {
+    if (原window存在) globalThis.window = 原window;
+    else delete globalThis.window;
+    if (原SillyTavern存在) globalThis.SillyTavern = 原SillyTavern;
+    else delete globalThis.SillyTavern;
+  }
+});
+
+test('自定义模型配置与解析通道原子提交：任一持久层失败都回滚，成功只保存一次', () => {
+  const 保存自定义变量解析设置 = MVU解析模式.保存自定义变量解析设置;
+  assert.equal(typeof 保存自定义变量解析设置, 'function', '必须由单一事务函数同时提交 MVU 配置与游戏通道');
+
+  const 原window存在 = Object.prototype.hasOwnProperty.call(globalThis, 'window');
+  const 原window = globalThis.window;
+  const 原SillyTavern存在 = Object.prototype.hasOwnProperty.call(globalThis, 'SillyTavern');
+  const 原SillyTavern = globalThis.SillyTavern;
+  const 存储 = new Map([
+    ['人妻公寓_界面偏好', JSON.stringify({ 变量解析通道: '自动', 省流: true })],
+  ]);
+  let 拒绝偏好写入 = true;
+  const localStorage = {
+    getItem: key => (存储.has(key) ? 存储.get(key) : null),
+    setItem: (key, value) => {
+      if (拒绝偏好写入) throw new Error('quota exceeded');
+      存储.set(key, String(value));
+    },
+    removeItem: key => 存储.delete(key),
+  };
+  let 保存次数 = 0;
+  let 拒绝MVU保存 = false;
+  const mvu设置 = {
+    更新方式: '额外模型解析',
+    保留字段: '不得丢',
+    额外模型解析配置: { 模型来源: '与插头相同', api地址: 'https://old.example/v1', 保留配置: 7 },
+  };
+  const 宿主 = {
+    localStorage,
+    SillyTavern: {
+      extensionSettings: { mvu_settings: mvu设置 },
+      saveSettingsDebounced: () => {
+        if (拒绝MVU保存) throw new Error('save failed');
+        保存次数 += 1;
+      },
+    },
+  };
+
+  try {
+    globalThis.window = { parent: 宿主, localStorage };
+    delete globalThis.SillyTavern;
+    const 初始MVU = structuredClone(mvu设置);
+    const 初始偏好 = 存储.get('人妻公寓_界面偏好');
+    assert.equal(
+      保存自定义变量解析设置({ api地址: 'https://new.example/v1', 密钥: 'key', 模型名称: 'model-a' }),
+      false,
+      'localStorage 拒绝时整笔提交失败',
+    );
+    assert.deepEqual(mvu设置, 初始MVU, '通道偏好失败不得留下半份 MVU 配置');
+    assert.equal(存储.get('人妻公寓_界面偏好'), 初始偏好);
+    assert.equal(保存次数, 0);
+
+    拒绝偏好写入 = false;
+    assert.equal(
+      保存自定义变量解析设置({ api地址: 'https://new.example/v1', 密钥: 'key', 模型名称: 'model-a' }),
+      true,
+    );
+    assert.equal(mvu设置.额外模型解析配置.模型来源, '自定义');
+    assert.equal(mvu设置.额外模型解析配置.api地址, 'https://new.example/v1');
+    assert.equal(mvu设置.额外模型解析配置.保留配置, 7, '事务补丁不得覆盖 MVU 其他配置');
+    assert.equal(JSON.parse(存储.get('人妻公寓_界面偏好')).变量解析通道, '自定义');
+    assert.equal(JSON.parse(存储.get('人妻公寓_界面偏好')).省流, true, '事务写偏好必须合并保留 UI 字段');
+    assert.equal(保存次数, 1, '成功事务只调一次宿主保存');
+
+    const 成功后MVU = structuredClone(mvu设置);
+    const 成功后偏好 = 存储.get('人妻公寓_界面偏好');
+    拒绝MVU保存 = true;
+    assert.equal(
+      保存自定义变量解析设置({ api地址: 'https://late.example/v1', 密钥: 'late', 模型名称: 'model-b' }),
+      false,
+      '宿主保存同步拒绝时整笔提交失败',
+    );
+    assert.deepEqual(mvu设置, 成功后MVU, '宿主保存失败必须原位恢复 MVU 对象');
+    assert.equal(存储.get('人妻公寓_界面偏好'), 成功后偏好, '宿主保存失败必须恢复通道偏好');
+  } finally {
+    if (原window存在) globalThis.window = 原window;
+    else delete globalThis.window;
+    if (原SillyTavern存在) globalThis.SillyTavern = 原SillyTavern;
+    else delete globalThis.SillyTavern;
+  }
+});
+
+test('解析通道单独持久化必须报告成功或失败，不能在隐私模式中假装已经切换', () => {
+  const 原window存在 = Object.prototype.hasOwnProperty.call(globalThis, 'window');
+  const 原window = globalThis.window;
+  const localStorage = {
+    getItem: () => JSON.stringify({ 变量解析通道: '自定义' }),
+    setItem: () => {
+      throw new Error('blocked');
+    },
+  };
+  try {
+    globalThis.window = { parent: { localStorage }, localStorage };
+    assert.equal(写入变量解析通道('自动'), false);
+  } finally {
+    if (原window存在) globalThis.window = 原window;
+    else delete globalThis.window;
+  }
+});
+
+test('解析开关偏好统一走父页存储、合并保留其他 UI 字段，并报告真实写入失败', () => {
+  const 原window存在 = Object.prototype.hasOwnProperty.call(globalThis, 'window');
+  const 原window = globalThis.window;
+  const 存储 = new Map([
+    ['人妻公寓_界面偏好', JSON.stringify({ 省流: true, 内置变量解析: false })],
+  ]);
+  let 拒绝写入 = false;
+  const localStorage = {
+    getItem: key => (存储.has(key) ? 存储.get(key) : null),
+    setItem: (key, value) => {
+      if (拒绝写入) throw new Error('blocked');
+      存储.set(key, String(value));
+    },
+  };
+  try {
+    globalThis.window = { parent: { localStorage }, localStorage: { getItem: () => null, setItem: () => undefined } };
+    assert.deepEqual(读取变量解析偏好(), { 内置变量解析: false, 严格变量审计: false });
+    assert.equal(写入变量解析偏好({ 内置变量解析: true, 严格变量审计: true }), true);
+    assert.deepEqual(JSON.parse(存储.get('人妻公寓_界面偏好')), {
+      省流: true,
+      内置变量解析: true,
+      严格变量审计: true,
+    });
+    拒绝写入 = true;
+    assert.equal(写入变量解析偏好({ 内置变量解析: false }), false);
+    assert.equal(JSON.parse(存储.get('人妻公寓_界面偏好')).内置变量解析, true, '失败不得改写旧偏好');
+  } finally {
+    if (原window存在) globalThis.window = 原window;
+    else delete globalThis.window;
+  }
+});
 
 test('路由矩阵：自动 数据库可用优先于自定义', () => {
   assert.equal(选择变量解析通道('自动', true, true), '数据库');
@@ -77,6 +348,75 @@ test('读取MVU外置模型配置 JSDoc 不再声称数据库/正文通道兜底
   assert.match(JSDoc段, /绝不回落正文 API/, 'JSDoc 明确配置缺失绝不回落正文 API');
 });
 
+test('运行期闸门从安排刷新起保持失败关闭，并刷新真正的父页面', async () => {
+  const 原window存在 = Object.prototype.hasOwnProperty.call(globalThis, 'window');
+  const 原window = globalThis.window;
+  const 存储 = new Map();
+  let 刷新次数 = 0;
+  const localStorage = {
+    getItem: key => (存储.has(key) ? 存储.get(key) : null),
+    setItem: (key, value) => 存储.set(key, String(value)),
+  };
+  const 宿主 = {
+    localStorage,
+    location: { reload: () => (刷新次数 += 1) },
+  };
+  try {
+    globalThis.window = { parent: 宿主, localStorage };
+    assert.equal(内置变量解析开启(), true);
+    assert.equal(安排宿主刷新以应用MVU设置(0), true);
+    assert.equal(内置变量解析等待宿主刷新(), true);
+    assert.equal(内置变量解析开启(), false, '刷新回调执行前也不得短暂启用内置解析');
+    await new Promise(resolve => setTimeout(resolve, 10));
+    assert.equal(刷新次数, 1, '必须刷新父级酒馆页面，而不是只重载角色卡 iframe');
+  } finally {
+    if (原window存在) globalThis.window = 原window;
+    else delete globalThis.window;
+  }
+});
+
+test('设置页运行中重新打开内置解析时，先落盘，再失败关闭并安排宿主刷新', () => {
+  const 解析模式源码 = 读('src/人妻公寓/MVU解析模式.ts');
+  assert.match(设置源码, /自动代关MVU自动请求/, '设置组件必须接入统一自愈函数');
+  assert.match(设置源码, /写入变量解析偏好/, '解析开关必须走可报告失败的共享父页持久层');
+  assert.match(设置源码, /读取变量解析偏好/, '解析开关恢复必须与游戏逻辑共用同一默认值和存储锚点');
+  assert.doesNotMatch(设置源码.replace(/<!--[^]*?-->/g, ''), /\blocalStorage\b/, '组件实现不得另写一套 iframe localStorage');
+  assert.match(设置源码, /安排宿主刷新以应用MVU设置/, '设置组件必须刷新父页才能重载 MVU Pinia 副本');
+  assert.match(解析模式源码, /export function 自动代关MVU自动请求/, '自愈函数保持单一事实来源');
+
+  const 起点 = 设置源码.indexOf('function 切换内置变量解析()');
+  const 终点 = 设置源码.indexOf('function 切换严格变量审计()', 起点);
+  assert.ok(起点 >= 0 && 终点 > 起点, '必须能定位内置解析切换函数');
+  const 段 = 设置源码.slice(起点, 终点);
+  const 持久化位 = 段.indexOf('持久化解析字段()');
+  const 自愈位 = 段.indexOf('自动代关MVU自动请求()');
+  const 刷新位 = 段.indexOf('安排宿主刷新以应用MVU设置()');
+  assert.ok(持久化位 >= 0 && 自愈位 > 持久化位, '必须先把新开关落盘，再让自愈读取最新内置解析状态');
+  assert.ok(刷新位 > 自愈位, '确实代关后必须再安排完整宿主刷新');
+  assert.match(段, /if \(!持久化解析字段\(\)\)[\s\S]*?内置变量解析\.value = 原值/, '第一步偏好保存失败必须恢复页面选中态');
+  assert.match(段, /const 需要刷新宿主 = 内置变量解析\.value && 自动代关MVU自动请求\(\)/, '只在重新打开且确实代关时刷新');
+  assert.match(段, /catch \{[\s\S]*?内置变量解析\.value = 原值[\s\S]*?const 已回滚 = 持久化解析字段\(\)/, '第二步 MVU 保存失败必须恢复旧开关');
+  assert.match(段, /if \(!已回滚\) 挂起内置变量解析直至宿主刷新\(\)/, '连偏好回滚都失败时必须在本页失败关闭');
+  assert.match(段.slice(刷新位), /return;/, '安排刷新后停止本次设置流程，不继续宣称运行时已完全同步');
+});
+
+test('启动自愈确实代关时停止后续挂载，等待父页刷新后才启用业务监听', () => {
+  const pending起点 = 入口源码.indexOf('if (内置变量解析等待宿主刷新())');
+  const 自愈起点 = 入口源码.indexOf('if (自动代关MVU自动请求())');
+  const 终点 = 入口源码.indexOf('// 必须先于监听与 UI 操作恢复', 自愈起点);
+  assert.ok(pending起点 >= 0 && 自愈起点 > pending起点 && 终点 > 自愈起点, '必须先检查遗留父页闸门，再进入启动自愈');
+  const pending段 = 入口源码.slice(pending起点, 自愈起点);
+  assert.match(pending段, /return;/, '只重载 iframe 时必须停止挂载，不能清掉父页闸门后继续');
+  assert.match(pending段, /完整宿主刷新/, '给玩家明确的完整刷新提示');
+
+  const 段 = 入口源码.slice(自愈起点, 终点);
+  const 自愈位 = 段.indexOf('自动代关MVU自动请求()');
+  const 刷新位 = 段.indexOf('安排宿主刷新以应用MVU设置()');
+  const 返回位 = 段.indexOf('return;', 刷新位);
+  assert.ok(刷新位 > 自愈位 && 返回位 > 刷新位, '代关后必须安排父页刷新并退出本轮初始化');
+  assert.match(段, /timeOut: 0, extendedTimeOut: 0/, '自动刷新失败时必须留下不会自动消失的手动刷新提示');
+});
+
 test('设置页不再出现"正文API"按钮，文案说明无可用独立模型时提示配置', () => {
   assert.doesNotMatch(设置源码, />正文API</, '正文API分段按钮已删除');
   assert.doesNotMatch(设置源码, /选择解析通道\('正文'\)/, '正文通道点击已删除');
@@ -130,22 +470,26 @@ test('模型列表逐项转字符串、trim、去空、去重并排序；下拉�
   assert.match(设置源码, /v-model="解析API表单\.模型名称"/, '下拉选择绑定表单草稿(模型名称)');
 });
 
-test('存在“保存并启用”按钮与独立提交函数：只有它写 MVU 配置，写入成功后才写自定义通道', () => {
+test('存在“保存并启用”按钮与独立提交函数：模型配置与自定义通道只走单一原子事务', () => {
   assert.match(设置源码, />保存并启用<\/button>/, '存在明确保存并启用按钮');
   assert.doesNotMatch(设置源码, /function 提交解析API表单/, '失焦自动提交函数已删除');
   assert.doesNotMatch(设置源码, /@change="提交解析API表单"|@blur="提交解析API表单"/, '不再有失焦自动提交');
   const 保存段 = 设置源码.slice(设置源码.indexOf('function 保存并启用'), 设置源码.indexOf('</script>'));
-  assert.match(保存段, /const 成功 = 写入MVU设置\(\{/, '保存函数调用 写入MVU设置 并保留返回值');
-  assert.match(保存段, /if \(成功\)[\s\S]{0,80}写入变量解析通道\('自定义'\)/, '写入成功后才写自定义解析通道');
-  assert.doesNotMatch(保存段, /写入变量解析通道\('自动'\)/, '保存函数只写自定义通道');
-  // 切通道分段按钮不写 MVU 配置、不立即写自定义通道（自定义只走完整表单+保存）
+  assert.match(
+    保存段,
+    /const 成功 = 保存自定义变量解析设置\(\{/,
+    '保存函数调用同时提交 MVU 配置与自定义通道的事务入口并保留返回值',
+  );
+  assert.match(保存段, /if \(成功\)[\s\S]{0,100}解析通道\.value = '自定义'/, '事务成功后才更新页面选中态');
+  assert.doesNotMatch(保存段, /写入MVU设置\(|写入变量解析通道\('自定义'\)/, '保存函数不得恢复拆成两笔的半提交模式');
+  // 切通道分段按钮不写 MVU 配置、不立即持久化自定义通道（自定义只走完整表单+保存）
   const 通道段 = 设置源码.slice(设置源码.indexOf('function 选择解析通道'), 设置源码.indexOf('function 保存并启用'));
   assert.doesNotMatch(通道段, /写入MVU设置/, '切通道按钮不写 MVU 配置');
   assert.doesNotMatch(通道段, /写入变量解析通道\('自定义'\)/, '切自定义按钮不立即写自定义通道');
   assert.equal(
     (设置源码.match(/写入变量解析通道\('自定义'\)/g) ?? []).length,
-    1,
-    '自定义通道只由保存函数写入一次',
+    0,
+    '自定义通道不再存在独立第二笔写入',
   );
 });
 

@@ -59,7 +59,11 @@ export function 清除末尾裸JSON补丁(正文: string): string {
 
 export function 清除末尾残缺协议标签(正文: string): string {
   let 结果 = String(正文 ?? '').trim();
-  const 残缺标签 = 结果.match(/<\/?([A-Za-z_\u3400-\u9fff][A-Za-z0-9_\u3400-\u9fff~:-]*)$/);
+  // 流式也可能在标签名后、属性尚未闭合时截断，例如 `<尺度判定 模式="`。
+  // 这仍是一个未完成的协议标签，不能被非空判断误认成正文。
+  const 残缺标签 = 结果.match(
+    /<\/?([A-Za-z_\u3400-\u9fff][A-Za-z0-9_\u3400-\u9fff~:-]*)(?:\s[^<>]*)?$/,
+  );
   const 协议标签 = [
     'think',
     'thinking',

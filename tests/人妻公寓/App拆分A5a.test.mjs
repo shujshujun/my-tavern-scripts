@@ -91,12 +91,12 @@ test('props/emits 接线完整：背包九事件、商店状态函数、useOpera
   const 模板段 = 提取模板(App源码);
   assert.match(
     模板段,
-    /<InventoryPopup\b[\s\S]*?:open="显示背包"[\s\S]*?:items="背包列表"[\s\S]*?:sending="发送中"[\s\S]*?:item-failed="道具图失效"[\s\S]*?:item-image="道具图"[\s\S]*?@close="显示背包 = false"[\s\S]*?@image-error="道具图失效\[\$event\] = true"[\s\S]*?@read="打开信"[\s\S]*?@deploy="布设"[\s\S]*?@use-resource="用资源道具"[\s\S]*?@use-operation="用运作"[\s\S]*?@play-tape="使用录像带"[\s\S]*?@prepare-meeting="打开静音会议筹备"[\s\S]*?@gift="送出"[\s\S]*?\/>/,
+    /<InventoryPopup\b[\s\S]*?:open="显示背包"[\s\S]*?:items="背包列表"[\s\S]*?:sending="场景操作锁"[\s\S]*?:item-failed="道具图失效"[\s\S]*?:item-image="道具图"[\s\S]*?@close="显示背包 = false"[\s\S]*?@image-error="道具图失效\[\$event\] = true"[\s\S]*?@read="打开信"[\s\S]*?@deploy="布设"[\s\S]*?@use-resource="用资源道具"[\s\S]*?@use-operation="用运作"[\s\S]*?@play-tape="使用录像带"[\s\S]*?@prepare-meeting="打开静音会议筹备"[\s\S]*?@gift="送出"[\s\S]*?\/>/,
     '背包 tag 全部 props/emits 接线',
   );
   assert.match(
     模板段,
-    /<ShopPopup\b[\s\S]*?:open="显示商店"[\s\S]*?:cash="data\.现金"[\s\S]*?:sending="发送中"[\s\S]*?:shelves="货架"[\s\S]*?:item-failed="道具图失效"[\s\S]*?:item-image="道具图"[\s\S]*?:item-visual="道具视觉信息"[\s\S]*?:lock-reasons="商品锁定原因"[\s\S]*?:purchase-label="商品购买文案"[\s\S]*?:purchase-disabled="商品不可购买"[\s\S]*?:price-label="商品价格文案"[\s\S]*?@close="显示商店 = false"[\s\S]*?@image-error="道具图失效\[\$event\] = true"[\s\S]*?@buy="买"[\s\S]*?\/>/,
+    /<ShopPopup\b[\s\S]*?:open="显示商店"[\s\S]*?:cash="data\.现金"[\s\S]*?:sending="场景操作锁"[\s\S]*?:shelves="货架"[\s\S]*?:item-failed="道具图失效"[\s\S]*?:item-image="道具图"[\s\S]*?:item-visual="道具视觉信息"[\s\S]*?:lock-reasons="商品锁定原因"[\s\S]*?:purchase-label="商品购买文案"[\s\S]*?:purchase-disabled="商品不可购买"[\s\S]*?:price-label="商品价格文案"[\s\S]*?@close="显示商店 = false"[\s\S]*?@image-error="道具图失效\[\$event\] = true"[\s\S]*?@buy="买"[\s\S]*?\/>/,
     '商店 tag 全部 props/emits 接线',
   );
   // 组件 emits 强类型契约
@@ -105,14 +105,18 @@ test('props/emits 接线完整：背包九事件、商店状态函数、useOpera
     /defineEmits<\{[\s\S]*?useOperation: \[itemId: string, door\?: 门牌, candidate\?: 阶段线路候选\]/,
     'useOperation 三参数签名',
   );
+  assert.match(背包源码, /defineEmits<\{[\s\S]*?gift: \[itemId: string, door: 门牌\]/, 'gift 签名');
+  assert.doesNotMatch(背包源码, /load: \[itemId: string, door: 门牌\]/, '下线的性癖装载事件不应残留');
+  assert.match(
+    商店源码,
+    /defineEmits<\{ close: \[\]; imageError: \[id: string\]; buy: \[itemId: string\] \}>/,
+    '商店三事件签名',
+  );
   assert.match(
     背包源码,
-    /defineEmits<\{[\s\S]*?gift: \[itemId: string, door: 门牌\]/,
-    'gift 签名',
+    /emit\('useOperation', 项\.id, 项\.全局线路候选\?\.门牌, 项\.全局线路候选\)/,
+    '背包内 useOperation 三参数调用保持',
   );
-  assert.doesNotMatch(背包源码, /load: \[itemId: string, door: 门牌\]/, '下线的性癖装载事件不应残留');
-  assert.match(商店源码, /defineEmits<\{ close: \[\]; imageError: \[id: string\]; buy: \[itemId: string\] \}>/, '商店三事件签名');
-  assert.match(背包源码, /emit\('useOperation', 项\.id, 项\.全局线路候选\?\.门牌, 项\.全局线路候选\)/, '背包内 useOperation 三参数调用保持');
   assert.match(背包源码, /emit\('useOperation', 项\.id, 候选\.门牌, 候选\)/, '全局多线候选三参数调用保持');
   assert.match(背包源码, /emit\('useOperation', 项\.id, 夫\.门牌\)/, '户向运作两参数调用保持');
   // close 只置显示状态

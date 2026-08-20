@@ -24,7 +24,7 @@ const 转义 = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const 驼峰转中划线 = s => s.replace(/([A-Z])/g, '-$1').toLowerCase();
 
-/** 组件 props 契约（18 项，与 spec 一致） */
+/** 组件 props 契约（19 项，与当前保存中状态一致） */
 const 期望props = [
   'veiled',
   'inScene',
@@ -37,6 +37,7 @@ const 期望props = [
   'entries',
   'editingFloor',
   'editingText',
+  'editingSaving',
   'streamSegments',
   'runtimeStage',
   'waitSeconds',
@@ -93,8 +94,12 @@ test('App 不再内联正文卷轴/到场卡/生成中文字；组件持有全�
   assert.match(组件模板, /class="hint"/, '到场提示');
   assert.match(组件模板, /v-for="\(条, i\) in inScene \? entries : \[\]"/, '条目循环只在幕中');
   assert.match(组件模板, /条\.楼 !== undefined && 条\.楼 === editingFloor/, '编辑只在有楼且等于编辑楼');
-  assert.match(组件模板, /:value="editingText" class="edit-area" rows="8"/, 'textarea 值经 prop 回 App');
-  assert.match(组件模板, /:disabled="!editingText\.trim\(\)"/, '保存 disabled 看 trim');
+  assert.match(
+    组件模板,
+    /:value="editingText"[\s\S]*?:disabled="editingSaving"[\s\S]*?class="edit-area"[\s\S]*?rows="8"/,
+    'textarea 值经 prop 回 App，保存中禁用',
+  );
+  assert.match(组件模板, /:disabled="editingSaving \|\| !editingText\.trim\(\)"/, '保存 disabled 同时看忙态与 trim');
   assert.match(组件模板, /emit\('saveEdit'\)/, '落笔只 emit');
   assert.match(组件模板, /emit\('cancelEdit'\)/, '作罢只 emit');
   assert.match(组件模板, /条\.谁 === '叙事' && 条\.楼 !== undefined && 条\.楼 > 0 && !sending/, '楼层提示词门不变');
@@ -121,12 +126,12 @@ test('App 不再内联正文卷轴/到场卡/生成中文字；组件持有全�
   assert.match(组件模板, /:class="\{ 'story-veiled': veiled \}"/, '组件根把 veiled 映射到 story-veiled');
 });
 
-test('18 个 props 与 9 个 emits 强类型完整，App 接线逐项存在；编辑/提示词/头像错误/取消重试原参数回 App', () => {
+test('19 个 props 与 9 个 emits 强类型完整，App 接线逐项存在；编辑/提示词/头像错误/取消重试原参数回 App', () => {
   const props声明 = 组件源码.match(/defineProps<\{[\s\S]*?\}>\(\)/)?.[0] ?? '';
   const emits声明 = 组件源码.match(/defineEmits<\{[\s\S]*?\}>\(\)/)?.[0] ?? '';
   assert.ok(props声明, '组件应声明 defineProps');
   assert.ok(emits声明, '组件应声明 defineEmits');
-  assert.equal((props声明.match(/^ {2}[A-Za-z]+(?=:)/gm) || []).length, 18, 'props 应为 18 项');
+  assert.equal((props声明.match(/^ {2}[A-Za-z]+(?=:)/gm) || []).length, 19, 'props 应为 19 项');
   assert.equal((emits声明.match(/^ {2}[A-Za-z]+(?=:)/gm) || []).length, 9, 'emits 应为 9 项');
   for (const 名 of 期望props) {
     assert.match(props声明, new RegExp(`\\b${名}:`), `props 契约应有 ${名}`);
@@ -138,7 +143,7 @@ test('18 个 props 与 9 个 emits 强类型完整，App 接线逐项存在；�
   }
   // 原参数回 App：编辑文本/编辑楼、提示词、头像错误、取消/重试
   assert.match(App源码, /@update-editing-text="编辑文本 = \$event"/, '编辑文本原值回 App');
-  assert.match(App源码, /@cancel-edit="编辑中楼 = null"/, '作罢清编辑楼');
+  assert.match(App源码, /@cancel-edit="取消编辑"/, '作罢走函数级保存门');
   assert.match(App源码, /@save-edit="存编辑"/, '落笔接存编辑');
   assert.match(App源码, /@edit-entry="开编辑"/, '铅笔接开编辑');
   assert.match(App源码, /@open-floor-prompt="打开楼层提示词"/, '楼层提示词接原 handler');

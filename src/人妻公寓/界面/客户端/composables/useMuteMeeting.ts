@@ -30,6 +30,7 @@ import {
 import { 户静态表 } from '../../../stageConfig';
 // 只读纯业务判定，不能经手机系统组合根把宿主手机渲染副作用带进客户端 iframe。
 import { 获取静音会议手机状态 } from '../../../脚本/游戏逻辑/手机/静音会议旁路';
+import { 处于医院硬锁 } from '../../../脚本/游戏逻辑/生产系统';
 import { 版本素材基址 } from '../assets';
 import type {
   静音会议互动ID,
@@ -157,6 +158,7 @@ export function useMuteMeeting(options: 静音会议选项) {
       if (!户) 原因.push('尚未入住');
       if (户 && 户.妻.当前阶段 < 4) 原因.push(`当前 L${户.妻.当前阶段}，需要 L4`);
       if (户 && !户.妻.特殊.some(项 => 项.includes('遥控跳蛋'))) 原因.push('未装载遥控跳蛋');
+      if (户 && 处于医院硬锁(data.value, 门牌)) 原因.push('正在医院，不能参加成人特殊场景');
       return {
         门牌,
         妻名: 户静态表[门牌].妻名,
@@ -530,11 +532,15 @@ export function useMuteMeeting(options: 静音会议选项) {
     return 相对路径 ? `${版本素材基址}/${相对路径}` : '';
   });
 
-  function 静音会议图加载成功() {
+  function 静音会议图加载成功(加载地址: string) {
+    // 旧拍的图片事件可能在参与者／画面状态已经切换后迟到；只能认领仍是当前 URL 的请求。
+    if (!加载地址 || 加载地址 !== 静音会议当前图地址.value) return;
     静音会议图已加载.value = true;
   }
 
-  function 静音会议图加载失败() {
+  function 静音会议图加载失败(失败地址: string) {
+    // 旧图失败不得推进新拍的回退序号，否则会跳过新拍首选图甚至直接落到空占位。
+    if (!失败地址 || 失败地址 !== 静音会议当前图地址.value) return;
     静音会议图已加载.value = false;
     if (静音会议图回退序号.value < 静音会议图状态序列.value.length) 静音会议图回退序号.value += 1;
   }
@@ -617,17 +623,35 @@ export function useMuteMeeting(options: 静音会议选项) {
     endMeeting();
   }
 
+  /**
+   * 切聊天／swipe 的同步本地清场：不发任何业务事件，只释放筹备、Pointer、计时器、
+   * 会后名单与图片回退态。随后 App 会从新聊天 Store 调用 同步静音会议界面 重建。
+   */
+  function 重置静音会议时间线界面() {
+    clearTimeout(静音会议筹备timer);
+    静音会议筹备timer = undefined;
+    静音会议筹备步骤.value = '';
+    静音会议筹备妻.value = [];
+    静音会议筹备议题.value = '';
+    静音会议筹备提交中.value = false;
+    静音会议会后选择.value = [];
+    静音会议继续已选.value = false;
+    静音会议自由行动进行中.value = false;
+    静音会议B目标.value = '';
+    静音会议C模式.value = '';
+    静音会议本地失败次数.value = 0;
+    静音会议本地画面状态.value = '';
+    静音会议图回退序号.value = 0;
+    静音会议图已加载.value = false;
+    清理静音会议互动现场();
+  }
+
   /** 场景阶段/筹备/清场后的统一界面收口；正式会议分支的跨 UI 写入委托 App lockMeetingUI。 */
   function 同步静音会议界面() {
     clearTimeout(静音会议筹备timer);
     静音会议筹备timer = undefined;
     if (!静音会议中.value) {
-      静音会议筹备步骤.value = '';
-      静音会议筹备提交中.value = false;
-      静音会议会后选择.value = [];
-      静音会议继续已选.value = false;
-      静音会议自由行动进行中.value = false;
-      清理静音会议互动现场();
+      重置静音会议时间线界面();
       return;
     }
     if (静音会议场景.value.阶段 === '筹备') {
@@ -774,6 +798,7 @@ export function useMuteMeeting(options: 静音会议选项) {
     继续静音会议会后活动,
     请求结束静音会议,
 
+    重置静音会议时间线界面,
     同步静音会议界面,
     处理静音会议回合完成前,
     处理静音会议回合失败前,

@@ -139,6 +139,7 @@ test('母亲阶段0只有确认裂缝后的低档外装或妆容会消耗并晋�
   assert.equal(是母亲破墙服饰('开叉旗袍'), false);
   assert.equal(是母亲破墙服饰('女仆装'), false);
   const result = await 送礼(data, '碎花连衣裙', '302');
+  await result.提交后?.();
   await 等待晋阶镜像写入();
 
   assert.equal(result.成功, true);

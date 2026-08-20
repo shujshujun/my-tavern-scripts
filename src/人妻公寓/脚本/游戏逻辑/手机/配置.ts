@@ -21,33 +21,59 @@ export interface 手机配置 {
 }
 
 const 配置KEY = '人妻公寓_手机配置';
+const 默认配置: 手机配置 = {
+  ai来源: '自动',
+  微信进展摘要: true,
+  base: '',
+  key: '',
+  model: '',
+  频率: '普通',
+};
+const 合法AI来源 = new Set<手机AI来源>(['自动', '数据库', '正文', '自定义']);
+const 合法频率 = new Set<手机配置['频率']>(['勤', '普通', '静', '关']);
+
+function 是配置对象(值: unknown): 值 is Record<string, unknown> {
+  return typeof 值 === 'object' && 值 !== null && !Array.isArray(值);
+}
+
+function 配置字符串(值: unknown): string {
+  return typeof 值 === 'string' ? 值.trim() : '';
+}
+
+function 规范手机配置(值: unknown): 手机配置 {
+  const 原 = 是配置对象(值) ? 值 : {};
+  const 旧 = {
+    ai来源: 原.ai来源,
+    微信进展摘要: 原.微信进展摘要,
+    base: 配置字符串(原.base),
+    key: 配置字符串(原.key),
+    model: 配置字符串(原.model),
+    频率: 原.频率,
+  };
+  // 0.27 及以前只有独立 API 三件套；已有完整配置的玩家迁移后继续走自定义 API。
+  const 迁移来源候选 = 旧.ai来源 ?? (旧.base && 旧.key && 旧.model ? '自定义' : '自动');
+  return {
+    ai来源: 合法AI来源.has(迁移来源候选 as 手机AI来源)
+      ? (迁移来源候选 as 手机AI来源)
+      : 默认配置.ai来源,
+    微信进展摘要:
+      typeof 旧.微信进展摘要 === 'boolean' ? 旧.微信进展摘要 : 默认配置.微信进展摘要,
+    base: 旧.base,
+    key: 旧.key,
+    model: 旧.model,
+    频率: 合法频率.has(旧.频率 as 手机配置['频率']) ? (旧.频率 as 手机配置['频率']) : 默认配置.频率,
+  };
+}
 
 export function 读配置(): 手机配置 {
-  const 默认: 手机配置 = {
-    ai来源: '自动',
-    微信进展摘要: true,
-    base: '',
-    key: '',
-    model: '',
-    频率: '普通',
-  };
   try {
     const root = (window.parent ?? window) as Window;
     const raw = root.localStorage?.getItem(配置KEY);
-    if (raw) {
-      const 旧 = JSON.parse(raw) as Partial<手机配置>;
-      // 0.27 及以前只有独立 API 三件套；已有完整配置的玩家迁移后继续走自定义 API。
-      const 迁移来源: 手机AI来源 = 旧.ai来源 ?? (旧.base && 旧.key && 旧.model ? '自定义' : '自动');
-      return {
-        ...默认,
-        ...旧,
-        ai来源: 迁移来源,
-      };
-    }
+    if (raw) return 规范手机配置(JSON.parse(raw) as unknown);
   } catch {
     /* 读取失败走默认 */
   }
-  return 默认;
+  return { ...默认配置 };
 }
 
 export function 存配置(c: 手机配置): void {
