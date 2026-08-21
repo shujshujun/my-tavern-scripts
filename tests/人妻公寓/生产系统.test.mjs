@@ -403,7 +403,7 @@ test('客户端接线在预产微信已读后开放真实医院，并让生产�
 
   assert.match(App源码, /:hospital-visible="医院已解锁\(data\)"/);
   assert.match(App源码, /房间id === '医院' && !医院已解锁\(data\.value\)/);
-  assert.match(App源码, /当前生产CG\.value \? 生产图片/);
+  assert.match(App源码, /当前借种CG\.value[\s\S]{0,100}借种结局图片[\s\S]{0,100}当前生产CG\.value[\s\S]{0,100}生产图片/);
   assert.match(App源码, /当前成人CG\.value && !荣耀洞图\.value && !当前事件CG\.value/);
   assert.match(地图源码, /v-if="hospitalVisible"[\s\S]*?点房\('医院'\)/);
   assert.match(

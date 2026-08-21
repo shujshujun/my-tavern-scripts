@@ -187,10 +187,10 @@ const 堕落轴说明 = computed(() => {
   return '实质暧昧或亲密并让她真实动摇时增长；普通闲聊不会增长。';
 });
 
-/** L4 要钱按钮(P3:钱的流向反转=堕落可视化;冷却与刹车全在脚本) */
+/** L3 要钱按钮(P3:钱的流向反转=堕落可视化;冷却与刹车全在脚本) */
 const 选中可要钱 = computed(() => {
   const 妻 = props.door ? props.data.户[props.door]?.妻 : undefined;
-  return !!妻 && 妻.当前阶段 >= 4 && props.wifeNearby;
+  return !!妻 && 妻.当前阶段 >= 3 && props.wifeNearby;
 });
 
 const 选中线索 = computed(() => {

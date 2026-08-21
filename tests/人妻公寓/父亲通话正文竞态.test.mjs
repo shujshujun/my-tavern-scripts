@@ -47,7 +47,7 @@ test('父亲通话写与正文最终整表提交严格串行，后到写不能�
   await Promise.all([正文提交, 父亲回复]);
   assert.deepEqual(顺序, ['正文开始', '正文结束', '父亲写入']);
 
-  const 提交段 = 回合源.slice(回合源.indexOf('await 排队父亲通话整表写'), 回合源.indexOf('await 记录数据库回合'));
+  const 提交段 = 回合源.slice(回合源.indexOf('await 排队父亲通话整表写'), 回合源.indexOf('const CG亲密'));
   assert.ok((提交段.match(/排队父亲通话整表写/g) ?? []).length >= 3);
   assert.match(提交段, /const 提交最终整表 = \(\) =>\s*排队父亲通话整表写/);
   assert.match(提交段, /if \(选项\.已持MVU操作租约\) await 提交最终整表\(\);\s*else await 排队MVU操作\(提交最终整表\)/);

@@ -26,6 +26,26 @@ function 是记录(value: unknown): value is Record<string, unknown> {
 }
 
 /**
+ * SillyTavern 会在刷新/重新渲染助手楼时通过 ensureSwipes 把缺失的 swipe_id 补成首分支 0。
+ * 对分支身份而言 undefined/null 与 0 是同一个“尚未发生真实 swipe 的首分支”，必须统一；
+ * 其他值原样保留，确保真正从 0 切到 1 仍能作废旧时间线。
+ */
+function 规范手机锚swipeId(值: unknown): unknown {
+  return 值 === undefined || 值 === null ? 0 : 值;
+}
+
+function 规范手机锚签名文本(签名: string): string {
+  try {
+    const 字段 = JSON.parse(签名) as unknown;
+    if (!Array.isArray(字段) || 字段.length !== 6) return 签名;
+    字段[3] = 规范手机锚swipeId(字段[3]);
+    return JSON.stringify(字段);
+  } catch {
+    return 签名;
+  }
+}
+
+/**
  * 引用用于识别“删掉后在同楼重建了外观相同的消息”，签名用于识别原对象上的 swipe/改写。
  * 这里只取酒馆消息的稳定身份字段，不序列化可能很大的插件 extra。
  */
@@ -35,10 +55,20 @@ export function 手机锚消息签名(message: unknown): string {
     message.is_user,
     message.mes,
     message.send_date,
-    message.swipe_id,
+    规范手机锚swipeId(message.swipe_id),
     message.name,
     message.force_avatar,
   ]);
+}
+
+/**
+ * 比较持久签名与当前酒馆楼。兼容 rq0.65～rq0.85 已写入的旧签名：旧版在 swipe_id
+ * 尚未初始化时会把 undefined 序列化为 null；网页刷新后宿主补成 0，不能因此把同一分支
+ * 的全部微信误判为旧分支。 malformed/未知形状仍严格比较，避免放宽真实分支隔离。
+ */
+export function 手机锚消息签名匹配(持久签名: string, message: unknown): boolean {
+  const 当前签名 = 手机锚消息签名(message);
+  return 持久签名 === 当前签名 || 规范手机锚签名文本(持久签名) === 当前签名;
 }
 
 export function 创建手机时间线租约(

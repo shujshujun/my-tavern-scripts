@@ -74,12 +74,13 @@ import {
   等待数据库时间线就绪,
   读取数据库记忆胶囊,
   读取微信进展胶囊,
+  读取数据库剧情事件已记录楼层,
   检测数据库脚本写入能力,
   同步数据库回合,
+  数据库事件待整理摘要,
   数据库状态,
+  触发数据库增量更新,
   通过数据库生成,
-  提取回合事件摘要,
-  保守回合摘要,
 } from './数据库桥';
 import { 取消当前数据库剧情规划, 构造数据库剧情规划输入, 经数据库剧情规划生成 } from './数据库剧情规划桥';
 import { 全局数据库AI租约 } from './数据库AI租约';
@@ -109,7 +110,7 @@ import { 推进特殊场景, 静音会议正式运行中 } from './特殊场景�
 import { 构造CG亲密上下文 } from './CG亲密上下文';
 import { 行动资源门槛, 现场楼身体增长依赖, 结算成功现场楼 } from './玩家资源系统';
 import { 当前预设正文标签 } from './预设桥';
-import { 清洗预设输出 } from './预设输出兼容';
+import { 应用酒馆最终显示正则, 清洗预设输出 } from './预设输出兼容';
 import { 严格清除协议残留, 清除末尾残缺协议标签, 清除末尾裸JSON补丁, 提取末尾裸JSON补丁 } from './严格正文清洗';
 import { 规范变量协议候选, 标准变量块需要本地应用 } from './变量块协议';
 import {
@@ -119,6 +120,12 @@ import {
   选择正文生成原文,
   更新有效流式正文,
 } from './正文生成完整性';
+import {
+  创建正文生成超时错误,
+  判定正文生成超时,
+  友好化正文生成错误,
+  正文生成超时错误前缀,
+} from './正文生成故障';
 import { 合并最新父亲通话, 排队父亲通话整表写 } from './父亲通话写租约';
 import { 当前时间线切换世代, 作废当前时间线切换世代, 登记内部删楼租约, 时间线切换协调中 } from './时间线切换协调';
 import {
@@ -559,6 +566,7 @@ let 本回合生成id = '';
 let 正文流式生成id = '';
 let 正文流式原文 = '';
 let 解除生成等待: (() => void) | null = null;
+let 正文生成进展回调: (() => void) | null = null;
 eventClearEvent(iframe_events.STREAM_TOKEN_RECEIVED_FULLY);
 // Tavern Helper 的完整流事件没有等待宿主 EventEmitter 分发完毕就可能让 generate() 返回。
 // 若前面挂着异步插件监听，普通 eventOn 会在本回合已经选文、清缓存之后才收到最终流。
@@ -567,10 +575,21 @@ eventMakeFirst(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, (文本: string, gener
   if (!进行中) return;
   if (generation_id && generation_id !== 本回合生成id) return;
   if (是当前正文流事件(正文流式生成id, 本回合生成id, generation_id)) {
+    正文生成进展回调?.();
     正文流式原文 = 更新有效流式正文(正文流式原文, 文本, 清洗严格正文);
   }
   eventEmit('人妻公寓:流式', 文本);
 });
+
+function 停止当前正文底层请求(): void {
+  const 生成id = 本回合生成id;
+  if (!生成id) return;
+  try {
+    if (!stopGenerationById(生成id)) stopAllGeneration();
+  } catch (e) {
+    console.error('[人妻公寓] 停止生成失败:', e);
+  }
+}
 
 // ── 取消本回合:停掉生成,作废的回合不落楼 ──
 let 已取消 = false;
@@ -586,14 +605,8 @@ export function 取消本回合(强制作废 = false) {
   const 数据库规划接管中止 = 取消当前数据库剧情规划();
   if (数据库规划接管中止) return;
   解除生成等待?.();
-  const 生成id = 本回合生成id;
   // 生成准备期还没有 id；取消旗会在下一处异步边界终止回合，不应误停其他脚本的生成。
-  if (!生成id) return;
-  try {
-    if (!stopGenerationById(生成id)) stopAllGeneration();
-  } catch (e) {
-    console.error('[人妻公寓] 停止生成失败:', e);
-  }
+  停止当前正文底层请求();
 }
 
 function 确认回合未取消(): void {
@@ -601,10 +614,9 @@ function 确认回合未取消(): void {
 }
 
 /**
- * 给正文生成加一层本卡可控的中止门。
- * - 手动取消不依赖第三方端点是否正确关闭连接；
- * - 不再设置固定时长硬超时：长文本模型即使超过 180 秒也继续等待；
- * - 手动取消后的底层迟到结果只会结束自己的 Promise，不会落楼或改变量。
+ * 给正文生成加两层本卡可控的失败门：手动取消立即结束本地等待；正文真正开始后，
+ * 首包、流式停滞与十分钟绝对上限共同兜住第三方端点永久 pending。数据库规划有自己的
+ * 90 秒降级门，正文看门狗不把规划时间算进去。迟到结果只会结束底层 Promise，不会落楼。
  */
 type 正文生成参数 = Parameters<typeof generate>[0] & { automatic_trigger?: boolean };
 
@@ -620,19 +632,61 @@ async function 等待正文生成(参数: 正文生成参数, 选项?: 正文生
   const 中止门 = new Promise<never>((_resolve, reject) => {
     解除生成等待 = () => reject(new Error('__RQGY_CANCELLED__'));
   });
+  let 正文已开始 = false;
+  let 正文开始毫秒 = 0;
+  let 最后进展毫秒 = 0;
+  let 已收到正文进展 = false;
+  let 看门狗timer: ReturnType<typeof setInterval> | undefined;
+  let 拒绝超时: (error: Error) => void = () => undefined;
+  const 超时门 = new Promise<never>((_resolve, reject) => {
+    拒绝超时 = reject;
+  });
+  const 标记正文开始 = () => {
+    const 现在 = Date.now();
+    正文已开始 = true;
+    正文开始毫秒 = 现在;
+    最后进展毫秒 = 现在;
+    已收到正文进展 = false;
+    if (看门狗timer !== undefined) clearInterval(看门狗timer);
+    看门狗timer = setInterval(() => {
+      if (!正文已开始) return;
+      const 阶段 = 判定正文生成超时(Date.now(), 正文开始毫秒, 最后进展毫秒, 已收到正文进展);
+      if (!阶段) return;
+      clearInterval(看门狗timer);
+      看门狗timer = undefined;
+      console.warn(`[人妻公寓] 正文生成看门狗触发：${阶段}，本轮按失败收口。`);
+      拒绝超时(创建正文生成超时错误(阶段));
+      停止当前正文底层请求();
+    }, 1000);
+  };
+  const 标记正文进展 = () => {
+    if (!正文已开始) return;
+    已收到正文进展 = true;
+    最后进展毫秒 = Date.now();
+  };
+  正文生成进展回调 = 标记正文进展;
   try {
-    const 生成任务 = 选项
-      ? 经数据库剧情规划生成(参数, {
-          启用: 选项.启用数据库规划,
-          规划输入: 选项.规划输入,
-          规划开始: 选项.规划开始,
-          正文开始: 选项.正文开始,
-          继续前确认: 选项.继续前确认,
-          调用正文: 正文参数 => generate(正文参数),
-        })
-      : generate(参数);
-    return String(await Promise.race([生成任务, 中止门]));
+    let 生成任务: Promise<unknown>;
+    if (选项) {
+      生成任务 = 经数据库剧情规划生成(参数, {
+        启用: 选项.启用数据库规划,
+        规划输入: 选项.规划输入,
+        规划开始: 选项.规划开始,
+        正文开始: 已规划 => {
+          标记正文开始();
+          选项.正文开始?.(已规划);
+        },
+        继续前确认: 选项.继续前确认,
+        调用正文: 正文参数 => generate(正文参数),
+      });
+    } else {
+      标记正文开始();
+      生成任务 = generate(参数);
+    }
+    return String(await Promise.race([生成任务, 中止门, 超时门]));
   } finally {
+    if (看门狗timer !== undefined) clearInterval(看门狗timer);
+    if (正文生成进展回调 === 标记正文进展) 正文生成进展回调 = null;
     解除生成等待 = null;
   }
 }
@@ -1467,108 +1521,249 @@ export async function 组快照注入(
   return { 快照, 焦点, 妻在场, 夫在场, 尺度模式, 变量范围, 快照刷新票 };
 }
 
+const 数据库事件元数据键 = '_rqgy数据库事件';
+
+interface 数据库事件元数据 {
+  版本: 1;
+  时间: string;
+  地点: string;
+  参与者: string[];
+  玩家行动: string;
+}
+
+type 宿主聊天消息 = {
+  role?: string;
+  is_user?: boolean;
+  mes?: unknown;
+  message?: unknown;
+  extra?: Record<string, unknown>;
+};
+
+function 宿主消息文本(message: 宿主聊天消息 | undefined): string {
+  return String(message?.mes ?? message?.message ?? '').trim();
+}
+
+function 宿主消息是玩家(message: 宿主聊天消息 | undefined): boolean {
+  return message?.is_user === true || message?.role === 'user';
+}
+
 /**
- * 数据库插件兼容广播(2026-07-19 用户点名要兼容 AlbusKen/shujuku 表格插件):
- * 主路径 generate()+createChatMessages(refresh:'none') 全程绕开酒馆消息管道,这类插件靠核心
- * GENERATION_ENDED 唤醒扫楼更新表格,所以在本卡里永远沉睡。落库完成后向酒馆核心补发一对
- * GENERATION_STARTED('normal')+GENERATION_ENDED(末楼号)——先发 STARTED 是为了覆盖可能残留的
- * quiet 生成记录(插件门控会拦 quiet/dryRun,无记录或 normal 记录则放行)。
- * ⚠ 刻意不发 MESSAGE_SENT:会惊醒 MVU 对玩家楼无条件跑一轮进而连锁触发本卡逃生舱补结算=双重记账
- * (feedback_mvu_message_sent_trap 同族陷阱)。广播失败只警告,绝不影响回合本体。
+ * 正式双楼已经提交后才在后台唤醒数据库。优先调用官方 V2 triggerUpdate；旧版才补发
+ * GENERATION_STARTED/ENDED。SillyTavern 的 GENERATION_ENDED 参数是 chat.length，不是末楼 ID。
+ * 数据库失败、超时或没有接口只记日志，绝不继续占用前台回合与场景移动锁。
  */
-async function 广播生成完成事件(提交校验: () => boolean = () => true): Promise<void> {
+async function 广播生成完成事件(
+  目标助手楼层: number,
+  提交校验: () => boolean = () => true,
+): Promise<void> {
   try {
+    if (!提交校验() || !数据库状态().已安装) return;
+    eventEmit('人妻公寓:运行阶段', '数据库正在后台整理记忆');
+    const V2结果 = await 触发数据库增量更新();
     if (!提交校验()) return;
+    if (V2结果 !== '无接口') {
+      if (V2结果 === '未触发') console.warn('[人妻公寓·数据库] V2 增量更新没有成功触发，本轮骨架保留待后续补写。');
+      return;
+    }
+
+    const 消息表 = SillyTavern.chat ?? [];
+    // 旧版事件桥只允许唤醒当前真实尾楼；若玩家已经开始下一轮，稍后的成功楼会再次触发，
+    // 不能对着临时 user 楼或更旧 assistant 楼伪造结束事件，否则数据库会报 no AI message found。
+    if (消息表.length - 1 !== 目标助手楼层) return;
     const 宿主 = window.parent as any;
     const 全局ST = 宿主?.SillyTavern;
     const 上下文 = 全局ST?.getContext?.() ?? 全局ST;
     const 事件源 = 上下文?.eventSource ?? 全局ST?.eventSource;
-    // 事件表键名随酒馆版本漂移(eventTypes/event_types),两头兼容,取不到就放弃
     const 事件表 = 上下文?.eventTypes ?? 上下文?.event_types ?? 全局ST?.eventTypes ?? 全局ST?.event_types;
     if (typeof 事件源?.emit !== 'function' || !事件表?.GENERATION_ENDED) return;
-    const 末楼 = getLastMessageId();
-    const 数据库已启用 = 数据库状态().已安装;
-    if (数据库已启用) eventEmit('人妻公寓:运行阶段', '数据库正在整理本回合');
     let 超时器: ReturnType<typeof setTimeout> | undefined;
     try {
       await Promise.race([
         (async () => {
           if (事件表.GENERATION_STARTED) await 事件源.emit(事件表.GENERATION_STARTED, 'normal', {}, false);
           if (!提交校验()) return;
-          await 事件源.emit(事件表.GENERATION_ENDED, 末楼);
+          await 事件源.emit(事件表.GENERATION_ENDED, (SillyTavern.chat ?? []).length);
         })(),
         new Promise<void>(resolve => {
           超时器 = setTimeout(() => {
-            if (数据库已启用) console.warn('[人妻公寓] 数据库兼容广播等待超过30秒，游戏先继续显示正文。');
+            console.warn('[人妻公寓] 数据库兼容广播等待超过30秒；前台游戏早已解锁，骨架留待后续批次。');
             resolve();
-          }, 30000);
+          }, 30_000);
         }),
       ]);
-      if (!提交校验()) return;
     } finally {
       if (超时器) clearTimeout(超时器);
     }
   } catch (e) {
-    console.warn('[人妻公寓] 数据库插件兼容广播失败(不影响游戏):', e);
+    console.warn('[人妻公寓] 数据库插件后台更新失败(不影响游戏):', e);
   }
 }
 
 let 数据库记录失败提示签名 = '';
 
-async function 记录数据库回合(
+async function 记录数据库回合骨架(
   楼层: number,
   data: SchemaType,
+  地点: string,
   行动: string,
-  结果: string,
   妻在场: readonly 门牌[],
   夫在场: readonly 门牌[],
   提交校验: () => boolean = () => true,
-): Promise<void> {
+): Promise<boolean> {
   if (!提交校验()) throw new Error('__RQGY_TIMELINE_CHANGED__');
-  const 场 = 读场景();
   const 参与者 = [...妻在场.map(m => 户静态表[m]?.妻名), ...夫在场.map(m => 户静态表[m]?.夫名)].filter(
     (name): name is string => !!name,
   );
   const 数据库已启用 = 数据库状态().已装游戏模板;
-  if (数据库已启用) eventEmit('人妻公寓:运行阶段', '数据库正在写入回合记录');
+  if (!数据库已启用) return false;
+  eventEmit('人妻公寓:运行阶段', '数据库正在记录剧情硬骨架');
   const 写入结果 = await 同步数据库回合(
     {
       楼层,
       时间: 格式化游戏内时间(data),
-      地点: 场.房间id || '公寓公共区域',
+      地点: 地点 || '公寓公共区域',
       参与者,
       玩家行动: 行动,
-      结果摘要: 结果,
+      结果摘要: 数据库事件待整理摘要,
     },
     提交校验,
   );
   if (!提交校验()) throw new Error('__RQGY_TIMELINE_CHANGED__');
-  if (!数据库已启用) return;
   if (写入结果 === '已确认') {
     数据库记录失败提示签名 = '';
-    eventEmit('人妻公寓:运行阶段', '数据库记录完成');
-    return;
+    eventEmit('人妻公寓:运行阶段', '数据库剧情骨架已记录');
+    return true;
   }
   if (写入结果 === '待确认') {
-    // mutation 已经交给 SQLite，但 6 秒内没有返回可核验结果；后台仍会等待原请求并按幂等键
-    // 补写一次。此时只能报告“确认中”，不能把尚可能失败的记录伪装成已经完成。
-    console.warn(`[人妻公寓·数据库] RQ_剧情事件 ${楼层} 已提交，仍在后台等待 SQLite 确认。`);
-    eventEmit('人妻公寓:运行阶段', '数据库记录后台确认中');
-    return;
+    console.warn(`[人妻公寓·数据库] RQ_剧情事件骨架 ${楼层} 已提交，仍在后台等待 SQLite 确认。`);
+    eventEmit('人妻公寓:运行阶段', '数据库剧情骨架后台确认中');
+    return true;
   }
 
   const 能力 = await 检测数据库脚本写入能力();
   if (!提交校验()) throw new Error('__RQGY_TIMELINE_CHANGED__');
   const 原因 = 能力.可写
-    ? 'SQLite 已就绪，但本次写入没有获得数据库确认；请检查数据库运行状态或 F12 控制台。'
+    ? 'SQLite 已就绪，但本次骨架写入没有获得数据库确认；请检查数据库运行状态或 F12 控制台。'
     : 能力.说明;
   const 提示签名 = `${当前聊天ID()}|${能力.状态}|${原因}`;
-  console.warn(`[人妻公寓·数据库] RQ_剧情事件 ${楼层} 未写入：${原因}`);
-  eventEmit('人妻公寓:运行阶段', '数据库记录未写入');
+  console.warn(`[人妻公寓·数据库] RQ_剧情事件骨架 ${楼层} 未写入：${原因}`);
+  eventEmit('人妻公寓:运行阶段', '数据库剧情骨架未写入');
   if (提示签名 !== 数据库记录失败提示签名) {
     数据库记录失败提示签名 = 提示签名;
-    eventEmit('人妻公寓:提示', `⚠ RQ_剧情事件未写入：${原因} 本轮正文与游戏结算不受影响。`);
+    eventEmit('人妻公寓:提示', `⚠ RQ_剧情事件骨架未写入：${原因} 本轮正文与游戏结算不受影响。`);
   }
+  return false;
+}
+
+/**
+ * v0.85 以前脚本直写偶发漏楼。只扫描当前仍存活的正式 assistant 楼，最近缺口优先，
+ * 每次最多补 12 条硬骨架；时间来自该楼 stat_data，未知地点明确标旧记录，不让 AI 猜硬事实。
+ */
+async function 补齐缺失数据库事件骨架(
+  截止楼层: number,
+  提交校验: () => boolean = () => true,
+): Promise<number> {
+  if (!提交校验() || !数据库状态().已装游戏模板) return 0;
+  const 已记录 = 读取数据库剧情事件已记录楼层(截止楼层);
+  if (!已记录) return 0;
+  const 消息表 = (SillyTavern.chat ?? []) as 宿主聊天消息[];
+  let 已补写 = 0;
+  for (let 楼层 = Math.min(截止楼层, 消息表.length - 1); 楼层 >= 1 && 已补写 < 12; 楼层 -= 1) {
+    if (!提交校验() || 已记录.has(楼层)) continue;
+    const 消息 = 消息表[楼层];
+    if (!消息 || 宿主消息是玩家(消息) || !宿主消息文本(消息)) continue;
+    const extra = 消息.extra ?? {};
+    if (extra[临时楼标记键] === true) continue;
+    const 前楼 = 消息表[楼层 - 1];
+    let 绝对时段 = Number.NaN;
+    try {
+      绝对时段 = Number(_.get(Mvu.getMvuData({ type: 'message', message_id: 楼层 }), 'stat_data.系统._绝对时段'));
+    } catch {
+      /* 无楼层数据时下面按非游戏消息跳过。 */
+    }
+    const 是正式游戏楼 =
+      extra[回合角色键] === 'assistant' ||
+      typeof extra._rqgy开局令牌 === 'string' ||
+      (宿主消息是玩家(前楼) && Number.isInteger(绝对时段) && 绝对时段 >= 0);
+    if (!是正式游戏楼) continue;
+
+    const 元数据 =
+      extra[数据库事件元数据键] && typeof extra[数据库事件元数据键] === 'object'
+        ? (extra[数据库事件元数据键] as Partial<数据库事件元数据>)
+        : null;
+    const 妻门牌 = Array.isArray(extra[回合在场妻键]) ? extra[回合在场妻键] : [];
+    const 参与者 = Array.isArray(元数据?.参与者)
+      ? 元数据.参与者.filter((name): name is string => typeof name === 'string' && !!name.trim())
+      : 妻门牌
+          .map(value => 户静态表[String(value) as 门牌]?.妻名)
+          .filter((name): name is string => Boolean(name));
+    const 玩家行动 =
+      (typeof 元数据?.玩家行动 === 'string' && 元数据.玩家行动.trim()) ||
+      宿主消息文本(前楼) ||
+      (typeof extra._rqgy开局令牌 === 'string' ? '开始新游戏' : '');
+    if (!玩家行动) continue;
+    const 时间 =
+      (typeof 元数据?.时间 === 'string' && 元数据.时间.trim()) ||
+      (Number.isInteger(绝对时段) && 绝对时段 >= 0 ? 格式化游戏内时间(绝对时段) : '旧记录（时间未保存）');
+    const 地点 =
+      (typeof 元数据?.地点 === 'string' && 元数据.地点.trim()) || '历史剧情（地点未保存）';
+    const 写入 = await 同步数据库回合(
+      {
+        楼层,
+        时间,
+        地点,
+        参与者,
+        玩家行动,
+        结果摘要: 数据库事件待整理摘要,
+      },
+      提交校验,
+    );
+    if (写入 === '失败') break;
+    已记录.add(楼层);
+    已补写 += 1;
+  }
+  if (已补写) console.info(`[人妻公寓·数据库] 已补齐 ${已补写} 条当前时间线缺失的 RQ 剧情硬骨架。`);
+  return 已补写;
+}
+
+function 安排数据库回合后处理(参数: {
+  楼层: number;
+  data: SchemaType;
+  地点: string;
+  行动: string;
+  妻在场: readonly 门牌[];
+  夫在场: readonly 门牌[];
+  提交校验: () => boolean;
+}): void {
+  const data快照 = _.cloneDeep(参数.data) as SchemaType;
+  const 妻快照 = [...参数.妻在场];
+  const 夫快照 = [...参数.夫在场];
+  setTimeout(() => {
+    void (async () => {
+      try {
+        if (!参数.提交校验()) return;
+        await 记录数据库回合骨架(
+          参数.楼层,
+          data快照,
+          参数.地点,
+          参数.行动,
+          妻快照,
+          夫快照,
+          参数.提交校验,
+        );
+        if (!参数.提交校验()) return;
+        await 补齐缺失数据库事件骨架(参数.楼层, 参数.提交校验);
+        if (!参数.提交校验()) return;
+        // 下一轮已经开始时不对着临时尾楼触发数据库；下一次成功楼会继续处理所有 pending 骨架。
+        if (回合进行中() || getLastMessageId() !== 参数.楼层) return;
+        await 广播生成完成事件(参数.楼层, 参数.提交校验);
+      } catch (error) {
+        console.warn('[人妻公寓·数据库] 回合后台记忆处理失败（前台游戏不受影响）:', error);
+      } finally {
+        if (!回合进行中()) eventEmit('人妻公寓:运行阶段', '');
+      }
+    })();
+  }, 0);
 }
 
 function 清洗正文核心(协议清: string): string {
@@ -2130,13 +2325,9 @@ export async function 执行回合(
       '严禁重演、复述或把本次正文写成对任何旧行动的回应;若历史楼层存在行动与回应错位,一律以本条为准。)' +
       '\n【外部预设输出完整性】若预设要求思考标签与正文标签，必须先闭合思考标签，再输出完整的正文开始和结束标签；' +
       '即使剩余长度不足，也要立即缩短思考并优先给出正文，禁止只留下思考、半截标签或正文外协议。';
-    // 已安装游戏模板时，正文结束后追加一个极短的机器摘要块供数据库回合使用；未安装时不要求额外输出。
-    const 事件摘要指令 = 本轮数据库已安装
-      ? '\n【事件摘要｜机器控制】正文结束后，另起一行输出<rq_event_summary>一句话客观结果摘要</rq_event_summary>：内容最多60个字符，只写本轮正文已经发生的结果，不复制正文原句，不写未发生的事。'
-      : '';
-
+    // 正文模型只负责故事与游戏控制协议；RQ_剧情事件的语义摘要改由数据库填表 AI 在同一批次完成。
     const injects: Omit<InjectionPrompt, 'id'>[] = [
-      { role: 'system', content: 快照 + 行动锚 + 事件摘要指令, position: 'in_chat', depth: 0, should_scan: true },
+      { role: 'system', content: 快照 + 行动锚, position: 'in_chat', depth: 0, should_scan: true },
     ];
     if (选项.系统注入?.trim()) {
       injects.push({ role: 'system', content: 选项.系统注入, position: 'in_chat', depth: 0, should_scan: false });
@@ -2215,6 +2406,8 @@ export async function 执行回合(
       );
     } catch (生成错误) {
       确认本轮事务有效();
+      // 看门狗说明正文连接已经长期无进展；即使缓存刚好停在句号，也不能把半截场景伪装成成功回合。
+      if (生成错误 instanceof Error && 生成错误.message.startsWith(正文生成超时错误前缀)) throw 生成错误;
       const 完整流式正文 = 生成失败时可保留的流式正文(正文流式原文, 清洗严格正文);
       if (!完整流式正文) throw 生成错误;
       console.warn('[人妻公寓] generate 最终 Promise 失败，但同 generation_id 已收到完整流式正文；保留正文继续结算');
@@ -2234,6 +2427,11 @@ export async function 执行回合(
     正文流式原文 = '';
     确认回合场景未变化('正文生成期间玩家场景已经变化，本轮不会把剧情和结算写到另一个地点。');
 
+    // 流式中间帧继续按玩家现有预设与游戏显示逻辑即时呈现；这里只在完整回复确定后，
+    // 采用酒馆最终显示正则的结果作为稽查检词与正式楼正文输入。原始回复仍保留给尺度块
+    // 和其他机器协议提取，不能让显示正则反向改写业务事实。
+    let 最终显示原文 = 应用酒馆最终显示正则(原文);
+
     // ── 稽查前移：必须审首稿，不能等独立变量结算把临时尺度块清掉后才审 ──
     const 焦点妻们 = 焦点.filter(m => 妻在场.includes(m));
     const 焦点妻门牌 = 焦点妻们[0];
@@ -2242,14 +2440,21 @@ export async function 执行回合(
     >;
     // 脚本自己导演的晋阶/特殊正戏已经有独立许可，不再被普通阶段上限二次拦截。
     const 正戏免检 = /【特殊场景·|【转折正戏】|【药物首夜】|【早饭桌】|【破墙】/.test(本楼事件);
-    let 稽查: 稽查结果 = 输出稽查(原文, 焦点妻们, 阶段表, 尺度模式, 正戏免检, 清洗正文(原文));
+    let 稽查: 稽查结果 = 输出稽查(
+      原文,
+      焦点妻们,
+      阶段表,
+      尺度模式,
+      正戏免检,
+      清洗正文(最终显示原文),
+    );
 
     if (稽查.状态 === '需重写' && 焦点妻门牌) {
       // 首稿已经作废，重写稿只重新生成故事与尺度判定。
       console.warn(`[人妻公寓·稽查] 首稿需静默重写：${稽查.原因}`);
       eventEmit('人妻公寓:运行阶段', '正在校准角色反应');
       const 校准令 =
-        `${快照}${行动锚}${事件摘要指令}${选项.系统注入?.trim() ? `\n${选项.系统注入}\n` : ''}\n` +
+        `${快照}${行动锚}${选项.系统注入?.trim() ? `\n${选项.系统注入}\n` : ''}\n` +
         `【本轮重写硬裁决】上一稿作废。脚本复核发现：${稽查.原因}。` +
         '保持玩家原始行动不变，重写完整剧情回应；允许界线内部分自然发生，越过每位角色当前界线的部分必须由她按自身性格拒绝、停住或转开，未遂不得写成已经发生。' +
         '不要提到稽查、等级、规则、重写或系统。仍须按上方格式输出临时尺度判定；不要输出 UpdateVariable、JSONPatch 或任何变量命令，变量由外置解析单独处理。';
@@ -2263,14 +2468,24 @@ export async function 执行回合(
         generation_id: 本回合生成id,
       });
       确认本轮事务有效();
-      const 重写稽查 = 输出稽查(重写, 焦点妻们, 阶段表, 尺度模式, 正戏免检, 清洗正文(重写));
+      const 重写显示原文 = 应用酒馆最终显示正则(重写);
+      const 重写稽查 = 输出稽查(
+        重写,
+        焦点妻们,
+        阶段表,
+        尺度模式,
+        正戏免检,
+        清洗正文(重写显示原文),
+      );
       if (重写稽查.状态 === '通过') {
         原文 = 重写;
+        最终显示原文 = 重写显示原文;
         稽查 = 重写稽查;
       } else {
         // 第二次仍不可靠：本地收束为角色拒绝。玩家输入不改、数值不罚、不会再调用模型循环。
         console.warn(`[人妻公寓·稽查] 重写仍未通过，启用无处罚兜底：${重写稽查.原因}`);
         原文 = 无处罚拒绝正文(焦点妻门牌);
+        最终显示原文 = 原文;
         稽查 = {
           状态: '通过',
           原因: '二次生成失败后使用无处罚拒绝兜底',
@@ -2282,11 +2497,6 @@ export async function 执行回合(
     }
 
     确认回合场景未变化('正文生成期间玩家场景已经变化，本轮不会把剧情和结算写到另一个地点。');
-
-    // 从最终采用的原始模型输出提取事件摘要机器块。漏块/块无效时由基于玩家行动的保守短句兜底，
-    // 不追加第二次 AI 请求；摘要块随后在所有清洗路径
-    // 物理删除，绝不进入聊天楼层、MVU 重处理文本或玩家界面。
-    const 事件摘要 = 提取回合事件摘要(原文);
 
     // 稽查事后补亲密妻(2026-08-04 堕落涨值修复):
     // 正则只能命中"她/他"或已知名字，玩家用昵称/自称时可能漏判亲密场景→堕落写门未开。
@@ -2313,7 +2523,10 @@ export async function 执行回合(
     // ── 正常路径:先落 AI 楼，再按 MVU“重新处理变量”的时序解析并明确写回该楼 ──
     // 只保存清洗后的正文 + 规范变量块：客户端/卡内正则会隐藏变量块，但 MVU 面板以后
     // 仍能从真实 AI 楼重新解析。思维链、摘要与外部预设格式不会因此重新进入聊天历史。
-    const 已清洗正文 = 本轮静音会议 || 事件必须有正文(本楼事件) || 选项.成功结算 ? 清洗严格正文(原文) : 清洗正文(原文);
+    const 已清洗正文 =
+      本轮静音会议 || 事件必须有正文(本楼事件) || 选项.成功结算
+        ? 清洗严格正文(最终显示原文)
+        : 清洗正文(最终显示原文);
     if (本轮静音会议 && !已清洗正文) {
       throw new Error('AI 没有返回有效正文——本拍未推进，请直接重试');
     }
@@ -2360,6 +2573,16 @@ export async function 执行回合(
                 [回合角色键]: 'assistant',
                 [临时楼标记键]: true,
                 [回合在场妻键]: [...new Set(妻在场)],
+                [数据库事件元数据键]: {
+                  版本: 1,
+                  时间: 格式化游戏内时间(data),
+                  地点: 回合起始场景 || '公寓公共区域',
+                  参与者: [
+                    ...妻在场.map(m => 户静态表[m]?.妻名),
+                    ...夫在场.map(m => 户静态表[m]?.夫名),
+                  ].filter((name): name is string => Boolean(name)),
+                  玩家行动: 行动,
+                } satisfies 数据库事件元数据,
               },
             },
           ],
@@ -2855,12 +3078,6 @@ export async function 执行回合(
     );
     确认本轮事务有效();
 
-    // 占位楼没有真实剧情,写入数据库会让长期记忆记住"楼道里安静了一瞬"这类假事件(M2)
-    if (已清洗正文) {
-      // 数据库只存真实短摘要：优先用模型输出的事件摘要块，漏块/无效时用围绕玩家行动的安全短句。
-      await 记录数据库回合(生成楼层, newStat, 行动, 事件摘要 ?? 保守回合摘要(行动), 妻在场, 夫在场, 本轮事务仍有效);
-      确认本轮事务有效();
-    }
     const CG亲密 = 构造CG亲密上下文(本轮结算基准, newStat, 资源结算.性爱结束);
     const CG门牌 = CG亲密.主焦点门牌 ?? 焦点妻门牌 ?? null;
     eventEmit('人妻公寓:CG回合信号', {
@@ -2873,13 +3090,33 @@ export async function 执行回合(
       亲密: CG亲密,
       variant: CG门牌 ? (应使用怀孕CG(newStat, CG门牌) ? 'pregnancy' : 'normal') : 'normal',
     });
-    await 广播生成完成事件(本轮事务仍有效);
-    确认本轮事务有效();
     if (变量解析已降级) {
       eventEmit('人妻公寓:提示', `正文已保留；${变量解析降级阶段 || 'AI'}变量本轮未更新，脚本结算已正常完成。`);
     }
     回合完成已广播 = true;
     eventEmit('人妻公寓:回合完成');
+    // 占位楼没有真实剧情，不建数据库骨架。有效正文先让前台成功收口；SQLite 骨架、
+    // 旧漏楼补齐和数据库 AI 自动填表全部放到下一任务拍，绝不再占住“内容正在生成”。
+    if (已清洗正文 && 本轮数据库已安装) {
+      const 数据库后处理仍有效 = () => {
+        const 消息 = SillyTavern.chat?.[生成楼层];
+        return (
+          本轮时间线仍有效() &&
+          消息?.extra?.[回合令牌键] === 本回合消息令牌 &&
+          消息.extra[回合角色键] === 'assistant' &&
+          消息.extra[临时楼标记键] === false
+        );
+      };
+      安排数据库回合后处理({
+        楼层: 生成楼层,
+        data: newStat,
+        地点: 回合起始场景 || '公寓公共区域',
+        行动,
+        妻在场,
+        夫在场,
+        提交校验: 数据库后处理仍有效,
+      });
+    }
     return true;
   } catch (e) {
     if (临时用户已转正) {
@@ -2903,7 +3140,7 @@ export async function 执行回合(
       待广播失败原因 = '已取消——这一轮没有发生';
     } else {
       console.error('[人妻公寓] 回合执行失败:', e);
-      待广播失败原因 = e instanceof Error ? e.message : String(e);
+      待广播失败原因 = 友好化正文生成错误(e);
     }
     return false;
   } finally {
@@ -3328,7 +3565,23 @@ export async function 开始新游戏(难度: string): Promise<boolean> {
       _.set(新, 'stat_data', data);
       try {
         await createChatMessages(
-          [{ role: 'assistant', message: 父亲来电正文, data: 新, extra: { _rqgy开局令牌: 开局消息令牌 } }],
+          [
+            {
+              role: 'assistant',
+              message: 父亲来电正文,
+              data: 新,
+              extra: {
+                _rqgy开局令牌: 开局消息令牌,
+                [数据库事件元数据键]: {
+                  版本: 1,
+                  时间: 格式化游戏内时间(data),
+                  地点: '管理员室',
+                  参与者: [],
+                  玩家行动: '开始新游戏',
+                } satisfies 数据库事件元数据,
+              },
+            },
+          ],
           { refresh: 'none' },
         );
       } finally {
@@ -3348,13 +3601,23 @@ export async function 开始新游戏(难度: string): Promise<boolean> {
       确认开局仍有效();
 
       console.info(`[人妻公寓] 序章开局完成(难度:${档},起始资金:${难度表[档].起始资金})`);
-      // 固定序章直接写确定性摘要，不把父亲来电全文复制进 RQ 事件。
-      await 记录数据库回合(getLastMessageId(), data, '开始新游戏', '父亲来电交代公寓管理与收租要求，玩家开始接手管理工作', [], [], 开局仍有效);
-      确认开局仍有效();
-      await 广播生成完成事件(开局仍有效);
-      确认开局仍有效();
       开局已提交 = true;
       eventEmit('人妻公寓:回合完成', { 跳过手机节拍: true });
+      if (数据库状态().已装游戏模板 && 开局消息楼层 !== null) {
+        const 开局数据库后处理仍有效 = () =>
+          开局时间线世代 === 当前时间线切换世代() &&
+          开局聊天ID === 当前聊天ID() &&
+          SillyTavern.chat?.[开局消息楼层!]?.extra?._rqgy开局令牌 === 开局消息令牌;
+        安排数据库回合后处理({
+          楼层: 开局消息楼层,
+          data,
+          地点: '管理员室',
+          行动: '开始新游戏',
+          妻在场: [],
+          夫在场: [],
+          提交校验: 开局数据库后处理仍有效,
+        });
+      }
       return true;
     });
     return 开局结果;

@@ -241,8 +241,19 @@ test('多人现场为未孕角色注入逐对一次的孕肚初见反应，姐�
   聊天变量._微信 = {
     消息: [{ 楼: 9, 时: 0, 会话: '姐妹群', 发: '对方', 文: '沈静仪:恭喜呀', 键: '姐妹孕情:101:snapshot-pregnancy:1' }],
   };
-  const 群聊后快照 = 组公寓快照([{ role: 'user', content: '大家继续聊。' }], data, 12);
-  assert.doesNotMatch(群聊后快照, /【孕情初见·一次性现场反应】/);
+  // 手机库以宿主聊天数组作为真实楼轴。夹具必须提供覆盖消息楼 9 的当前时间线，不能再依赖
+  // 刷新早期“空 chat + 假第 0 楼”的旧行为把任意楼号当作可见。
+  const 原SillyTavern = globalThis.SillyTavern;
+  globalThis.SillyTavern = {
+    chat: Array.from({ length: 13 }, (_, i) => ({ is_user: i % 2 === 0, mes: `锚${i}`, swipe_id: 0 })),
+  };
+  try {
+    const 群聊后快照 = 组公寓快照([{ role: 'user', content: '大家继续聊。' }], data, 12);
+    assert.doesNotMatch(群聊后快照, /【孕情初见·一次性现场反应】/);
+  } finally {
+    if (原SillyTavern === undefined) delete globalThis.SillyTavern;
+    else globalThis.SillyTavern = 原SillyTavern;
+  }
 });
 
 test('普通地图多人连续对话会保持上一轮仍在场的焦点，显式点名才切换', () => {

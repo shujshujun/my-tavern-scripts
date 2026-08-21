@@ -517,7 +517,10 @@ test('写库增量 邀约计划提交：与活动旧 _赴约 同一回调最终 
     cb(测试聊天变量);
   };
   globalThis.getLastMessageId = () => 10;
-  globalThis.SillyTavern = { chat: [{ mes: '锚', is_user: true, swipe_id: 0 }] };
+  globalThis.SillyTavern = {
+    chat: Array.from({ length: 11 }, (_, i) => ({ mes: `锚${i}`, is_user: true, swipe_id: 0 })),
+    saveMetadata: async () => {},
+  };
   const 完整MVU快照 = Schema.parse({ 系统: { _绝对时段: 20 } });
   globalThis.Mvu = { getMvuData: () => ({ stat_data: 完整MVU快照 }) };
   const 好计划 = { m: '101', 创建楼: 10, 创建绝对时段: 20, 目标绝对时段: 24, 地点: '天台' };

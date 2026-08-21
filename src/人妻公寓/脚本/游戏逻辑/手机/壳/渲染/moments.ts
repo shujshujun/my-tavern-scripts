@@ -4,6 +4,7 @@ import { seededRandom } from '../../../楼层时钟';
 import { 列出阶段线路候选详情 } from '../../../阶段线路系统';
 import { 手机记录时间字 } from '../../../手机时间显示';
 import { 朋友圈有未读, 写实时手机已读 } from '../../数据层';
+import { 朋友圈允许公开互动 } from '../../朋友圈隐私';
 import { 请求刷新手机红点 } from '../../UI刷新';
 import { 头像块, el, 手机图标, 朋友圈图片地址 } from '../资源与皮肤';
 import { 渲染底栏, 渲染头, type 渲染上下文 } from './共享';
@@ -26,13 +27,15 @@ export function 渲染moments(上下文: 渲染上下文): void {
       el('div', 'rqw-post', '<div class="rqw-r"><p class="rqw-text" style="color:#999">朋友圈还静悄悄的。</p></div>'),
     );
   for (const c of 朋友圈页.条目) {
-    const 赞 = 1 + Math.floor(seededRandom(c.楼, c.谁, '赞') * 9);
+    const 公开互动 = 朋友圈允许公开互动(c);
+    const 赞 = 公开互动 ? 1 + Math.floor(seededRandom(c.楼, c.谁, '赞') * 9) : 0;
     const 正文 = _.escape(c.文).replace(/#([^#\s]{1,12})#/g, '<span class="tp">#$1#</span>');
-    // 真微信排版:左头像右内容;时间行右侧两点钮(纯装饰);赞+评合进浅灰盒
-    const 盒 =
-      `<div class="rqw-box"><span class="lk">楼里的 ${赞} 位邻居</span>` +
-      (c.评.length ? `<br/>${c.评.map(e => `<b>${_.escape(e.谁)}:</b>${_.escape(e.文)}`).join('<br/>')}` : '') +
-      `</div>`;
+    // 公开动态才有邻居点赞与评论；仅你可见只有玩家能刷到，不可能出现其他住户互动。
+    const 盒 = 公开互动
+      ? `<div class="rqw-box"><span class="lk">楼里的 ${赞} 位邻居</span>` +
+        (c.评.length ? `<br/>${c.评.map(e => `<b>${_.escape(e.谁)}:</b>${_.escape(e.文)}`).join('<br/>')}` : '') +
+        `</div>`
+      : '';
     const 卡 = el(
       'div',
       'rqw-post',

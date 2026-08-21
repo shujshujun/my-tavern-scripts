@@ -202,6 +202,7 @@ test('写实时手机已读 锚定最后一条实际记录（含序）；前台�
         最后手机时间记录,
         读库: () => 读库结果,
         写库增量: 写库增量桩,
+        立即持久保存手机聊天变量: async () => true,
       },
     );
 
@@ -389,6 +390,68 @@ test('无 Schema 的旧手机库缺评论或顶层数组损坏时只丢坏子字
     assert.equal(Array.isArray(测试聊天变量._微信.圈), true);
     assert.equal(测试聊天变量._微信.消息[0].文, '新回复');
     assert.equal(测试聊天变量._微信.圈[0].文, '新动态');
+  } finally {
+    globalThis.updateVariablesWith = 原updateVariablesWith;
+    globalThis.getLastMessageId = 原getLastMessageId;
+    globalThis.SillyTavern = 原SillyTavern;
+    globalThis.Mvu = 原Mvu;
+    globalThis.getVariables = 原getVariables;
+  }
+});
+
+test('网页刷新把缺失 swipe_id 补成 0 后，旧微信仍可读，下一次增量写不会覆盖旧历史', async () => {
+  const 原updateVariablesWith = globalThis.updateVariablesWith;
+  const 原getLastMessageId = globalThis.getLastMessageId;
+  const 原SillyTavern = globalThis.SillyTavern;
+  const 原Mvu = globalThis.Mvu;
+  const 原getVariables = globalThis.getVariables;
+  const 测试聊天变量 = {
+    _微信: {
+      消息: [
+        {
+          楼: 0,
+          时: 0,
+          会话: '101',
+          发: '对方',
+          文: '刷新前旧消息',
+          序: 1,
+          // rq0.65～rq0.85 可能在宿主尚未补 swipe_id 时把 undefined 序列化成 null。
+          锚签名: JSON.stringify([false, '锚0', null, null, null, null]),
+        },
+      ],
+      圈: [],
+      读到: {},
+      读时: {},
+      圈读到: -1,
+      圈读时: { 楼: -1, 时: -1 },
+      节拍: {},
+      已发私聊图: {},
+    },
+  };
+  globalThis.updateVariablesWith = async cb => {
+    cb(测试聊天变量);
+  };
+  globalThis.getLastMessageId = () => 0;
+  // SillyTavern 刷新加载后会把助手楼缺失的 swipe_id 规范成首分支 0。
+  globalThis.SillyTavern = { chat: [{ mes: '锚0', is_user: false, swipe_id: 0 }] };
+  globalThis.Mvu = { getMvuData: () => ({ stat_data: { 系统: { _绝对时段: 0 } } }) };
+  globalThis.getVariables = () => 测试聊天变量;
+  try {
+    const { 读库, 写库增量 } = require('../../src/人妻公寓/脚本/游戏逻辑/手机/数据层.ts');
+    assert.deepEqual(读库().消息.map(消息 => 消息.文), ['刷新前旧消息'], '刷新后旧历史必须继续可见');
+
+    const 已写 = await 写库增量({
+      新圈: [],
+      新消息: [{ 楼: 0, 时: 0, 会话: '101', 发: '我', 文: '刷新后新消息', 标识: 'after-reload-1' }],
+      节拍改: {},
+    });
+    assert.equal(已写, true);
+    assert.deepEqual(
+      测试聊天变量._微信.消息.map(消息 => 消息.文),
+      ['刷新前旧消息', '刷新后新消息'],
+      '下一次写库不得用过滤后的空历史覆盖旧微信',
+    );
+    assert.deepEqual(读库().消息.map(消息 => 消息.文), ['刷新前旧消息', '刷新后新消息']);
   } finally {
     globalThis.updateVariablesWith = 原updateVariablesWith;
     globalThis.getLastMessageId = 原getLastMessageId;

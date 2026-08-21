@@ -167,8 +167,12 @@ test('读信：组件内三条路径 emit close，App 统一 @close="合上信"�
   );
 });
 
-test('监控：组件只 emit close/select/avatarError；App 看监控顺序保持；dock 监控列表.length 保持', () => {
-  assert.match(监控源码, /defineEmits<\{ close: \[\]; select: \[门牌\]; avatarError: \[string\] \}>/, '监控仅三事件');
+test('监控：组件只展示并 emit 四个具名事件；App 看监控与借种断线确认顺序保持', () => {
+  assert.match(
+    监控源码,
+    /defineEmits<\{[\s\S]*?close: \[\];[\s\S]*?select: \[门牌\];[\s\S]*?avatarError: \[string\];[\s\S]*?confirmBorrowSeedOffline: \[\];[\s\S]*?\}>\(\)/,
+    '监控只暴露关闭、选房、头像失败与借种断线确认四个展示事件',
+  );
   assert.doesNotMatch(监控源码, /dismissLoot|emit\('loot'\)|emit\('pick'\)/, '监控不混入其他事件名');
   assert.doesNotMatch(监控源码, /eventEmit|eventOn/, '监控组件不含事件总线写入');
   assert.match(
@@ -181,7 +185,12 @@ test('监控：组件只 emit close/select/avatarError；App 看监控顺序保�
   assert.match(监控源码, /v-else class="cam-room fb" role="img"/, '缩略图失败显示可读门牌占位');
   assert.match(App源码, /@select="看监控"/, 'App 选择监控行仍走看监控');
   assert.match(App源码, /@avatar-error="头像失效\[\$event\] = true"/, 'App 用极小 handler 记头像失效');
-  assert.match(App源码, /v-if="监控列表\.length"/, 'dock 监控按钮仍按列表长度显示');
+  assert.match(监控源码, /borrowSeedOffline: boolean;/, '断线画面资格由 App 通过只读 prop 注入');
+  assert.match(监控源码, /v-if="borrowSeedOffline"[\s\S]*?CAM-101[\s\S]*?NO SIGNAL/, '组件只呈现101无信号卡');
+  assert.match(监控源码, /@click="emit\('confirmBorrowSeedOffline'\)"/, '点击断线卡只 emit，不在组件写业务状态');
+  assert.match(App源码, /:borrow-seed-offline="借种监控待确认"/, 'App 注入断线资格');
+  assert.match(App源码, /@confirm-borrow-seed-offline="提交借种监控断线确认"/, 'App 把断线确认接回业务事件');
+  assert.match(App源码, /v-if="监控列表\.length \|\| 借种监控待确认"/, '无剩余摄像头时仍能从302打开断线卡');
   assert.match(App源码, /const 监控列表 = computed<门牌\[\]>/, '监控列表响应式逻辑仍留 App');
 });
 

@@ -30,6 +30,7 @@ import {
 } from './邀约计划';
 import { 末楼, 当前聊天ID, 当前手机绝对时段 } from './运行时上下文';
 import { 请求刷新手机红点 } from './UI刷新';
+import { 朋友圈允许公开互动 } from './朋友圈隐私';
 import type { 朋友圈主题 } from './内容素材表';
 
 /**
@@ -341,6 +342,85 @@ export function 带当前手机分支锚<T extends { 楼: number; 锚签名?: st
   return 附手机分支锚(记录, SillyTavern.chat ?? []);
 }
 
+type 手机宿主保存接口 = {
+  saveMetadata?: () => void | Promise<void>;
+  saveChat?: () => void | Promise<void>;
+  getContext?: () => 手机宿主保存接口 | null | undefined;
+};
+
+let 手机聊天变量持久化队列: Promise<void> = Promise.resolve();
+let 已警告缺少手机硬保存接口 = false;
+
+function 读取手机宿主保存接口(): { 上下文: 手机宿主保存接口; 保存: () => void | Promise<void> } | null {
+  const 候选 = new Set<手机宿主保存接口>();
+  const 加入候选 = (值: unknown): void => {
+    if ((typeof 值 === 'object' && 值 !== null) || typeof 值 === 'function') 候选.add(值 as 手机宿主保存接口);
+  };
+  try {
+    加入候选(SillyTavern);
+  } catch {
+    /* 极旧运行时未注入时继续找父窗口。 */
+  }
+  try {
+    加入候选((globalThis as unknown as { SillyTavern?: unknown }).SillyTavern);
+  } catch {
+    /* 全局包装对象不可读时继续。 */
+  }
+  try {
+    加入候选((window.parent as unknown as { SillyTavern?: unknown })?.SillyTavern);
+  } catch {
+    /* sandbox/跨域时由 iframe 注入接口兜底。 */
+  }
+  for (const 候选项 of 候选) {
+    let 上下文 = 候选项;
+    try {
+      上下文 = 候选项.getContext?.() ?? 候选项;
+    } catch {
+      // 包装对象取 context 失败时仍尝试它自身暴露的接口。
+      上下文 = 候选项;
+    }
+    for (const 方法名 of ['saveMetadata', 'saveChat'] as const) {
+      const 保存 = 上下文[方法名];
+      if (typeof 保存 === 'function') return { 上下文, 保存 };
+    }
+  }
+  return null;
+}
+
+/**
+ * 酒馆助手的 chat 变量更新只会安排防抖保存；这里把手机提交串行接到宿主立即保存接口，
+ * 保证玩家已经看见的气泡在本函数返回前真正落盘。排队期间切聊则失败关闭，绝不把旧聊天
+ * 的延迟提交误保存到新聊天。旧宿主没有接口时保留原防抖兼容路径，并只警告一次。
+ */
+export async function 立即持久保存手机聊天变量(预期聊天ID = 当前聊天ID()): Promise<boolean> {
+  const 需要校验聊天 = !!预期聊天ID;
+  const 本次保存 = 手机聊天变量持久化队列
+    .catch(() => undefined)
+    .then(async (): Promise<boolean> => {
+      if (需要校验聊天 && 当前聊天ID() !== 预期聊天ID) return false;
+      const 接口 = 读取手机宿主保存接口();
+      if (!接口) {
+        if (!已警告缺少手机硬保存接口) {
+          已警告缺少手机硬保存接口 = true;
+          console.warn('[人妻公寓·手机] 宿主没有暴露 saveMetadata/saveChat，微信记录只能沿用防抖保存兼容路径。');
+        }
+        return false;
+      }
+      await Promise.resolve(接口.保存.call(接口.上下文));
+      return !需要校验聊天 || 当前聊天ID() === 预期聊天ID;
+    });
+  手机聊天变量持久化队列 = 本次保存.then(
+    () => undefined,
+    () => undefined,
+  );
+  try {
+    return await 本次保存;
+  } catch (e) {
+    console.error('[人妻公寓·手机] 微信聊天变量立即保存失败:', e);
+    return false;
+  }
+}
+
 /**
  * 宿主明确报告删楼/swipe 后物理裁枝，避免旧分支稳定键在下一次写库时被合并复活。
  * 返回是否真实写入了 `_微信`；可选 允许写入 在 updateVariablesWith 回调最前面复核
@@ -348,6 +428,7 @@ export function 带当前手机分支锚<T extends { 楼: number; 锚签名?: st
  * 不刷新红点，并返回未写结果，避免旧协调收口或推进新分支的已读水位。
  */
 export async function 隔离当前手机分支(切分支楼 = 末楼(), 允许写入: () => boolean = () => true): Promise<boolean> {
+  const 写入聊天ID = 当前聊天ID();
   let 已写 = false;
   await updateVariablesWith(
     vars => {
@@ -386,7 +467,10 @@ export async function 隔离当前手机分支(切分支楼 = 末楼(), 允许�
     },
     { type: 'chat' },
   );
-  if (已写) 请求刷新手机红点();
+  if (已写) {
+    await 立即持久保存手机聊天变量(写入聊天ID);
+    请求刷新手机红点();
+  }
   return 已写;
 }
 
@@ -409,9 +493,12 @@ export function 读库(): 微信库 {
     .filter(x => 验收短文本(x.文, 手机可见单条硬上限) !== null)
     .map(x => ({
       ...x,
-      评: 数组或空<{ 谁: string; 文: string }>(x.评).filter(
-        p => 是普通对象(p) && 验收短文本(p.文, 手机可见单条硬上限) !== null,
-      ),
+      // 仅你可见的动态只有玩家本人能刷到；即使旧档或第三方数据残留评论，也必须按隐私语义归零。
+      评: 朋友圈允许公开互动(x)
+        ? 数组或空<{ 谁: string; 文: string }>(x.评).filter(
+            p => 是普通对象(p) && 验收短文本(p.文, 手机可见单条硬上限) !== null,
+          )
+        : [],
     }));
   const 库: 微信库 = {
     消息,
@@ -617,6 +704,7 @@ export async function 压缩微信会话记录(
   普通气泡上限: number,
   允许写入: () => boolean = () => true,
 ): Promise<boolean> {
+  const 写入聊天ID = 当前聊天ID();
   let 已写 = false;
   let 有变化 = false;
   await updateVariablesWith(
@@ -673,7 +761,10 @@ export async function 压缩微信会话记录(
     },
     { type: 'chat' },
   );
-  if (已写 && 有变化) 请求刷新手机红点();
+  if (已写 && 有变化) {
+    await 立即持久保存手机聊天变量(写入聊天ID);
+    请求刷新手机红点();
+  }
   return 已写;
 }
 
@@ -709,7 +800,7 @@ export async function 写实时手机已读(
   const 仍有效 = () =>
     手机时间线租约仍有效(租约, 当前聊天ID(), SillyTavern.chat ?? [], 当前手机绝对时段()) && 前台仍有效();
   const 锚 = 创建手机已读时锚(锚记录.楼, 锚记录.时, 锚记录.序);
-  return 写库增量(
+  const 已写 = await 写库增量(
     {
       新圈: [],
       新消息: [],
@@ -718,6 +809,8 @@ export async function 写实时手机已读(
     },
     仍有效,
   );
+  if (已写) await 立即持久保存手机聊天变量(聊天ID);
+  return 已写;
 }
 
 function 赴约仍活动(赴约: Partial<手机赴约提交> | null, 当前楼: number): boolean {

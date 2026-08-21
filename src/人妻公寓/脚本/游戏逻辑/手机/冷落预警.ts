@@ -15,7 +15,7 @@ import {
 } from '../冷落系统';
 import { 构造微信联系保护表 } from '../微信每日联系';
 import type { 微信库 } from './数据层';
-import { 读库, 手机可见单条硬上限, 私聊节拍键, 写库增量 } from './数据层';
+import { 读库, 手机可见单条硬上限, 私聊节拍键, 写库增量, 立即持久保存手机聊天变量 } from './数据层';
 import { 人设段 } from './配置';
 import { 称呼纪律, 家庭事实, 口吻纪律, 小生成, 微信短文本 } from './生成引擎';
 import { 微信好友 } from './通知桥';
@@ -196,6 +196,7 @@ export async function 冷落预警节拍(): Promise<void> {
     if (!已写) return;
     请求刷新手机红点();
     请求手机重绘();
+    await 立即持久保存手机聊天变量(时间线租约.聊天标识);
   } catch (e) {
     console.error('[人妻公寓·手机] 冷落预警节拍失败:', e);
   } finally {

@@ -222,8 +222,9 @@ test('序章开局用唯一消息令牌认领迟到楼，并在失败时只清�
   assert.match(开局, /_rqgy开局令牌/);
   assert.match(开局, /finally \{\s*捕获开局消息\(\)/);
   assert.match(开局, /SillyTavern\.chat\?\.\[开局消息楼层\] === 开局消息引用/);
-  assert.match(开局, /记录数据库回合\([\s\S]*开局仍有效/);
-  assert.match(开局, /广播生成完成事件\(开局仍有效\)/);
+  assert.match(开局, /const 开局数据库后处理仍有效 = \(\) =>[\s\S]*_rqgy开局令牌 === 开局消息令牌/);
+  assert.match(开局, /安排数据库回合后处理\([\s\S]*提交校验: 开局数据库后处理仍有效/);
+  assert.doesNotMatch(开局, /await 记录数据库回合\(/, '序章数据库写入已经降为成功回合后的后台副作用');
   assert.match(开局, /开局前保护数据 = _\.cloneDeep\(data\)/, '变更序章字段前必须冻结原保护基准');
   assert.match(
     开局,

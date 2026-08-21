@@ -34,6 +34,14 @@ export const 生产图片 = (文件: string): string =>
     .split('/')
     .map(段 => encodeURIComponent(段))
     .join('/')}.webp`;
+/** 夏乔借种结局事件画面与手机合照共享同一不可变发布目录。 */
+export const 借种结局素材基址 =
+  'https://testingcf.jsdelivr.net/gh/shujun8520-design/qgy-assets@cg4/cg1/borrow-seed-ending';
+export const 借种结局图片 = (文件: string): string =>
+  `${借种结局素材基址}/${文件
+    .split('/')
+    .map(段 => encodeURIComponent(段))
+    .join('/')}.webp`;
 export const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.55/dist/人妻公寓/素材';
 /**
  * 与孕态服装发布记录保持同一命名契约：approved/<角色>/服装_<商店 SKU>_孕态.webp。

@@ -447,8 +447,8 @@
             :open="!!当前事件CG"
             :image-url="当前事件CG地址"
             :title="当前事件CG?.标题 ?? ''"
-            :kicker="当前生产CG ? 'PRODUCTION / 生产' : 'FAMILY PLAN'"
-            :close-label="当前生产CG ? '收起生产剧情画面' : '收起家庭计划画面'"
+            :kicker="当前事件CG眉题"
+            :close-label="当前事件CG关闭文案"
             @close="关闭当前事件CG"
             @image-error="当前事件CG加载失败"
           />
@@ -1028,7 +1028,7 @@
             <Ic n="bag" /><span>背包</span>
           </button>
           <button
-            v-if="监控列表.length"
+            v-if="监控列表.length || 借种监控待确认"
             class="dock-btn"
             :disabled="发送中 || 静音会议正式中 || 场景剧情锁定"
             :title="发送中 ? '当前内容正在生成，监控暂不可用' : 场景剧情锁定 ? '当前强制剧情尚未完成，监控暂不可用' : '你装下的眼睛'"
@@ -1161,8 +1161,10 @@
         :avatar-failed="头像失效"
         :background-url="背景图"
         :avatar-url="头像图"
+        :borrow-seed-offline="借种监控待确认"
         @close="显示监控 = false"
         @select="看监控"
+        @confirm-borrow-seed-offline="提交借种监控断线确认"
         @avatar-error="头像失效[$event] = true"
       />
 
@@ -1285,6 +1287,8 @@ import { 解析绝对时段 } from '../../周作息';
 import { 丈夫在楼, 妻位置推算 } from '../../脚本/游戏逻辑/楼层时钟';
 import { 余波有冻结效力 } from '../../脚本/游戏逻辑/冷落系统';
 import { 怀孕已公开 } from '../../脚本/游戏逻辑/怀孕系统';
+import { 借种离线监控待确认 } from '../../脚本/游戏逻辑/借种结局系统';
+import { 借种101持久背景文件 } from '../../脚本/游戏逻辑/借种结局状态';
 import { 处于医院硬锁, 医院已解锁, 房间生产背景键, type 生产地点动作ID } from '../../脚本/游戏逻辑/生产系统';
 import { 安眠药可圆场, 丈夫登门药物窗口已开启 } from '../../脚本/游戏逻辑/丈夫登门系统';
 import { 全部阶段性癖已完成, 读取阶段性癖状态, 阶段性癖门牌 } from '../../脚本/游戏逻辑/阶段性癖状态';
@@ -1343,6 +1347,7 @@ import {
   替换失败CG槽位,
   type CG加载槽位,
 } from './cgLoadState';
+import { 选择借种CG序列, type 借种CG帧 } from './借种CG序列';
 import { 计算场景同步, type 场景聊天状态 } from './场景状态同步';
 import {
   创建正文幕归属,
@@ -1401,6 +1406,7 @@ import {
   蛋白粉道具图,
   家庭计划图片,
   生产图片,
+  借种结局图片,
   素材基址,
   角色立绘候选,
   成人CG基址,
@@ -1804,6 +1810,7 @@ async function 写场景(房间id: string | null, 破门 = false, 待提交状�
     清空当前成人CG();
     当前家庭计划CG.value = null;
     当前生产CG.value = null;
+    清空借种CG序列();
     最近CG信号 = null;
   }
   return true;
@@ -2030,6 +2037,7 @@ function 同步场景自变量() {
       清空当前成人CG();
       当前家庭计划CG.value = null;
       当前生产CG.value = null;
+      当前借种CG.value = null;
       最近CG信号 = null;
     }
   } catch (e) {
@@ -2440,17 +2448,50 @@ interface 生产CG载荷 {
   保留夏乔?: boolean;
 }
 const 当前生产CG = ref<生产CG载荷 | null>(null);
-const 当前事件CG = computed(() => 当前生产CG.value ?? 当前家庭计划CG.value);
+interface 借种CG载荷 extends 借种CG帧 {
+  后续?: 借种CG帧[];
+}
+const 当前借种CG = ref<借种CG帧 | null>(null);
+const 借种CG队列 = ref<借种CG帧[]>([]);
+const 借种CG本场已展示 = new Set<string>();
+let 借种CG来源键 = '';
+function 显示借种CG序列(帧: readonly 借种CG帧[]): void {
+  const 有效 = 帧.filter(item => item?.文件);
+  if (!有效.length) return;
+  当前借种CG.value = 有效[0];
+  借种CG队列.value = 有效.slice(1);
+}
+function 清空借种CG序列(): void {
+  当前借种CG.value = null;
+  借种CG队列.value = [];
+}
+const 当前事件CG = computed(() => 当前借种CG.value ?? 当前生产CG.value ?? 当前家庭计划CG.value);
 const 当前家庭计划CG地址 = computed(() => (当前家庭计划CG.value ? 家庭计划图片(当前家庭计划CG.value.文件) : ''));
-const 当前事件CG地址 = computed(() => (当前生产CG.value ? 生产图片(当前生产CG.value.文件) : 当前家庭计划CG地址.value));
+const 当前事件CG地址 = computed(() =>
+  当前借种CG.value
+    ? 借种结局图片(当前借种CG.value.文件)
+    : 当前生产CG.value
+      ? 生产图片(当前生产CG.value.文件)
+      : 当前家庭计划CG地址.value,
+);
+const 当前事件CG眉题 = computed(() =>
+  当前借种CG.value ? 'BORROW SEED ENDING / 借种结局' : 当前生产CG.value ? 'PRODUCTION / 生产' : 'FAMILY PLAN',
+);
+const 当前事件CG关闭文案 = computed(() =>
+  当前借种CG.value ? '收起借种结局画面' : 当前生产CG.value ? '收起生产剧情画面' : '收起家庭计划画面',
+);
 function 关闭当前事件CG(): void {
+  if (当前借种CG.value) {
+    当前借种CG.value = 借种CG队列.value.shift() ?? null;
+    return;
+  }
   if (当前生产CG.value) 当前生产CG.value = null;
   else 当前家庭计划CG.value = null;
 }
 function 当前事件CG加载失败(失败地址: string): void {
-  // 图片请求可能在家庭计划节点切换或生产画面抢占后才迟到失败；只允许仍是当前地址的请求收口。
+  // 图片请求可能在事件节点切换或其他画面抢占后才迟到失败；只允许仍是当前地址的请求收口。
   if (!失败地址 || 失败地址 !== 当前事件CG地址.value) return;
-  const 类型 = 当前生产CG.value ? '生产' : '家庭计划';
+  const 类型 = 当前借种CG.value ? '借种结局' : 当前生产CG.value ? '生产' : '家庭计划';
   关闭当前事件CG();
   弹提示(`${类型}画面加载失败，任务进度不受影响。`, 4200);
 }
@@ -2495,6 +2536,23 @@ function 处理CG回合信号(
     成人CG本次失效.clear();
   }
   最近CG信号 = 信号;
+  const 借种选择 = 选择借种CG序列(data.value, 信号);
+  if (借种选择.接管) {
+    清空当前成人CG();
+    const 来源 = data.value?.系统._性爱场景.场次标识 || data.value?.系统._上次性爱结果.场次标识 || '借种';
+    if (来源 !== 借种CG来源键) {
+      借种CG来源键 = 来源;
+      借种CG本场已展示.clear();
+    }
+    const 未展示 = 借种选择.帧.filter(帧 => !借种CG本场已展示.has(帧.文件));
+    if (未展示.length) {
+      未展示.forEach(帧 => 借种CG本场已展示.add(帧.文件));
+      显示借种CG序列(未展示);
+    }
+    return;
+  }
+  // 下一场普通亲密或专属素材不匹配的明确行为，必须先清掉旧借种画面再交回通用精确图库。
+  if (当前借种CG.value) 清空借种CG序列();
   const 阶段 = 判定亲密场景CG阶段(信号);
   const 动作 = 阶段 ? 判定CG动作(信号, 阶段) : null;
   // 展示键包含图库/门牌/阶段/动作：图库切换必然改变展示键，旧图库画面不能沿用。
@@ -2666,6 +2724,10 @@ function 背景图(房间id: string | null): string {
   };
   if (房间id && 本地背景[房间id]) return 本地背景[房间id]!;
   if (房间id === '医院') return 生产图片('医院/医院_通用地点背景');
+  if (房间id === '101') {
+    const 借种文件 = 借种101持久背景文件(data.value);
+    if (借种文件) return 借种结局图片(借种文件);
+  }
   if (房间id && 门牌列表.includes(房间id as 门牌)) {
     const 文件 = 房间生产背景键(data.value, 房间id as 门牌);
     if (文件) return 生产图片(文件);
@@ -2944,6 +3006,15 @@ const { 房间动作, 当前房间动作, 普通房间动作, 确认已到达动
       void 提交界面事务(() => eventEmit('人妻公寓:丈夫礼物', { 门牌, 道具id })),
     催租: ({ 门牌, 选择 }) => void 提交界面事务(() => eventEmit('人妻公寓:催租', { 门牌, 选择 })),
     空房偷窃: id => void 提交界面事务(() => eventEmit('人妻公寓:空房偷窃', id)),
+    拆除借种摄像头: () => void 提交界面事务(() => eventEmit('人妻公寓:拆除借种摄像头')),
+    启动借种: () => void 提交界面事务(() => eventEmit('人妻公寓:启动借种')),
+    查看借种阳性结果: () => void 提交界面事务(() => eventEmit('人妻公寓:查看借种阳性结果')),
+    拍摄借种三人合照: () => void 提交界面事务(() => eventEmit('人妻公寓:拍摄借种三人合照')),
+    拍摄借种产后家庭合照: () => void 提交界面事务(() => eventEmit('人妻公寓:拍摄借种产后家庭合照')),
+    停止借种: () => void 提交界面事务(() => eventEmit('人妻公寓:停止借种')),
+    借种三人日常: () => void 提交界面事务(() => eventEmit('人妻公寓:借种三人日常')),
+    借种朋友圈选择: 选择 =>
+      void 提交界面事务(() => eventEmit('人妻公寓:借种朋友圈选择', 选择)),
     打听: m => void 提交界面事务(() => eventEmit('人妻公寓:打听', m)),
     荣耀洞: () => void 提交界面事务(() => eventEmit('人妻公寓:荣耀洞')),
     捡金币: id => void 提交界面事务(() => eventEmit('人妻公寓:捡金币', id)),
@@ -3815,6 +3886,15 @@ const 显示监控 = ref(false);
  * store 拉回新账之前读到旧数据,之后又无人再刷;computed 跟着 store 走,数据一到位自动弹。
  * 布设名单只读 stat 主账，与背包在同一个楼层快照中同生共死。
  */
+const 借种监控待确认 = computed(
+  () => 当前房间.value === '302' && 借种离线监控待确认(data.value),
+);
+
+function 提交借种监控断线确认() {
+  if (!借种监控待确认.value) return;
+  void 提交界面事务(() => eventEmit('人妻公寓:确认借种断线'));
+}
+
 const 监控列表 = computed<门牌[]>(() => {
   const 布设 = (data.value?.系统 as { _摄像头布设?: Record<string, boolean> } | undefined)?._摄像头布设 ?? {};
   return 门牌列表.filter(m => 布设[m]);
@@ -4327,6 +4407,49 @@ async function 读取酒馆原生提示词模块(宿主窗口: 宿主窗口接�
 // 关闭监测轮询提到模块级:原生窗口最长挂 5 分钟,期间界面若被销毁必须能在 onUnmounted 收掉(2026-08-03 审计 L10)
 let 原生弹窗轮询: number | undefined;
 
+/**
+ * SillyTavern 的 promptItemize 只负责打开“提示词拆分”；截图右侧原始提示词由弹窗内
+ * `#showRawPrompt` 的原生 click 监听负责展开。必须在调用 promptItemize 前先监听宿主
+ * 文档，避免模板异步完成后弹窗同步挂载时错过按钮；游戏不读取 rawPrompt，也不自制窗口。
+ */
+function 等待酒馆显示原始提示词按钮(弹窗文档: Document): Promise<HTMLElement | null> {
+  const 已有按钮 = new Set(弹窗文档.querySelectorAll<HTMLElement>('#showRawPrompt'));
+  const 查找新按钮 = (): HTMLElement | null =>
+    [...
+      弹窗文档.querySelectorAll<HTMLElement>(
+        'dialog[open] #showRawPrompt, [role="dialog"] #showRawPrompt, .popup[open] #showRawPrompt',
+      ),
+    ].find(按钮 => !已有按钮.has(按钮)) ?? null;
+  const 立即按钮 = 查找新按钮();
+  if (立即按钮) return Promise.resolve(立即按钮);
+
+  const 宿主视窗 = 弹窗文档.defaultView ?? window;
+  return new Promise(resolve => {
+    let 已完成 = false;
+    let 超时号 = 0;
+    const 观察器 = new 宿主视窗.MutationObserver(() => {
+      const 按钮 = 查找新按钮();
+      if (按钮) 完成(按钮);
+    });
+    const 完成 = (按钮: HTMLElement | null): void => {
+      if (已完成) return;
+      已完成 = true;
+      观察器.disconnect();
+      宿主视窗.clearTimeout(超时号);
+      resolve(按钮);
+    };
+    观察器.observe(弹窗文档.documentElement, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['open'],
+    });
+    超时号 = 宿主视窗.setTimeout(() => 完成(null), 3000);
+    const 按钮 = 查找新按钮();
+    if (按钮) 完成(按钮);
+  });
+}
+
 async function 打开楼层提示词(楼: number) {
   const 同源窗口们: Window[] = [];
   try {
@@ -4392,8 +4515,12 @@ async function 打开楼层提示词(楼: number) {
   }
 
   let 弹窗文档 = 宿主文档;
+  if (!原生模块) 弹窗文档 = 入口文档;
+  // 官方源码没有单独导出的 showRawPrompt 函数；它是 promptItemize 弹窗里的原生按钮。
+  // 先监听，再打开提示词拆分，最后只点击该原生按钮，直接得到截图中的完整框架与右侧原文。
+  const 原始提示词按钮任务 = 等待酒馆显示原始提示词按钮(弹窗文档);
   if (原生模块) {
-    // promptItemize 会等弹窗关闭才 resolve，不能 await，否则会错过下方的关闭监测。
+    // promptItemize 会等弹窗关闭才 resolve，不能 await，否则无法继续自动点击显示原始提示词。
     const 原生调用 = 原生模块.promptItemize(原生模块.itemizedPrompts, 楼号);
     void Promise.resolve(原生调用).catch(e => {
       console.warn('[人妻公寓客户端] 打开酒馆原生提示词窗口失败:', e);
@@ -4401,10 +4528,17 @@ async function 打开楼层提示词(楼: number) {
     });
   } else {
     if (!入口) return;
-    弹窗文档 = 入口文档;
     // 兼容无法动态导入模块的酒馆版本；原生监听的是 pointerup，不是 click。
     const Pointer事件 = 入口文档.defaultView?.PointerEvent ?? PointerEvent;
     入口.dispatchEvent(new Pointer事件('pointerup', { bubbles: true, cancelable: true }));
+  }
+
+  const 原始提示词按钮 = await 原始提示词按钮任务;
+  if (原始提示词按钮) {
+    原始提示词按钮.click();
+  } else {
+    console.warn('[人妻公寓客户端] 已唤起提示词拆分，但未找到酒馆原生 #showRawPrompt 按钮');
+    弹提示('提示词拆分已打开，但“显示原始提示词”未自动展开，请点击左上角第一个按钮。', 5000);
   }
 
   // 原生窗口挂在父文档；若本按钮替玩家退出了全屏，等原生窗口真正关闭后再恢复。
@@ -4699,6 +4833,7 @@ function 客户端聊天切换(): void {
   清空当前成人CG();
   当前家庭计划CG.value = null;
   当前生产CG.value = null;
+  当前借种CG.value = null;
   最近CG信号 = null;
   当前房间.value = null;
   进房末楼.value = 0;
@@ -4907,7 +5042,7 @@ onMounted(() => {
   eventOn('人妻公寓:CG回合信号', (信号: CG回合信号) => {
     // 荣耀洞拥有独立三拍画面；这里仍可接收事件，但渲染层与解锁层均不采用普通CG。
     // 医院同样只允许生产系统的非成人画面；不能把正文尺度误判生成的成人CG藏在生产图后。
-    if (荣耀洞图.value || 当前房间.value === '医院' || 当前生产CG.value) {
+    if (荣耀洞图.value || 当前房间.value === '医院' || 当前事件CG.value) {
       清空当前成人CG();
       最近CG信号 = null;
       return;
@@ -4918,13 +5053,22 @@ onMounted(() => {
     if (!载荷?.文件) return;
     清空当前成人CG();
     当前生产CG.value = null;
+    清空借种CG序列();
     当前家庭计划CG.value = 载荷;
   });
   eventOn('人妻公寓:生产CG', (载荷: 生产CG载荷) => {
     if (!载荷?.文件) return;
     清空当前成人CG();
     当前家庭计划CG.value = null;
+    清空借种CG序列();
     当前生产CG.value = 载荷;
+  });
+  eventOn('人妻公寓:借种CG', (载荷: 借种CG载荷) => {
+    if (!载荷?.文件) return;
+    清空当前成人CG();
+    当前家庭计划CG.value = null;
+    当前生产CG.value = null;
+    显示借种CG序列([载荷, ...(载荷.后续 ?? [])]);
   });
   eventOn('人妻公寓:回合完成', async (选项?: 回合完成正文选项) => {
     场景剧情准备锁.value = null;
@@ -5220,7 +5364,7 @@ onUnmounted(() => {
     gap: 8px;
   }
   .mobile-fullscreen-actions button {
-    min-height: 34px;
+    min-height: 44px;
     padding: 7px 9px;
     border: 1px solid rgba(255, 255, 255, 0.72);
     border-radius: 10px;
@@ -5591,6 +5735,17 @@ onUnmounted(() => {
   box-shadow: var(--card-shadow);
   backdrop-filter: blur(6px);
   transition: background 0.5s ease;
+}
+
+/* 展开亲密管理时，正文舞台可能只剩一个 48px 底栏高；允许抽屉从舞台底边向上覆盖，
+   而不是继承残余高度后被 overflow:hidden 裁成不可点击的窄缝。 */
+.story-wrap.story-intimacy-open {
+  overflow: visible;
+}
+
+.story-wrap.story-intimacy-open .intimacy-stage-dock {
+  top: auto;
+  height: min(260px, calc(100dvh - 24px));
 }
 
 .story-wrap.story-special-interaction {
@@ -6206,6 +6361,7 @@ onUnmounted(() => {
 .intimacy-panel {
   position: relative;
   z-index: 1;
+  box-sizing: border-box;
   width: 100%;
   max-height: calc(100% - 48px);
   overflow-y: auto;

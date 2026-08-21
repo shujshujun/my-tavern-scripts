@@ -51,9 +51,23 @@ test('外地项目复用冷却为 12 时段：消息加楼不解锁，世界时�
   assert.equal(data.户['101'].夫._外出至, 24);
 });
 
-test('首次要钱的 -1 哨兵表示从未使用，绝对时段 0 即可要钱', () => {
+test('阶段2仍不能要钱，拒绝时不写次数、冷却或现金', () => {
   const data = 建101数据();
-  data.户['101'].妻.当前阶段 = 4;
+  data.户['101'].妻.当前阶段 = 2;
+  const 原现金 = data.现金;
+
+  const result = 要钱(data, '101', 0);
+
+  assert.equal(result.变动, undefined);
+  assert.match(result.提示, /关系还没到伸手的地步/);
+  assert.equal(data.户['101'].妻._要钱次数, 0);
+  assert.equal(data.户['101'].妻._上次要钱楼层, -1);
+  assert.equal(data.现金, 原现金);
+});
+
+test('阶段3首次要钱的 -1 哨兵表示从未使用，绝对时段 0 即可要钱', () => {
+  const data = 建101数据();
+  data.户['101'].妻.当前阶段 = 3;
   assert.equal(data.户['101'].妻._上次要钱楼层, -1);
 
   const 原现金 = data.现金;
@@ -62,6 +76,7 @@ test('首次要钱的 -1 哨兵表示从未使用，绝对时段 0 即可要钱'
   assert.equal(result.变动, true);
   assert.doesNotMatch(result.提示, /刚开过口/);
   assert.equal(data.户['101'].妻._上次要钱楼层, 0);
+  assert.equal(data.户['101'].妻._要钱次数, 1);
   assert.equal(data.现金, 原现金 + 经济配置.要钱数额);
 });
 

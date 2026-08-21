@@ -1,6 +1,7 @@
 import type { SchemaType } from '../../schema';
 import { 户静态表, 阶段标题, type 门牌 } from '../../stageConfig';
 import { 风闻阈值 } from './风闻系统';
+import { 夏乔家庭计划后果有效 } from './借种结局状态';
 
 export type 有效胎次 = 1 | 2 | 3;
 export type 孕产事件类型 = '报孕' | '姐妹群报孕' | '预产' | '生产' | '母婴合照' | '住院';
@@ -30,6 +31,7 @@ export interface 孕产事件数据 {
   已生胎数: number;
   受孕场次标识: string;
   家庭计划知情: boolean;
+  借种结局来源: boolean;
 }
 
 export interface 报孕生成资料 extends 孕产事件数据 {
@@ -98,13 +100,18 @@ export function 构建孕产事件数据(
   事件类型: 孕产事件类型,
 ): 孕产事件数据 {
   const 胎次 = 当前叙事胎次(data, 母亲);
+  const 场次标识 = data.户[母亲]?.妻._怀孕.受孕场次标识 ?? '';
+  const 家庭计划知情 = data.户[母亲]?.妻._生产.家庭计划知情 === true;
   return {
     事件类型,
     母亲: 构建孕产角色数据(data, 母亲, true),
     胎次,
     已生胎数: 已生胎数(data, 母亲),
-    受孕场次标识: data.户[母亲]?.妻._怀孕.受孕场次标识 ?? '',
-    家庭计划知情: data.户[母亲]?.妻._生产.家庭计划知情 === true,
+    受孕场次标识: 场次标识,
+    家庭计划知情,
+    // 字段名兼容旧消费者；true 同时表示精确借种首胎或其后续家庭计划延续胎。
+    借种结局来源:
+      母亲 === '101' && 夏乔家庭计划后果有效(data, { 场次标识, 家庭计划知情, 胎次 }),
   };
 }
 

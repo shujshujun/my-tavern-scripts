@@ -11,7 +11,7 @@ import { 创建手机已读时锚, 手机记录晚于已读 } from '../手机已
 import { 家庭计划微信事件键 } from '../家庭计划系统';
 import { 是结构化报孕资料 } from '../孕产叙事系统';
 import { 列出预产通知, 预产微信键, type 生产通知凭据 } from '../生产系统';
-import { 读库, 写库增量, type 微信消息 } from './数据层';
+import { 读库, 写库增量, 立即持久保存手机聊天变量, type 微信消息 } from './数据层';
 import { 当前手机绝对时段, 当前聊天ID, 末楼 } from './运行时上下文';
 import { 请求手机重绘, 请求刷新手机红点 } from './UI刷新';
 
@@ -166,6 +166,7 @@ export async function 同步管理任务微信(data: SchemaType): Promise<boolea
   if (已写) {
     请求刷新手机红点();
     请求手机重绘();
+    await 立即持久保存手机聊天变量(时间线租约.聊天标识);
   }
   return 已写;
 }

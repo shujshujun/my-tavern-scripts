@@ -6,6 +6,8 @@ import {
   type 静音会议候选门牌,
 } from '../../静音会议配置';
 import { 取会场私聊摘要提示 } from './手机系统';
+import { 借种开场事件, 借种玩家行动许可, 推进借种开场 } from './借种结局系统';
+import { 借种开场事件标记 } from './借种结局状态';
 import { 登记脚本正增长候选 } from './冷落系统';
 import { 事件角色标记 } from './snapshotSystem';
 import { 特殊场景启动亲密门 } from './特殊场景策略';
@@ -221,6 +223,11 @@ function 静音会议拍提示(data: SchemaType): string {
 export function 准备当前特殊场景节拍(data: SchemaType): void {
   if (!data.系统._特殊场景.id) return;
   const 场 = data.系统._特殊场景;
+  if (场.id === '借种' && 场.阶段 === '开场') {
+    const 提示 = 借种开场事件(data);
+    if (提示) 追加待发送节拍(data, 借种开场事件标记, 绑定妻(提示, ['101']));
+    return;
+  }
   if (场.id === '录像带前置' && /^(102|202)-[12]$/.test(场.阶段)) {
     const [, 门牌号, 拍] = 场.阶段.match(/^(102|202)-([12])$/)!;
     const 标记 = `【特殊前置·录像带·${门牌号}·${拍}】`;
@@ -539,6 +546,12 @@ export function 特殊场景玩家行动前(data: SchemaType, 当前地点?: str
   const 场 = data.系统._特殊场景;
   const 已提供地点 = 当前地点 !== undefined;
   const 当前位置 = String(当前地点 ?? '').trim();
+  if (场.id === '借种') {
+    const 许可 = 借种玩家行动许可(data, 当前位置);
+    if (!许可.成功) return 许可;
+    准备当前特殊场景节拍(data);
+    return { 成功: true, 提示: '' };
+  }
   if (场.id === '录像带前置') {
     if (已提供地点 && 当前位置 !== 场.地点) {
       return { 成功: false, 提示: `这段前置必须留在${场.地点}室继续，不能换到其他地点。` };
@@ -573,6 +586,11 @@ export function 特殊场景玩家行动前(data: SchemaType, 当前地点?: str
 export function 推进特殊场景(data: SchemaType, 已演事件: string): void {
   const 场 = data.系统._特殊场景;
   if (!场.id) return;
+
+  if (场.id === '借种') {
+    if (已演事件.includes(借种开场事件标记)) 推进借种开场(data);
+    return;
+  }
 
   if (场.id === '静音会议') {
     const 固定 = 已演事件.match(/【特殊场景·静音会议·(\d{1,2})】/);

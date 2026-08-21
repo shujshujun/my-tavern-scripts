@@ -266,7 +266,8 @@ test('头像块父亲/丈夫影子规则、姐妹群/群头像规则保持', () 
   assert.doesNotMatch(头像块('路人'), /avatar-/);
   assert.match(decodeURIComponent(头像块('路人')), /头像\/路人\.webp/);
   // 图挂了只用常量纯文本回退；不得把持久角色名拼进内联事件属性。
-  assert.match(头像块('夏乔'), /this\.parentElement\.textContent='\?'/, '头像 onerror 使用常量回退');
+  assert.match(头像块('夏乔'), /var p=this\.parentElement;if\(p\)p\.textContent='\?'/, '头像 onerror 使用常量回退');
+  assert.doesNotMatch(头像块('夏乔'), /this\.remove\(\);this\.parentElement/, '头像失败不能访问已移除节点的父元素');
   const 异常头像 = 头像块(`x" onerror="globalThis.__rq=1`);
   assert.equal((异常头像.match(/\sonerror=/g) ?? []).length, 1);
   assert.doesNotMatch(异常头像, /onerror="[^"]*globalThis/);

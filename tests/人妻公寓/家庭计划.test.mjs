@@ -40,11 +40,8 @@ const {
   执行家庭计划地点动作,
   确认家庭计划微信已读,
 } = require('../../src/人妻公寓/脚本/游戏逻辑/家庭计划系统.ts');
-const {
-  夏乔借种占位ID,
-  角色剧情占位已上架,
-  角色剧情占位锁定原因,
-} = require('../../src/人妻公寓/脚本/游戏逻辑/角色结局占位.ts');
+const { 借种场景ID } = require('../../src/人妻公寓/脚本/游戏逻辑/借种结局状态.ts');
+const { 角色剧情占位已上架, 角色剧情占位锁定原因 } = require('../../src/人妻公寓/脚本/游戏逻辑/角色结局占位.ts');
 
 const initvar = YAML.parse(
   readFileSync(new URL('../../src/人妻公寓/世界书/变量/initvar.yaml', import.meta.url), 'utf8'),
@@ -201,32 +198,33 @@ test('家庭计划监控提交会复核夫妻物理条件，陈旧票不得在�
   assert.deepEqual(data.系统._家庭计划, 提交前, '陈旧监控票据不得留下部分进度');
 });
 
-test('借种仅在家庭计划完成后作为不可购买的夏乔结局占位上架', () => {
+test('借种是可见但由家庭计划硬门锁定的真实商品，完成前零副作用、完成后只购入一张票', () => {
   const data = 建夏乔完成数据();
-  assert.equal(夏乔借种占位ID, '借种');
-  assert.equal(角色剧情占位已上架(data, 夏乔借种占位ID), false);
-  assert.equal(
-    取货架(data)
-      .flatMap(x => x.商品)
-      .some(x => x.id === 夏乔借种占位ID),
-    false,
-  );
+  assert.equal(借种场景ID, '借种');
+  const 商品 = 取货架(data)
+    .flatMap(x => x.商品)
+    .find(x => x.id === 借种场景ID);
+  assert.ok(商品, '达到夏乔最终阶段后应能在特殊场景货架看到借种商品');
+  assert.equal(商品.价格, 1500);
+  assert.equal(商品.剧情占位, undefined, '借种不再走角色剧情占位购买分支');
+
+  const 锁定前 = lodash.cloneDeep({ 现金: data.现金, 背包: data.背包 });
+  const 锁定结果 = 购买(data, 借种场景ID);
+  assert.equal(锁定结果.成功, false);
+  assert.match(锁定结果.提示, /先完成夏乔的家庭计划/);
+  assert.deepEqual({ 现金: data.现金, 背包: data.背包 }, 锁定前);
 
   data.系统._家庭计划.阶段 = '已完成';
-  assert.equal(角色剧情占位已上架(data, 夏乔借种占位ID), true);
-  assert.equal(
-    取货架(data)
-      .flatMap(x => x.商品)
-      .some(x => x.id === 夏乔借种占位ID),
-    true,
-  );
-  const 前现金 = data.现金;
-  const 结果 = 购买(data, 夏乔借种占位ID);
-  assert.equal(结果.成功, false);
-  assert.match(结果.提示, /设计待完成.*夏乔.*结局剧情.*不会扣款/);
-  assert.equal(data.现金, 前现金);
-  assert.equal(data.背包.includes(夏乔借种占位ID), false);
-  assert.match(客户端源码, /if \(商品\.剧情占位\) return '设计待完成';/);
+  const 结果 = 购买(data, 借种场景ID);
+  assert.equal(结果.成功, true);
+  assert.equal(data.现金, 1500);
+  assert.equal(data.背包.filter(id => id === 借种场景ID).length, 1);
+
+  const 重复 = 购买(data, 借种场景ID);
+  assert.equal(重复.成功, false);
+  assert.match(重复.提示, /已经购买或正在使用/);
+  assert.equal(data.现金, 1500);
+  assert.equal(data.背包.filter(id => id === 借种场景ID).length, 1);
 });
 
 test('其余五名角色各有操作性剧情与结局剧情占位，达到 L5 并完成阶段主题后成对上架', () => {
@@ -260,7 +258,7 @@ test('其余五名角色各有操作性剧情与结局剧情占位，达到 L5 �
 
   const 上架占位 = 取货架(data)
     .flatMap(x => x.商品)
-    .filter(x => x.剧情占位 && x.id !== 夏乔借种占位ID);
+    .filter(x => x.剧情占位);
   assert.equal(上架占位.length, 10);
   for (const 商品 of 上架占位) {
     assert.equal(角色剧情占位已上架(data, 商品.id), true);

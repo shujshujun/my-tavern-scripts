@@ -4,6 +4,7 @@ import { 户静态表, 门牌列表, type 门牌 } from '../../stageConfig';
 import { 读取世界时间 } from './楼层时钟';
 import { 处于医院硬锁 } from './生产系统';
 import { 降低风闻 } from './风闻系统';
+import { 夏乔家庭计划后果有效 } from './借种结局状态';
 
 export const 丈夫登门触发疑心 = 50;
 export const 喜讯奖励 = { 疑心降低: 20, 信任提高: 10, 风闻降低: 15 } as const;
@@ -31,6 +32,18 @@ function 登门账(data: SchemaType, 门牌号: 门牌) {
   return data.户[门牌号]?.妻._怀孕.丈夫登门;
 }
 
+function 夏乔借种后果有效(data: SchemaType): boolean {
+  const 妻 = data.户['101']?.妻;
+  return Boolean(
+    妻 &&
+      夏乔家庭计划后果有效(data, {
+        场次标识: 妻._怀孕.受孕场次标识,
+        家庭计划知情: 妻._生产.家庭计划知情,
+        胎次: 妻._生产.本胎序号,
+      }),
+  );
+}
+
 /**
  * 后续丈夫结局只需在这里返回新的稳定变体标识，并在构造节拍处分派对应演出。
  * 当前不擅自把“观众席／哑巴亏”等尚未设计完成的轨道解释成感谢事件。
@@ -38,7 +51,7 @@ function 登门账(data: SchemaType, 门牌号: 门牌) {
 export function 解析丈夫特殊登门变体(data: SchemaType, 门牌号: 门牌): string {
   if (门牌号 !== '101') return '';
   const 生产 = data.户['101']?.妻._生产;
-  if (!生产?.家庭计划知情) return '';
+  if (!生产 || !夏乔借种后果有效(data)) return '';
   if (生产.本胎序号 === 1) return '夏乔感谢';
   if (生产.本胎序号 === 2) return '夏乔带酒';
   if (生产.本胎序号 === 3) return '夏乔不登门';
@@ -72,7 +85,7 @@ export function 安眠药可圆场(data: SchemaType, 门牌号: 门牌): boolean
   if (门牌号 === '302') return false;
   if (处于医院硬锁(data, 门牌号)) return false;
   // 夏乔知情家庭计划的三胎全部由专属语义接管，安眠药不能把感谢／带酒／不上门改写成通用喜讯。
-  if (门牌号 === '101' && data.户['101']?.妻._生产.家庭计划知情) return false;
+  if (门牌号 === '101' && 夏乔借种后果有效(data)) return false;
   const 账 = 登门账(data, 门牌号);
   return !!账 && 账.状态 === '待触发' && !账.隐藏圆场;
 }

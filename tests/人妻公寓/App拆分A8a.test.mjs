@@ -6,7 +6,7 @@ import test from 'node:test';
 // 契约式结构回归测试：验证 App A8a 拆分（正文卷轴/到场卡/生成中文字 → components/正文卷轴.vue）
 // 等价外移，不依赖空格/Prettier 行宽。
 const 客户端目录 = new URL('../../src/人妻公寓/界面/客户端/', import.meta.url);
-const App源码 = readFileSync(new URL('./App.vue', 客户端目录), 'utf8');
+const App源码 = readFileSync(new URL('./App.vue', 客户端目录), 'utf8').replace(/\r\n/gu, '\n');
 const 组件源码 = readFileSync(new URL('./components/正文卷轴.vue', 客户端目录), 'utf8');
 const types源码 = readFileSync(new URL('./types.ts', 客户端目录), 'utf8');
 const 行动选项源码 = readFileSync(new URL('./components/行动选项.vue', 客户端目录), 'utf8');

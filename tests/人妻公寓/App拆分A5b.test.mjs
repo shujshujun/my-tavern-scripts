@@ -171,7 +171,7 @@ test('组件拥有完整派生 imports/逻辑；App 仅档案 imports 移除但�
   assert.match(档案卡源码, /读取开门线索\(props\.data, m\)/, '阶段0开门线索读取');
   assert.match(档案卡源码, /const 选中关系轨迹 = computed/, '开门与四节点线路统一为只读关系轨迹');
   assert.match(档案卡源码, /watch\(\(\) => props\.door, \(\) => \{/, '门牌变化 watch 在组件');
-  assert.match(档案卡源码, /!!妻 && 妻\.当前阶段 >= 4 && props\.wifeNearby/, '要钱=阶段4+wifeNearby');
+  assert.match(档案卡源码, /!!妻 && 妻\.当前阶段 >= 3 && props\.wifeNearby/, '要钱=阶段3+wifeNearby');
   assert.match(档案卡源码, /查裂缝\(m\)/, '选中线索/裂缝读查裂缝');
 
   for (const 源 of [App源码, 档案卡源码]) {

@@ -13,6 +13,7 @@ import {
   type 数据库脚本写入静态能力,
 } from './数据库脚本写入能力';
 
+export { 等待数据库脚本写入能力稳定 } from './数据库脚本写入能力';
 export type { 数据库脚本写入能力结果 } from './数据库脚本写入能力';
 
 type 数据库消息 = { role: 'system' | 'user' | 'assistant'; content: string };
@@ -86,10 +87,29 @@ interface 数据库API {
   getTableTemplate?: () => unknown;
 }
 
+interface 数据库V2API {
+  triggerUpdate?: () => Promise<boolean>;
+  manualUpdate?: () => Promise<boolean>;
+}
+
 interface 数据表 {
   name?: string;
   content?: unknown[][];
-  sourceData?: { ddl?: string };
+  sourceData?: {
+    ddl?: string;
+    note?: string;
+    insertNode?: string;
+    updateNode?: string;
+    deleteNode?: string;
+  };
+  updateConfig?: {
+    contextDepth?: number;
+    updateFrequency?: number;
+    batchSize?: number;
+    skipFloors?: number;
+    groupId?: number;
+    sendLatestRows?: number;
+  };
 }
 
 const 数据库旗 = '__ACU_STAR_DB_III_LOADED__';
@@ -131,6 +151,17 @@ const 默认通用表处置: Readonly<Record<string, readonly (readonly string[]
 /** 摘要与玩家行动的字符上限（按 Unicode 码点计数，避免代理对拆散中文/表情）。 */
 const 玩家行动上限 = 40;
 const 结果摘要上限 = 60;
+
+/**
+ * 脚本先把楼层、游戏时间、地点、参与者、行动与稳定事件键写成硬骨架；数据库填表 AI
+ * 在自己的正常批次里只替换本占位摘要。重复补写骨架时必须保留已经完成的 AI 摘要。
+ */
+export const 数据库事件待整理摘要 = '【待数据库AI整理】正文已成功落楼，等待数据库统一摘要';
+
+export function 数据库事件摘要待整理(value: unknown): boolean {
+  const 文本 = String(value ?? '').trim();
+  return !文本 || 文本.startsWith('【待数据库AI整理】') || 文本.includes('本轮结果未取得可靠摘要');
+}
 
 function 截断字符(text: string, 上限: number): string {
   return Array.from(String(text ?? '')).slice(0, 上限).join('');
@@ -456,6 +487,42 @@ export function 取数据库API(): 数据库API | null {
   // 的完整 API 因“能力更多”覆盖当前聊天上下文。
   try {
     return window.opener ? 从候选选择([window.opener as 数据库宿主]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function 取数据库V2API(): 数据库V2API | null {
+  type 数据库V2宿主 = Window & { AutoCardUpdaterV2API?: unknown; autoCardUpdaterV2API?: unknown };
+  const 候选: 数据库V2宿主[] = [];
+  const 加入 = (scope: Window | null | undefined) => {
+    if (scope && !候选.includes(scope as 数据库V2宿主)) 候选.push(scope as 数据库V2宿主);
+  };
+  try {
+    加入(window);
+    加入(window.parent);
+    加入(window.top);
+  } catch {
+    /* 跨域层级继续检查已收集候选。 */
+  }
+  const 选择 = (scopes: readonly 数据库V2宿主[]): 数据库V2API | null => {
+    for (const scope of scopes) {
+      try {
+        for (const api of [scope.AutoCardUpdaterV2API, scope.autoCardUpdaterV2API]) {
+          if (api && typeof api === 'object' && typeof (api as 数据库V2API).triggerUpdate === 'function') {
+            return api as 数据库V2API;
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    return null;
+  };
+  const 当前 = 选择(候选);
+  if (当前) return 当前;
+  try {
+    return window.opener ? 选择([window.opener as 数据库V2宿主]) : null;
   } catch {
     return null;
   }
@@ -1223,6 +1290,24 @@ function 读取数据库填表参数(api: 数据库API | null): {
   }
 }
 
+function 剧情事件AI摘要配置可用(value: unknown): boolean {
+  const sheet = 取表(value, 'RQ_剧情事件');
+  const config = sheet?.updateConfig;
+  const updateNode = String(sheet?.sourceData?.updateNode ?? '');
+  const insertNode = String(sheet?.sourceData?.insertNode ?? '');
+  return (
+    config?.contextDepth === 12 &&
+    config.updateFrequency === 3 &&
+    config.batchSize === 3 &&
+    config.skipFloors === 0 &&
+    config.groupId === 62001 &&
+    config.sendLatestRows === 60 &&
+    /result_summary/.test(updateNode) &&
+    /待数据库AI整理/.test(updateNode) &&
+    /禁止插入/.test(insertNode)
+  );
+}
+
 export function 数据库状态(): {
   已安装: boolean;
   可调用AI: boolean;
@@ -1230,6 +1315,7 @@ export function 数据库状态(): {
   有SQL接口: boolean;
   有SQL写入接口: boolean;
   已装游戏模板: boolean;
+  剧情事件AI摘要已启用: boolean;
   版本: string;
   填表最短回复: number | null;
   填表最大尝试: number | null;
@@ -1238,13 +1324,16 @@ export function 数据库状态(): {
   const api = 取数据库API();
   const 填表参数 = 读取数据库填表参数(api);
   let 已装游戏模板 = false;
+  let 剧情事件AI摘要已启用 = false;
   try {
     const 模板 = 解析数据库数据(api?.getTableTemplate?.());
     已装游戏模板 = 游戏表名.every(name => 表结构可用(取表(模板, name), 游戏表头[name]));
+    剧情事件AI摘要已启用 = 已装游戏模板 && 剧情事件AI摘要配置可用(模板);
     // 一些旧版没有 getTableTemplate，但会通过导出接口返回当前聊天的完整表结构。
     if (!已装游戏模板 && typeof api?.exportTableAsJson === 'function') {
       const 数据 = 解析数据库数据(api.exportTableAsJson());
       已装游戏模板 = 游戏表名.every(name => 表结构可用(取表(数据, name), 游戏表头[name]));
+      剧情事件AI摘要已启用 = 已装游戏模板 && 剧情事件AI摘要配置可用(数据);
     }
   } catch {
     /* 旧版没有模板查询接口时只显示未知/未装，不影响其他能力。 */
@@ -1258,6 +1347,7 @@ export function 数据库状态(): {
     有SQL接口: !!api && !!取SQL查询方法(api),
     有SQL写入接口: typeof api?.executeSqlMutation === 'function',
     已装游戏模板,
+    剧情事件AI摘要已启用,
     版本: 读取数据库脚本版本(),
     填表最短回复: 填表参数.最短回复,
     填表最大尝试: 填表参数.最大尝试,
@@ -1352,9 +1442,24 @@ export async function 通过数据库生成(
   if (typeof api?.callAI !== 'function') return null;
   const options: { presetName?: string; max_tokens: number } = { max_tokens: maxTokens };
   if (presetName.trim()) options.presetName = presetName.trim();
-  // 只经全局数据库 AI 租约调用 callAI：超时只拒绝外层，底层 settle 前租约不释放；
+  // 只经全局数据库 AI 租约调用 callAI：外层超时后仍短暂隔离迟到请求，但有最终解锁上限；
   // 并发第二次调用由协调器 fail closed，避免双请求/二次计费。数据库桥不再裸调 api.callAI。
   return 全局数据库AI租约.执行(messages, options, api.callAI.bind(api), 90000);
+}
+
+export type 数据库增量更新触发结果 = '已触发' | '未触发' | '无接口';
+
+/** 优先走数据库公开的 V2 增量更新入口，不再依赖伪造宿主生成事件。 */
+export async function 触发数据库增量更新(): Promise<数据库增量更新触发结果> {
+  const api = 取数据库V2API();
+  if (typeof api?.triggerUpdate !== 'function') return '无接口';
+  try {
+    const 成功 = await 限时等待(Promise.resolve(api.triggerUpdate.call(api)), 30_000, '数据库增量更新');
+    return 成功 ? '已触发' : '未触发';
+  } catch (error) {
+    console.warn('[人妻公寓·数据库] V2 增量更新触发失败（正文与游戏结算不受影响）:', error);
+    return '未触发';
+  }
 }
 
 /** 同一聊天同一时刻只允许一个安装任务；按聊天标识隔离，失败/完成后释放，不形成全局永久锁。 */
@@ -1559,6 +1664,28 @@ export interface 数据库回合事件 {
 
 export type 数据库回合写入结果 = '已确认' | '待确认' | '失败';
 
+/** 当前 SQLite 时间线里已经存在的 RQ 事件楼层；用于补齐旧版本漏写的正式正文楼。 */
+export function 读取数据库剧情事件已记录楼层(截止楼层: number): Set<number> | null {
+  const 截止 = Number.isInteger(截止楼层) && 截止楼层 >= 0 ? 截止楼层 : Number.MAX_SAFE_INTEGER;
+  const result = 执行SQLite查询(
+    `SELECT floor_no
+       FROM rq_events
+      WHERE floor_no <= ?
+      ORDER BY floor_no DESC
+      LIMIT 5000`,
+    [截止],
+    5000,
+  );
+  if (!result) return null;
+  const rows = SQL结果对象行(result);
+  if (rows === null) return null;
+  return new Set(
+    rows
+      .map(row => Number(row.floor_no))
+      .filter(楼层 => Number.isInteger(楼层) && 楼层 >= 0),
+  );
+}
+
 export async function 同步数据库回合(
   event: 数据库回合事件,
   额外提交校验: () => boolean = () => true,
@@ -1590,6 +1717,25 @@ export async function 同步数据库回合(
          location = excluded.location,
          participants = excluded.participants,
          player_action = excluded.player_action,
+         result_summary = CASE
+           WHEN rq_events.result_summary IS NULL
+             OR TRIM(rq_events.result_summary) = ''
+             OR rq_events.result_summary LIKE '【待数据库AI整理】%'
+             OR rq_events.result_summary LIKE '%本轮结果未取得可靠摘要%'
+           THEN excluded.result_summary
+           ELSE rq_events.result_summary
+         END,
+         event_code = excluded.event_code`;
+    // 时间线失效补偿必须无条件恢复 before-image；不能复用“保护已完成 AI 摘要”的正常 UPSERT，
+    // 否则迟到分支已经写入一条非 pending 摘要时，会把旧分支的真实摘要错误挡住。
+    const 恢复SQL = `INSERT INTO rq_events
+        (floor_no, time_text, location, participants, player_action, result_summary, event_code)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(floor_no) DO UPDATE SET
+         time_text = excluded.time_text,
+         location = excluded.location,
+         participants = excluded.participants,
+         player_action = excluded.player_action,
          result_summary = excluded.result_summary,
          event_code = excluded.event_code`;
     const 失效补偿 = 构造SQLite唯一行失效补偿({
@@ -1597,7 +1743,7 @@ export async function 同步数据库回合(
       查询SQL,
       查询参数: [data.楼层],
       删除SQL: 'DELETE FROM rq_events WHERE floor_no = ?',
-      恢复SQL: upsertSQL,
+      恢复SQL,
       恢复列: ['floor_no', 'time_text', 'location', 'participants', 'player_action', 'result_summary', 'event_code'],
     });
     const SQL写入状态 = await 执行SQLite写入(
@@ -1610,24 +1756,21 @@ export async function 同步数据库回合(
     if (!仍是同一聊天(聊天标识) || !额外提交校验()) return '失败';
     if (SQL写入状态 === '已确认') return '已确认';
     if (SQL写入状态 === '已提交待定') return '待确认';
-    if (
-      SQL写入状态 === '需核对' &&
-      额外提交校验() &&
-      核对SQLite记录(
-        查询SQL,
-        [data.楼层],
-        {
-          floor_no: data.楼层,
-          time_text: data.时间,
-          location: data.地点,
-          participants: data.参与者,
-          player_action: data.玩家行动,
-          result_summary: data.结果摘要,
-          event_code: data.事件编码,
-        },
-      ) === true
-    ) {
-      return '已确认';
+    if (SQL写入状态 === '需核对' && 额外提交校验()) {
+      const 核对 = 执行SQLite查询(查询SQL, [data.楼层], 1);
+      const rows = 核对 ? SQL结果对象行(核对) : null;
+      const row = rows?.[0];
+      const 硬字段一致 =
+        !!row &&
+        Number(row.floor_no) === data.楼层 &&
+        String(row.time_text ?? '') === String(data.时间) &&
+        String(row.location ?? '') === String(data.地点) &&
+        String(row.participants ?? '') === String(data.参与者) &&
+        String(row.player_action ?? '') === String(data.玩家行动) &&
+        String(row.event_code ?? '') === String(data.事件编码);
+      // 重放硬骨架时，结果摘要可能已经被数据库 AI 完成；只要硬字段一致且摘要非空就算确认，
+      // 绝不能为了核对占位值把已完成摘要重新覆盖成“待整理”。
+      if (硬字段一致 && String(row?.result_summary ?? '').trim()) return '已确认';
     }
     // 普通行 API 会把这次写入挂到更早的可追加消息；回档后该旧消息可能仍存活。
     // 因此脚本事件只允许 SQLite 的“最新 AI 消息 mutation”路径，非 SQLite 模式失败闭合。

@@ -74,6 +74,26 @@ test('亲密详情默认收在正文舞台底边，展开后使用舞台抽屉�
   assert.doesNotMatch(截段(App源, '.intimacy-people {', '.intimacy-people article'), /overflow-x/);
 });
 
+test('亲密抽屉展开态脱离正文残余高度，短正文与电脑窗口也能滚动操作收尾', () => {
+  assert.match(
+    App源,
+    /\.story-wrap\.story-intimacy-open\s*\{[\s\S]{0,160}overflow:\s*visible;/,
+    '展开态必须允许抽屉向正文舞台上方展开，不能继续被 story-wrap 裁掉',
+  );
+  assert.match(
+    App源,
+    /\.story-wrap\.story-intimacy-open \.intimacy-stage-dock\s*\{[\s\S]{0,220}top:\s*auto;[\s\S]{0,120}height:\s*min\(/,
+    '展开态 Dock 应从舞台底边取得独立可用高度，不能继承短正文只剩的几十像素',
+  );
+  assert.match(
+    App源,
+    /\.intimacy-panel\s*\{[\s\S]{0,180}box-sizing:\s*border-box;/,
+    '面板的 100% 宽度必须包含自身 padding 与 border，展开后不能制造横向滚动条',
+  );
+  assert.match(App源, /\.intimacy-panel\s*\{[\s\S]{0,220}overflow-y:\s*auto;/, '内容超出时仍须在面板内滚动');
+  assert.match(App源, /\.intimacy-stage-dock\s*\{[\s\S]{0,180}pointer-events:\s*none;/, '闭合态仍不能遮挡正文');
+});
+
 test('角色卡切换持久主焦点，快照明确主焦点与非焦点参与限制', () => {
   assert.match(App源, /eventEmit\('人妻公寓:切换性爱主焦点', 门牌号\)/);
   assert.match(游戏逻辑源, /eventOn\('人妻公寓:切换性爱主焦点'/);

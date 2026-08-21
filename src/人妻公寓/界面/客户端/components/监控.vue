@@ -9,9 +9,15 @@ defineProps<{
   avatarFailed: Record<string, boolean>;
   backgroundUrl: (door: string) => string;
   avatarUrl: (name: string) => string;
+  borrowSeedOffline: boolean;
 }>();
 
-const emit = defineEmits<{ close: []; select: [门牌]; avatarError: [string] }>();
+const emit = defineEmits<{
+  close: [];
+  select: [门牌];
+  avatarError: [string];
+  confirmBorrowSeedOffline: [];
+}>();
 
 /** 房间缩略图只是导航呈现；单图失败显示本地占位，不影响监控事务与头像。 */
 const 背景失效 = ref<ReadonlySet<string>>(new Set());
@@ -25,6 +31,17 @@ function 标记背景失效(url: string): void {
   <div class="mask" @click.self="emit('close')">
     <div class="sheet">
       <button class="sheet-close" @click="emit('close')">✕</button>
+      <button
+        v-if="borrowSeedOffline"
+        type="button"
+        class="borrow-seed-offline"
+        aria-label="确认101监控已经断线"
+        :disabled="sending"
+        @click="emit('confirmBorrowSeedOffline')"
+      >
+        <span class="borrow-seed-offline-screen"><b>CAM-101</b><em>NO SIGNAL</em></span>
+        <span><b>101 · 观察点已移除</b><small>你亲手拆下的针孔摄像头已经没有信号。点击确认。</small></span>
+      </button>
       <div class="shop-hero cams">
         <div class="ui-kicker light">HIDDEN EYES / 你装下的眼睛</div>
         <b>监 控</b>
@@ -171,5 +188,43 @@ function 标记背景失效(url: string): void {
 
 :global(html.rq-dark) .cam-row {
   background: #2c2e40;
+}
+
+
+.borrow-seed-offline {
+  width: 100%;
+  min-height: 74px;
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  color: var(--ink-soft);
+  text-align: left;
+  background: rgba(17, 22, 25, 0.92);
+  border: 1px solid rgba(159, 184, 188, 0.38);
+  border-radius: 12px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.borrow-seed-offline-screen {
+  min-height: 52px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  color: rgba(222, 235, 235, 0.82);
+  background:
+    repeating-linear-gradient(0deg, rgba(255,255,255,.055) 0 1px, transparent 1px 3px),
+    #111719;
+  border-radius: 7px;
+  font-family: var(--font-mono);
+}
+.borrow-seed-offline-screen b { font-size: .68em; letter-spacing: .08em; }
+.borrow-seed-offline-screen em { font-size: .58em; font-style: normal; opacity: .72; }
+.borrow-seed-offline > span:last-child { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.borrow-seed-offline > span:last-child b { color: #e1eceb; font-size: .78em; }
+.borrow-seed-offline > span:last-child small { color: #a5b4b4; font-size: .66em; line-height: 1.45; }
+@media (max-width: 540px) {
+  .borrow-seed-offline { grid-template-columns: 82px minmax(0, 1fr); min-height: 78px; }
 }
 </style>

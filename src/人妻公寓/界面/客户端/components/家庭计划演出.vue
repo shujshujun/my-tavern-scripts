@@ -63,7 +63,10 @@ function 图片加载失败(event: Event): void {
 }
 
 .family-plan-stage img {
-  position: relative;
+  position: absolute;
+  inset: 0;
+  min-width: 0;
+  min-height: 0;
   width: 100%;
   height: 100%;
   object-fit: contain;

@@ -31,6 +31,11 @@ const 父亲通话源码 = readFileSync(
 const 节拍引擎源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/节拍引擎.ts', import.meta.url), 'utf8');
 const 生成引擎源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/生成引擎.ts', import.meta.url), 'utf8');
 const 输出安全源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/手机输出安全.ts', import.meta.url), 'utf8');
+const 数据层源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/数据层.ts', import.meta.url), 'utf8');
+const 朋友圈渲染源码 = readFileSync(
+  new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/壳/渲染/moments.ts', import.meta.url),
+  'utf8',
+);
 
 test('父亲候选为空或未满足圆场要求时保持待回复，不把固定兜底冒充AI台词', () => {
   assert.equal(安全父亲台词('', false), '');
@@ -97,7 +102,8 @@ test('头像和朋友圈持久图片键只进入编码后的URL，不生成动�
   const 注入名 = `x" onerror="globalThis.__rq=1`;
   const 头像 = 头像块(注入名);
   assert.equal((头像.match(/\sonerror=/g) ?? []).length, 1, '只能保留资源失败用的常量事件属性');
-  assert.match(头像, /onerror="this\.remove\(\);this\.parentElement\.textContent='\?'"/);
+  assert.match(头像, /onerror="var p=this\.parentElement;if\(p\)p\.textContent='\?'"/);
+  assert.doesNotMatch(头像, /this\.remove\(\);this\.parentElement/, '不得先 remove 再访问已经归零的 parentElement');
   assert.doesNotMatch(头像, /" onerror="globalThis/);
   assert.match(头像, /x%22%20onerror%3D%22globalThis/);
 
@@ -120,4 +126,20 @@ test('公开朋友圈正文和评论复用楼务隐私门，仅你可见不套�
   assert.match(节拍引擎源码.slice(正文开始, 正文结束), /验收群聊隐私\(文, '楼务'\)/);
   assert.match(节拍引擎源码.slice(评论开始, 评论结束), /验收群聊隐私\(行, '楼务'\)/);
   assert.doesNotMatch(节拍引擎源码.slice(私密开始, 私密结束), /验收群聊隐私/);
+});
+
+test('仅你可见动态必须关闭邻居点赞和评论，旧档残留互动也不得显示', () => {
+  const { 朋友圈允许公开互动 } = require('../../src/人妻公寓/脚本/游戏逻辑/手机/朋友圈隐私.ts');
+  assert.equal(朋友圈允许公开互动({}), true, '公开动态仍允许邻居点赞与评论');
+  assert.equal(朋友圈允许公开互动({ 私: { 图序: 1 } }), false, '仅你可见动态禁止公开互动');
+  assert.equal(朋友圈允许公开互动({ 私: null }), false, '损坏的私密标记按隐私优先处理');
+
+  assert.match(朋友圈渲染源码, /const 公开互动 = 朋友圈允许公开互动\(c\)/);
+  assert.match(朋友圈渲染源码, /const 盒 = 公开互动[\s\S]*?`<\/div>`[\s\S]*?: '';/);
+  assert.doesNotMatch(
+    朋友圈渲染源码,
+    /const 盒 =\s*`<div class="rqw-box"><span class="lk">楼里的 \$\{赞\} 位邻居<\/span>`/,
+    '互动盒不能再无条件渲染',
+  );
+  assert.match(数据层源码, /评: 朋友圈允许公开互动\(x\)[\s\S]*?: \[\]/);
 });

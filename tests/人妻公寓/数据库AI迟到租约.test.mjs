@@ -11,35 +11,43 @@ require('ts-node/register/transpile-only');
 const { 创建数据库AI租约 } = require('../../src/人妻公寓/脚本/游戏逻辑/数据库AI租约.ts');
 const 回合源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/回合引擎.ts', import.meta.url), 'utf8');
 
-test('数据库调用短时限超时后：外层拒绝、底层未 settle 仍 busy、并发第二次被拒且不调用底层、settle 后租约释放', async () => {
+test('数据库迟到请求先隔离并发，达到最终上限后自动解锁；旧请求迟到 settle 不得释放新租约', async () => {
   const 租约 = 创建数据库AI租约();
   let 调用次数 = 0;
-  let 悬空 = false;
-  let 结算底层;
+  const 结算器 = [];
   const 底层 = () => {
     调用次数 += 1;
-    return 悬空 ? new Promise(resolve => { 结算底层 = resolve; }) : Promise.resolve('结果');
+    return new Promise(resolve => {
+      结算器.push(resolve);
+    });
   };
 
-  // 第一轮：悬空底层 + 短时限 → 外层超时，租约保持 busy。
-  悬空 = true;
-  const 第一轮 = 租约.执行([], {}, 底层, 50);
+  // 第一轮：外层 30ms 超时，但在 80ms 最终上限前仍隔离迟到请求。
+  const 第一轮 = 租约.执行([], {}, 底层, 30, 80);
   await assert.rejects(第一轮, /数据库AI调用超时/, '超时只拒绝外层');
-  assert.equal(租约.在结算(), true, '底层未 settle 前租约必须保持 busy');
+  assert.equal(租约.在结算(), true, '最终上限前租约仍应隔离并发请求');
 
-  // 并发第二次调用：fail closed，且不得调用传入的底层函数。
-  const 第二轮 = 租约.执行([], {}, 底层, 50);
-  await assert.rejects(第二轮, /仍在结算/, '并发第二次调用必须 fail closed');
+  const 第二轮 = 租约.执行([], {}, 底层, 30, 80);
+  await assert.rejects(第二轮, /仍在结算/, '隔离期内并发第二次调用必须 fail closed');
   assert.equal(调用次数, 1, '并发第二次不得调用底层函数');
 
-  // 底层 settle 后租约释放，下一次可执行。
-  结算底层('结果');
+  // 第一轮底层永久 pending 时，租约也必须在硬上限后恢复，不能把整局永久锁死。
+  await new Promise(resolve => setTimeout(resolve, 70));
+  assert.equal(租约.在结算(), false, '达到最终占用上限后必须自动解锁');
+
+  const 第三轮 = 租约.执行([], {}, 底层, 1000, 1200);
   await new Promise(resolve => setTimeout(resolve, 0));
-  assert.equal(租约.在结算(), false, '底层 settle 后租约释放');
-  悬空 = false;
-  const 第三轮 = await 租约.执行([], {}, 底层, 50);
-  assert.equal(第三轮, '结果');
-  assert.equal(调用次数, 2, '下一次调用可以正常执行');
+  assert.equal(调用次数, 2, '解锁后新请求可以正常启动');
+  assert.equal(租约.在结算(), true);
+
+  // 第一轮此时才迟到完成，不能把第三轮的新租约错误释放。
+  结算器[0]('旧结果');
+  await new Promise(resolve => setTimeout(resolve, 0));
+  assert.equal(租约.在结算(), true, '旧世代迟到 settle 不得释放新世代租约');
+
+  结算器[1]('新结果');
+  assert.equal(await 第三轮, '新结果');
+  assert.equal(租约.在结算(), false, '当前世代结算后正常释放');
 });
 
 test('底层 reject 同样释放租约', async () => {

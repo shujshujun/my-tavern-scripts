@@ -1,4 +1,4 @@
-import { 手机锚消息签名 } from './手机时间线租约';
+import { 手机锚消息签名, 手机锚消息签名匹配 } from './手机时间线租约';
 
 export interface 手机分支记录 {
   楼: number;
@@ -16,7 +16,7 @@ export function 附手机分支锚<T extends 手机分支记录>(记录: T, 聊�
 export function 手机记录属于当前分支(记录: 手机分支记录, 聊天消息: readonly unknown[]): boolean {
   if (!记录.锚签名) return true;
   if (!Number.isInteger(记录.楼) || 记录.楼 < 0 || 记录.楼 >= 聊天消息.length) return false;
-  return 手机锚消息签名(聊天消息[记录.楼]) === 记录.锚签名;
+  return 手机锚消息签名匹配(记录.锚签名, 聊天消息[记录.楼]);
 }
 
 export function 裁手机分支记录<T extends 手机分支记录>(记录: readonly T[], 聊天消息: readonly unknown[]): T[] {

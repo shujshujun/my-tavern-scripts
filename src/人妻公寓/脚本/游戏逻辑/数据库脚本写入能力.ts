@@ -19,6 +19,59 @@ export interface 数据库脚本写入能力结果 {
   说明: string;
 }
 
+export interface 数据库脚本写入复检选项 {
+  最大尝试次数?: number;
+  复检间隔毫秒?: number;
+  当前仍有效?: () => boolean;
+  每次检测前?: (尝试次数: number) => void | Promise<void>;
+  等待?: (毫秒: number) => Promise<void>;
+}
+
+/**
+ * 新版数据库会在聊天切换／SQLite 重建期间暂时隐藏同步查询接口；这两种状态可能自行恢复。
+ * 插件、模板或 mutation 接口缺失则不是启动时序问题，必须立即失败，不能用等待掩盖。
+ */
+export function 数据库脚本写入能力可复检(结果: 数据库脚本写入能力结果): boolean {
+  return !结果.可写 && (结果.状态 === '缺少SQL查询接口' || 结果.状态 === 'SQLite未就绪');
+}
+
+/**
+ * 对“查询接口暂时隐藏／SQLite runtime 尚在重建”做有界复检。调用者负责在每次检测前
+ * 刷新自身缓存；达到上限后原样返回最后一次失败，绝不把未就绪伪装成成功。
+ */
+export async function 等待数据库脚本写入能力稳定(
+  检测: () => Promise<数据库脚本写入能力结果>,
+  选项: 数据库脚本写入复检选项 = {},
+): Promise<数据库脚本写入能力结果> {
+  const 最大尝试次数 =
+    typeof 选项.最大尝试次数 === 'number' && Number.isFinite(选项.最大尝试次数)
+      ? Math.max(1, Math.min(50, Math.floor(选项.最大尝试次数)))
+      : 1;
+  const 复检间隔毫秒 =
+    typeof 选项.复检间隔毫秒 === 'number' && Number.isFinite(选项.复检间隔毫秒)
+      ? Math.max(0, Math.min(5000, Math.floor(选项.复检间隔毫秒)))
+      : 750;
+  const 当前仍有效 = 选项.当前仍有效 ?? (() => true);
+  const 等待 =
+    选项.等待 ??
+    ((毫秒: number) =>
+      new Promise<void>(resolve => {
+        setTimeout(resolve, 毫秒);
+      }));
+  let 最后结果: 数据库脚本写入能力结果 | null = null;
+
+  for (let 尝试次数 = 1; 尝试次数 <= 最大尝试次数; 尝试次数 += 1) {
+    if (最后结果 && !当前仍有效()) return 最后结果;
+    await 选项.每次检测前?.(尝试次数);
+    const 结果 = await 检测();
+    最后结果 = 结果;
+    if (!数据库脚本写入能力可复检(结果) || 尝试次数 >= 最大尝试次数 || !当前仍有效()) return 结果;
+    await 等待(复检间隔毫秒);
+  }
+
+  return 最后结果!;
+}
+
 /**
  * RQ_剧情事件等脚本直写表只能走 SQLite mutation。这里把静态 API 能力与
  * “当前 SQLite 运行时确实可查询”合并成一个权威判定，供首次准备页和回合写入共用。

@@ -8,7 +8,7 @@ import test from 'node:test';
 // composable；App 只保留背包 wrapper、事件总线 6 事件名、发送锁/清流、store pull、toast、UI lock、
 // 输入聚焦与跨 listener 接线。不依赖绝对行号/Prettier 行宽。
 const 客户端目录 = new URL('../../src/人妻公寓/界面/客户端/', import.meta.url);
-const App源码 = readFileSync(new URL('./App.vue', 客户端目录), 'utf8');
+const App源码 = readFileSync(new URL('./App.vue', 客户端目录), 'utf8').replace(/\r\n/gu, '\n');
 const composable源码 = readFileSync(new URL('./composables/useMuteMeeting.ts', 客户端目录), 'utf8');
 const 舞台源码 = readFileSync(new URL('./components/静音会议舞台.vue', 客户端目录), 'utf8');
 const 互动源码 = readFileSync(new URL('./components/静音会议互动.vue', 客户端目录), 'utf8');

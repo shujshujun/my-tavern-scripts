@@ -56,21 +56,21 @@ test.beforeEach(() => {
   chatVars = {};
 });
 
-test('特殊剧情货架保留录像带、静音会议、肉偿账本，另外六场改为只读待设计占位', () => {
+test('特殊剧情货架保留录像带、静音会议、借种、肉偿账本四个实装场景，另外六场保持只读占位', () => {
   const data = 建数据('101', '102', '201', '202', '301', '302');
   data.户['101'].妻.当前阶段 = 3;
   const 场景页 = 取货架(data).find(页 => 页.页签 === '特殊场景');
-  const 九场 = Object.keys(特殊场景表);
-  const 保持现状 = ['录像带', '静音会议', '肉偿账本'];
+  const 十场 = Object.keys(特殊场景表);
+  const 保持实装 = ['录像带', '静音会议', '借种', '肉偿账本'];
 
   assert.ok(场景页);
-  assert.equal(九场.length, 9);
-  assert.deepEqual(九场.filter(id => 场景页.商品.some(商品 => 商品.id === id)).sort(), [...九场].sort());
+  assert.equal(十场.length, 10);
+  assert.deepEqual(十场.filter(id => 场景页.商品.some(商品 => 商品.id === id)).sort(), [...十场].sort());
   assert.deepEqual([...特殊场景占位ID列表].sort(), ['大扫除日', '部位评比', '合拍', '家宴', '制服夜巡', '衣柜'].sort());
 
-  for (const id of 保持现状) {
+  for (const id of 保持实装) {
     const 配 = 特殊场景表[id];
-    assert.notEqual(配.待设计, true, `${id} 必须保持现状`);
+    assert.notEqual(配.待设计, true, `${id} 必须保持实装`);
     assert.ok(配.价格 > 0, `${id} 必须保留原价`);
     assert.ok(配.剧情, `${id} 必须保留现有剧情`);
     assert.equal(道具表[id].特殊剧情占位, undefined);

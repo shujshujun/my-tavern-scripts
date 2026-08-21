@@ -5,6 +5,59 @@ export interface 预设输出清洗结果 {
   正文已开始: boolean;
 }
 
+/**
+ * 完整 AI 回复进入游戏持久层前，先采用酒馆对当前预设／全局／角色正则计算出的最终显示文本。
+ * 这里不识别具体预设或标签，也不介入流式中间帧；玩家的预设正则最终显示什么，游戏就以什么
+ * 作为后续正文清洗输入。接口缺失、单条正则异常或宿主版本不兼容时原样回退，不能让正文消失。
+ */
+export function 应用酒馆最终显示正则(原文: string): string {
+  const 文本 = String(原文 ?? '');
+  try {
+    if (typeof formatAsTavernRegexedString !== 'function') return 文本;
+    const 结果 = formatAsTavernRegexedString(文本, 'ai_output', 'display', { depth: 0 });
+    return typeof 结果 === 'string' ? 结果 : 文本;
+  } catch (error) {
+    console.warn('[人妻公寓·预设兼容] 酒馆最终显示正则处理失败，原样保留完整回复:', error);
+    return 文本;
+  }
+}
+
+/**
+ * 酒馆助手只会把“Markdown 代码围栏内同时存在闭合 <body>…</body>”的内容当作前端 iframe。
+ * 这类块里的 CSS、脚本、折叠、摘要、吐槽与动画都只是酒馆楼层皮肤，不属于游戏正文，
+ * 因而整块删除；围栏或 body 未闭合时不猜测边界，保留原样让玩家按常见做法重新生成。
+ */
+const 酒馆助手前端围栏 = /(^|\r?\n)[ \t]*(`{3,})[^\r\n]*\r?\n([\s\S]*?)\r?\n[ \t]*\2[ \t]*(?=\r?\n|$)/g;
+const 酒馆助手闭合Body = /<body\b[^>]*>[\s\S]*<\/body\s*>/i;
+
+export function 移除酒馆助手前端块(原文: string): string {
+  const 文本 = String(原文 ?? '');
+  return 文本.replace(
+    酒馆助手前端围栏,
+    (整块: string, 前导换行: string, _围栏: string, 内容: string) =>
+      酒馆助手闭合Body.test(内容) ? 前导换行 : 整块,
+  );
+}
+
+/**
+ * 原生 <details> 也是预设常用的思维链／摘要折叠壳。只删除成对闭合块；嵌套时由内向外
+ * 逐层移除。未闭合块不做吞尾推断，避免误删其后的真实剧情。
+ */
+const 最内层闭合Details = /<details\b[^>]*>(?:(?!<details\b)[\s\S])*?<\/details\s*>/gi;
+
+function 移除闭合Details折叠块(原文: string): string {
+  let 文本 = 原文;
+  while (true) {
+    const 下一轮 = 文本.replace(最内层闭合Details, '');
+    if (下一轮 === 文本) return 文本;
+    文本 = 下一轮;
+  }
+}
+
+function 移除预设非正文展示块(原文: string): string {
+  return 移除闭合Details折叠块(移除酒馆助手前端块(原文));
+}
+
 const 正文标签们: readonly 预设正文标签[] = ['content', 'story_scene', 'dream_body'];
 const 思考标签源 = '(?:think(?:ing)?|reason(?:ing)?|analysis|thought)';
 
@@ -53,11 +106,12 @@ function 清洗正文内展示标记(原文: string): string {
  *
  * - 乙酉类：只取 `<content>`；
  * - 梦鲸类：只取 `<dream_body>`；
+ * - 酒馆助手闭合前端代码块与闭合 `<details>` 折叠块整块删除，只保留块外正文；
  * - 思考标签完整、名称不配对或流式截断时都不回退泄露；
  * - 传入期望标签时，正文开标签到达前保持空白，供流式界面作安全门。
  */
 export function 清洗预设输出(原文: string, 期望正文标签: 预设正文标签 | null = null): 预设输出清洗结果 {
-  let 文本 = String(原文 ?? '');
+  let 文本 = 移除预设非正文展示块(String(原文 ?? ''));
   let 正文标签: 预设正文标签 | null = null;
   let 正文开始 = -1;
 

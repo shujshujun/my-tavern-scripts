@@ -544,14 +544,24 @@ test('E1 自定义输入框全链:组件 submit → App 发送/发出 → 玩家
   assert.match(主回合, /role: 'assistant'/);
 });
 
-test('E2 成功路径在双楼/最终 stat 提交后才广播生成完成事件,且不发 MESSAGE_SENT', () => {
-  const 广播函数 = engine.slice(engine.indexOf('async function 广播生成完成事件'), engine.indexOf('async function 记录数据库回合'));
-  assert.match(广播函数, /GENERATION_ENDED/, '必须补发正常生成完成事件唤醒数据库插件扫楼');
-  assert.match(广播函数, /GENERATION_STARTED/, '先发 STARTED 覆盖可能残留的 quiet 生成记录');
+test('E2 成功路径先解锁前台，再后台触发数据库；V2 优先，旧版 GENERATION_ENDED 使用 chat.length 且不发 MESSAGE_SENT', () => {
+  const 广播函数 = engine.slice(engine.indexOf('async function 广播生成完成事件'), engine.indexOf('let 数据库记录失败提示签名'));
+  assert.match(广播函数, /触发数据库增量更新\(\)/, '优先使用数据库公开的 V2 增量更新入口');
+  assert.match(广播函数, /GENERATION_ENDED/, '旧版仍须补发正常生成完成事件唤醒数据库插件扫楼');
+  assert.match(广播函数, /GENERATION_STARTED/, '旧版先发 STARTED 覆盖可能残留的 quiet 生成记录');
+  assert.match(
+    广播函数,
+    /GENERATION_ENDED, \(SillyTavern\.chat \?\? \[\]\)\.length/,
+    'SillyTavern 的 GENERATION_ENDED 参数必须是 chat.length，不得再误传末楼 ID',
+  );
   assert.doesNotMatch(广播函数, /\.emit\([^)]*MESSAGE_SENT/, '刻意不发 MESSAGE_SENT,避免惊醒 MVU 对玩家楼无条件跑一轮=双重记账');
-  const 广播调用位置 = 主回合.indexOf('广播生成完成事件(本轮事务仍有效)');
+
   const 转正标志位置 = 主回合.indexOf('临时用户已转正 = true');
-  assert.ok(广播调用位置 > 转正标志位置, '广播必须在双楼转正/最终整表提交之后');
+  const 完成位置 = 主回合.indexOf("eventEmit('人妻公寓:回合完成')", 转正标志位置);
+  const 后台位置 = 主回合.indexOf('安排数据库回合后处理({', 完成位置);
+  assert.ok(完成位置 > 转正标志位置, '双楼转正与最终 stat 提交后才能解锁前台');
+  assert.ok(后台位置 > 完成位置, '数据库骨架与填表更新必须在回合完成事件之后异步安排');
+  assert.doesNotMatch(主回合, /await 广播生成完成事件\(/, '数据库插件等待不得继续占住前台回合锁');
 });
 
 test('E3 同步数据库回合禁止普通 insertRow 兜底,只走 SQLite mutation', () => {

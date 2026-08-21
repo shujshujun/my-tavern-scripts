@@ -5,7 +5,7 @@ import { 读最近有效stat } from '../../../mvuIO';
 import { 取绝对时段 } from '../../../楼层时钟';
 import { 手机记录在当前时间线 } from '../../../手机已读水位';
 import { 读库 } from '../../数据层';
-import { 末楼 } from '../../运行时上下文';
+import { 手机楼轴已就绪, 末楼 } from '../../运行时上下文';
 import { 获取静音会议手机状态 } from '../../静音会议旁路';
 import { 活动父亲通话, 恢复父亲通话, 注册父亲通话UI端口 } from '../../交互/父亲通话';
 import {
@@ -53,6 +53,17 @@ export function 渲染(): void {
   if (!屏) return;
   const 本次渲染世代 = 开始新手机聊天渲染世代();
   屏.innerHTML = '';
+
+  // 网页刷新时手机 iframe 可能早于酒馆聊天数组恢复。此时不能读库：空楼轴会把高楼层
+  // 记录当成未来数据、空分支会把带锚记录当成旧分支。保留明确恢复态，由红点层短轮询重绘。
+  if (!手机楼轴已就绪()) {
+    const 体 = el('div', 'rqp-body');
+    体.style.display = 'flex';
+    体.appendChild(el('div', 'rqp-meeting-lock', '<b>正在恢复微信记录</b>酒馆聊天加载完成后会自动显示。'));
+    屏.appendChild(体);
+    刷新红点();
+    return;
+  }
 
   let data: SchemaType | null = null;
   try {

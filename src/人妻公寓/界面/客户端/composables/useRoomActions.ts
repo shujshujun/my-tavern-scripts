@@ -20,6 +20,16 @@ import {
   type 家庭计划地点动作ID,
 } from '../../../脚本/游戏逻辑/家庭计划系统';
 import { 生产地点动作, type 生产地点动作ID } from '../../../脚本/游戏逻辑/生产系统';
+import {
+  借种场景运行中,
+  借种三人合照可拍,
+  借种三人日常可用,
+  借种产后家庭合照可拍,
+  借种朋友圈选择可用,
+  借种启动条件提示,
+  借种阳性结果可查看,
+} from '../../../脚本/游戏逻辑/借种结局系统';
+import { 借种结局已完成, 借种票在背包 } from '../../../脚本/游戏逻辑/借种结局状态';
 import type { 卡动作, 客户端时间方式 } from '../types';
 
 /** 业务事件回调：App 在回调内保留原事件名与载荷，本模块不直连事件总线。 */
@@ -34,6 +44,14 @@ export interface 房间动作事件 {
   处理管理任务: (载荷: { 任务id: string; 选项id: string; 地点: string }) => void;
   开启阶段性癖: (门牌号: 门牌) => void;
   家庭计划动作: (动作: 家庭计划地点动作ID) => void;
+  拆除借种摄像头: () => void;
+  启动借种: () => void;
+  查看借种阳性结果: () => void;
+  拍摄借种三人合照: () => void;
+  拍摄借种产后家庭合照: () => void;
+  停止借种: () => void;
+  借种三人日常: () => void;
+  借种朋友圈选择: (选择: '发布' | '私密') => void;
   生产动作: (载荷: { 门牌: 门牌; 动作: 生产地点动作ID; 预期绝对时段: number }) => void;
 }
 
@@ -132,6 +150,7 @@ export function useRoomActions(options: 房间动作选项) {
     添加管理任务动作(动作, id);
     添加家庭计划动作(动作, id);
     添加生产动作(动作, id);
+    添加借种产后家庭合照动作(动作, id);
 
     if (id === '公寓外部') {
       if (当前房间.value !== id) {
@@ -305,9 +324,27 @@ export function useRoomActions(options: 房间动作选项) {
             类: 'risky',
             做: () => 事件.空房偷窃(id),
           });
+          if (
+            id === '101' &&
+            data.value.系统._家庭计划.阶段 === '已完成' &&
+            data.value.系统._摄像头布设['101'] === true &&
+            借种票在背包(data.value) &&
+            !借种结局已完成(data.value)
+          ) {
+            动作.push({
+              kicker: 'CAM OFF',
+              icon: 'camera',
+              文案: '拆下101针孔摄像头',
+              类: 'risky',
+              做: () => 事件.拆除借种摄像头(),
+            });
+          }
         }
       }
-      if (当前房间.value === id) 添加地点线路动作(动作, id);
+      if (当前房间.value === id) {
+        添加借种动作(动作, id);
+        添加地点线路动作(动作, id);
+      }
       return 动作;
     }
 
@@ -484,6 +521,73 @@ export function useRoomActions(options: 房间动作选项) {
     }
   }
 
+  function 添加借种动作(动作: 卡动作[], 地点: string): void {
+    if (地点 !== '101' || 当前房间.value !== 地点) return;
+    if (借种场景运行中(data.value) && data.value.系统._性爱场景.状态 === '空闲') {
+      动作.push({
+        kicker: 'STOP',
+        icon: 'close',
+        文案: '停止这次借种安排',
+        类: 'risky',
+        做: () => 事件.停止借种(),
+      });
+      return;
+    }
+    const 户 = data.value.户['101'];
+    const 夏乔在场 = 妻现位('101') === '101';
+    const 陆嘉明在场 = !!户 && 丈夫在楼(户, '101', 绝对时段.value) !== '外出';
+    if (借种阳性结果可查看(data.value, 地点, 夏乔在场, 陆嘉明在场)) {
+      动作.push({
+        kicker: 'RESULT',
+        icon: 'favor',
+        文案: '查看夏乔准备的检测结果',
+        做: () => 事件.查看借种阳性结果(),
+      });
+      return;
+    }
+    if (借种三人合照可拍(data.value, 地点, 夏乔在场, 陆嘉明在场)) {
+      动作.push({
+        kicker: 'PHOTO',
+        icon: 'camera',
+        文案: '站到她身边，拍下三人合照',
+        做: () => 事件.拍摄借种三人合照(),
+      });
+      return;
+    }
+    if (借种朋友圈选择可用(data.value, 地点, 夏乔在场, 陆嘉明在场)) {
+      动作.push({
+        kicker: 'PUBLIC CROP',
+        icon: 'camera',
+        文案: '只发布计划板安全裁切到朋友圈',
+        做: () => 事件.借种朋友圈选择('发布'),
+      });
+      动作.push({
+        kicker: 'PRIVATE',
+        icon: 'close',
+        文案: '保持完整三人合照私密',
+        做: () => 事件.借种朋友圈选择('私密'),
+      });
+    }
+    if (借种三人日常可用(data.value, 地点, 夏乔在场, 陆嘉明在场)) {
+      动作.push({
+        kicker: 'FAMILY',
+        icon: 'home',
+        文案: '和夏乔、陆嘉明一起吃顿饭',
+        做: () => 事件.借种三人日常(),
+      });
+      return;
+    }
+    if (借种启动条件提示(data.value, 地点)) return;
+    if (!户 || 妻现位('101') !== '101' || 丈夫在楼(户, '101', 绝对时段.value) === '外出') return;
+    动作.push({
+      kicker: 'ENDING',
+      icon: 'favor',
+      文案: '开始夏乔「借种」结局',
+      类: 'risky',
+      做: () => 事件.启动借种(),
+    });
+  }
+
   function 添加生产动作(动作: 卡动作[], 地点: string): void {
     if (当前房间.value !== 地点) return;
     for (const 候选 of 生产地点动作(data.value, 地点)) {
@@ -497,6 +601,21 @@ export function useRoomActions(options: 房间动作选项) {
         },
       });
     }
+  }
+
+  function 添加借种产后家庭合照动作(动作: 卡动作[], 地点: string): void {
+    if (当前房间.value !== 地点 || !['101', '医院'].includes(地点)) return;
+    const 户 = data.value.户['101'];
+    if (!户) return;
+    const 夏乔在场 = 地点 === '医院' ? 户.妻._生产.状态 === '住院中' : 妻现位('101') === '101';
+    const 陆嘉明在场 = 地点 === '医院' || 丈夫在楼(户, '101', 绝对时段.value) !== '外出';
+    if (!借种产后家庭合照可拍(data.value, 地点, 夏乔在场, 陆嘉明在场)) return;
+    动作.push({
+      kicker: 'FAMILY PHOTO',
+      icon: 'camera',
+      文案: 地点 === '医院' ? '和夏乔、孩子、陆嘉明拍一张合照' : '在101拍下产后家庭合照',
+      做: () => 事件.拍摄借种产后家庭合照(),
+    });
   }
 
   function 添加地点线路动作(动作: 卡动作[], 地点: string): void {

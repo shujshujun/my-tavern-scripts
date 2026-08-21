@@ -39,17 +39,24 @@ test('聊天模板固定为五张有用记忆表，七张默认硬状态/选项�
   for (const sheet of 表) {
     assert.ok(sheet.content[0].length <= 8, `${sheet.name} 不得超过数据库官方建议的 7～8 列上限`);
   }
-  assert.equal(取('RQ_剧情事件').updateConfig.updateFrequency, 0);
+  assert.equal(取('RQ_剧情事件').updateConfig.updateFrequency, 3);
+  assert.equal(取('RQ_剧情事件').updateConfig.batchSize, 3);
   assert.equal(取('纪要表').updateConfig.updateFrequency, 3);
   assert.equal(取('纪要表').updateConfig.batchSize, 3);
   assert.equal(取('RQ_人物长期记忆').updateConfig.groupId, 取('RQ_承诺与伏笔').updateConfig.groupId);
   assert.equal(取('纪要表').updateConfig.groupId, 取('RQ_人物长期记忆').updateConfig.groupId);
+  assert.equal(取('RQ_剧情事件').updateConfig.groupId, 取('纪要表').updateConfig.groupId);
   assert.equal(取('RQ_社交轨迹').updateConfig.updateFrequency, 6);
   assert.equal(取('RQ_人物长期记忆').updateConfig.sendLatestRows, 60);
   assert.equal(取('RQ_承诺与伏笔').updateConfig.sendLatestRows, 60);
   assert.equal(取('RQ_社交轨迹').updateConfig.sendLatestRows, 60);
-  assert.equal(取('RQ_剧情事件').updateConfig.sendLatestRows, undefined);
+  assert.equal(取('RQ_剧情事件').updateConfig.sendLatestRows, 60);
   assert.equal(取('纪要表').updateConfig.sendLatestRows, undefined);
+  assert.match(取('RQ_剧情事件').sourceData.note, /脚本在正式正文成功落楼后先写入硬骨架/);
+  assert.match(取('RQ_剧情事件').sourceData.note, /数据库填表AI只负责/);
+  assert.match(取('RQ_剧情事件').sourceData.updateNode, /只更新待整理行的 result_summary/);
+  assert.match(取('RQ_剧情事件').sourceData.updateNode, /WHERE event_code[\s\S]*待数据库AI整理/);
+  assert.match(取('RQ_剧情事件').sourceData.insertNode, /禁止插入/);
   assert.match(取('纪要表').sourceData.initNode, /本批处理范围/);
   assert.equal(取('纪要表').exportConfig.keywords, '编码索引');
   assert.deepEqual(取('RQ_人物长期记忆').content[0], [
@@ -82,7 +89,7 @@ test('聊天模板固定为五张有用记忆表，七张默认硬状态/选项�
     '最后楼层',
     '事件键',
   ]);
-  assert.match(取('RQ_剧情事件').sourceData.note, /固定写“第N天 时段”/);
+  assert.match(取('RQ_剧情事件').sourceData.note, /固定(?:写|为)“第N天 时段”/);
   assert.match(取('RQ_人物长期记忆').sourceData.ddl, /last_time TEXT, -- 最后时间/);
   assert.match(取('RQ_承诺与伏笔').sourceData.ddl, /last_time TEXT, -- 最后时间/);
   assert.match(取('RQ_社交轨迹').sourceData.ddl, /game_time TEXT, -- 游戏时间/);
@@ -219,19 +226,43 @@ test('回合数据库时间由世界绝对时段统一格式化，不能再只�
   assert.match(数据库源, /SELECT event_type, character_name, event_text, result, game_time, last_floor, event_key/);
 });
 
-test('最终采用稿提取机器摘要；清洗不放回残缺标签；固定序章不用正文冒充摘要', () => {
-  const 重写结束 = 回合源.indexOf('const 事件摘要 = 提取回合事件摘要(原文)');
-  const 落助手楼 = 回合源.indexOf("role: 'assistant'", 重写结束);
-  assert.ok(重写结束 > 0 && 落助手楼 > 重写结束, '应在最终重写稿采用后、助手楼落地前提取摘要');
-  assert.match(回合源, /事件摘要 \?\? 保守回合摘要\(行动\)/);
-  assert.doesNotMatch(回合源, /记录数据库回合\(生成楼层,[^\n]+正文,/);
-  assert.match(回合源, /父亲来电交代公寓管理与收租要求，玩家开始接手管理工作/);
+test('长档补写读取最近5000条剧情事件，不能在超长聊天里永久漏掉最新楼层', () => {
+  const 起 = 数据库源.indexOf('export function 读取数据库剧情事件已记录楼层');
+  const 止 = 数据库源.indexOf('export async function 同步数据库回合', 起);
+  const 函数 = 数据库源.slice(起, 止);
+  assert.match(函数, /ORDER BY floor_no DESC\s+LIMIT 5000/);
+  assert.doesNotMatch(函数, /ORDER BY floor_no ASC\s+LIMIT 5000/);
+});
+
+test('正文模型不再生成 RQ 摘要；脚本只写硬骨架，数据库填表 AI 后台补结果并保留旧协议清洗兼容', () => {
+  assert.doesNotMatch(回合源, /事件摘要指令|提取回合事件摘要\(原文\)|事件摘要 \?\? 保守回合摘要\(行动\)/);
+  assert.match(回合源, /async function 记录数据库回合骨架/);
+  assert.match(回合源, /结果摘要:\s*数据库事件待整理摘要/);
+  assert.match(回合源, /function 安排数据库回合后处理/);
+  assert.match(回合源, /补齐缺失数据库事件骨架/);
+  assert.match(回合源, /触发数据库增量更新\(\)/);
+  assert.match(回合源, /\[数据库事件元数据键\]/, '正式助手楼应持久保存硬字段元数据供漏楼补写');
+  const 完成位置 = 回合源.indexOf("eventEmit('人妻公寓:回合完成')");
+  const 后台位置 = 回合源.indexOf('安排数据库回合后处理({', 完成位置);
+  assert.ok(完成位置 >= 0 && 后台位置 > 完成位置, '前台必须先完成解锁，数据库后处理随后异步执行');
+
+  assert.match(数据库源, /export const 数据库事件待整理摘要/);
+  assert.match(数据库源, /result_summary = CASE[\s\S]*待数据库AI整理[\s\S]*ELSE rq_events\.result_summary/);
+  assert.match(
+    数据库源,
+    /const 恢复SQL = `INSERT INTO rq_events[\s\S]*result_summary = excluded\.result_summary[\s\S]*恢复SQL,/,
+    '时间线失效补偿必须无条件恢复旧摘要，不能被正常骨架的摘要保护 CASE 挡住',
+  );
+  assert.match(数据库源, /读取数据库剧情事件已记录楼层/);
+  assert.match(数据库源, /触发数据库增量更新/);
+
+  // 旧存档或旧模型回复可能仍含该控制块，清洗层继续物理移除，但新正文提示不再要求生成它。
   assert.match(回合源, /<rq_event_summary\\b\[\^>\]\*>\[\\s\\S\]\*\?<\\\/rq_event_summary/);
   assert.match(回合源, /<rq_event_summary\\b\[\^>\]\*>\[\\s\\S\]\*\$\/i/);
   assert.match(
     回合源,
     /return 闭合清\.replace\(\/<rq_event_summary[\s\S]*?\.replace\(\/<\\\/rq_event_summary/,
-    '通用吞尾回退仍须再次清掉摘要协议',
+    '通用吞尾回退仍须再次清掉旧摘要协议',
   );
 });
 

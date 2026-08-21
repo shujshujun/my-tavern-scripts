@@ -4,7 +4,7 @@ import { 读最近有效stat } from '../../mvuIO';
 import { ROOT_ID, 根文档 } from './资源与皮肤';
 import { 清理失效手机聊天批次 } from './会话瞬态';
 import { 读库, 会话有未读, 朋友圈有未读 } from '../数据层';
-import { 末楼, 当前手机绝对时段 } from '../运行时上下文';
+import { 手机楼轴已就绪, 末楼, 当前手机绝对时段 } from '../运行时上下文';
 import { 获取静音会议手机状态, type 静音会议手机状态 } from '../静音会议旁路';
 import { 活动父亲通话, 恢复父亲通话 } from '../交互/父亲通话';
 import { 挂载手机, 拉回手机视口, 显示手机教程, type 手机页面 } from './挂载';
@@ -25,6 +25,36 @@ export interface 手机红点开合端口 {
 }
 
 let 已注册端口: 手机红点开合端口 | null = null;
+let 手机冷启动恢复计时器: ReturnType<typeof setTimeout> | null = null;
+let 手机冷启动恢复次数 = 0;
+const 手机冷启动快速恢复上限 = 120;
+
+function 停止恢复手机冷启动(): void {
+  if (手机冷启动恢复计时器 !== null) clearTimeout(手机冷启动恢复计时器);
+  手机冷启动恢复计时器 = null;
+  手机冷启动恢复次数 = 0;
+}
+
+/**
+ * 刷新时酒馆聊天数组可能晚于手机壳就绪。前 12 秒快速复查，之后降为每秒一次；真正
+ * 就绪后同时重绘已打开页面与红点。未就绪期间绝不读取空楼轴下的 `_微信`，也不会因
+ * 某次加载超过 12 秒就永久停在恢复页。
+ */
+function 排队恢复手机冷启动(): void {
+  if (手机冷启动恢复计时器 !== null) return;
+  const 延迟 = 手机冷启动恢复次数 < 手机冷启动快速恢复上限 ? 100 : 1000;
+  手机冷启动恢复次数 += 1;
+  手机冷启动恢复计时器 = setTimeout(() => {
+    手机冷启动恢复计时器 = null;
+    if (!手机楼轴已就绪()) {
+      排队恢复手机冷启动();
+      return;
+    }
+    手机冷启动恢复次数 = 0;
+    已注册端口?.渲染();
+    刷新红点();
+  }, 延迟);
+}
 
 /** 由内核在模块初始化完成后安装。 */
 export function 注册手机红点开合端口(端口: 手机红点开合端口): void {
@@ -66,9 +96,14 @@ export function 有来电(): boolean {
 }
 
 export function 刷新红点(): void {
-  清理失效手机聊天批次();
   const root = 根文档().getElementById(ROOT_ID);
   if (!root) return;
+  if (!手机楼轴已就绪()) {
+    排队恢复手机冷启动();
+    return;
+  }
+  停止恢复手机冷启动();
+  清理失效手机聊天批次();
   const 库 = 读库();
   const 楼 = 末楼();
   const 当前绝对时段 = 当前手机绝对时段();

@@ -14,6 +14,8 @@ export const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tav
 export const 成人素材基址 = 'https://testingcf.jsdelivr.net/gh/shujun8520-design/qgy-assets@cg2/cg1';
 export const 生产素材基址 =
   'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.83/output/imagegen/production-system/final';
+export const 借种结局素材基址 =
+  'https://testingcf.jsdelivr.net/gh/shujun8520-design/qgy-assets@cg4/cg1/borrow-seed-ending';
 
 /** 持久图片键只能成为 URL 路径段；引号、尖括号和斜杠外的属性语法均百分号编码。 */
 function 编码资源路径(value: unknown): string {
@@ -24,12 +26,22 @@ function 编码资源路径(value: unknown): string {
 }
 
 export function 朋友圈图片地址(图: unknown): string {
-  return `${素材基址}/微信圈/${编码资源路径(图)}.webp`;
+  const 值 = String(图 ?? '');
+  if (值.startsWith('@ending/夏乔借种/')) {
+    return `${借种结局素材基址}/${编码资源路径(值.slice('@ending/夏乔借种/'.length))}.webp`;
+  }
+  return `${素材基址}/微信圈/${编码资源路径(值)}.webp`;
 }
 
 export function 私聊图片地址(图: string): string {
   if (图.startsWith('@production/')) {
     return `${生产素材基址}/${编码资源路径(图.slice('@production/'.length))}.webp`;
+  }
+  if (图.startsWith('@ending/夏乔借种/')) {
+    return `${借种结局素材基址}/${编码资源路径(图.slice('@ending/夏乔借种/'.length))}.webp`;
+  }
+  if (图.startsWith('@ending/')) {
+    return `${素材基址}/结局/${编码资源路径(图.slice('@ending/'.length))}.webp`;
   }
   if (图.startsWith('@adult/')) {
     return `${成人素材基址}/${编码资源路径(图.slice('@adult/'.length))}`;
@@ -302,7 +314,7 @@ export function 头像块(名: string): string {
           : '';
   // 头像名通常来自静态表，但朋友圈旧档仍可能携带任意字符串。文件段必须编码；错误回退
   // 使用常量文本，不能把持久字符串再次拼进内联事件属性。
-  return `<span class="rqp-ava${语义框}"><img src="${素材基址}/头像/${encodeURIComponent(String(文件))}.webp" onerror="this.remove();this.parentElement.textContent='?'"/></span>`;
+  return `<span class="rqp-ava${语义框}"><img src="${素材基址}/头像/${encodeURIComponent(String(文件))}.webp" onerror="var p=this.parentElement;if(p)p.textContent='?'"/></span>`;
 }
 
 /** 群消息正文以「发言人:内容」保存；气泡头像必须跟发言人走，不能永远显示群头像。 */

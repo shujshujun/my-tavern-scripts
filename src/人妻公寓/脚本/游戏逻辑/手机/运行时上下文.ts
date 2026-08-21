@@ -9,10 +9,32 @@ import { 取绝对时段 } from '../楼层时钟';
  */
 
 export function 末楼(): number {
+  // 冷启动时酒馆助手宏可能尚未展开，`Number('')` 会伪装成合法第 0 楼；而宿主 chat
+  // 数组已经加载时才是手机分支锚与楼轴的权威。空数组表示聊天尚未恢复，不是第 0 楼。
   try {
-    return getLastMessageId();
+    const 聊天 = (SillyTavern as unknown as { chat?: unknown }).chat;
+    if (Array.isArray(聊天)) return 聊天.length > 0 ? 聊天.length - 1 : -1;
   } catch {
-    return Math.max(0, (SillyTavern.chat?.length ?? 1) - 1);
+    /* 极旧宿主没有注入 chat 时再尝试宏接口。 */
+  }
+  try {
+    const 楼 = Number(getLastMessageId());
+    return Number.isSafeInteger(楼) && 楼 >= 0 ? 楼 : -1;
+  } catch {
+    return -1;
+  }
+}
+
+/**
+ * 手机依赖宿主聊天数组提供真实楼轴与分支签名。刷新早期的空数组不能读取 `_微信`，
+ * 否则高楼层记录会被误判为未来数据、带锚记录也会被误判为旧分支，形成假清屏。
+ */
+export function 手机楼轴已就绪(): boolean {
+  try {
+    const 聊天 = (SillyTavern as unknown as { chat?: unknown }).chat;
+    return Array.isArray(聊天) && 聊天.length > 0 && 末楼() === 聊天.length - 1;
+  } catch {
+    return false;
   }
 }
 

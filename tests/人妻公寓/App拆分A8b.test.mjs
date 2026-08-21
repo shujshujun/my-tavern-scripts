@@ -8,7 +8,7 @@ import test from 'node:test';
 // App 只留 props 接线与组合门，两组件纯展示/纯 emit，textarea DOM ref 经 defineExpose 公开。
 // 不依赖绝对行号/Prettier 行宽。
 const 客户端目录 = new URL('../../src/人妻公寓/界面/客户端/', import.meta.url);
-const App源码 = readFileSync(new URL('./App.vue', 客户端目录), 'utf8');
+const App源码 = readFileSync(new URL('./App.vue', 客户端目录), 'utf8').replace(/\r\n/gu, '\n');
 const 行动选项源码 = readFileSync(new URL('./components/行动选项.vue', 客户端目录), 'utf8');
 const 回合输入源码 = readFileSync(new URL('./components/回合输入.vue', 客户端目录), 'utf8');
 

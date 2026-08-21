@@ -122,27 +122,33 @@ test('家庭计划旧图片的迟到失败只淘汰自己的请求，不得关�
   assert.match(舞台源码, /dataset\.imageUrl/u, '迟到回调不能临时读取已经切换的新 prop');
   assert.match(舞台源码, /:key="imageUrl"/u, '节点切换必须创建独立图片请求节点');
   assert.match(
+    舞台源码,
+    /\.family-plan-stage img \{[\s\S]{0,160}position: absolute;[\s\S]{0,100}inset: 0;[\s\S]{0,160}object-fit: contain;/u,
+    '事件CG必须被舞台边界绝对约束并完整显示，不能由固有宽高撑出容器后只截到顶部',
+  );
+  assert.match(
     客户端源码,
     /function 当前事件CG加载失败\(失败地址: string\)[\s\S]{0,160}失败地址 !== 当前事件CG地址\.value[\s\S]{0,160}关闭当前事件CG\(\)/u,
     'App 只允许当前仍展示的事件 CG 失败回调关闭舞台',
   );
 });
 
-test('生产画面与家庭计划画面共用事件舞台时，生产候选拥有明确渲染优先级且资源仓不串线', () => {
+test('借种、生产与家庭计划画面共用事件舞台时，候选拥有明确渲染优先级且资源仓不串线', () => {
   const 客户端源码 = readFileSync(path.join(仓库根, 'src/人妻公寓/界面/客户端/App.vue'), 'utf8');
   const 素材源码 = readFileSync(path.join(仓库根, 'src/人妻公寓/界面/客户端/assets.ts'), 'utf8');
   const 逻辑源码 = readFileSync(path.join(仓库根, 'src/人妻公寓/脚本/游戏逻辑/index.ts'), 'utf8');
 
   assert.match(
     客户端源码,
-    /当前事件CG = computed\(\(\) => 当前生产CG\.value \?\? 当前家庭计划CG\.value\)/u,
+    /当前事件CG = computed\(\(\) => 当前借种CG\.value \?\? 当前生产CG\.value \?\? 当前家庭计划CG\.value\)/u,
   );
   assert.match(
     客户端源码,
-    /当前事件CG地址 = computed\(\(\) => \(当前生产CG\.value \? 生产图片\([^)]+\) : 当前家庭计划CG地址\.value\)\)/u,
+    /当前事件CG地址 = computed\(\(\) =>[\s\S]{0,100}当前借种CG\.value[\s\S]{0,100}借种结局图片\([^)]+\)[\s\S]{0,100}当前生产CG\.value[\s\S]{0,100}生产图片\([^)]+\)[\s\S]{0,100}当前家庭计划CG地址\.value/u,
   );
   assert.match(客户端源码, /eventOn\('人妻公寓:生产CG',[\s\S]{0,220}当前家庭计划CG\.value = null/u);
   assert.match(逻辑源码, /当前事件尚未结束，家庭计划暂不能继续/u);
   assert.match(素材源码, /家庭计划素材基址[\s\S]{0,180}rq0\.83\/output\/imagegen\/family-plan/u);
   assert.match(素材源码, /生产素材基址[\s\S]{0,180}rq0\.83\/output\/imagegen\/production-system\/final/u);
+  assert.match(素材源码, /借种结局素材基址[\s\S]{0,220}shujun8520-design\/qgy-assets@cg4\/cg1\/borrow-seed-ending/u);
 });

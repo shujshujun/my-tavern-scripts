@@ -240,7 +240,7 @@ export function 提交家庭计划赴约(data: SchemaType, 当前地点: string,
   data.系统._家庭计划.完成楼层 = Number.isInteger(成功楼层) ? 成功楼层 : -1;
   return {
     成功: true,
-    提示: '家庭计划完成。「借种」结局剧情占位已在特殊场景货架显示。',
+    提示: '家庭计划完成。「借种」场景票已在特殊场景货架解锁。',
     变动: true,
     CG: '家庭计划_赴约_宣布决定',
   };

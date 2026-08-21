@@ -50,6 +50,11 @@ test('客户端全屏建议允许继续窗口模式，并持久记住任一选�
   // 中央 CTA 与按钮模板留在 App；存储与选择动作在 A3 拆出的 useUIPrefs 单例。
   assert.match(客户端源, /v-if="显示移动端全屏引导"[^>]*class="mobile-fullscreen-cta"/);
   assert.match(客户端源, />继续窗口模式</);
+  assert.match(
+    客户端源,
+    /\.mobile-fullscreen-actions button \{[\s\S]{0,100}min-height:\s*44px/,
+    '两种全屏选择都必须保留至少44px的移动端触控高度',
+  );
   assert.match(界面偏好源, /移动端全屏引导存储键 = ['"]rqgy-mobile-fullscreen-guide-v1['"]/);
   assert.match(界面偏好源, /localStorage\.getItem\(移动端全屏引导存储键\)/);
   assert.match(界面偏好源, /localStorage\.setItem\(移动端全屏引导存储键,/);
