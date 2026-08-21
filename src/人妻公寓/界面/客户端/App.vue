@@ -4165,14 +4165,73 @@ async function 滚到底() {
 
 let 卷轴请求序号 = 0;
 
+/**
+ * 获取酒馆已经完成渲染的消息 HTML。
+ * 不重新实现用户预设 regex/markdown，只消费 SillyTavern 已挂载到 .mes_text 的结果。
+ * 获取失败时返回空，让旧的文本清洗链继续兜底。
+ */
+function 获取酒馆已渲染消息HTML(楼号: number): string {
+  try {
+    const 根文档 = (window.parent ?? window).document;
+    const 消息 = [...根文档.querySelectorAll<HTMLElement>('.mes[mesid]')].find(
+      el => Number(el.getAttribute('mesid')) === 楼号,
+    );
+    return 消息?.querySelector<HTMLElement>('.mes_text')?.innerHTML ?? '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * 回合完成事件可能早于酒馆消息 DOM 最终挂载；读取最终显示 HTML 时允许短暂等待重试。
+ * 不等待会导致偶发退回纯文本，从而丢失预设动画/卡片。
+ */
+async function 等待酒馆已渲染消息HTML(楼号: number): Promise<string> {
+  for (let i = 0; i < 3; i++) {
+    const html = 获取酒馆已渲染消息HTML(楼号);
+    if (html) return html;
+    await new Promise(resolve => requestAnimationFrame(() => resolve(null)));
+  }
+  return '';
+}
+
+/**
+ * 保留预设视觉层，但禁止把酒馆消息中的可执行能力带入游戏舞台。
+ * CSS/动画属于显示协议，不在这里删除；脚本和事件属性属于执行能力，需要隔离。
+ */
+function 净化正文舞台HTML(html: string): string {
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    doc.querySelectorAll('script, iframe, object, embed, link, meta').forEach(el => el.remove());
+    doc.querySelectorAll<HTMLElement>('*').forEach(el => {
+      [...el.attributes].forEach(attr => {
+        if (/^on/i.test(attr.name)) el.removeAttribute(attr.name);
+      });
+    });
+
+    // 预设视觉 CSS 需要保留(@keyframes、卡片 class、inline style)，但不能让消息里的全局规则污染游戏 UI。
+    doc.querySelectorAll('style').forEach(style => {
+      style.textContent = String(style.textContent ?? '')
+        .replace(/(^|})\s*(html|body|\*|:root)\s*\{[^}]*\}/gi, '$1')
+        .replace(/@import[^;]+;/gi, '');
+    });
+
+    return doc.body.innerHTML;
+  } catch {
+    return html;
+  }
+}
+
 async function 读取卷轴范围(范围: 楼层范围, 当前末楼: number): Promise<卷轴条[]> {
   const 消息组 = (await getChatMessages(`${范围.起楼}-${范围.末楼}`)) ?? [];
   const 条目: 卷轴条[] = [];
   for (const 消息 of 消息组) {
     const 是玩家 = 消息.role === 'user';
     const 原文 = 消息.message ?? '';
+    const 渲染HTML = 是玩家 ? '' : 净化正文舞台HTML(await 等待酒馆已渲染消息HTML(消息.message_id));
     const 净文 = 清洗(过酒馆正则(原文, 是玩家 ? 'user_input' : 'ai_output', 当前末楼 - 消息.message_id));
-    if (!净文) continue;
+    // 预设 HTML 已经被酒馆渲染时，原始文本可能被协议清洗为空；不能因为纯文本为空而吞掉已经存在的视觉正文。
+    if (!净文 && !渲染HTML) continue;
     // 0 楼藏着界面占位标记,整楼写回会砸掉客户端,不开放编辑
     const 可编辑 = 消息.message_id > 0 ? { 原文 } : {};
     if (是玩家) {
@@ -4190,6 +4249,7 @@ async function 读取卷轴范围(范围: 楼层范围, 当前末楼: number): P
           .split(/\n+/)
           .map(s => s.trim())
           .filter(Boolean),
+        ...(渲染HTML ? { 渲染HTML } : {}),
         楼: 消息.message_id,
         _排序: 消息.message_id * 10000,
         可回档: 消息.message_id > 0 && 消息.message_id < 当前末楼,

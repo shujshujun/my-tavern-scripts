@@ -117,7 +117,10 @@ defineExpose({ 滚到底 });
         </button>
         <p v-if="条.谁 === '玩家'" class="story-player">▸ {{ 条.文本[0] }}</p>
         <template v-else>
-          <p v-for="(段, j) in 条.文本" :key="j" class="narr">{{ 段 }}</p>
+          <template v-if="条.渲染HTML">
+            <div class="narr rendered-html" v-html="条.渲染HTML"></div>
+          </template>
+          <p v-else v-for="(段, j) in 条.文本" :key="j" class="narr">{{ 段 }}</p>
         </template>
       </template>
     </div>

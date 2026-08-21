@@ -167,7 +167,7 @@ for (const 组 of index.条目) {
 if (!开场白) throw new Error('未找到 [开场白] 条目');
 
 // ── 资源走 jsdelivr(手机友好；角色卡版本与正式发布 tag 同步) ──
-const TAG = 'rq0.86';
+const TAG = 'rq0.87';
 const BASE = `https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@${TAG}`;
 
 const 加载块 = url => "```\n<body>\n<script>\n$('body').load('" + url + "')\n</script>\n</body>\n```";
@@ -271,7 +271,7 @@ const tavern_helper = {
 
 // ── 卡体 ──
 const 卡名 = '人妻公寓';
-const 版本 = '0.86';
+const 版本 = '0.87';
 const data = {
   name: 卡名,
   description: '',
@@ -279,7 +279,7 @@ const data = {
   scenario: '',
   first_mes: '<StatusPlaceHolderImpl/>',
   mes_example: '',
-  creator_notes: `人妻公寓 v${版本}。支持继承 v0.80／v0.81／v0.82／v0.83／v0.84／v0.85 存档：v0.80～v0.82 会自动迁移到当前数据版本，v0.83～v0.85 可直接继续；更早版本请新建聊天。需安装最新版酒馆助手、MVU 与数据库插件，并把数据库模式设为 SQLite；首次进入按引导安装五张游戏记忆表。v0.86 实装夏乔「借种」结局及专属 CG，补齐正文生成看门狗、微信硬保存与数据库剧情骨架后台整理，并继续兼容 v0.85 已冻结的家庭计划知情旧档。变量解析已自动配置（默认走数据库代发），无需手动调整 MVU 面板；如需切换解析通道，进入游戏【设置 → 变量解析】调整即可。本作不再兼容智脑。开局：0楼进入游戏界面，选难度→接父亲电话进入到任首日；输入使用游戏内输入框。`,
+  creator_notes: `人妻公寓 v${版本}。支持继承 v0.80～v0.86 存档；需安装最新版酒馆助手、MVU 与数据库插件，并把数据库模式设为 SQLite；首次进入按引导安装五张游戏记忆表。v0.86 实装夏乔「借种」结局及专属 CG。v0.87 新增 SillyTavern 原生渲染兼容正文舞台，支持复杂预设 HTML/CSS 动画、卡片与显示效果，并修复预设标签泄漏问题。变量解析已自动配置（默认走数据库代发），无需手动调整 MVU 面板；如需切换解析通道，进入游戏【设置 → 变量解析】调整即可。本作不再兼容智脑。开局：0楼进入游戏界面，选难度→接父亲电话进入到任首日；输入使用游戏内输入框。`,
   system_prompt: '',
   post_history_instructions: '',
   tags: ['人妻公寓'],
