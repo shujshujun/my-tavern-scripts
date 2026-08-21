@@ -184,7 +184,7 @@ import {
   开始新游戏,
   恢复遗留临时回合楼,
 } from './回合引擎';
-import { 清理数据库陈旧互斥旗, 读取数据库记忆胶囊 } from './数据库桥';
+import { 确保RQ剧情事件SQLite结构, 清理数据库陈旧互斥旗, 读取数据库记忆胶囊 } from './数据库桥';
 import { 应用酒馆最终显示正则 } from './预设输出兼容';
 import { 构造入住登场演出态, 创建配置户节点, 提交入住登场, 入住检测, 同步入住世界书条目 } from './入住系统';
 import { type 本轮事件冻结, 事件必须有正文, 是入住登场事件, 本轮事件可提交, 识别入住登场预约 } from './入住触发门';
@@ -950,6 +950,8 @@ $(() => {
 
       // 只在互斥旗存在、公开 API 经过等待仍不存在时清理死旗；活动中的数据库实例绝不触碰。
       await 清理数据库陈旧互斥旗();
+      // 模板升级不会自动修改已有 SQLite 物理表；启动时只补人妻公寓业务表缺失字段。
+      await 确保RQ剧情事件SQLite结构();
       确认启动仍有效();
 
       // 安检机第一道:挂载 zod schema
@@ -4240,6 +4242,9 @@ function 挂载监听() {
       dryRun: boolean,
     ) => {
       if (dryRun) return;
+      // 0.88：关闭自动原生正文逃生路径。GENERATION_STARTED 无法可靠区分角色聊天、数据库兼容广播
+      // 与游戏正文；游戏正式入口统一走执行回合()，不再让普通酒馆生成占用人妻公寓正文租约。
+      return;
       if (回合进行中()) return; // 固定 0 楼主回合及数据库兼容广播不登记
       if (类型 !== 'normal') return; // 不扩张到 regenerate/swipe/continue/quiet/impersonate
       if (选项?.automatic_trigger || 选项?.quiet_prompt || 选项?.quietToLoud) return;

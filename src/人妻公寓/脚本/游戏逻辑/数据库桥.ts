@@ -565,6 +565,45 @@ export function 刷新SQLite能力缓存(): void {
   SQLite探测缓存 = null;
 }
 
+/**
+ * 业务表运行态迁移：shujuku 的模板导入只负责模板/运行快照，不保证已经存在的 SQLite
+ * 物理表跟随模板新增字段。因此人妻公寓自己的 RQ 表必须在使用前自检结构。
+ *
+ * 只补缺失列，不重建表、不触碰已有数据。
+ */
+export async function 确保RQ剧情事件SQLite结构(): Promise<void> {
+  const api = 取数据库API();
+  if (!api) return;
+  const 查询 = 取SQL查询方法(api);
+  const 写入 = api.executeSqlMutation;
+  if (!查询 || typeof 写入 !== 'function') return;
+  try {
+    const schema = await 限时等待(
+      Promise.resolve(查询.call(api, 'PRAGMA table_info(rq_events)')),
+      4000,
+      'RQ剧情事件结构检测',
+    );
+    if (!SQL查询结果有效(schema)) return;
+    const rows = SQL结果对象行(schema);
+    if (!rows) return;
+    const 已有字段 = new Set(rows.map(row => String(row.name ?? '')));
+    const 缺失字段: Array<{ name: string; ddl: string }> = [
+      { name: 'result_summary', ddl: 'ALTER TABLE rq_events ADD COLUMN result_summary TEXT' },
+      { name: 'event_code', ddl: 'ALTER TABLE rq_events ADD COLUMN event_code TEXT' },
+    ].filter(item => !已有字段.has(item.name));
+    for (const 字段 of 缺失字段) {
+      await 限时等待(
+        Promise.resolve(写入.call(api, 字段.ddl)),
+        4000,
+        `RQ剧情事件补字段:${字段.name}`,
+      );
+      console.info(`[人妻公寓·数据库] rq_events 已补字段: ${字段.name}`);
+    }
+  } catch (error) {
+    console.warn('[人妻公寓·数据库] rq_events 结构自检失败，将在后续启动继续尝试:', error);
+  }
+}
+
 function 读SQLite探测缓存(api: 数据库API): boolean | null {
   if (!SQLite探测缓存 || SQLite探测缓存.api !== api || Date.now() - SQLite探测缓存.时间 > SQLite探测缓存时长)
     return null;
