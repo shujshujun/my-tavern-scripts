@@ -15,6 +15,114 @@
  * 精确覆写这个历史宏,让预设读到的是本拍行动,而非真实聊天的上一楼指令。
  */
 
+import type { 外部正文标签 } from './正文输出边界';
+
+interface 可识别预设词条 {
+  identifier?: string;
+  id?: string;
+  enabled?: boolean;
+  content?: string;
+  role?: string;
+}
+
+interface 预设结构 {
+  prompts?: 可识别预设词条[];
+  prompt_order?: Array<{
+    character_id?: number;
+    order?: Array<{ identifier?: string; enabled?: boolean }>;
+  }>;
+}
+
+export interface 预设流式边界 {
+  期望正文标签: 外部正文标签 | null;
+  等待思维闭标签: boolean;
+}
+
+function 含未闭合私有开标签(文本: string): boolean {
+  const 开标签 = /<([A-Za-z_:~-]*(?:think|reason|analysis|thought|draft|cot|plan)[A-Za-z_:~-]*|metacognition|original|bginfor|CEstuff|fox_selc|fox_tip|tucao|思考)(?=\s|\/?>)[^>]*>/gi;
+  for (const 匹配 of 文本.matchAll(开标签)) {
+    const 标签 = 匹配[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (!new RegExp(`</${标签}\\s*>`, 'i').test(文本.slice((匹配.index ?? 0) + 匹配[0].length))) return true;
+  }
+  return false;
+}
+
+/** SillyTavern 的真实启用状态在 prompt_order；prompts.enabled 可能仍是导出时的旧默认值。 */
+export function 读取预设启用词条(预设: 预设结构 | null | undefined): 可识别预设词条[] {
+  const 词条们 = Array.isArray(预设?.prompts) ? 预设.prompts : [];
+  const 顺序组 = Array.isArray(预设?.prompt_order) ? 预设.prompt_order : [];
+  const 当前顺序 = 顺序组.find(项 => 项?.character_id === 100001) ?? 顺序组.at(-1);
+  if (!Array.isArray(当前顺序?.order)) return 词条们.filter(词条 => 词条?.enabled);
+  const 词条表 = new Map(
+    词条们
+      .map(词条 => [词条.identifier ?? 词条.id, 词条] as const)
+      .filter((项): 项 is readonly [string, 可识别预设词条] => typeof 项[0] === 'string'),
+  );
+  return 当前顺序.order
+    .filter(项 => 项?.enabled && typeof 项.identifier === 'string')
+    .map(项 => 词条表.get(项.identifier!))
+    .filter((词条): 词条 is 可识别预设词条 => Boolean(词条))
+    .map(词条 => ({ ...词条, enabled: true }));
+}
+
+/**
+ * 只检测启用提示词里的强输出协议组合，供流式显示在正文封套出现前隐藏裸思考文字。
+ * 不读取预设名称；单独提到一个标签也不算协议，避免普通设定误关流式正文。
+ */
+export function 识别预设正文标签(词条们: readonly 可识别预设词条[]): 外部正文标签 | null {
+  const 协议文 = 词条们
+    .filter(词条 => 词条?.enabled && typeof 词条.content === 'string')
+    .map(词条 => 词条.content)
+    .join('\n');
+  const 有思维协议 = /<(?:[A-Za-z_:~-]*(?:think|reason|analysis|thought|draft|cot|plan)[A-Za-z_:~-]*|metacognition|思考)(?=\s|\/?>)/i.test(协议文);
+  if (/(?:DREAM_PLOT_OUTPUT|<dream_plot\b)/i.test(协议文) && /<dream_body\b/i.test(协议文)) return 'dream_body';
+  if (/<game\b/i.test(协议文) && (有思维协议 || /正文[^\n]{0,40}<game\b/i.test(协议文))) return 'game';
+  if (/<content\b/i.test(协议文) && (有思维协议 || /<output-template\b/i.test(协议文))) return 'content';
+  if (/<story_scene\b/i.test(协议文) && 有思维协议) return 'story_scene';
+  if (/<正文(?=\s|\/?>)/i.test(协议文) && 有思维协议) return '正文';
+  if (/<revised\b/i.test(协议文) && /<(?:original|analysis)\b/i.test(协议文)) return 'revised';
+  for (const 标签 of ['response', 'final', 'answer'] as const) {
+    if (new RegExp(`<${标签}\\b`, 'i').test(协议文) && 有思维协议) return 标签;
+  }
+  return null;
+}
+
+export function 当前预设正文标签(): 外部正文标签 | null {
+  try {
+    return 识别预设正文标签(读取预设启用词条(getPreset('in_use') as 预设结构));
+  } catch (e) {
+    console.warn('[人妻公寓·预设桥] 识别当前预设输出协议失败:', e);
+    return null;
+  }
+}
+
+export function 识别预设流式边界(词条们: readonly 可识别预设词条[]): 预设流式边界 {
+  const 期望正文标签 = 识别预设正文标签(词条们);
+  const 最后模型边界词条 = [...词条们]
+    .reverse()
+    .find(
+      词条 =>
+        词条?.enabled &&
+        (词条.role === 'assistant' || 词条.role === 'model' || 词条.role === 'user') &&
+        typeof 词条.content === 'string' &&
+        词条.content.trim(),
+    );
+  const 等待思维闭标签 =
+    !期望正文标签 &&
+    typeof 最后模型边界词条?.content === 'string' &&
+    含未闭合私有开标签(最后模型边界词条.content);
+  return { 期望正文标签, 等待思维闭标签 };
+}
+
+export function 当前预设流式边界(): 预设流式边界 {
+  try {
+    return 识别预设流式边界(读取预设启用词条(getPreset('in_use') as 预设结构));
+  } catch (e) {
+    console.warn('[人妻公寓·预设桥] 识别当前预设流式边界失败:', e);
+    return { 期望正文标签: null, 等待思维闭标签: false };
+  }
+}
+
 export interface 预设消息 {
   role: 'system' | 'user' | 'assistant';
   content: string;

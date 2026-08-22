@@ -307,7 +307,7 @@ test('App 导入并常驻接线抽屉组件；垃圾选择弹窗留在组件外�
     /:mobile="移动端"/,
     /:room-id="当前房间"/,
     /:action-count="可见房内动作数"/,
-    /:suppressed="房内操作抑制"/,
+    /:suppressed="房内操作抑制 \|\| 前台硬决策中"/,
     /:actions="普通房间动作"/,
     /:garbage-visible="垃圾入口可见"/,
     /:video-tape-active="录像带中"/,

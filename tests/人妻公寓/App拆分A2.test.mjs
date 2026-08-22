@@ -89,8 +89,8 @@ test('App 不再内联五段模板，但对应组件拥有原文案与关键 DOM
   assert.match(读信源码, /\.split\('\\n'\)/, '读信正文仍按换行拆段');
   assert.ok((读信源码.match(/emit\('close'\)/g) ?? []).length >= 3, '读信三条关闭路径都 emit close');
 
-  assert.match(事件提示词源码, />本 拍 提 示 词</, '事件提示词标题保持');
-  assert.match(事件提示词源码, /<pre class="event-prompt-view">/, '事件提示词只读 pre 保持');
+  assert.match(事件提示词源码, />完 整 提 示 词</, '提示词弹窗明确展示完整请求');
+  assert.match(事件提示词源码, /<pre class="event-prompt-view" tabindex="0">/, '事件提示词只读 pre 保持');
 
   assert.match(反馈提示源码, /FOUND \/ 拾获/, '拾获卡 kicker 文案保持');
   assert.ok((反馈提示源码.match(/点击收下/g) ?? []).length >= 2, '拾获卡 title/提示均保持');

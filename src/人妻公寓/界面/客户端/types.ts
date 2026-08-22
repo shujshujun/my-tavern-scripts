@@ -84,7 +84,13 @@ export type 移动端全屏选择 = '全屏' | '窗口';
 export type 全屏根 = HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void };
 export type 全屏文档 = Document & { webkitExitFullscreen?: () => void; webkitFullscreenElement?: Element | null };
 
+export type 酒馆原生提示词记录 = {
+  mesId?: unknown;
+  rawPrompt?: unknown;
+  presetName?: unknown;
+};
+
 export type 酒馆原生提示词模块 = {
   promptItemize: (提示词: unknown[], 楼号: number) => Promise<unknown> | unknown;
-  itemizedPrompts: unknown[];
+  itemizedPrompts: 酒馆原生提示词记录[];
 };

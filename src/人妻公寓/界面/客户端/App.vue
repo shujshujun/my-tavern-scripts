@@ -1,6 +1,6 @@
 <template>
   <div class="apt" :class="{ 'keyboard-open': 键盘打开 }">
-    <div class="page">
+    <div class="page" :class="{ 'foreground-decision': 前台硬决策中 }">
       <!-- 错误护栏:任何运行时异常显示在此,不再整屏空白(点击即散,不常驻) -->
       <div v-if="错误信息" class="err" title="点击关闭" @click="错误信息 = ''">⚠︎ 界面异常:{{ 错误信息 }}(点击关闭)</div>
 
@@ -367,7 +367,7 @@
             class="avatar"
             :class="[项.态, 项.冷落态, 项.怀孕态]"
             :title="`${项.妻名}(${项.门牌})${项.冷落说明 ? ` · ${项.冷落说明}` : ''}`"
-            @click="!静音会议正式中 && (选中门牌 = 项.门牌)"
+            @click="!静音会议正式中 && !前台硬决策中 && (选中门牌 = 项.门牌)"
           >
             <img
               v-if="!头像失效[项.妻名]"
@@ -727,9 +727,11 @@
           <button
             v-if="当前房间 && !录像带中"
             class="btn icon"
-            :disabled="发送中 || 静音会议正式中 || 场景剧情移动锁"
+            :disabled="发送中 || 静音会议正式中 || 场景剧情移动锁 || 前台硬决策中"
             :title="
-              静音会议正式中
+              前台硬决策中
+                ? '请先完成当前画面的判断'
+                : 静音会议正式中
                 ? '会议进行中，无法离开管理员室'
                 : 场景剧情移动锁
                   ? `「${场景剧情状态?.标题 ?? 录像带前置标题 ?? '当前剧情'}」尚未完成，当前场景已锁定`
@@ -856,7 +858,7 @@
           :mobile="移动端"
           :room-id="当前房间"
           :action-count="可见房内动作数"
-          :suppressed="房内操作抑制"
+          :suppressed="房内操作抑制 || 前台硬决策中"
           :actions="普通房间动作"
           :garbage-visible="垃圾入口可见"
           :video-tape-active="录像带中"
@@ -892,21 +894,47 @@
           </div>
         </transition>
         <!-- 偷窥余像:"你注意到了什么?"(摄像头渠道,选对收进线索板;选项走 gal 纸条样式与行动选项同款) -->
-        <div
+        <section
           v-if="!静音会议正式中 && !场景剧情锁定 && 偷窥待选 && !发送中"
           class="peep-card"
+          :class="{ collapsed: 偷窥决策收起 }"
           :style="{ '--opt-img': `url(${素材基址}/界面/选项条.webp)` }"
+          role="region"
+          aria-labelledby="peep-decision-title"
         >
-          <p class="hint">画面看完了。你注意到了什么?</p>
-          <button v-for="(项, i) in 偷窥待选.选项" :key="i" class="option-chip gal" @click="选细节(i)">
-            {{ 项 }}
-          </button>
-        </div>
+          <header class="peep-head">
+            <span>
+              <b id="peep-decision-title">画面看完了。你注意到了什么?</b>
+              <small>{{ 界面事务提交中 ? '正在确认观察结果…' : '判断完成前，普通操作暂时收起' }}</small>
+            </span>
+            <button
+              v-if="移动端"
+              type="button"
+              class="peep-collapse"
+              :aria-expanded="!偷窥决策收起"
+              @click="偷窥决策收起 = !偷窥决策收起"
+            >
+              {{ 偷窥决策收起 ? '展开答案' : '收起答案' }}
+            </button>
+          </header>
+          <div class="peep-options">
+            <button
+              v-for="(项, i) in 偷窥待选.选项"
+              :key="i"
+              class="option-chip gal"
+              :disabled="界面事务提交中"
+              @click="选细节(i)"
+            >
+              {{ 项 }}
+            </button>
+          </div>
+        </section>
 
         <!-- 行动选项(AI 每轮给 4 条,点了直接发送;gal 式居中选择条,纸条底=AI 水彩件) -->
         <ActionOptions
           :key="行动选项世代"
-          :open="显示选项 && !录像带中 && !静音会议交互幕 && !静音会议待散会选择 && !静音会议自由待选择"
+          :open="显示选项 && !录像带中 && !静音会议交互幕 && !静音会议待散会选择 && !静音会议自由待选择 && !前台硬决策中"
+          :mobile="移动端"
           :options="行动选项"
           @select="点选项"
         />
@@ -943,7 +971,7 @@
         <!-- 游戏内输入(玩家不碰酒馆输入框) -->
         <RoundInput
           ref="回合输入"
-          :open="可输入"
+          :open="可输入 && !偷窥决策中"
           :text="输入文本"
           :sending="发送中 || Boolean(场景剧情准备锁)"
           :preface-writing="由头写入中"
@@ -963,6 +991,7 @@
           :period="时段"
           :current-period-label="当前时段显示"
           :next-period-label="下一时段显示"
+          :decision-mode="前台决策输入模式"
           @update-text="输入文本 = $event"
           @submit="发送"
           @focus="输入聚焦"
@@ -976,7 +1005,7 @@
         />
 
         <!-- 功能区:gal 式底部 dock(大图标按钮,与数据 HUD 分离) -->
-        <nav v-if="!录像带中" class="dock" :class="{ 'mute-meeting-dock': 静音会议正式中 }">
+        <nav v-if="!录像带中 && !前台硬决策中" class="dock" :class="{ 'mute-meeting-dock': 静音会议正式中 }">
           <button
             class="dock-btn primary"
             :disabled="发送中 || 静音会议正式中 || 场景剧情移动锁"
@@ -1285,6 +1314,7 @@ import {
   type 门牌,
 } from '../../stageConfig';
 import { 解析绝对时段 } from '../../周作息';
+import { 从酒馆原始提示词构造快照 } from '../../提示词快照';
 import { 丈夫在楼, 妻位置推算 } from '../../脚本/游戏逻辑/楼层时钟';
 import { 余波有冻结效力 } from '../../脚本/游戏逻辑/冷落系统';
 import { 怀孕已公开 } from '../../脚本/游戏逻辑/怀孕系统';
@@ -1318,7 +1348,8 @@ import { 手机锚消息签名 } from '../../脚本/游戏逻辑/手机时间线
 import { 判定时间撤销点, 是时间撤销地点, 时间撤销点键 } from '../../脚本/游戏逻辑/时间撤销系统';
 import { 风闻事件安全摘要 } from '../../脚本/游戏逻辑/风闻系统';
 import { 检测AI输出美化正则 } from '../../脚本/游戏逻辑/预设输出兼容';
-import { 提取正文舞台文本 } from '../../脚本/游戏逻辑/正文输出边界';
+import { 当前预设流式边界 } from '../../脚本/游戏逻辑/预设桥';
+import { 提取正文舞台文本, type 外部正文标签 } from '../../脚本/游戏逻辑/正文输出边界';
 import { 更新有效流式正文 } from '../../脚本/游戏逻辑/正文生成完整性';
 import {
   行动资源门槛,
@@ -2169,6 +2200,10 @@ async function 从地图外出(): Promise<void> {
 
 function 发起时间推进(方式: 客户端时间方式): void {
   if (发送中.value) return;
+  if (偷窥决策中.value) {
+    弹提示('请先判断刚才监控画面里的关键细节。');
+    return;
+  }
   // 小憩、晨跑与健身直接结算；只有睡眠先生成不入正文记忆的独立反馈。两条路径都要锁住
   // 地图、输入和回档按钮，直到脚本明确回报结束。
   发送中.value = true;
@@ -3030,6 +3065,8 @@ const { 房间动作, 当前房间动作, 普通房间动作, 确认已到达动
 void 当前房间动作;
 const 流式段 = ref<string[]>([]);
 const 失败残稿段 = ref<string[]>([]);
+let 流式预期正文标签: 外部正文标签 | null = null;
+let 流式等待思维闭标签 = false;
 // ── 特殊场景「录像带」交互(App A7a:状态机/5 秒与 10 连点/完整失败记账/补偿迁入 composables/useVideoTape.ts) ──
 // App 只注入运行态 refs 与业务事件回调;事件名与载荷保持原样,composable 不直连事件总线。
 const {
@@ -3352,6 +3389,10 @@ function 确认失控收尾(): void {
 function 发出(文本: string) {
   文本 = 文本.trim();
   if (!文本 || 发送中.value || 场景移动中) return;
+  if (偷窥决策中.value) {
+    弹提示('请先判断刚才监控画面里的关键细节。');
+    return;
+  }
   if (场景剧情准备锁.value || 场景剧情活动.value) {
     弹提示('当前场景剧情已经开始，请使用“重试本段剧情”继续，不要用新行动改写它。');
     return;
@@ -3909,23 +3950,31 @@ async function 看监控(门牌号: 门牌) {
 }
 
 const 偷窥待选 = ref<{ 门牌: 门牌; 拍: number; 选项: string[] } | null>(null);
+const 偷窥决策中 = computed(() => Boolean(偷窥待选.value));
+const 偷窥决策收起 = ref(false);
+let 上次偷窥决策签名 = '';
 
 function 刷新偷窥待选() {
   const 挂起 = _.get(getVariables({ type: 'chat' }), '_侦探.偷窥待选') as { 门牌: 门牌; 拍: number } | null;
   if (!挂起) {
     偷窥待选.value = null;
+    上次偷窥决策签名 = '';
+    偷窥决策收起.value = false;
     return;
   }
   const 本拍 = 查裂缝(挂起.门牌)?.偷窥?.[挂起.拍];
+  const 新签名 = 本拍 ? `${挂起.门牌}:${挂起.拍}` : '';
+  if (新签名 !== 上次偷窥决策签名) 偷窥决策收起.value = false;
+  上次偷窥决策签名 = 新签名;
   偷窥待选.value = 本拍 ? { ...挂起, 选项: 本拍.选项 } : null;
 }
 
 function 选细节(i: number) {
-  if (!偷窥待选.value) return;
+  if (!偷窥待选.value || 界面事务提交中.value) return;
   const 门牌号 = 偷窥待选.value.门牌;
-  if (提交界面事务(() => eventEmit('人妻公寓:偷窥选细节', { 门牌: 门牌号, 选项: i }))) {
-    偷窥待选.value = null;
-  }
+  // 选择卡是持久挂起的硬决策：提交期间只禁用按钮，等脚本真正提交后再由刷新函数清掉。
+  // 若核心写入失败，原挂起仍在，回合失败收口重读后会恢复，不做乐观消费。
+  提交界面事务(() => eventEmit('人妻公寓:偷窥选细节', { 门牌: 门牌号, 选项: i }));
 }
 
 const 读信门牌 = ref<门牌 | null>(null);
@@ -4277,9 +4326,9 @@ async function 读取酒馆原生提示词模块(宿主窗口: 宿主窗口接�
 let 原生弹窗轮询: number | undefined;
 
 /**
- * SillyTavern 的 promptItemize 只负责打开“提示词拆分”；截图右侧原始提示词由弹窗内
- * `#showRawPrompt` 的原生 click 监听负责展开。必须在调用 promptItemize 前先监听宿主
- * 文档，避免模板异步完成后弹窗同步挂载时错过按钮；游戏不读取 rawPrompt，也不自制窗口。
+ * 新版优先直接读取 itemizedPrompts.rawPrompt；本函数只服务旧酒馆或缺失 rawPrompt 的兼容回退。
+ * SillyTavern 的 promptItemize 只负责打开“提示词拆分”，右侧原始提示词仍由弹窗内
+ * `#showRawPrompt` 展开。必须在调用 promptItemize 前先监听宿主文档，避免错过同步挂载的按钮。
  */
 function 等待酒馆显示原始提示词按钮(弹窗文档: Document): Promise<HTMLElement | null> {
   const 已有按钮 = new Set(弹窗文档.querySelectorAll<HTMLElement>('#showRawPrompt'));
@@ -4353,11 +4402,16 @@ async function 打开楼层提示词(楼: number) {
   // 宿主窗口来自同源窗口列表(已过 document 同源检查)或 window，同源必有 eval；只在此做一次局部结构断言。
   const 原生模块 = await 读取酒馆原生提示词模块(宿主窗口 as 宿主窗口接口);
   if (原生模块) {
-    const 有这一回合 = 原生模块.itemizedPrompts.some(
-      item => Number((item as { mesId?: unknown } | null)?.mesId) === 楼号,
-    );
-    if (!有这一回合) {
+    const 提示词记录 = 原生模块.itemizedPrompts.find(item => Number(item?.mesId) === 楼号);
+    if (!提示词记录) {
       弹提示('这一回合没有保存可查看的提示词。', 4000);
+      return;
+    }
+    // rawPrompt 是 SillyTavern 在真正发请求前保存的最终数据：包含当时预设、世界书、角色卡、
+    // 聊天历史与全部扩展注入。优先在游戏内统一查看，保留 role/name，不再只看拆分统计。
+    if (提示词记录.rawPrompt !== undefined && 提示词记录.rawPrompt !== null) {
+      const 完整提示词 = 从酒馆原始提示词构造快照(提示词记录.rawPrompt, 提示词记录.presetName);
+      事件提示词文本.value = 完整提示词;
       return;
     }
   } else {
@@ -4605,6 +4659,19 @@ const {
   endMeeting: () => eventEmit('人妻公寓:结束静音会议'),
 });
 
+type 前台决策输入模式 = 'none' | 'blocked' | 'summary';
+
+/**
+ * 只有必须先理解当前正文再作答的硬生命周期进入前台决策态。
+ * 普通 AI 行动建议与录像带操作各有自己的可选/特殊场景语义，不能被批量升级成全局锁。
+ */
+const 前台硬决策中 = computed(
+  () => 偷窥决策中.value || 静音会议待散会选择.value,
+);
+const 前台决策输入模式 = computed<前台决策输入模式>(() =>
+  偷窥决策中.value ? 'blocked' : 静音会议待散会选择.value ? 'summary' : 'none',
+);
+
 // ── 房内操作抽屉可见性(App 只算可见动作数、垃圾入口与统一抑制,展开/自动收起在组件内状态机) ──
 // 普通动作只在 !录像带中 时计入;垃圾入口保持原 v-if 语义(垃圾房且有袋,不受录像带门控)。
 const 垃圾入口可见 = computed(() => 当前房间.value === '垃圾房' && 垃圾袋列表.value.length > 0);
@@ -4688,6 +4755,8 @@ function 客户端聊天切换(): void {
   运行阶段.value = '';
   流式段.value = [];
   失败残稿段.value = [];
+  流式预期正文标签 = null;
+  流式等待思维闭标签 = false;
   输入文本.value = '';
   待重试行动.value = '';
   失败行动.value = '';
@@ -4834,6 +4903,9 @@ onMounted(() => {
     场景剧情准备锁.value = null;
     // 脚本侧发起的回合(查看监控等)也要锁输入+亮书写态；重要反馈由发送中门暂时隐藏，结束后继续展示。
     // “保留最后有效流”只能发生在同一次生成内，绝不把上一回合正文带进新 generation。
+    const 流式边界 = 当前预设流式边界();
+    流式预期正文标签 = 流式边界.期望正文标签;
+    流式等待思维闭标签 = 流式边界.等待思维闭标签;
     流式段.value = [];
     失败残稿段.value = [];
     发送中.value = true;
@@ -4892,9 +4964,17 @@ onMounted(() => {
   });
   eventOn('人妻公寓:流式', (文本: string) => {
     if (!运行阶段.value.startsWith('数据库')) 运行阶段.value = 'AI正在生成正文';
-    // 流式中间帧只转为纯文本并清除游戏机器协议，不执行或猜测玩家预设协议。
+    // 已知预设正文封套时，封套出现前保持空白，避免 assistant prefill 后的裸思维链短暂泄露。
     const 当前净文 = 流式段.value.join('\n');
-    const 净文 = 更新有效流式正文(当前净文, 提取正文舞台文本(文本), 内容 => 内容);
+    const 净文 = 更新有效流式正文(
+      当前净文,
+      提取正文舞台文本(文本, {
+        期望正文标签: 流式预期正文标签,
+        等待思维闭标签: 流式等待思维闭标签,
+        流式: true,
+      }),
+      内容 => 内容,
+    );
     流式段.value = 净文
       ? 净文
           .split(/\n+/)
@@ -4909,6 +4989,8 @@ onMounted(() => {
   eventOn('人妻公寓:时间推进结束', (成功: boolean) => {
     时间撤销刷新版本.value += 1;
     if (成功) return; // 成功路径由“回合完成”统一拉取新时钟和地图。
+    流式预期正文标签 = null;
+    流式等待思维闭标签 = false;
     发送中.value = false;
     运行阶段.value = '';
     同步场景自变量();
@@ -4959,6 +5041,8 @@ onMounted(() => {
       取消后自动重试.value = false;
       流式段.value = [];
       失败残稿段.value = [];
+      流式预期正文标签 = null;
+      流式等待思维闭标签 = false;
       重置录像带界面();
       处理静音会议回合完成前();
       同步场景自变量(); // 回档把 _场景 清空后 UI 必须跟着回楼道(审计 C2)
@@ -4995,6 +5079,8 @@ onMounted(() => {
     }
   });
   eventOn('人妻公寓:隔离事件完成', async (载荷?: { 类型?: string }) => {
+    流式预期正文标签 = null;
+    流式等待思维闭标签 = false;
     发送中.value = false;
     运行阶段.value = '';
     停止生成计时();
@@ -5036,7 +5122,9 @@ onMounted(() => {
     if (待重试) 失败行动.value = 待重试;
     待重试行动.value = '';
     流式段.value = [];
-    偷窥待选.value = null; // 偷窥回合没演成,挂起的选择卡一并作废(脚本侧同步清账)
+    流式预期正文标签 = null;
+    流式等待思维闭标签 = false;
+    偷窥待选.value = null; // 先收起失败拍的本地卡；重拉后以脚本持久挂起为准。
     // 回合失败=这一轮没发生,是提示不是事故——走可消散 toast,不占常驻错误横幅(2026-07-17 用户反馈)
     if (!原因.startsWith('已取消')) {
       const 活动剧情 = data.value.系统._场景剧情事务;
@@ -5061,6 +5149,8 @@ onMounted(() => {
       刷赴约();
       刷新在场();
       刷新行动选项();
+      // 监控生成失败时脚本已清账，结果仍为空；若只是答案提交失败，持久挂起仍在并在这里恢复。
+      刷新偷窥待选();
     } finally {
       发送中.value = false;
     }
@@ -5986,34 +6076,52 @@ onUnmounted(() => {
   z-index: 2;
   top: 1px;
   right: 27px;
-  padding: 2px 6px;
-  border: 1px solid rgba(86, 112, 142, 0.2);
+  min-width: 56px;
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.74);
-  color: var(--ink-faint);
-  font: 600 0.62em/1.35 var(--font-mono);
+  background: var(--surface-sheet);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: max(11px, 0.66em);
+  font-weight: 700;
+  line-height: 1.35;
   opacity: 0;
   cursor: pointer;
   transition:
     opacity 0.2s,
     color 0.2s,
-    border-color 0.2s;
+    border-color 0.2s,
+    background 0.2s;
+}
+
+.entry-prompt::after {
+  position: absolute;
+  inset: -8px -4px;
+  content: '';
 }
 
 .story-entry:hover .entry-edit,
 .story-entry:hover .entry-prompt,
 .entry-prompt:focus-visible {
-  opacity: 0.85;
+  opacity: 1;
+}
+
+.entry-prompt:focus-visible {
+  outline: 2px solid var(--field-focus);
+  outline-offset: 2px;
 }
 
 .entry-prompt:hover {
-  color: var(--blue);
-  border-color: rgba(68, 118, 174, 0.5);
+  color: var(--ink);
+  background: var(--blue-soft);
+  border-color: color-mix(in srgb, var(--blue) 56%, var(--line));
 }
 
 @media (hover: none), (pointer: coarse) {
   .entry-prompt {
-    opacity: 0.72;
+    opacity: 1;
   }
 }
 
@@ -7285,22 +7393,72 @@ onUnmounted(() => {
 
 .peep-card {
   flex: none;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
   border: 1px solid rgba(140, 115, 255, 0.4);
   border-radius: 14px;
   padding: 9px 11px;
   margin-top: 6px;
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 6px 18px rgba(140, 115, 255, 0.18);
-  animation: card-pop-in 0.28s cubic-bezier(0.34, 1.4, 0.64, 1);
+  animation: card-pop-in 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.peep-card .hint {
-  margin: 0 0 2px;
+.peep-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 6px;
+}
+
+.peep-head > span {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.peep-head b {
   color: var(--violet);
   font-weight: 700;
+}
+
+.peep-head small {
+  color: var(--ink-faint);
+  font-size: 0.68em;
+  line-height: 1.4;
+}
+
+.peep-collapse {
+  flex: none;
+  min-height: 44px;
+  padding: 7px 11px;
+  color: var(--violet);
+  background: var(--glass);
+  border: 1px solid rgba(140, 115, 255, 0.34);
+  border-radius: 999px;
+  font: 700 0.7em/1.2 inherit;
+  cursor: pointer;
+}
+
+.peep-collapse:focus-visible {
+  outline: 2px solid var(--violet);
+  outline-offset: 2px;
+}
+
+.peep-options {
+  min-height: 0;
+  display: grid;
+  gap: 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(140, 115, 255, 0.45) transparent;
+}
+
+.peep-card.collapsed .peep-options {
+  display: none;
 }
 
 /* ═══ 坏结局 ═══ */
@@ -8369,6 +8527,31 @@ button.battery:focus-visible {
 
   .page {
     padding: 4px 7px 6px;
+  }
+
+  /* 硬决策只重排当前前台：正文保留可读下限，答案区在剩余高度内自己滚动。
+     普通建议与特殊场景不套这条门，避免把可选操作误升级成全局阻塞。 */
+  .page.foreground-decision .story-wrap {
+    min-height: clamp(180px, 32dvh, 260px);
+  }
+
+  .page.foreground-decision .peep-card {
+    flex: 1 1 240px;
+    min-height: 54px;
+    max-height: min(40dvh, 300px);
+  }
+
+  .page.foreground-decision .peep-card.collapsed {
+    flex: none;
+    max-height: none;
+  }
+
+  .peep-head {
+    padding-bottom: 5px;
+  }
+
+  .peep-card.collapsed .peep-head {
+    padding-bottom: 0;
   }
 
   /* 题头:kicker 行整行让位,标题缩一号 */

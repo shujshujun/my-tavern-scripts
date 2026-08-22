@@ -270,19 +270,19 @@ test('App 其他录像带门控原样；A1–A6 边界未回退；无中文首�
   // 普通房内动作瓷砖迁入 房内操作抽屉.vue：录像带门控等价保留在组件，App 接线动作数组与统一抑制
   assert.match(App源码, /:actions="普通房间动作"/, 'App 把普通房间动作传给抽屉组件');
   assert.match(App源码, /:video-tape-active="录像带中"/, 'App 接线录像带门控');
-  assert.match(App源码, /:suppressed="房内操作抑制"/, 'App 接线统一抑制');
+  assert.match(App源码, /:suppressed="房内操作抑制 \|\| 前台硬决策中"/, 'App 接线统一抑制与硬决策门');
   assert.match(
     抽屉源码,
     /const 普通动作可见 = computed\(\(\) => !props\.videoTapeActive && props\.actions\.length > 0\)/,
     '录像带门控等价保留在组件',
   );
   // A8b:行动选项/推进时间门控迁入 行动选项.vue / 回合输入.vue,App 只留完整组合门接线
-  assert.match(App源码, /:open="显示选项 && !录像带中 && !静音会议交互幕 && !静音会议待散会选择 && !静音会议自由待选择"/, '行动选项门控保持(App 接线完整组合门)');
-  assert.match(行动选项源码, /v-if="open"\s+class="option-row"/, '行动选项组件根自持 v-if="open"');
+  assert.match(App源码, /:open="显示选项 && !录像带中 && !静音会议交互幕 && !静音会议待散会选择 && !静音会议自由待选择 && !前台硬决策中"/, '行动选项门控保持并避让硬决策');
+  assert.match(行动选项源码, /<template v-if="open">/, '行动选项组件根自持 v-if="open"');
   assert.match(App源码, /:video-active="录像带中"/, '推进时间钮门控保持(App video-active)');
   assert.match(App源码, /:formal-meeting="静音会议正式中"/, '推进时间钮门控保持(App formal-meeting)');
-  assert.match(回合输入源码, /v-if="!videoActive && !formalMeeting"/, '推进时间钮组件根自持门控');
-  assert.match(App源码, /v-if="!录像带中" class="dock"/, 'dock 门控保持');
+  assert.match(回合输入源码, /v-if="decisionMode === 'none' && !videoActive && !formalMeeting"/, '推进时间钮组件根自持门控');
+  assert.match(App源码, /v-if="!录像带中 && !前台硬决策中" class="dock"/, 'dock 保持录像带门并避让硬决策');
   assert.match(
     App源码,
     /if \(录像带中\.value\) \{[\s\S]*?录像带阶段\.value !== '等待102'[\s\S]*?录像带阶段\.value !== '等待202'/,

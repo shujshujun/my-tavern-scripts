@@ -341,7 +341,7 @@ test('meeting 模板/CSS 与 A7b1/A7a 组件挂载仍在；四组件(A7b3)导入
   assert.match(互动源码, /\.mute-interaction-panel \{/, '互动组件应持有 .mute-interaction-panel');
   assert.match(会后源码, /\.mute-after-panel \{/, '会后组件应持有 .mute-after-panel');
   // dock 静态 class + 动态 mute-meeting-dock 绑定、dock CSS、筹备组件、录像带组件与 A1–A6 边界仍在
-  assert.match(App模板, /<nav v-if="!录像带中" class="dock"[\s\S]*?:class="\{ 'mute-meeting-dock': 静音会议正式中 \}">/, 'dock nav 保留动态 mute-meeting-dock 绑定');
+  assert.match(App模板, /<nav v-if="!录像带中 && !前台硬决策中" class="dock"[\s\S]*?:class="\{ 'mute-meeting-dock': 静音会议正式中 \}">/, 'dock nav 保留动态绑定并在硬决策时让位');
   assert.match(App源码, /\.dock\.mute-meeting-dock \{/, 'App 仍保留 .dock.mute-meeting-dock');
   assert.match(App模板, /<MuteMeetingPreparation/, 'App 模板仍挂载 A7b1 筹备组件');
   assert.match(App源码, /import MuteMeetingPreparation from '\.\/components\/静音会议筹备\.vue';/, 'App 仍导入 A7b1 组件');

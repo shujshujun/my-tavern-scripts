@@ -27,6 +27,7 @@ defineProps<{
   period: string;
   currentPeriodLabel: string;
   nextPeriodLabel: string;
+  decisionMode: 'none' | 'blocked' | 'summary';
 }>();
 
 const emit = defineEmits<{
@@ -70,7 +71,7 @@ defineExpose({ 聚焦 });
 </script>
 
 <template>
-  <div v-if="open" class="quill">
+  <div v-if="open && decisionMode !== 'blocked'" class="quill">
     <textarea
       ref="输入框"
       :value="text"
@@ -91,7 +92,7 @@ defineExpose({ 聚焦 });
       {{ resourceHint }}
     </small>
   </div>
-  <div v-if="sending && retryAction" class="generation-recovery-row" aria-live="polite">
+  <div v-if="decisionMode === 'none' && sending && retryAction" class="generation-recovery-row" aria-live="polite">
     <span>{{ retrying ? '正在停止这一轮…' : '正文卡住或没有写完整？' }}</span>
     <button
       class="btn retry-generation"
@@ -102,14 +103,15 @@ defineExpose({ 聚焦 });
       {{ retrying ? '正在重试…' : '↻ 停止并重试' }}
     </button>
   </div>
-  <div v-if="failedAction && !sending" class="reroll-row failed-reroll">
+  <div v-if="decisionMode === 'none' && failedAction && !sending" class="reroll-row failed-reroll">
     <span>刚才的生成没有完成。</span>
     <button class="btn" title="使用刚才完全相同的行动重新请求" @click="emit('retryFailed')">↻ 重新生成刚才行动</button>
   </div>
   <div
     v-if="
-      (!formalMeeting && !failedAction && canReroll && !sending && currentRoom === turnRoom) ||
-      variableRegenerationState !== '不可用'
+      decisionMode === 'none' &&
+      ((!formalMeeting && !failedAction && canReroll && !sending && currentRoom === turnRoom) ||
+        variableRegenerationState !== '不可用')
     "
     class="reroll-row"
     aria-live="polite"
@@ -147,7 +149,7 @@ defineExpose({ 聚焦 });
   </div>
 
   <button
-    v-if="!videoActive && !formalMeeting"
+    v-if="decisionMode === 'none' && !videoActive && !formalMeeting"
     class="global-time-advance"
     type="button"
     :disabled="sending || prefaceWriting"

@@ -1,10 +1,12 @@
 import { Schema, 当前MVU数据版本, type SchemaType } from '../../schema';
+import { 构造隔离事件完整提示词快照 } from '../../提示词快照';
 import { 数据库状态, 通过数据库生成 } from './数据库桥';
 import { 全局数据库AI租约 } from './数据库AI租约';
 import { 前台生成租约持有中, 取得前台生成租约, 手机生成租约持有中 } from './生成通道互斥';
 import { 当前正文模型是DeepSeek } from './正文模型识别';
 import { 预设破限段 } from './预设桥';
 import { 应用酒馆最终显示正则 } from './预设输出兼容';
+import { 提取外部预设正文原文 } from './正文输出边界';
 import { 严格清除协议残留 } from './正文协议安全';
 import { 当前聊天ID } from './手机/运行时上下文';
 import { 捕获精确聊天快照, 恢复精确聊天快照, 时间状态指纹, type 精确聊天快照 } from './时间撤销系统';
@@ -99,7 +101,7 @@ function 读库(): 隔离事件库 {
 }
 
 export function 净化隔离事件正文(原文: string): string {
-  const 闭合清 = 严格清除协议残留(String(原文 ?? ''))
+  const 闭合清 = 严格清除协议残留(提取外部预设正文原文(String(原文 ?? '')))
     .replace(/^[\s\S]*?<content\b[^>]*>/i, '')
     .replace(/<\/content\s*>[\s\S]*$/i, '')
     .replace(/【开始思考】[\s\S]*?<\/think_fox~\s*>/gi, '')
@@ -165,6 +167,14 @@ const 隔离事件收尾 = '以上设定与本拍行动均已给出。现在只�
 // 非推理模型写完自然停,不会真用满这个预算。
 const 普通隔离事件生成上限 = 8192;
 
+function 当前预设名称(): string {
+  try {
+    return getLoadedPresetName() || 'in_use';
+  } catch {
+    return 'in_use';
+  }
+}
+
 function 最近线程(线程: string): { role: 'user' | 'assistant'; content: string }[] {
   return 读库()
     .日志.filter(条 => 条.线程 === 线程)
@@ -201,7 +211,7 @@ export async function 生成隔离事件草稿(参数: 隔离事件参数): Prom
     // 独立事件没有真实临时玩家楼,传入本拍行动让预设里的 {{lastUserMessage}} 展开为
     // 本拍行动,而不是真实聊天的上一楼玩家指令。
     const { 前, 后 } = 预设破限段(参数.行动);
-    // 核心段单列:存档日志(史册考古的"提示词"字段)只记核心,预设破限段不进 chat 变量(防存档膨胀)
+    // 核心段仍单列供生成组合；史册提示词快照会在下方按实际请求顺序重新合并预设前后段。
     const 核心段: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
       { role: 'system', content: system },
       ...history,
@@ -209,6 +219,7 @@ export async function 生成隔离事件草稿(参数: 隔离事件参数): Prom
     // generateRaw 可能返回 GenerateToolCallResult(本卡不传 tools,该分支不触发),统一按 unknown 收
     let 原文: unknown;
     let 本拍用户输入 = 参数.行动;
+    let 用户输入置后 = false;
     // 通道决策收在纯函数 选择隔离事件生成通道：日常时间反馈(晨跑/健身/睡眠)恒走可取消的
     // 正文 generateRaw——数据库 callAI 的 90 秒超时无法取消底层请求，超时后会留下占用生成槽
     // 的迟到请求，下一次点击就会被误判为“正文有内容在输出”；荣耀洞/监控只按数据库可调用性
@@ -224,6 +235,7 @@ export async function 生成隔离事件草稿(参数: 隔离事件参数): Prom
       if (!String(原文 ?? '').trim()) throw new Error('数据库 AI 返回空内容；为避免重复计费，本拍没有再次请求正文 API');
     } else {
       const 是DeepSeek = 当前正文模型是DeepSeek();
+      用户输入置后 = 是DeepSeek;
       本拍用户输入 = 是DeepSeek ? `${参数.行动}\n\n${隔离事件收尾}` : 参数.行动;
       const ordered_prompts: ({ role: 'system' | 'user' | 'assistant'; content: string } | 'user_input')[] = [
         ...前,
@@ -236,9 +248,15 @@ export async function 生成隔离事件草稿(参数: 隔离事件参数): Prom
     const 正文 = 净化隔离事件正文(应用酒馆最终显示正则(String(原文 ?? '')));
     if (!正文) throw new Error('事件 AI 没有返回可显示的正文');
 
-    const 提示词 = [...核心段, { role: 'user' as const, content: 本拍用户输入 }]
-      .map(项 => 项.role.toUpperCase() + '\n' + 项.content)
-      .join('\n\n');
+    const 提示词 = 构造隔离事件完整提示词快照({
+      通道,
+      预设名: 当前预设名称(),
+      前,
+      核心: 核心段,
+      用户输入: 本拍用户输入,
+      后,
+      用户输入置后,
+    });
     return { 参数: { ...参数 }, 正文, 提示词 };
   } finally {
     生成中 = false;

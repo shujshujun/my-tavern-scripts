@@ -31,6 +31,7 @@ let 当前聊天变量 = {};
 
 const { Schema, 当前MVU数据版本 } = require('../../src/人妻公寓/schema.ts');
 const {
+  净化隔离事件正文,
   选择隔离事件生成通道,
   生成隔离事件草稿,
   顺序提交隔离事件,
@@ -55,6 +56,30 @@ const { 全局数据库AI租约 } = require('../../src/人妻公寓/脚本/游�
 const { 捕获精确聊天快照, 恢复精确聊天快照 } = require('../../src/人妻公寓/脚本/游戏逻辑/时间撤销系统.ts');
 const { 预设破限段 } = require('../../src/人妻公寓/脚本/游戏逻辑/预设桥.ts');
 Module._load = 原加载;
+
+test('Prism 未闭合思维链后的 content 仍是有效隔离正文，思维链和检查注释不外泄', () => {
+  const 原文 = [
+    '<analysis>内部规划没有闭合',
+    '<content>',
+    '<!-- Prism:物理环境与睡前感知。 -->',
+    '屋子里暗下来，我闭上眼睛。',
+    '<!-- Prism:完成时间跨度，苏醒。 -->',
+    '第二天早上我醒了。',
+    '</content>',
+  ].join('\n');
+  assert.equal(净化隔离事件正文(原文), '屋子里暗下来，我闭上眼睛。\n\n第二天早上我醒了。');
+});
+
+test('无预填充模型返回控制段、think_nya 与 game 时，睡眠隔离正文只采用 game 内剧情', () => {
+  const 原文 = [
+    '<|im_start|>gemini',
+    '<think_nya~>未闭合私有推理',
+    '<|im_end|>',
+    '<game>第二天早上我醒了。</game>',
+    '<summary>后台总结</summary>',
+  ].join('\n');
+  assert.equal(净化隔离事件正文(原文), '第二天早上我醒了。');
+});
 
 const Index源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
 const 隔离事件源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/隔离事件引擎.ts', import.meta.url), 'utf8');

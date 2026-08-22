@@ -24,7 +24,7 @@ const 转义 = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const 驼峰转中划线 = s => s.replace(/([A-Z])/g, '-$1').toLowerCase();
 
-/** 回合输入组件 props 契约（20 项：原 17 项 + 生成恢复行动/切换态 + 变量重生成状态） */
+/** 回合输入组件 props 契约（21 项：原 20 项 + 前台决策输入模式） */
 const 期望props = [
   'open',
   'text',
@@ -46,6 +46,7 @@ const 期望props = [
   'period',
   'currentPeriodLabel',
   'nextPeriodLabel',
+  'decisionMode',
 ];
 
 /** 回合输入组件 emits 契约（10 项：原 8 项 + 生成中停止并重试 + 变量重生成） */
@@ -90,21 +91,24 @@ test('App 不再内联 option-row/quill/reroll/global-time 模板；两组件拥
   for (const 标志 of ['class="option-row"', 'class="quill"', 'class="reroll-row"', 'class="global-time-advance"']) {
     assert.doesNotMatch(App模板, new RegExp(转义(标志)), `App 不应再内联 ${标志}`);
   }
-  // 行动选项：根/循环/纸条 class/点击只 emit
+  // 行动选项：根门、移动抽屉/桌面两列、循环/纸条 class/点击转发
   const 行动选项模板 = 提取模板(行动选项源码);
-  assert.match(行动选项模板, /v-if="open"\s+class="option-row"/, '行动选项根条件与 class');
+  assert.match(行动选项模板, /<template v-if="open">/, '行动选项根门');
+  assert.match(行动选项模板, /v-if="mobile" class="option-drawer"/, '手机使用覆盖式抽屉');
+  assert.match(行动选项模板, /v-else\s+class="option-row desktop-option-row"/, '桌面保持两列');
   assert.match(
     行动选项模板,
     /v-for="\(项, i\) in options" :key="i" class="option-chip gal"/,
     '行动选项循环与 gal 纸条 class',
   );
-  assert.match(行动选项模板, /@click="emit\('select', 项\)"/, '行动选项点击只 emit 原字符串');
+  assert.match(行动选项模板, /@click="选择\(项\)"/, '行动选项点击统一经选择函数收起并转发');
+  assert.match(行动选项源码, /function 选择\(文本: string\): void \{[\s\S]*?emit\('select', 文本\)/, '选择函数只收起展示态并 emit 原字符串');
   assert.match(行动选项模板, /\{\{ 项 \}\}/, '行动选项文案插值');
   assert.match(行动选项源码, /from '\.\.\/assets'/, '行动选项应导入 ../assets');
   assert.match(行动选项源码, /素材基址\}\/界面\/选项条\.webp/, '行动选项纸条底仍拼 素材基址');
   // 回合输入：三块输入区 + 文案/title/class/图标全部在组件
   const 回合输入模板 = 提取模板(回合输入源码);
-  assert.match(回合输入模板, /v-if="open" class="quill"/, '输入根条件与 class');
+  assert.match(回合输入模板, /v-if="open && decisionMode !== 'blocked'" class="quill"/, '输入根按前台决策类型门控');
   assert.match(回合输入模板, /rows="2"/, 'textarea rows=2');
   assert.match(回合输入模板, /placeholder="你的言行……\(Enter 发送,Shift\+Enter 换行\)"/, 'placeholder 原样');
   assert.match(回合输入模板, /:disabled="sending \|\| prefaceWriting"/, 'textarea disabled 看 sending/prefaceWriting');
@@ -126,7 +130,7 @@ test('App 不再内联 option-row/quill/reroll/global-time 模板；两组件拥
   assert.match(回合输入模板, /@click="emit\('regenerateVariables'\)"/, '变量重生成只 emit regenerateVariables');
   assert.match(回合输入模板, /<Ic n="refresh" \/>/, '变量重生成使用 refresh 图标');
   assert.match(回合输入模板, />重新生成变量<\/span>/, '变量重生成默认文案');
-  assert.match(回合输入模板, /v-if="sending && retryAction" class="generation-recovery-row"/, '生成中固定恢复行');
+  assert.match(回合输入模板, /v-if="decisionMode === 'none' && sending && retryAction" class="generation-recovery-row"/, '生成中固定恢复行只在普通输入态显示');
   assert.match(回合输入模板, /@click="emit\('abandonAndRetry'\)"/, '生成中停止重试只 emit abandonAndRetry');
   assert.match(回合输入模板, /class="reroll-row failed-reroll"/, '失败重试行 class');
   assert.match(回合输入模板, /刚才的生成没有完成。/, '失败文案');
@@ -166,12 +170,13 @@ test('props/emits 强类型完整，App 逐项接线存在，所有 handler 参�
   const 输入emits = 回合输入源码.match(/defineEmits<\{[\s\S]*?\}>\(\)/)?.[0] ?? '';
   assert.ok(选项props && 选项emits, '行动选项应声明 props/emits');
   assert.ok(输入props && 输入emits, '回合输入应声明 props/emits');
-  assert.equal((选项props.match(/^ {2}[A-Za-z]+(?=:)/gm) || []).length, 2, '行动选项 props 应为 2 项');
+  assert.equal((选项props.match(/^ {2}[A-Za-z]+(?=:)/gm) || []).length, 3, '行动选项 props 应为 3 项');
   assert.match(选项props, /open: boolean;/, 'open 强类型 boolean');
+  assert.match(选项props, /mobile: boolean;/, 'mobile 强类型 boolean');
   assert.match(选项props, /options: readonly string\[\];/, 'options 强类型 readonly string[]');
   assert.equal((选项emits.match(/^ {2}[A-Za-z]+(?=:)/gm) || []).length, 1, '行动选项 emits 应为 1 项');
   assert.match(选项emits, /select: \[option: string\]/, 'select 参数为 string');
-  assert.equal((输入props.match(/^ {2}[A-Za-z]+(?=:)/gm) || []).length, 20, '回合输入 props 应为 20 项');
+  assert.equal((输入props.match(/^ {2}[A-Za-z]+(?=:)/gm) || []).length, 21, '回合输入 props 应为 21 项');
   assert.equal((输入emits.match(/^ {2}[A-Za-z]+(?=:)/gm) || []).length, 10, '回合输入 emits 应为 10 项');
   for (const 名 of 期望props) {
     assert.match(输入props, new RegExp(`\\b${名}:`), `props 契约应有 ${名}`);
@@ -185,19 +190,21 @@ test('props/emits 强类型完整，App 逐项接线存在，所有 handler 参�
     'failedAction: string;',
     'sendLabel: string;',
     "variableRegenerationState: '不可用' | '未配置' | '可用' | '进行中' | '已完成';",
+    "decisionMode: 'none' | 'blocked' | 'summary';",
     'updateText: [text: string];',
   ]) {
     assert.match(输入props + 输入emits, new RegExp(转义(类型)), `应强类型 ${类型}`);
   }
-  // App 接线：行动选项 open/options/select
+  // App 接线：行动选项 open/mobile/options/select
   assert.match(
     App源码,
-    /:open="显示选项 && !录像带中 && !静音会议交互幕 && !静音会议待散会选择 && !静音会议自由待选择"/,
+    /:open="显示选项 && !录像带中 && !静音会议交互幕 && !静音会议待散会选择 && !静音会议自由待选择 && !前台硬决策中"/,
     'App 接线 ActionOptions :open',
   );
+  assert.match(App源码, /:mobile="移动端"/, 'App 接线 ActionOptions :mobile');
   assert.match(App源码, /:options="行动选项"/, 'App 接线 ActionOptions :options');
   assert.match(App源码, /@select="点选项"/, 'App 接线 ActionOptions @select');
-  // App 接线：回合输入 20 props
+  // App 接线：回合输入 21 props
   for (const 名 of 期望props) {
     assert.match(App源码, new RegExp(`:${驼峰转中划线(名)}="`), `App 应接线 :${驼峰转中划线(名)}=`);
   }
@@ -226,24 +233,24 @@ test('ActionOptions 完整组合门控，组件只映射 open；RoundInput 输�
   const App模板 = 提取模板(App源码);
   assert.match(
     App模板,
-    /<ActionOptions\b[\s\S]*?:open="显示选项 && !录像带中 && !静音会议交互幕 && !静音会议待散会选择 && !静音会议自由待选择"/,
+    /<ActionOptions\b[\s\S]*?:open="显示选项 && !录像带中 && !静音会议交互幕 && !静音会议待散会选择 && !静音会议自由待选择 && !前台硬决策中"/,
     'App 端行动选项完整组合门',
   );
   const 选项模板 = 提取模板(行动选项源码);
-  assert.match(选项模板, /v-if="open"\s+class="option-row"/, '组件只按 open 显示');
+  assert.match(选项模板, /<template v-if="open">/, '组件只按 open 显示');
   assert.doesNotMatch(
     选项模板,
     /显示选项|录像带中|静音会议|点选项|ref\(|computed\(|watch\(/,
     '组件不持有任何门控业务状态',
   );
   const 输入模板 = 提取模板(回合输入源码);
-  assert.match(输入模板, /v-if="open" class="quill"/, '输入根 v-if="open"');
+  assert.match(输入模板, /v-if="open && decisionMode !== 'blocked'" class="quill"/, '输入根按 decisionMode 门控');
   assert.match(
     输入模板,
-    /\(!formalMeeting && !failedAction && canReroll && !sending && currentRoom === turnRoom\) \|\|\s+variableRegenerationState !== '不可用'/,
+    /decisionMode === 'none' &&\s+\(\(!formalMeeting && !failedAction && canReroll && !sending && currentRoom === turnRoom\) \|\|\s+variableRegenerationState !== '不可用'\)/,
     '快捷入口行在正常重掷可用或变量可重生成时显示',
   );
-  assert.match(输入模板, /v-if="failedAction && !sending" class="reroll-row failed-reroll"/, '失败门优先起链');
+  assert.match(输入模板, /v-if="decisionMode === 'none' && failedAction && !sending" class="reroll-row failed-reroll"/, '失败门优先起链');
   assert.match(
     输入模板,
     /v-if="!formalMeeting && !failedAction && canReroll && !sending && currentRoom === turnRoom"/,
@@ -251,8 +258,8 @@ test('ActionOptions 完整组合门控，组件只映射 open；RoundInput 输�
   );
   assert.match(输入模板, /v-if="variableRegenerationState !== '不可用'"/, '变量重生成入口独立常驻，不受正文重掷门影响');
   assert.match(输入模板, /:disabled="sending \|\| variableRegenerationState !== '可用'"/, '变量按钮仅可用态允许点击');
-  assert.match(输入模板, /v-if="!videoActive && !formalMeeting"[\s\S]*?class="global-time-advance"/, '推进时间门完整');
-  const 失败位置 = 输入模板.indexOf('v-if="failedAction');
+  assert.match(输入模板, /v-if="decisionMode === 'none' && !videoActive && !formalMeeting"[\s\S]*?class="global-time-advance"/, '推进时间门完整');
+  const 失败位置 = 输入模板.indexOf('failedAction && !sending');
   const 重掷位置 = 输入模板.indexOf("variableRegenerationState !== '不可用'");
   const 时间位置 = 输入模板.indexOf('class="global-time-advance"');
   assert.ok(失败位置 >= 0 && 重掷位置 > 失败位置, '失败行动提示位于快捷入口之前');
@@ -434,7 +441,7 @@ test('两个新组件在原相对顺序；A1–A8a 边界不回退；无中文�
   const 录像带位置 = 模板段.indexOf('<VideoTapeControls');
   const 输入位置 = 模板段.indexOf('<RoundInput');
   const 会后位置 = 模板段.indexOf('<MuteMeetingAfter');
-  const dock位置 = 模板段.indexOf('<nav v-if="!录像带中" class="dock"');
+  const dock位置 = 模板段.indexOf('<nav v-if="!录像带中 && !前台硬决策中" class="dock"');
   assert.ok(
     选项位置 !== -1 && 录像带位置 !== -1 && 输入位置 !== -1 && 会后位置 !== -1 && dock位置 !== -1,
     '五锚点都应存在',

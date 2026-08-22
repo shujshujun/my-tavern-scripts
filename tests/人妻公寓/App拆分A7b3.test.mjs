@@ -369,15 +369,15 @@ test('useMuteMeeting 未改职责；App 仍只使用其既有 API，story-wrap/d
   assert.match(App源码, /'story-special-interaction': 录像带交互幕 \|\| 静音会议交互幕/, 'story-wrap 场景态保持');
   assert.match(App源码, /'story-mute-meeting': 静音会议显示组合图/, 'story-mute-meeting 类保持');
   assert.match(App源码, /v-if="!录像带中 && !静音会议交互幕"/, '隐藏正文钮门控保持');
-  assert.match(App模板, /<nav v-if="!录像带中" class="dock"[\s\S]*?:class="\{ 'mute-meeting-dock': 静音会议正式中 \}">/, 'dock nav 保持');
+  assert.match(App模板, /<nav v-if="!录像带中 && !前台硬决策中" class="dock"[\s\S]*?:class="\{ 'mute-meeting-dock': 静音会议正式中 \}">/, 'dock nav 在硬决策时让位');
   // A8b:行动选项/游戏输入门控迁入 行动选项.vue / 回合输入.vue,App 只留 props 接线,组件根自持门控
-  assert.match(App源码, /:open="显示选项 && !录像带中 && !静音会议交互幕 && !静音会议待散会选择 && !静音会议自由待选择"/, '行动选项门控保持(App 接线完整组合门)');
-  assert.match(行动选项源码, /v-if="open"\s+class="option-row"/, '行动选项组件根自持 v-if="open"');
-  assert.match(App源码, /:open="可输入"/, '游戏输入门控保持(App 接线)');
-  assert.match(回合输入源码, /v-if="open" class="quill"/, '游戏输入组件根自持 v-if="open"');
+  assert.match(App源码, /:open="显示选项 && !录像带中 && !静音会议交互幕 && !静音会议待散会选择 && !静音会议自由待选择 && !前台硬决策中"/, '行动选项门控保持并避让硬决策');
+  assert.match(行动选项源码, /<template v-if="open">/, '行动选项组件根自持 v-if="open"');
+  assert.match(App源码, /:open="可输入 && !偷窥决策中"/, '监控硬决策关闭普通输入');
+  assert.match(回合输入源码, /v-if="open && decisionMode !== 'blocked'" class="quill"/, '游戏输入组件按决策类型自持门控');
   assert.match(App源码, /:actions="普通房间动作"/, '普通房内动作经抽屉组件消费');
   assert.match(App源码, /:video-tape-active="录像带中"/, '录像带门控接线保持');
-  assert.match(App源码, /:suppressed="房内操作抑制"/, '统一抑制接线保持');
+  assert.match(App源码, /:suppressed="房内操作抑制 \|\| 前台硬决策中"/, '统一抑制与硬决策接线保持');
   // A1–A7b2 关键组件仍在
   assert.match(App源码, /import Ic from '\.\/components\/Icon\.vue';/, 'App 仍导入 A1 Icon');
   assert.match(App源码, /import InventoryPopup from '\.\/components\/背包\.vue';/, 'App 仍导入 A5a 背包');

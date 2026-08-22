@@ -110,7 +110,8 @@ import { 推进特殊场景, 静音会议正式运行中 } from './特殊场景�
 import { 构造CG亲密上下文 } from './CG亲密上下文';
 import { 行动资源门槛, 现场楼身体增长依赖, 结算成功现场楼 } from './玩家资源系统';
 import { 应用酒馆最终显示正则 } from './预设输出兼容';
-import { 提取正文舞台文本, 提取可提交正文 } from './正文输出边界';
+import { 当前预设流式边界 } from './预设桥';
+import { 提取正文舞台文本, 提取可提交正文, type 外部正文标签 } from './正文输出边界';
 import { 提取末尾裸JSON补丁 } from './正文协议安全';
 import { 规范变量协议候选, 标准变量块需要本地应用 } from './变量块协议';
 import {
@@ -566,6 +567,8 @@ function 读上次回合(): 上次回合记录 | undefined {
 let 本回合生成id = '';
 let 正文流式生成id = '';
 let 正文流式原文 = '';
+let 正文流式预期标签: 外部正文标签 | null = null;
+let 正文流式等待思维闭标签 = false;
 let 解除生成等待: (() => void) | null = null;
 let 正文生成进展回调: (() => void) | null = null;
 eventClearEvent(iframe_events.STREAM_TOKEN_RECEIVED_FULLY);
@@ -577,7 +580,13 @@ eventMakeFirst(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, (文本: string, gener
   if (generation_id && generation_id !== 本回合生成id) return;
   if (是当前正文流事件(正文流式生成id, 本回合生成id, generation_id)) {
     正文生成进展回调?.();
-    正文流式原文 = 更新有效流式正文(正文流式原文, 文本, 提取可提交正文);
+    正文流式原文 = 更新有效流式正文(正文流式原文, 文本, 候选 =>
+      提取可提交正文(候选, {
+        期望正文标签: 正文流式预期标签,
+        等待思维闭标签: 正文流式等待思维闭标签,
+        流式: true,
+      }),
+    );
   }
   eventEmit('人妻公寓:流式', 文本);
 });
@@ -2085,6 +2094,9 @@ export async function 执行回合(
     // (幂等,零命中零写入);删除失败向上抛,由 catch 发回合失败、finally 释放互斥,
     // 绝不带着遗留楼开始下一轮。
     await 恢复遗留临时回合楼();
+    const 流式边界 = 当前预设流式边界();
+    正文流式预期标签 = 流式边界.期望正文标签;
+    正文流式等待思维闭标签 = 流式边界.等待思维闭标签;
     eventEmit('人妻公寓:生成开始');
 
     // 重掷快照:回合前末楼号 + 回合内会动的 chat 变量整值
@@ -3077,6 +3089,8 @@ export async function 执行回合(
     本回合生成id = ''; // 防回档等无生成的回合被"取消"误伤
     正文流式生成id = '';
     正文流式原文 = '';
+    正文流式预期标签 = null;
+    正文流式等待思维闭标签 = false;
     if (本轮静音会议) 设置静音会议手机生成中(false);
     标记回合事务结束();
     // 前台生成租约在所有临时楼/变量回滚/事务标记之后幂等释放，手机才允许重新取得；

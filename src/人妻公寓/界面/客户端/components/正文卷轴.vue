@@ -297,34 +297,52 @@ defineExpose({ 滚到底 });
   z-index: 2;
   top: 1px;
   right: 27px;
-  padding: 2px 6px;
-  border: 1px solid rgba(86, 112, 142, 0.2);
+  min-width: 56px;
+  min-height: 28px;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.74);
-  color: var(--ink-faint);
-  font: 600 0.62em/1.35 var(--font-mono);
+  background: var(--surface-sheet);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: max(11px, 0.66em);
+  font-weight: 700;
+  line-height: 1.35;
   opacity: 0;
   cursor: pointer;
   transition:
     opacity 0.2s,
     color 0.2s,
-    border-color 0.2s;
+    border-color 0.2s,
+    background 0.2s;
+}
+
+.entry-prompt::after {
+  position: absolute;
+  inset: -8px -4px;
+  content: '';
 }
 
 .story-entry:hover .entry-edit,
 .story-entry:hover .entry-prompt,
 .entry-prompt:focus-visible {
-  opacity: 0.85;
+  opacity: 1;
+}
+
+.entry-prompt:focus-visible {
+  outline: 2px solid var(--field-focus);
+  outline-offset: 2px;
 }
 
 .entry-prompt:hover {
-  color: var(--blue);
-  border-color: rgba(68, 118, 174, 0.5);
+  color: var(--ink);
+  background: var(--blue-soft);
+  border-color: color-mix(in srgb, var(--blue) 56%, var(--line));
 }
 
 @media (hover: none), (pointer: coarse) {
   .entry-prompt {
-    opacity: 0.72;
+    opacity: 1;
   }
 }
 

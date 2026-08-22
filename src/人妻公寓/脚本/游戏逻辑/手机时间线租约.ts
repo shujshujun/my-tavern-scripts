@@ -34,14 +34,20 @@ function 规范手机锚swipeId(值: unknown): unknown {
   return 值 === undefined || 值 === null ? 0 : 值;
 }
 
-function 规范手机锚签名文本(签名: string): string {
+/** 签名字段位序：0 is_user、1 mes、2 send_date、3 swipe_id、4 name、5 force_avatar。 */
+const 手机锚签名字段数 = 6;
+const 手机锚签名正文位 = 1;
+
+/** 解析并归一持久/当前签名；形状未知时返回 null，由调用方退回严格比较。 */
+function 解析手机锚签名(签名: string): unknown[] | null {
   try {
     const 字段 = JSON.parse(签名) as unknown;
-    if (!Array.isArray(字段) || 字段.length !== 6) return 签名;
-    字段[3] = 规范手机锚swipeId(字段[3]);
-    return JSON.stringify(字段);
+    if (!Array.isArray(字段) || 字段.length !== 手机锚签名字段数) return null;
+    const 归一 = [...(字段 as unknown[])];
+    归一[3] = 规范手机锚swipeId(归一[3]);
+    return 归一;
   } catch {
-    return 签名;
+    return null;
   }
 }
 
@@ -65,10 +71,28 @@ export function 手机锚消息签名(message: unknown): string {
  * 比较持久签名与当前酒馆楼。兼容 rq0.65～rq0.85 已写入的旧签名：旧版在 swipe_id
  * 尚未初始化时会把 undefined 序列化为 null；网页刷新后宿主补成 0，不能因此把同一分支
  * 的全部微信误判为旧分支。 malformed/未知形状仍严格比较，避免放宽真实分支隔离。
+ *
+ * 正文 `mes` 是分支身份里唯一会被宿主在同一分支内合法改写的字段：`substituteParams`
+ * 会在每次载入聊天时重新展开开局楼宏，思维链解析会把 reasoning 段从 `mes` 剥离回写，
+ * 楼层编辑也会原地改写；`syncMesToSwipe` 只是把改写结果同步进当前 swipe。这些都不是
+ * 分支切换，旧实现却因整段正文进入签名而把该楼产生的全部微信判成旧分支——刷新后
+ * 聊天记录整段隐身，带稳定键的楼务通知
+ * 还会因活键集合丢失而重新派发（玩家实测“刷新后夏乔又来一次修水管新手指引”）。
+ *
+ * 因此正文位改为“同分支容差”：其余五个身份字段全部一致时，`mes` 差异按宿主改写解释，
+ * 仍视为同一分支。真实 swipe 会改变 swipe_id 并触发明确的同楼物理裁枝；删楼/回档由
+ * 楼轴裁枝，迟到异步写还会核对锚消息对象引用，因此分支隔离强度不下降。
  */
 export function 手机锚消息签名匹配(持久签名: string, message: unknown): boolean {
   const 当前签名 = 手机锚消息签名(message);
-  return 持久签名 === 当前签名 || 规范手机锚签名文本(持久签名) === 当前签名;
+  if (持久签名 === 当前签名) return true;
+  const 持久字段 = 解析手机锚签名(持久签名);
+  const 当前字段 = 解析手机锚签名(当前签名);
+  // 任一侧形状未知（旧版极端存档或非对象锚）时保持严格比较，不放宽隔离。
+  if (!持久字段 || !当前字段) return false;
+  return 持久字段.every(
+    (值, 位) => 位 === 手机锚签名正文位 || 值 === 当前字段[位],
+  );
 }
 
 export function 创建手机时间线租约(

@@ -18,9 +18,12 @@ function 截段(源码, 开始标记, 结束标记) {
 const 提示词入口段 = 截段(客户端源, 'async function 读取酒馆原生提示词模块', '\nfunction 打开首次说明()');
 
 test('酒馆原生提示词模块类型由 types.ts 导出，App 从 ./types 导入', () => {
+  assert.match(类型源, /export type 酒馆原生提示词记录 = \{/);
+  assert.match(类型源, /rawPrompt\?: unknown;/);
+  assert.match(类型源, /presetName\?: unknown;/);
   assert.match(类型源, /export type 酒馆原生提示词模块 = \{/);
   assert.match(类型源, /promptItemize: \(提示词: unknown\[\], 楼号: number\) => Promise<unknown> \| unknown;/);
-  assert.match(类型源, /itemizedPrompts: unknown\[\];/);
+  assert.match(类型源, /itemizedPrompts: 酒馆原生提示词记录\[\];/);
   assert.match(客户端源, /import type \{[\s\S]{0,400}酒馆原生提示词模块,\s*\} from '\.\/types';/);
 });
 
@@ -35,13 +38,20 @@ test('楼层提示词优先在同源宿主窗口导入原生模块，不依赖�
   assert.doesNotMatch(提示词入口段, /酒馆当前没有渲染这一回合的原生消息/);
 });
 
-test('调用 promptItemize 后自动点击酒馆原生“显示原始提示词”，直接展开截图中的原始提示词面板', () => {
+test('有 rawPrompt 时优先在游戏内展示完整最终请求，保留角色与预设信息', () => {
+  assert.match(提示词入口段, /从酒馆原始提示词构造快照\(提示词记录\.rawPrompt, 提示词记录\.presetName\)/);
+  assert.match(提示词入口段, /事件提示词文本\.value = 完整提示词/);
+  const 完整快照位置 = 提示词入口段.indexOf('从酒馆原始提示词构造快照');
+  const 原生调用位置 = 提示词入口段.indexOf('原生模块.promptItemize(原生模块.itemizedPrompts, 楼号)');
+  assert.ok(完整快照位置 >= 0 && 完整快照位置 < 原生调用位置, '完整 rawPrompt 必须优先于原生兼容回退');
+});
+
+test('rawPrompt 缺失时仍可调用 promptItemize 并自动点击酒馆原生“显示原始提示词”', () => {
   assert.match(提示词入口段, /#showRawPrompt/, '必须查找酒馆原生显示原始提示词按钮');
-  assert.match(提示词入口段, /原始提示词按钮\.click\(\)/, '必须调用酒馆原生按钮，而不是自制提示词弹窗');
+  assert.match(提示词入口段, /原始提示词按钮\.click\(\)/, '兼容回退仍调用酒馆原生按钮');
   const 等待位置 = 提示词入口段.indexOf('等待酒馆显示原始提示词按钮');
   const 原生调用位置 = 提示词入口段.indexOf('原生模块.promptItemize(原生模块.itemizedPrompts, 楼号)');
   assert.ok(等待位置 >= 0 && 等待位置 < 原生调用位置, '必须先监听原生弹窗，再调用 promptItemize，避免错过同步挂载');
-  assert.doesNotMatch(提示词入口段, /rawPrompt\s*[:=]|itemizedPrompts\[[^\]]+\]\.rawPrompt/, '游戏不得自行读取并重做 rawPrompt 展示');
 });
 
 test('原生模块不可用时仍保留 mes_prompt pointerup 兼容路径和全屏往返', () => {

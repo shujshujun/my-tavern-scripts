@@ -240,7 +240,7 @@ test('B5 普通业务写与正文启动双向互斥，生成中商店和背包�
     '变量重生成也必须在取得前台槽前拒绝已有普通业务事务',
   );
 
-  const dock起 = 客户端源码.indexOf('<nav v-if="!录像带中" class="dock"');
+  const dock起 = 客户端源码.indexOf('<nav v-if="!录像带中 && !前台硬决策中" class="dock"');
   const dock止 = 客户端源码.indexOf('</nav>', dock起);
   const dock源码 = 客户端源码.slice(dock起, dock止);
   const 商店按钮 = dock源码.slice(dock源码.indexOf('<span>商店</span>') - 700, dock源码.indexOf('<span>商店</span>') + 100);

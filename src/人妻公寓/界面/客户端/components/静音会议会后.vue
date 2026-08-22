@@ -242,6 +242,15 @@ const emit = defineEmits<{
 }
 
 @media (max-width: 540px) {
+  .mute-dismiss-panel {
+    flex: 1 1 260px;
+    min-height: 112px;
+    max-height: min(40dvh, 320px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
   .mute-after-heading {
     align-items: flex-start;
     flex-direction: column;
@@ -249,7 +258,13 @@ const emit = defineEmits<{
   }
 
   .mute-after-wives {
+    min-height: 0;
     grid-template-columns: 1fr;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-right: 2px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(74, 152, 122, 0.42) transparent;
   }
 
   .mute-free-actions .btn {
