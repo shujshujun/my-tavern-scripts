@@ -14,14 +14,12 @@ const 回合源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏�
 const 协调源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/时间线切换协调.ts', import.meta.url), 'utf8');
 const 预设兼容源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/预设输出兼容.ts', import.meta.url), 'utf8');
 
-test('修1:预设期望标签缺失时回退通用清洗，不得整篇清空正文', () => {
-  assert.match(预设兼容源码, /已回退通用清洗以保住正文/);
-  assert.match(预设兼容源码, /已回退采用 <\$\{正文标签\}> 包裹的正文/, '模型混用其他预设正文标签时应就地采纳');
-  assert.match(
-    预设兼容源码,
-    /正文已开始: 正文标签 !== null/,
-    '回退时流式安全门必须保持关闭，开标签到达前不向界面放行',
-  );
+test('修1:预设兼容不再识别专用正文标签，最终显示正则清空时保留原稿', () => {
+  assert.doesNotMatch(预设兼容源码, /正文标签们|识别预设正文标签|dream_body|story_scene/);
+  assert.match(预设兼容源码, /酒馆最终显示正则把非空回复清成空串/);
+  assert.match(预设兼容源码, /return 文本;/);
+  assert.match(预设兼容源码, /检测AI输出美化正则/);
+  assert.match(预设兼容源码, /转为正文舞台纯文本/);
 });
 
 test('修2:完整空JSONPatch是合法完成信号，不让无变化回合白等120秒', () => {

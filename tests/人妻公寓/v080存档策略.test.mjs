@@ -28,6 +28,7 @@ const initvar = YAML.parse(readFileSync(new URL('../../src/人妻公寓/世界�
 const schema源码 = readFileSync(new URL('../../src/人妻公寓/schema.ts', import.meta.url), 'utf8');
 const index源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
 const 回合源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/回合引擎.ts', import.meta.url), 'utf8');
+const 机器协议源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/游戏机器协议.ts', import.meta.url), 'utf8');
 const 资源源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/玩家资源系统.ts', import.meta.url), 'utf8');
 const 线路源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/阶段线路系统.ts', import.meta.url), 'utf8');
 const 守护源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/守护系统.ts', import.meta.url), 'utf8');
@@ -402,7 +403,7 @@ test('旧单值行为等级解析已由多角色尺度结果完整承接', () =>
   assert.match(稽查源码, /export function 解析尺度判定/);
   assert.match(回合源码, /稽查\.角色\[CG门牌\]\?\.实际 \?\? 稽查\.最高实际等级/);
   assert.match(回合源码, /Object\.entries\(稽查\.角色\)/);
-  assert.match(回合源码, /replace\(\/<行为等级\(\?:\\s\[\^>\]\*\)\?>/);
+  assert.match(机器协议源码, /replace\(\/<行为等级\(\?:\\s\[\^>\]\*\)\?>/);
 });
 
 test('v0.80 现行资源与特殊场景字段不得按旧兼容空壳删除', () => {

@@ -24,7 +24,7 @@ const 转义 = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const 驼峰转中划线 = s => s.replace(/([A-Z])/g, '-$1').toLowerCase();
 
-/** 组件 props 契约（19 项，与当前保存中状态一致） */
+/** 组件 props 契约（20 项，含失败残稿展示） */
 const 期望props = [
   'veiled',
   'inScene',
@@ -39,6 +39,7 @@ const 期望props = [
   'editingText',
   'editingSaving',
   'streamSegments',
+  'failedDraftSegments',
   'runtimeStage',
   'waitSeconds',
   'retryAction',
@@ -126,12 +127,12 @@ test('App 不再内联正文卷轴/到场卡/生成中文字；组件持有全�
   assert.match(组件模板, /:class="\{ 'story-veiled': veiled \}"/, '组件根把 veiled 映射到 story-veiled');
 });
 
-test('19 个 props 与 9 个 emits 强类型完整，App 接线逐项存在；编辑/提示词/头像错误/取消重试原参数回 App', () => {
+test('20 个 props 与 9 个 emits 强类型完整，App 接线逐项存在；编辑/提示词/头像错误/取消重试原参数回 App', () => {
   const props声明 = 组件源码.match(/defineProps<\{[\s\S]*?\}>\(\)/)?.[0] ?? '';
   const emits声明 = 组件源码.match(/defineEmits<\{[\s\S]*?\}>\(\)/)?.[0] ?? '';
   assert.ok(props声明, '组件应声明 defineProps');
   assert.ok(emits声明, '组件应声明 defineEmits');
-  assert.equal((props声明.match(/^ {2}[A-Za-z]+(?=:)/gm) || []).length, 19, 'props 应为 19 项');
+  assert.equal((props声明.match(/^ {2}[A-Za-z]+(?=:)/gm) || []).length, 20, 'props 应为 20 项');
   assert.equal((emits声明.match(/^ {2}[A-Za-z]+(?=:)/gm) || []).length, 9, 'emits 应为 9 项');
   for (const 名 of 期望props) {
     assert.match(props声明, new RegExp(`\\b${名}:`), `props 契约应有 ${名}`);

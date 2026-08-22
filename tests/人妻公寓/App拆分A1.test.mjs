@@ -34,7 +34,7 @@ const 局部类型名 = [
   '风闻账视图', '风闻事件视图', '无耗时拜访记录', '由头日记录', '卡动作',
   '客户端时间方式', '静音会议互动ID', '静音会议峰值模式', '静音会议筹备步骤',
   '静音会议运行状态', '静音会议活动指针', '立绘项', '道具视觉类型', '卷轴条',
-  '玩家正则项', '移动端全屏选择', '全屏根', '全屏文档', '酒馆原生提示词模块',
+  '移动端全屏选择', '全屏根', '全屏文档', '酒馆原生提示词模块',
 ];
 
 /** 提取真实静态 import 语句里的模块 specifier（只认 import 语句，不搜普通文本/注释）。 */
@@ -67,7 +67,7 @@ test('五个目标文件存在，App 与新模块导入关系正确，新模块�
   }
 });
 
-test('App 不再包含内联图标库/Ic、17 个素材常量、19 个局部类型与基础图标 CSS；模板保持 <Ic 与动态 :n', () => {
+test('App 不再包含内联图标库/Ic、17 个素材常量、18 个局部类型与基础图标 CSS；模板保持 <Ic 与动态 :n', () => {
   assert.doesNotMatch(App源码, /const 图标库/, 'App 不应再有内联图标库');
   assert.doesNotMatch(App源码, /FunctionalComponent/, 'App 不应再引用 FunctionalComponent');
   assert.doesNotMatch(App源码, /const Ic:/, 'App 不应再有内联 Ic');
@@ -156,7 +156,7 @@ test('assets.ts 精确含 rq0.70/rq0.55/cg3 三个基址与全部文件名，App
   }
 });
 
-test('types.ts 逐项导出 19 个局部类型，风闻类型仍由 SchemaType 派生', () => {
+test('types.ts 逐项导出 18 个局部类型，风闻类型仍由 SchemaType 派生', () => {
   assert.match(types源码, /import type \{ SchemaType \} from '\.\.\/\.\.\/schema';/, 'types.ts 应从 ../../schema 导入 SchemaType');
   assert.match(types源码, /export type 风闻账视图 = SchemaType\['系统'\]\['_风闻账'\];/, '风闻账视图应仍由 SchemaType 派生');
   assert.match(types源码, /export type 风闻事件视图 = 风闻账视图\['最近事件'\]\[number\];/, '风闻事件视图应仍由风闻账视图派生');

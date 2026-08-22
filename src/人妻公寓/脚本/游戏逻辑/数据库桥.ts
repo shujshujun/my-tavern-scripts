@@ -565,11 +565,41 @@ export function 刷新SQLite能力缓存(): void {
   SQLite探测缓存 = null;
 }
 
+function 引用SQLite标识符(value: string): string {
+  return `"${value.replace(/"/g, '""')}"`;
+}
+
+async function 查找RQ剧情事件物理表(api: 数据库API, 查询: SQL查询方法): Promise<string | null> {
+  const 模板 = 解析数据库数据(api.getTableTemplate?.()) ?? 解析数据库数据(api.exportTableAsJson?.());
+  if (!取表(模板, 'RQ_剧情事件')) return null;
+  const tableList = await 限时等待(Promise.resolve(查询.call(api, 'PRAGMA table_list')), 4000, 'RQ剧情事件物理表检测');
+  if (!SQL查询结果有效(tableList)) return null;
+  const tables = SQL结果对象行(tableList);
+  if (!tables) return null;
+  const 必需字段 = ['row_id', 'floor_no', 'time_text', 'location', 'participants', 'player_action'];
+  const 候选: string[] = [];
+  for (const table of tables) {
+    const name = String(table.name ?? '').trim();
+    if (!name || name.startsWith('sqlite_')) continue;
+    const schema = await 限时等待(
+      Promise.resolve(查询.call(api, `PRAGMA table_info(${引用SQLite标识符(name)})`)),
+      4000,
+      `RQ剧情事件候选表检测:${name}`,
+    );
+    if (!SQL查询结果有效(schema)) continue;
+    const rows = SQL结果对象行(schema);
+    if (!rows) continue;
+    const columns = new Set(rows.map(row => String(row.name ?? '')));
+    if (必需字段.every(column => columns.has(column))) 候选.push(name);
+  }
+  return 候选.length === 1 ? 候选[0] : null;
+}
+
 /**
- * 业务表运行态迁移：shujuku 的模板导入只负责模板/运行快照，不保证已经存在的 SQLite
- * 物理表跟随模板新增字段。因此人妻公寓自己的 RQ 表必须在使用前自检结构。
+ * 业务表运行态迁移：shujuku 会把作者 DDL 表名重绑定为当前 SQLite 物理表名，但 ALTER
+ * 不属于其 mutation 重绑定范围。先按稳定列签名找到唯一物理表，再补列并回读验证。
  *
- * 只补缺失列，不重建表、不触碰已有数据。
+ * 只补缺失列，不重建表、不触碰已有数据；无法唯一确认目标表时失败关闭。
  */
 export async function 确保RQ剧情事件SQLite结构(): Promise<void> {
   const api = 取数据库API();
@@ -578,29 +608,44 @@ export async function 确保RQ剧情事件SQLite结构(): Promise<void> {
   const 写入 = api.executeSqlMutation;
   if (!查询 || typeof 写入 !== 'function') return;
   try {
-    const schema = await 限时等待(
-      Promise.resolve(查询.call(api, 'PRAGMA table_info(rq_events)')),
-      4000,
-      'RQ剧情事件结构检测',
-    );
-    if (!SQL查询结果有效(schema)) return;
-    const rows = SQL结果对象行(schema);
-    if (!rows) return;
-    const 已有字段 = new Set(rows.map(row => String(row.name ?? '')));
-    const 缺失字段: Array<{ name: string; ddl: string }> = [
-      { name: 'result_summary', ddl: 'ALTER TABLE rq_events ADD COLUMN result_summary TEXT' },
-      { name: 'event_code', ddl: 'ALTER TABLE rq_events ADD COLUMN event_code TEXT' },
-    ].filter(item => !已有字段.has(item.name));
+    const 物理表 = await 查找RQ剧情事件物理表(api, 查询);
+    if (!物理表) return;
+    const 读取结构 = async (): Promise<Set<string> | null> => {
+      const schema = await 限时等待(
+        Promise.resolve(查询.call(api, `PRAGMA table_info(${引用SQLite标识符(物理表)})`)),
+        4000,
+        'RQ剧情事件结构检测',
+      );
+      if (!SQL查询结果有效(schema)) return null;
+      const rows = SQL结果对象行(schema);
+      return rows ? new Set(rows.map(row => String(row.name ?? ''))) : null;
+    };
+    let 已有字段 = await 读取结构();
+    if (!已有字段) return;
+    const 缺失字段 = [
+      { name: 'result_summary', definition: 'TEXT' },
+      { name: 'event_code', definition: 'TEXT' },
+    ].filter(item => !已有字段?.has(item.name));
     for (const 字段 of 缺失字段) {
-      await 限时等待(
-        Promise.resolve(写入.call(api, 字段.ddl)),
+      const result = await 限时等待(
+        Promise.resolve(
+          写入.call(
+            api,
+            `ALTER TABLE ${引用SQLite标识符(物理表)} ADD COLUMN ${引用SQLite标识符(字段.name)} ${字段.definition}`,
+          ),
+        ),
         4000,
         `RQ剧情事件补字段:${字段.name}`,
       );
-      console.info(`[人妻公寓·数据库] rq_events 已补字段: ${字段.name}`);
+      if (!result || result.errors?.length || result.ok === false || result.success === false || result.saved === false) {
+        throw new Error(`补字段 ${字段.name} 失败: ${result?.errors?.map(String).join('；') || '数据库未确认写入'}`);
+      }
+      已有字段 = await 读取结构();
+      if (!已有字段?.has(字段.name)) throw new Error(`补字段 ${字段.name} 后回读未生效`);
+      console.info(`[人妻公寓·数据库] ${物理表} 已补字段: ${字段.name}`);
     }
   } catch (error) {
-    console.warn('[人妻公寓·数据库] rq_events 结构自检失败，将在后续启动继续尝试:', error);
+    console.warn('[人妻公寓·数据库] RQ_剧情事件结构自检失败，将在后续启动继续尝试:', error);
   }
 }
 
@@ -1757,12 +1802,12 @@ export async function 同步数据库回合(
          participants = excluded.participants,
          player_action = excluded.player_action,
          result_summary = CASE
-           WHEN rq_events.result_summary IS NULL
-             OR TRIM(rq_events.result_summary) = ''
-             OR rq_events.result_summary LIKE '【待数据库AI整理】%'
-             OR rq_events.result_summary LIKE '%本轮结果未取得可靠摘要%'
+           WHEN result_summary IS NULL
+             OR TRIM(result_summary) = ''
+             OR result_summary LIKE '【待数据库AI整理】%'
+             OR result_summary LIKE '%本轮结果未取得可靠摘要%'
            THEN excluded.result_summary
-           ELSE rq_events.result_summary
+           ELSE result_summary
          END,
          event_code = excluded.event_code`;
     // 时间线失效补偿必须无条件恢复 before-image；不能复用“保护已完成 AI 摘要”的正常 UPSERT，

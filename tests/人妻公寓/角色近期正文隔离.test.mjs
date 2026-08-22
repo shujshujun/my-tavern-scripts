@@ -89,7 +89,7 @@ test('主回合与原生逃生舱都把角色元数据写进成功助手楼，�
 
   assert.match(引擎, /\[回合在场妻键\]:[\s\S]{0,120}妻在场/);
   assert.match(原生固化, /setChatMessages\([\s\S]*?\[回合在场妻键\][\s\S]*?本轮妻在场/);
-  assert.match(脚本, /构造角色近期正文\(SillyTavern\.chat \?\? \[\], m, 清洗正文\)/);
+  assert.match(脚本, /构造角色近期正文\(SillyTavern\.chat \?\? \[\], m, 提取正文舞台文本\)/);
   assert.equal((脚本.match(/读取角色近期正文\(/g) ?? []).length, 4, '定义和三个消费者必须全部保留');
   assert.doesNotMatch(脚本, /slice\(-14\)[\s\S]{0,240}\.filter\(\(消息[^\n]+!消息\?\.is_user/);
 });

@@ -18,10 +18,19 @@ import { fileURLToPath } from 'node:url';
 
 import { parse as parseYaml } from 'yaml';
 
+import { 校验发布版本一致, 校验客户端构建版本 } from './发布版本门禁.mjs';
+
 const 根 = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const 项目 = path.join(根, 'src/人妻公寓');
 const 产物 = path.join(根, 'dist/人妻公寓');
 const 头像源 = path.join(项目, '素材/游戏头像.png');
+const 版本 = '0.89';
+const TAG = 'rq0.89';
+const 客户端构建路径 = path.join(产物, '界面/客户端/index.html');
+
+校验发布版本一致({ 版本, 标签: TAG });
+if (!existsSync(客户端构建路径)) throw new Error(`缺少客户端构建产物：${客户端构建路径}`);
+校验客户端构建版本(readFileSync(客户端构建路径, 'utf8'), 版本);
 
 const CRC32表 = Array.from({ length: 256 }, (_, n) => {
   let c = n;
@@ -167,7 +176,6 @@ for (const 组 of index.条目) {
 if (!开场白) throw new Error('未找到 [开场白] 条目');
 
 // ── 资源走 jsdelivr(手机友好；角色卡版本与正式发布 tag 同步) ──
-const TAG = 'rq0.88';
 const BASE = `https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@${TAG}`;
 
 const 加载块 = url => "```\n<body>\n<script>\n$('body').load('" + url + "')\n</script>\n</body>\n```";
@@ -271,7 +279,6 @@ const tavern_helper = {
 
 // ── 卡体 ──
 const 卡名 = '人妻公寓';
-const 版本 = '0.88';
 const data = {
   name: 卡名,
   description: '',
@@ -279,7 +286,7 @@ const data = {
   scenario: '',
   first_mes: '<StatusPlaceHolderImpl/>',
   mes_example: '',
-  creator_notes: `人妻公寓 v${版本}。支持继承 v0.80～v0.86 存档；需安装最新版酒馆助手、MVU 与数据库插件，并把数据库模式设为 SQLite；首次进入按引导安装五张游戏记忆表。v0.86 实装夏乔「借种」结局及专属 CG。v0.87 新增 SillyTavern 原生渲染兼容正文舞台，支持复杂预设 HTML/CSS 动画、卡片与显示效果，并修复预设标签泄漏问题。变量解析已自动配置（默认走数据库代发），无需手动调整 MVU 面板；如需切换解析通道，进入游戏【设置 → 变量解析】调整即可。本作不再兼容智脑。开局：0楼进入游戏界面，选难度→接父亲电话进入到任首日；输入使用游戏内输入框。`,
+  creator_notes: `人妻公寓 v${版本}。支持继承 v0.80～v0.88 存档；需安装最新版酒馆助手、MVU 与数据库插件，并把数据库模式设为 SQLite；首次进入按引导安装五张游戏记忆表。v0.86 实装夏乔「借种」结局及专属 CG。v0.89 修复 RQ_剧情事件物理表升级与 UPSERT 重绑定，收口普通角色聊天误占游戏生成锁，并重构正文输出边界：游戏只采用酒馆显示正则后的纯文字，不复制预设 HTML、CSS、动画或折叠面板；检测到美化正则时会列出名称并提醒关闭，纯删除或隐藏思维链的正则可以保留。GLM5.2 等模型已经生成但被旧清洗误删的正文会被保留；真正未完成的输出显示为未结算残稿，不会推进强制剧情、任务、资源、变量或数据库回合。变量解析已自动配置（默认走数据库代发），无需手动调整 MVU 面板；如需切换解析通道，进入游戏【设置 → 变量解析】调整即可。本作不再兼容智脑。开局：0楼进入游戏界面，选难度→接父亲电话进入到任首日；输入使用游戏内输入框。`,
   system_prompt: '',
   post_history_instructions: '',
   tags: ['人妻公寓'],

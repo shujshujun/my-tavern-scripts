@@ -4,8 +4,8 @@ import { 全局数据库AI租约 } from './数据库AI租约';
 import { 前台生成租约持有中, 取得前台生成租约, 手机生成租约持有中 } from './生成通道互斥';
 import { 当前正文模型是DeepSeek } from './正文模型识别';
 import { 预设破限段 } from './预设桥';
-import { 应用酒馆最终显示正则, 清洗预设输出 } from './预设输出兼容';
-import { 严格清除协议残留 } from './严格正文清洗';
+import { 应用酒馆最终显示正则 } from './预设输出兼容';
+import { 严格清除协议残留 } from './正文协议安全';
 import { 当前聊天ID } from './手机/运行时上下文';
 import { 捕获精确聊天快照, 恢复精确聊天快照, 时间状态指纹, type 精确聊天快照 } from './时间撤销系统';
 
@@ -99,7 +99,7 @@ function 读库(): 隔离事件库 {
 }
 
 export function 净化隔离事件正文(原文: string): string {
-  const 闭合清 = 严格清除协议残留(清洗预设输出(原文).文本)
+  const 闭合清 = 严格清除协议残留(String(原文 ?? ''))
     .replace(/^[\s\S]*?<content\b[^>]*>/i, '')
     .replace(/<\/content\s*>[\s\S]*$/i, '')
     .replace(/【开始思考】[\s\S]*?<\/think_fox~\s*>/gi, '')

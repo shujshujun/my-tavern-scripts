@@ -71,8 +71,6 @@ export type 道具视觉类型 = 'product' | 'evidence' | 'scene' | 'action';
 export interface 卷轴条 {
   谁: '玩家' | '叙事';
   文本: string[];
-  /** SillyTavern 已完成正则/Markdown渲染后的显示HTML。存在时仅用于展示层。 */
-  渲染HTML?: string;
   楼?: number;
   可回档?: boolean;
   原文?: string;
@@ -80,8 +78,6 @@ export interface 卷轴条 {
   事件提示词?: string;
   _排序?: number;
 }
-
-export type 玩家正则项 = { re: RegExp; 替换: string; 用户: boolean; ai: boolean; min: number | null; max: number | null };
 
 export type 移动端全屏选择 = '全屏' | '窗口';
 

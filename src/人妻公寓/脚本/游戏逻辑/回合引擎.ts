@@ -109,12 +109,13 @@ import { 手机锚消息签名, 作废当前手机时间线租约世代 } from '
 import { 推进特殊场景, 静音会议正式运行中 } from './特殊场景系统';
 import { 构造CG亲密上下文 } from './CG亲密上下文';
 import { 行动资源门槛, 现场楼身体增长依赖, 结算成功现场楼 } from './玩家资源系统';
-import { 当前预设正文标签 } from './预设桥';
-import { 应用酒馆最终显示正则, 清洗预设输出 } from './预设输出兼容';
-import { 严格清除协议残留, 清除末尾残缺协议标签, 清除末尾裸JSON补丁, 提取末尾裸JSON补丁 } from './严格正文清洗';
+import { 应用酒馆最终显示正则 } from './预设输出兼容';
+import { 提取正文舞台文本, 提取可提交正文 } from './正文输出边界';
+import { 提取末尾裸JSON补丁 } from './正文协议安全';
 import { 规范变量协议候选, 标准变量块需要本地应用 } from './变量块协议';
 import {
   生成失败时可保留的流式正文,
+  判定正文提交,
   提取纯控制协议尾段,
   是当前正文流事件,
   选择正文生成原文,
@@ -576,7 +577,7 @@ eventMakeFirst(iframe_events.STREAM_TOKEN_RECEIVED_FULLY, (文本: string, gener
   if (generation_id && generation_id !== 本回合生成id) return;
   if (是当前正文流事件(正文流式生成id, 本回合生成id, generation_id)) {
     正文生成进展回调?.();
-    正文流式原文 = 更新有效流式正文(正文流式原文, 文本, 清洗严格正文);
+    正文流式原文 = 更新有效流式正文(正文流式原文, 文本, 提取可提交正文);
   }
   eventEmit('人妻公寓:流式', 文本);
 });
@@ -1124,7 +1125,7 @@ export async function 重新生成最近回合变量(): Promise<boolean> {
   try {
     if (!身份仍有效()) throw new Error('__RQGY_VARIABLE_REGEN_STALE__');
     const 当前正文 = getChatMessages(上下文.助手楼层).at(-1)?.message ?? '';
-    const 基础正文 = 清洗正文(当前正文);
+    const 基础正文 = 提取正文舞台文本(当前正文);
     if (!基础正文) throw new Error('__RQGY_VARIABLE_REGEN_NO_STORY__');
     const 基准stat = Schema.parse(上下文.解析基准) as SchemaType;
     const 可写视图 = 构造AI可写变量视图(基准stat, 上下文.变量范围);
@@ -1766,117 +1767,9 @@ function 安排数据库回合后处理(参数: {
   }, 0);
 }
 
-function 清洗正文核心(协议清: string): string {
-  const 闭合清 = 协议清
-    // 狐系等玩家预设把思考写成不配对的“【开始思考】…</think_fox~>”，但会用
-    // <content> 单独圈正文。content 是可靠的正文白名单边界；闭合缺失时也保住其后剧情。
-    .replace(/^[\s\S]*?<content\b[^>]*>/i, '')
-    .replace(/<\/content\s*>[\s\S]*$/i, '')
-    // story_scene 是部分预设使用的正文包装标签：语义与 content 相同，只保留标签内剧情。
-    // 开标签未闭合时保留其后文本，避免流式截断或模型漏闭合导致整段正文丢失。
-    .replace(/^[\s\S]*?<story_scene\b[^>]*>/i, '')
-    .replace(/<\/story_scene\s*>[\s\S]*$/i, '')
-    .replace(/【开始思考】[\s\S]*?<\/think_fox~\s*>/gi, '')
-    .replace(/<fox_selc\b[^>]*>[\s\S]*?<\/fox_selc\s*>/gi, '')
-    .replace(/<fox_tip\b[^>]*>[\s\S]*?<\/fox_tip\s*>/gi, '')
-    // Izumi 预设：konatan_planning~ 是思考规划，tucao 是正文后的吐槽/总结；两块均非正文。
-    .replace(/<konatan_planning~[^>]*>[\s\S]*?<\/konatan_planning~\s*>/gi, '')
-    .replace(/<tucao\b[^>]*>[\s\S]*?<\/tucao\s*>/gi, '')
-    // TG：SexualScene 是剧情特写容器，保留内部正文；校验/免责声明/行动选项不是剧情。
-    .replace(/<\/?SexualScene\b[^>]*>/gi, '')
-    .replace(/<(VariableCheck|Disclaimer|w2g)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
-    // 双人成行：这些都是 content 正文之后的摘要、选项或独立展示模块。
-    // content 缺失时也要按块清除，防止预设协议被落库并在下一轮继续污染上下文。
-    .replace(/<(meow_FM|branches|parallel_world|historic_events|htm1fenge)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
-    // 流式截断或模型漏闭合时，以上附加模块一旦开始，后面都不再属于正文。
-    .replace(
-      /<(?:VariableCheck|Disclaimer|w2g|meow_FM|branches|parallel_world|historic_events|htm1fenge)\b[^>]*>[\s\S]*$/i,
-      '',
-    )
-    .replace(
-      /<\/?(?:content|story_scene|now_plot|think_fox~|fox_selc|fox_tip|konatan_planning~|tucao|SexualScene|VariableCheck|Disclaimer|w2g|meow_FM|branches|parallel_world|historic_events|htm1fenge)(?:\s[^>]*)?>/gi,
-      '',
-    )
-    // 玩家预设的前置草稿偶尔漏 </draft_notes>，但后续 bginfor 仍完整。用完整的信息栏
-    // 作为安全右边界清掉两块元数据；若右边界也缺失，末尾仅剥标签，绝不吞掉剧情。
-    .replace(/<draft_notes\b[^>]*>[\s\S]*?<bginfor\b[^>]*>[\s\S]*?<\/bginfor\s*>/gi, '')
-    .replace(/<draft_notes\b[^>]*>[\s\S]*?<\/draft_notes\s*>/gi, '')
-    .replace(/<bginfor\b[^>]*>[\s\S]*?<\/bginfor\s*>/gi, '')
-    .replace(/<CEstuff\b[^>]*>[\s\S]*?<\/CEstuff\s*>/gi, '')
-    .replace(/<\/?(?:draft_notes|bginfor|CEstuff)\b[^>]*>/gi, '')
-    .replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, '')
-    .replace(/<reason(?:ing)?>[\s\S]*?<\/reason(?:ing)?>/gi, '')
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/^\s*-{2,}>?\s*$/gm, '')
-    .replace(/<UpdateVariable\b[^>]*>[\s\S]*?<\/UpdateVariable\s*>/gi, '')
-    .replace(/<json_?patch\b[^>]*>[\s\S]*?<\/json_?patch\s*>/gi, '')
-    .replace(/<options\b[^>]*>[\s\S]*?<\/options\s*>/gi, '')
-    .replace(/<行为等级(?:\s[^>]*)?>[\s\S]*?<\/行为等级\s*>/gi, '')
-    .replace(/<尺度判定(?:\s[^>]*)?>[\s\S]*?(?:<\/尺度判定\s*>|$)/gi, '')
-    .replace(/<\/(?:UpdateVariable|json_?patch|options|行为等级|尺度判定)\s*>/gi, '')
-    // 玩家预设夹带的整篇 HTML 组件(2026-07-18 玩家实测:破限预设让模型在正文后附"选项分支"
-    // HTML 文档,原生酒馆渲染成卡,固定0楼界面=裸代码墙,还白吃上下文token)——整体剥除
-    .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*?```/gi, '')
-    .replace(/<!DOCTYPE[\s\S]*?<\/html\s*>/gi, '')
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-    .replace(/<StatusPlaceHolderImpl\/>/g, '')
-    // 有些玩家预设把裸 <p> 当换行符且从不输出 </p>。它不是需要“吞到结尾”的协议块，
-    // 只剥标签并补换行，避免未闭合 HTML 扰乱正文，同时不误删标签后的剧情。
-    .replace(/<\/?p(?:\s[^>]*)?>/gi, '\n')
-    // 玩家预设夹带的包装 div(2026-07-19 玩家实测:konata-thinking-wrapper/tucao-w 这类空壳
-    // 或漏闭合的裸 div 直接印在正文里)——正文永远不该有裸 div,标签一律剥壳(内容保留)
-    .replace(/<\/?div[^>]*>/gi, '')
-    // 机器控制块 <rq_event_summary> 只供数据库回合摘要提取，绝不进入聊天楼层正文。
-    .replace(/<rq_event_summary\b[^>]*>[\s\S]*?<\/rq_event_summary\s*>/gi, '')
-    .replace(/<\/rq_event_summary\s*>/gi, '');
-  const 全清 = 闭合清
-    // 生成被截断时的未闭合块也吞掉,否则半截标记块会永久留在楼层原文里
-    .replace(/<rq_event_summary\b[^>]*>[\s\S]*$/i, '')
-    .replace(/<think(?:ing)?>[\s\S]*$/i, '')
-    .replace(/<reason(?:ing)?>[\s\S]*$/i, '')
-    .replace(/<UpdateVariable\b[^>]*>[\s\S]*$/i, '')
-    .replace(/<json_?patch\b[^>]*>[\s\S]*$/i, '')
-    .replace(/<options\b[^>]*>[\s\S]*$/i, '')
-    .replace(/<行为等级(?:\s[^>]*)?>[\s\S]*$/i, '')
-    .replace(/<尺度判定(?:\s[^>]*)?>[\s\S]*$/i, '')
-    .replace(/<tucao\b[^>]*>[\s\S]*$/i, '')
-    .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*$/i, '')
-    .replace(/<!DOCTYPE[\s\S]*$/i, '')
-    .replace(/<style[^>]*>[\s\S]*$/i, '')
-    .replace(/<script[^>]*>[\s\S]*$/i, '')
-    .replace(/<!--[\s\S]*$/, '')
-    .trim();
-  // 吞尾防误杀(2026-07-17 BUG2根因:偷窥回合"无正文却弹选择"):AI 把协议标记漏闭合地写在
-  // 正文开头(如裸 <行为等级>3 打头),吞尾会把整楼吞成空白——宁留半截标记,不吞整场戏
-  if (!全清 && 闭合清.trim()) {
-    console.warn('[人妻公寓] 清洗吞尾把正文吞成了空白,回退只清闭合块(原文开头疑有未闭合协议标记)');
-    // 摘要是本游戏自己声明的机器协议，不能沿用“宁留协议也不吞正文”的通用回退策略。
-    // 即使模型只输出一个未闭合摘要块，也必须返回空正文，绝不把控制标签落进聊天/MVU。
-    return 闭合清.replace(/<rq_event_summary\b[^>]*>[\s\S]*$/i, '').replace(/<\/rq_event_summary\s*>/gi, '').trim();
-  }
-  return 全清;
-}
-
-/** 楼层落库前的清洗:思维链/变量块/选项块/临时尺度标签不进楼层文本(prompt 与卷轴双干净) */
-export function 清洗正文(原文: string): string {
-  return 清除末尾裸JSON补丁(清除末尾残缺协议标签(清洗正文核心(清洗预设输出(原文, 当前预设正文标签()).文本)));
-}
-
-/** 确定性剧情专用：纯思维链、变量协议或截断协议一律视为无正文，不采用常规回退。 */
-export function 清洗严格正文(原文: string): string {
-  const 协议清 = 清洗预设输出(原文, 当前预设正文标签()).文本;
-  return 严格清除协议残留(清洗正文核心(严格清除协议残留(协议清)));
-}
-
-/**
- * 静音会议的 AI 楼永远不允许保留任何可重放变量协议。普通清洗为防误吞正文会在“整楼只剩
- * 未闭合协议”时回退原文；隔离场必须反过来宁可判失败，也不能让旧楼日后重新处理变量。
- */
-export function 清洗静音会议正文(原文: string): string {
-  let 正文 = 清洗严格正文(原文)
-    .replace(/<UpdateVariable\b[^>]*>[\s\S]*?(?:<\/UpdateVariable\s*>|$)/gi, '')
-    .replace(/<json_?patch\b[^>]*>[\s\S]*?(?:<\/json_?patch\s*>|$)/gi, '')
+/** 静音会议的成功正文还必须拒绝任何可重放的裸变量命令。 */
+export function 提取静音会议可提交正文(原文: string): string {
+  let 正文 = 提取可提交正文(原文)
     .replace(/^\s*_\.(?:set|insert|assign|remove|unset|delete|add)\(.*\)\s*;?\s*$/gim, '')
     .trim();
 
@@ -2186,6 +2079,7 @@ export async function 执行回合(
   // 旧顺序在 catch 里先广播，客户端会抢在回滚前读取临时 assistant 楼：正文先出现后消失，
   // 背包/任务/在场头像也会短暂读取尚未提交的快照，并在删楼后继续停留于假状态。
   let 待广播失败原因: string | null = null;
+  let 失败残稿 = '';
   try {
     // 已取得进行中互斥:先清上一次 deleteChatMessages 失败/宿主重建遗留的临时回合楼
     // (幂等,零命中零写入);删除失败向上抛,由 catch 发回合失败、finally 释放互斥,
@@ -2322,9 +2216,7 @@ export async function 执行回合(
     const 行动锚 =
       `\n【本轮玩家行动】\n${行动}\n` +
       '(以上是{{user}}本轮唯一的新行动,本次回复只回应这条行动。之前楼层的行动均已演出完毕,' +
-      '严禁重演、复述或把本次正文写成对任何旧行动的回应;若历史楼层存在行动与回应错位,一律以本条为准。)' +
-      '\n【外部预设输出完整性】若预设要求思考标签与正文标签，必须先闭合思考标签，再输出完整的正文开始和结束标签；' +
-      '即使剩余长度不足，也要立即缩短思考并优先给出正文，禁止只留下思考、半截标签或正文外协议。';
+      '严禁重演、复述或把本次正文写成对任何旧行动的回应;若历史楼层存在行动与回应错位,一律以本条为准。)';
     // 正文模型只负责故事与游戏控制协议；RQ_剧情事件的语义摘要改由数据库填表 AI 在同一批次完成。
     const injects: Omit<InjectionPrompt, 'id'>[] = [
       { role: 'system', content: 快照 + 行动锚, position: 'in_chat', depth: 0, should_scan: true },
@@ -2406,16 +2298,22 @@ export async function 执行回合(
       );
     } catch (生成错误) {
       确认本轮事务有效();
-      // 看门狗说明正文连接已经长期无进展；即使缓存刚好停在句号，也不能把半截场景伪装成成功回合。
-      if (生成错误 instanceof Error && 生成错误.message.startsWith(正文生成超时错误前缀)) throw 生成错误;
-      const 完整流式正文 = 生成失败时可保留的流式正文(正文流式原文, 清洗严格正文);
-      if (!完整流式正文) throw 生成错误;
+      // 看门狗说明正文连接已经长期无进展；不能把半截场景伪装成成功回合，但仍保留给玩家查看。
+      if (生成错误 instanceof Error && 生成错误.message.startsWith(正文生成超时错误前缀)) {
+        失败残稿 = 提取正文舞台文本(应用酒馆最终显示正则(正文流式原文));
+        throw 生成错误;
+      }
+      const 完整流式正文 = 生成失败时可保留的流式正文(正文流式原文, 提取可提交正文);
+      if (!完整流式正文) {
+        失败残稿 = 提取正文舞台文本(应用酒馆最终显示正则(正文流式原文));
+        throw 生成错误;
+      }
       console.warn('[人妻公寓] generate 最终 Promise 失败，但同 generation_id 已收到完整流式正文；保留正文继续结算');
       原文 = 完整流式正文;
     }
     确认本轮事务有效();
     const 最终返回原文 = 原文;
-    原文 = 选择正文生成原文(最终返回原文, 正文流式原文, 清洗严格正文);
+    原文 = 选择正文生成原文(最终返回原文, 正文流式原文, 提取可提交正文);
     const 采用流式正文 = 原文 !== 最终返回原文;
     if (采用流式正文) {
       const 最终控制尾段 = 提取纯控制协议尾段(最终返回原文);
@@ -2427,9 +2325,8 @@ export async function 执行回合(
     正文流式原文 = '';
     确认回合场景未变化('正文生成期间玩家场景已经变化，本轮不会把剧情和结算写到另一个地点。');
 
-    // 流式中间帧继续按玩家现有预设与游戏显示逻辑即时呈现；这里只在完整回复确定后，
-    // 采用酒馆最终显示正则的结果作为稽查检词与正式楼正文输入。原始回复仍保留给尺度块
-    // 和其他机器协议提取，不能让显示正则反向改写业务事实。
+    // 流式中间帧继续即时呈现；完整回复确定后，酒馆最终显示正则只决定玩家可见文本。
+    // 稽查、成功提交与机器协议仍读取原始回复，任何显示美化都不能反向改写业务事实。
     let 最终显示原文 = 应用酒馆最终显示正则(原文);
 
     // ── 稽查前移：必须审首稿，不能等独立变量结算把临时尺度块清掉后才审 ──
@@ -2446,7 +2343,7 @@ export async function 执行回合(
       阶段表,
       尺度模式,
       正戏免检,
-      清洗正文(最终显示原文),
+      提取可提交正文(原文),
     );
 
     if (稽查.状态 === '需重写' && 焦点妻门牌) {
@@ -2475,7 +2372,7 @@ export async function 执行回合(
         阶段表,
         尺度模式,
         正戏免检,
-        清洗正文(重写显示原文),
+        提取可提交正文(重写),
       );
       if (重写稽查.状态 === '通过') {
         原文 = 重写;
@@ -2520,30 +2417,28 @@ export async function 执行回合(
 
     确认本轮事务有效();
 
-    // ── 正常路径:先落 AI 楼，再按 MVU“重新处理变量”的时序解析并明确写回该楼 ──
-    // 只保存清洗后的正文 + 规范变量块：客户端/卡内正则会隐藏变量块，但 MVU 面板以后
-    // 仍能从真实 AI 楼重新解析。思维链、摘要与外部预设格式不会因此重新进入聊天历史。
-    const 已清洗正文 =
-      本轮静音会议 || 事件必须有正文(本楼事件) || 选项.成功结算
-        ? 清洗严格正文(最终显示原文)
-        : 清洗正文(最终显示原文);
-    if (本轮静音会议 && !已清洗正文) {
-      throw new Error('AI 没有返回有效正文——本拍未推进，请直接重试');
+    // ── 正常路径：玩家可见文本与业务成功正文分门判定 ──
+    // 显示门只移除游戏机器协议与通用 HTML 外壳，允许失败残稿保留；成功门另外剥除思维链，
+    // 只有成功正文非空时才允许创建正式楼、解析变量、提交任务、扣资源或写数据库骨架。
+    const 正文判定 = 判定正文提交(最终显示原文, 提取正文舞台文本, 提取可提交正文, 原文);
+    const 可提交正文 = 正文判定.成功正文;
+    if (!正文判定.可提交) {
+      失败残稿 = 正文判定.失败残稿;
+      if (本轮静音会议) throw new Error('AI 没有返回有效正文——本拍未推进，请直接重试');
+      if (事件必须有正文(本楼事件)) {
+        throw new Error('AI 没有返回有效的剧情正文——待演事件已保留，请直接重试');
+      }
+      if (选项.成功结算) throw new Error('AI 没有返回有效正文——楼务任务没有提交，请重新点击任务瓷砖');
+      throw new Error('AI 输出没有形成可提交正文——未完成内容已保留供你查看，本轮没有发生');
     }
-    if (事件必须有正文(本楼事件) && !已清洗正文) {
-      throw new Error('AI 没有返回有效的剧情正文——待演事件已保留，请直接重试');
-    }
-    if (选项.成功结算 && !已清洗正文) {
-      throw new Error('AI 没有返回有效正文——楼务任务没有提交，请重新点击任务瓷砖');
-    }
-    const 基础正文 = 已清洗正文 || '(楼道里安静了一瞬……本轮 AI 未返回正文,可换个说法再试)';
+    const 基础正文 = 正文判定.显示正文;
     // 正文楼永远只落故事；正文模型偶然输出的变量协议也不采纳，随后由外置模型生成唯一有效变量块。
     let 变量块 = '';
     let 可重处理楼层正文 = 变量块 ? `${基础正文}\n${变量块}` : 基础正文;
     let 解析基准 = _.cloneDeep(Mvu.getMvuData({ type: 'message', message_id: -1 }) ?? 旧) as Mvu.MvuData;
     const 入住预约 = 识别入住登场预约(本楼事件);
     const 入住事件将提交 =
-      !!入住预约 && 本轮事件可提交(本轮事件冻结, data.系统._待发送事件, 生成楼层, Boolean(已清洗正文));
+      !!入住预约 && 本轮事件可提交(本轮事件冻结, data.系统._待发送事件, 生成楼层, Boolean(可提交正文));
     const 本轮结算基准 = 入住事件将提交 ? 演出data : data;
     if (入住事件将提交) {
       // 临时演出态只进入本轮变量解析与守护基准；此处明确禁止同步晋阶镜像。
@@ -2790,7 +2685,7 @@ export async function 执行回合(
       夫在场,
       生成楼层,
       本轮事件冻结,
-      Boolean(已清洗正文),
+      Boolean(可提交正文),
       回合起始场景,
       变量重生成派生票据 ?? undefined,
       当前场景剧情事务ID
@@ -2833,7 +2728,7 @@ export async function 执行回合(
         推进余波安抚(newStat.户[本轮余波目标]!.妻, {
           正文楼: 生成楼层,
           当前绝对时段,
-          成功主线当面楼: Boolean(已清洗正文) && 妻在场.includes(本轮余波目标),
+          成功主线当面楼: Boolean(可提交正文) && 妻在场.includes(本轮余波目标),
           玩家有效回应: 玩家行动是有效安抚(行动),
         });
       }
@@ -2892,7 +2787,7 @@ export async function 执行回合(
         本楼事件,
         妻在场,
         实际尺度: 资源实际尺度,
-        资源计费: 本轮资源计费 && Boolean(已清洗正文),
+        资源计费: 本轮资源计费 && Boolean(可提交正文),
       });
     }
     const 资源结算 = 结算成功现场楼(newStat, 本轮结算基准, {
@@ -2903,7 +2798,7 @@ export async function 执行回合(
       妻在场,
       实际尺度: 资源实际尺度,
       // 无效正文只落占位楼,不算"有效正文成功落楼",不得扣玩家资源(2026-08-03 审计 M2)
-      资源计费: 本轮资源计费 && Boolean(已清洗正文),
+      资源计费: 本轮资源计费 && Boolean(可提交正文),
       记录攻略风闻调用: (门牌号, 档) => 变量重生成后续风闻调用.push({ 门牌: 门牌号, 档 }),
     });
     if (变量重生成派生票据 && 变量重生成风闻派生前) {
@@ -2925,8 +2820,8 @@ export async function 执行回合(
     if (已取消) throw new Error('__RQGY_CANCELLED__');
     确认本轮事务有效();
     确认回合场景未变化('生成期间场景已经变化，本轮正文不会在错误地点提交。');
-    if (已清洗正文) 提交孕情初见评价(newStat, 快照, 生成楼层);
-    if (已清洗正文) 提交快照刷新(newStat, 快照刷新票);
+    if (可提交正文) 提交孕情初见评价(newStat, 快照, 生成楼层);
+    if (可提交正文) 提交快照刷新(newStat, 快照刷新票);
     // 这里是回合的提交点。之后会同步结算一次性票据，再异步写回 MVU；关闭生成 id
     // 让迟到的取消点击不再把已经进入提交阶段的事务标成“已取消”。
     允许取消 = false;
@@ -3097,7 +2992,7 @@ export async function 执行回合(
     eventEmit('人妻公寓:回合完成');
     // 占位楼没有真实剧情，不建数据库骨架。有效正文先让前台成功收口；SQLite 骨架、
     // 旧漏楼补齐和数据库 AI 自动填表全部放到下一任务拍，绝不再占住“内容正在生成”。
-    if (已清洗正文 && 本轮数据库已安装) {
+    if (可提交正文 && 本轮数据库已安装) {
       const 数据库后处理仍有效 = () => {
         const 消息 = SillyTavern.chat?.[生成楼层];
         return (
@@ -3187,7 +3082,10 @@ export async function 执行回合(
     // 前台生成租约在所有临时楼/变量回滚/事务标记之后幂等释放，手机才允许重新取得；
     // 失败广播必须放在释放之后：同步重试的失败监听器会先看到共享槽已空闲，监听器抛错也不阻塞释放。
     前台租约.释放();
-    if (待广播失败原因 !== null) eventEmit('人妻公寓:回合失败', 待广播失败原因);
+    if (待广播失败原因 !== null) {
+      if (!已取消 && 本轮时间线仍有效() && 失败残稿.trim()) eventEmit('人妻公寓:失败残稿', 失败残稿);
+      eventEmit('人妻公寓:回合失败', 待广播失败原因);
+    }
   }
 }
 

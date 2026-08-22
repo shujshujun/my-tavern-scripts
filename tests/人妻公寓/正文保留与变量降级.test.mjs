@@ -15,8 +15,9 @@ const {
   选择正文生成原文,
   更新有效流式正文,
 } = require('../../src/人妻公寓/脚本/游戏逻辑/正文生成完整性.ts');
-const { 严格清除协议残留, 清除末尾裸JSON补丁 } = require('../../src/人妻公寓/脚本/游戏逻辑/严格正文清洗.ts');
+const { 严格清除协议残留, 清除末尾裸JSON补丁 } = require('../../src/人妻公寓/脚本/游戏逻辑/正文协议安全.ts');
 const 回合源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/回合引擎.ts', import.meta.url), 'utf8');
+const 输出边界源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/正文输出边界.ts', import.meta.url), 'utf8');
 const 客户端源码 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
 
 const 清掉变量协议 = 原文 =>
@@ -98,7 +99,18 @@ test('迟到的纯协议流式事件不得覆盖最后一份有效正文', () =>
 });
 
 test('流式尚未进入正文时，半截标签及未闭合属性不能成为兜底正文', () => {
-  for (const 半截 of ['<', '<Upd', '<JSONP', '<think', '<尺度判定 模式="', '<UpdateVariable foo="', '<JSONPatch mode="', '<think class="']) {
+  for (const 半截 of [
+    '<',
+    '<Upd',
+    '<JSONP',
+    '<think',
+    '<analysis',
+    '<content',
+    '<尺度判定 模式="',
+    '<UpdateVariable foo="',
+    '<JSONPatch mode="',
+    '<think class="',
+  ]) {
     assert.equal(更新有效流式正文('', 半截, 严格清除协议残留), '', 半截);
     assert.equal(选择正文生成原文('<JSONPatch>[]</JSONPatch>', 半截, 严格清除协议残留), '<JSONPatch>[]</JSONPatch>');
   }
@@ -190,10 +202,10 @@ test('回合只缓存正文请求流，并在正文清洗前完成流式兜底�
   );
   assert.doesNotMatch(回合源码, /eventOn\(iframe_events\.STREAM_TOKEN_RECEIVED_FULLY/);
   assert.match(回合源码, /generation_id && generation_id !== 本回合生成id/);
-  assert.match(回合源码, /更新有效流式正文\(正文流式原文,\s*文本,\s*清洗严格正文\)/);
+  assert.match(回合源码, /更新有效流式正文\(正文流式原文,\s*文本,\s*提取可提交正文\)/);
   assert.match(
     回合源码,
-    /catch \(生成错误\)[\s\S]{0,280}生成失败时可保留的流式正文\(正文流式原文, 清洗严格正文\)[\s\S]{0,180}throw 生成错误/,
+    /catch \(生成错误\)[\s\S]{0,280}生成失败时可保留的流式正文\(正文流式原文, 提取可提交正文\)[\s\S]{0,180}throw 生成错误/,
     '最终 Promise 失败也只能在同 generation_id 已有完整流式正文时继续',
   );
   assert.match(回合源码, /提取纯控制协议尾段\(最终返回原文\)/);
@@ -208,14 +220,17 @@ test('回合只缓存正文请求流，并在正文清洗前完成流式兜底�
   assert.match(回合源码, /function 取变量块\(文本: string\)[\s\S]{0,120}清除变量禁区\(文本\)/);
   assert.doesNotMatch(回合源码, /function 有可用变量命令|function 含可改变量命令|流式兜底变量块/);
   assert.match(客户端源码, /const 当前净文 = 流式段\.value\.join\(['"]\\n['"]\)/);
-  assert.match(客户端源码, /更新有效流式正文\(当前净文,\s*清洗\(文本, true\),\s*内容 => 内容\)/);
+  assert.match(客户端源码, /更新有效流式正文\(当前净文,\s*提取正文舞台文本\(文本\),\s*内容 => 内容\)/);
   assert.match(客户端源码, /eventOn\('人妻公寓:生成开始',[\s\S]{0,260}流式段\.value = \[\]/);
-  const 客户端尺度完整块 = 客户端源码.indexOf('.replace(/<尺度判定(?:\\s[^>]*)?>[\\s\\S]*?(?:<\\/尺度判定\\s*>|$)/gi');
-  const 客户端孤立闭标签 = 客户端源码.indexOf('.replace(/<\\/(?:UpdateVariable|json_?patch|options|行为等级|尺度判定)');
-  assert.ok(客户端尺度完整块 >= 0 && 客户端尺度完整块 < 客户端孤立闭标签, '客户端必须先删完整控制块再删孤立闭标签');
-  assert.match(客户端源码, /return 清除末尾裸JSON补丁\(清除末尾残缺协议标签\(全清\)\)/);
+  assert.doesNotMatch(客户端源码, /<UpdateVariable\\b|<json_\?patch\\b|<尺度判定/, '客户端不得维护机器协议正则副本');
+  assert.match(
+    输出边界源码,
+    /const 纯文本 = 转为正文舞台纯文本\(清除游戏机器协议\(原文\)\)/,
+    '共享输出边界必须先隔离游戏协议再转纯文本',
+  );
+  assert.match(输出边界源码, /清除末尾裸JSON补丁\(清除末尾残缺输出标签\(纯文本\)\)/);
   const 生成开始 = 回合源码.indexOf('本回合生成id = `rqgy-');
-  const 清洗开始 = 回合源码.indexOf('const 已清洗正文', 生成开始);
+  const 清洗开始 = 回合源码.indexOf('const 可提交正文', 生成开始);
   const 选择位置 = 回合源码.indexOf('选择正文生成原文(', 生成开始);
   const 尾段位置 = 回合源码.indexOf('提取纯控制协议尾段(最终返回原文)', 选择位置);
   const 清生成id位置 = 回合源码.indexOf("正文流式生成id = '';", 选择位置);

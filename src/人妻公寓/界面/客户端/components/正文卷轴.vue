@@ -19,6 +19,7 @@ defineProps<{
   editingText: string;
   editingSaving: boolean;
   streamSegments: readonly string[];
+  failedDraftSegments: readonly string[];
   runtimeStage: string;
   waitSeconds: number;
   retryAction: string;
@@ -117,12 +118,13 @@ defineExpose({ 滚到底 });
         </button>
         <p v-if="条.谁 === '玩家'" class="story-player">▸ {{ 条.文本[0] }}</p>
         <template v-else>
-          <template v-if="条.渲染HTML">
-            <div class="narr rendered-html" v-html="条.渲染HTML"></div>
-          </template>
-          <p v-else v-for="(段, j) in 条.文本" :key="j" class="narr">{{ 段 }}</p>
+          <p v-for="(段, j) in 条.文本" :key="j" class="narr">{{ 段 }}</p>
         </template>
       </template>
+    </div>
+    <div v-if="!sending && failedDraftSegments.length" class="story-entry failed-draft">
+      <small>未完成输出 · 本轮未结算</small>
+      <p v-for="(段, j) in failedDraftSegments" :key="'残稿' + j" class="narr">{{ 段 }}</p>
     </div>
     <div v-if="sending" class="story-entry">
       <p v-for="(段, j) in streamSegments" :key="'流' + j" class="narr">{{ 段 }}</p>
@@ -242,6 +244,19 @@ defineExpose({ 滚到底 });
   line-height: 1.85;
   margin: 5px 0;
   text-indent: 2em;
+}
+
+.failed-draft {
+  border: 1px dashed rgba(195, 112, 72, 0.6);
+  background: rgba(255, 244, 232, 0.78);
+}
+
+.failed-draft > small {
+  display: block;
+  margin-bottom: 4px;
+  color: #9a4d2e;
+  font-weight: 800;
+  letter-spacing: 0.08em;
 }
 
 .scribing {

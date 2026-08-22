@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { DatabaseSync } from 'node:sqlite';
 import test from 'node:test';
 
 const require = createRequire(import.meta.url);
@@ -9,6 +10,7 @@ const ts = require('typescript');
 const 读 = 路径 => readFileSync(new URL(`../../${路径}`, import.meta.url), 'utf8');
 const 数据库源 = 读('src/人妻公寓/脚本/游戏逻辑/数据库桥.ts');
 const 回合源 = 读('src/人妻公寓/脚本/游戏逻辑/回合引擎.ts');
+const 机器协议源 = 读('src/人妻公寓/脚本/游戏逻辑/游戏机器协议.ts');
 
 function 载入摘要纯函数() {
   const 起 = 数据库源.indexOf('const 游戏表名 =');
@@ -247,7 +249,12 @@ test('正文模型不再生成 RQ 摘要；脚本只写硬骨架，数据库填�
   assert.ok(完成位置 >= 0 && 后台位置 > 完成位置, '前台必须先完成解锁，数据库后处理随后异步执行');
 
   assert.match(数据库源, /export const 数据库事件待整理摘要/);
-  assert.match(数据库源, /result_summary = CASE[\s\S]*待数据库AI整理[\s\S]*ELSE rq_events\.result_summary/);
+  assert.match(数据库源, /result_summary = CASE[\s\S]*WHEN result_summary IS NULL[\s\S]*ELSE result_summary/);
+  assert.doesNotMatch(
+    数据库源,
+    /rq_events\.result_summary/,
+    '插件重绑定 INSERT 目标表后不会改写限定符左侧，业务 SQL 不得残留逻辑表限定符',
+  );
   assert.match(
     数据库源,
     /const 恢复SQL = `INSERT INTO rq_events[\s\S]*result_summary = excluded\.result_summary[\s\S]*恢复SQL,/,
@@ -257,13 +264,64 @@ test('正文模型不再生成 RQ 摘要；脚本只写硬骨架，数据库填�
   assert.match(数据库源, /触发数据库增量更新/);
 
   // 旧存档或旧模型回复可能仍含该控制块，清洗层继续物理移除，但新正文提示不再要求生成它。
-  assert.match(回合源, /<rq_event_summary\\b\[\^>\]\*>\[\\s\\S\]\*\?<\\\/rq_event_summary/);
-  assert.match(回合源, /<rq_event_summary\\b\[\^>\]\*>\[\\s\\S\]\*\$\/i/);
   assert.match(
-    回合源,
-    /return 闭合清\.replace\(\/<rq_event_summary[\s\S]*?\.replace\(\/<\\\/rq_event_summary/,
-    '通用吞尾回退仍须再次清掉旧摘要协议',
+    机器协议源,
+    /\.replace\(\/<rq_event_summary\\b\[\^>\]\*>\[\\s\\S\]\*\?<\\\/rq_event_summary\\s\*>\/gi, ''\)/,
+    '闭合旧摘要协议必须在 HTML 转纯文本前移除',
   );
+  assert.match(机器协议源, /\.replace\(\/<rq_event_summary\\b\[\^>\]\*>\[\\s\\S\]\*\$\/i, ''\)/);
+  assert.doesNotMatch(机器协议源, /return 闭合清\.replace\(\/<rq_event_summary/, '游戏机器协议不再进入通用吞尾回退');
+});
+
+test('剧情事件 UPSERT 经 spv8.9.2 重绑定到物理表后仍可执行，并保护已完成摘要', () => {
+  const match = 数据库源.match(/const upsertSQL = `([\s\S]*?)`;/);
+  assert.ok(match, '应能取得生产环境剧情事件 UPSERT');
+  const runtimeSql = match[1].replace('INSERT INTO rq_events', 'INSERT INTO rqjuqingshijian');
+  assert.doesNotMatch(runtimeSql, /rq_events\./, '目标表改名后 SQL 中不得残留旧逻辑表限定符');
+
+  const db = new DatabaseSync(':memory:');
+  try {
+    db.exec(`CREATE TABLE rqjuqingshijian (
+      row_id INTEGER PRIMARY KEY,
+      floor_no INTEGER NOT NULL UNIQUE,
+      time_text TEXT,
+      location TEXT,
+      participants TEXT,
+      player_action TEXT,
+      result_summary TEXT,
+      event_code TEXT NOT NULL UNIQUE
+    )`);
+    const upsert = db.prepare(runtimeSql);
+    upsert.run(12, '第2天 晚上', '102室', '沈静仪', '敲门拜访', '【待数据库AI整理】RQ-12', 'RQ-12');
+    upsert.run(12, '第2天 深夜', '102室', '沈静仪', '继续交谈', '新骨架摘要', 'RQ-12');
+    assert.equal(
+      db.prepare('SELECT result_summary FROM rqjuqingshijian WHERE floor_no = 12').get().result_summary,
+      '新骨架摘要',
+      '待整理占位摘要应被新骨架更新',
+    );
+
+    db.prepare('UPDATE rqjuqingshijian SET result_summary = ? WHERE floor_no = 12').run('数据库 AI 已完成的可靠摘要');
+    upsert.run(12, '第2天 深夜', '102室', '沈静仪', '再次交谈', '【待数据库AI整理】RQ-12', 'RQ-12');
+    assert.equal(
+      db.prepare('SELECT result_summary FROM rqjuqingshijian WHERE floor_no = 12').get().result_summary,
+      '数据库 AI 已完成的可靠摘要',
+      '重复写硬骨架不得覆盖数据库 AI 已完成摘要',
+    );
+  } finally {
+    db.close();
+  }
+});
+
+test('剧情事件结构自检只对唯一识别的真实物理表执行 ALTER，并回读确认', () => {
+  const 起 = 数据库源.indexOf('function 引用SQLite标识符');
+  const 止 = 数据库源.indexOf('function 读SQLite探测缓存', 起);
+  const 函数族 = 数据库源.slice(起, 止);
+  assert.match(函数族, /PRAGMA table_list/);
+  assert.match(函数族, /必需字段 = \['row_id', 'floor_no', 'time_text', 'location', 'participants', 'player_action'\]/);
+  assert.match(函数族, /候选\.length === 1 \? 候选\[0\] : null/);
+  assert.match(函数族, /ALTER TABLE \$\{引用SQLite标识符\(物理表\)\} ADD COLUMN/);
+  assert.match(函数族, /补字段 \$\{字段\.name\} 后回读未生效/);
+  assert.doesNotMatch(函数族, /ALTER TABLE rq_events/, 'ALTER 不会被插件重绑定，不能再直接使用逻辑别名');
 });
 
 test('首次准备和手机设置都明确显示五表迁移，不再把旧四表判为完成文案', () => {

@@ -678,7 +678,7 @@ test('报修与投诉微信由任务真相编译，并在普通消息频率门�
 
 test('成功结算型回合只在非空正文且未晚取消时提交', () => {
   const engine = readFileSync('src/人妻公寓/脚本/游戏逻辑/回合引擎.ts', 'utf8');
-  const 空正文门 = engine.indexOf('选项.成功结算 && !已清洗正文');
+  const 空正文门 = engine.indexOf("if (选项.成功结算) throw new Error('AI 没有返回有效正文");
   const 提交前取消门 = engine.indexOf('if (已取消)', engine.indexOf('const 资源结算 = 结算成功现场楼'));
   const 关闭可取消窗口 = engine.indexOf('允许取消 = false;', 提交前取消门);
   const 关闭取消窗口 = engine.indexOf("本回合生成id = '';", 提交前取消门);

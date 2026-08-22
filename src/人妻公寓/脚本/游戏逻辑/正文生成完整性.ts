@@ -3,8 +3,8 @@
  * 最终 Promise 却可能只剩空串或变量协议。只有最终返回确实没有可用正文时，才允许
  * 采用同一个正文 generation_id 留下的最后一份完整流式文本；正常最终返回永远优先。
  */
-function 有有效正文(原文: string, 清洗正文: (原文: string) => string): boolean {
-  const 已清洗 = 清洗正文(原文).trim();
+function 有有效正文(原文: string, 提取有效正文: (原文: string) => string): boolean {
+  const 已清洗 = 提取有效正文(原文).trim();
   const 仅残缺标签 = /^<\/?[A-Za-z_\u3400-\u9fff][A-Za-z0-9_\u3400-\u9fff~:-]*$/.test(已清洗);
   return Boolean(原文.trim() && 已清洗 && !仅残缺标签);
 }
@@ -109,23 +109,51 @@ export function 是当前正文流事件(正文生成id: string, 当前生成id:
  * 流式宿主偶尔在完整累计文本之后又补发一帧纯变量尾段。缓存只接受仍含剧情正文的帧，
  * 避免最后一帧把同一 generation 已经收到的完整正文覆盖掉。
  */
-export function 更新有效流式正文(当前缓存: unknown, 新流式文本: unknown, 清洗正文: (原文: string) => string): string {
+export function 更新有效流式正文(当前缓存: unknown, 新流式文本: unknown, 提取有效正文: (原文: string) => string): string {
   const 当前原文 = typeof 当前缓存 === 'string' ? 当前缓存 : '';
   const 新流式原文 = typeof 新流式文本 === 'string' ? 新流式文本 : '';
   // 累计流通常只在末尾增长；当前缓存已通过有效性门时，其前缀仍在即可直接接纳，
   // 避免每个 token 都对越来越长的全文重复执行完整协议清洗。
   if (当前原文.trim() && 新流式原文.startsWith(当前原文)) return 新流式原文;
-  if (有有效正文(新流式原文, 清洗正文)) return 新流式原文;
+  if (有有效正文(新流式原文, 提取有效正文)) return 新流式原文;
   return 当前原文;
 }
 
-export function 选择正文生成原文(最终返回: unknown, 流式缓存: unknown, 清洗正文: (原文: string) => string): string {
+export function 选择正文生成原文(最终返回: unknown, 流式缓存: unknown, 提取有效正文: (原文: string) => string): string {
   const 最终原文 = typeof 最终返回 === 'string' ? 最终返回 : '';
   const 流式原文 = typeof 流式缓存 === 'string' ? 流式缓存 : '';
 
-  if (有有效正文(最终原文, 清洗正文)) return 最终原文;
-  if (有有效正文(流式原文, 清洗正文)) return 流式原文;
+  if (有有效正文(最终原文, 提取有效正文)) return 最终原文;
+  if (有有效正文(流式原文, 提取有效正文)) return 流式原文;
   return 最终原文;
+}
+
+export interface 正文提交判定 {
+  显示正文: string;
+  成功正文: string;
+  失败残稿: string;
+  可提交: boolean;
+}
+
+/**
+ * 玩家可见文本与游戏成功正文使用两道独立门：显示门可以保留未完成残稿，成功门仍会
+ * 剥除思维链和机器协议。失败残稿永远不会被上层当作任务、资源或变量结算依据。
+ */
+export function 判定正文提交(
+  显示原文: string,
+  清洗显示正文: (原文: string) => string,
+  清洗成功正文: (原文: string) => string,
+  成功判定原文: string = 显示原文,
+): 正文提交判定 {
+  const 显示正文 = 清洗显示正文(String(显示原文 ?? '')).trim();
+  const 成功正文 = 清洗成功正文(String(成功判定原文 ?? '')).trim();
+  const 可提交 = Boolean(成功正文);
+  return {
+    显示正文: 显示正文 || 成功正文,
+    成功正文,
+    失败残稿: 可提交 ? '' : 显示正文,
+    可提交,
+  };
 }
 
 /**
@@ -133,9 +161,9 @@ export function 选择正文生成原文(最终返回: unknown, 流式缓存: un
  * 留下正文且已经以自然句末收口时才允许保住该流；半句、纯协议和思维链仍返回空，让上层
  * 按失败回滚，不能拿玩家刚看见的一截残文冒充完成。
  */
-export function 生成失败时可保留的流式正文(流式缓存: unknown, 清洗正文: (原文: string) => string): string {
+export function 生成失败时可保留的流式正文(流式缓存: unknown, 提取有效正文: (原文: string) => string): string {
   const 原文 = typeof 流式缓存 === 'string' ? 流式缓存 : '';
-  if (!有有效正文(原文, 清洗正文)) return '';
-  const 净文 = 清洗正文(原文).trim();
+  if (!有有效正文(原文, 提取有效正文)) return '';
+  const 净文 = 提取有效正文(原文).trim();
   return /[。！？!?….](?:[」』”’"'）)\]】》〕〉]*)$/.test(净文) ? 原文 : '';
 }

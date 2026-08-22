@@ -82,19 +82,19 @@ test('数据库最新版只从 spv 稳定标签中选择最高数字版本', () 
   assert.equal(选择最新数据库稳定版本({ versions: ['test29', 'xingv5.2'] }), '');
 });
 
-test('游戏当前版本固定为 0.87，最新版只接受官方 rq 稳定标签', () => {
+test('游戏当前版本固定为 0.89，最新版只接受官方 rq 稳定标签', () => {
   const { 当前游戏版本, 选择最新游戏稳定版本 } = 载入TypeScript('src/人妻公寓/脚本/游戏逻辑/依赖版本.ts');
   const 组卡源码 = 读('src/人妻公寓/组卡.mjs');
   const 组卡版本 = 组卡源码.match(/const 版本 = '([^']+)'/)?.[1];
   const 组卡标签 = 组卡源码.match(/const TAG = 'rq([^']+)'/)?.[1];
-  assert.equal(当前游戏版本, '0.87', '下一次发布必须显式更新游戏本体版本');
+  assert.equal(当前游戏版本, '0.89', '下一次发布必须显式更新游戏本体版本');
   assert.equal(当前游戏版本, 组卡版本, '游戏检测版本必须与角色卡展示版本一致');
   assert.equal(当前游戏版本, 组卡标签, '游戏检测版本必须与角色卡资源标签一致');
   assert.equal(
     选择最新游戏稳定版本({
-      versions: ['xdy0.99', 'v9.0', '0.90', 'rq0.83', 'rq0.84', 'rq0.85', 'rq0.86', 'rq0.87', 'rq0.88-beta', 'rq0.9'],
+      versions: ['xdy0.99', 'v9.0', '0.90', 'rq0.83', 'rq0.84', 'rq0.85', 'rq0.86', 'rq0.87', 'rq0.88', 'rq0.89', 'rq0.90-beta', 'rq0.9'],
     }),
-    '0.87',
+    '0.89',
   );
   assert.equal(
     选择最新游戏稳定版本([
@@ -103,9 +103,11 @@ test('游戏当前版本固定为 0.87，最新版只接受官方 rq 稳定标�
       { ref: 'refs/tags/rq0.85' },
       { ref: 'refs/tags/rq0.86' },
       { ref: 'refs/tags/rq0.87' },
+      { ref: 'refs/tags/rq0.88' },
+      { ref: 'refs/tags/rq0.89' },
       { ref: 'refs/heads/rq99.0' },
     ]),
-    '0.87',
+    '0.89',
   );
   assert.equal(选择最新游戏稳定版本({ versions: ['xdy0.99', 'v0.87', 'rq0.87-beta'] }), '');
 });

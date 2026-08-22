@@ -551,6 +551,7 @@
             :editing-text="编辑文本"
             :editing-saving="编辑保存中"
             :stream-segments="流式段"
+            :failed-draft-segments="失败残稿段"
             :runtime-stage="运行阶段"
             :wait-seconds="生成等待秒"
             :retry-action="待重试行动"
@@ -1316,9 +1317,8 @@ import { 手机邀约计划成员, 手机邀约计划状态, type 手机邀约�
 import { 手机锚消息签名 } from '../../脚本/游戏逻辑/手机时间线租约';
 import { 判定时间撤销点, 是时间撤销地点, 时间撤销点键 } from '../../脚本/游戏逻辑/时间撤销系统';
 import { 风闻事件安全摘要 } from '../../脚本/游戏逻辑/风闻系统';
-import { 清除末尾残缺协议标签, 清除末尾裸JSON补丁 } from '../../脚本/游戏逻辑/严格正文清洗';
-import { 当前预设正文标签 as 读取当前预设正文标签 } from '../../脚本/游戏逻辑/预设桥';
-import { 清洗预设输出, type 预设正文标签 } from '../../脚本/游戏逻辑/预设输出兼容';
+import { 检测AI输出美化正则 } from '../../脚本/游戏逻辑/预设输出兼容';
+import { 提取正文舞台文本 } from '../../脚本/游戏逻辑/正文输出边界';
 import { 更新有效流式正文 } from '../../脚本/游戏逻辑/正文生成完整性';
 import {
   行动资源门槛,
@@ -1421,7 +1421,6 @@ import type {
   立绘项,
   道具视觉类型,
   卷轴条,
-  玩家正则项,
   全屏文档,
   酒馆原生提示词模块,
 } from './types';
@@ -3030,6 +3029,7 @@ const { 房间动作, 当前房间动作, 普通房间动作, 确认已到达动
 // 保留 App 对组合器完整返回契约的接线；当前模板只直接消费普通房间动作。
 void 当前房间动作;
 const 流式段 = ref<string[]>([]);
+const 失败残稿段 = ref<string[]>([]);
 // ── 特殊场景「录像带」交互(App A7a:状态机/5 秒与 10 连点/完整失败记账/补偿迁入 composables/useVideoTape.ts) ──
 // App 只注入运行态 refs 与业务事件回调;事件名与载荷保持原样,composable 不直连事件总线。
 const {
@@ -4000,162 +4000,31 @@ const 当前幕 = computed(() => {
   return 列表[起].谁 === '玩家' ? 列表.slice(起) : 列表;
 });
 
-// 玩家预设兼容:按玩家自己酒馆里的显示向正则(仅全局+预设)跑一遍
-let 玩家正则表: 玩家正则项[] = [];
+// 预设美化仅检测并提醒，不在游戏内重跑正则或复制其 HTML/CSS/动画。
+let 已提示美化正则签名 = '';
 
-function 刷新玩家正则() {
+function 刷新美化正则提醒(): void {
+  const 正则们: ReturnType<typeof getTavernRegexes> = [];
   try {
-    // 分源读取:预设正则读取失败不连累全局正则(2026-07-17 摘要块漏显修复)
-    const 原: ReturnType<typeof getTavernRegexes> = [];
-    try {
-      原.push(...getTavernRegexes({ type: 'global' }));
-    } catch (e) {
-      console.warn('[人妻公寓客户端] 读取全局正则失败:', e);
-    }
-    try {
-      原.push(...getTavernRegexes({ type: 'preset', name: 'in_use' }));
-    } catch (e) {
-      console.warn('[人妻公寓客户端] 读取预设正则失败:', e);
-    }
-    玩家正则表 = 原
-      .filter(r => r.enabled && r.destination?.display && (r.source?.ai_output || r.source?.user_input))
-      .map(r => {
-        try {
-          const m = r.find_regex.match(/^\/([\s\S]+)\/([a-z]*)$/);
-          const re = m ? new RegExp(m[1], m[2]) : new RegExp(_.escapeRegExp(r.find_regex), 'g');
-          return {
-            re,
-            替换: r.replace_string ?? '',
-            用户: !!r.source.user_input,
-            ai: !!r.source.ai_output,
-            min: r.min_depth,
-            max: r.max_depth,
-          };
-        } catch {
-          return null;
-        }
-      })
-      .filter(Boolean) as 玩家正则项[];
-  } catch (e) {
-    玩家正则表 = [];
-    console.warn('[人妻公寓客户端] 读取玩家正则失败(退回本卡清洗):', e);
+    正则们.push(...getTavernRegexes({ type: 'global' }));
+  } catch (error) {
+    console.warn('[人妻公寓客户端] 读取全局正则用于美化检测失败:', error);
   }
-}
-
-function 过酒馆正则(文本: string, 来源: 'ai_output' | 'user_input', 深度: number): string {
-  for (const 项 of 玩家正则表) {
-    if (来源 === 'ai_output' ? !项.ai : !项.用户) continue;
-    if (项.min !== null && 深度 < 项.min) continue;
-    if (项.max !== null && 深度 > 项.max) continue;
-    try {
-      文本 = 文本.replace(项.re, 项.替换.replace(/\{\{match\}\}/gi, '$&'));
-    } catch {
-      /* 单条应用失败跳过 */
-    }
+  try {
+    正则们.push(...getTavernRegexes({ type: 'preset', name: 'in_use' }));
+  } catch (error) {
+    console.warn('[人妻公寓客户端] 读取预设正则用于美化检测失败:', error);
   }
-  return 文本;
-}
 
-let 当前预设正文标签: 预设正文标签 | null = null;
-
-function 刷新当前预设正文标签(): void {
-  当前预设正文标签 = 读取当前预设正文标签();
-}
-
-function 清洗(原文: string, 流式 = false): string {
-  const 协议清 = 清洗预设输出(原文, 流式 ? 当前预设正文标签 : null);
-  if (流式 && 当前预设正文标签 && !协议清.正文已开始) return '';
-  const 闭合清 = 协议清.文本
-    // content 包裹型预设：正文边界明确时只显示 content，兼容思考标签开闭名称不一致。
-    // 未闭合 content 也只裁掉前缀，保留其后的正文；流式生成时同样不会露出思考区。
-    .replace(/^[\s\S]*?<content\b[^>]*>/i, '')
-    .replace(/<\/content\s*>[\s\S]*$/i, '')
-    // story_scene 与 content 同为正文包装：保留内部剧情、剥掉标签外的预设噪声。
-    // 未闭合开标签也只裁前缀，兼容流式半截输出。
-    .replace(/^[\s\S]*?<story_scene\b[^>]*>/i, '')
-    .replace(/<\/story_scene\s*>[\s\S]*$/i, '')
-    .replace(/【开始思考】[\s\S]*?<\/think_fox~\s*>/gi, '')
-    .replace(/<fox_selc\b[^>]*>[\s\S]*?<\/fox_selc\s*>/gi, '')
-    .replace(/<fox_tip\b[^>]*>[\s\S]*?<\/fox_tip\s*>/gi, '')
-    // Izumi 预设：konatan_planning~ 是思考规划，tucao 是正文后的吐槽/总结；两块均不显示。
-    .replace(/<konatan_planning~[^>]*>[\s\S]*?<\/konatan_planning~\s*>/gi, '')
-    .replace(/<tucao\b[^>]*>[\s\S]*?<\/tucao\s*>/gi, '')
-    // TG：SexualScene 内是应显示的特写剧情；w2g/校验/免责声明不属于正文。
-    .replace(/<\/?SexualScene\b[^>]*>/gi, '')
-    .replace(/<(VariableCheck|Disclaimer|w2g)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
-    // 双人成行的摘要、选项、平行世界与前端组件只供该预设渲染，不混入游戏卷轴。
-    .replace(/<(meow_FM|branches|parallel_world|historic_events|htm1fenge)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, '')
-    .replace(
-      /<(?:VariableCheck|Disclaimer|w2g|meow_FM|branches|parallel_world|historic_events|htm1fenge)\b[^>]*>[\s\S]*$/i,
-      '',
-    )
-    .replace(
-      /<\/?(?:content|story_scene|now_plot|think_fox~|fox_selc|fox_tip|konatan_planning~|tucao|SexualScene|VariableCheck|Disclaimer|w2g|meow_FM|branches|parallel_world|historic_events|htm1fenge)(?:\s[^>]*)?>/gi,
-      '',
-    )
-    // 兼容漏写 </draft_notes> 的玩家预设：只在后续完整 bginfor 提供可靠边界时整块删除。
-    // 没有可靠边界时只剥标签，避免重演“清洗吞尾导致整段正文消失”。
-    .replace(/<draft_notes\b[^>]*>[\s\S]*?<bginfor\b[^>]*>[\s\S]*?<\/bginfor\s*>/gi, '')
-    .replace(/<draft_notes\b[^>]*>[\s\S]*?<\/draft_notes\s*>/gi, '')
-    .replace(/<bginfor\b[^>]*>[\s\S]*?<\/bginfor\s*>/gi, '')
-    .replace(/<CEstuff\b[^>]*>[\s\S]*?<\/CEstuff\s*>/gi, '')
-    .replace(/<\/?(?:draft_notes|bginfor|CEstuff)\b[^>]*>/gi, '')
-    .replace(/<UpdateVariable\b[^>]*>[\s\S]*?<\/UpdateVariable\s*>/gi, '')
-    .replace(/<json_?patch\b[^>]*>[\s\S]*?<\/json_?patch\s*>/gi, '')
-    .replace(/<StatusPlaceHolderImpl\/>/g, '')
-    // 预设的摘要/折叠块(<details>)只藏不删:楼层原文保留给 AI 与预设当记忆,显示层吞掉
-    .replace(/<details[^>]*>[\s\S]*?<\/details>/gi, '')
-    .replace(/<think(?:ing)?>[\s\S]*?<\/think(?:ing)?>/gi, '')
-    .replace(/<reason(?:ing)?>[\s\S]*?<\/reason(?:ing)?>/gi, '')
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/^\s*-{2,}>?\s*$/gm, '')
-    .replace(/<options\b[^>]*>[\s\S]*?<\/options\s*>/gi, '')
-    .replace(/<行为等级(?:\s[^>]*)?>[\s\S]*?<\/行为等级\s*>/gi, '')
-    .replace(/<尺度判定(?:\s[^>]*)?>[\s\S]*?(?:<\/尺度判定\s*>|$)/gi, '')
-    .replace(/<\/(?:UpdateVariable|json_?patch|options|行为等级|尺度判定)\s*>/gi, '')
-    // 玩家预设夹带的整篇 HTML 组件(2026-07-18 玩家实测,同脚本侧 清洗正文):裸代码墙整体剥除
-    .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*?```/gi, '')
-    .replace(/<!DOCTYPE[\s\S]*?<\/html\s*>/gi, '')
-    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-    // 兼容玩家预设用作换行但没有闭合的裸 <p>。
-    .replace(/<\/?p(?:\s[^>]*)?>/gi, '\n')
-    // 玩家预设夹带的包装 div(2026-07-19,同脚本侧):konata-thinking-wrapper/tucao-w 等
-    // 空壳或漏闭合裸 div 剥壳，保留其中正文。
-    .replace(/<\/?div[^>]*>/gi, '');
-  const 全清 = 闭合清
-    // 未闭合块也吞掉:流式=防半截标记块闪现;完整楼层=防截断残块
-    .replace(/<details[^>]*>[\s\S]*$/i, '')
-    .replace(/<think(?:ing)?>[\s\S]*$/i, '')
-    .replace(/<reason(?:ing)?>[\s\S]*$/i, '')
-    .replace(/<!--[\s\S]*$/, '')
-    .replace(/<UpdateVariable\b[^>]*>[\s\S]*$/i, '')
-    .replace(/<json_?patch\b[^>]*>[\s\S]*$/i, '')
-    .replace(/<options\b[^>]*>[\s\S]*$/i, '')
-    .replace(/<行为等级(?:\s[^>]*)?>[\s\S]*$/i, '')
-    .replace(/<尺度判定(?:\s[^>]*)?>[\s\S]*$/i, '')
-    .replace(/<tucao\b[^>]*>[\s\S]*$/i, '')
-    .replace(/```(?:html|xml)?\s*(?:<!DOCTYPE|<html)[\s\S]*$/i, '')
-    .replace(/<!DOCTYPE[\s\S]*$/i, '')
-    .replace(/<style[^>]*>[\s\S]*$/i, '')
-    .replace(/<script[^>]*>[\s\S]*$/i, '')
-    .trim();
-  // 吞尾防误杀(2026-07-17,与脚本侧 清洗正文 同款):AI 把协议标记漏闭合写在开头时,
-  // 吞尾会把整楼显示成空白——完整楼层回退只清闭合块,顺手剥掉裸标记词;流式期间不回退
-  if (!流式 && !全清 && 闭合清.trim()) {
-    console.warn('[人妻公寓客户端] 显示层吞尾把楼层吞成了空白,回退只清闭合块');
-    return 清除末尾裸JSON补丁(
-      清除末尾残缺协议标签(
-        闭合清
-          .replace(
-            /<\/?(?:think(?:ing)?|reason(?:ing)?|UpdateVariable|json_?patch|options|行为等级|尺度判定|details[^>]*|konatan_planning~|tucao|now_plot|SexualScene|VariableCheck|Disclaimer|w2g|meow_FM|branches|parallel_world|historic_events|htm1fenge)>/gi,
-            '',
-          )
-          .trim(),
-      ),
-    );
+  const 名称们 = 检测AI输出美化正则(正则们);
+  const 签名 = 名称们.slice().sort().join('\u0000');
+  if (!签名) {
+    已提示美化正则签名 = '';
+    return;
   }
-  return 清除末尾裸JSON补丁(清除末尾残缺协议标签(全清));
+  if (签名 === 已提示美化正则签名) return;
+  已提示美化正则签名 = 签名;
+  弹提示(`检测到正文显示美化正则：${名称们.join('、')}。游戏只使用最终纯文字，请在当前预设中关闭这些美化正则；删除/隐藏思维链的正则可以保留。`, 10000);
 }
 
 async function 滚到底() {
@@ -4165,73 +4034,14 @@ async function 滚到底() {
 
 let 卷轴请求序号 = 0;
 
-/**
- * 获取酒馆已经完成渲染的消息 HTML。
- * 不重新实现用户预设 regex/markdown，只消费 SillyTavern 已挂载到 .mes_text 的结果。
- * 获取失败时返回空，让旧的文本清洗链继续兜底。
- */
-function 获取酒馆已渲染消息HTML(楼号: number): string {
-  try {
-    const 根文档 = (window.parent ?? window).document;
-    const 消息 = [...根文档.querySelectorAll<HTMLElement>('.mes[mesid]')].find(
-      el => Number(el.getAttribute('mesid')) === 楼号,
-    );
-    return 消息?.querySelector<HTMLElement>('.mes_text')?.innerHTML ?? '';
-  } catch {
-    return '';
-  }
-}
-
-/**
- * 回合完成事件可能早于酒馆消息 DOM 最终挂载；读取最终显示 HTML 时允许短暂等待重试。
- * 不等待会导致偶发退回纯文本，从而丢失预设动画/卡片。
- */
-async function 等待酒馆已渲染消息HTML(楼号: number): Promise<string> {
-  for (let i = 0; i < 3; i++) {
-    const html = 获取酒馆已渲染消息HTML(楼号);
-    if (html) return html;
-    await new Promise(resolve => requestAnimationFrame(() => resolve(null)));
-  }
-  return '';
-}
-
-/**
- * 保留预设视觉层，但禁止把酒馆消息中的可执行能力带入游戏舞台。
- * CSS/动画属于显示协议，不在这里删除；脚本和事件属性属于执行能力，需要隔离。
- */
-function 净化正文舞台HTML(html: string): string {
-  try {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    doc.querySelectorAll('script, iframe, object, embed, link, meta').forEach(el => el.remove());
-    doc.querySelectorAll<HTMLElement>('*').forEach(el => {
-      [...el.attributes].forEach(attr => {
-        if (/^on/i.test(attr.name)) el.removeAttribute(attr.name);
-      });
-    });
-
-    // 预设视觉 CSS 需要保留(@keyframes、卡片 class、inline style)，但不能让消息里的全局规则污染游戏 UI。
-    doc.querySelectorAll('style').forEach(style => {
-      style.textContent = String(style.textContent ?? '')
-        .replace(/(^|})\s*(html|body|\*|:root)\s*\{[^}]*\}/gi, '$1')
-        .replace(/@import[^;]+;/gi, '');
-    });
-
-    return doc.body.innerHTML;
-  } catch {
-    return html;
-  }
-}
-
 async function 读取卷轴范围(范围: 楼层范围, 当前末楼: number): Promise<卷轴条[]> {
   const 消息组 = (await getChatMessages(`${范围.起楼}-${范围.末楼}`)) ?? [];
   const 条目: 卷轴条[] = [];
   for (const 消息 of 消息组) {
     const 是玩家 = 消息.role === 'user';
     const 原文 = 消息.message ?? '';
-    const 渲染HTML = 是玩家 ? '' : 净化正文舞台HTML(await 等待酒馆已渲染消息HTML(消息.message_id));
-    const 净文 = 清洗(过酒馆正则(原文, 是玩家 ? 'user_input' : 'ai_output', 当前末楼 - 消息.message_id));
-    // 预设 HTML 已经被酒馆渲染时，原始文本可能被协议清洗为空；不能因为纯文本为空而吞掉已经存在的视觉正文。
-    if (!净文 && !渲染HTML) continue;
+    const 净文 = 提取正文舞台文本(原文);
+    if (!净文) continue;
     // 0 楼藏着界面占位标记,整楼写回会砸掉客户端,不开放编辑
     const 可编辑 = 消息.message_id > 0 ? { 原文 } : {};
     if (是玩家) {
@@ -4249,7 +4059,6 @@ async function 读取卷轴范围(范围: 楼层范围, 当前末楼: number): P
           .split(/\n+/)
           .map(s => s.trim())
           .filter(Boolean),
-        ...(渲染HTML ? { 渲染HTML } : {}),
         楼: 消息.message_id,
         _排序: 消息.message_id * 10000,
         可回档: 消息.message_id > 0 && 消息.message_id < 当前末楼,
@@ -4263,7 +4072,7 @@ async function 读取卷轴范围(范围: 楼层范围, 当前末楼: number): P
       const 锚楼 = Number(原?.锚楼 ?? -1);
       if (锚楼 < 范围.起楼 || 锚楼 > 范围.末楼) continue;
       if (!原 || (原.谁 !== '玩家' && 原.谁 !== '叙事') || typeof 原.文本 !== 'string') continue;
-      const 净文 = 清洗(过酒馆正则(原.文本, 原.谁 === '玩家' ? 'user_input' : 'ai_output', 0));
+      const 净文 = 提取正文舞台文本(原.文本);
       if (!净文) continue;
       条目.push({
         谁: 原.谁,
@@ -4290,7 +4099,7 @@ async function 取卷轴(保留已加载史册 = false) {
   const 请求时间线世代 = 当前时间线切换世代();
   史册加载中.value = false;
   try {
-    刷新玩家正则();
+    刷新美化正则提醒();
     const 末楼 = getLastMessageId();
     const 范围 = 保留已加载史册 ? { 起楼: Math.max(0, Math.min(史册最早楼.value, 末楼)), 末楼 } : 末页楼层范围(末楼);
     const 条目 = await 读取卷轴范围(范围, 末楼);
@@ -4319,7 +4128,7 @@ async function 加载更早史册() {
   const 原位置 = 容器?.scrollTop ?? 0;
   史册加载中.value = true;
   try {
-    刷新玩家正则();
+    刷新美化正则提醒();
     const 当前末楼 = getLastMessageId();
     const 新页 = await 读取卷轴范围(范围, 当前末楼);
     if (请求序号 !== 卷轴请求序号 || 请求时间线世代 !== 当前时间线切换世代()) return;
@@ -4878,6 +4687,7 @@ function 客户端聊天切换(): void {
   由头写入中.value = false;
   运行阶段.value = '';
   流式段.value = [];
+  失败残稿段.value = [];
   输入文本.value = '';
   待重试行动.value = '';
   失败行动.value = '';
@@ -5023,9 +4833,9 @@ onMounted(() => {
     场景剧情准备事件序号 += 1;
     场景剧情准备锁.value = null;
     // 脚本侧发起的回合(查看监控等)也要锁输入+亮书写态；重要反馈由发送中门暂时隐藏，结束后继续展示。
-    刷新当前预设正文标签();
     // “保留最后有效流”只能发生在同一次生成内，绝不把上一回合正文带进新 generation。
     流式段.value = [];
+    失败残稿段.value = [];
     发送中.value = true;
     运行阶段.value = '正在准备本回合';
     // 脚本忙门会拒绝并行业务；界面同时收起已经打开的旧弹窗，避免玩家点击后只收到失败提示。
@@ -5071,11 +4881,20 @@ onMounted(() => {
       if (载荷?.提示) 弹提示(载荷.提示, 载荷.成功 ? 3600 : 5200);
     },
   );
+  eventOn('人妻公寓:失败残稿', (文本: string) => {
+    const 净文 = 提取正文舞台文本(文本);
+    失败残稿段.value = 净文
+      ? 净文
+          .split(/\n+/)
+          .map(段 => 段.trim())
+          .filter(Boolean)
+      : [];
+  });
   eventOn('人妻公寓:流式', (文本: string) => {
     if (!运行阶段.value.startsWith('数据库')) 运行阶段.value = 'AI正在生成正文';
-    // 流式半截文本只走本卡清洗,不过玩家正则(闭合标记未到会整段吞空)
+    // 流式中间帧只转为纯文本并清除游戏机器协议，不执行或猜测玩家预设协议。
     const 当前净文 = 流式段.value.join('\n');
-    const 净文 = 更新有效流式正文(当前净文, 清洗(文本, true), 内容 => 内容);
+    const 净文 = 更新有效流式正文(当前净文, 提取正文舞台文本(文本), 内容 => 内容);
     流式段.value = 净文
       ? 净文
           .split(/\n+/)
@@ -5139,6 +4958,7 @@ onMounted(() => {
       失败行动.value = '';
       取消后自动重试.value = false;
       流式段.value = [];
+      失败残稿段.value = [];
       重置录像带界面();
       处理静音会议回合完成前();
       同步场景自变量(); // 回档把 _场景 清空后 UI 必须跟着回楼道(审计 C2)

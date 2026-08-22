@@ -417,7 +417,7 @@ test('孕情初见迟到提交必须重新验证公开状态与观察者资格�
 test('正文双入口都只在有效正文成功收口时提交孕情初见票', () => {
   const 回合源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/回合引擎.ts', import.meta.url), 'utf8');
   const 原生源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
-  assert.match(回合源码, /if \(已清洗正文\) 提交孕情初见评价\(newStat, 快照, 生成楼层\)/);
+  assert.match(回合源码, /if \(可提交正文\) 提交孕情初见评价\(newStat, 快照, 生成楼层\)/);
   assert.match(原生源码, /if \(本轮有效正文\) 提交孕情初见评价\(newData, _本轮孕情初见提示, 楼层\)/);
   assert.ok(
     回合源码.indexOf("if (已取消) throw new Error('__RQGY_CANCELLED__')") < 回合源码.indexOf('提交孕情初见评价(newStat'),

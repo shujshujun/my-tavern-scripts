@@ -184,13 +184,13 @@ test('早餐属于强制正文事件，空正文在固定0楼与原生逃生路�
 
   const 回合Source = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/回合引擎.ts', import.meta.url), 'utf8');
   const 固定零楼回合起点 = 回合Source.indexOf('export async function 执行回合');
-  const 固定零楼已清洗位置 = 回合Source.indexOf('const 已清洗正文 =', 固定零楼回合起点);
+  const 固定零楼可提交位置 = 回合Source.indexOf('const 可提交正文 =', 固定零楼回合起点);
   const 固定零楼空正文门 = 回合Source.slice(
-    固定零楼已清洗位置,
-    回合Source.indexOf('const 基础正文 =', 固定零楼已清洗位置),
+    固定零楼可提交位置,
+    回合Source.indexOf('const 基础正文 =', 固定零楼可提交位置),
   );
   assert.match(固定零楼空正文门, /事件必须有正文\(本楼事件\)/);
-  assert.match(固定零楼空正文门, /!已清洗正文/);
+  assert.match(固定零楼空正文门, /!正文判定\.可提交/);
   assert.match(固定零楼空正文门, /throw new Error/);
 
   const indexSource = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
@@ -221,8 +221,8 @@ test('所有确定性正戏都要求真实正文，不能用纯标签响应消�
   const 回合Source = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/回合引擎.ts', import.meta.url), 'utf8');
   assert.match(
     回合Source,
-    /事件必须有正文\(本楼事件\)[\s\S]{0,180}清洗严格正文\(最终显示原文\)/,
-    '确定性正戏必须在酒馆最终显示正则后继续走严格正文门，纯标签仍不能消费票据',
+    /判定正文提交\(最终显示原文, 提取正文舞台文本, 提取可提交正文, 原文\)[\s\S]{0,360}事件必须有正文\(本楼事件\)/,
+    '确定性正戏必须在酒馆最终显示正则后继续走严格成功门，纯标签仍不能消费票据',
   );
 });
 

@@ -17,6 +17,7 @@ import {
 } from '../../../脚本/游戏逻辑/数据库桥';
 import {
   当前游戏版本,
+  游戏版本构建标记,
   比较稳定版本,
   查询数据库官方最新版本,
   查询游戏官方最新版本,
@@ -423,6 +424,7 @@ watch(
   <div
     v-if="open"
     class="mask setup-mask"
+    :data-game-build="游戏版本构建标记"
     role="dialog"
     aria-modal="true"
     aria-labelledby="setup-sheet-title"
