@@ -46,9 +46,17 @@ export function 渲染settings(上下文: 渲染上下文): void {
       <option value="自定义"${c.ai来源 === '自定义' ? ' selected' : ''}>手机专用模型（自定义 API）</option>
     </select></label>
     <div class="rqp-api-section db-api-section">
-      <p class="db-status" style="color:${db.已安装 ? '#287a50' : '#666'};font-size:12px;margin:2px 0 5px">数据库：${
+      <p class="db-status" style="color:${
+        !db.已安装 ? '#666' : db.已装游戏模板 && db.脚本所有权模板已启用 ? '#287a50' : '#9a6420'
+      };font-size:12px;margin:2px 0 5px">数据库：${
         db.已安装
-          ? `已连接${db.已装游戏模板 ? '，人妻公寓五表已安装' : '，尚未安装人妻公寓五表'}${
+          ? `已连接${
+              !db.已装游戏模板
+                ? '，尚未安装人妻公寓五表'
+                : db.脚本所有权模板已启用
+                  ? '，人妻公寓五表与逐楼归属规则已就绪'
+                  : '，五表已安装但逐楼归属规则需更新（通用填表已暂停）'
+            }${
               db.可调用AI ? '' : '，未开放AI代理'
             }`
           : '未检测到公开 API（自动模式会使用正文 API）'

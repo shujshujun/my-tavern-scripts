@@ -79,7 +79,10 @@ import {
   检测数据库脚本写入能力,
   修复数据库固定开局摘要,
   同步数据库回合,
-  数据库事件待整理摘要,
+  覆盖数据库剧情事件摘要,
+  提取回合事件摘要,
+  脚本保守回合摘要,
+  数据库固定开局摘要,
   数据库状态,
   触发数据库增量更新,
   通过数据库生成,
@@ -93,6 +96,7 @@ import {
   当前微信摘要引用,
   当前微信联系保护表,
   当前聊天ID,
+  立即持久保存手机聊天变量,
   等待微信摘要任务,
   读取近期微信胶囊,
   设置静音会议手机生成中,
@@ -108,6 +112,11 @@ import {
   type 手机邀约计划,
 } from './手机/邀约计划';
 import { 手机锚消息签名, 作废当前手机时间线租约世代 } from './手机时间线租约';
+import {
+  写入微信清空镜像,
+  推进微信持久修订,
+  选择微信刷新恢复值,
+} from './手机/刷新恢复镜像';
 import { 推进特殊场景, 静音会议正式运行中 } from './特殊场景系统';
 import { 构造CG亲密上下文 } from './CG亲密上下文';
 import { 行动资源门槛, 现场楼身体增长依赖, 结算成功现场楼 } from './玩家资源系统';
@@ -337,7 +346,15 @@ async function 恢复回合变量快照(
 /** 手机记录不塞进每回合快照（会令存档平方膨胀），按楼层戳裁掉被删除时间线。
  * @param 目标钟 回滚后 stat 的绝对时段——手机节拍水位线使用世界时间轴。 */
 export function 裁手机时间线(vars: Record<string, unknown>, 楼层: number, 目标钟: number): void {
-  const 库 = _.get(vars, '_微信') as
+  const 手机聊天ID = 当前聊天ID();
+  const 当前微信值 = _.get(vars, '_微信');
+  const 微信选择 = 选择微信刷新恢复值(
+    当前微信值,
+    Object.prototype.hasOwnProperty.call(vars, '_微信'),
+    手机聊天ID,
+    目标钟,
+  );
+  const 库 = 微信选择.值 as
     | {
         消息?: { 楼: number; 时: number; 会话?: string; 发?: string; 图?: string }[];
         圈?: { 楼: number; 时: number; 谁?: string; 图?: string }[];
@@ -384,6 +401,7 @@ export function 裁手机时间线(vars: Record<string, unknown>, 楼层: number
   // 从已裁剪的存活朋友圈重建；若该类图已全部被回档裁掉，对应游标也一并消失。
   const 妻名按门牌 = Object.fromEntries(Object.entries(户静态表).map(([门牌, 配置]) => [门牌, 配置.妻名]));
   库.节拍 = 裁剪手机节拍水位(库.节拍 ?? {}, 目标钟, 库.圈, 妻名按门牌);
+  推进微信持久修订(库 as Record<string, unknown>, 手机聊天ID, 目标钟);
   _.set(vars, '_微信', 库);
   const 事件日志 = _.get(vars, '_隔离事件.日志');
   if (Array.isArray(事件日志)) {
@@ -416,6 +434,7 @@ async function 协调已删时间线(
   const 确认提交仍有效 = () => {
     if (!提交校验()) throw new Error('__RQGY_TIMELINE_CHANGED__');
   };
+  const 手机聊天ID = 当前聊天ID();
   确认提交仍有效();
   await 等待数据库时间线就绪();
   确认提交仍有效();
@@ -445,6 +464,10 @@ async function 协调已删时间线(
     { type: 'chat' },
   );
   确认提交仍有效();
+  if (手机聊天ID && 当前聊天ID() === 手机聊天ID) {
+    await 立即持久保存手机聊天变量(手机聊天ID);
+    确认提交仍有效();
+  }
 
   清保护快照();
   if (!当前真值) return null;
@@ -1536,12 +1559,19 @@ export async function 组快照注入(
 const 数据库事件元数据键 = '_rqgy数据库事件';
 
 interface 数据库事件元数据 {
-  版本: 1;
+  版本: 1 | 2;
   时间: string;
   地点: string;
   参与者: string[];
   玩家行动: string;
+  /** v2：由本楼最终采用的正文同轮产出，脚本按 RQ-${楼层} 精确写入。 */
+  结果摘要?: string;
 }
+
+const 数据库事件摘要指令 =
+  '【数据库事件摘要协议】在完整故事与其他机器协议之后，额外输出且只输出一块' +
+  '<rq_event_summary>客观短摘要</rq_event_summary>。摘要必须单行、最多60字，只概括本次回复已经发生的结果；' +
+  '不得复述对话原句、不得写未发生的推测、不得写楼层号或任何其他标签。该块只供脚本绑定本轮数据库事件，玩家界面会移除。';
 
 type 宿主聊天消息 = {
   role?: string;
@@ -1612,12 +1642,14 @@ async function 广播生成完成事件(
 }
 
 let 数据库记录失败提示签名 = '';
+let 数据库所有权模板提示签名 = '';
 
 async function 记录数据库回合骨架(
   楼层: number,
   data: SchemaType,
   地点: string,
   行动: string,
+  结果摘要: string,
   妻在场: readonly 门牌[],
   夫在场: readonly 门牌[],
   提交校验: () => boolean = () => true,
@@ -1636,7 +1668,7 @@ async function 记录数据库回合骨架(
       地点: 地点 || '公寓公共区域',
       参与者,
       玩家行动: 行动,
-      结果摘要: 数据库事件待整理摘要,
+      结果摘要,
     },
     提交校验,
   );
@@ -1720,6 +1752,9 @@ async function 补齐缺失数据库事件骨架(
       (Number.isInteger(绝对时段) && 绝对时段 >= 0 ? 格式化游戏内时间(绝对时段) : '旧记录（时间未保存）');
     const 地点 =
       (typeof 元数据?.地点 === 'string' && 元数据.地点.trim()) || '历史剧情（地点未保存）';
+    const 结果摘要 =
+      (typeof 元数据?.结果摘要 === 'string' && 元数据.结果摘要.trim()) ||
+      (typeof extra._rqgy开局令牌 === 'string' ? 数据库固定开局摘要 : 脚本保守回合摘要(玩家行动));
     const 写入 = await 同步数据库回合(
       {
         楼层,
@@ -1727,7 +1762,7 @@ async function 补齐缺失数据库事件骨架(
         地点,
         参与者,
         玩家行动,
-        结果摘要: 数据库事件待整理摘要,
+        结果摘要,
       },
       提交校验,
     );
@@ -1744,6 +1779,7 @@ function 安排数据库回合后处理(参数: {
   data: SchemaType;
   地点: string;
   行动: string;
+  结果摘要: string;
   妻在场: readonly 门牌[];
   夫在场: readonly 门牌[];
   提交校验: () => boolean;
@@ -1760,6 +1796,7 @@ function 安排数据库回合后处理(参数: {
           data快照,
           参数.地点,
           参数.行动,
+          参数.结果摘要,
           妻快照,
           夫快照,
           参数.提交校验,
@@ -1779,7 +1816,23 @@ function 安排数据库回合后处理(参数: {
         if (场景剧情占用前台生成(最新, 当前场景)) return;
         // 下一轮已经开始时不对着临时尾楼触发数据库；下一次成功楼会继续处理所有 pending 骨架。
         if (回合进行中() || getLastMessageId() !== 参数.楼层) return;
-        await 广播生成完成事件(参数.楼层, 参数.提交校验);
+        const 当前数据库状态 = 数据库状态();
+        if (当前数据库状态.脚本所有权模板已启用) {
+          await 广播生成完成事件(参数.楼层, 参数.提交校验);
+          if (!参数.提交校验()) return;
+        } else {
+          // 旧聊天的五表仍允许脚本精确写本楼，但它的通用 AI 还拥有 RQ/社交表写权。
+          // 在玩家更新当前聊天模板前暂停整批通用填表，宁可暂缓可选记忆，也不再制造跨楼污染。
+          const 提示签名 = 当前聊天ID();
+          console.warn('[人妻公寓·数据库] 当前聊天仍是旧逐楼归属模板；已暂停通用填表，只保留脚本精确纪要。');
+          if (提示签名 && 数据库所有权模板提示签名 !== 提示签名) {
+            数据库所有权模板提示签名 = 提示签名;
+            eventEmit('人妻公寓:提示', '数据库旧模板的通用填表已安全暂停；请在手机“我”中点“安装/更新本游戏表”，已有记录会保留。');
+          }
+        }
+        // 通用填表仍负责人物记忆／承诺／纪要；RQ 剧情摘要由脚本在同楼重申，
+        // 即使模型擅自选择了错误 event_code，也不能把下一楼正文冻结进上一楼。
+        await 覆盖数据库剧情事件摘要(参数.楼层, 参数.结果摘要, 参数.行动, 参数.提交校验);
       } catch (error) {
         console.warn('[人妻公寓·数据库] 回合后台记忆处理失败（前台游戏不受影响）:', error);
       } finally {
@@ -2257,10 +2310,14 @@ export async function 执行回合(
       `\n【本轮玩家行动】\n${行动}\n` +
       '(以上是{{user}}本轮唯一的新行动,本次回复只回应这条行动。之前楼层的行动均已演出完毕,' +
       '严禁重演、复述或把本次正文写成对任何旧行动的回应;若历史楼层存在行动与回应错位,一律以本条为准。)';
-    // 正文模型只负责故事与游戏控制协议；RQ_剧情事件的语义摘要改由数据库填表 AI 在同一批次完成。
+    // 正文模型在本楼原始输出末尾附带机器摘要；脚本提取后与正式助手楼绑定，
+    // 通用数据库填表只处理人物长期记忆、承诺伏笔和纪要。
     const injects: Omit<InjectionPrompt, 'id'>[] = [
       { role: 'system', content: 快照 + 行动锚, position: 'in_chat', depth: 0, should_scan: true },
     ];
+    if (本轮数据库已安装) {
+      injects.push({ role: 'system', content: 数据库事件摘要指令, position: 'in_chat', depth: 0, should_scan: false });
+    }
     if (选项.系统注入?.trim()) {
       injects.push({ role: 'system', content: 选项.系统注入, position: 'in_chat', depth: 0, should_scan: false });
     }
@@ -2399,12 +2456,13 @@ export async function 执行回合(
         `【本轮重写硬裁决】上一稿作废。脚本复核发现：${稽查.原因}。` +
         '保持玩家原始行动不变，重写完整剧情回应；允许界线内部分自然发生，越过每位角色当前界线的部分必须由她按自身性格拒绝、停住或转开，未遂不得写成已经发生。' +
         '不要提到稽查、等级、规则、重写或系统。仍须按上方格式输出临时尺度判定；不要输出 UpdateVariable、JSONPatch 或任何变量命令，变量由外置解析单独处理。';
+      const 完整校准令 = 本轮数据库已安装 ? `${校准令}\n${数据库事件摘要指令}` : 校准令;
       本回合生成id = `rqgy-audit-${回合前末楼}-${_.random(1e9)}`;
       const 重写 = await 等待正文生成({
         user_input: 行动,
         should_stream: false,
         automatic_trigger: true,
-        injects: [{ role: 'system', content: 校准令, position: 'in_chat', depth: 0, should_scan: false }],
+        injects: [{ role: 'system', content: 完整校准令, position: 'in_chat', depth: 0, should_scan: false }],
         overrides: 正文模型覆盖,
         generation_id: 本回合生成id,
       });
@@ -2476,6 +2534,9 @@ export async function 执行回合(
       throw new Error('AI 输出没有形成可提交正文——未完成内容已保留供你查看，本轮没有发生');
     }
     const 基础正文 = 正文判定.显示正文;
+    const 本轮数据库结果摘要 = 本轮数据库已安装
+      ? (提取回合事件摘要(原文) ?? 脚本保守回合摘要(行动))
+      : '';
     // 正文楼永远只落故事；正文模型偶然输出的变量协议也不采纳，随后由外置模型生成唯一有效变量块。
     let 变量块 = '';
     let 可重处理楼层正文 = 变量块 ? `${基础正文}\n${变量块}` : 基础正文;
@@ -2513,7 +2574,7 @@ export async function 执行回合(
                 [临时楼标记键]: true,
                 [回合在场妻键]: [...new Set(妻在场)],
                 [数据库事件元数据键]: {
-                  版本: 1,
+                  版本: 2,
                   时间: 格式化游戏内时间(data),
                   地点: 回合起始场景 || '公寓公共区域',
                   参与者: [
@@ -2521,6 +2582,7 @@ export async function 执行回合(
                     ...夫在场.map(m => 户静态表[m]?.夫名),
                   ].filter((name): name is string => Boolean(name)),
                   玩家行动: 行动,
+                  结果摘要: 本轮数据库结果摘要,
                 } satisfies 数据库事件元数据,
               },
             },
@@ -3053,6 +3115,7 @@ export async function 执行回合(
         data: newStat,
         地点: 回合起始场景 || '公寓公共区域',
         行动,
+        结果摘要: 本轮数据库结果摘要,
         妻在场,
         夫在场,
         提交校验: 数据库后处理仍有效,
@@ -3520,11 +3583,12 @@ export async function 开始新游戏(难度: string): Promise<boolean> {
               extra: {
                 _rqgy开局令牌: 开局消息令牌,
                 [数据库事件元数据键]: {
-                  版本: 1,
+                  版本: 2,
                   时间: 格式化游戏内时间(data),
                   地点: '管理员室',
                   参与者: [],
                   玩家行动: '开始新游戏',
+                  结果摘要: 数据库固定开局摘要,
                 } satisfies 数据库事件元数据,
               },
             },
@@ -3560,6 +3624,7 @@ export async function 开始新游戏(难度: string): Promise<boolean> {
           data,
           地点: '管理员室',
           行动: '开始新游戏',
+          结果摘要: 数据库固定开局摘要,
           妻在场: [],
           夫在场: [],
           提交校验: 开局数据库后处理仍有效,
@@ -3685,6 +3750,11 @@ export async function 重开一局(): Promise<void> {
       }
       const 旧raw = Mvu.getMvuData({ type: 'message', message_id: -1 });
       await 脚本写入(旧raw, 出厂, { 记录成长: false });
+      确认重开仍有效();
+      // 墓碑必须在出厂 stat 已写回后创建；否则它会锚在重开前的未来绝对时段，刷新时
+      // 因时间线校验失败而失去阻止旧 `_微信` 复活的能力。
+      写入微信清空镜像(重开聊天ID, 出厂.系统._绝对时段);
+      await 立即持久保存手机聊天变量(重开聊天ID);
       确认重开仍有效();
       // 0 楼出厂 stat 与 chat 清场已经成为当前时间线真值；后面的保护快照、晋阶镜像和
       // 世界书同步都是可重建派生。它们失败时不得把已经完成的重开伪报成未发生。

@@ -203,6 +203,15 @@ test('隔离当前手机分支：允许写入 在回调最前复核，失效不�
       裁同楼切分支记录: 记录 => 记录,
       // 此用例只验证允许写入的原子收口；数据层坏容器归一由 BUG-049 回归单独执行。
       归一微信原始库: 值 => structuredClone(值),
+      读取微信原始候选: vars => ({
+        库: structuredClone(vars._微信),
+        选择: { 值: vars._微信, 使用镜像: false, 当前修订: 0, 镜像修订: 0, 聊天身份: 'test:chat-a' },
+      }),
+      推进微信持久修订: 库 => {
+        库.__rqgy微信持久修订 = (库.__rqgy微信持久修订 ?? 0) + 1;
+        return 库.__rqgy微信持久修订;
+      },
+      写入当前聊天微信刷新镜像: () => true,
       手机分支变更后已读时锚,
       请求刷新手机红点: () => {
         红点刷新 += 1;
@@ -253,5 +262,9 @@ test('CHAT_CHANGED 同步作废手机世代；原生分支协调把 仍为最新
   );
   const 收口段 = 截源(数据层源码, 'export async function 隔离当前手机分支', 'export function 读库');
   assert.match(收口段, /允许写入: \(\) => boolean = \(\) => true/);
-  assert.match(收口段, /if \(!允许写入\(\)\) return vars;/, '允许写入 必须在 updateVariablesWith 回调最前复核');
+  assert.match(
+    收口段,
+    /if \(\(写入聊天ID && 当前聊天ID\(\) !== 写入聊天ID\) \|\| !允许写入\(\)\) return vars;/,
+    '聊天身份与允许写入必须在 updateVariablesWith 回调最前共同复核',
+  );
 });

@@ -13,14 +13,14 @@ const { 当前MVU数据版本, 验证当前MVU存档版本 } = require('../../sr
 const { 当前游戏版本 } = require('../../src/人妻公寓/脚本/游戏逻辑/依赖版本.ts');
 const 读 = 路径 => readFileSync(new URL(`../../${路径}`, import.meta.url), 'utf8');
 
-test('v0.86 后续发布：游戏检测、角色卡展示与代码入口统一锁定当前 rq0.90.1', () => {
+test('v0.86 后续发布：游戏检测、角色卡展示与代码入口统一锁定当前 rq0.90.2', () => {
   const 组卡 = 读('src/人妻公寓/组卡.mjs');
-  assert.equal(当前游戏版本, '0.90.1');
-  assert.match(组卡, /const TAG = 'rq0\.90\.1'/);
-  assert.match(组卡, /const 版本 = '0\.90\.1'/);
-  assert.match(组卡, /支持继承 v0\.80～v0\.90 存档/);
+  assert.equal(当前游戏版本, '0.90.2');
+  assert.match(组卡, /const TAG = 'rq0\.90\.2'/);
+  assert.match(组卡, /const 版本 = '0\.90\.2'/);
+  assert.match(组卡, /支持继承 v0\.80～v0\.90\.1 存档/);
   assert.match(组卡, /真正未完成的输出显示为未结算残稿/);
-  assert.doesNotMatch(组卡, /const TAG = 'rq0\.90';/);
+  assert.doesNotMatch(组卡, /const TAG = 'rq0\.90\.1';/);
 });
 
 test('v0.86 发布：借种结局图片统一锁定 CG 仓库不可变标签 cg4', () => {

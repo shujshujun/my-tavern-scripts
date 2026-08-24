@@ -61,7 +61,7 @@ import {
   读手机邀约计划,
   写库增量,
   立即持久保存手机聊天变量,
-  规范微信消息容器,
+  修改微信消息容器,
   手机可见单条硬上限,
   玩家名,
   带当前手机分支锚,
@@ -247,25 +247,20 @@ async function 持久化玩家微信撤回(定位: 微信撤回定位): Promise<
     eventEmit('人妻公寓:提示', 入口只读原因);
     return;
   }
-  let 已撤回 = false;
   let 迟到只读原因 = '';
-  await updateVariablesWith(
-    vars => {
-      if (当前聊天ID() !== 预期聊天ID) return vars;
+  const 已撤回 = await 修改微信消息容器(
+    原 => {
       const 最新data = 当前手机数据();
       const 最新只读原因 = 最新data ? 普通手机场景剧情只读原因(最新data) : '';
       if (最新只读原因) {
         迟到只读原因 = 最新只读原因;
-        return vars;
+        return null;
       }
-      const 原 = 规范微信消息容器(_.get(vars, '_微信.消息'));
       const 结果 = 撤回微信玩家消息(原, 定位);
-      if (!结果.已撤回) return vars;
-      _.set(vars, '_微信.消息', 结果.消息);
-      已撤回 = true;
-      return vars;
+      return 结果.已撤回 ? 结果.消息 : null;
     },
-    { type: 'chat' },
+    预期聊天ID,
+    () => 当前聊天ID() === 预期聊天ID,
   );
   if (迟到只读原因) {
     eventEmit('人妻公寓:提示', 迟到只读原因);

@@ -145,8 +145,10 @@ test('增量基线、节拍差量、已发私聊图差量、余波同事务与�
   assert.match(收尾, /节拍改\[k\] = v;/);
   assert.match(收尾, /已发私聊图改 = JSON\.stringify\(库\.已发私聊图\) === 原已发私聊图 \? undefined : 库\.已发私聊图/);
   assert.match(收尾, /if \(有新 \|\| Object\.keys\(节拍改\)\.length \|\| 已发私聊图改\)/);
-  assert.match(收尾, /新圈: 库\.圈\.slice\(0, 库\.圈\.length - 原圈数\)/);
-  assert.match(收尾, /新消息: 库\.消息\.slice\(原消息数\)/);
+  assert.match(收尾, /const 新圈增量 = 库\.圈\.slice\(0, 库\.圈\.length - 原圈数\)/);
+  assert.match(收尾, /新圈: 新圈增量/);
+  assert.match(收尾, /const 新消息增量 = 库\.消息\.slice\(原消息数\)/);
+  assert.match(收尾, /新消息: 新消息增量/);
   assert.match(收尾, /余波消费:\s*待提交余波/);
   // 只有写入成功才刷新 UI，顺序保持红点后重绘，且经注册表不直调内核实现
   assert.match(收尾, /if \(!已写\) return;\s*请求刷新手机红点\(\);\s*请求手机重绘\(\);/);

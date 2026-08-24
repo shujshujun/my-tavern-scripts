@@ -82,6 +82,10 @@ interface 数据库API {
   ) => Promise<SQL写入结果 | null>;
   registerTableUpdateCallback?: (callback: (data: unknown) => void) => void;
   unregisterTableUpdateCallback?: (callback: (data: unknown) => void) => void;
+  registerTableFillStartCallback?: (callback: () => void) => void;
+  getManualSelectedTables?: () => { selectedTables?: unknown; hasManualSelection?: unknown };
+  setManualSelectedTables?: (sheetKeys: string[]) => boolean;
+  clearManualSelectedTables?: () => boolean;
   openSettings?: () => Promise<boolean | void>;
   openVisualizer?: () => void;
   getTableTemplate?: () => unknown;
@@ -114,6 +118,9 @@ interface 数据表 {
 
 const 数据库旗 = '__ACU_STAR_DB_III_LOADED__';
 const 游戏表名 = ['RQ_剧情事件', 'RQ_人物长期记忆', 'RQ_承诺与伏笔', 'RQ_社交轨迹', '纪要表'] as const;
+/** 精确流水账只允许游戏脚本写；自动/手动通用填表都不得取得这两张表的目标选择权。 */
+export const 数据库脚本所有权表名 = ['RQ_剧情事件', 'RQ_社交轨迹'] as const;
+const 数据库脚本所有权表名集 = new Set<string>(数据库脚本所有权表名);
 const 游戏表头: Record<(typeof 游戏表名)[number], readonly string[]> = {
   RQ_剧情事件: ['row_id', '楼层', '时间', '地点', '参与者', '玩家行动', '结果摘要', '事件编码'],
   RQ_人物长期记忆: ['row_id', '人物', '主题', '记忆', '未来影响', '最后时间', '最后楼层', '可信度'],
@@ -152,10 +159,7 @@ const 默认通用表处置: Readonly<Record<string, readonly (readonly string[]
 const 玩家行动上限 = 40;
 const 结果摘要上限 = 60;
 
-/**
- * 脚本先把楼层、游戏时间、地点、参与者、行动与稳定事件键写成硬骨架；数据库填表 AI
- * 在自己的正常批次里只替换本占位摘要。重复补写骨架时必须保留已经完成的 AI 摘要。
- */
+/** 旧模板的待整理标记，仅用于识别并迁移历史行；新回合绝不再生产该占位。 */
 export const 数据库事件待整理摘要 = '【待数据库AI整理】正文已成功落楼，等待数据库统一摘要';
 /** 开局正文是脚本固定文本，对应摘要也由脚本确定；可安全修复 v0.90 已知的 RQ-1 错绑。 */
 export const 数据库固定开局摘要 = '父亲来电交代公寓管理与收租要求，玩家开始接手管理工作';
@@ -180,6 +184,14 @@ export function 保守回合摘要(行动: string): string {
 }
 
 /**
+ * 新版逐楼脚本所有权的失败关闭摘要。它明确表示正文已经落楼，但不虚构未能可靠提取的
+ * 具体结果；同时不含旧“待整理”标记，通用填表 AI 因而无权在未来批次拿别楼正文补写。
+ */
+export function 脚本保守回合摘要(行动: string): string {
+  return 截断字符(`玩家执行：${规范玩家行动(行动) || '未记录行动'}；该楼正文已完成，具体结果以对应楼层为准`, 结果摘要上限);
+}
+
+/**
  * 判断旧 `结果摘要` 是否明显是整篇正文污染（超长、多段、含包装标签或对话引用）。
  * 命中时禁止 slice 正文冒充摘要，必须走纪要概览或安全短句迁移。
  */
@@ -195,11 +207,14 @@ function 判断结果摘要为正文(结果: string): boolean {
   return false;
 }
 
-/** 同步数据库回合的最后边界：空值、超限值与正文污染一律改为安全短句；合规短摘要保持原样。 */
+/**
+ * 同步数据库回合的最后边界：空值、超限值与正文污染一律收敛成该楼脚本保守摘要，
+ * 绝不再生成可被未来通用填表批次认领的“待整理”占位；合规短摘要保持原样。
+ */
 export function 规范事件摘要(摘要: string, 行动: string): string {
   const 原文 = String(摘要 ?? '');
-  if (!原文.replace(/\s+/g, ' ').trim()) return 保守回合摘要(行动);
-  if (判断结果摘要为正文(原文)) return 保守回合摘要(行动);
+  if (!原文.replace(/\s+/g, ' ').trim()) return 脚本保守回合摘要(行动);
+  if (判断结果摘要为正文(原文)) return 脚本保守回合摘要(行动);
   return 截断字符(原文.replace(/\s+/g, ' ').trim(), 结果摘要上限);
 }
 
@@ -428,6 +443,10 @@ const 数据库API能力权重 = {
   executeSqlMutation: 8,
   registerTableUpdateCallback: 4,
   unregisterTableUpdateCallback: 4,
+  registerTableFillStartCallback: 2,
+  getManualSelectedTables: 2,
+  setManualSelectedTables: 2,
+  clearManualSelectedTables: 2,
   openSettings: 1,
   openVisualizer: 1,
   getTableTemplate: 5,
@@ -1205,6 +1224,7 @@ function 启动数据库时间线恢复(聊天标识: string, 最长等待毫秒
 
 const 数据库刷新完成回调 = (raw: unknown): void => {
   if (时间线接线已清理) return;
+  确保数据库手动填表选择安全(raw);
   const 聊天标识 = 更新当前聊天驻留();
   const persisted = 读取持久时间线状态(聊天标识);
   if (!persisted) return;
@@ -1394,6 +1414,28 @@ function 剧情事件AI摘要配置可用(value: unknown): boolean {
   );
 }
 
+/**
+ * 当前安全模板把逐楼剧情账与社交事务账交还给脚本；通用填表 AI 只能处理其余长期记忆表。
+ * 旧聊天即使已有五张同名表，也必须能被识别为“结构存在、所有权规则待更新”。
+ */
+function 脚本所有权模板配置可用(value: unknown): boolean {
+  const 剧情 = 取表(value, 'RQ_剧情事件');
+  const 社交 = 取表(value, 'RQ_社交轨迹');
+  const 配置关闭 = (sheet: 数据表 | null | undefined) =>
+    sheet?.updateConfig?.contextDepth === 0 &&
+    sheet.updateConfig.updateFrequency === 0 &&
+    sheet.updateConfig.batchSize === 1 &&
+    sheet.updateConfig.skipFloors === 0;
+  return (
+    配置关闭(剧情) &&
+    配置关闭(社交) &&
+    /通用填表AI不得修改/.test(String(剧情?.sourceData?.updateNode ?? '')) &&
+    /禁止/.test(String(剧情?.sourceData?.insertNode ?? '')) &&
+    /禁止/.test(String(社交?.sourceData?.updateNode ?? '')) &&
+    /禁止/.test(String(社交?.sourceData?.insertNode ?? ''))
+  );
+}
+
 export function 数据库状态(): {
   已安装: boolean;
   可调用AI: boolean;
@@ -1401,6 +1443,7 @@ export function 数据库状态(): {
   有SQL接口: boolean;
   有SQL写入接口: boolean;
   已装游戏模板: boolean;
+  脚本所有权模板已启用: boolean;
   剧情事件AI摘要已启用: boolean;
   版本: string;
   填表最短回复: number | null;
@@ -1410,15 +1453,18 @@ export function 数据库状态(): {
   const api = 取数据库API();
   const 填表参数 = 读取数据库填表参数(api);
   let 已装游戏模板 = false;
+  let 脚本所有权模板已启用 = false;
   let 剧情事件AI摘要已启用 = false;
   try {
     const 模板 = 解析数据库数据(api?.getTableTemplate?.());
     已装游戏模板 = 游戏表名.every(name => 表结构可用(取表(模板, name), 游戏表头[name]));
+    脚本所有权模板已启用 = 已装游戏模板 && 脚本所有权模板配置可用(模板);
     剧情事件AI摘要已启用 = 已装游戏模板 && 剧情事件AI摘要配置可用(模板);
     // 一些旧版没有 getTableTemplate，但会通过导出接口返回当前聊天的完整表结构。
     if (!已装游戏模板 && typeof api?.exportTableAsJson === 'function') {
       const 数据 = 解析数据库数据(api.exportTableAsJson());
       已装游戏模板 = 游戏表名.every(name => 表结构可用(取表(数据, name), 游戏表头[name]));
+      脚本所有权模板已启用 = 已装游戏模板 && 脚本所有权模板配置可用(数据);
       剧情事件AI摘要已启用 = 已装游戏模板 && 剧情事件AI摘要配置可用(数据);
     }
   } catch {
@@ -1433,6 +1479,7 @@ export function 数据库状态(): {
     有SQL接口: !!api && !!取SQL查询方法(api),
     有SQL写入接口: typeof api?.executeSqlMutation === 'function',
     已装游戏模板,
+    脚本所有权模板已启用,
     剧情事件AI摘要已启用,
     版本: 读取数据库脚本版本(),
     填表最短回复: 填表参数.最短回复,
@@ -1440,6 +1487,481 @@ export function 数据库状态(): {
     可设置填表参数: typeof api?.setUpdateConfigParams === 'function',
   };
 }
+
+export interface 数据库手动填表安全选择 {
+  可用表键: string[];
+  受保护表键: string[];
+  安全选择: string[];
+  需要写回: boolean;
+}
+
+interface 数据库表键名项 {
+  键: string;
+  名称: string;
+  表: 数据表;
+}
+
+function 读取数据库表键名(value: unknown): 数据库表键名项[] {
+  const data = 解析数据库数据(value);
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return [];
+  return Object.entries(data as Record<string, unknown>).flatMap(([键, raw]) => {
+    if (!键.startsWith('sheet_') || !raw || typeof raw !== 'object' || Array.isArray(raw)) return [];
+    const 表 = raw as 数据表;
+    const 名称 = String(表.name ?? '').trim();
+    return 名称 ? [{ 键, 名称, 表 }] : [];
+  });
+}
+
+function 数据库表项受脚本所有权(项: 数据库表键名项): boolean {
+  if (!数据库脚本所有权表名集.has(项.名称)) return false;
+  const expected = 游戏表头[项.名称 as keyof typeof 游戏表头];
+  const headers = (项.表.content?.[0] ?? []).map(String);
+  return !!expected && headers.length === expected.length && headers.every((列名, index) => 列名 === expected[index]);
+}
+
+/**
+ * 数据库插件的手动填表明确忽略 updateFrequency=0，并且首次打开默认全选。
+ * 因此不能只靠模板提示词；这里把脚本所有权表从实际手动选择集合中物理剔除，同时保留
+ * 玩家选择的其他作者自定义表，避免为了保护两张流水表而把整个数据库手动填表关闭。
+ */
+export function 计算数据库手动填表安全选择(
+  tableData: unknown,
+  selectedTables: unknown,
+  hasManualSelection: unknown,
+): 数据库手动填表安全选择 {
+  const 表们 = 读取数据库表键名(tableData);
+  const 可用表键 = 表们.map(项 => 项.键);
+  const 可用键集 = new Set(可用表键);
+  const 受保护表键 = 表们.filter(数据库表项受脚本所有权).map(项 => 项.键);
+  const 受保护键集 = new Set(受保护表键);
+  const 当前有效选择 = Array.isArray(selectedTables)
+    ? selectedTables.filter((键): 键 is string => typeof 键 === 'string' && 可用键集.has(键))
+    : [];
+  const 选择基线 = hasManualSelection === true ? 当前有效选择 : 可用表键;
+  const 安全选择 = 选择基线.filter(键 => !受保护键集.has(键));
+  const 当前已经安全 =
+    hasManualSelection === true &&
+    当前有效选择.length === 安全选择.length &&
+    当前有效选择.every((键, index) => 键 === 安全选择[index]);
+  return {
+    可用表键,
+    受保护表键,
+    安全选择,
+    需要写回: 受保护表键.length > 0 && !当前已经安全,
+  };
+}
+
+function 当前数据库表数据(api: 数据库API, raw?: unknown): unknown {
+  const 候选 = [raw, api.exportTableAsJson?.(), api.getTableTemplate?.()];
+  for (const value of 候选) {
+    if (!value || (typeof value === 'object' && typeof (value as { then?: unknown }).then === 'function')) continue;
+    if (读取数据库表键名(value).length) return value;
+  }
+  return null;
+}
+
+/**
+ * 收敛数据库公开 API 保存的手动选择。返回 true 表示当前已经安全或成功修正；
+ * 老版本没有选择 API 时返回 false，DOM 捕获保护仍会继续兜底。
+ */
+export function 确保数据库手动填表选择安全(raw?: unknown): boolean {
+  const api = 取数据库API();
+  if (typeof api?.getManualSelectedTables !== 'function' || typeof api.setManualSelectedTables !== 'function') return false;
+  try {
+    const data = 当前数据库表数据(api, raw);
+    if (!data) return false;
+    const 当前 = api.getManualSelectedTables();
+    const 结果 = 计算数据库手动填表安全选择(data, 当前?.selectedTables, 当前?.hasManualSelection);
+    if (!结果.受保护表键.length) return false;
+    if (!结果.需要写回) return true;
+    return api.setManualSelectedTables(结果.安全选择) === true;
+  } catch (error) {
+    console.warn('[人妻公寓·数据库] 手动填表脚本表选择保护失败:', error);
+    return false;
+  }
+}
+
+const 数据库手动填表保护宿主键 = '__RQP_DATABASE_MANUAL_FILL_GUARD_V1__';
+
+interface 数据库手动填表保护宿主状态 {
+  清理?: () => void;
+}
+
+interface 数据库手动填表保护运行态 {
+  已清理: boolean;
+  扫描计时器?: ReturnType<typeof setTimeout>;
+  重试计时器: ReturnType<typeof setTimeout>[];
+  观察器: Map<Document, MutationObserver>;
+  点击监听: Map<Document, EventListener>;
+  允许重放按钮: WeakSet<Element>;
+  回调API: 数据库API | null;
+  包装API: (数据库API & 数据库V2API) | null;
+  原始手动选择?: { selectedTables: string[]; hasManualSelection: boolean };
+  原始手动更新?: 数据库V2API['manualUpdate'];
+  包装手动更新?: 数据库V2API['manualUpdate'];
+  原始设置选择?: 数据库API['setManualSelectedTables'];
+  包装设置选择?: 数据库API['setManualSelectedTables'];
+  原始清空选择?: 数据库API['clearManualSelectedTables'];
+  包装清空选择?: 数据库API['clearManualSelectedTables'];
+  停止切聊监听?: () => void;
+}
+
+function 恢复数据库手动填表API保护(运行态: 数据库手动填表保护运行态): void {
+  const api = 运行态.包装API;
+  if (!api) return;
+  try {
+    if (运行态.包装手动更新 && api.manualUpdate === 运行态.包装手动更新) api.manualUpdate = 运行态.原始手动更新;
+    if (运行态.包装设置选择 && api.setManualSelectedTables === 运行态.包装设置选择) {
+      api.setManualSelectedTables = 运行态.原始设置选择;
+    }
+    if (运行态.包装清空选择 && api.clearManualSelectedTables === 运行态.包装清空选择) {
+      api.clearManualSelectedTables = 运行态.原始清空选择;
+    }
+    const 原始 = 运行态.原始手动选择;
+    if (原始?.hasManualSelection && 运行态.原始设置选择) {
+      运行态.原始设置选择.call(api, 原始.selectedTables);
+    } else if (原始 && 运行态.原始清空选择) {
+      运行态.原始清空选择.call(api);
+    }
+  } catch (error) {
+    console.warn('[人妻公寓·数据库] 恢复进入本卡前的手动填表选择失败:', error);
+  }
+  运行态.包装API = null;
+  运行态.原始手动选择 = undefined;
+  运行态.原始手动更新 = undefined;
+  运行态.包装手动更新 = undefined;
+  运行态.原始设置选择 = undefined;
+  运行态.包装设置选择 = undefined;
+  运行态.原始清空选择 = undefined;
+  运行态.包装清空选择 = undefined;
+}
+
+/**
+ * 游戏存活期间把公开 API 也变成失败关闭：外部脚本重新“全选”仍会被过滤，直接调用
+ * manualUpdate() 也会在插件读取 targetKeys 之前收敛选择。离开本卡时恢复进入前设置，
+ * 避免数据库的全局手动选择污染其他角色卡。
+ */
+function 安装数据库手动填表API保护(api: 数据库API & 数据库V2API, 运行态: 数据库手动填表保护运行态): void {
+  const 现有保护完整 =
+    运行态.包装API === api &&
+    (typeof api.setManualSelectedTables !== 'function' || api.setManualSelectedTables === 运行态.包装设置选择) &&
+    (typeof api.clearManualSelectedTables !== 'function' || api.clearManualSelectedTables === 运行态.包装清空选择) &&
+    (typeof api.manualUpdate !== 'function' || api.manualUpdate === 运行态.包装手动更新);
+  if (现有保护完整) return;
+  恢复数据库手动填表API保护(运行态);
+  运行态.包装API = api;
+  try {
+    const 当前 = api.getManualSelectedTables?.();
+    运行态.原始手动选择 = {
+      selectedTables: Array.isArray(当前?.selectedTables)
+        ? 当前.selectedTables.filter((键): 键 is string => typeof 键 === 'string')
+        : [],
+      hasManualSelection: 当前?.hasManualSelection === true,
+    };
+  } catch {
+    /* 无法读取时仍保护本卡，但退出时不猜测原设置。 */
+  }
+
+  const 原设置 = api.setManualSelectedTables;
+  if (typeof 原设置 === 'function') {
+    const 包装设置: NonNullable<数据库API['setManualSelectedTables']> = sheetKeys => {
+      const data = 当前数据库表数据(api);
+      const 安全键 = data ? 计算数据库手动填表安全选择(data, sheetKeys, true).安全选择 : sheetKeys;
+      return 原设置.call(api, 安全键);
+    };
+    try {
+      api.setManualSelectedTables = 包装设置;
+      if (api.setManualSelectedTables === 包装设置) {
+        运行态.原始设置选择 = 原设置;
+        运行态.包装设置选择 = 包装设置;
+      }
+    } catch {
+      /* 冻结 API 时由 DOM 捕获与填表前收敛兜底。 */
+    }
+  }
+
+  const 原清空 = api.clearManualSelectedTables;
+  if (typeof 原清空 === 'function' && typeof 原设置 === 'function') {
+    const 包装清空: NonNullable<数据库API['clearManualSelectedTables']> = () => {
+      const data = 当前数据库表数据(api);
+      if (!data) return 原清空.call(api);
+      const 安全默认 = 计算数据库手动填表安全选择(data, [], false).安全选择;
+      return 原设置.call(api, 安全默认);
+    };
+    try {
+      api.clearManualSelectedTables = 包装清空;
+      if (api.clearManualSelectedTables === 包装清空) {
+        运行态.原始清空选择 = 原清空;
+        运行态.包装清空选择 = 包装清空;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const 原手动更新 = api.manualUpdate;
+  if (typeof 原手动更新 === 'function') {
+    const 包装手动更新: NonNullable<数据库V2API['manualUpdate']> = async () => {
+      确保数据库手动填表选择安全();
+      return 原手动更新.call(api);
+    };
+    try {
+      api.manualUpdate = 包装手动更新;
+      if (api.manualUpdate === 包装手动更新) {
+        运行态.原始手动更新 = 原手动更新;
+        运行态.包装手动更新 = 包装手动更新;
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+function 收集可访问数据库文档(): Document[] {
+  const 文档 = new Set<Document>();
+  const 窗口 = new Set<Window>();
+  const 加入窗口 = (scope: Window | null | undefined): void => {
+    if (!scope || 窗口.has(scope) || 窗口.size >= 16) return;
+    窗口.add(scope);
+    try {
+      const doc = scope.document;
+      文档.add(doc);
+      for (const iframe of doc.querySelectorAll<HTMLIFrameElement>('iframe')) {
+        try {
+          加入窗口(iframe.contentWindow);
+        } catch {
+          /* 跨域 iframe 不参与数据库 UI 保护。 */
+        }
+      }
+    } catch {
+      /* sandbox/跨域窗口忽略。 */
+    }
+  };
+  try {
+    加入窗口(window);
+    加入窗口(window.parent);
+    加入窗口(window.top);
+  } catch {
+    加入窗口(window);
+  }
+  return [...文档];
+}
+
+function 是脚本所有权表名(value: unknown): boolean {
+  const 名称 = String(value ?? '').trim();
+  if (!数据库脚本所有权表名集.has(名称)) return false;
+  const api = 取数据库API();
+  if (!api) return false;
+  const data = 当前数据库表数据(api);
+  return 读取数据库表键名(data).some(项 => 项.名称 === 名称 && 数据库表项受脚本所有权(项));
+}
+
+function 取消新版手动面板受保护选择(doc: Document): boolean {
+  let 已取消 = false;
+  for (const panel of doc.querySelectorAll<HTMLElement>('#form-fill-manual-panel')) {
+    for (const item of panel.querySelectorAll<HTMLElement>('.acu-v2-table-selector__item')) {
+      const 名称 = item.querySelector<HTMLElement>('.acu-checkbox__label')?.textContent?.trim() ?? '';
+      if (!是脚本所有权表名(名称)) continue;
+      const checkbox = item.querySelector<HTMLButtonElement>('button.acu-checkbox[role="checkbox"]');
+      if (!checkbox) continue;
+      if (checkbox.getAttribute('aria-checked') === 'true' && !checkbox.disabled) {
+        checkbox.click();
+        已取消 = true;
+      }
+      checkbox.disabled = true;
+      checkbox.setAttribute('aria-disabled', 'true');
+      checkbox.title = '本表由《人妻公寓》脚本按真实楼层/事务维护，不参与数据库通用手动填表。';
+      item.dataset.rqgyScriptOwned = 'true';
+    }
+    if (!panel.querySelector('[data-rqgy-script-owned-note]')) {
+      const note = doc.createElement('p');
+      note.dataset.rqgyScriptOwnedNote = 'true';
+      note.style.cssText = 'margin:8px 0;color:var(--acu-text-3,#777);font-size:12px;line-height:1.45';
+      note.textContent = 'RQ_剧情事件与RQ_社交轨迹由游戏脚本精确维护，已从手动填表和追平目标中锁定排除。';
+      panel.querySelector('.acu-v2-table-selector')?.insertAdjacentElement('beforebegin', note);
+    }
+  }
+  return 已取消;
+}
+
+function 取消旧版手动面板受保护选择(doc: Document): boolean {
+  let 已取消 = false;
+  for (const container of doc.querySelectorAll<HTMLElement>('[id$="-manual-table-selector"]')) {
+    for (const label of container.querySelectorAll<HTMLLabelElement>('label')) {
+      const 名称 = label.querySelector<HTMLElement>('span')?.textContent?.trim() ?? label.textContent?.trim() ?? '';
+      if (!是脚本所有权表名(名称)) continue;
+      const checkbox = label.querySelector<HTMLInputElement>('input[type="checkbox"][data-key]');
+      if (!checkbox) continue;
+      if (checkbox.checked && !checkbox.disabled) {
+        checkbox.click();
+        已取消 = true;
+      }
+      checkbox.disabled = true;
+      checkbox.title = '本表由《人妻公寓》脚本维护，不参与数据库通用手动填表。';
+      label.dataset.rqgyScriptOwned = 'true';
+    }
+  }
+  return 已取消;
+}
+
+function 取消数据库手动面板受保护选择(doc: Document): boolean {
+  const 新版已取消 = 取消新版手动面板受保护选择(doc);
+  const 旧版已取消 = 取消旧版手动面板受保护选择(doc);
+  return 新版已取消 || 旧版已取消;
+}
+
+function 事件目标元素(value: EventTarget | null): Element | null {
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as unknown as { closest?: unknown; parentElement?: Element | null };
+  if (typeof candidate.closest === 'function') return value as unknown as Element;
+  return candidate.parentElement ?? null;
+}
+
+function 数据库手动执行按钮(button: Element): boolean {
+  if (button.closest('#form-fill-manual-panel .acu-v2-form-fill-page__actions')) return true;
+  return button.id.endsWith('-manual-update-card');
+}
+
+function 安装数据库手动填表保护(): void {
+  const host = 宿主窗口() as Window & Record<string, unknown>;
+  const 上一状态 = host[数据库手动填表保护宿主键] as 数据库手动填表保护宿主状态 | undefined;
+  try {
+    上一状态?.清理?.();
+  } catch {
+    /* 热重载时旧 iframe 可能已经销毁。 */
+  }
+
+  const 运行态: 数据库手动填表保护运行态 = {
+    已清理: false,
+    重试计时器: [],
+    观察器: new Map(),
+    点击监听: new Map(),
+    允许重放按钮: new WeakSet(),
+    回调API: null,
+    包装API: null,
+  };
+  const 宿主状态: 数据库手动填表保护宿主状态 = {};
+  host[数据库手动填表保护宿主键] = 宿主状态;
+
+  const 扫描 = (): void => {
+    if (运行态.已清理) return;
+    const api = 取数据库API() as (数据库API & 数据库V2API) | null;
+    const 当前数据 = api ? 当前数据库表数据(api) : null;
+    const 当前有脚本所有权表 = 当前数据
+      ? 计算数据库手动填表安全选择(当前数据, [], false).受保护表键.length > 0
+      : false;
+    if (api && 当前有脚本所有权表) {
+      安装数据库手动填表API保护(api, 运行态);
+      确保数据库手动填表选择安全(当前数据);
+    } else if (运行态.包装API) {
+      // 同一酒馆页面切到其他角色卡时 iframe 不一定立刻 pagehide；发现当前表已经不是本游戏，
+      // 立即恢复进入前的数据库全局手动选择，不能等旧页面最终销毁。
+      恢复数据库手动填表API保护(运行态);
+    }
+    const 文档们 = 收集可访问数据库文档();
+    for (const doc of 文档们) {
+      取消数据库手动面板受保护选择(doc);
+      if (!运行态.点击监听.has(doc)) {
+        const 点击监听: EventListener = event => {
+          const target = 事件目标元素(event.target);
+          if (!target) return;
+          const button = target.closest('button');
+          if (!button) return;
+          if (运行态.允许重放按钮.has(button)) {
+            运行态.允许重放按钮.delete(button);
+            return;
+          }
+          const 是新版全选 = Boolean(button.closest('#form-fill-manual-panel')) && button.textContent?.trim() === '全选';
+          const 是旧版全选 = button.id.endsWith('-manual-table-select-all');
+          if (是新版全选 || 是旧版全选) {
+            安排扫描();
+            return;
+          }
+          if (!数据库手动执行按钮(button)) return;
+          const 本文档取消 = 取消数据库手动面板受保护选择(doc);
+          const API安全 = 确保数据库手动填表选择安全();
+          if (!本文档取消) {
+            if (!API安全) 安排扫描();
+            return;
+          }
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          setTimeout(() => {
+            if (运行态.已清理 || !button.isConnected) return;
+            取消数据库手动面板受保护选择(doc);
+            确保数据库手动填表选择安全();
+            运行态.允许重放按钮.add(button);
+            (button as HTMLButtonElement).click();
+          }, 0);
+        };
+        doc.addEventListener('click', 点击监听, true);
+        运行态.点击监听.set(doc, 点击监听);
+      }
+      if (!运行态.观察器.has(doc) && doc.documentElement) {
+        const Observer = doc.defaultView?.MutationObserver;
+        if (Observer) {
+          const observer = new Observer(() => 安排扫描());
+          observer.observe(doc.documentElement, { childList: true, subtree: true });
+          运行态.观察器.set(doc, observer);
+        }
+      }
+    }
+
+    if (api !== 运行态.回调API) {
+      运行态.回调API = api;
+      if (typeof api?.registerTableFillStartCallback === 'function') {
+        const 注册API = api;
+        try {
+          api.registerTableFillStartCallback(() => {
+            if (运行态.已清理 || 运行态.回调API !== 注册API) return;
+            确保数据库手动填表选择安全();
+            安排扫描();
+          });
+        } catch {
+          /* 无公开填表开始回调时，选择 API 与 DOM 捕获继续保护。 */
+        }
+      }
+    }
+  };
+
+  function 安排扫描(): void {
+    if (运行态.已清理 || 运行态.扫描计时器 !== undefined) return;
+    运行态.扫描计时器 = setTimeout(() => {
+      运行态.扫描计时器 = undefined;
+      扫描();
+    }, 0);
+  }
+
+  const 清理 = (): void => {
+    if (运行态.已清理) return;
+    运行态.已清理 = true;
+    if (运行态.扫描计时器 !== undefined) clearTimeout(运行态.扫描计时器);
+    for (const timer of 运行态.重试计时器) clearTimeout(timer);
+    for (const observer of 运行态.观察器.values()) observer.disconnect();
+    for (const [doc, listener] of 运行态.点击监听) doc.removeEventListener('click', listener, true);
+    运行态.停止切聊监听?.();
+    运行态.观察器.clear();
+    运行态.点击监听.clear();
+    恢复数据库手动填表API保护(运行态);
+    if ((host[数据库手动填表保护宿主键] as 数据库手动填表保护宿主状态 | undefined)?.清理 === 清理) {
+      delete host[数据库手动填表保护宿主键];
+    }
+    window.removeEventListener('pagehide', 清理);
+  };
+  宿主状态.清理 = 清理;
+  window.addEventListener('pagehide', 清理, { once: true });
+  try {
+    const 切聊监听 = eventOn(tavern_events.CHAT_CHANGED, 安排扫描);
+    运行态.停止切聊监听 = () => 切聊监听.stop();
+  } catch {
+    /* 极旧宿主没有切聊事件时仍由 DOM 变化与 pagehide 收口。 */
+  }
+  for (const delay of [0, 300, 1000, 3000, 8000]) {
+    运行态.重试计时器.push(setTimeout(扫描, delay));
+  }
+}
+
+安装数据库手动填表保护();
 
 /**
  * 检测 RQ_剧情事件等脚本直写表的真实可写条件。静态接口缺失时立即返回；
@@ -1535,8 +2057,13 @@ export async function 通过数据库生成(
 
 export type 数据库增量更新触发结果 = '已触发' | '未触发' | '无接口';
 
-/** 优先走数据库公开的 V2 增量更新入口，不再依赖伪造宿主生成事件。 */
+/**
+ * 旧模板可走数据库公开的整批 triggerUpdate。安全脚本所有权模板必须返回“无接口”，让
+ * 回合引擎改走数据库自己的自动调度事件：公开 triggerUpdate 没有 targetSheetKeys 参数，
+ * 会忽略表内 updateFrequency=0 并把两张脚本表也放进 AI prompt，不能用于精确流水账。
+ */
 export async function 触发数据库增量更新(): Promise<数据库增量更新触发结果> {
+  if (数据库状态().脚本所有权模板已启用) return '无接口';
   const api = 取数据库V2API();
   if (typeof api?.triggerUpdate !== 'function') return '无接口';
   try {
@@ -1602,7 +2129,7 @@ function 迁移旧RQ事件数据(rq事件表: 数据表, 纪要表: 数据表 | 
       候选 && Array.from(候选).length <= 结果摘要上限 && 概览与事件相似度足够(候选, row, 楼层列)
         ? 候选
         : '';
-    row[结果摘要列] = 概览 ? 截断字符(概览, 结果摘要上限) : 保守回合摘要(行动);
+    row[结果摘要列] = 概览 ? 截断字符(概览, 结果摘要上限) : 脚本保守回合摘要(行动);
   }
 }
 
@@ -1697,6 +2224,7 @@ export async function 安装人妻公寓数据库模板(): Promise<{ success: bo
         message: `数据库安装未完成：${细节 || '模板已保存但运行态未同步，请打开数据库设置检查 SQLite/表格状态后重试。'}`,
       };
     }
+    确保数据库手动填表选择安全(当前模板);
     return {
       success: true,
       message: `当前聊天已收敛为五张游戏记忆表；全局模板未修改；自定义表已保留。${result.message ? `（${result.message}）` : ''}`,
@@ -1731,6 +2259,7 @@ export async function 打开数据库设置(): Promise<boolean> {
   try {
     if (typeof api?.openSettings !== 'function') return false;
     await api.openSettings();
+    确保数据库手动填表选择安全();
     刷新SQLite能力缓存();
     return true;
   } catch (error) {
@@ -1829,11 +2358,14 @@ export async function 修复数据库固定开局摘要(
   return '失败';
 }
 
-/** 当前 SQLite 时间线里已经存在的 RQ 事件楼层；用于补齐旧版本漏写的正式正文楼。 */
+/**
+ * 当前 SQLite 时间线里已经存在且摘要完成的 RQ 事件楼层。旧“待整理”/空摘要故意不算完成，
+ * 让历史补写用该楼自身消息元数据与玩家行动收敛成安全摘要，而不是等待未来正文猜测。
+ */
 export function 读取数据库剧情事件已记录楼层(截止楼层: number): Set<number> | null {
   const 截止 = Number.isInteger(截止楼层) && 截止楼层 >= 0 ? 截止楼层 : Number.MAX_SAFE_INTEGER;
   const result = 执行SQLite查询(
-    `SELECT floor_no
+    `SELECT floor_no, result_summary
        FROM rq_events
       WHERE floor_no <= ?
       ORDER BY floor_no DESC
@@ -1846,6 +2378,7 @@ export function 读取数据库剧情事件已记录楼层(截止楼层: number)
   if (rows === null) return null;
   return new Set(
     rows
+      .filter(row => !数据库事件摘要待整理(row.result_summary))
       .map(row => Number(row.floor_no))
       .filter(楼层 => Number.isInteger(楼层) && 楼层 >= 0),
   );
@@ -1933,8 +2466,8 @@ export async function 同步数据库回合(
         String(row.participants ?? '') === String(data.参与者) &&
         String(row.player_action ?? '') === String(data.玩家行动) &&
         String(row.event_code ?? '') === String(data.事件编码);
-      // 重放硬骨架时，结果摘要可能已经被数据库 AI 完成；只要硬字段一致且摘要非空就算确认，
-      // 绝不能为了核对占位值把已完成摘要重新覆盖成“待整理”。
+      // 重放同楼记录时，结果摘要可能已经由该楼脚本完成；只要硬字段一致且摘要非空就算确认，
+      // 绝不能为了核对历史占位值把已完成摘要重新覆盖成旧“待整理”状态。
       if (硬字段一致 && String(row?.result_summary ?? '').trim()) return '已确认';
     }
     // 普通行 API 会把这次写入挂到更早的可追加消息；回档后该旧消息可能仍存活。
@@ -1946,8 +2479,65 @@ export async function 同步数据库回合(
   }
 }
 
+/**
+ * 剧情摘要的脚本精确写权：楼层与事件码双键同时匹配才允许更新。
+ * 通用填表 AI 仍可整理其他长期表，但不能再自行选择 RQ 行号。
+ */
+export const 数据库精确摘要覆盖SQL = `UPDATE rq_events
+   SET result_summary = ?
+ WHERE floor_no = ?
+   AND event_code = ?`;
+
+export async function 覆盖数据库剧情事件摘要(
+  楼层: number,
+  摘要: string,
+  玩家行动: string,
+  额外提交校验: () => boolean = () => true,
+): Promise<数据库回合写入结果> {
+  const api = 取数据库API();
+  if (!api || !数据库状态().已装游戏模板 || !额外提交校验()) return '失败';
+  const 聊天标识 = 当前聊天标识();
+  const 事件编码 = `RQ-${楼层}`;
+  const 结果摘要 = 规范事件摘要(摘要, 玩家行动);
+  const 查询SQL = `SELECT floor_no, time_text, location, participants, player_action, result_summary, event_code
+       FROM rq_events
+      WHERE floor_no = ? AND event_code = ?
+      LIMIT 1`;
+  const 恢复SQL = `INSERT INTO rq_events
+      (floor_no, time_text, location, participants, player_action, result_summary, event_code)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(floor_no) DO UPDATE SET
+       time_text = excluded.time_text,
+       location = excluded.location,
+       participants = excluded.participants,
+       player_action = excluded.player_action,
+       result_summary = excluded.result_summary,
+       event_code = excluded.event_code`;
+  const 失效补偿 = 构造SQLite唯一行失效补偿({
+    描述: `剧情摘要 ${事件编码} 的旧行`,
+    查询SQL,
+    查询参数: [楼层, 事件编码],
+    删除SQL: 'DELETE FROM rq_events WHERE floor_no = ? AND event_code = ?',
+    恢复SQL,
+    恢复列: ['floor_no', 'time_text', 'location', 'participants', 'player_action', 'result_summary', 'event_code'],
+  });
+  const 写入状态 = await 执行SQLite写入(
+    数据库精确摘要覆盖SQL,
+    [结果摘要, 楼层, 事件编码],
+    聊天标识,
+    额外提交校验,
+    失效补偿,
+  );
+  if (!仍是同一聊天(聊天标识) || !额外提交校验()) return '失败';
+  if (写入状态 === '已确认') return '已确认';
+  if (写入状态 === '已提交待定') return '待确认';
+  const 核对 = 执行SQLite查询(查询SQL, [楼层, 事件编码], 1);
+  const row = 核对 ? SQL结果对象行(核对)?.[0] : null;
+  return row && String(row.result_summary ?? '') === 结果摘要 ? '已确认' : '失败';
+}
+
 export interface 社交轨迹条目 {
-  类型: '邀约' | '来电' | '赠礼' | '微信进展';
+  类型: '邀约' | '来电' | '赠礼' | '微信进展' | '朋友圈';
   人物: string;
   事件: string;
   结果: string;
@@ -1960,8 +2550,8 @@ export interface 社交轨迹条目 {
 export type 数据库社交写入结果 = '已确认' | '待确认' | '失败';
 
 /**
- * 手机/商店硬事件与微信分支摘要版本直写社交轨迹。硬事件使用固定措辞；
- * 微信行只保存通过结构校验的派生数据，不保存聊天原文。两者都不受填表字数门槛影响。
+ * 手机/商店硬事件、微信分支摘要与带脚本凭据的重要朋友圈直写社交轨迹。硬事件使用固定措辞；
+ * 微信和朋友圈行只保存通过结构校验的派生数据，不保存可见原文。它们都不受填表字数门槛影响。
  * 返回三态，避免把“已交给 SQLite、但尚未确认”误当成已持久化完成。
  */
 export async function 同步社交轨迹(

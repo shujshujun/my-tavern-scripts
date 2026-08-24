@@ -334,9 +334,23 @@ test('手机在活动事务、同场等待或未知旧档时保持只读，远�
 
 test('强剧情只读门先于玩家微信发送、邀约与撤回的首次持久写，邀约先占手机生成租约', () => {
   const 撤回入口 = 段(phoneInteraction, 'async function 持久化玩家微信撤回(', 'interface 微信消息菜单选项');
-  const 撤回只读门 = 撤回入口.indexOf('普通手机场景剧情只读原因');
-  const 撤回首次写 = 撤回入口.indexOf('await updateVariablesWith');
-  assert.ok(撤回只读门 >= 0 && 撤回只读门 < 撤回首次写, '撤回必须在首次 chat 写入前复核强剧情只读门');
+  const 撤回入口只读门 = 撤回入口.indexOf('const 入口只读原因 =');
+  const 撤回统一写入口 = 撤回入口.indexOf('await 修改微信消息容器');
+  const 撤回迟到只读门 = 撤回入口.indexOf('const 最新只读原因 =');
+  const 撤回真实改写 = 撤回入口.indexOf('撤回微信玩家消息(原, 定位)');
+  const 撤回硬保存 = 撤回入口.indexOf('await 立即持久保存手机聊天变量');
+  assert.ok(
+    撤回入口只读门 >= 0 && 撤回入口只读门 < 撤回统一写入口,
+    '撤回必须在统一 chat 写入口前先做入口强剧情只读复核',
+  );
+  assert.ok(
+    撤回迟到只读门 > 撤回统一写入口 && 撤回迟到只读门 < 撤回真实改写,
+    '撤回必须在统一变量回调内、真实改写前再次复核迟到强剧情只读门',
+  );
+  assert.ok(
+    撤回真实改写 >= 0 && 撤回真实改写 < 撤回硬保存,
+    '撤回成功改写后必须再走微信刷新镜像与宿主硬保存边界',
+  );
 
   const 邀约入口 = 段(phoneInteraction, 'async function 约出来(', '// ── 楼务群接话');
   const 邀约只读门 = 邀约入口.indexOf('普通手机场景剧情只读原因');

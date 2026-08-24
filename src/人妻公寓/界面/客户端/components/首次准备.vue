@@ -169,6 +169,7 @@ const 数据库准备完成 = computed(
   () =>
     数据库检测.value.已安装 &&
     数据库检测.value.已装游戏模板 &&
+    数据库检测.value.脚本所有权模板已启用 &&
     !数据库脚本写入检测中.value &&
     数据库脚本写入能力.value?.可写 === true,
 );
@@ -496,6 +497,15 @@ watch(
               </button>
             </div>
           </template>
+          <template v-else-if="!数据库检测.脚本所有权模板已启用">
+            <b><em>3</em>更新游戏记忆归属规则</b>
+            <p>当前聊天仍是旧逐楼填表规则。更新会保留已有数据，并阻止后一楼内容写进前一楼；更新前通用填表已安全暂停。</p>
+            <div class="setup-db-actions">
+              <button class="btn rite" :disabled="安装模板中" @click="从说明安装数据库模板">
+                {{ 安装模板中 ? '更新中…' : '一键更新游戏记忆' }}
+              </button>
+            </div>
+          </template>
           <template v-else-if="数据库脚本写入检测中 || !数据库脚本写入能力?.可写">
             <b><em>3</em>开启 SQLite（SQL）存储</b>
             <p>
@@ -543,7 +553,11 @@ watch(
           <p class="setup-adv-note" :class="{ warn: 游戏为最新版 === false }">游戏：{{ 游戏检测说明 }}。</p>
           <p class="setup-adv-note" :class="{ warn: 数据库为最新版 === false }">
             数据库：{{ 数据库检测说明 }}。五张游戏记忆表{{
-              数据库检测.已装游戏模板 ? '已就绪' : '尚未安装'
+              !数据库检测.已装游戏模板
+                ? '尚未安装'
+                : 数据库检测.脚本所有权模板已启用
+                  ? '与逐楼归属规则均已就绪'
+                  : '已安装，但逐楼归属规则需要更新'
             }}。
           </p>
           <div class="setup-db-actions">

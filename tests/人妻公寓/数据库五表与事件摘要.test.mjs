@@ -18,7 +18,7 @@ function 载入摘要纯函数() {
   assert.notEqual(起, -1);
   assert.notEqual(止, -1);
   const ts片段 = `${数据库源.slice(起, 止)}
-module.exports = { 规范玩家行动, 保守回合摘要, 判断结果摘要为正文, 规范事件摘要, 提取回合事件摘要, 迁移官方纪要表内容, 迁移游戏记忆表时间列, 规范旧数据库时间文本 };`;
+module.exports = { 规范玩家行动, 保守回合摘要, 脚本保守回合摘要, 判断结果摘要为正文, 规范事件摘要, 提取回合事件摘要, 迁移官方纪要表内容, 迁移游戏记忆表时间列, 规范旧数据库时间文本 };`;
   const js = ts.transpileModule(ts片段, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText;
@@ -41,23 +41,22 @@ test('聊天模板固定为五张有用记忆表，七张默认硬状态/选项�
   for (const sheet of 表) {
     assert.ok(sheet.content[0].length <= 8, `${sheet.name} 不得超过数据库官方建议的 7～8 列上限`);
   }
-  assert.equal(取('RQ_剧情事件').updateConfig.updateFrequency, 3);
-  assert.equal(取('RQ_剧情事件').updateConfig.batchSize, 3);
+  assert.equal(取('RQ_剧情事件').updateConfig.updateFrequency, 0);
+  assert.equal(取('RQ_剧情事件').updateConfig.batchSize, 1);
   assert.equal(取('纪要表').updateConfig.updateFrequency, 3);
   assert.equal(取('纪要表').updateConfig.batchSize, 3);
   assert.equal(取('RQ_人物长期记忆').updateConfig.groupId, 取('RQ_承诺与伏笔').updateConfig.groupId);
   assert.equal(取('纪要表').updateConfig.groupId, 取('RQ_人物长期记忆').updateConfig.groupId);
   assert.equal(取('RQ_剧情事件').updateConfig.groupId, 取('纪要表').updateConfig.groupId);
-  assert.equal(取('RQ_社交轨迹').updateConfig.updateFrequency, 6);
+  assert.equal(取('RQ_社交轨迹').updateConfig.updateFrequency, 0);
   assert.equal(取('RQ_人物长期记忆').updateConfig.sendLatestRows, 60);
   assert.equal(取('RQ_承诺与伏笔').updateConfig.sendLatestRows, 60);
   assert.equal(取('RQ_社交轨迹').updateConfig.sendLatestRows, 60);
   assert.equal(取('RQ_剧情事件').updateConfig.sendLatestRows, 60);
   assert.equal(取('纪要表').updateConfig.sendLatestRows, undefined);
-  assert.match(取('RQ_剧情事件').sourceData.note, /脚本在正式正文成功落楼后先写入硬骨架/);
-  assert.match(取('RQ_剧情事件').sourceData.note, /数据库填表AI只负责/);
-  assert.match(取('RQ_剧情事件').sourceData.updateNode, /只更新待整理行的 result_summary/);
-  assert.match(取('RQ_剧情事件').sourceData.updateNode, /WHERE event_code[\s\S]*待数据库AI整理/);
+  assert.match(取('RQ_剧情事件').sourceData.note, /游戏脚本按同一正式AI楼精确写入/);
+  assert.match(取('RQ_剧情事件').sourceData.note, /填表AI不得插入、更新或删除/);
+  assert.match(取('RQ_剧情事件').sourceData.updateNode, /禁止/);
   assert.match(取('RQ_剧情事件').sourceData.insertNode, /禁止插入/);
   assert.match(取('纪要表').sourceData.initNode, /本批处理范围/);
   assert.equal(取('纪要表').exportConfig.keywords, '编码索引');
@@ -95,9 +94,11 @@ test('聊天模板固定为五张有用记忆表，七张默认硬状态/选项�
   assert.match(取('RQ_人物长期记忆').sourceData.ddl, /last_time TEXT, -- 最后时间/);
   assert.match(取('RQ_承诺与伏笔').sourceData.ddl, /last_time TEXT, -- 最后时间/);
   assert.match(取('RQ_社交轨迹').sourceData.ddl, /game_time TEXT, -- 游戏时间/);
-  for (const name of ['RQ_人物长期记忆', 'RQ_承诺与伏笔', 'RQ_社交轨迹']) {
+  for (const name of ['RQ_人物长期记忆', 'RQ_承诺与伏笔']) {
     assert.match(取(name).sourceData.updateNode, /SQL示例: UPDATE[\s\S]* WHERE /, `${name} 的 UPDATE 示例必须带业务键 WHERE`);
   }
+  assert.equal(取('RQ_社交轨迹').updateConfig.updateFrequency, 0);
+  assert.match(取('RQ_社交轨迹').sourceData.updateNode, /禁止.*脚本更新/);
   assert.match(取('RQ_人物长期记忆').sourceData.deleteNode, /DELETE[\s\S]*WHERE character_name[\s\S]*topic/);
 });
 
@@ -115,8 +116,14 @@ test('spv8.9.1 模板导入不会再把“事件”和社交“游戏时间”�
 });
 
 test('摘要边界拒绝正文截断、多块、漏块和超限值，合规短摘要保持原样', () => {
-  const { 规范玩家行动, 保守回合摘要, 判断结果摘要为正文, 规范事件摘要, 提取回合事件摘要 } =
-    载入摘要纯函数();
+  const {
+    规范玩家行动,
+    保守回合摘要,
+    脚本保守回合摘要,
+    判断结果摘要为正文,
+    规范事件摘要,
+    提取回合事件摘要,
+  } = 载入摘要纯函数();
   assert.equal(规范玩家行动('行'.repeat(50)), '行'.repeat(40));
   assert.equal(
     提取回合事件摘要('正文。\n<rq_event_summary>玩家修好101室水管</rq_event_summary>'),
@@ -131,8 +138,11 @@ test('摘要边界拒绝正文截断、多块、漏块和超限值，合规短�
   );
   assert.equal(提取回合事件摘要(`正文。<rq_event_summary>${'长'.repeat(61)}</rq_event_summary>`), null);
   assert.equal(判断结果摘要为正文('长'.repeat(61)), true);
-  assert.equal(规范事件摘要('长'.repeat(61), '去收租'), 保守回合摘要('去收租'));
+  assert.equal(规范事件摘要('长'.repeat(61), '去收租'), 脚本保守回合摘要('去收租'));
   assert.equal(规范事件摘要('夏乔交付房租并提到停水。', '去收租'), '夏乔交付房租并提到停水。');
+  assert.equal(规范事件摘要('', '去收租'), 脚本保守回合摘要('去收租'));
+  assert.doesNotMatch(规范事件摘要('', '去收租'), /待数据库AI整理|本轮结果未取得可靠摘要/);
+  assert.equal(规范事件摘要(脚本保守回合摘要('去收租'), '去收租'), 脚本保守回合摘要('去收租'));
   assert.match(保守回合摘要('去收租'), /玩家尝试「去收租」；本轮结果未取得可靠摘要/);
   assert.ok(Array.from(保守回合摘要('行'.repeat(80))).length <= 60);
 });
@@ -236,10 +246,12 @@ test('长档补写读取最近5000条剧情事件，不能在超长聊天里永�
   assert.doesNotMatch(函数, /ORDER BY floor_no ASC\s+LIMIT 5000/);
 });
 
-test('正文模型不再生成 RQ 摘要；脚本只写硬骨架，数据库填表 AI 后台补结果并保留旧协议清洗兼容', () => {
-  assert.doesNotMatch(回合源, /事件摘要指令|提取回合事件摘要\(原文\)|事件摘要 \?\? 保守回合摘要\(行动\)/);
+test('正文同轮生成 RQ 机器摘要；脚本绑定精确楼层，通用填表只处理其他长期表', () => {
+  assert.match(回合源, /数据库事件摘要指令/);
+  assert.match(回合源, /提取回合事件摘要\(原文\)/);
+  assert.match(回合源, /脚本保守回合摘要\(行动\)/);
   assert.match(回合源, /async function 记录数据库回合骨架/);
-  assert.match(回合源, /结果摘要:\s*数据库事件待整理摘要/);
+  assert.match(回合源, /结果摘要:\s*本轮数据库结果摘要/);
   assert.match(回合源, /function 安排数据库回合后处理/);
   assert.match(回合源, /补齐缺失数据库事件骨架/);
   assert.match(回合源, /触发数据库增量更新\(\)/);
@@ -262,8 +274,9 @@ test('正文模型不再生成 RQ 摘要；脚本只写硬骨架，数据库填�
   );
   assert.match(数据库源, /读取数据库剧情事件已记录楼层/);
   assert.match(数据库源, /触发数据库增量更新/);
+  assert.match(数据库源, /数据库精确摘要覆盖SQL/);
 
-  // 旧存档或旧模型回复可能仍含该控制块，清洗层继续物理移除，但新正文提示不再要求生成它。
+  // 摘要块属于机器协议，玩家正文始终物理移除。
   assert.match(
     机器协议源,
     /\.replace\(\/<rq_event_summary\\b\[\^>\]\*>\[\\s\\S\]\*\?<\\\/rq_event_summary\\s\*>\/gi, ''\)/,
@@ -400,6 +413,6 @@ test('首次准备和手机设置都明确显示五表迁移，不再把旧四�
   const 首次准备 = 读('src/人妻公寓/界面/客户端/components/首次准备.vue');
   const 设置 = 读('src/人妻公寓/脚本/游戏逻辑/手机/壳/渲染/settings.ts');
   assert.match(首次准备, /五张游戏记忆表/);
-  assert.match(设置, /人妻公寓五表已安装/);
+  assert.match(设置, /人妻公寓五表与逐楼归属规则已就绪/);
   assert.doesNotMatch(`${首次准备}\n${设置}`, /四张 RQ_ 表|人妻公寓四表|更新四张表/);
 });
