@@ -22,7 +22,7 @@ test('写库增量在同一变量回调内验证并提交余波消费', () => {
   assert.match(增量写, /余波消费\?:\s*手机余波消费/);
   assert.match(增量写, /余波身份相同/);
   assert.match(增量写, /_换装余波/);
-  assert.ok(增量写.indexOf('余波身份相同') < 增量写.indexOf("_.set(vars, '_微信', 新鲜)"));
+  assert.ok(增量写.indexOf('余波身份相同') < 增量写.indexOf("_.set(vars, '_微信', v)"));
 });
 
 test('朋友圈晒装只登记待提交圈晒，不提前写余波', () => {

@@ -227,3 +227,14 @@ test('剧情硬骨架写入区分已确认、后台待确认与失败；数据�
   assert.match(函数, /本轮正文与游戏结算不受影响/);
   assert.doesNotMatch(函数, /数据库记录完成|语义摘要.*完成/, '骨架成功不得伪报数据库 AI 摘要已经完成');
 });
+
+test('数据库补楼任务的时间线校验失效时立即终止，不能把事务作废当成跳过单楼', () => {
+  const 引擎 = 读('src/人妻公寓/脚本/游戏逻辑/回合引擎.ts');
+  const 起 = 引擎.indexOf('async function 补齐缺失数据库事件骨架');
+  const 止 = 引擎.indexOf('\nfunction 安排数据库回合后处理', 起 + 1);
+  assert.ok(起 >= 0 && 止 > 起);
+  const 函数 = 引擎.slice(起, 止);
+  assert.match(函数, /if \(!提交校验\(\)\) return 已补写;/, '旧时间线失效必须结束整个后台任务');
+  assert.match(函数, /if \(已记录\.has\(楼层\)\) continue;/, '只有当前楼已存在才允许 continue');
+  assert.doesNotMatch(函数, /!提交校验\(\) \|\| 已记录\.has\(楼层\)\) continue/);
+});

@@ -1393,6 +1393,13 @@ import { useRoomActions } from './composables/useRoomActions';
 import { useVideoTape } from './composables/useVideoTape';
 import { useMuteMeeting } from './composables/useMuteMeeting';
 import {
+  创建CG信号交接,
+  接收CG信号,
+  取出待处理CG信号,
+  清理越界CG信号,
+  清空CG信号交接,
+} from './composables/useAdultCGHandoff';
+import {
   保存回合恢复记录,
   读取回合恢复记录,
   清除回合恢复记录,
@@ -1842,6 +1849,7 @@ async function 写场景(房间id: string | null, 破门 = false, 待提交状�
     当前生产CG.value = null;
     清空借种CG序列();
     最近CG信号 = null;
+    清空CG信号交接(成人CG信号交接);
   }
   return true;
 }
@@ -2069,6 +2077,7 @@ function 同步场景自变量() {
       当前生产CG.value = null;
       当前借种CG.value = null;
       最近CG信号 = null;
+      清空CG信号交接(成人CG信号交接);
     }
   } catch (e) {
     console.error('[人妻公寓客户端] 场景同步失败:', e);
@@ -2499,6 +2508,11 @@ function 清空借种CG序列(): void {
   当前借种CG.value = null;
   借种CG队列.value = [];
 }
+function 清空借种CG场次瞬态(): void {
+  清空借种CG序列();
+  借种CG来源键 = '';
+  借种CG本场已展示.clear();
+}
 const 当前事件CG = computed(() => 当前借种CG.value ?? 当前生产CG.value ?? 当前家庭计划CG.value);
 const 当前家庭计划CG地址 = computed(() => (当前家庭计划CG.value ? 家庭计划图片(当前家庭计划CG.value.文件) : ''));
 const 当前事件CG地址 = computed(() =>
@@ -2517,10 +2531,12 @@ const 当前事件CG关闭文案 = computed(() =>
 function 关闭当前事件CG(): void {
   if (当前借种CG.value) {
     当前借种CG.value = 借种CG队列.value.shift() ?? null;
+    尝试恢复待处理成人CG();
     return;
   }
   if (当前生产CG.value) 当前生产CG.value = null;
   else 当前家庭计划CG.value = null;
+  尝试恢复待处理成人CG();
 }
 function 当前事件CG加载失败(失败地址: string): void {
   // 图片请求可能在事件节点切换或其他画面抢占后才迟到失败；只允许仍是当前地址的请求收口。
@@ -2532,6 +2548,7 @@ function 当前事件CG加载失败(失败地址: string): void {
 const 成人CG本次失效 = new Set<string>();
 const 已解锁CG = ref<Set<string>>(new Set());
 let 最近CG信号: CG回合信号 | null = null;
+const 成人CG信号交接 = 创建CG信号交接<CG回合信号>();
 let 当前成人CG展示键 = '';
 let 成人CG请求epoch = 0;
 
@@ -2624,9 +2641,20 @@ function 处理CG回合信号(
   // 场内的委婉/对话楼或软阶段同角色同图库同阶段没有新候选时沿用当前 CG，不能掉回普通立绘。
 }
 
+/** 事件图只是视觉遮挡；最后一帧关闭后恢复遮挡期间最新的普通亲密场景状态。 */
+function 尝试恢复待处理成人CG(): void {
+  if (荣耀洞图.value || 当前房间.value === '医院') {
+    清空CG信号交接(成人CG信号交接);
+    return;
+  }
+  const 待处理 = 取出待处理CG信号(成人CG信号交接, Boolean(当前事件CG.value), getLastMessageId());
+  if (待处理) 处理CG回合信号(待处理);
+}
+
 /** 回档/撤回把产生 CG 的楼层删掉后，画面不能继续停留在被抹去的成人场景上(2026-08-03 审计 M10)。
  * 正常回合的 CG 信号楼层 ≤ 末楼，此检查恒为无害幂等。 */
 function 清理越界成人CG(): void {
+  清理越界CG信号(成人CG信号交接, getLastMessageId());
   if (!最近CG信号 || 最近CG信号.楼层 <= getLastMessageId()) return;
   清空当前成人CG();
   最近CG信号 = null;
@@ -4772,8 +4800,9 @@ function 客户端聊天切换(): void {
   清空当前成人CG();
   当前家庭计划CG.value = null;
   当前生产CG.value = null;
-  当前借种CG.value = null;
+  清空借种CG场次瞬态();
   最近CG信号 = null;
+  清空CG信号交接(成人CG信号交接);
   当前房间.value = null;
   进房末楼.value = 0;
   本次入房由头已用.value = false;
@@ -5001,9 +5030,11 @@ onMounted(() => {
     }
   });
   eventOn('人妻公寓:CG回合信号', (信号: CG回合信号) => {
-    // 荣耀洞拥有独立三拍画面；这里仍可接收事件，但渲染层与解锁层均不采用普通CG。
-    // 医院同样只允许生产系统的非成人画面；不能把正文尺度误判生成的成人CG藏在生产图后。
-    if (荣耀洞图.value || 当前房间.value === '医院' || 当前事件CG.value) {
+    // 荣耀洞/医院是语义硬隔离，普通成人 CG 永久丢弃；借种、生产、家庭计划事件图只是
+    // 临时视觉遮挡，保留遮挡期间最新信号，最后一帧关闭后再恢复，不能无声吞掉。
+    const 阻塞 = 荣耀洞图.value || 当前房间.value === '医院' ? '硬隔离' : 当前事件CG.value ? '可恢复遮挡' : '无';
+    const 交接结果 = 接收CG信号(成人CG信号交接, 信号, 阻塞);
+    if (交接结果 !== '立即处理') {
       清空当前成人CG();
       最近CG信号 = null;
       return;
@@ -6244,6 +6275,14 @@ onUnmounted(() => {
   justify-content: flex-end;
   pointer-events: none;
   transition: background 0.24s ease;
+}
+
+/* 收起态是持续可见的状态栏，不是遮罩：让它作为 story-wrap 的末尾 flex 项真实占高，
+   正文滚动层会自动让出完整底栏高度，最大字号和移动端也不会被固定像素垫片截住。 */
+.intimacy-stage-dock:not(.open) {
+  position: relative;
+  inset: auto;
+  flex: none;
 }
 
 .intimacy-stage-dock.open {

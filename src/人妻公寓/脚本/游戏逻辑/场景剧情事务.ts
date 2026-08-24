@@ -134,6 +134,18 @@ export function 等待场景剧情阻塞当前场景(
   return Boolean(waiting && (waiting.目标场景 === null || 场景剧情目标匹配(waiting.目标场景, 当前场景)));
 }
 
+/**
+ * 前台生成所有权的统一判定。普通活动票、已到场等待票、专用特殊场景与荣耀洞都属于
+ * 强剧情；手机和数据库后台 AI 必须让路。远处等待票不占当前前台，避免长期冻结日常内容。
+ */
+export function 场景剧情占用前台生成(data: SchemaType | null | undefined, 当前场景: string | null | undefined): boolean {
+  if (!data) return false;
+  if (data.系统._特殊场景.id || data.系统._荣耀洞拍 >= 0) return true;
+  const 活动 = 读取活动场景剧情(data);
+  const 等待 = 读取队首场景剧情(data.系统._待发送事件);
+  return Boolean(活动 || 等待场景剧情阻塞当前场景(等待, 当前场景));
+}
+
 export function 场景剧情目标显示名(目标场景: 场景剧情目标): string {
   if (目标场景 === null) return '原触发场景';
   return 目标场景 || '楼道';
@@ -428,6 +440,42 @@ export function 激活队首场景剧情(
   return { 成功: true, 事务: 建立事务(data, meta, content, 行动, 触发楼层) };
 }
 
+export type 场景剧情队首恢复结果 = '无活动' | '一致' | '已恢复' | '不可恢复';
+
+function 队首匹配活动事务(head: 队首场景剧情 | null, active: 场景剧情事务): boolean {
+  return Boolean(head && head.内容 === active.内容 && (!head.id || head.id === active.id));
+}
+
+/**
+ * 旧版本若在首次生成失败后又排入后续强剧情，活动事务对应的结构票可能仍完整存在于队列
+ * 中段。只在“事务 ID 相同、整组内容逐字相同、且唯一命中”时把该组移回队首；其余积压票
+ * 原顺序保留。正文遗失、重复副本或 ID 冲突一律拒绝猜测，不删除任何票。
+ */
+export function 恢复活动场景剧情队首(data: SchemaType): 场景剧情队首恢复结果 {
+  const active = 读取活动场景剧情(data);
+  if (!active) return '无活动';
+  const items = 读取待发送事件队列(data.系统._待发送事件);
+  const head = 读取队首场景剧情(拼接待发送事件队列(items));
+  if (队首匹配活动事务(head, active)) return '一致';
+
+  const 候选: Array<{ 起: number; 止: number }> = [];
+  for (let 起 = 0; 起 < items.length; 起 += 1) {
+    const meta = 解析场景剧情元数据(items[起]);
+    if (meta?.id !== active.id) continue;
+    if (起 > 0 && 解析场景剧情元数据(items[起 - 1])?.id === active.id) continue;
+    let 止 = 起 + 1;
+    while (止 < items.length && 解析场景剧情元数据(items[止])?.id === active.id) 止 += 1;
+    if (拼接待发送事件队列(items.slice(起, 止)) === active.内容) 候选.push({ 起, 止 });
+  }
+  if (候选.length !== 1) return '不可恢复';
+
+  const [{ 起, 止 }] = 候选;
+  const 活动组 = items.slice(起, 止);
+  const 其余 = [...items.slice(0, 起), ...items.slice(止)];
+  data.系统._待发送事件 = 拼接待发送事件队列([...活动组, ...其余]);
+  return 队首匹配活动事务(读取队首场景剧情(data.系统._待发送事件), active) ? '已恢复' : '不可恢复';
+}
+
 export function 准备重试场景剧情(
   data: SchemaType,
   当前场景: string | null | undefined,
@@ -440,7 +488,10 @@ export function 准备重试场景剧情(
   if (!场景剧情目标匹配(txn.目标场景, 当前场景)) {
     return { 成功: false, 提示: `「${txn.标题}」必须回到原场景后才能继续。` };
   }
-  const head = 读取队首场景剧情(data.系统._待发送事件);
+  let head = 读取队首场景剧情(data.系统._待发送事件);
+  if (!队首匹配活动事务(head, txn) && 恢复活动场景剧情队首(data) === '已恢复') {
+    head = 读取队首场景剧情(data.系统._待发送事件);
+  }
   if (!head || head.内容 !== txn.内容 || (head.id && head.id !== txn.id)) {
     return { 成功: false, 提示: '场景剧情票据与待演内容已经不一致，已停止自动重试以免串戏。' };
   }
@@ -626,14 +677,17 @@ export function 同步场景剧情事务(
   }
   const active = 读取活动场景剧情(data);
   if (!active && 独立连场活动中(data)) return;
-  const head = 读取队首场景剧情(data.系统._待发送事件);
+  let head = 读取队首场景剧情(data.系统._待发送事件);
   if (active) {
     if (!head) {
       // 普通活动票还在但正文队首丢失，说明并发覆盖或存档损坏。无关写入不能静默清票，
       // 否则玩家会看到“业务已结算、剧情却假装完成”。
       throw new Error('活动场景剧情仍在，但待发送正文已经丢失；不能静默解锁，已拒绝写回。');
     }
-    if (head.内容 !== active.内容 || (head.id && head.id !== active.id)) {
+    if (!队首匹配活动事务(head, active) && 恢复活动场景剧情队首(data) === '已恢复') {
+      head = 读取队首场景剧情(data.系统._待发送事件);
+    }
+    if (!队首匹配活动事务(head, active)) {
       throw new Error('活动场景剧情与待发送队首不一致，已拒绝写回以免串戏。');
     }
     return;

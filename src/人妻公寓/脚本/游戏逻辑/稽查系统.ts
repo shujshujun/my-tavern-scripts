@@ -96,13 +96,36 @@ export function 解析尺度判定(原文: string): { 模式: 尺度模式; 角�
     if (!原对象 || typeof 原对象 !== 'object' || Array.isArray(原对象)) return null;
     const 显式模式 = 匹配[1] as 尺度模式 | undefined;
     const 条目 = Object.entries(原对象 as Record<string, unknown>);
-    const 推定模式: 尺度模式 = 显式模式 ?? (条目.some(([, 值]) => typeof 值 === 'object') ? '详' : '简');
+    // 新版简协议也是对象，但不含“许可”；属性偶发被模型省略时，不能再用“对象=详”
+    // 的旧启发式把自然请求裁决误判成模式不符。详协议必须以逐角色许可字段区分。
+    const 推定模式: 尺度模式 =
+      显式模式 ??
+      (条目.some(
+        ([, 值]) => Boolean(值 && typeof 值 === 'object' && !Array.isArray(值) && Object.hasOwn(值 as object, '许可')),
+      )
+        ? '详'
+        : '简');
     const 角色: Partial<Record<门牌, 角色尺度判定>> = {};
     for (const [门牌号, 值] of 条目) {
       if (!是门牌(门牌号)) continue;
       if (推定模式 === '简') {
         const 实际 = 合法等级(值);
-        if (实际 !== null) 角色[门牌号] = { 许可: null, 请求: null, 实际, 结果: '' };
+        if (实际 !== null) {
+          // 旧版简协议只有一个数字，继续兼容；新版简协议同时报告“请求/实际”，让脚本
+          // 能理解含蓄、承接式玩家表达，而不是要求玩家说出某个固定口令。
+          角色[门牌号] = { 许可: null, 请求: null, 实际, 结果: '' };
+          continue;
+        }
+        if (!值 || typeof 值 !== 'object' || Array.isArray(值)) continue;
+        const 项 = 值 as Record<string, unknown>;
+        const 对象实际 = 合法等级(项.实际);
+        if (对象实际 === null) continue;
+        角色[门牌号] = {
+          许可: null,
+          请求: 合法等级(项.请求),
+          实际: 对象实际,
+          结果: typeof 项.结果 === 'string' ? 项.结果.slice(0, 40) : '',
+        };
         continue;
       }
       if (!值 || typeof 值 !== 'object' || Array.isArray(值)) continue;
@@ -129,6 +152,20 @@ export function 解析尺度判定(原文: string): { 模式: 尺度模式; 角�
  */
 const 拍摄题材词: readonly string[] = ['录像', '录下', '摄像头前', '镜头前'];
 const 拍摄题材户: readonly 门牌[] = ['301', '102'];
+
+// 只用于“模型漏掉控制块”时阻止正文事实与结构化账本分叉，不参与正常玩家意图准入。
+// 逐句排除明确否定/拒绝，避免“没有发生关系”反向触发重写。
+const 正式性行为事实词 =
+  /发生(?:了)?(?:性关系|关系)|共度(?:了)?春宵|行房|圆房|肌肤之亲|鱼水之欢|翻云覆雨|云雨一番|做爱|性交|交合|交媾|抽插|挺入|内射|中出/;
+const 正式性行为否定词 = /没(?:有)?|并未|未曾|不愿|拒绝|制止|停下|到此为止|没有真的/;
+
+function 正文明确发生正式性行为(正文: string): boolean {
+  return 正文
+    .split(/[。！？；;\n]/)
+    .map(句 => 句.trim())
+    .filter(Boolean)
+    .some(句 => 正式性行为事实词.test(句) && !正式性行为否定词.test(句));
+}
 
 function 关键词命中(正文: string, 最低阶段: number, 免计词: ReadonlySet<string>): string[] {
   const 命中: string[] = [];
@@ -181,6 +218,22 @@ export function 输出稽查(
     }
   }
 
+  // 正式性行为会创建体力、满意度与 CG 共用的结构化亲密账本。若模型只报“实际 3+”
+  // 却漏掉玩家请求，脚本无法区分自然承接与 AI 擅自升级，不能把正文静默落成普通楼。
+  const 缺请求裁决 = 待检角色.filter(门牌号 => {
+    const 项 = 角色[门牌号];
+    return Boolean(项 && 项.实际 >= 3 && 项.请求 === null);
+  });
+  if (缺请求裁决.length) {
+    return {
+      状态: '需重写',
+      原因: `正式性行为缺少玩家请求裁决:${缺请求裁决.join('、')}`,
+      模式: 判定?.模式 ?? null,
+      角色,
+      最高实际等级: 实际们.length ? Math.max(...实际们) : null,
+    };
+  }
+
   const 最低阶段 = Math.min(...待检角色.map(m => Math.floor(阶段表[m] ?? 0)));
   // 拍摄词豁免属于 301／102 各自的题材边界，不能因其中一人在混合多人场景里出现，
   // 就替其他低阶段角色全局免掉镜头越界信号。只有全部待检角色都属于拍摄题材户时
@@ -189,6 +242,15 @@ export function 输出稽查(
   const 命中 = 关键词命中(检词文本, 最低阶段, 免计词);
   const 缺角色 = 待检角色.filter(m => !角色[m]);
   const 模式不符 = 判定 && 判定.模式 !== 期望模式;
+  if ((!判定 || 缺角色.length || 模式不符) && 正文明确发生正式性行为(检词文本)) {
+    return {
+      状态: '需重写',
+      原因: `尺度结论${!判定 ? '缺失或损坏' : 模式不符 ? '模式不符' : `漏报${缺角色.join('、')}`}，正文已出现正式性行为事实`,
+      模式: 判定?.模式 ?? null,
+      角色,
+      最高实际等级: 实际们.length ? Math.max(...实际们) : null,
+    };
+  }
   if ((!判定 || 缺角色.length || 模式不符) && 命中.length >= 2) {
     return {
       状态: '需重写',

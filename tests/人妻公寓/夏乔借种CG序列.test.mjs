@@ -1,6 +1,8 @@
+/* eslint-disable import-x/no-nodejs-modules -- Node-only regression test */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 
 const require = createRequire(import.meta.url);
 process.env.TS_NODE_COMPILER_OPTIONS = JSON.stringify({ module: 'CommonJS', moduleResolution: 'node' });
@@ -10,6 +12,7 @@ require('ts-node/register/transpile-only');
 
 const { Schema, 创建户节点 } = require('../../src/人妻公寓/schema.ts');
 const { 选择借种CG序列 } = require('../../src/人妻公寓/界面/客户端/借种CG序列.ts');
+const App源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
 
 function 建数据() {
   const 节点 = 创建户节点(0);
@@ -134,4 +137,21 @@ test('借种失败收尾不能播放确定受孕三连图', () => {
     }),
   );
   assert.deepEqual(result, { 接管: false, 帧: [] });
+});
+
+test('CHAT_CHANGED 清空借种当前画面、队列、来源键与本场去重集合，但不清全局解锁', () => {
+  const 起 = App源.indexOf('function 客户端聊天切换');
+  const 止 = App源.indexOf('\n}', 起) + 2;
+  assert.ok(起 >= 0 && 止 > 起);
+  const 切聊段 = App源.slice(起, 止);
+  assert.match(切聊段, /清空借种CG场次瞬态\(\)/, '切聊必须清完整借种场次瞬态');
+
+  const 清理起 = App源.indexOf('function 清空借种CG场次瞬态');
+  const 清理止 = App源.indexOf('\n}', 清理起) + 2;
+  assert.ok(清理起 >= 0 && 清理止 > 清理起);
+  const 清理段 = App源.slice(清理起, 清理止);
+  assert.match(清理段, /清空借种CG序列\(\)/);
+  assert.match(清理段, /借种CG来源键\s*=\s*''/);
+  assert.match(清理段, /借种CG本场已展示\.clear\(\)/);
+  assert.doesNotMatch(清理段, /清空CG解锁|localStorage|已解锁CG/);
 });

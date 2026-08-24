@@ -68,6 +68,96 @@ function 解码常见HTML实体(文本: string): string {
   });
 }
 
+// 只清理真实 HTML 与已经由上游识别过的常见协议外壳。不能再使用 `<[^>]+>`：普通
+// 比较式与玩家写下的 `<请勿打扰>` 不是标签。未知尖括号内容宁可保留给玩家判断。
+const 可转纯文本标签 = [
+  'a',
+  'abbr',
+  'address',
+  'article',
+  'aside',
+  'b',
+  'bdi',
+  'bdo',
+  'blockquote',
+  'body',
+  'button',
+  'caption',
+  'cite',
+  'code',
+  'col',
+  'colgroup',
+  'data',
+  'dd',
+  'del',
+  'details',
+  'dfn',
+  'div',
+  'dl',
+  'dt',
+  'em',
+  'fieldset',
+  'figcaption',
+  'figure',
+  'footer',
+  'form',
+  'h[1-6]',
+  'head',
+  'header',
+  'html',
+  'i',
+  'img',
+  'input',
+  'ins',
+  'kbd',
+  'label',
+  'legend',
+  'li',
+  'main',
+  'mark',
+  'meta',
+  'menu',
+  'nav',
+  'ol',
+  'optgroup',
+  'option',
+  'output',
+  'p',
+  'picture',
+  'pre',
+  'q',
+  'rp',
+  'rt',
+  'ruby',
+  's',
+  'samp',
+  'section',
+  'select',
+  'source',
+  'small',
+  'span',
+  'strong',
+  'sub',
+  'summary',
+  'sup',
+  'table',
+  'tbody',
+  'td',
+  'textarea',
+  'tfoot',
+  'th',
+  'thead',
+  'time',
+  'title',
+  'track',
+  'tr',
+  'u',
+  'ul',
+  'var',
+  'wbr',
+].join('|');
+const 可转纯文本标签正则 = new RegExp(`<\\/?(?:${可转纯文本标签})(?:\\s[^<>]*?)?\\s*\\/?>`, 'gi');
+
 /**
  * 把酒馆正则的最终结果收敛为正文舞台纯文本。这里只处理通用 HTML/CSS/脚本外壳，
  * 不识别预设名称、正文标签或思维链标签；折叠块的文字会展开成普通文本，而不是复制其视觉层。
@@ -81,12 +171,14 @@ export function 转为正文舞台纯文本(原文: string): string {
     .replace(/<script\b[^>]*>[\s\S]*$/i, '')
     .replace(/<(?:iframe|object|embed)\b[^>]*>[\s\S]*?<\/(?:iframe|object|embed)\s*>/gi, '')
     .replace(/<(?:iframe|object|embed)\b[^>]*>[\s\S]*$/i, '')
+    .replace(/<svg\b[^>]*>[\s\S]*?<\/svg\s*>/gi, '')
+    .replace(/<svg\b[^>]*>[\s\S]*$/i, '')
     .replace(/<!--([\s\S]*?)-->/g, '')
     .replace(/<br\b[^>]*\/?\s*>/gi, '\n')
     .replace(/<hr\b[^>]*\/?\s*>/gi, '\n')
     .replace(/<li\b[^>]*>/gi, '• ')
     .replace(/<\/(?:p|div|section|article|header|footer|li|h[1-6]|details|summary|blockquote|pre|table|tr)\s*>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
+    .replace(可转纯文本标签正则, '')
     .replace(/^\s*```(?:html|xml|css|javascript|js)?\s*$/gim, '')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n');

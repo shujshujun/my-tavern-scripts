@@ -1,5 +1,6 @@
 import {
   场景剧情可见标题,
+  场景剧情占用前台生成,
   绑定新增待发送事件到场景,
   场景剧情目标匹配,
   标记场景剧情待重试,
@@ -76,6 +77,7 @@ import {
   读取微信进展胶囊,
   读取数据库剧情事件已记录楼层,
   检测数据库脚本写入能力,
+  修复数据库固定开局摘要,
   同步数据库回合,
   数据库事件待整理摘要,
   数据库状态,
@@ -1679,7 +1681,8 @@ async function 补齐缺失数据库事件骨架(
   const 消息表 = (SillyTavern.chat ?? []) as 宿主聊天消息[];
   let 已补写 = 0;
   for (let 楼层 = Math.min(截止楼层, 消息表.length - 1); 楼层 >= 1 && 已补写 < 12; 楼层 -= 1) {
-    if (!提交校验() || 已记录.has(楼层)) continue;
+    if (!提交校验()) return 已补写;
+    if (已记录.has(楼层)) continue;
     const 消息 = 消息表[楼层];
     if (!消息 || 宿主消息是玩家(消息) || !宿主消息文本(消息)) continue;
     const extra = 消息.extra ?? {};
@@ -1762,8 +1765,18 @@ function 安排数据库回合后处理(参数: {
           参数.提交校验,
         );
         if (!参数.提交校验()) return;
+        const 开局摘要修复 = await 修复数据库固定开局摘要(参数.提交校验);
+        if (!参数.提交校验()) return;
         await 补齐缺失数据库事件骨架(参数.楼层, 参数.提交校验);
         if (!参数.提交校验()) return;
+        // 旧错绑行的修复 mutation 尚未确认时，本拍不再启动可选填表 AI；下一张成功正文
+        // 会先重读并确认固定开场，再处理所有 pending 骨架，避免修复与填表互相抢写。
+        if (开局摘要修复 === '待确认' || 开局摘要修复 === '失败') return;
+        // 硬骨架已经落库；可选数据库 AI 在强剧情前台到达后必须让路。下一张成功正文会
+        // 继续处理 pending 骨架，不能为了上一楼的记忆整理制造强剧情固定首轮失败。
+        const 最新 = 读取最近有效()?.data ?? data快照;
+        const 当前场景 = 读场景().房间id ?? null;
+        if (场景剧情占用前台生成(最新, 当前场景)) return;
         // 下一轮已经开始时不对着临时尾楼触发数据库；下一次成功楼会继续处理所有 pending 骨架。
         if (回合进行中() || getLastMessageId() !== 参数.楼层) return;
         await 广播生成完成事件(参数.楼层, 参数.提交校验);
@@ -2007,6 +2020,8 @@ export async function 执行回合(
     场景剧情事务ID?: string;
     /** 同一事务的每次重试都有独立世代；旧请求迟到时不得认领新世代。 */
     场景剧情请求世代?: number;
+    /** 同一 MVU 操作刚激活并成功写回的场景数据；避免首次正文立刻重读到半新半旧快照。 */
+    预载场景剧情数据?: SchemaType;
   } = {},
 ): Promise<boolean> {
   const 释放预占租约 = () => 选项.预占前台生成租约?.释放();
@@ -2110,7 +2125,20 @@ export async function 执行回合(
       eventEmit('人妻公寓:回合失败', '变量还没就绪——请稍等片刻再试');
       return false;
     }
-    const data = Schema.parse(rawStat) as SchemaType;
+    let data = Schema.parse(rawStat) as SchemaType;
+    if (选项.预载场景剧情数据) {
+      const 预载 = Schema.parse(_.cloneDeep(选项.预载场景剧情数据)) as SchemaType;
+      const 预载事务 = 读取活动场景剧情(预载);
+      if (
+        !选项.场景剧情事务ID ||
+        !预载事务 ||
+        预载事务.id !== 选项.场景剧情事务ID ||
+        预载事务.请求世代 !== 选项.场景剧情请求世代
+      ) {
+        throw new Error('首次场景剧情移交的数据快照与事务身份不一致，本轮已停止。');
+      }
+      data = 预载;
+    }
     回合基准data = _.cloneDeep(data) as SchemaType;
     const 回合起始场景 = 读场景().房间id ?? '';
     const 确认回合场景未变化 = (消息: string): void => {
@@ -2288,6 +2316,10 @@ export async function 执行回合(
           injects,
           overrides: 正文模型覆盖,
           generation_id: 本回合生成id,
+          // 本卡会在正文、MVU 与当前 RQ 硬骨架全部提交后自行触发数据库增量更新。
+          // 先抑制数据库监听这次原始 GENERATION_ENDED，避免当前骨架尚未出现时，
+          // 用本轮正文去填写上一轮仍待整理的 RQ 行并把填表游标错误前移。
+          automatic_trigger: true,
         },
         {
           // 回档重建或迟到 SQL 补偿尚未落定时，官方数据库规划同样必须停用；只停本卡
@@ -2799,6 +2831,7 @@ export async function 执行回合(
         本楼事件,
         妻在场,
         实际尺度: 资源实际尺度,
+        尺度判定: 稽查.角色,
         资源计费: 本轮资源计费 && Boolean(可提交正文),
       });
     }
@@ -2809,6 +2842,7 @@ export async function 执行回合(
       本楼事件,
       妻在场,
       实际尺度: 资源实际尺度,
+      尺度判定: 稽查.角色,
       // 无效正文只落占位楼,不算"有效正文成功落楼",不得扣玩家资源(2026-08-03 审计 M2)
       资源计费: 本轮资源计费 && Boolean(可提交正文),
       记录攻略风闻调用: (门牌号, 档) => 变量重生成后续风闻调用.push({ 门牌: 门牌号, 档 }),
@@ -3228,6 +3262,7 @@ export async function 重掷回合(): Promise<void> {
           预占前台生成租约: 前台租约,
           场景剧情事务ID: 重试.事务.id,
           场景剧情请求世代: 重试.事务.请求世代,
+          预载场景剧情数据: 恢复后.data,
         });
       } finally {
         if (!重演成功 && 重掷仍有效()) {

@@ -1,14 +1,16 @@
 /* eslint-disable import-x/no-nodejs-modules -- Node-only regression test */
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
 process.env.TS_NODE_COMPILER_OPTIONS = JSON.stringify({ module: 'CommonJS', moduleResolution: 'node' });
 const require = createRequire(import.meta.url);
 require('ts-node/register/transpile-only');
-const { 附手机分支锚, 手机记录属于当前分支, 裁手机分支记录, 裁同楼切分支记录 } = require(
+const { 附手机分支锚, 手机记录属于当前分支, 裁手机分支记录, 裁同楼切分支记录, 裁删楼后记录 } = require(
   '../../src/人妻公寓/脚本/游戏逻辑/手机分支隔离.ts',
 );
+const 手机数据层源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/数据层.ts', import.meta.url), 'utf8');
 
 test('同楼 swipe 后已提交旧分支微信与稳定键一起失去当前分支资格', () => {
   const 旧锚 = { is_user: false, mes: '旧回复', swipe_id: 0, send_date: 1 };
@@ -57,6 +59,24 @@ test('已发布旧档中 swipe_id=null 的持久签名兼容刷新后的 0，但
   );
 });
 
+test('旧助手楼缺失 is_user、刷新后补 false 仍属于同一角色侧', () => {
+  const 旧档记录 = {
+    楼: 0,
+    时: 2,
+    会话: '101',
+    文: '旧助手楼微信',
+    锚签名: JSON.stringify([null, '同一条回复', null, null, null, null]),
+  };
+  assert.equal(
+    手机记录属于当前分支(旧档记录, [{ is_user: false, mes: '刷新后的回复', swipe_id: 0 }]),
+    true,
+  );
+  assert.equal(
+    手机记录属于当前分支(旧档记录, [{ is_user: true, mes: '用户楼', swipe_id: 0 }]),
+    false,
+  );
+});
+
 test('明确同楼 swipe 时裁掉该楼无锚自动消息和稳定键，仅保留无法判别的玩家手动消息', () => {
   const 新分支 = [{ is_user: false, mes: '新回复', swipe_id: 1 }];
   const 带锚旧消息 = 附手机分支锚({ 楼: 0, 时: 2, 发: '对方', 文: '带锚旧自动回复' }, 新分支);
@@ -88,20 +108,43 @@ test('宿主在同一分支内改写正文（宏展开/思维链剥离/楼层编
   assert.equal(手机记录属于当前分支(记录, [编辑后]), true, '楼层编辑不应清空该楼已产生的微信');
 });
 
-test('正文容差不放宽真实分支隔离：swipe、send_date、is_user、name、头像任一变化仍失配', () => {
+test('持久分支只认角色侧与 swipe：刷新补齐时间、名称、头像或正文时仍保留，真实 swipe/角色侧变化仍隔离', () => {
   const 原锚 = { is_user: false, mes: '原回复', send_date: 100, swipe_id: 0, name: '人妻公寓', force_avatar: null };
   const 记录 = 附手机分支锚({ 楼: 0, 时: 2, 会话: '101', 文: '原分支微信' }, [原锚]);
 
-  const 变体 = [
-    ['真实 swipe', { ...原锚, mes: '另一分支回复', swipe_id: 1 }],
-    ['删楼后重建（新时间戳）', { ...原锚, mes: '重建回复', send_date: 200 }],
-    ['角色/用户身份变化', { ...原锚, mes: '重建回复', is_user: true }],
-    ['发言人变化', { ...原锚, mes: '重建回复', name: '苏斌' }],
-    ['persona 头像变化', { ...原锚, mes: '重建回复', force_avatar: 'thumb/persona' }],
+  const 刷新软变体 = [
+    ['正文改写', { ...原锚, mes: '刷新后的正文' }],
+    ['时间字段补齐', { ...原锚, send_date: 200 }],
+    ['发言人显示名归一', { ...原锚, name: '更新后的角色名' }],
+    ['头像归一', { ...原锚, force_avatar: 'thumb/updated-avatar' }],
   ];
-  for (const [说明, 新锚] of 变体) {
-    assert.equal(手机记录属于当前分支(记录, [新锚]), false, `${说明} 必须仍然隔离旧分支微信`);
+  for (const [说明, 新锚] of 刷新软变体) {
+    assert.equal(手机记录属于当前分支(记录, [新锚]), true, `${说明}不是分支身份，不得隐藏微信`);
   }
+
+  assert.equal(
+    手机记录属于当前分支(记录, [{ ...原锚, mes: '另一分支回复', swipe_id: 1 }]),
+    false,
+    '真实 swipe 仍必须隔离旧分支微信',
+  );
+  assert.equal(
+    手机记录属于当前分支(记录, [{ ...原锚, mes: '用户楼', is_user: true }]),
+    false,
+    '用户/助手角色侧变化仍必须失败关闭',
+  );
+});
+
+test('明确删楼拥有物理裁枝权：删除楼及后续记录即使外观和 swipe_id 相同也不能复活', () => {
+  const 当前聊天 = [
+    { is_user: true, mes: '保留楼', swipe_id: 0 },
+    { is_user: false, mes: '宿主在同楼重建的相同正文', swipe_id: 0 },
+  ];
+  const 记录 = [
+    附手机分支锚({ 楼: 0, 时: 2, 发: '我', 文: '删除点以前' }, 当前聊天),
+    附手机分支锚({ 楼: 1, 时: 2, 发: '对方', 文: '被删除楼的旧微信' }, 当前聊天),
+    { 楼: 2, 时: 2, 发: '系统', 文: '删除楼之后的旧事件', 键: '旧事件' },
+  ];
+  assert.deepEqual(裁删楼后记录(记录, 1, 当前聊天).map(x => x.文), ['删除点以前']);
 });
 
 test('正文容差覆盖已发布旧档签名：swipe_id=null 与正文改写可同时发生', () => {
@@ -143,5 +186,21 @@ test('签名形状未知时退回严格比较，不因容差放宽隔离', () =>
     手机记录属于当前分支(畸形签名记录, [{ is_user: false, mes: '正常楼', swipe_id: 0 }]),
     false,
     '不可解析的签名必须失败关闭',
+  );
+});
+
+test('真实 swipe 协调期间唯一手机写入口双重冻结，事件后新分支消息不得先写入再被裁掉', () => {
+  assert.match(手机数据层源, /时间线切换协调中/);
+  const 起 = 手机数据层源.indexOf('export async function 写库增量');
+  const 止 = 手机数据层源.indexOf('\nexport ', 起 + 1);
+  assert.ok(起 >= 0 && 止 > 起);
+  const 写入段 = 手机数据层源.slice(起, 止);
+  const 外门 = 写入段.indexOf('if (时间线切换协调中()) return false;');
+  const 更新 = 写入段.indexOf('updateVariablesWith');
+  assert.ok(外门 >= 0 && 外门 < 更新, '进入变量队列前必须冻结新手机写入');
+  assert.match(
+    写入段.slice(更新),
+    /if \(时间线切换协调中\(\) \|\| !允许写入\(\)\) return vars;/,
+    '变量回调真正提交前必须再次复核协调锁',
   );
 });

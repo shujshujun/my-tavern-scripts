@@ -54,7 +54,10 @@ function 载入手机生成行为(data, 当前场景 = '垃圾房') {
     },
     '../数据库桥': { 数据库状态: () => ({ 可调用AI: false }), 通过数据库生成: async () => '' },
     '../数据库AI租约': { 全局数据库AI租约: { 在结算: () => false } },
-    '../预设输出兼容': { 清洗预设输出: value => ({ 文本: String(value ?? '') }) },
+    '../预设输出兼容': { 转为正文舞台纯文本: value => String(value ?? '') },
+    '../受控生成等待': {
+      创建受控生成等待: task => ({ 结果: Promise.resolve(task), 取消: () => false, 已结束: () => false }),
+    },
     '../手机输出安全': { 验收群聊隐私: value => value },
     '../手机生成完整性': {
       手机回复封套未闭合: () => false,
@@ -138,6 +141,16 @@ test('即时业务严格按“通道→结算→建票→持久化→正文”�
   assert.match(body, /绝不能清掉旧剧情/);
   assert.match(body, /场景剧情事务ID/);
   assert.match(body, /场景剧情请求世代/);
+  assert.match(body, /预载场景剧情数据:\s*data/, '首次即时演出必须把刚激活并持久化的同一份数据直接移交正文回合');
+});
+
+test('首次、到场、专用重试和重掷恢复都把同一活动事务数据直接移交正文回合', () => {
+  const 继续段 = 段(index, "eventOn('人妻公寓:继续场景剧情'", "eventOn('人妻公寓:开始新游戏'");
+  const 到场段 = 段(index, 'async function 到场触发场景剧情', 'async function 运行荣耀洞隔离拍');
+  const 重掷段 = engine.slice(engine.indexOf('const 恢复后 = 读取最近有效()'));
+  assert.match(继续段, /预载场景剧情数据:\s*data/);
+  assert.match(到场段, /预载场景剧情数据:\s*data/);
+  assert.match(重掷段, /预载场景剧情数据:\s*恢复后\.data/);
 });
 
 test('翻垃圾、送礼、读信、晋阶与可能暴露的偷窃都接入即时场景事务', () => {
@@ -311,15 +324,11 @@ test('手机在活动事务、同场等待或未知旧档时保持只读，远�
   assert.doesNotMatch(phone, /有场景剧情阻塞/);
 
   const 自动节拍入口 = 段(phoneBeat, 'export async function 手机节拍()', 'type 孕产群后私聊类型');
-  assert.match(自动节拍入口, /读取活动场景剧情\(data\)/);
-  assert.match(自动节拍入口, /读取队首场景剧情\(data\.系统\._待发送事件\)/);
-  assert.match(自动节拍入口, /等待场景剧情阻塞当前场景\(等待剧情, 当前场景\)/);
+  assert.match(自动节拍入口, /场景剧情占用前台生成\(data, 当前场景\)/);
   assert.doesNotMatch(自动节拍入口, /if \(data\.系统\._待发送事件\) return/);
 
   const 冷落预警入口 = phoneCold.slice(phoneCold.indexOf('export async function 冷落预警节拍()'));
-  assert.match(冷落预警入口, /读取活动场景剧情\(data\)/);
-  assert.match(冷落预警入口, /读取队首场景剧情\(data\.系统\._待发送事件\)/);
-  assert.match(冷落预警入口, /等待场景剧情阻塞当前场景\(等待剧情, 当前场景\)/);
+  assert.match(冷落预警入口, /场景剧情占用前台生成\(data, 当前场景\)/);
   assert.doesNotMatch(冷落预警入口, /if \(data\.系统\._待发送事件\) return/);
 });
 

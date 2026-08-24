@@ -119,7 +119,7 @@ test('入口结果能区分无新/有新/中止，时间线失效或余波身份
 test('楼务通知、时间线复核、冷落预警、频率门顺序保持', () => {
   const 拍 = 截源(节拍引擎源码, 'export async function 手机节拍()', '// ── 姐妹群一拍');
   const 坏结局门 = 拍.indexOf('if (data.系统._坏结局) return');
-  const 特殊场景门 = 拍.indexOf('if (data.系统._特殊场景.id) return');
+  const 特殊场景门 = 拍.indexOf('if (场景剧情占用前台生成(data, 当前场景)) return');
   const 建租约 = 拍.indexOf('创建手机时间线租约(当前聊天ID()');
   const 楼务同步 = 拍.indexOf('await 同步管理任务微信(data)');
   const 验楼务 = 拍.indexOf('if (!时间线仍有效()) return;', 楼务同步);

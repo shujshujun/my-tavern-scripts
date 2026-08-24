@@ -157,6 +157,8 @@ const 结果摘要上限 = 60;
  * 在自己的正常批次里只替换本占位摘要。重复补写骨架时必须保留已经完成的 AI 摘要。
  */
 export const 数据库事件待整理摘要 = '【待数据库AI整理】正文已成功落楼，等待数据库统一摘要';
+/** 开局正文是脚本固定文本，对应摘要也由脚本确定；可安全修复 v0.90 已知的 RQ-1 错绑。 */
+export const 数据库固定开局摘要 = '父亲来电交代公寓管理与收租要求，玩家开始接手管理工作';
 
 export function 数据库事件摘要待整理(value: unknown): boolean {
   const 文本 = String(value ?? '').trim();
@@ -1747,6 +1749,85 @@ export interface 数据库回合事件 {
 }
 
 export type 数据库回合写入结果 = '已确认' | '待确认' | '失败';
+
+export type 固定开局摘要修复结果 = '无需修复' | '已修复' | '待确认' | '失败';
+
+const 固定开局摘要修复SQL = `UPDATE rq_events
+   SET result_summary = ?
+ WHERE floor_no = 1
+   AND event_code = 'RQ-1'
+   AND player_action = '开始新游戏'
+   AND result_summary IS NOT ?`;
+
+/**
+ * 只修复内容完全确定的固定开场。其他楼层即使疑似错绑也不能靠字符串猜测后批量重置；
+ * 正确摘要与未知坏摘要无法可靠区分，自动清空会破坏长期记忆并制造额外填表费用。
+ */
+export async function 修复数据库固定开局摘要(
+  额外提交校验: () => boolean = () => true,
+): Promise<固定开局摘要修复结果> {
+  if (!数据库状态().已装游戏模板 || !额外提交校验()) return '失败';
+  const 聊天标识 = 当前聊天标识();
+  const 查询SQL = `SELECT floor_no, time_text, location, participants, player_action, result_summary, event_code
+       FROM rq_events
+      WHERE floor_no = 1
+      LIMIT 1`;
+  const 查询 = 执行SQLite查询(查询SQL, [], 1);
+  if (!查询) return '失败';
+  const rows = SQL结果对象行(查询);
+  if (rows === null) return '失败';
+  const row = rows[0];
+  if (
+    !row ||
+    Number(row.floor_no) !== 1 ||
+    String(row.event_code ?? '') !== 'RQ-1' ||
+    String(row.player_action ?? '').trim() !== '开始新游戏'
+  ) {
+    return '无需修复';
+  }
+  if (String(row.result_summary ?? '').trim() === 数据库固定开局摘要) return '无需修复';
+
+  const 恢复SQL = `INSERT INTO rq_events
+      (floor_no, time_text, location, participants, player_action, result_summary, event_code)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(floor_no) DO UPDATE SET
+       time_text = excluded.time_text,
+       location = excluded.location,
+       participants = excluded.participants,
+       player_action = excluded.player_action,
+       result_summary = excluded.result_summary,
+       event_code = excluded.event_code`;
+  const 失效补偿 = 构造SQLite唯一行失效补偿({
+    描述: '固定开局 RQ-1 摘要旧行',
+    查询SQL,
+    查询参数: [],
+    删除SQL: 'DELETE FROM rq_events WHERE floor_no = 1',
+    恢复SQL,
+    恢复列: ['floor_no', 'time_text', 'location', 'participants', 'player_action', 'result_summary', 'event_code'],
+  });
+  const 状态 = await 执行SQLite写入(
+    固定开局摘要修复SQL,
+    [数据库固定开局摘要, 数据库固定开局摘要],
+    聊天标识,
+    额外提交校验,
+    失效补偿,
+  );
+  if (!仍是同一聊天(聊天标识) || !额外提交校验()) return '失败';
+  if (状态 === '已确认') return '已修复';
+  if (状态 === '已提交待定') return '待确认';
+  if (
+    状态 === '需核对' &&
+    核对SQLite记录(查询SQL, [], {
+      floor_no: 1,
+      player_action: '开始新游戏',
+      result_summary: 数据库固定开局摘要,
+      event_code: 'RQ-1',
+    }) === true
+  ) {
+    return '已修复';
+  }
+  return '失败';
+}
 
 /** 当前 SQLite 时间线里已经存在的 RQ 事件楼层；用于补齐旧版本漏写的正式正文楼。 */
 export function 读取数据库剧情事件已记录楼层(截止楼层: number): Set<number> | null {

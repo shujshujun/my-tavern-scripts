@@ -23,7 +23,7 @@ const 通知桥源 = readFileSync('src/人妻公寓/脚本/游戏逻辑/手机/�
 test('楼务硬通知先于任何可能等待AI的冷落预警，同时仍服从坏结局与特殊场景门', () => {
   const 节拍 = 节拍引擎源.slice(节拍引擎源.indexOf('export async function 手机节拍'), 节拍引擎源.indexOf('// 手机节拍水位'));
   const 坏结局门 = 节拍.indexOf('if (data.系统._坏结局) return');
-  const 特殊场景门 = 节拍.indexOf('if (data.系统._特殊场景.id) return');
+  const 特殊场景门 = 节拍.indexOf('if (场景剧情占用前台生成(data, 当前场景)) return');
   const 楼务同步 = 节拍.indexOf('await 同步管理任务微信(data)');
   const 冷落预警 = 节拍.indexOf('await 冷落预警节拍()');
   const 频率门 = 节拍.indexOf('const 倍 = 频率倍率');

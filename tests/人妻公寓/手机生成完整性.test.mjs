@@ -60,6 +60,36 @@ test('手机原始返回只净化一次，最终字数验收不重复执行玩�
   assert.doesNotMatch(生成引擎源码, /取合法\(净化消息\(原\)\)/);
 });
 
+test('手机气泡不执行小说正文显示正则，继续只依靠回复封套与本地协议清理', () => {
+  const 净化起 = 生成引擎源码.indexOf('export function 净化消息');
+  const 净化止 = 生成引擎源码.indexOf('\nfunction 有单条超过汉字上限', 净化起);
+  assert.ok(净化起 >= 0 && 净化止 > 净化起);
+  const 净化段 = 生成引擎源码.slice(净化起, 净化止);
+  assert.doesNotMatch(净化段, /formatAsTavernRegexedString/, '正文显示正则会删改自然微信措辞，手机不得再调用');
+  assert.match(净化段, /手机回复封套未闭合/);
+  assert.match(净化段, /<回复>/);
+  assert.match(净化段, /think|reason|draft/, '手机自己的思维／协议清理必须保留');
+  assert.match(净化段, /转为正文舞台纯文本/);
+  assert.doesNotMatch(净化段, /a-zA-Z一-龥/, '手机不得再把任意中文尖括号内容当作标签删除');
+});
+
+test('正文与自定义手机路由都通过有界等待收口，超时不得永久占住手机租约', () => {
+  const 正文路由 = 生成引擎源码.slice(
+    生成引擎源码.indexOf('async function 正文API生成'),
+    生成引擎源码.indexOf('async function 自定义API生成'),
+  );
+  const 自定义路由 = 生成引擎源码.slice(
+    生成引擎源码.indexOf('async function 自定义API生成'),
+    生成引擎源码.indexOf('export async function 小生成'),
+  );
+  assert.match(正文路由, /创建受控生成等待|等待受控生成/, '正文手机路由必须有本地有界等待');
+  assert.match(自定义路由, /创建受控生成等待|等待受控生成/, '自定义手机路由必须有本地有界等待');
+  assert.match(生成引擎源码, /手机生成等待上限毫秒/);
+  assert.match(生成引擎源码, /stopGenerationById|stopAllGeneration/);
+  assert.match(生成引擎源码, /if \(外部ID\) return 外部ID;/, '手动红灯批次的既有取消 ID 必须原样传给底层');
+  assert.match(生成引擎源码, /仍有效:\s*\(\) => 手机小生成仍有效\(控制\)/, '切聊／回档令牌失效也必须结束本地等待');
+});
+
 test('玩家可见内容放宽到150汉字，本地隐藏进展保留80字符硬门', () => {
   assert.match(数据层源码, /const 手机可见单条硬上限 = 150;/);
   assert.match(

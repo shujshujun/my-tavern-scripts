@@ -263,7 +263,8 @@ test('红灯前置步骤抛错时仍依次执行全部收口且不向外拒绝',
 test('手机实装使用独立 generation_id 与定向停止，并把一次私聊结果拆成多气泡', () => {
   // P8:执行待回复批次/批次聊天回复迁至 交互/邀约与发消息；活动生成ID 的定向停止归 壳/会话瞬态。
   assert.match(交互源码, /async function 执行待回复批次\(请求: 手机聊天批次请求\)/);
-  assert.match(生成引擎源码, /generation_id: 控制\.生成ID/);
+  assert.match(生成引擎源码, /generation_id: 生成ID/);
+  assert.match(生成引擎源码, /if \(外部ID\) return 外部ID;/, '手动批次的定向停止 ID 必须原样进入底层请求');
   assert.match(会话瞬态源码, /stopGenerationById\(上下文\.活动生成ID\)/);
   assert.doesNotMatch(交互源码, /stopAllGeneration\(/, '手机停止不得中断正文或其他生成');
   assert.match(交互源码, /单次请求:\s*true/);

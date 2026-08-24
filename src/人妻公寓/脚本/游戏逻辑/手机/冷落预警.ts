@@ -5,7 +5,7 @@ import { 当前时段, 取绝对时段 } from '../楼层时钟';
 import { 妻状态包 } from '../snapshotSystem';
 import { 读最近有效stat } from '../mvuIO';
 import { 创建手机时间线租约, 手机时间线租约仍有效 } from '../手机时间线租约';
-import { 等待场景剧情阻塞当前场景, 读取活动场景剧情, 读取队首场景剧情 } from '../场景剧情事务';
+import { 场景剧情占用前台生成 } from '../场景剧情事务';
 import {
   构造冷落预警去重键,
   计算妻冷落消息档,
@@ -142,18 +142,15 @@ export async function 冷落预警节拍(): Promise<void> {
     const rawStat = 读最近有效stat();
     if (!rawStat) return;
     const data = Schema.parse(rawStat) as SchemaType;
-    if (data.系统._坏结局 || data.系统._特殊场景.id) return;
-    // 活动剧情、同场等待票与目标未知的旧票都不能让预警私聊抢生成通道；明确在远处
-    // 等待的结构票不占当前场景，不能让冷落预警永久沉默。
-    const 活动场景剧情 = 读取活动场景剧情(data);
-    const 等待剧情 = 读取队首场景剧情(data.系统._待发送事件);
+    if (data.系统._坏结局) return;
+    // 与手机总节拍共用前台所有权；专用场景、荣耀洞、活动票和同场等待票都不能被预警抢占。
     let 当前场景: string | null = null;
     try {
       当前场景 = (_.get(getVariables({ type: 'chat' }), '_场景.房间id') as string | null | undefined) ?? null;
     } catch {
       /* 聊天场景不可读时只用活动票硬门；结构票不会被猜成已经到场。 */
     }
-    if (活动场景剧情 || 等待场景剧情阻塞当前场景(等待剧情, 当前场景)) return;
+    if (场景剧情占用前台生成(data, 当前场景)) return;
 
     const 楼 = 末楼();
     const 钟 = 取绝对时段(data);

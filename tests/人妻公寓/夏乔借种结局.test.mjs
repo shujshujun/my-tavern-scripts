@@ -433,6 +433,18 @@ test('借种孕情微信只邀请赴约，必须到101查看阳性后才正式�
   assert.equal(借种阳性结果可查看(data, '101', true, true), false);
 });
 
+test('借种阳性邀约已读重复同步幂等，不得让每次手机状态刷新都伪装成存档变更', () => {
+  const { data, 场次标识 } = 完成借种并读邀约();
+  const 首次已读后 = structuredClone(data);
+
+  assert.deepEqual(
+    确认怀孕微信已送达(data, [{ 门牌: '101', 场次标识 }]),
+    [],
+    '同一借种邀约已经登记已读后，重复同步必须返回无变更，调用层才不会再次写档',
+  );
+  assert.deepEqual(data, 首次已读后, '幂等重放不得改写任何借种、孕情或前置状态');
+});
+
 test('阳性确认必须夏乔与陆嘉明真实同场，任一缺席都零副作用', () => {
   const { data } = 完成借种并读邀约();
   const 入口快照 = structuredClone(data);

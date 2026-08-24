@@ -15,10 +15,12 @@ require.extensions['.json'] = jsonLoader;
 // `window.addEventListener` 且依赖 webpack `?raw`，Node 下整模块不可 require，测试时整模块桩掉。
 const Module = require('node:module');
 const 原加载 = Module._load;
+let 测试数据库可调用AI = false;
+let 测试数据库生成 = async () => '';
 Module._load = function 测试加载(request, parent, isMain) {
   const 路径 = String(request).replace(/\\/g, '/');
   if (路径.endsWith('数据库桥')) {
-    return { 数据库状态: () => ({ 可调用AI: false }), 通过数据库生成: async () => '' };
+    return { 数据库状态: () => ({ 可调用AI: 测试数据库可调用AI }), 通过数据库生成: (...args) => 测试数据库生成(...args) };
   }
   if (路径.endsWith('.json?raw')) return '{}';
   return 原加载.call(this, request, parent, isMain);
@@ -32,8 +34,9 @@ let 当前聊天变量 = {};
 const { Schema, 当前MVU数据版本 } = require('../../src/人妻公寓/schema.ts');
 const {
   净化隔离事件正文,
-  选择隔离事件生成通道,
   生成隔离事件草稿,
+  取消隔离事件,
+  隔离事件进行中,
   顺序提交隔离事件,
   捕获隔离时间线身份,
   复核隔离时间线身份,
@@ -79,6 +82,14 @@ test('无预填充模型返回控制段、think_nya 与 game 时，睡眠隔离�
     '<summary>后台总结</summary>',
   ].join('\n');
   assert.equal(净化隔离事件正文(原文), '第二天早上我醒了。');
+});
+
+test('隔离正文把常见美化 HTML 转为可读纯文本，不把字面标签写进睡眠与监控日志', () => {
+  assert.equal(净化隔离事件正文('<span>第二天早上醒来。</span>'), '第二天早上醒来。');
+  assert.equal(
+    净化隔离事件正文('<section><strong>监控画面</strong><br>她走进厨房。</section>'),
+    '监控画面\n她走进厨房。',
+  );
 });
 
 const Index源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
@@ -152,20 +163,15 @@ function 四键快照(额外 = {}) {
 }
 
 // ─────────────────────────────────────────────
-// 1. 纯函数提供方决策表
+// 1. 隔离正文通道边界
 // ─────────────────────────────────────────────
-test('选择隔离事件生成通道：日常三类型恒走正文，荣耀洞/监控只按数据库可用性分流', () => {
-  for (const 类型 of ['晨跑', '健身', '睡眠']) {
-    assert.equal(选择隔离事件生成通道(类型, true), '正文');
-    assert.equal(选择隔离事件生成通道(类型, false), '正文');
-  }
-  assert.equal(选择隔离事件生成通道('荣耀洞', true), '数据库');
-  assert.equal(选择隔离事件生成通道('监控', true), '数据库');
-  assert.equal(选择隔离事件生成通道('荣耀洞', false), '正文');
-  assert.equal(选择隔离事件生成通道('监控', false), '正文');
-
-  const 通道决策段 = 截段(隔离事件源, 'export function 选择隔离事件生成通道', '\n}');
-  assert.doesNotMatch(通道决策段, /DeepSeek/, '正文模型不得参与荣耀洞/监控的数据库通道选择');
+test('隔离事件生成不再导入数据库桥，五种类型共用正文 generateRaw', () => {
+  const 生成段 = 截段(隔离事件源, 'export async function 生成隔离事件草稿', '\nexport function 写入隔离事件草稿');
+  assert.doesNotMatch(隔离事件源, /from '\.\/数据库桥'/);
+  assert.doesNotMatch(生成段, /数据库状态|通过数据库生成|通道 === '数据库'/);
+  assert.match(生成段, /const 通道 = '正文' as const;/);
+  assert.match(生成段, /当前正文模型是DeepSeek\(\)/);
+  assert.match(生成段, /generateRaw\(/);
 });
 
 test('生成隔离事件草稿：手机或前台占用时返回可行动的明确原因，不伪装成正文为空', async () => {
@@ -205,6 +211,157 @@ test('生成隔离事件草稿：数据库迟到租约明确提示上一请求�
   完成底层('迟到结果');
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(全局数据库AI租约.在结算(), false);
+});
+
+test('监控/荣耀洞即使数据库可用也各只请求一次正文 API', async () => {
+  清空生成租约();
+  const 原环境 = {
+    generateRaw: globalThis.generateRaw,
+    eventEmit: globalThis.eventEmit,
+    getPreset: globalThis.getPreset,
+    substitudeMacros: globalThis.substitudeMacros,
+    getLoadedPresetName: globalThis.getLoadedPresetName,
+    formatAsTavernRegexedString: globalThis.formatAsTavernRegexedString,
+  };
+  let 数据库次数 = 0;
+  let 正文次数 = 0;
+  try {
+    测试数据库可调用AI = true;
+    测试数据库生成 = async () => {
+      数据库次数 += 1;
+      throw new Error('隔离事件不应调用数据库 AI');
+    };
+    globalThis.generateRaw = async () => {
+      正文次数 += 1;
+      return '<content>正文线路生成成功</content>';
+    };
+    globalThis.eventEmit = () => undefined;
+    globalThis.getPreset = () => ({ prompts: [] });
+    globalThis.substitudeMacros = 文 => 文;
+    globalThis.getLoadedPresetName = () => '测试预设';
+    globalThis.formatAsTavernRegexedString = 文 => 文;
+
+    for (const 参数 of [
+      { 类型: '监控', 线程: '监控:正文线路', 行动: '查看摄像头', 导演事件: '客观描写监控画面', 房间: '302' },
+      { 类型: '荣耀洞', 线程: '荣耀洞:正文线路', 行动: '继续', 导演事件: '继续当前演出', 房间: '洗手间' },
+    ]) {
+      const 结果 = await 生成隔离事件草稿(参数);
+      assert.equal(结果.正文, '正文线路生成成功');
+    }
+    assert.equal(数据库次数, 0, '监控与荣耀洞不得再调用数据库线路');
+    assert.equal(正文次数, 2, '两类事件应各自只请求一次正文 API');
+  } finally {
+    测试数据库可调用AI = false;
+    测试数据库生成 = async () => '';
+    Object.assign(globalThis, 原环境);
+    清空生成租约();
+  }
+});
+
+test('监控正文 API 返回空正文时失败关闭且不自动重试', async () => {
+  清空生成租约();
+  const 原环境 = {
+    generateRaw: globalThis.generateRaw,
+    eventEmit: globalThis.eventEmit,
+    getPreset: globalThis.getPreset,
+    substitudeMacros: globalThis.substitudeMacros,
+    getLoadedPresetName: globalThis.getLoadedPresetName,
+    formatAsTavernRegexedString: globalThis.formatAsTavernRegexedString,
+  };
+  let 数据库次数 = 0;
+  let 正文次数 = 0;
+  try {
+    测试数据库可调用AI = true;
+    测试数据库生成 = async () => {
+      数据库次数 += 1;
+      return '<content>不应调用</content>';
+    };
+    globalThis.generateRaw = async () => {
+      正文次数 += 1;
+      return '';
+    };
+    globalThis.eventEmit = () => undefined;
+    globalThis.getPreset = () => ({ prompts: [] });
+    globalThis.substitudeMacros = 文 => 文;
+    globalThis.getLoadedPresetName = () => '测试预设';
+    globalThis.formatAsTavernRegexedString = 文 => 文;
+
+    await assert.rejects(
+      () =>
+        生成隔离事件草稿({
+          类型: '监控',
+          线程: '监控:正文空响应',
+          行动: '查看摄像头',
+          导演事件: '客观描写监控画面',
+          房间: '302',
+        }),
+      /事件 AI 没有返回可显示的正文/,
+    );
+    assert.equal(数据库次数, 0);
+    assert.equal(正文次数, 1, '一次点击只允许一次正文请求');
+  } finally {
+    测试数据库可调用AI = false;
+    测试数据库生成 = async () => '';
+    Object.assign(globalThis, 原环境);
+    清空生成租约();
+  }
+});
+
+test('正文 generateRaw 永久 pending 时，取消隔离事件必须立即结束本地等待并释放前台租约', async () => {
+  清空生成租约();
+  let 完成底层;
+  const 底层 = new Promise(resolve => {
+    完成底层 = resolve;
+  });
+  const 原环境 = {
+    generateRaw: globalThis.generateRaw,
+    stopAllGeneration: globalThis.stopAllGeneration,
+    eventEmit: globalThis.eventEmit,
+    getPreset: globalThis.getPreset,
+    substitudeMacros: globalThis.substitudeMacros,
+    getLoadedPresetName: globalThis.getLoadedPresetName,
+    formatAsTavernRegexedString: globalThis.formatAsTavernRegexedString,
+  };
+  let 停止次数 = 0;
+  try {
+    globalThis.generateRaw = () => 底层;
+    globalThis.stopAllGeneration = () => {
+      停止次数 += 1;
+    };
+    globalThis.eventEmit = () => undefined;
+    globalThis.getPreset = () => ({ prompts: [] });
+    globalThis.substitudeMacros = 文 => 文;
+    globalThis.getLoadedPresetName = () => '测试预设';
+    globalThis.formatAsTavernRegexedString = 文 => 文;
+
+    const 调用 = 生成隔离事件草稿({
+      类型: '睡眠',
+      线程: '睡眠:pending',
+      行动: '睡到第二天',
+      导演事件: '从入睡写到醒来',
+      房间: '302',
+    });
+    const 结果 = 调用.then(
+      () => '成功',
+      error => String(error?.message ?? error),
+    );
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(隔离事件进行中(), true);
+    assert.equal(取消隔离事件(), true);
+    const 取消结果 = await Promise.race([结果, new Promise(resolve => setTimeout(() => resolve('仍在等待'), 50))]);
+    assert.notEqual(取消结果, '仍在等待', '取消不能等待不服从 stopAllGeneration 的供应商 Promise');
+    assert.match(String(取消结果), /取消/);
+    assert.equal(隔离事件进行中(), false);
+    const 新租约 = 取得前台生成租约();
+    assert.ok(新租约, '取消后共享前台租约必须立即可用');
+    新租约.释放();
+    assert.ok(停止次数 >= 1);
+  } finally {
+    完成底层?.('<回复>迟到结果</回复>');
+    await new Promise(resolve => setImmediate(resolve));
+    Object.assign(globalThis, 原环境);
+    清空生成租约();
+  }
 });
 
 test('复核隔离时间线身份：同聊天/同锚楼/同消息引用通过，任一变化都失败关闭', () => {

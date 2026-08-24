@@ -1,40 +1,17 @@
 import { Schema, 当前MVU数据版本, type SchemaType } from '../../schema';
 import { 构造隔离事件完整提示词快照 } from '../../提示词快照';
-import { 数据库状态, 通过数据库生成 } from './数据库桥';
 import { 全局数据库AI租约 } from './数据库AI租约';
 import { 前台生成租约持有中, 取得前台生成租约, 手机生成租约持有中 } from './生成通道互斥';
 import { 当前正文模型是DeepSeek } from './正文模型识别';
 import { 预设破限段 } from './预设桥';
-import { 应用酒馆最终显示正则 } from './预设输出兼容';
+import { 应用酒馆最终显示正则, 转为正文舞台纯文本 } from './预设输出兼容';
 import { 提取外部预设正文原文 } from './正文输出边界';
 import { 严格清除协议残留 } from './正文协议安全';
+import { 创建受控生成等待, 受控生成超时错误前缀, type 受控生成等待句柄 } from './受控生成等待';
 import { 当前聊天ID } from './手机/运行时上下文';
 import { 捕获精确聊天快照, 恢复精确聊天快照, 时间状态指纹, type 精确聊天快照 } from './时间撤销系统';
 
 export type 隔离事件类型 = '荣耀洞' | '监控' | '晨跑' | '健身' | '睡眠';
-
-/**
- * 当前时间按钮只会为睡眠请求日常反馈；晨跑/健身类型为旧日志和旧调用兼容而保留。
- * 若这些兼容类型被显式调用，仍必须走可由 stopAllGeneration() 取消的正文 generateRaw，
- * 不能改走无法取消底层请求的数据库代发。荣耀洞/监控维持原有分流。
- */
-function 是日常时间反馈(类型: 隔离事件类型): boolean {
-  return 类型 === '晨跑' || 类型 === '健身' || 类型 === '睡眠';
-}
-
-export type 隔离事件生成通道 = '数据库' | '正文';
-
-/**
- * 隔离事件生成通道决策表（纯函数，供行为测试与生成草稿共用）：
- *  - 睡眠及为旧版兼容保留的晨跑/健身类型恒为正文 generateRaw——数据库 callAI 没有
- *    abort 信号，迟到请求仍占用生成槽，与玩家取消语义冲突；
- *  - 荣耀洞/监控：数据库可调用时走数据库代发，否则才回退正文。数据库代理使用自己的
- *    独立模型，普通正文当前使用什么模型不得参与这里的通道判断。
- */
-export function 选择隔离事件生成通道(类型: 隔离事件类型, 数据库可用: boolean): 隔离事件生成通道 {
-  if (是日常时间反馈(类型)) return '正文';
-  return 数据库可用 ? '数据库' : '正文';
-}
 
 /** 供正文 PROMPT_READY 监听器识别脚本自己的短生成，避免误占原生正文锁。 */
 export const 隔离事件请求标记 = '<rqgy_isolated_event_request>';
@@ -75,20 +52,38 @@ export interface 隔离事件草稿 {
 }
 
 const 最大日志条数 = 120;
+/** 非流式独立正文没有片段进展可观测，沿用主正文十分钟绝对保险，不恢复旧三分钟硬切。 */
+export const 隔离正文生成等待上限毫秒 = 600_000;
 let 生成中 = false;
 let 已取消 = false;
+let 隔离正文请求序号 = 0;
+let 当前隔离正文等待: 受控生成等待句柄<unknown> | null = null;
 
 export const 隔离事件进行中 = () => 生成中;
 
 export function 取消隔离事件(): boolean {
   if (!生成中) return false;
   已取消 = true;
+  if (当前隔离正文等待?.取消('已取消——这一拍没有发生')) return true;
   try {
     stopAllGeneration();
   } catch {
-    /* 数据库 callAI 不一定走酒馆生成器；仍会在返回后丢弃结果。 */
+    /* 本地等待已取消；旧宿主没有停止函数时，迟到结果仍由单次 settle 门丢弃。 */
   }
   return true;
+}
+
+function 停止隔离正文底层请求(生成ID: string): void {
+  try {
+    if (typeof stopGenerationById === 'function' && stopGenerationById(生成ID)) return;
+  } catch {
+    /* 旧宿主没有按 ID 停止能力时回退全局停止。 */
+  }
+  try {
+    stopAllGeneration();
+  } catch {
+    /* 本地等待仍会结束，底层迟到结果由单次 settle 门丢弃。 */
+  }
 }
 
 function 从变量读库(vars: unknown): 隔离事件库 {
@@ -142,7 +137,7 @@ export function 净化隔离事件正文(原文: string): string {
     .replace(/<script[^>]*>[\s\S]*$/i, '')
     .replace(/<!--[\s\S]*$/, '')
     .trim();
-  return 严格清除协议残留(全清);
+  return 转为正文舞台纯文本(严格清除协议残留(全清));
 }
 
 function 系统提示(类型: 隔离事件类型, 导演事件: string): string {
@@ -161,11 +156,6 @@ function 系统提示(类型: 隔离事件类型, 导演事件: string): string 
  * 以真实 user 消息收尾更稳定；这样既保留预设注入，也明确要求模型现在给出最终事件正文。
  */
 const 隔离事件收尾 = '以上设定与本拍行动均已给出。现在只输出这一拍可直接显示的中文事件正文。';
-// 推理模型的思考 token 也计入 max_tokens,旧值1400会被 reasoning 烧光后 length 截断、
-// 正文为空(2026-08-04,与手机系统同因);正文篇幅仍由提示词约束。
-// 8192 是全模型安全上限:再高 DeepSeek chat(输出上限8192)等模型会 400 拒绝请求;
-// 非推理模型写完自然停,不会真用满这个预算。
-const 普通隔离事件生成上限 = 8192;
 
 function 当前预设名称(): string {
   try {
@@ -220,29 +210,31 @@ export async function 生成隔离事件草稿(参数: 隔离事件参数): Prom
     let 原文: unknown;
     let 本拍用户输入 = 参数.行动;
     let 用户输入置后 = false;
-    // 通道决策收在纯函数 选择隔离事件生成通道：日常时间反馈(晨跑/健身/睡眠)恒走可取消的
-    // 正文 generateRaw——数据库 callAI 的 90 秒超时无法取消底层请求，超时后会留下占用生成槽
-    // 的迟到请求，下一次点击就会被误判为“正文有内容在输出”；荣耀洞/监控只按数据库可调用性
-    // 选择数据库代发，不读取普通正文模型。数据库分支返回空或抛错只失败一次，不允许再自动
-    // 请求正文 API（避免二次计费）。只有实际回退正文时才启用对应模型的生成兼容。
-    const 通道 = 选择隔离事件生成通道(参数.类型, 数据库状态().可调用AI);
-    if (通道 === '数据库') {
-      原文 = await 通过数据库生成(
-        [...前, { role: 'system', content: system }, ...history, { role: 'user', content: 参数.行动 }, ...后],
-        '',
-        普通隔离事件生成上限,
-      );
-      if (!String(原文 ?? '').trim()) throw new Error('数据库 AI 返回空内容；为避免重复计费，本拍没有再次请求正文 API');
-    } else {
-      const 是DeepSeek = 当前正文模型是DeepSeek();
-      用户输入置后 = 是DeepSeek;
-      本拍用户输入 = 是DeepSeek ? `${参数.行动}\n\n${隔离事件收尾}` : 参数.行动;
-      const ordered_prompts: ({ role: 'system' | 'user' | 'assistant'; content: string } | 'user_input')[] = [
-        ...前,
-        ...核心段,
-        ...(是DeepSeek ? [...后, 'user_input' as const] : ['user_input' as const, ...后]),
-      ];
-      原文 = await generateRaw({ ordered_prompts, user_input: 本拍用户输入, should_stream: 是DeepSeek });
+    // 五种隔离事件统一直接走当前正文 API。监控/荣耀洞不再读取数据库可用性，也没有
+    // “数据库失败后再回退正文”的双请求路径；一次点击只会发出一次可取消的 generateRaw。
+    const 通道 = '正文' as const;
+    const 是DeepSeek = 当前正文模型是DeepSeek();
+    用户输入置后 = 是DeepSeek;
+    本拍用户输入 = 是DeepSeek ? `${参数.行动}\n\n${隔离事件收尾}` : 参数.行动;
+    const ordered_prompts: ({ role: 'system' | 'user' | 'assistant'; content: string } | 'user_input')[] = [
+      ...前,
+      ...核心段,
+      ...(是DeepSeek ? [...后, 'user_input' as const] : ['user_input' as const, ...后]),
+    ];
+    const 生成ID = `rqgy-isolated-${Date.now()}-${++隔离正文请求序号}`;
+    const 等待 = 创建受控生成等待(
+      generateRaw({ ordered_prompts, user_input: 本拍用户输入, should_stream: 是DeepSeek, generation_id: 生成ID }),
+      {
+        超时毫秒: 隔离正文生成等待上限毫秒,
+        超时说明: '独立事件正文超过十分钟未返回',
+        请求停止: () => 停止隔离正文底层请求(生成ID),
+      },
+    );
+    当前隔离正文等待 = 等待;
+    try {
+      原文 = await 等待.结果;
+    } finally {
+      if (当前隔离正文等待 === 等待) 当前隔离正文等待 = null;
     }
     if (已取消) throw new Error('已取消——这一拍没有发生');
     const 正文 = 净化隔离事件正文(应用酒馆最终显示正则(String(原文 ?? '')));
@@ -258,7 +250,14 @@ export async function 生成隔离事件草稿(参数: 隔离事件参数): Prom
       用户输入置后,
     });
     return { 参数: { ...参数 }, 正文, 提示词 };
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith(受控生成超时错误前缀)) {
+      console.warn('[人妻公寓·隔离] 独立事件正文超过十分钟仍未返回，已结束本地等待。');
+      throw new Error('AI 服务长时间没有返回完整事件正文，本拍与时间均未结算；请重试或更换模型线路。');
+    }
+    throw error;
   } finally {
+    当前隔离正文等待 = null;
     生成中 = false;
     前台租约.释放();
   }

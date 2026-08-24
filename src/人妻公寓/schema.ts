@@ -41,7 +41,7 @@ function 是记录(value: unknown): value is 原始记录 {
   return 原型 === null || Object.getPrototypeOf(原型) === null;
 }
 
-/** v0.86 接受 v0.80(v7)、v0.81/v0.82(v8) 与 v0.83/v0.84/v0.85(v9)；更早或未来数据版本继续硬拒绝。 */
+/** 当前版本接受数据版本 7、8、9；角色卡小版本升级不改变这道持久数据门。 */
 export function 验证当前MVU存档版本(input: unknown): void {
   if (!是记录(input)) {
     throw new Error('人妻公寓存档结构损坏：stat_data 必须是对象。请新建聊天开始游戏。');
@@ -56,7 +56,7 @@ export function 验证当前MVU存档版本(input: unknown): void {
   ) {
     const 显示版本 = typeof 版本 === 'number' && Number.isInteger(版本) ? String(版本) : '未知';
     throw new Error(
-      `v0.86 仅兼容数据版本 7、8 和 9：当前存档版本为 ${显示版本}。v0.80/v0.81/v0.82/v0.83/v0.84/v0.85 存档可直接继承；其他版本请新建聊天开始游戏。`,
+      `当前版本仅兼容数据版本 7、8 和 9：当前存档版本为 ${显示版本}。受支持的旧存档可直接继承；其他数据版本请新建聊天开始游戏。`,
     );
   }
 }

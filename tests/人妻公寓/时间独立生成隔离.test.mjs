@@ -11,6 +11,7 @@ require('ts-node/register/transpile-only');
 const 预设桥源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/预设桥.ts', import.meta.url), 'utf8');
 const 隔离事件源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/隔离事件引擎.ts', import.meta.url), 'utf8');
 const Index源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
+const { 预设破限段 } = require('../../src/人妻公寓/脚本/游戏逻辑/预设桥.ts');
 
 const 旧楼指令 = '（前一轮真实指令：去酒吧喝酒）';
 const 本拍晨跑 = '（在晨跑公园开始今天的晨跑）';
@@ -35,7 +36,6 @@ test('预设破限段(本拍行动)把 {{lastUserMessage}} 覆写为本拍行动
   globalThis.substitudeMacros = 文 =>
     文.replace(/\{\{user\}\}/g, '沈翊').replace(/\{\{lastUserMessage\}\}/g, 旧楼指令);
 
-  const { 预设破限段 } = require('../../src/人妻公寓/脚本/游戏逻辑/预设桥.ts');
   const { 前 } = 预设破限段(本拍晨跑);
 
   assert.equal(前[0].content, `${本拍晨跑} 是本轮唯一的新行动。`);
@@ -55,10 +55,46 @@ test('无参数调用预设破限段维持原有宏展开行为', () => {
   });
   globalThis.substitudeMacros = 文 => 文.replace(/\{\{lastUserMessage\}\}/g, 旧楼指令);
 
-  const { 预设破限段 } = require('../../src/人妻公寓/脚本/游戏逻辑/预设桥.ts');
   const { 前 } = 预设破限段();
 
   assert.equal(前[0].content, `${旧楼指令} 收尾。`);
+});
+
+test('预设破限段与流式边界共用 prompt_order 权威顺序，旧 enabled 不得让独立事件裸发或错发', () => {
+  globalThis.getPreset = () => ({
+    prompts: [
+      { identifier: 'old', enabled: true, role: 'system', content: '已经关闭的旧规则。' },
+      { identifier: 'chatHistory', enabled: false, role: 'system', content: '' },
+      { identifier: 'new', enabled: false, role: 'assistant', content: '当前启用的新规则：{{lastUserMessage}}' },
+      {
+        identifier: 'bottom',
+        enabled: false,
+        role: 'system',
+        position: { type: 'in_chat' },
+        content: '当前启用的聊天底部规则。',
+      },
+    ],
+    prompt_order: [
+      {
+        character_id: 100001,
+        order: [
+          { identifier: 'old', enabled: false },
+          { identifier: 'chatHistory', enabled: true },
+          { identifier: 'new', enabled: true },
+          { identifier: 'bottom', enabled: true },
+        ],
+      },
+    ],
+  });
+  globalThis.substitudeMacros = 文 => 文;
+
+  const { 前, 后 } = 预设破限段(本拍晨跑);
+  assert.deepEqual(前, []);
+  assert.deepEqual(后, [
+    { role: 'assistant', content: `当前启用的新规则：${本拍晨跑}` },
+    { role: 'system', content: '当前启用的聊天底部规则。' },
+  ]);
+  assert.equal(JSON.stringify({ 前, 后 }).includes('已经关闭的旧规则'), false);
 });
 
 test('正文模型识别按当前来源调用宿主 getter，不被来源字段中的旧模型误导', () => {
@@ -80,33 +116,18 @@ test('正文模型识别按当前来源调用宿主 getter，不被来源字段�
   assert.equal(模型线索指向DeepSeek(线索), true);
 });
 
-test('日常三类型明确排除数据库分支，预设破限段收到本拍行动，荣耀洞/监控数据库条件仍存在', () => {
-  // 类型判定必须显式列出晨跑/健身/睡眠，且与荣耀洞/监控的数据库代发分支分开。
-  assert.match(
-    隔离事件源,
-    /类型 === '晨跑'[\s\S]*?类型 === '健身'[\s\S]*?类型 === '睡眠'/,
-    '日常时间反馈类型判定必须包含晨跑、健身、睡眠',
-  );
-  assert.doesNotMatch(隔离事件源, /类型 === '荣耀洞'[\s\S]*?类型 === '晨跑'/, '荣耀洞不得被日常类型判定吞并');
-
+test('五种隔离事件统一只走正文 API，预设破限段仍收到本拍行动', () => {
   const 生成段 = 截段(隔离事件源, 'export async function 生成隔离事件草稿', '\nexport function 写入隔离事件草稿');
 
-  // 通道决策必须收口进纯函数 选择隔离事件生成通道，生成草稿只按返回值分派：日常三类型
-  // 无论数据库 API 可用与否都走 generateRaw；荣耀洞/监控只要数据库可调用就走数据库代发。
-  // 数据库分支返回空/抛错只失败一次，不回退正文，也不得读取普通正文模型。
-  assert.match(
-    生成段,
-    /选择隔离事件生成通道\(\s*参数\.类型,\s*数据库状态\(\)\.可调用AI\s*\)/,
-    '生成草稿必须通过纯函数决策通道',
-  );
-  assert.match(生成段, /通道 === '数据库'[\s\S]{0,60}通过数据库生成\(/, '数据库分支必须显式按通道分派');
+  // 监控、荣耀洞与日常三类型共用同一条正文 generateRaw 路径；生产模块不得再依赖数据库桥。
+  assert.doesNotMatch(隔离事件源, /from '\.\/数据库桥'/, '隔离事件引擎不得再导入数据库生成桥');
+  assert.doesNotMatch(生成段, /数据库状态|通过数据库生成|通道 === '数据库'/, '隔离正文不得残留数据库分支');
+  assert.match(生成段, /const 通道 = '正文' as const;/, '史册提示词快照必须如实标记正文通道');
   assert.match(生成段, /预设破限段\(参数\.行动\)/, '预设破限段必须收到本拍行动，阻断上一楼指令泄漏');
-  assert.match(生成段, /通过数据库生成\(/, '荣耀洞/监控的数据库代发路径必须保留');
-  const 数据库分支 = 截段(生成段, "if (通道 === '数据库')", "} else {");
-  assert.doesNotMatch(数据库分支, /generateRaw/, '数据库分支不得在失败后自动回退正文 generateRaw（避免二次计费）');
-  assert.doesNotMatch(数据库分支, /当前正文模型是DeepSeek/, '数据库分支不得读取普通正文使用的模型');
-  const 正文分支 = 生成段.slice(生成段.indexOf('} else {', 生成段.indexOf("if (通道 === '数据库')")));
-  assert.match(正文分支, /当前正文模型是DeepSeek\(\)/, '只有数据库不可用后的正文兜底才允许启用模型兼容');
+  assert.match(生成段, /当前正文模型是DeepSeek\(\)/, '所有隔离正文必须沿用当前正文模型的兼容判定');
+  assert.match(生成段, /generateRaw\(\{[\s\S]*?generation_id: 生成ID/, '隔离正文必须直接调用可取消的正文 API');
+  assert.match(生成段, /受控生成超时错误前缀/);
+  assert.match(生成段, /本拍与时间均未结算/);
 });
 
 test('隔离事件进行中()不再是辅助请求身份旁路；认证原生正文在隔离期间被明确拒绝并释放租约', () => {

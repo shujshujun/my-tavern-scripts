@@ -74,6 +74,19 @@ test('亲密详情默认收在正文舞台底边，展开后使用舞台抽屉�
   assert.doesNotMatch(截段(App源, '.intimacy-people {', '.intimacy-people article'), /overflow-x/);
 });
 
+test('亲密底栏收起时参与正文舞台纵向布局，只有展开管理面板时才允许覆盖正文', () => {
+  assert.match(
+    App源,
+    /\.intimacy-stage-dock:not\(\.open\)\s*\{[\s\S]{0,180}position:\s*relative;[\s\S]{0,100}inset:\s*auto;[\s\S]{0,100}flex:\s*none;/,
+    '收起底栏必须真实占用自身高度，让正文滚动层缩短，而不是绝对定位压住末尾文字',
+  );
+  assert.match(
+    App源,
+    /\.intimacy-stage-dock\.open\s*\{[\s\S]{0,160}pointer-events:\s*auto;/,
+    '只有展开详情时才恢复全舞台覆盖与交互接管',
+  );
+});
+
 test('亲密抽屉展开态脱离正文残余高度，短正文与电脑窗口也能滚动操作收尾', () => {
   assert.match(
     App源,

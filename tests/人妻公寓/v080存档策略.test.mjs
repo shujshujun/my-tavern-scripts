@@ -45,7 +45,7 @@ const 档案卡源码 = readFileSync(
   'utf8',
 );
 
-test('v0.86 接受 v0.80-v0.85 存档并拒绝未知版本与损坏结构', () => {
+test('当前版本接受数据版本7/8/9存档并拒绝未知版本与损坏结构', () => {
   const { 当前MVU数据版本, 验证当前MVU存档版本 } = schema模块;
   assert.equal(当前MVU数据版本, 9);
   assert.doesNotThrow(() => 验证当前MVU存档版本(initvar));
@@ -55,6 +55,15 @@ test('v0.86 接受 v0.80-v0.85 存档并拒绝未知版本与损坏结构', () =
   assert.throws(() => 验证当前MVU存档版本({ 系统: { _数据版本: 6 } }), /数据版本 7、8 和 9/);
   assert.throws(() => 验证当前MVU存档版本({ 系统: { _数据版本: 10 } }), /数据版本 7、8 和 9/);
   assert.throws(() => 验证当前MVU存档版本({ 系统: { _序章完成: true } }), /数据版本 7、8 和 9/);
+  let 未来档错误;
+  try {
+    验证当前MVU存档版本({ 系统: { _数据版本: 10 } });
+  } catch (error) {
+    未来档错误 = error;
+  }
+  assert.ok(未来档错误 instanceof Error);
+  assert.doesNotMatch(未来档错误.message, /v0\.86|v0\.85/, '坏档提示不得继续手写过期角色卡小版本');
+  assert.match(未来档错误.message, /当前版本/);
   for (const 坏存档 of [
     null,
     'v7',

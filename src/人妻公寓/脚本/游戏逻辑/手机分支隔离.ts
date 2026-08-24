@@ -39,3 +39,16 @@ export function 裁同楼切分支记录<T extends 手机分支记录>(
     return 手机记录属于当前分支(条, 聊天消息);
   });
 }
+
+/**
+ * 明确 MESSAGE_DELETED 后，删除楼及其后的记录都失去楼轴身份；即使宿主马上在同楼重建了
+ * 外观、角色侧和 swipe_id 相同的消息，也不能让旧微信复活。删除楼未知时退回当前分支过滤。
+ */
+export function 裁删楼后记录<T extends 手机分支记录>(
+  记录: readonly T[],
+  删除楼: number,
+  聊天消息: readonly unknown[],
+): T[] {
+  if (!Number.isInteger(删除楼) || 删除楼 < 0) return 裁手机分支记录(记录, 聊天消息);
+  return 记录.filter(条 => 条.楼 < 删除楼 && 手机记录属于当前分支(条, 聊天消息));
+}

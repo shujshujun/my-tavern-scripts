@@ -32,7 +32,7 @@ export function 比较稳定版本(当前值: unknown, 官方值: unknown): 稳�
 }
 
 /** 随角色卡发布的游戏本体版本；与 MVU 存档的数据版本无关。 */
-export const 当前游戏版本 = '0.90';
+export const 当前游戏版本 = '0.90.1';
 export const 游戏版本构建标记 = `RQGY_GAME_VERSION:${当前游戏版本}`;
 
 export const 游戏版本清单地址 = [

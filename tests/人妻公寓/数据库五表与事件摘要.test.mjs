@@ -273,6 +273,78 @@ test('正文模型不再生成 RQ 摘要；脚本只写硬骨架，数据库填�
   assert.doesNotMatch(机器协议源, /return 闭合清\.replace\(\/<rq_event_summary/, '游戏机器协议不再进入通用吞尾回退');
 });
 
+test('脚本正文生成必须抑制数据库原生结束事件抢跑，填表只能在当前楼骨架落库后由后台触发', () => {
+  const 正文生成起 = 回合源.indexOf('原文 = await 等待正文生成(');
+  const 正文生成止 = 回合源.indexOf('    } catch (生成错误)', 正文生成起);
+  assert.ok(正文生成起 >= 0 && 正文生成止 > 正文生成起, '应能定位普通正文的首个生成参数');
+  const 正文生成参数 = 回合源.slice(正文生成起, 正文生成止);
+  assert.match(
+    正文生成参数,
+    /automatic_trigger:\s*true/,
+    '数据库插件必须忽略正文请求自身的 GENERATION_ENDED，避免当前骨架尚未落库时用新正文填写旧 RQ 行',
+  );
+
+  const 后处理起 = 回合源.indexOf('function 安排数据库回合后处理');
+  const 后处理止 = 回合源.indexOf('/** 静音会议的成功正文', 后处理起);
+  const 后处理 = 回合源.slice(后处理起, 后处理止);
+  const 当前骨架 = 后处理.indexOf('await 记录数据库回合骨架(');
+  const 补旧骨架 = 后处理.indexOf('await 补齐缺失数据库事件骨架(');
+  const 触发填表 = 后处理.indexOf('await 广播生成完成事件(');
+  assert.ok(当前骨架 >= 0 && 补旧骨架 > 当前骨架 && 触发填表 > 补旧骨架, '填表必须晚于当前与缺失骨架落库');
+});
+
+test('固定开场错绑摘要只按楼1、RQ-1与开始新游戏三重硬键修复，不批量改写其他历史', () => {
+  const sqlMatch = 数据库源.match(/const 固定开局摘要修复SQL = `([\s\S]*?)`;/);
+  assert.ok(sqlMatch, '应提供固定开场窄修复 SQL');
+  const 摘要Match = 数据库源.match(/export const 数据库固定开局摘要 = '([^']+)'/);
+  assert.ok(摘要Match, '固定开场摘要必须是脚本拥有的确定性文本');
+  const 摘要 = 摘要Match[1];
+  const sql = sqlMatch[1].replace('UPDATE rq_events', 'UPDATE rqjuqingshijian');
+
+  const db = new DatabaseSync(':memory:');
+  try {
+    db.exec(`CREATE TABLE rqjuqingshijian (
+      row_id INTEGER PRIMARY KEY,
+      floor_no INTEGER NOT NULL UNIQUE,
+      time_text TEXT,
+      location TEXT,
+      participants TEXT,
+      player_action TEXT,
+      result_summary TEXT,
+      event_code TEXT NOT NULL UNIQUE
+    )`);
+    const insert = db.prepare(
+      'INSERT INTO rqjuqingshijian (floor_no, player_action, result_summary, event_code) VALUES (?, ?, ?, ?)',
+    );
+    insert.run(1, '开始新游戏', '错误混入下一轮101检修剧情', 'RQ-1');
+    insert.run(3, '去信箱区查看租约单子', '正确的第三楼摘要', 'RQ-3');
+    insert.run(5, '重新开始游戏', '名称相似但不是固定开场', 'RQ-5');
+
+    const update = db.prepare(sql);
+    assert.equal(update.run(摘要, 摘要).changes, 1, '只修复已知固定开场行');
+    assert.equal(db.prepare('SELECT result_summary FROM rqjuqingshijian WHERE floor_no = 1').get().result_summary, 摘要);
+    assert.equal(
+      db.prepare('SELECT result_summary FROM rqjuqingshijian WHERE floor_no = 3').get().result_summary,
+      '正确的第三楼摘要',
+    );
+    assert.equal(
+      db.prepare('SELECT result_summary FROM rqjuqingshijian WHERE floor_no = 5').get().result_summary,
+      '名称相似但不是固定开场',
+    );
+    assert.equal(update.run(摘要, 摘要).changes, 0, '重复修复幂等');
+  } finally {
+    db.close();
+  }
+
+  const 后处理起 = 回合源.indexOf('function 安排数据库回合后处理');
+  const 后处理止 = 回合源.indexOf('/** 静音会议的成功正文', 后处理起);
+  const 后处理 = 回合源.slice(后处理起, 后处理止);
+  const 骨架位置 = 后处理.indexOf('await 记录数据库回合骨架(');
+  const 修复位置 = 后处理.indexOf('await 修复数据库固定开局摘要(');
+  const 填表位置 = 后处理.indexOf('await 广播生成完成事件(');
+  assert.ok(骨架位置 >= 0 && 修复位置 > 骨架位置 && 填表位置 > 修复位置, '窄修复必须在硬骨架后、AI填表前完成');
+});
+
 test('剧情事件 UPSERT 经 spv8.9.2 重绑定到物理表后仍可执行，并保护已完成摘要', () => {
   const match = 数据库源.match(/const upsertSQL = `([\s\S]*?)`;/);
   assert.ok(match, '应能取得生产环境剧情事件 UPSERT');

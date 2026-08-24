@@ -7,7 +7,7 @@ import { 妻状态包 } from '../snapshotSystem';
 import { 姐妹群成员, 雌竞火气, 雌竞资格, 读余波, 余波缓冲楼, 余波已发酵, type 换装余波 } from '../雌竞系统';
 import { 私聊图库清单, type 私聊图库项 } from '../私聊图库清单';
 import { 创建手机时间线租约, 手机时间线租约仍有效 } from '../手机时间线租约';
-import { 等待场景剧情阻塞当前场景, 读取活动场景剧情, 读取队首场景剧情 } from '../场景剧情事务';
+import { 场景剧情占用前台生成 } from '../场景剧情事务';
 import { 验收群聊隐私 } from '../手机输出安全';
 import { 仅你可见触发参数 } from '../手机触发参数';
 import { 汉字数 } from '../手机群聊格式';
@@ -704,20 +704,14 @@ export async function 手机节拍(): Promise<void> {
     if (!rawStat) return;
     const data = Schema.parse(rawStat) as SchemaType;
     if (data.系统._坏结局) return;
-    // 正式特殊场景是隔离演出：朋友圈、主动私聊、父亲/群聊等后台内容都不能插队。
-    // 静音会议开放的只是玩家主动发起的参与妻私聊旁路，不是自动内容节拍。
-    if (data.系统._特殊场景.id) return;
-    // 活动剧情与已经抵达当前地点的等待票取得场景所有权；旧档目标未知时同样失败关闭。
-    // 明确仍在其他地点等待的结构票不能让朋友圈、主动私聊和群聊长期沉默。
-    const 活动场景剧情 = 读取活动场景剧情(data);
-    const 等待剧情 = 读取队首场景剧情(data.系统._待发送事件);
+    // 普通活动票、同场等待票、专用特殊场景与荣耀洞都取得前台所有权；远处等待票不阻塞。
     let 当前场景: string | null = null;
     try {
       当前场景 = (_.get(getVariables({ type: 'chat' }), '_场景.房间id') as string | null | undefined) ?? null;
     } catch {
       /* 聊天场景不可读时只用活动票硬门；结构票不会被猜成已经到场。 */
     }
-    if (活动场景剧情 || 等待场景剧情阻塞当前场景(等待剧情, 当前场景)) return;
+    if (场景剧情占用前台生成(data, 当前场景)) return;
     const 楼 = 末楼();
     const 钟 = 取绝对时段(data);
     const 时间线租约 = 创建手机时间线租约(当前聊天ID(), 楼, SillyTavern.chat ?? [], 钟);

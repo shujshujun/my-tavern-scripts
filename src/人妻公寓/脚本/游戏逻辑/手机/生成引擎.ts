@@ -13,6 +13,8 @@ import { 汉字数, 解析微信群消息 } from '../手机群聊格式';
 import { 攻略动态方向 } from './内容素材表';
 import { 取得手机生成租约, 手机生成租约持有中 } from '../生成通道互斥';
 import { 等待场景剧情阻塞当前场景, 读取活动场景剧情, 读取队首场景剧情 } from '../场景剧情事务';
+import { 创建受控生成等待 } from '../受控生成等待';
+import { 转为正文舞台纯文本 } from '../预设输出兼容';
 
 /**
  * 手机生成引擎（拆分方案 P4）：净化/协议抽取、手机专用轻量预设与三路 AI 路由
@@ -35,7 +37,7 @@ const 手机可见内容长度纪律 = `完整表达优先，不设最低字数�
 const 手机请求token上限 = 8192;
 
 // ============================================
-// 消息净化(协议标签剥除 + 玩家预设正则兼容)
+// 消息净化(手机封套 + 本地协议标签剥除)
 // ============================================
 
 /**
@@ -59,15 +61,10 @@ export function 净化消息(原: string): string {
   // 部分预设改用 story_scene 包正文；与 <回复> 一样抽取内部文本，闭合缺失时取到结尾。
   const 场景包 = 原.match(/<story_scene\b[^>]*>([\s\S]*?)(?:<\/story_scene\s*>|$)/i);
   if (场景包?.[1]?.trim()) 原 = 场景包[1];
-  let 过正则 = 原;
-  // 玩家预设自带的正则先走一遍(2026-07-27 用户点单:与正文同一套规则源,防预设协议标签
-  // 漏进气泡;酒馆助手一站式接口=全局+预设+角色卡正则,失败退回原文走硬编码清洗)
-  try {
-    过正则 = formatAsTavernRegexedString(原, 'ai_output', 'display', { depth: 0 });
-  } catch (e) {
-    console.warn('[人妻公寓·手机] 预设正则应用失败,退回硬编码清洗:', e);
-  }
-  const 闭合清 = 过正则
+  // 2026-08-23 真实预设 A/B：正文显示正则会把自然口语删成病句。手机已经用完整
+  // <回复> 封套证明生成完成，并在下方清理已知机器／思维协议，因此不再执行小说显示正则。
+  const 闭合清 = 转为正文舞台纯文本(
+    原
     // 与正文/隔离事件共用同一组玩家预设兼容边界。尤其兼容 draft_notes
     // 漏闭合、但后续 bginfor 完整的狐系预设，避免手机把草稿思考当消息显示。
     .replace(/^[\s\S]*?<content\b[^>]*>/i, '')
@@ -107,10 +104,10 @@ export function 净化消息(原: string): string {
       /<(?:VariableCheck|Disclaimer|w2g|meow_FM|branches|parallel_world|historic_events|htm1fenge)\b[^>]*>[\s\S]*$/i,
       '',
     )
-    .replace(/<\/?[a-zA-Z一-龥][^>]*>/g, '')
     // 破限词条常令"每条消息以[地点,日期,时间]开头"(RONG等叙事预设指令渗透):微信气泡剥掉行首方括号头
     .replace(/^\[[^\]\n]{2,60}\]\s*/, '')
-    .trim();
+    .trim(),
+  );
   const 全清 = 闭合清
     .replace(/<think(?:ing)?>[\s\S]*$/i, '')
     .replace(/<reason(?:ing)?>[\s\S]*$/i, '')
@@ -195,6 +192,44 @@ const 手机尾部破限 =
   '人物状态和当前入口规则是本次输出的唯一依据；完成内部判断后，只给出所要求的最终手机内容。' +
   '</phone_generation_calibration>';
 
+/** 手机是短通讯生成；四分钟只作永久 pending 保险，不改变提示词长度或正常模型输出预算。 */
+export const 手机生成等待上限毫秒 = 240_000;
+let 手机生成请求序号 = 0;
+
+function 新手机生成ID(控制?: 手机小生成控制): string {
+  const 外部ID = 控制?.生成ID?.trim();
+  // 手动红灯批次会用同一个 ID 调 stopGenerationById；不得擅自加后缀破坏现有取消入口。
+  if (外部ID) return 外部ID;
+  return `rqgy-phone-${Date.now()}-${++手机生成请求序号}`;
+}
+
+function 停止手机底层请求(生成ID: string): void {
+  try {
+    if (typeof stopGenerationById === 'function' && stopGenerationById(生成ID)) return;
+  } catch {
+    /* 旧宿主回退全局停止。 */
+  }
+  try {
+    stopAllGeneration();
+  } catch {
+    /* 本地等待仍按时失败，迟到结果不会进入手机入库链。 */
+  }
+}
+
+async function 等待受控生成(
+  任务: PromiseLike<unknown>,
+  生成ID: string,
+  控制?: 手机小生成控制,
+): Promise<unknown> {
+  return 创建受控生成等待(任务, {
+    超时毫秒: 手机生成等待上限毫秒,
+    超时说明: '手机生成超过四分钟未返回',
+    请求停止: () => 停止手机底层请求(生成ID),
+    仍有效: () => 手机小生成仍有效(控制),
+    失效说明: '手机生成上下文已经失效',
+  }).结果;
+}
+
 function 手机系统消息(入口提示: string) {
   return [
     { role: 'system' as const, content: 手机内置核心预设 },
@@ -206,7 +241,8 @@ function 手机系统消息(入口提示: string) {
 async function 正文API生成(系统提示: string, 用户提示: string, 控制?: 手机小生成控制): Promise<手机小生成结果> {
   if (!手机小生成仍有效(控制)) return 空手机小生成结果();
   try {
-    const 原 = await generateRaw({
+    const 生成ID = 新手机生成ID(控制);
+    const 原 = await 等待受控生成(generateRaw({
       // 手机是独立的短文本生成通道，不加载正文预设条目。角色状态、事件语境和
       // 输出格式均由手机自己的提示提供，避免叙事预设把微信回复拉成长文或改写格式。
       ordered_prompts: [...手机系统消息(系统提示), 'user_input', { role: 'system', content: 手机尾部破限 }],
@@ -215,8 +251,8 @@ async function 正文API生成(系统提示: string, 用户提示: string, 控�
       // 手机回复是后台短生成，不得绑定酒馆全局停止按钮；否则玩家取消正文时会和
       // 微信／父亲通话的生成互相干扰。generateRaw 本身不会创建宿主聊天楼层。
       should_silence: true,
-      ...(控制?.生成ID ? { generation_id: 控制.生成ID } : {}),
-    });
+      generation_id: 生成ID,
+    }), 生成ID, 控制);
     if (!手机小生成仍有效(控制)) return 空手机小生成结果();
     return 解析手机小生成原文(原);
   } catch (e) {
@@ -240,7 +276,8 @@ async function 自定义API生成(
     // 不从手机 iframe 直接 fetch 外部 API：移动端 WebView/远端 API 的 CORS
     // 往往会把有效地址也拦成 TypeError: Failed to fetch。统一走酒馆助手的
     // custom_api 代理链路，与数据库插件和其他脚本的自定义 API 调用方式一致。
-    const 原 = await generateRaw({
+    const 生成ID = 新手机生成ID(控制);
+    const 原 = await 等待受控生成(generateRaw({
       ordered_prompts: [
         ...手机系统消息(系统提示),
         { role: 'user', content: 用户提示 },
@@ -248,7 +285,7 @@ async function 自定义API生成(
       ],
       should_stream: false,
       should_silence: true,
-      ...(控制?.生成ID ? { generation_id: 控制.生成ID } : {}),
+      generation_id: 生成ID,
       custom_api: {
         apiurl: c.base.trim().replace(/\/+$/, ''),
         key: c.key,
@@ -257,7 +294,7 @@ async function 自定义API生成(
         temperature: 0.9,
         source: 'openai',
       },
-    });
+    }), 生成ID, 控制);
     if (!手机小生成仍有效(控制)) return 空手机小生成结果();
     return 解析手机小生成原文(原);
   } catch (e) {

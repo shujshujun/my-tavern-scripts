@@ -23,6 +23,7 @@ interface 可识别预设词条 {
   enabled?: boolean;
   content?: string;
   role?: string;
+  position?: { type?: string };
 }
 
 interface 预设结构 {
@@ -135,13 +136,13 @@ export interface 预设消息 {
  */
 export function 预设破限段(本拍玩家输入?: string): { 前: 预设消息[]; 后: 预设消息[] } {
   try {
-    const 预设 = getPreset('in_use');
+    const 预设 = getPreset('in_use') as 预设结构;
     const 前: 预设消息[] = [];
     const 后: 预设消息[] = [];
     let 过史 = false;
-    for (const p of 预设?.prompts ?? []) {
-      if (!p?.enabled) continue;
-      if (p.id === 'chatHistory') {
+    for (const p of 读取预设启用词条(预设)) {
+      const 标识 = p.identifier ?? p.id;
+      if (标识 === 'chatHistory') {
         过史 = true;
         continue;
       }
@@ -154,7 +155,8 @@ export function 预设破限段(本拍玩家输入?: string): { 前: 预设消�
       const 文 = substitudeMacros(待展开);
       if (!文.trim()) continue;
       // in_chat 深度词条本就锚在聊天底部(高权重),与 chatHistory 之后的词条同归后段
-      (过史 || p.position?.type === 'in_chat' ? 后 : 前).push({ role: p.role ?? 'system', content: 文 });
+      const role = p.role === 'user' || p.role === 'assistant' ? p.role : 'system';
+      (过史 || p.position?.type === 'in_chat' ? 后 : 前).push({ role, content: 文 });
     }
     return { 前, 后 };
   } catch (e) {

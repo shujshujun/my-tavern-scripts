@@ -248,7 +248,7 @@ test('CHAT_CHANGED 同步作废手机世代；原生分支协调把 仍为最新
   const 排队段 = 截源(index源码, 'function 排队宿主原生时间线切换', 'const 滑动监听');
   assert.match(
     排队段,
-    /隔离当前手机分支\(类型 === '删楼' \? -1 : 切分支楼, 租约\.仍为最新\)/,
+    /隔离当前手机分支\(切分支楼, 租约\.仍为最新, 类型\)/,
     '原生删楼/swipe 协调必须把 仍为最新 传进收口',
   );
   const 收口段 = 截源(数据层源码, 'export async function 隔离当前手机分支', 'export function 读库');
