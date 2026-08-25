@@ -6,10 +6,7 @@ import test from 'node:test';
 
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
-const 源码 = readFileSync(
-  new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/刷新恢复镜像.ts', import.meta.url),
-  'utf8',
-);
+const 源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/刷新恢复镜像.ts', import.meta.url), 'utf8');
 
 class 内存会话存储 {
   #值 = new Map();
@@ -31,11 +28,23 @@ class 内存会话存储 {
   }
 }
 
+class 写入失败存储 extends 内存会话存储 {
+  setItem() {
+    throw new Error('QuotaExceededError');
+  }
+}
+
 function 默认聊天(数量 = 12) {
   return Array.from({ length: 数量 }, (_, 楼) => ({ is_user: 楼 % 2 === 0, swipe_id: 0, extra: {} }));
 }
 
-function 加载恢复镜像({ 存储 = new 内存会话存储(), integrity = 'chat-integrity-a', 父窗口, chat = 默认聊天() } = {}) {
+function 加载恢复镜像({
+  存储 = new 内存会话存储(),
+  本地存储 = new 内存会话存储(),
+  integrity = 'chat-integrity-a',
+  父窗口,
+  chat = 默认聊天(),
+} = {}) {
   const 上下文 = {
     chatMetadata: { integrity },
     chatId: 'chat-a',
@@ -45,8 +54,9 @@ function 加载恢复镜像({ 存储 = new 内存会话存储(), integrity = 'ch
       return this;
     },
   };
-  const parent = 父窗口 ?? { sessionStorage: 存储 };
+  const parent = 父窗口 ?? {};
   parent.sessionStorage = 存储;
+  parent.localStorage = 本地存储;
   parent.SillyTavern = 上下文;
   const window = { parent };
   const globalThis = { SillyTavern: 上下文 };
@@ -54,21 +64,22 @@ function 加载恢复镜像({ 存储 = new 内存会话存储(), integrity = 'ch
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText;
   const module = { exports: {} };
-  Function('module', 'exports', 'window', 'SillyTavern', 'globalThis', js)(
-    module,
-    module.exports,
-    window,
-    上下文,
-    globalThis,
-  );
-  return { api: module.exports, 上下文, parent, 存储 };
+  Function(
+    'module',
+    'exports',
+    'window',
+    'SillyTavern',
+    'globalThis',
+    js,
+  )(module, module.exports, window, 上下文, globalThis);
+  return { api: module.exports, 上下文, parent, 存储, 本地存储 };
 }
 
 function 微信样本(文 = '已经聊过的内容', 楼 = 8, 时 = 20) {
   return {
     消息: [{ 楼, 时, 会话: '101', 发: '对方', 文 }],
     圈: [],
-    读到: { '101': 8 },
+    读到: { 101: 8 },
     读时: {},
     节拍: { '私:101': 20 },
     已发私聊图: {},
@@ -106,6 +117,49 @@ test('完整网页刷新：父窗口内存消失后仍能从同一 tab 的 sessi
   const 恢复 = 第二页.api.选择微信刷新恢复值(undefined, false, 'chat-a', 20);
   assert.equal(恢复.使用镜像, true);
   assert.equal(恢复.值.消息[0].文, '完整刷新前的消息');
+});
+
+test('关闭页面后重启：父窗口内存与 sessionStorage 消失时仍能从 localStorage 恢复完整微信', () => {
+  const 本地存储 = new 内存会话存储();
+  const 第一页 = 加载恢复镜像({ 存储: new 内存会话存储(), 本地存储, integrity: 'restart-persistence-chat' });
+  const 微信 = 微信样本('关闭页面前的完整上下文');
+  api写入(第一页.api, 微信);
+
+  const 第二页 = 加载恢复镜像({ 存储: new 内存会话存储(), 本地存储, integrity: 'restart-persistence-chat' });
+  const 恢复 = 第二页.api.选择微信刷新恢复值(undefined, false, 'chat-a', 20);
+  assert.equal(恢复.使用镜像, true);
+  assert.equal(恢复.值.消息[0].文, '关闭页面前的完整上下文');
+  assert.equal(恢复.值.节拍['私:101'], 20);
+});
+
+function api写入(api, 微信) {
+  assert.equal(api.推进微信持久修订(微信, 'chat-a', 20), 1);
+  assert.equal(api.写入微信刷新镜像('chat-a', 微信, 20), true);
+}
+
+test('浏览器存储单通道失败时另一通道仍可恢复，双通道失败时保留当前页内存镜像', () => {
+  const session失败 = new 写入失败存储();
+  const local可用 = new 内存会话存储();
+  const local页 = 加载恢复镜像({ 存储: session失败, 本地存储: local可用, integrity: 'storage-fallback-chat' });
+  api写入(local页.api, 微信样本('localStorage 兜底'));
+  const local重启页 = 加载恢复镜像({
+    存储: new 内存会话存储(),
+    本地存储: local可用,
+    integrity: 'storage-fallback-chat',
+  });
+  assert.equal(local重启页.api.选择微信刷新恢复值(undefined, false, 'chat-a', 20).值.消息[0].文, 'localStorage 兜底');
+
+  const 双失败页 = 加载恢复镜像({
+    存储: new 写入失败存储(),
+    本地存储: new 写入失败存储(),
+    integrity: 'both-storage-fail-chat',
+  });
+  const 微信 = 微信样本('仅内存镜像');
+  assert.equal(双失败页.api.推进微信持久修订(微信, 'chat-a', 20), 1);
+  assert.equal(双失败页.api.写入微信刷新镜像('chat-a', 微信, 20), false);
+  const 当前页恢复 = 双失败页.api.选择微信刷新恢复值(undefined, false, 'chat-a', 20);
+  assert.equal(当前页恢复.使用镜像, true);
+  assert.equal(当前页恢复.值.消息[0].文, '仅内存镜像');
 });
 
 test('聊天身份隔离：另一聊天或另一开局绝不读取当前聊天副本', () => {
@@ -178,14 +232,26 @@ test('时间线安全门：正常加楼可恢复，回到更早时段、删楼�
   assert.equal(api.选择微信刷新恢复值(undefined, false, 'chat-a', 21).使用镜像, true, '只追加新楼时原前缀仍存活');
   上下文.chat.pop();
 
-  assert.equal(api.选择微信刷新恢复值(undefined, false, 'chat-a', 19).使用镜像, false, '回到镜像以前的世界时段不得恢复未来微信');
+  assert.equal(
+    api.选择微信刷新恢复值(undefined, false, 'chat-a', 19).使用镜像,
+    false,
+    '回到镜像以前的世界时段不得恢复未来微信',
+  );
 
   上下文.chat[5].swipe_id = 1;
-  assert.equal(api.选择微信刷新恢复值(undefined, false, 'chat-a', 20).使用镜像, false, '锚楼内切换 swipe 后分支指纹必须失配');
+  assert.equal(
+    api.选择微信刷新恢复值(undefined, false, 'chat-a', 20).使用镜像,
+    false,
+    '锚楼内切换 swipe 后分支指纹必须失配',
+  );
   上下文.chat[5].swipe_id = 0;
 
   上下文.chat.splice(8);
-  assert.equal(api.选择微信刷新恢复值(undefined, false, 'chat-a', 20).使用镜像, false, '删到镜像锚楼之前不得复活已删除时间线');
+  assert.equal(
+    api.选择微信刷新恢复值(undefined, false, 'chat-a', 20).使用镜像,
+    false,
+    '删到镜像锚楼之前不得复活已删除时间线',
+  );
 });
 
 test('回档后的新分支修订必须跨过旧镜像，再以新的楼/时锚覆盖同一恢复槽', () => {

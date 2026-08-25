@@ -1,10 +1,9 @@
 /**
  * 微信刷新恢复镜像。
  *
- * `_微信` 的正式真值仍在 Tavern Helper chat variables；本模块只保存同一浏览器会话内的
- * 紧急副本，专门兜住宿主整聊保存超时/失败后立刻刷新造成的“聊天变量回到旧版本”。
- * 副本按聊天 metadata.integrity（优先）或角色+聊天 ID 隔离，并带单调修订号；正常
- * `_微信`、显式重开墓碑、回档/删楼后的裁剪都会争取更高修订，旧时间线不能靠刷新复活。
+ * `_微信` 的正式真值仍在 Tavern Helper chat variables；本模块只保存同一聊天的完整紧急副本，专门兜住宿主整聊保存超时/失败后刷新或重启造成的“聊天变量回到旧版本”。
+ * 副本按聊天 metadata.integrity（优先）或角色+聊天 ID 隔离，并带单调修订号；正常 `_微信`、显式重开墓碑、回档/删楼后的裁剪都会争取更高修订，旧时间线不能靠刷新或重启复活。
+ * 父窗口内存用于当前页面，sessionStorage 覆盖同一标签页刷新，localStorage 覆盖关闭页面后的重启窗口；三者都不是正式聊天文件真值。
  */
 
 export const 微信持久修订字段 = '__rqgy微信持久修订';
@@ -50,7 +49,9 @@ type 手机恢复宿主窗口 = Window & {
   [宿主镜像字段]?: Record<string, 微信刷新镜像包>;
 };
 
-let 已警告会话镜像写入失败 = false;
+const 已警告浏览器镜像写入失败 = new Set<'sessionStorage' | 'localStorage'>();
+
+type 浏览器镜像存储 = 'sessionStorage' | 'localStorage';
 
 function 是普通对象(值: unknown): 值 is Record<string, unknown> {
   if (值 === null || typeof 值 !== 'object' || Array.isArray(值)) return false;
@@ -274,9 +275,18 @@ function 宿主镜像集合(): Record<string, 微信刷新镜像包> {
   return 新建;
 }
 
-function 读取会话镜像集合(): Record<string, unknown> {
+function 取浏览器镜像存储(名称: 浏览器镜像存储): Storage | null {
   try {
-    const raw = 宿主窗口()?.sessionStorage?.getItem(会话存储键);
+    const root = 宿主窗口();
+    return root?.[名称] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function 读取浏览器镜像集合(名称: 浏览器镜像存储): Record<string, unknown> {
+  try {
+    const raw = 取浏览器镜像存储(名称)?.getItem(会话存储键);
     if (!raw) return Object.create(null) as Record<string, unknown>;
     const parsed = JSON.parse(raw) as unknown;
     return 是普通对象(parsed) ? parsed : (Object.create(null) as Record<string, unknown>);
@@ -285,27 +295,27 @@ function 读取会话镜像集合(): Record<string, unknown> {
   }
 }
 
-function 写会话镜像集合(集合: Record<string, 微信刷新镜像包>, 当前聊天身份: string): boolean {
-  const root = 宿主窗口();
-  if (!root?.sessionStorage) return false;
+function 写浏览器镜像集合(集合: Record<string, 微信刷新镜像包>, 当前聊天身份: string, 名称: 浏览器镜像存储): boolean {
+  const storage = 取浏览器镜像存储(名称);
+  if (!storage) return false;
   const 排序后 = Object.entries(集合)
     .sort(([, a], [, b]) => b.写入时间 - a.写入时间)
     .slice(0, 最多保留聊天数);
   const 精简 = Object.fromEntries(排序后) as Record<string, 微信刷新镜像包>;
   try {
-    root.sessionStorage.setItem(会话存储键, JSON.stringify(精简));
+    storage.setItem(会话存储键, JSON.stringify(精简));
     return true;
   } catch {
-    // 旧聊天副本过大时只保留当前聊天再试一次；宿主内存镜像仍可兜住客户端 iframe 刷新。
+    // 旧聊天副本过大时只保留当前聊天再试一次；另一个浏览器存储和宿主内存镜像仍可兜底。
     try {
       const 当前 = 集合[当前聊天身份];
       if (!当前) return false;
-      root.sessionStorage.setItem(会话存储键, JSON.stringify({ [当前聊天身份]: 当前 }));
+      storage.setItem(会话存储键, JSON.stringify({ [当前聊天身份]: 当前 }));
       return true;
     } catch (error) {
-      if (!已警告会话镜像写入失败) {
-        已警告会话镜像写入失败 = true;
-        console.warn('[人妻公寓·手机] 微信刷新恢复副本无法写入 sessionStorage；本次仍保留宿主内存镜像。', error);
+      if (!已警告浏览器镜像写入失败.has(名称)) {
+        已警告浏览器镜像写入失败.add(名称);
+        console.warn(`[人妻公寓·手机] 微信刷新恢复副本无法写入 ${名称}；本次仍保留其他镜像通道。`, error);
       }
       return false;
     }
@@ -324,9 +334,11 @@ function 读取微信刷新镜像候选(聊天ID: string): 微信刷新镜像包
   if (!聊天身份) return null;
   const 宿主集合 = 宿主镜像集合();
   const fromHost = 解析镜像包(宿主集合[聊天身份], 聊天身份);
-  const 会话集合 = 读取会话镜像集合();
+  const 会话集合 = 读取浏览器镜像集合('sessionStorage');
   const fromSession = 解析镜像包(会话集合[聊天身份], 聊天身份);
-  const 选择 = 较新镜像(fromHost, fromSession);
+  const 本地集合 = 读取浏览器镜像集合('localStorage');
+  const fromLocal = 解析镜像包(本地集合[聊天身份], 聊天身份);
+  const 选择 = 较新镜像(较新镜像(fromHost, fromSession), fromLocal);
   if (选择) 宿主集合[聊天身份] = 选择;
   return 选择;
 }
@@ -350,26 +362,27 @@ export function 推进微信持久修订(微信: Record<string, unknown>, 聊天
 
 function 写入镜像包(包: 微信刷新镜像包): boolean {
   const 宿主集合 = 宿主镜像集合();
-  const 已有宿主 = 解析镜像包(宿主集合[包.聊天身份], 包.聊天身份);
-  const 会话原 = 读取会话镜像集合();
-  const 会话合法: Record<string, 微信刷新镜像包> = Object.create(null) as Record<string, 微信刷新镜像包>;
-  for (const [身份, 值] of Object.entries(会话原)) {
+  const 会话原 = 读取浏览器镜像集合('sessionStorage');
+  const 本地原 = 读取浏览器镜像集合('localStorage');
+  const 合法集合: Record<string, 微信刷新镜像包> = Object.create(null) as Record<string, 微信刷新镜像包>;
+  const 合入 = (身份: string, 值: unknown): void => {
     const 合法 = 解析镜像包(值, 身份);
-    if (合法) 会话合法[身份] = 合法;
-  }
+    if (合法) 合法集合[身份] = 较新镜像(合法集合[身份] ?? null, 合法) ?? 合法;
+  };
+  for (const [身份, 值] of Object.entries(宿主集合)) 合入(身份, 值);
+  for (const [身份, 值] of Object.entries(会话原)) 合入(身份, 值);
+  for (const [身份, 值] of Object.entries(本地原)) 合入(身份, 值);
+  合入(包.聊天身份, 包);
 
-  const 已有会话 = 解析镜像包(会话合法[包.聊天身份], 包.聊天身份);
-  const 已有最新 = 较新镜像(已有宿主, 已有会话);
-  // 修订号是同一聊天的状态版本，而不是“最后调用时间”。较早事务可能在回档、清空或
-  // 新消息提交之后才迟到执行镜像写入；即使它拥有更晚的 Date.now()，也绝不能把存储槽
-  // 从较高修订降回旧状态。同修订也只认最先落下的真值，并借本次调用修复另一存储通道。
-  const 应保存 = 已有最新 && 已有最新.修订 >= 包.修订 ? 已有最新 : 包;
+  const 应保存 = 合法集合[包.聊天身份];
+  if (!应保存) return false;
   宿主集合[包.聊天身份] = 应保存;
-  会话合法[包.聊天身份] = 应保存;
-  return 写会话镜像集合(会话合法, 包.聊天身份);
+  const session成功 = 写浏览器镜像集合(合法集合, 包.聊天身份, 'sessionStorage');
+  const local成功 = 写浏览器镜像集合(合法集合, 包.聊天身份, 'localStorage');
+  return session成功 || local成功;
 }
 
-/** 把已经带修订号的 `_微信` 快照写入宿主内存 + sessionStorage。 */
+/** 把已经带修订号的 `_微信` 快照写入宿主内存 + localStorage + sessionStorage。 */
 export function 写入微信刷新镜像(聊天ID: string, 微信: unknown, 当前绝对时段: number): boolean {
   if (!是普通对象(微信)) return false;
   const 聊天身份 = 当前微信持久身份(聊天ID);

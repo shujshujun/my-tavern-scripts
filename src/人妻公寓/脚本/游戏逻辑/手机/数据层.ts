@@ -503,9 +503,9 @@ function 读取手机宿主保存接口(): { 上下文: 手机宿主保存接口
 }
 
 /**
- * 在调用宿主保存前，把本聊天最新 `_微信` 统一成高于现有刷新镜像的单调修订并写入
- * sessionStorage/宿主内存。SillyTavern 的 saveChatConditional 会吞掉内部超时和请求异常，
- * 因而“await 没抛错”并不能证明服务器已经落盘；刷新镜像承担这段不可观测失败窗口。
+ * 在调用宿主保存前，把本聊天最新 `_微信` 统一成高于现有恢复镜像的单调修订并写入
+ * 父窗口内存、localStorage 与 sessionStorage。SillyTavern 的 saveChatConditional 会吞掉内部超时和请求异常，
+ * 因而“await 没抛错”并不能证明服务器已经落盘；恢复镜像承担这段不可观测失败窗口。
  */
 async function 记录当前微信刷新恢复副本(预期聊天ID: string): Promise<boolean> {
   const 需要校验聊天 = !!预期聊天ID;
@@ -579,8 +579,8 @@ function 安排手机聊天变量延迟补存(预期聊天ID: string): void {
 
 /**
  * 酒馆助手的 chat 变量更新只会安排防抖保存；这里把手机提交串行接到宿主立即保存接口，
- * 并先写同聊天刷新镜像。排队期间切聊则失败关闭，绝不把旧聊天的延迟提交误保存到新聊天。
- * 旧宿主没有保存接口时，刷新镜像仍可兜住同一浏览器会话内的客户端/网页刷新。
+ * 并先写同聊天的内存 + localStorage + sessionStorage 恢复镜像。排队期间切聊则失败关闭，绝不把旧聊天的延迟提交误保存到新聊天。
+ * 旧宿主没有保存接口时，浏览器恢复镜像仍可兜住跨刷新与跨重启的未落盘窗口。
  */
 export async function 立即持久保存手机聊天变量(预期聊天ID = 当前聊天ID()): Promise<boolean> {
   const 需要校验聊天 = !!预期聊天ID;
