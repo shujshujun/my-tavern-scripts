@@ -1,3 +1,5 @@
+import { 折叠检测文本, 规范可读文本 } from './记忆文本规范';
+
 export interface 微信可知正文消息 {
   mes?: string;
   is_user?: boolean;
@@ -7,16 +9,15 @@ const 指令风险 =
   /(?:忽略|无视|覆盖|绕过|泄露).{0,16}(?:系统|上文|规则|指令|提示词)|(?:system|developer|assistant|prompt|instruction)\s*[:：]?|\b(?:ignore|obey|respond|output|roleplay)\b/i;
 
 export function 净化微信只读文本(value: unknown, 上限: number): string {
-  const 文 = String(value ?? '')
-    .normalize('NFKC')
+  const 去结构 = String(value ?? '')
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/<[^>]*>/g, ' ')
     .replace(/\{\{|\}\}/g, ' ')
     .replace(/\u3010事件(?:在场妻|在场夫|关联妻|关联夫):[^\u3011]+\u3011/g, ' ')
-    .replace(/[\r\n\t]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  if (!文 || 指令风险.test(文)) return '';
+    .replace(/[\r\n\t]+/g, ' ');
+  // 只读注入文本同样不折叠中文全角标点；指令检测在折叠副本上执行。
+  const 文 = 规范可读文本(去结构);
+  if (!文 || 指令风险.test(折叠检测文本(文))) return '';
   return 文.slice(-上限);
 }
 

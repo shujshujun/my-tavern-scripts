@@ -219,7 +219,7 @@ const 选中线索 = computed(() => {
     case '丈夫':
       源 = 缝.夫漏?.map(拍 => 拍.碎片文案) ?? [];
       break;
-    case '动态广场':
+    case '朋友圈':
       源 = 考古线索();
       break;
     case '特例双拼':

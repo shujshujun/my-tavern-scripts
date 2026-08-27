@@ -36,6 +36,36 @@ export function MVU操作进行中(): boolean {
 }
 
 /**
+ * 有界等待整表写回队列真正排空。
+ *
+ * 语义：启动收口、上一轮 VARIABLE_UPDATE_ENDED 的整表写回、世界书与整表视图同步都经
+ * `排队MVU操作` 串行。玩家在这段窗口里的第一次操作原先被忙态门直接判失败（新档实测
+ * “进游戏后第一次触发 AI 自动回复 100% 失败、需手点重新生成正文”即此路径）。调用方
+ * 应先同步占住自己的入口门（界面事务门 / 客户端发送锁），再用本函数等队列归零；只有
+ * 超时才回落到原忙态提示，忙态语义与提示文案都不放宽。
+ *
+ * 本函数只读 `待处理MVU操作数`：不入队、不持锁、不改变任何事务；等待期间新入队的整表
+ * 操作同样计入忙态，因此“等到空闲”指的是该时刻队列确实为空，而不是某一笔特定事务结束。
+ */
+export function 等待MVU操作空闲(超时毫秒 = 8000, 轮询间隔 = 40): Promise<boolean> {
+  if (!MVU操作进行中()) return Promise.resolve(true);
+  return new Promise(resolve => {
+    const 截止 = Date.now() + Math.max(0, 超时毫秒);
+    const 定时 = setInterval(() => {
+      if (!MVU操作进行中()) {
+        clearInterval(定时);
+        resolve(true);
+        return;
+      }
+      if (Date.now() >= 截止) {
+        clearInterval(定时);
+        resolve(false);
+      }
+    }, Math.max(1, 轮询间隔));
+  });
+}
+
+/**
  * 活动整表事务的提交守卫。任务可以在 await 前读到旧分支；宿主 swipe/delete 会同步
  * 推进时间线世代，因此真正写回前必须重新核对，而不能只依赖“拿锁时检查过一次”。
  */

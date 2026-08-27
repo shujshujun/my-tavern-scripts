@@ -4027,7 +4027,7 @@ const 裂缝证物槽 = computed(() => {
   if (渠道 === '摄像头') return 同类('监控观察', 'cctv');
   if (渠道 === '打听') return 同类('邻里口供', 'peep');
   if (渠道 === '丈夫') return 同类('丈夫酒话', 'favor');
-  if (渠道 === '动态广场') return 同类('旧动态', 'book');
+  if (渠道 === '朋友圈') return 同类('旧动态', 'book');
   if (渠道 === '特例双拼')
     return [
       { 标: '父亲来电', 图: 'phone' },

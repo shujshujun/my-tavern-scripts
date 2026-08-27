@@ -29,8 +29,19 @@ test('本地摘要确定性合并旧约定与最新一轮对话事实', () => {
   assert.deepEqual(首次.b, ['不在丈夫面前谈私事']);
   assert.deepEqual(首次.p, ['门锁问题还没有解决']);
   assert.match(首次.f.at(-1), /玩家.*门锁配件.*夏乔.*微信/);
-  assert.ok(['f', 'a', 'b', 'p'].flatMap(key => 首次[key]).length <= 6);
-  assert.ok(['f', 'a', 'b', 'p'].flatMap(key => 首次[key]).every(item => item.length <= 80));
+  assert.ok(['f', 'a', 'b', 'p'].flatMap(key => 首次[key]).length <= 30);
+  assert.ok(['f', 'a', 'b', 'p'].flatMap(key => 首次[key]).every(item => item.length <= 400));
+});
+
+test('摘要保存值不折叠中文全角标点，只在安全检测时折叠', () => {
+  const 结果 = 合并本地微信进展摘要(null, '安若妍', [
+    { 说话者: '玩家', 内容: '明晚我过去，可以吗？' },
+    { 说话者: '安若妍', 内容: '明晚……你若是真敢对我做那种事，我也不会像你以为的那样只会躲。' },
+  ]);
+  const 文 = 结果.f.join(' ');
+  assert.match(文, /，/, '中文逗号必须原样保留');
+  assert.match(文, /？|……/, '问号或省略号必须原样保留');
+  assert.doesNotMatch(文, /[,?]/, '不得出现被 NFKC 折叠出来的半角标点');
 });
 
 test('危险或超长原文降级为安全的对话发生事实，不生成指令记忆', () => {

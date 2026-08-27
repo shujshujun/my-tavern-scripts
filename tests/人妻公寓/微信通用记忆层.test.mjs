@@ -4,7 +4,9 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import test from 'node:test';
 
+process.env.TS_NODE_COMPILER_OPTIONS = JSON.stringify({ module: 'CommonJS', moduleResolution: 'node' });
 const require = createRequire(import.meta.url);
+require('ts-node/register/transpile-only');
 const { 合并本地群聊进展摘要, 合并本地微信进展摘要 } = require('../../src/人妻公寓/脚本/游戏逻辑/微信本地进展摘要.ts');
 const { 压缩微信会话消息 } = require('../../src/人妻公寓/脚本/游戏逻辑/微信消息压缩.ts');
 const { 编译本人见证正文 } = require('../../src/人妻公寓/脚本/游戏逻辑/微信可知正文.ts');
@@ -163,7 +165,7 @@ test('SQLite 摘要只有获得确认后才压缩原始消息；后台待确认�
   assert.doesNotMatch(摘要源, /if \(写入结果\)[\s\S]{0,240}压缩微信会话记录/);
 });
 
-test('三条生成路径共用同一知识边界，摘要确认成功后才按48/60条安全压缩', () => {
+test('三条生成路径共用同一知识边界，摘要确认成功后才按400条安全压缩', () => {
   assert.doesNotMatch(交互源, /function 最近正文\(/);
   assert.match(交互源, /读取私聊记忆上下文/);
   assert.match(节拍源, /读取私聊记忆上下文/);
@@ -171,8 +173,8 @@ test('三条生成路径共用同一知识边界，摘要确认成功后才按48
   assert.match(记忆源, /相关剧情连续性（未证明本人知情）/);
   assert.match(记忆源, /除非条目本身明确写出她亲历、获告知或作出回应，否则不得让她说出、追问或据此行动/);
   assert.match(摘要源, /export function 排队刷新群聊进展摘要/);
-  assert.match(摘要源, /私聊原始消息上限\s*=\s*48/);
-  assert.match(摘要源, /群聊原始消息上限\s*=\s*60/);
+  assert.match(摘要源, /私聊原始消息上限\s*=\s*400/);
+  assert.match(摘要源, /群聊原始消息上限\s*=\s*400/);
   assert.match(摘要源, /写入结果 === '已确认'[\s\S]{0,240}压缩微信会话记录/);
   assert.match(数据源, /图池容量\s*=\s*私聊图库清单/);
   assert.match(数据源, /图片轮换保护\.has\(消息\)/);

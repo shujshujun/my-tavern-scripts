@@ -18,7 +18,7 @@ function 载入摘要纯函数() {
   assert.notEqual(起, -1);
   assert.notEqual(止, -1);
   const ts片段 = `${数据库源.slice(起, 止)}
-module.exports = { 规范玩家行动, 保守回合摘要, 脚本保守回合摘要, 判断结果摘要为正文, 规范事件摘要, 提取回合事件摘要, 迁移官方纪要表内容, 迁移游戏记忆表时间列, 规范旧数据库时间文本 };`;
+module.exports = { 规范玩家行动, 保守回合摘要, 脚本保守回合摘要, 判断结果摘要为正文, 规范事件摘要, 提取回合事件摘要, 摘要按句收口, 数据库事件摘要为脚本兜底, 迁移官方纪要表内容, 迁移游戏记忆表时间列, 规范旧数据库时间文本 };`;
   const js = ts.transpileModule(ts片段, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText;
@@ -56,6 +56,7 @@ test('聊天模板固定为五张有用记忆表，七张默认硬状态/选项�
   assert.equal(取('纪要表').updateConfig.sendLatestRows, undefined);
   assert.match(取('RQ_剧情事件').sourceData.note, /游戏脚本按同一正式AI楼精确写入/);
   assert.match(取('RQ_剧情事件').sourceData.note, /填表AI不得插入、更新或删除/);
+  assert.match(取('RQ_剧情事件').sourceData.note, /结果摘要写1～3句、最多120字/);
   assert.match(取('RQ_剧情事件').sourceData.updateNode, /禁止/);
   assert.match(取('RQ_剧情事件').sourceData.insertNode, /禁止插入/);
   assert.match(取('纪要表').sourceData.initNode, /本批处理范围/);
@@ -115,7 +116,7 @@ test('spv8.9.1 模板导入不会再把“事件”和社交“游戏时间”�
   assert.equal(new Set(当前候选).size, 当前候选.length, '当前模板不得再被数据库插件预检拒绝');
 });
 
-test('摘要边界拒绝正文截断、多块、漏块和超限值，合规短摘要保持原样', () => {
+test('摘要边界拒绝正文截断、漏块和无法收口的超长值；写长了的按句末收口', () => {
   const {
     规范玩家行动,
     保守回合摘要,
@@ -123,28 +124,64 @@ test('摘要边界拒绝正文截断、多块、漏块和超限值，合规短�
     判断结果摘要为正文,
     规范事件摘要,
     提取回合事件摘要,
+    摘要按句收口,
+    数据库事件摘要为脚本兜底,
   } = 载入摘要纯函数();
-  assert.equal(规范玩家行动('行'.repeat(50)), '行'.repeat(40));
+  assert.equal(规范玩家行动('行'.repeat(90)), '行'.repeat(80));
   assert.equal(
     提取回合事件摘要('正文。\n<rq_event_summary>玩家修好101室水管</rq_event_summary>'),
     '玩家修好101室水管',
   );
   assert.equal(提取回合事件摘要('正文。<rq_event_summary>未闭合'), null);
+  // 模型偶尔连输两块（先草稿后定稿）：取最后一块，而不是整块判废落回兜底句。
   assert.equal(
     提取回合事件摘要(
       '正文。<rq_event_summary>第一条</rq_event_summary><rq_event_summary>第二条</rq_event_summary>',
     ),
-    null,
+    '第二条',
   );
-  assert.equal(提取回合事件摘要(`正文。<rq_event_summary>${'长'.repeat(61)}</rq_event_summary>`), null);
-  assert.equal(判断结果摘要为正文('长'.repeat(61)), true);
-  assert.equal(规范事件摘要('长'.repeat(61), '去收租'), 脚本保守回合摘要('去收租'));
+  // 摘要块内换行不再判废，压成单行后继续走长度与收口规则。
+  assert.equal(
+    提取回合事件摘要('正文。<rq_event_summary>玩家修好水管。\n夏乔留他吃饭。</rq_event_summary>'),
+    '玩家修好水管。 夏乔留他吃饭。',
+  );
+
+  // 新上限 120 字：过去 61 字就被丢弃的摘要现在完整保留。
+  const 一百字摘要 = `${'甲'.repeat(99)}。`;
+  assert.equal(Array.from(一百字摘要).length, 100);
+  assert.equal(提取回合事件摘要(`正文。<rq_event_summary>${一百字摘要}</rq_event_summary>`), 一百字摘要);
+  assert.equal(判断结果摘要为正文(一百字摘要), false);
+  assert.equal(规范事件摘要(一百字摘要, '去收租'), 一百字摘要);
+
+  // 超过 120 字但仍在可收口范围内：截到上限内最后一个完整句子，不硬切、不判废。
+  // 第 1 句 60 字（含句号），第 2 句会跨过 120 字上限，因此只保留第 1 句。
+  const 可收口 = `${'甲'.repeat(59)}。${'乙'.repeat(80)}。`;
+  assert.ok(Array.from(可收口).length > 120);
+  assert.equal(摘要按句收口(可收口), `${'甲'.repeat(59)}。`);
+  assert.equal(规范事件摘要(可收口, '去收租'), `${'甲'.repeat(59)}。`);
+  // 上限内恰好能放下两句时，两句都保留（收口只丢放不下的部分）。
+  const 两句刚好 = `${'甲'.repeat(59)}。${'乙'.repeat(59)}。${'丙'.repeat(59)}。`;
+  assert.equal(摘要按句收口(两句刚好), `${'甲'.repeat(59)}。${'乙'.repeat(59)}。`);
+
+  // 上限内没有任何完整句子：不允许在句中硬切，落回兜底句。
+  assert.equal(摘要按句收口(`${'甲'.repeat(200)}。`), '');
+  assert.equal(规范事件摘要(`${'甲'.repeat(200)}。`, '去收租'), 脚本保守回合摘要('去收租'));
+
+  // 长到超过可收口上限（120*3）：视为模型把正文塞进摘要块，一律判废。
+  assert.equal(判断结果摘要为正文('长'.repeat(361)), true);
+  assert.equal(提取回合事件摘要(`正文。<rq_event_summary>${'长'.repeat(361)}</rq_event_summary>`), null);
+  assert.equal(规范事件摘要('长'.repeat(361), '去收租'), 脚本保守回合摘要('去收租'));
+
   assert.equal(规范事件摘要('夏乔交付房租并提到停水。', '去收租'), '夏乔交付房租并提到停水。');
   assert.equal(规范事件摘要('', '去收租'), 脚本保守回合摘要('去收租'));
   assert.doesNotMatch(规范事件摘要('', '去收租'), /待数据库AI整理|本轮结果未取得可靠摘要/);
   assert.equal(规范事件摘要(脚本保守回合摘要('去收租'), '去收租'), 脚本保守回合摘要('去收租'));
   assert.match(保守回合摘要('去收租'), /玩家尝试「去收租」；本轮结果未取得可靠摘要/);
-  assert.ok(Array.from(保守回合摘要('行'.repeat(80))).length <= 60);
+  assert.ok(Array.from(保守回合摘要('行'.repeat(200))).length <= 120);
+
+  // 兜底句可被识别，据此允许同楼真摘要覆盖它；真摘要不得被误判为兜底。
+  assert.equal(数据库事件摘要为脚本兜底(脚本保守回合摘要('去收租')), true);
+  assert.equal(数据库事件摘要为脚本兜底('夏乔交付房租并提到停水。'), false);
 });
 
 test('旧 RQ 事件只有半截时段时明确标记第几天未知，不能根据消息楼伪造日期', () => {
@@ -392,9 +429,43 @@ test('剧情事件 UPSERT 经 spv8.9.2 重绑定到物理表后仍可执行，�
       '数据库 AI 已完成的可靠摘要',
       '重复写硬骨架不得覆盖数据库 AI 已完成摘要',
     );
+
+    // 兜底句（模型漏块时写入）没有任何剧情内容：同楼后来拿到真摘要时必须能覆盖它，
+    // 否则一次漏块就把该行永久钉死成“该楼正文已完成”。
+    const 兜底 = '玩家执行：去收租；该楼正文已完成，具体结果以对应楼层为准';
+    db.prepare('UPDATE rqjuqingshijian SET result_summary = ? WHERE floor_no = 12').run(兜底);
+    upsert.run(12, '第2天 深夜', '102室', '沈静仪', '去收租', '夏乔交了房租，并抱怨厨房下水返味。', 'RQ-12');
+    assert.equal(
+      db.prepare('SELECT result_summary FROM rqjuqingshijian WHERE floor_no = 12').get().result_summary,
+      '夏乔交了房租，并抱怨厨房下水返味。',
+      '真摘要必须能覆盖脚本兜底句',
+    );
+    // 反向不成立：已有真摘要时，后来的兜底句不得把它冲掉。
+    upsert.run(12, '第2天 深夜', '102室', '沈静仪', '去收租', 兜底, 'RQ-12');
+    assert.equal(
+      db.prepare('SELECT result_summary FROM rqjuqingshijian WHERE floor_no = 12').get().result_summary,
+      '夏乔交了房租，并抱怨厨房下水返味。',
+      '兜底句不得覆盖已有真摘要',
+    );
   } finally {
     db.close();
   }
+
+  // UPSERT 的 CASE 分支不能用占位符，只能内联字面量；它必须与导出常量逐字一致。
+  const 标记 = 数据库源.match(/export const 脚本保守摘要标记 = '([^']+)';/);
+  assert.ok(标记, '数据库桥必须导出脚本兜底摘要标记');
+  assert.ok(
+    match[1].includes(`'%${标记[1]}%'`),
+    'UPSERT 内联的兜底摘要字面量必须与 脚本保守摘要标记 完全一致',
+  );
+
+  // 需核对回读分支：本次带来真摘要而库里仍是兜底句时不得判为已确认，
+  // 否则一次未生效的覆盖会被当成写入成功，兜底句永久留下。
+  assert.match(
+    数据库源,
+    /本次是兜底 \|\| !数据库事件摘要为脚本兜底\(库中摘要\)/u,
+    '同步回合的需核对回读必须区分兜底句与真摘要',
+  );
 });
 
 test('剧情事件结构自检只对唯一识别的真实物理表执行 ALTER，并回读确认', () => {

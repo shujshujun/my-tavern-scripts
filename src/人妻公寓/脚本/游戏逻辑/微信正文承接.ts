@@ -1,4 +1,5 @@
 import { 胶囊预算选择 } from './胶囊预算';
+import { 折叠检测文本, 规范可读文本 } from './记忆文本规范';
 
 export interface 微信承接消息 {
   楼: number;
@@ -16,25 +17,23 @@ export interface 微信承接人物 {
   人物: string;
 }
 
-const 最大每人消息数 = 6;
+const 最大每人消息数 = 16;
 /** 与可见消息150汉字门配套，额外容纳标点、emoji与少量非汉字内容。 */
 const 最大消息长度 = 300;
-const 最大胶囊长度 = 1200;
+const 最大胶囊长度 = 4000;
 const 近期时段跨度 = 12;
 const 指令式内容 =
   /(?:忽略|无视|覆盖|绕过|泄露).{0,16}(?:系统|上文|之前|此前|规则|指令|提示词)|(?:system|developer|assistant|prompt|instruction)\s*[:：]?|(?:必须|务必).{0,16}(?:输出|回复|表现|提及)|(?:下一轮|下次回复|正文中|每轮).{0,16}(?:写|说|提|表现|输出|回复)|\b(?:ignore|obey|respond|output|roleplay)\b/i;
 
 function 清洗聊天文本(value: unknown): string {
-  if (typeof value !== 'string') return '';
-  const text = value
-    .normalize('NFKC')
+  const 去结构 = String(value ?? '')
     .replace(/```[\s\S]*?```/g, ' ')
     .replace(/<[^>]*>/g, ' ')
     .replace(/\{\{|\}\}/g, ' ')
-    .replace(/[\r\n\t]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  if (!text || 指令式内容.test(text)) return '';
+    .replace(/[\r\n\t]+/g, ' ');
+  // 保存与注入用未折叠原文，避免中文全角标点被 NFKC 压成半角；指令检测走折叠副本。
+  const text = 规范可读文本(去结构);
+  if (!text || 指令式内容.test(折叠检测文本(text))) return '';
   return text.slice(0, 最大消息长度);
 }
 

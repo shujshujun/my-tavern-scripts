@@ -1,0 +1,65 @@
+/* eslint-disable import-x/no-nodejs-modules -- Node-only release contract test */
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import test from 'node:test';
+
+import { 客户端构建版本标记, 校验发布版本一致, 校验客户端构建版本 } from '../../src/人妻公寓/发布版本门禁.mjs';
+
+const require = createRequire(import.meta.url);
+const ts = require('typescript');
+const 读 = 路径 => readFileSync(new URL(`../../${路径}`, import.meta.url), 'utf8');
+
+function 载入TypeScript(路径) {
+  const js = ts.transpileModule(读(路径), {
+    compilerOptions: { esModuleInterop: true, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const module = { exports: {} };
+  Function('require', 'module', 'exports', js)(require, module, module.exports);
+  return module.exports;
+}
+
+test('v0.90.4 发布统一版本、标签、兼容范围与客户端构建标记', () => {
+  const 依赖版本源 = 读('src/人妻公寓/脚本/游戏逻辑/依赖版本.ts');
+  const 首次准备源 = 读('src/人妻公寓/界面/客户端/components/首次准备.vue');
+  const 组卡源 = 读('src/人妻公寓/组卡.mjs');
+  const 发布说明 = 读('src/人妻公寓/发布说明_v0.90.4_2026-08-28.md');
+  assert.match(依赖版本源, /当前游戏版本 = '0\.90\.4'/);
+  assert.match(依赖版本源, /游戏版本构建标记 = `RQGY_GAME_VERSION:\$\{当前游戏版本\}`/);
+  assert.match(首次准备源, /游戏版本构建标记/);
+  assert.match(首次准备源, /:data-game-build="游戏版本构建标记"/);
+  assert.match(组卡源, /const 版本 = '0\.90\.4'/);
+  assert.match(组卡源, /const TAG = 'rq0\.90\.4'/);
+  assert.match(组卡源, /支持继承 v0\.80～v0\.90\.3 存档/);
+  assert.match(组卡源, /校验发布版本一致\(\{ 版本, 标签: TAG \}\)/);
+  assert.match(组卡源, /校验客户端构建版本\(readFileSync\(客户端构建路径, 'utf8'\), 版本\)/);
+  assert.match(发布说明, /发布分支：`release\/rq0904`/);
+  assert.match(发布说明, /发布标签：`rq0\.90\.4`/);
+  assert.match(发布说明, /丈夫结局阶段接线尚未更新，不属于 v0\.90\.4 已完成功能/);
+});
+
+test('0.90～0.90.3 玩家都能检测到 0.90.4；同版不重复提示', () => {
+  const { 比较稳定版本 } = 载入TypeScript('src/人妻公寓/脚本/游戏逻辑/依赖版本.ts');
+  const 首次准备源 = 读('src/人妻公寓/界面/客户端/components/首次准备.vue');
+  for (const 旧版 of ['0.90', '0.90.1', '0.90.2', '0.90.3']) {
+    assert.equal(比较稳定版本(旧版, '0.90.4'), '当前较旧', `${旧版} 必须显示 0.90.4 更新提示`);
+  }
+  assert.equal(比较稳定版本('0.90.4', '0.90.4'), '相同');
+  assert.match(首次准备源, /if \(游戏版本关系\.value === '当前较旧'\) \{\s*更新项\.push/);
+  assert.doesNotMatch(首次准备源, /游戏版本关系\.value === '相同'[\s\S]{0,120}更新项\.push/);
+});
+
+test('v0.90.4 组卡门禁拒绝旧客户端、缺失标记、多版本混包和标签不一致', () => {
+  const 当前标记 = 客户端构建版本标记('0.90.4');
+  assert.equal(当前标记, 'RQGY_GAME_VERSION:0.90.4');
+  assert.equal(校验发布版本一致({ 版本: '0.90.4', 标签: 'rq0.90.4' }), 当前标记);
+  assert.equal(校验客户端构建版本(`<script>${当前标记}</script>`, '0.90.4'), 当前标记);
+
+  assert.throws(() => 校验发布版本一致({ 版本: '0.90.4', 标签: 'rq0.90.3' }), /标签.*不一致/);
+  assert.throws(() => 校验客户端构建版本('<script>RQGY_GAME_VERSION:0.90.3</script>', '0.90.4'), /客户端构建版本不一致/);
+  assert.throws(() => 校验客户端构建版本('<script>没有版本标记</script>', '0.90.4'), /未找到构建标记/);
+  assert.throws(
+    () => 校验客户端构建版本('<script>RQGY_GAME_VERSION:0.90.3 RQGY_GAME_VERSION:0.90.4</script>', '0.90.4'),
+    /客户端构建版本不一致/,
+  );
+});
