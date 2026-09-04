@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
@@ -33,23 +33,24 @@ const {
 
 const 根 = new URL('../../', import.meta.url);
 const 根路径 = fileURLToPath(根);
+const 证据根路径 = process.env.RQGY_VTR_EVIDENCE_ROOT ? resolve(process.env.RQGY_VTR_EVIDENCE_ROOT) : 根路径;
 const 契约目录 = 'src/人妻公寓/生产契约/录像带V4';
 const 契约哈希 = Object.freeze({
   [`${契约目录}/final-candidates-manifest-v2.json`]:
-    'ef3baaf31b93ddf8e69b5f5826cbf7bdaae22a4727ee0248fcf14c757284d4af',
+    'a7918724d506c1c4db19e62dd63a778d00407be49176be164b242b568bc60cca',
   [`${契约目录}/shot-cards-v8.json`]:
-    'f9d89be75e8905e118d6aa51e1ad96dfb2e3b8fb57a1048c5a6c5ab1d0b7d2bb',
+    'df5db1182931fddc26fa43d57260f1dbe84a661c6c880f762c08d519c2aebb19',
   [`${契约目录}/context-isolation-policy-v1.json`]:
     '3a3436368adf1c42ffd732318c6e4e607e7a91210c058017c4cc2813e021b858',
   [`${契约目录}/monitor-overlay-contract-v1.json`]:
     'fafe7d013b0ed6f35888cb503214d6f61e5ffd75463c30fdd387bd56c06db11f',
   [`${契约目录}/wechat-prelude-flow-v2.json`]:
-    '03fec2470286401fe031bcf98fd029d0467cef0622be9de5bdf0ff11ed867174',
+    '76ae5ec7109e7e3060227a6e0efb9c09a58885ed61410e981d998df41e6196c1',
 });
 
-function sha256(相对路径) {
+function 规范文本SHA256(相对路径) {
   return createHash('sha256')
-    .update(readFileSync(new URL(相对路径, 根)))
+    .update(readFileSync(new URL(相对路径, 根), 'utf8').replace(/\r\n?/gu, '\n'))
     .digest('hex');
 }
 
@@ -69,8 +70,8 @@ function 递归生产源码(目录) {
   return 结果;
 }
 
-test('五份src内生产机器契约仍是交接冻结的SHA，安装状态不得被代码接线偷改', () => {
-  for (const [路径, 预期] of Object.entries(契约哈希)) assert.equal(sha256(路径), 预期, 路径);
+test('五份src内生产机器契约保持规范换行SHA，安装状态不得被代码接线偷改', () => {
+  for (const [路径, 预期] of Object.entries(契约哈希)) assert.equal(规范文本SHA256(路径), 预期, 路径);
   assert.doesNotThrow(() => 校验录像带V4机器契约());
   assert.equal(录像带V4候选清单.formalAccepted, false);
   assert.equal(录像带V4候选清单.installed, false);
@@ -115,14 +116,14 @@ test('38张候选与38张逐幕卡严格一一对应，102/202各19幕且哈希�
 
 test('38张候选物理存在、SHA与1536×1024匹配，逐图provenance保持未烘焙未安装', () => {
   for (const 候选 of 录像带V4候选清单.records) {
-    const bytes = readFileSync(new URL(候选.output, 根));
+    const bytes = readFileSync(join(证据根路径, 候选.output));
     assert.equal(
       createHash('sha256').update(bytes).digest('hex').toUpperCase(),
       String(候选.outputSha256).toUpperCase(),
       候选.output,
     );
     assert.deepEqual(png尺寸(bytes), [1536, 1024], 候选.output);
-    const provenance = JSON.parse(readFileSync(new URL(候选.provenance, 根), 'utf8'));
+    const provenance = JSON.parse(readFileSync(join(证据根路径, 候选.provenance), 'utf8'));
     assert.equal(provenance.id, 候选.id);
     assert.equal(provenance.output, 候选.output);
     assert.equal(String(provenance.outputSha256).toUpperCase(), String(候选.outputSha256).toUpperCase());

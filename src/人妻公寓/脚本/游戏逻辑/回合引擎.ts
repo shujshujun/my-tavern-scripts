@@ -3041,12 +3041,7 @@ export async function 执行回合(
     const 回合结算后待发送基线 = newStat.系统._待发送事件;
     const 特殊场景id = 本楼事件.match(/【特殊场景·([^·】]+)/)?.[1];
     const 特殊场景 = 特殊场景id ? 查特殊场景(特殊场景id) : undefined;
-    const 录像带双承接CG = 推进特殊场景(newStat, 本楼事件) ?? [];
-    if (录像带双承接CG.length) {
-      回合提交后任务.push(() => {
-        for (const 载荷 of 录像带双承接CG) eventEmit('人妻公寓:录像带双承接CG', 载荷);
-      });
-    }
+    推进特殊场景(newStat, 本楼事件);
     if (本轮静音会议) 结算隔离脚本成长(本轮结算基准, newStat);
     if (!本轮静音会议 && 特殊场景?.接入主线 === true) {
       for (const 门牌号 of 特殊场景.参与(newStat as never)) {

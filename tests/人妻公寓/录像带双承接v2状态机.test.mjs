@@ -19,7 +19,6 @@ const {
   提交录像带双承接节点,
   提交录像带双承接剧情阶段,
   请求录像带双承接中断,
-  记录录像带双承接CG加载失败,
 } = require('../../src/人妻公寓/脚本/游戏逻辑/录像带双承接状态.ts');
 
 const 路线 = '丈夫结局:录像带双承接';
@@ -33,10 +32,7 @@ function 提交(data, 场次标识, 房间, 轨道, 序号) {
   const 结果 = 提交录像带双承接节点(data, 节点(场次标识, 房间, 轨道, 序号));
   assert.equal(结果.成功, true, 结果.提示);
   assert.equal(结果.变动, true, 结果.提示);
-  assert.equal(结果.CG?.版本, 2);
-  assert.equal(结果.CG?.房间, 房间);
-  assert.equal(结果.CG?.轨道, 轨道);
-  assert.equal(结果.CG?.序号, 序号);
+  assert.equal(结果.CG, undefined, '旧档兼容节点不得继续产生已退场视觉载荷');
   return 结果;
 }
 
@@ -67,7 +63,7 @@ test('V4一旦购买或运行，旧v2启动门与直接节点入口都拒绝并�
   assert.equal(data.系统._录像带双承接.房间['102'].已提交键.length, 0);
 });
 
-test('正式载荷严格区分 v2 两条轨道与旧无版本试播', () => {
+test('旧档节点严格区分两条兼容轨道并拒绝无版本视觉载荷', () => {
   assert.deepEqual(解析录像带双承接节点提交(节点('scene-a', '102', '平板', 10)), 节点('scene-a', '102', '平板', 10));
   assert.deepEqual(解析录像带双承接节点提交(节点('scene-a', '202', '外层', 9)), 节点('scene-a', '202', '外层', 9));
   assert.equal(解析录像带双承接节点提交({ 路线, 房间: '102', 序号: 5 }), null);
@@ -75,34 +71,24 @@ test('正式载荷严格区分 v2 两条轨道与旧无版本试播', () => {
   assert.equal(解析录像带双承接节点提交(节点('', '102', '平板', 1)), null);
 });
 
-test('六段正式剧情原子映射全部38张画面，最后一段才完成双路交接', () => {
+test('六段旧档剧情保持原子状态推进，最后一段才完成双路交接且全程无旧图', () => {
   const data = Schema.parse({});
   const 场次 = 'vtr-story-001';
   assert.equal(开始录像带双承接正式场次(data, 场次).成功, true);
 
-  const 全部CG = [];
-  for (const [房间, 阶段, 期望张数] of [
-    ['102', 1, 8],
-    ['102', 2, 6],
-    ['102', 3, 4],
-    ['202', 1, 8],
-    ['202', 2, 6],
-    ['202', 3, 6],
+  for (const [房间, 阶段] of [
+    ['102', 1],
+    ['102', 2],
+    ['102', 3],
+    ['202', 1],
+    ['202', 2],
+    ['202', 3],
   ]) {
     const 结果 = 提交录像带双承接剧情阶段(data, 场次, 房间, 阶段);
     assert.equal(结果.成功, true, 结果.提示);
-    assert.equal(结果.CG.length, 期望张数);
-    全部CG.push(...结果.CG);
+    assert.equal(结果.CG, undefined);
   }
 
-  assert.equal(全部CG.length, 38);
-  assert.equal(new Set(全部CG.map(载荷 => `${载荷.房间}:${载荷.轨道}:${载荷.序号}`)).size, 38);
-  assert.equal(全部CG.filter(载荷 => 载荷.房间 === '102').length, 19);
-  assert.equal(全部CG.filter(载荷 => 载荷.房间 === '202').length, 19);
-  assert.deepEqual(
-    全部CG.slice(-2).map(载荷 => `${载荷.房间}:${载荷.轨道}:${载荷.序号}`),
-    ['102:外层:9', '202:外层:9'],
-  );
   assert.equal(data.系统._录像带双承接.状态, '已完成');
   assert.deepEqual(data.系统._已完成特殊场景, [录像带双承接完成ID]);
 });
@@ -114,7 +100,7 @@ test('剧情批次中任一节点乱序会整批回滚，不留下已显示但�
   const 开始前 = lodash.cloneDeep(data.系统._录像带双承接);
   const 结果 = 提交录像带双承接剧情阶段(data, 场次, '102', 2);
   assert.equal(结果.成功, false);
-  assert.deepEqual(结果.CG, []);
+  assert.equal(结果.CG, undefined);
   assert.deepEqual(data.系统._录像带双承接, 开始前);
   assert.deepEqual(data.系统._已完成特殊场景, []);
 });
@@ -145,7 +131,7 @@ test('每户 19 个交错节点有头有尾，双路核验后才能分别交接�
   assert.equal(data.系统._已完成特殊场景.includes('录像带'), false, '正式完成不得伪造旧特殊场景完成事实');
 });
 
-test('乱序失败不改状态，重复事件幂等且不会重复弹图', () => {
+test('乱序失败不改状态，重复事件幂等且不会产生旧图', () => {
   const data = Schema.parse({});
   const 场次 = 'vtr-order-001';
   const 初始 = lodash.cloneDeep(data.系统._录像带双承接);
@@ -214,15 +200,10 @@ test('解锁后取消、超时或正文失败会冻结播放，强制本人复�
   }
 });
 
-test('图片失败不碰硬状态，回档恢复最近已提交硬快照而不是最后显示图', () => {
+test('回档恢复最近已提交硬快照且不依赖任何显示状态', () => {
   const data = Schema.parse({});
   const 场次 = 'vtr-render-001';
-  const 第一拍 = 提交(data, 场次, '102', '外层', 1);
-  const 图片前 = lodash.cloneDeep(data.系统._录像带双承接);
-  const 图片失败 = 记录录像带双承接CG加载失败(data, 第一拍.CG);
-  assert.equal(图片失败.变动, false);
-  assert.deepEqual(data.系统._录像带双承接, 图片前);
-
+  提交(data, 场次, '102', '外层', 1);
   提交(data, 场次, '102', '平板', 1);
   提交(data, 场次, '102', '外层', 2);
   提交(data, 场次, '102', '外层', 3);
@@ -250,27 +231,22 @@ test('旧档缺少 v2 字段会补空，正在运行或已完成的旧录像带�
   assert.deepEqual(继承.系统._录像带双承接, 基线.系统._录像带双承接);
 });
 
-test('正式路线只由特殊场景事务提交，宿主不保留无生产者平行入口，CG仍在持久化后发送', () => {
+test('旧档路线只由特殊场景事务提交，宿主与客户端不再保留旧视觉事件', () => {
   const 入口 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
   const 引擎 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/回合引擎.ts', import.meta.url), 'utf8');
   const 场景 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/特殊场景系统.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(入口, /人妻公寓:录像带双承接提交节点/u, '不可达的直接节点入口必须移除');
   assert.doesNotMatch(入口, /人妻公寓:录像带双承接中断/u, '不可达的平行中断入口必须移除');
   assert.doesNotMatch(入口, /人妻公寓:录像带双承接状态/u, '没有消费者的死刷新事件必须移除');
-  assert.match(入口, /录像带双承接正式节点由 `推进特殊场景` 在正文成功结算中原子提交/u);
+  assert.match(入口, /录像带旧档兼容节点由 `推进特殊场景` 在正文成功结算中原子提交/u);
   assert.match(场景, /开始录像带双承接正式场次\(data, 场次标识\)[\s\S]{0,220}data\.背包\.splice\(i, 1\)/u);
   assert.match(场景, /提交录像带双承接剧情阶段\(data, data\.系统\._录像带双承接\.场次标识, 房, 拍\)/u);
-  assert.match(
-    引擎,
-    /推进特殊场景\(newStat, 本楼事件\)[\s\S]{0,260}回合提交后任务\.push[\s\S]*?eventEmit\('人妻公寓:录像带双承接CG'/u,
-    '状态先写进 newStat，CG 只排入提交后任务',
-  );
+  assert.match(引擎, /推进特殊场景\(newStat, 本楼事件\)/u);
+  assert.doesNotMatch(引擎, /人妻公寓:录像带双承接CG/u);
+  assert.doesNotMatch(入口, /人妻公寓:录像带双承接CG/u);
   assert.match(
     引擎,
     /await 持久转正本轮临时楼\(\)[\s\S]*?for \(const 任务 of 回合提交后任务\)/u,
     '提交后任务必须晚于正文和变量持久转正',
   );
-  const 原生同步位置 = 入口.indexOf('await 同步原生整表视图(newData, false)');
-  const 原生CG位置 = 入口.indexOf("for (const 载荷 of 原生录像带双承接CG) eventEmit('人妻公寓:录像带双承接CG', 载荷)");
-  assert.ok(原生同步位置 >= 0 && 原生CG位置 > 原生同步位置, '原生兜底只能在整表持久同步后发送正式 CG');
 });

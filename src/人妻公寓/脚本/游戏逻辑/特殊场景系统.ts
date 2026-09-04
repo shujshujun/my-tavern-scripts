@@ -9,7 +9,6 @@ import { 取会场私聊摘要提示 } from './手机系统';
 import { 借种开场事件, 借种玩家行动许可, 推进借种开场 } from './借种结局系统';
 import { 借种开场事件标记 } from './借种结局状态';
 import { 登记脚本正增长候选 } from './冷落系统';
-import type { 录像带双承接CG正式事件载荷 } from './录像带双承接CG路由';
 import { 开始录像带双承接正式场次, 提交录像带双承接剧情阶段 } from './录像带双承接状态';
 import { 事件角色标记 } from './snapshotSystem';
 import { 特殊场景启动亲密门 } from './特殊场景策略';
@@ -616,7 +615,7 @@ export function 特殊场景玩家行动前(data: SchemaType, 当前地点?: str
   return { 成功: true, 提示: '' };
 }
 
-export function 推进特殊场景(data: SchemaType, 已演事件: string): 录像带双承接CG正式事件载荷[] | undefined {
+export function 推进特殊场景(data: SchemaType, 已演事件: string): void {
   const 场 = data.系统._特殊场景;
   if (!场.id) return;
 
@@ -777,7 +776,7 @@ export function 推进特殊场景(data: SchemaType, 已演事件: string): 录�
       }
       清空特殊场景(data);
     }
-    return 提交.CG;
+    return;
   }
 
   const 正式 = 已演事件.match(/【特殊场景·录像带·(102|202)-([123])】/);

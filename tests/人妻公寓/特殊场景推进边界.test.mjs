@@ -133,7 +133,7 @@ test('录像带只接受与当前阶段完全一致的房间和拍数', () => {
   assert.equal(data.系统._特殊场景.阶段, '102-3');
 });
 
-test('新录像带票启动独立双承接场景，六段成功正文消费38张图并完成正式结局', () => {
+test('新录像带票启动双承接兼容场景，六段正文只推进硬状态且不再返回旧CG', () => {
   const data = Schema.parse({
     户: { 102: 创建户节点(0), 202: 创建户节点(0) },
     背包: ['录像带'],
@@ -148,27 +148,23 @@ test('新录像带票启动独立双承接场景，六段成功正文消费38张
   assert.match(data.系统._录像带双承接.场次标识, /^vtr-v2:40:/u);
   assert.equal(data.背包.includes('录像带'), false);
 
-  const CG = [];
   assert.equal(通过录像带互动(data, '102').成功, true);
   for (const 拍 of [1, 2, 3]) {
-    const 结果 = 推进特殊场景(data, `【特殊场景·录像带双承接·102-${拍}】成功正文`);
-    assert.ok(结果);
-    CG.push(...结果);
+    assert.equal(推进特殊场景(data, `【特殊场景·录像带双承接·102-${拍}】成功正文`), undefined);
   }
   assert.equal(data.系统._特殊场景.阶段, '等待202');
   assert.equal(data.系统._录像带双承接.房间['102'].硬状态, 'visually-verified');
   assert.equal(data.系统._录像带双承接.房间['102'].外层序号, 8);
+  assert.equal(data.系统._录像带双承接.房间['102'].已提交键.length, 18);
 
   assert.equal(通过录像带互动(data, '202').成功, true);
   for (const 拍 of [1, 2, 3]) {
-    const 结果 = 推进特殊场景(data, `【特殊场景·录像带双承接·202-${拍}】成功正文`);
-    assert.ok(结果);
-    CG.push(...结果);
+    assert.equal(推进特殊场景(data, `【特殊场景·录像带双承接·202-${拍}】成功正文`), undefined);
   }
-  assert.equal(CG.length, 38);
-  assert.equal(new Set(CG.map(载荷 => `${载荷.房间}:${载荷.轨道}:${载荷.序号}`)).size, 38);
   assert.equal(data.系统._特殊场景.id, '');
   assert.equal(data.系统._录像带双承接.状态, '已完成');
+  assert.equal(data.系统._录像带双承接.房间['102'].已提交键.length, 19);
+  assert.equal(data.系统._录像带双承接.房间['202'].已提交键.length, 19);
   assert.equal(data.系统._已完成特殊场景.includes('录像带结局'), true);
   assert.equal(data.系统._已完成特殊场景.includes('录像带'), false);
 });

@@ -245,46 +245,6 @@ export function 许曼君离婚图片(文件: string): string {
   );
   return 基址 ? `${基址}/${文件}.webp` : '';
 }
-/**
- * 《录像带》丈夫结局的 v1 十张试播图、v2 二十张平板图与十八张外层图
- * 均独立于旧“特殊场景/录像带”三态素材。
- * 发布前保持空基址，避免请求不存在的标签；本地验收可用显式全局基址预览。
- */
-export const 录像带双承接素材发布配置 = Object.freeze({
-  路线: '丈夫结局:录像带双承接',
-  仓库: 'shujshujun/my-tavern-scripts',
-  不可变标签: 'rq0.91',
-  产品目录: 'src/人妻公寓/素材/丈夫结局/录像带',
-  状态: '待不可变标签' as '待不可变标签' | '已发布',
-});
-export const 录像带双承接待发布素材基址 =
-  `https://testingcf.jsdelivr.net/gh/${录像带双承接素材发布配置.仓库}` +
-  `@${录像带双承接素材发布配置.不可变标签}/${录像带双承接素材发布配置.产品目录}`;
-export const 录像带双承接素材基址 = String(
-  (globalThis as Record<string, unknown>).__RQGY_VTR_ENDING_ASSET_BASE__ ??
-    (录像带双承接素材发布配置.状态 === '已发布' ? 录像带双承接待发布素材基址 : ''),
-)
-  .trim()
-  .replace(/\/+$/, '');
-export const 录像带双承接平板图片 = (文件: string): string =>
-  录像带双承接素材基址 && /^SCREEN-(?:102|202)-0[1-5]$/u.test(文件) ? `${录像带双承接素材基址}/${文件}.png` : '';
-/**
- * v1 无版本五格保留根目录；v2 平板与外层分别进入版本目录。
- * 严格白名单防止事件载荷把任意相对路径拼进素材基址。
- */
-export const 录像带双承接图片 = (文件: string): string => {
-  if (!录像带双承接素材基址) return '';
-  if (/^SCREEN-(?:102|202)-0[1-5]$/u.test(文件)) return `${录像带双承接素材基址}/${文件}.png`;
-  if (/^SCREEN-V2-(?:102|202)-(?:0[1-9]|10)$/u.test(文件)) return `${录像带双承接素材基址}/v2/${文件}.png`;
-  if (
-    /^OUTER-V2-(?:102|202)-0[1-9]-(?:LOCKED|AUTHORIZATION|SELF-UNLOCK|VIEW-EARLY|VIEW-ESCALATION|SELF-COMPLETION|SELF-RELOCK|VISUAL-VERIFICATION|HANDOFF)$/u.test(
-      文件,
-    )
-  ) {
-    return `${录像带双承接素材基址}/v2/outer/${文件}.png`;
-  }
-  return '';
-};
 /** 生产／医院73张非成人图片随 v0.83 发布，与普通素材及成人CG仓隔离。 */
 export const 生产素材基址 =
   'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.83/output/imagegen/production-system/final';

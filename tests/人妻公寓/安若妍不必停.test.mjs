@@ -339,7 +339,8 @@ test('源码接线同时覆盖原生回合、固定回合、房卡、快照和�
   assert.match(app, /安若妍不必停CG队列\.value\.push\(画面\)/);
   assert.match(app, /当前家庭计划CG\.value = 安若妍不必停CG队列\.value\.shift\(\) \?\? null/);
   assert.match(app, /if \(!安若妍不必停CG覆盖普通亲密\(画面\.文件\)\) 清空当前成人CG\(\)/);
-  assert.match(app, /清空录像带双承接CG队列\(true\)/);
+  assert.match(app, /function 清空安若妍不必停CG队列\(\): void/);
+  assert.doesNotMatch(app, /录像带双承接CG队列/u, '不必停队列不得继续借用已退场录像带视觉所有者');
 
   const native = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
   const nativeBroadcaster = native.slice(native.indexOf('function 播放安若妍不必停CG'), native.indexOf('function 播放许曼君离婚CG'));

@@ -1501,7 +1501,6 @@ import {
 import { useDataStore } from './store';
 import { 创建CG加载槽位, 完成CG槽位加载, 选择CG显示槽位, 替换失败CG槽位, type CG加载槽位 } from './cgLoadState';
 import { 选择借种CG序列, type 借种CG帧 } from './借种CG序列';
-import { 解析录像带双承接CG载荷 } from './录像带双承接平板资源';
 import { 计算场景同步, type 场景聊天状态 } from './场景状态同步';
 import {
   创建正文幕归属,
@@ -1579,7 +1578,6 @@ import {
   许曼君分居图片,
   安若妍不必停图片,
   许曼君离婚图片,
-  录像带双承接图片,
   生产图片,
   借种结局图片,
   母亲视频通话CG图片,
@@ -1984,7 +1982,7 @@ async function 写场景(房间id: string | null, 破门 = false, 待提交状�
   if (旧房间 !== 房间id) {
     清空当前成人CG();
     当前家庭计划CG.value = null;
-    清空录像带双承接CG队列();
+    清空安若妍不必停CG队列();
     当前生产CG.value = null;
     清空借种CG序列();
     最近CG信号 = null;
@@ -2237,7 +2235,7 @@ function 同步场景自变量() {
       正文幕归属状态.value = 作废正文幕归属(正文幕归属状态.value);
       清空当前成人CG();
       当前家庭计划CG.value = null;
-      清空录像带双承接CG队列();
+      清空安若妍不必停CG队列();
       当前生产CG.value = null;
       当前借种CG.value = null;
       最近CG信号 = null;
@@ -2701,7 +2699,6 @@ interface 家庭计划CG载荷 {
     | '许曼君分居'
     | '安若妍不必停'
     | '许曼君离婚'
-    | '录像带双承接'
     | '不再留门';
   实例?: string;
 }
@@ -2738,25 +2735,6 @@ interface 生产CG载荷 {
   保留夏乔?: boolean;
 }
 const 当前生产CG = ref<生产CG载荷 | null>(null);
-const 录像带双承接CG队列 = ref<家庭计划CG载荷[]>([]);
-
-function 清空录像带双承接CG队列(保留不必停队列 = false): void {
-  录像带双承接CG队列.value = [];
-  if (!保留不必停队列) 清空安若妍不必停CG队列();
-}
-
-function 显示录像带双承接CG(文件: string, 标题: string): void {
-  const 载荷: 家庭计划CG载荷 = { 文件, 标题, 来源: '录像带双承接' };
-  const 已排入 = [当前家庭计划CG.value, ...录像带双承接CG队列.value].some(
-    项 => 项?.来源 === '录像带双承接' && 项.文件 === 文件,
-  );
-  if (已排入) return;
-  清空当前成人CG();
-  当前生产CG.value = null;
-  清空借种CG序列();
-  if (当前家庭计划CG.value?.来源 === '录像带双承接') 录像带双承接CG队列.value.push(载荷);
-  else 当前家庭计划CG.value = 载荷;
-}
 interface 借种CG载荷 extends 借种CG帧 {
   后续?: 借种CG帧[];
 }
@@ -2791,7 +2769,6 @@ const 当前家庭计划CG地址 = computed(() => {
   if (载荷.来源 === '许曼君分居') return 许曼君分居图片(载荷.文件);
   if (载荷.来源 === '安若妍不必停') return 安若妍不必停图片(载荷.文件);
   if (载荷.来源 === '许曼君离婚') return 许曼君离婚图片(载荷.文件);
-  if (载荷.来源 === '录像带双承接') return 录像带双承接图片(载荷.文件);
   return 家庭计划图片(载荷.文件);
 });
 const 当前事件CG请求epoch = ref(0);
@@ -2825,7 +2802,7 @@ watch(
     const 文件 = 许曼君离婚检查点CG(data.value, 当前房间.value ?? '');
     if (!文件 || !许曼君离婚图片(文件)) return;
     清空当前成人CG();
-    清空录像带双承接CG队列();
+    清空安若妍不必停CG队列();
     当前家庭计划CG.value = { 文件, 标题: 许曼君离婚CG标题(文件), 来源: '许曼君离婚' };
   },
   { immediate: true },
@@ -2850,8 +2827,6 @@ const 当前事件CG眉题 = computed(() =>
                   ? 'NO NEED TO STOP / 安若妍301'
                   : 当前家庭计划CG.value?.来源 === '许曼君离婚'
                   ? 'DIVORCE / 许曼君离婚'
-                  : 当前家庭计划CG.value?.来源 === '录像带双承接'
-                  ? 'VTR DUAL HANDOFF / 录像带双承接'
                   : 'FAMILY PLAN',
 );
 const 当前事件CG关闭文案 = computed(() =>
@@ -2876,21 +2851,12 @@ const 当前事件CG关闭文案 = computed(() =>
                     : '收起不必停画面'
                   : 当前家庭计划CG.value?.来源 === '许曼君离婚'
                   ? '收起许曼君离婚画面'
-                  : 当前家庭计划CG.value?.来源 === '录像带双承接'
-                  ? 录像带双承接CG队列.value.length
-                    ? `继续播放（剩余 ${录像带双承接CG队列.value.length} 张）`
-                    : '收起录像带双承接画面'
                   : '收起家庭计划画面',
 );
 function 关闭当前事件CG(): void {
   if (当前借种CG.value) {
     当前借种CG.value = 借种CG队列.value.shift() ?? null;
     尝试恢复待处理成人CG();
-    return;
-  }
-  if (当前家庭计划CG.value?.来源 === '录像带双承接') {
-    当前家庭计划CG.value = 录像带双承接CG队列.value.shift() ?? null;
-    if (!当前家庭计划CG.value) 尝试恢复待处理成人CG();
     return;
   }
   if (当前家庭计划CG.value?.来源 === '安若妍不必停') {
@@ -5353,7 +5319,7 @@ watch(
     清空借种CG序列();
     当前生产CG.value = null;
     当前家庭计划CG.value = null;
-    清空录像带双承接CG队列();
+    清空安若妍不必停CG队列();
   },
   { immediate: true },
 );
@@ -5446,7 +5412,7 @@ function 客户端聊天切换(): void {
   重置静音会议时间线界面();
   清空当前成人CG();
   当前家庭计划CG.value = null;
-  清空录像带双承接CG队列();
+  清空安若妍不必停CG队列();
   当前生产CG.value = null;
   清空借种CG场次瞬态();
   最近CG信号 = null;
@@ -5702,12 +5668,12 @@ onMounted(() => {
     清空当前成人CG();
     当前生产CG.value = null;
     清空借种CG序列();
-    清空录像带双承接CG队列();
+    清空安若妍不必停CG队列();
     当前家庭计划CG.value = { ...载荷, 来源: '家庭计划' };
   });
   eventOn('人妻公寓:不再留门CG', (载荷: { 文件: string; 实例: string }) => {
     if (!载荷?.文件 || !不再留门CG允许(data.value, 载荷.文件, 载荷.实例, 当前房间.value) || !不再留门图片(载荷.文件)) return;
-    清空当前成人CG(); 当前生产CG.value = null; 清空借种CG序列(); 清空录像带双承接CG队列();
+    清空当前成人CG(); 当前生产CG.value = null; 清空借种CG序列(); 清空安若妍不必停CG队列();
     当前家庭计划CG.value = { ...载荷, 标题: 不再留门CG标题(载荷.文件), 来源: '不再留门' };
   });
   eventOn('人妻公寓:第二机位CG', (载荷: 家庭计划CG载荷) => {
@@ -5715,7 +5681,7 @@ onMounted(() => {
     清空当前成人CG();
     当前生产CG.value = null;
     清空借种CG序列();
-    清空录像带双承接CG队列();
+    清空安若妍不必停CG队列();
     当前家庭计划CG.value = { ...载荷, 来源: '第二机位' };
   });
   eventOn('人妻公寓:回国CG', (载荷: 家庭计划CG载荷) => {
@@ -5723,7 +5689,7 @@ onMounted(() => {
     清空当前成人CG();
     当前生产CG.value = null;
     清空借种CG序列();
-    清空录像带双承接CG队列();
+    清空安若妍不必停CG队列();
     当前家庭计划CG.value = { ...载荷, 来源: '回国' };
   });
   eventOn('人妻公寓:双重继承CG', (载荷: 家庭计划CG载荷) => {
@@ -5731,7 +5697,7 @@ onMounted(() => {
     清空当前成人CG();
     当前生产CG.value = null;
     清空借种CG序列();
-    清空录像带双承接CG队列();
+    清空安若妍不必停CG队列();
     当前家庭计划CG.value = { ...载荷, 来源: '双重继承' };
   });
   eventOn('人妻公寓:302亲密开场CG', (载荷: 家庭计划CG载荷) => {
@@ -5739,7 +5705,7 @@ onMounted(() => {
     // 专属开场只在上层短暂覆盖；收起后继续显示同一成功首楼已选中的普通亲密CG。
     当前生产CG.value = null;
     清空借种CG序列();
-    清空录像带双承接CG队列();
+    清空安若妍不必停CG队列();
     当前家庭计划CG.value = { ...载荷, 来源: '302亲密开场' };
   });
   eventOn('人妻公寓:许曼君分居CG', (载荷: 家庭计划CG载荷) => {
@@ -5747,7 +5713,7 @@ onMounted(() => {
     清空当前成人CG();
     当前生产CG.value = null;
     清空借种CG序列();
-    清空录像带双承接CG队列();
+    清空安若妍不必停CG队列();
     当前家庭计划CG.value = { ...载荷, 来源: '许曼君分居' };
   });
   eventOn('人妻公寓:安若妍不必停CG', (载荷: 家庭计划CG载荷) => {
@@ -5761,7 +5727,6 @@ onMounted(() => {
     if (!安若妍不必停CG覆盖普通亲密(画面.文件)) 清空当前成人CG();
     当前生产CG.value = null;
     清空借种CG序列();
-    清空录像带双承接CG队列(true);
     if (当前家庭计划CG.value?.来源 === '安若妍不必停') 安若妍不必停CG队列.value.push(画面);
     else {
       清空安若妍不必停CG队列();
@@ -5773,28 +5738,23 @@ onMounted(() => {
     清空当前成人CG();
     当前生产CG.value = null;
     清空借种CG序列();
-    清空录像带双承接CG队列();
+    清空安若妍不必停CG队列();
     当前家庭计划CG.value = { ...载荷, 来源: '许曼君离婚' };
     if (/^XMJ-DIV-1[1-3]$/u.test(载荷.文件)) 触发离婚结果白闪();
-  });
-  eventOn('人妻公寓:录像带双承接CG', (载荷: unknown) => {
-    const 帧 = 解析录像带双承接CG载荷(载荷);
-    if (!帧) return;
-    显示录像带双承接CG(帧.文件, 帧.标题);
   });
   eventOn('人妻公寓:生产CG', (载荷: 生产CG载荷) => {
     if (!载荷?.文件) return;
     清空当前成人CG();
     当前家庭计划CG.value = null;
     清空借种CG序列();
-    清空录像带双承接CG队列();
+    清空安若妍不必停CG队列();
     当前生产CG.value = 载荷;
   });
   eventOn('人妻公寓:借种CG', (载荷: 借种CG载荷) => {
     if (!载荷?.文件) return;
     清空当前成人CG();
     当前家庭计划CG.value = null;
-    清空录像带双承接CG队列();
+    清空安若妍不必停CG队列();
     当前生产CG.value = null;
     显示借种CG序列([载荷, ...(载荷.后续 ?? [])]);
   });
@@ -5963,7 +5923,7 @@ onMounted(() => {
       当前家庭计划CG.value = null;
       当前生产CG.value = null;
       清空借种CG序列();
-      清空录像带双承接CG队列();
+      清空安若妍不必停CG队列();
     }
   });
   eventOn('人妻公寓:特殊场景状态', () => {
