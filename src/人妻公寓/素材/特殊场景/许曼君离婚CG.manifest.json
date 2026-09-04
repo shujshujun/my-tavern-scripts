@@ -1,0 +1,353 @@
+{
+  "schemaVersion": 1,
+  "路线": "许曼君201正式结局:离婚",
+  "产品状态": "本地产品化·待不可变标签",
+  "运行ID总数": 15,
+  "源manifest": "output/imagegen/rqgy-reset/adult-completion/xumanjun-divorce-ending/manifest-v2.json",
+  "源manifestSHA256": "2C6115E8546DF9A6C243F8F7E962BDEA5C06F42E311FBF6C730712485673AD51",
+  "源封板时间": "2026-09-04T00:00:00+08:00",
+  "转换参数": {
+    "格式": "WebP",
+    "质量": 90,
+    "方法": 4,
+    "保留尺寸": true,
+    "清除源元数据": true
+  },
+  "禁止运行时二次分镜": true,
+  "禁止生产读取": [
+    "output/imagegen/**",
+    "output/imagegen/rqgy-reset/adult-completion/xumanjun-divorce-ending/local-insets/**"
+  ],
+  "items": [
+    {
+      "运行ID": "XMJ-DIV-01",
+      "场景用途": "办理结束",
+      "分类": {
+        "人物": true,
+        "物件": true,
+        "背景": true
+      },
+      "允许长期背景": false,
+      "发布状态": "本地产品化·待不可变标签",
+      "productPreferred": false,
+      "源选择规则": "generatedArtifacts.path/sha256",
+      "最终采用源路径": "output/imagegen/rqgy-reset/adult-completion/xumanjun-divorce-ending/built-in-candidates/DIV-01_离婚_办好手续.png",
+      "最终源SHA256": "38EB863CD49A772473F684D44FB00FC73CD4A3BBA88B62D024D28A552DC32D05",
+      "产品文件路径": "src/人妻公寓/素材/特殊场景/许曼君离婚/XMJ-DIV-01.webp",
+      "产品尺寸": {
+        "宽": 1536,
+        "高": 1024
+      },
+      "产品字节数": 149318,
+      "产品SHA256": "C94841C2339D4D14F6C6958F80E77176E402C67B3BD871EED0ED39F9C615CE81"
+    },
+    {
+      "运行ID": "XMJ-DIV-02",
+      "场景用途": "旧钥匙归档",
+      "分类": {
+        "人物": true,
+        "物件": true,
+        "背景": true
+      },
+      "允许长期背景": false,
+      "发布状态": "本地产品化·待不可变标签",
+      "productPreferred": false,
+      "源选择规则": "generatedArtifacts.path/sha256",
+      "最终采用源路径": "output/imagegen/rqgy-reset/adult-completion/xumanjun-divorce-ending/built-in-candidates/DIV-02_离婚_旧钥匙归档.png",
+      "最终源SHA256": "6F19BFD23421477BC151FABEEE6DB1BA9A1E8C39C3F34CA0956518C5C1377E69",
+      "产品文件路径": "src/人妻公寓/素材/特殊场景/许曼君离婚/XMJ-DIV-02.webp",
+      "产品尺寸": {
+        "宽": 1536,
+        "高": 1024
+      },
+      "产品字节数": 171570,
+      "产品SHA256": "056CBB37B70EE92610A055F043E24BE927F2095105D8F54C334F58B7B0EFCBC2"
+    },
+    {
+      "运行ID": "XMJ-DIV-03",
+      "场景用途": "换锁交新钥匙",
+      "分类": {
+        "人物": true,
+        "物件": true,
+        "背景": true
+      },
+      "允许长期背景": false,
+      "发布状态": "本地产品化·待不可变标签",
+      "productPreferred": false,
+      "源选择规则": "generatedArtifacts.path/sha256",
+      "最终采用源路径": "output/imagegen/rqgy-reset/adult-completion/xumanjun-divorce-ending/built-in-candidates/DIV-03_离婚_换锁交新钥匙.png",
+      "最终源SHA256": "3A4BDDC7F0F92DDF5D944F1BFDCD170FFE96D363132253456F56CC51B707F0EA",
+      "产品文件路径": "src/人妻公寓/素材/特殊场景/许曼君离婚/XMJ-DIV-03.webp",
+      "产品尺寸": {
+        "宽": 1536,
+        "高": 1024
+      },
+      "产品字节数": 117744,
+      "产品SHA256": "C49A3421902C79F9278FA3EC368776F14E106FF0A62926F4831EB9AA00CFDC6C"
+    },
+    {
+      "运行ID": "XMJ-DIV-04",
+      "场景用途": "离婚后201白天背景",
+      "分类": {
+        "人物": false,
+        "物件": false,
+        "背景": true
+      },
+      "允许长期背景": true,
+      "发布状态": "本地产品化·待不可变标签",
+      "productPreferred": false,
+      "源选择规则": "generatedArtifacts.path/sha256",
+      "最终采用源路径": "output/imagegen/rqgy-reset/adult-completion/xumanjun-divorce-ending/built-in-candidates/DIV-04_201_离婚后_白天.png",
+      "最终源SHA256": "E3AECCC2EDA3F267410AAF4D86F9593081DF42F7B8CD63CB782B215FB9182F99",
+      "产品文件路径": "src/人妻公寓/素材/特殊场景/许曼君离婚/XMJ-DIV-04.webp",
+      "产品尺寸": {
+        "宽": 1536,
+        "高": 1024
+      },
+      "产品字节数": 156490,
+      "产品SHA256": "3B12744A258D7BBD8562113AD47B0064FF26E62E5935FF90D7D20D2393943D47"
+    },
+    {
+      "运行ID": "XMJ-DIV-05",
+      "场景用途": "离婚后201夜晚背景",
+      "分类": {
+        "人物": false,
+        "物件": false,
+        "背景": true
+      },
+      "允许长期背景": true,
+      "发布状态": "本地产品化·待不可变标签",
+      "productPreferred": false,
+      "源选择规则": "generatedArtifacts.path/sha256",
+      "最终采用源路径": "output/imagegen/rqgy-reset/adult-completion/xumanjun-divorce-ending/built-in-candidates/DIV-05_201_离婚后_夜晚.png",
+      "最终源SHA256": "9DCF4BF0ECAAE6FA84CA6D73EB53F5D0536E5CE7BD44E041E9F45C32AAC822DC",
+      "产品文件路径": "src/人妻公寓/素材/特殊场景/许曼君离婚/XMJ-DIV-05.webp",
+      "产品尺寸": {
+        "宽": 1536,
+        "高": 1024
+      },
+      "产品字节数": 144918,
+      "产品SHA256": "D37FE66A8B22E68220FB109BDACFC8BE9904B591ED504A2471CFF692137A5F57"
+    },
+    {
+      "运行ID": "XMJ-DIV-06",
+      "场景用途": "H1婚纱开门",
+      "分类": {
+        "人物": true,
+        "物件": true,
+        "背景": true
+      },
+      "允许长期背景": false,
+      "发布状态": "本地产品化·待不可变标签",
+      "productPreferred": false,
+      "源选择规则": "generatedArtifacts.path/sha256",
+      "最终采用源路径": "output/imagegen/rqgy-reset/adult-completion/xumanjun-divorce-ending/built-in-candidates/DIV-06_离婚_H1_婚纱开门.png",
+      "最终源SHA256": "233D2870715A99FB0835B64BEC27B5CF452F87C71B5C8CF1E8ADFEF48959669B",
+      "产品文件路径": "src/人妻公寓/素材/特殊场景/许曼君离婚/XMJ-DIV-06.webp",
+      "产品尺寸": {
+        "宽": 1536,
+        "高": 1024
+      },
+      "产品字节数": 144134,
+      "产品SHA256": "082BADC5CB9F0A8C720D5A5BFFE22FD61600B048E189235C421DAAE3C7E5E735"
+    },
+    {
+      "运行ID": "XMJ-DIV-07",
+      "场景用途": "H2选择桌",
+      "分类": {
+        "人物": true,
+        "物件": true,
+        "背景": true
+      },
+      "允许长期背景": false,
+      "发布状态": "本地产品化·待不可变标签",
+      "productPreferred": false,
+      "源选择规则": "generatedArtifacts.path/sha256",
+      "最终采用源路径": "output/imagegen/rqgy-reset/adult-completion/xumanjun-divorce-ending/built-in-candidates/DIV-07_离婚_H2_选择桌.png",
+      "最终源SHA256": "D699BFB249106AD3D6C24DBA6BFC3D280ACF819BA9C8B465A5C0DFDC32CCEE08",
+      "产品文件路径": "src/人妻公寓/素材/特殊场景/许曼君离婚/XMJ-DIV-07.webp",
+      "产品尺寸": {
+        "宽": 1536,
+        "高": 1024
+      },
+      "产品字节数": 179514,
+      "产品SHA256": "0B7466C418AC05E447A0DAC4FDAC205E89855462A7D79C6BE7C61D094A29A473"
+    },
+    {
+      "运行ID": "XMJ-DIV-08",
+      "场景用途": "H7红本干净目标",
+      "分类": {
+        "人物": true,
+        "物件": true,
+        "背景": true
+      },
+      "允许长期背景": false,
+      "发布状态": "本地产品化·待不可变标签",
+      "productPreferred": false,
+      "源选择规则": "generatedArtifacts.path/sha256",
+      "最终采用源路径": "output/imagegen/rqgy-reset/adult-completion/xumanjun-divorce-ending/built-in-candidates/DIV-08_离婚_红本_干净目标底图.png",
+      "最终源SHA256": "D1EF4E4F7B8E42D02AAA4B3D4D36F219FAA89D2414A0814AA9CB78991D9A8991",
+      "产品文件路径": "src/人妻公寓/素材/特殊场景/许曼君离婚/XMJ-DIV-08.webp",
+      "产品尺寸": {
+        "宽": 1536,
+        "高": 1024
+      },
+      "产品字节数": 170974,
+      "产品SHA256": "0CB15219A8F44D50CC7FCDD41135552E57EE2730EF7FD9F70533E7863376EABD"
+    },
+    {
+      "运行ID": "XMJ-DIV-09",
+      "场景用途": "H7婚戒干净目标",
+      "分类": {
+        "人物": true,
+        "物件": true,
+        "背景": true
+      },
+      "允许长期背景": false,
+      "发布状态": "本地产品化·待不可变标签",
+      "productPreferred": false,
+      "源选择规则": "generatedArtifacts.path/sha256",
+      "最终采用源路径": "output/imagegen/rqgy-reset/adult-completion/xumanjun-divorce-ending/built-in-candidates/DIV-09_离婚_婚戒_干净目标底图.png",
+      "最终源SHA256": "B4D9ACC23E2B5278979B77D58E4105B9478531C0930F62C1C72219707707D422",
+      "产品文件路径": "src/人妻公寓/素材/特殊场景/许曼君离婚/XMJ-DIV-09.webp",
+      "产品尺寸": {
+        "宽": 1536,
+        "高": 1024
+      },
+      "产品字节数": 115468,
+      "产品SHA256": "7F5B9E6BF997486E0B19FD782ED5495FBD97432B9070BFDD94CF90E83677E48F"
+    },
+    {
+      "运行ID": "XMJ-DIV-10",
+      "场景用途": "H7戒印干净目标",
+      "分类": {
+        "人物": true,
+        "物件": true,
+        "背景": true
+      },
+      "允许长期背景": false,
+      "发布状态": "本地产品化·待不可变标签",
+      "productPreferred": false,
+      "源选择规则": "generatedArtifacts.path/sha256",
+      "最终采用源路径": "output/imagegen/rqgy-reset/adult-completion/xumanjun-divorce-ending/built-in-candidates/DIV-10_离婚_戒印_干净目标底图.png",
+      "最终源SHA256": "A06FFE6FFDF1A7AB3BF40996E7388A770CAF7F4AB1A77F1C03A8D41A1D7C9C90",
+      "产品文件路径": "src/人妻公寓/素材/特殊场景/许曼君离婚/XMJ-DIV-10.webp",
+      "产品尺寸": {
+        "宽": 1536,
+        "高": 1024
+      },
+      "产品字节数": 180596,
+      "产品SHA256": "321D864B9F95FC02D258FA76B32DE2B8A99C7293C73B69096C7D17E1F084E079"
+    },
+    {
+      "运行ID": "XMJ-DIV-11",
+      "场景用途": "H8红本右下分镜展示版",
+      "分类": {
+        "人物": true,
+        "物件": true,
+        "背景": true
+      },
+      "允许长期背景": false,
+      "发布状态": "本地产品化·待不可变标签",
+      "productPreferred": true,
+      "源选择规则": "generatedArtifacts.presentationPath/presentationSha256",
+      "最终采用源路径": "output/imagegen/rqgy-reset/adult-completion/xumanjun-divorce-ending/presentation-with-inset/DIV-11_离婚_红本_结果_右下阴茎分镜.png",
+      "最终源SHA256": "80FFCC4FBA142899E156A135D36EA124E430E83334715266DDF4956AE01B69BE",
+      "产品文件路径": "src/人妻公寓/素材/特殊场景/许曼君离婚/XMJ-DIV-11.webp",
+      "产品尺寸": {
+        "宽": 1536,
+        "高": 1024
+      },
+      "产品字节数": 147742,
+      "产品SHA256": "7FB70BB9A15753B39A27BCDC250008523481943E2DCF54CAF798A639CB38DE58"
+    },
+    {
+      "运行ID": "XMJ-DIV-12",
+      "场景用途": "H8婚戒右下分镜展示版",
+      "分类": {
+        "人物": true,
+        "物件": true,
+        "背景": true
+      },
+      "允许长期背景": false,
+      "发布状态": "本地产品化·待不可变标签",
+      "productPreferred": true,
+      "源选择规则": "generatedArtifacts.presentationPath/presentationSha256",
+      "最终采用源路径": "output/imagegen/rqgy-reset/adult-completion/xumanjun-divorce-ending/presentation-with-inset/DIV-12_离婚_婚戒_结果_右下阴茎分镜.png",
+      "最终源SHA256": "47853B03100AC97424F2A40281BDE7A19C8AD1B1ADFAFB5A40CE0CDC204BB6DF",
+      "产品文件路径": "src/人妻公寓/素材/特殊场景/许曼君离婚/XMJ-DIV-12.webp",
+      "产品尺寸": {
+        "宽": 1536,
+        "高": 1024
+      },
+      "产品字节数": 114076,
+      "产品SHA256": "6BFBAC01BA2A5FDA79E0B39D67ED77067E4618C6A9D337B19705D18F75ED2EA8"
+    },
+    {
+      "运行ID": "XMJ-DIV-13",
+      "场景用途": "H8／H9戒印右下分镜展示版",
+      "分类": {
+        "人物": true,
+        "物件": true,
+        "背景": true
+      },
+      "允许长期背景": false,
+      "发布状态": "本地产品化·待不可变标签",
+      "productPreferred": true,
+      "源选择规则": "generatedArtifacts.presentationPath/presentationSha256",
+      "最终采用源路径": "output/imagegen/rqgy-reset/adult-completion/xumanjun-divorce-ending/presentation-with-inset/DIV-13_离婚_戒印_结果_右下阴茎分镜.png",
+      "最终源SHA256": "02F3BE4B28D04BBDED6EBD58CB4C0657A15D7FF6195554FB2BA58D560A101A6A",
+      "产品文件路径": "src/人妻公寓/素材/特殊场景/许曼君离婚/XMJ-DIV-13.webp",
+      "产品尺寸": {
+        "宽": 1536,
+        "高": 1024
+      },
+      "产品字节数": 170972,
+      "产品SHA256": "5539AEE167C97006B948C48E77444EF50A4D1001253748C7FD0D246C65319752"
+    },
+    {
+      "运行ID": "XMJ-DIV-14",
+      "场景用途": "H9她亲手封盒",
+      "分类": {
+        "人物": true,
+        "物件": true,
+        "背景": true
+      },
+      "允许长期背景": false,
+      "发布状态": "本地产品化·待不可变标签",
+      "productPreferred": false,
+      "源选择规则": "generatedArtifacts.path/sha256",
+      "最终采用源路径": "output/imagegen/rqgy-reset/adult-completion/xumanjun-divorce-ending/built-in-candidates/DIV-14_离婚_H9_她亲手封盒.png",
+      "最终源SHA256": "18625401164D2ADDE8F2978977BF013C61D43CDF964BA522DB98C01745FF5E94",
+      "产品文件路径": "src/人妻公寓/素材/特殊场景/许曼君离婚/XMJ-DIV-14.webp",
+      "产品尺寸": {
+        "宽": 1536,
+        "高": 1024
+      },
+      "产品字节数": 163862,
+      "产品SHA256": "983C18E9FE0FF5BA2D741208A3F5BF61B9823E3FB8A4178FB5506507D0C2D767"
+    },
+    {
+      "运行ID": "XMJ-DIV-15",
+      "场景用途": "真实次晨",
+      "分类": {
+        "人物": true,
+        "物件": false,
+        "背景": true
+      },
+      "允许长期背景": false,
+      "发布状态": "本地产品化·待不可变标签",
+      "productPreferred": false,
+      "源选择规则": "generatedArtifacts.path/sha256",
+      "最终采用源路径": "output/imagegen/rqgy-reset/adult-completion/xumanjun-divorce-ending/built-in-candidates/DIV-15_离婚_次晨_不用再看出车表.png",
+      "最终源SHA256": "976953705FBE70F32E4B7D47079BEA4D652D6B3CE3D8D4A15DF5061FC87B1CD7",
+      "产品文件路径": "src/人妻公寓/素材/特殊场景/许曼君离婚/XMJ-DIV-15.webp",
+      "产品尺寸": {
+        "宽": 1536,
+        "高": 1024
+      },
+      "产品字节数": 185902,
+      "产品SHA256": "F468571503003A35530C188DB54F9AFBA52D256385692F3EE0F9AD3D5D6CEB1C"
+    }
+  ]
+}

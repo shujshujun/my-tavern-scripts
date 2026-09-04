@@ -1,0 +1,194 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "scripts/build-rqgy-mother-line-assets.py",
+  "runtimeCount": 20,
+  "productRoot": "src/人妻公寓/素材/特殊场景",
+  "publishTarget": {
+    "repository": "shujshujun/my-tavern-scripts",
+    "nextImmutableTag": "rq0.91",
+    "path": "src/人妻公寓/素材/特殊场景",
+    "status": "pending_immutable_tag_not_published"
+  },
+  "entries": [
+    {
+      "route": "回国",
+      "id": "回国_01_管理员室整理经营归档",
+      "productFile": "src/人妻公寓/素材/特殊场景/回国/回国_01_管理员室整理经营归档.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 281870,
+      "sha256": "ab45f5fb9ba26aee6d633dc4111ce482ee094fa124e8f67df5528ce65dbf31f2"
+    },
+    {
+      "route": "回国",
+      "id": "回国_02_302共同阅读回国消息",
+      "productFile": "src/人妻公寓/素材/特殊场景/回国/回国_02_302共同阅读回国消息.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 211284,
+      "sha256": "8bc0499372e410866d0f564e05345d7c9b5b60fe93e288fabbb69b32e7e5325d"
+    },
+    {
+      "route": "回国",
+      "id": "回国_03_302清点私人物件箱",
+      "productFile": "src/人妻公寓/素材/特殊场景/回国/回国_03_302清点私人物件箱.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 209352,
+      "sha256": "2f22859e50d4e6e305ebf67286cb3b09cfad61f6bd79ca5629cdf3d54da09f75"
+    },
+    {
+      "route": "回国",
+      "id": "回国_04_管理员室锁存私人物件箱",
+      "productFile": "src/人妻公寓/素材/特殊场景/回国/回国_04_管理员室锁存私人物件箱.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 180110,
+      "sha256": "7900e472b505fb638cbc600efd6ab28e539b432d58386c421f16328e278387be"
+    },
+    {
+      "route": "回国",
+      "id": "回国_05_母亲核对平常管理记录",
+      "productFile": "src/人妻公寓/素材/特殊场景/回国/回国_05_母亲核对平常管理记录.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 232070,
+      "sha256": "eb0f594ce2fb47ead1f84a287aef12f28daa4a0cb120bde70706acaa0a4b27aa"
+    },
+    {
+      "route": "回国",
+      "id": "回国_06_母亲加入姐妹茶话会",
+      "productFile": "src/人妻公寓/素材/特殊场景/回国/回国_06_母亲加入姐妹茶话会.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 204312,
+      "sha256": "31476c66f9201b53754b89fd53252739867833131ad8d02519cbc978ade11f09"
+    },
+    {
+      "route": "回国",
+      "id": "回国_07_大堂接待旧维修人员",
+      "productFile": "src/人妻公寓/素材/特殊场景/回国/回国_07_大堂接待旧维修人员.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 246414,
+      "sha256": "a866dcc4d641aeffb0c4640961ffbbb3e5d857db0f3e80386d2e6f63edf72c61"
+    },
+    {
+      "route": "回国",
+      "id": "回国_08_管理员室深夜夜谈",
+      "productFile": "src/人妻公寓/素材/特殊场景/回国/回国_08_管理员室深夜夜谈.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 197134,
+      "sha256": "1dccb7c6a3f70b3523fe340a00b5b56a0c089efb5dc1e819bac24d65ba29ce8e"
+    },
+    {
+      "route": "回国",
+      "id": "回国_09_302父亲会话协同回复",
+      "productFile": "src/人妻公寓/素材/特殊场景/回国/回国_09_302父亲会话协同回复.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 220368,
+      "sha256": "1e29dce76d70beae3d1b1bc94a27089f0965ca05e8b025fd7b5f7b8923e8c98b"
+    },
+    {
+      "route": "双重继承",
+      "id": "双重继承_01_公寓外部检查",
+      "productFile": "src/人妻公寓/素材/特殊场景/双重继承/双重继承_01_公寓外部检查.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 459148,
+      "sha256": "3b03a5bf195707349f29e68457c36411b15740866b62e1684a7804f931c304be"
+    },
+    {
+      "route": "双重继承",
+      "id": "双重继承_02_大堂检查",
+      "productFile": "src/人妻公寓/素材/特殊场景/双重继承/双重继承_02_大堂检查.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 198880,
+      "sha256": "05a6ba90894dab8216c335010ba3af60c2bc00932bd3a9a9d7a3d490dd6f10f4"
+    },
+    {
+      "route": "双重继承",
+      "id": "双重继承_03_信箱区检查",
+      "productFile": "src/人妻公寓/素材/特殊场景/双重继承/双重继承_03_信箱区检查.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 170948,
+      "sha256": "c10ae6a7fca3e5e54b236de7c17feb5610c216a813e50944996a943e068c2c2f"
+    },
+    {
+      "route": "双重继承",
+      "id": "双重继承_04_楼梯间检查",
+      "productFile": "src/人妻公寓/素材/特殊场景/双重继承/双重继承_04_楼梯间检查.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 184862,
+      "sha256": "05c21326dd8ab9e4908ca8c87c0aff3dbf0c2327c2994c46732461a26262cbe1"
+    },
+    {
+      "route": "双重继承",
+      "id": "双重继承_05_垃圾房检查",
+      "productFile": "src/人妻公寓/素材/特殊场景/双重继承/双重继承_05_垃圾房检查.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 232718,
+      "sha256": "14b242eb10249f016d5ebaeaafec4a43cb2ec68a3cca66a3cbf57ec34fd87c69"
+    },
+    {
+      "route": "双重继承",
+      "id": "双重继承_06_公共洗手间检查",
+      "productFile": "src/人妻公寓/素材/特殊场景/双重继承/双重继承_06_公共洗手间检查.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 190800,
+      "sha256": "cfd2345f2ed9d0cb2b0000d36a5cb95d41217c0822e866bf1b2f6a28a21ff0b0"
+    },
+    {
+      "route": "双重继承",
+      "id": "双重继承_07_健身房检查",
+      "productFile": "src/人妻公寓/素材/特殊场景/双重继承/双重继承_07_健身房检查.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 396188,
+      "sha256": "a93dcbf38c5c63675cd94709bcdd221e45e204eec2152640d43fe7989326046a"
+    },
+    {
+      "route": "双重继承",
+      "id": "双重继承_08_天台检查",
+      "productFile": "src/人妻公寓/素材/特殊场景/双重继承/双重继承_08_天台检查.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 340766,
+      "sha256": "807ed8d4fa3bdd36ec453a0a2fb2f86c4326029a5cb745d03ae7b1baaa95e4cd"
+    },
+    {
+      "route": "双重继承",
+      "id": "双重继承_09_管理员室完全交权",
+      "productFile": "src/人妻公寓/素材/特殊场景/双重继承/双重继承_09_管理员室完全交权.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 260194,
+      "sha256": "660e9b3e0a490f46d585e9e32e9accb28959998bd5a70cfcd662f7011ed865f3"
+    },
+    {
+      "route": "双重继承",
+      "id": "双重继承_10_父亲交出公寓楼总钥匙",
+      "productFile": "src/人妻公寓/素材/特殊场景/双重继承/双重继承_10_父亲交出公寓楼总钥匙.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 225680,
+      "sha256": "bdd31eb0d0505ae337b99b648e6b6ebb930bf839a13e07bd1c4d8c690caef6a3"
+    },
+    {
+      "route": "双重继承",
+      "id": "双重继承_11_302三人早餐",
+      "productFile": "src/人妻公寓/素材/特殊场景/双重继承/双重继承_11_302三人早餐.webp",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 278684,
+      "sha256": "bd71409ad49540ce36ef9a9d940362edf8d5c219e5e389e77816b3deb1dcceb1"
+    }
+  ]
+}
