@@ -1,4 +1,4 @@
-import { 安若妍结局后亲密可用, 安若妍换掉地点动作, type 安若妍换掉动作ID } from '../../../脚本/游戏逻辑/安若妍换掉系统';
+import { 安若妍结局后亲密可用, 安若妍换掉地点动作, 安若妍换掉等待硬操作, type 安若妍换掉动作ID } from '../../../脚本/游戏逻辑/安若妍换掉系统';
 /**
  * 房内动作生成器（App A6b 从 App.vue 等价外移）。
  *
@@ -205,7 +205,7 @@ export function useRoomActions(options: 房间动作选项) {
         动作.push({ kicker: a.kicker, icon: a.icon, 文案: a.文案, 禁用: !a.可执行, 提示: a.原因,
           做: () => { if (!发送中.value && 当前房间.value === id && a.可执行) 事件.安若妍换掉动作(a.id); } });
       }
-      if (['待P1', '待P2', '待换照'].includes(data.value.系统._安若妍换掉.阶段)) return 动作;
+      if (安若妍换掉等待硬操作(data.value)) return 动作;
     }
     添加管理任务动作(动作, id);
     添加家庭计划动作(动作, id);

@@ -1379,6 +1379,7 @@
 
 <script setup lang="ts">
 import { 安若妍换掉图片, 安若妍换掉背景文件, 安若妍换掉CG覆盖普通场次, 安若妍换掉CG占位图 } from '../../脚本/游戏逻辑/安若妍换掉资源';
+import { 安若妍换掉等待硬操作 } from '../../脚本/游戏逻辑/安若妍换掉系统';
 import { 场景剧情楼道, 读取场景剧情状态, 读取队首场景剧情 } from '../../脚本/游戏逻辑/场景剧情事务';
 import { 是入住登场事件 } from '../../脚本/游戏逻辑/入住触发门';
 import type { SchemaType } from '../../schema';
@@ -1844,7 +1845,7 @@ const 资源详情 = computed(() => {
 const 当前房间 = ref<string | null>(null);
 // 保留既有301前台决策接线，同时覆盖《换掉》的两次拍照和最终换照。
 const 安若妍H7决策中 = computed(() => 当前房间.value === '301' && (
-  安若妍H7等待决定.value || ['待P1', '待P2', '待换照'].includes(data.value.系统._安若妍换掉.阶段)
+  安若妍H7等待决定.value || 安若妍换掉等待硬操作(data.value)
 ));
 const 显示地图 = ref(false);
 /** A6a:地图/房卡迁入 components/地图.vue 后,独立事件结果经此公开接口翻出(组件内守 open+房卡)。 */

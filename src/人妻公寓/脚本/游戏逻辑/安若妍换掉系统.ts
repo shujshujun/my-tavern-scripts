@@ -3,7 +3,7 @@ import { 当前时段, 取绝对时段, 妻位置推算 } from './楼层时钟';
 import { 阶段性癖已完成 } from './阶段性癖状态';
 import { 读取医院内容策略 } from './生产系统';
 import { 应使用怀孕CG } from './怀孕系统';
-import { 拼接待发送事件队列, 读取待发送事件队列, 有普通场景剧情阻塞 } from './场景剧情事务';
+import { 拼接待发送事件队列, 读取待发送事件队列, 有普通场景剧情阻塞, 清空场景剧情事务 } from './场景剧情事务';
 
 export const 安若妍换掉商品ID = '角色路线:301:结局剧情';
 export const 安若妍拍立得ID = '301拍立得套装';
@@ -39,7 +39,6 @@ export function 安若妍结局后亲密可用(data: SchemaType, 地点: string)
   return (
     地点 === '301' &&
     已完成(data) &&
-    前置成立(data) &&
     !外部阻断(data) &&
     妻位置推算('301', 取绝对时段(data), data.户['301']) === '301' &&
     data.系统._性爱场景.状态 === '空闲' &&
@@ -79,18 +78,46 @@ const 场景标题: Record<安若妍换掉场景, string> = {
 };
 // 固定拍提供当前动作、数值结算边界和末帧；状态机按持久票提交完成凭据。
 const 场景任务: Record<安若妍换掉场景, string> = {
-  A1: '安若妍望向301客厅旧结婚照，提出请江辰拍一张新照片并换进原相框。末帧是把相机采购要求交给玩家；相机尚未买回，江辰尚未获通知。',
+  A1: '安若妍望向301客厅旧结婚照，提出请江辰为她与玩家拍摄亲密合照并换进原相框。末帧是把相机采购要求交给玩家；相机尚未买回，江辰尚未获通知。',
   B1: '玩家交付拍立得套装；安若妍检查电池与相纸并完成一次试机。末帧是可用的相机放在桌上；本拍不通知江辰。',
   B2: '安若妍与江辰约定次日晚间回301。末帧是玩家准备去管理员室登记；尚未完成登记，江辰尚未到场。',
   C1: '江辰按登记时间进入301客厅，看到旧结婚照、桌上的拍立得以及等候的两人。末帧是他的目光落到相机上；他尚未接过相机。',
   C2: '安若妍将拍立得交给江辰，请他为两人拍照。末帧是江辰拿稳相机；尚未按快门。',
-  H1: '两人来到镜头前，江辰举好拍立得；本拍完成开场并把下一步交给玩家。场次从零进度开始，拍照和收尾由后续步骤处理。',
+  H1: '安若妍将玩家带到镜头前，江辰举好拍立得；本拍完成亲密开场并把下一步交给玩家。场次从零进度开始，拍照和收尾由后续步骤处理。',
   P1: '本拍暂停普通数值结算，保持同一场次和当前现场状态。两人面对镜头调整姿势，江辰按一次快门；末帧停在第一张相纸吐出，第二次拍摄留待后续步骤。',
   P2: '本拍暂停普通数值结算，保持同一场次和当前现场状态。两人望向镜头一起做鬼脸，江辰按一次快门；末帧停在最终相纸吐出，换照和群消息留待后续步骤。',
   H10: '场次已经结束。只呈现整理后等待最终相纸显影，末帧是安若妍拿起照片准备去客厅。不要重演收尾、进入客厅或换照。',
   H11: '只完成三人回到301客厅的转场。安若妍把新照片拿到旧相框旁比较，末帧转头看向江辰；尚未询问或换照。',
   H12: '安若妍询问是否可以更换客厅照片，江辰简短同意；最后将动作交给玩家。末帧旧结婚照仍在原相框内。玩家尚未换照，结局尚未完成。',
 };
+function 构造换掉剧情事件(场景: 安若妍换掉场景, 票: string): string {
+  const 夫在场 = !['A1', 'B1', 'B2'].includes(场景);
+  const 演员 = `【事件在场妻:301】${夫在场 ? '【事件在场夫:301】' : '【事件关联夫:301】'}`;
+  return `【${提交标记}:${场景}:${票}】${演员}换掉 · ${场景标题[场景]}。${场景任务[场景]}本楼只有这一拍，不合并后续阶段。`;
+}
+
+/** 启动或回档时更新尚未完成的本线票文案，原事务元数据和提交标识保持不变。 */
+export function 同步安若妍换掉当前剧情票(data: SchemaType): boolean {
+  const 路线 = data.系统._安若妍换掉;
+  if (已完成(data) || 路线.阶段 !== '固定剧情中' || !路线.当前场景 || !路线.当前票) return false;
+  const 标记 = `【${提交标记}:${路线.当前场景}:${路线.当前票}】`;
+  const 当前内容 = 构造换掉剧情事件(路线.当前场景, 路线.当前票);
+  let changed = false;
+  const 更新 = (content: string): string => {
+    const start = content.indexOf(标记);
+    if (start < 0) return content;
+    const next = content.slice(0, start) + 当前内容;
+    if (next !== content) changed = true;
+    return next;
+  };
+  const queue = 读取待发送事件队列(data.系统._待发送事件);
+  const nextQueue = queue.map(更新);
+  if (nextQueue.some((item, index) => item !== queue[index])) data.系统._待发送事件 = 拼接待发送事件队列(nextQueue);
+  data.系统._场景剧情事务.内容 = 更新(data.系统._场景剧情事务.内容);
+  data.系统._已注入事件.内容 = 更新(data.系统._已注入事件.内容);
+  return changed;
+}
+
 const 动作配置: Record<安若妍换掉动作ID, { 地点: string; 阶段: 状态['阶段']; 文案: string; 场景?: 安若妍换掉场景 }> = {
   使用换掉: { 地点: '301', 阶段: '已购买', 文案: '使用「安若妍 · 换掉」', 场景: 'A1' },
   购买拍立得: { 地点: '公寓外部', 阶段: '待购买拍立得', 文案: '去摄影器材店购买拍立得' },
@@ -146,6 +173,9 @@ function 同一天(a: number, b: number): boolean {
 }
 function 是暂停场景(场景: string): boolean {
   return 场景 === 'P1' || 场景 === 'P2';
+}
+function 当前步骤需要绑定(路线: 状态): boolean {
+  return 亲密阶段.has(路线.阶段) || (路线.阶段 === '固定剧情中' && 是暂停场景(路线.当前场景));
 }
 
 export function 安若妍换掉商店已上架(data: SchemaType): boolean {
@@ -205,7 +235,7 @@ export function 绑定安若妍换掉亲密场次(data: SchemaType): boolean {
 }
 export function 安若妍换掉接管普通收尾(data: SchemaType): boolean {
   const 路线 = data.系统._安若妍换掉;
-  if (!路线.绑定亲密场次标识) return false;
+  if (!安若妍换掉真实亲密已绑定(data)) return false;
   const 项 = data.系统._性爱场景.参与者['301'];
   return !(
     安若妍换掉真实亲密已绑定(data) &&
@@ -219,12 +249,14 @@ export function 安若妍换掉接管普通收尾(data: SchemaType): boolean {
 }
 export function 安若妍换掉普通回合阻断原因(data: SchemaType, 本楼事件: unknown): string {
   const 路线 = data.系统._安若妍换掉;
-  if (!路线.绑定亲密场次标识 || 解析安若妍换掉剧情事件(本楼事件)) return '';
+  if (!安若妍换掉真实亲密已绑定(data) || 解析安若妍换掉剧情事件(本楼事件)) return '';
   return ['待P1', '待P2', '固定剧情中'].includes(路线.阶段) ? '请先完成当前拍照动作，再继续同一场次。' : '';
 }
 
 function 重排夜晚(data: SchemaType, 原因: string): void {
   const 路线 = data.系统._安若妍换掉;
+  const 活动 = data.系统._场景剧情事务;
+  if (活动.id && 解析安若妍换掉剧情事件(活动.内容)) 清空场景剧情事务(data);
   data.系统._待发送事件 = 拼接待发送事件队列(
     读取待发送事件队列(data.系统._待发送事件).filter(event => !event.includes(`【${提交标记}:`)),
   );
@@ -248,12 +280,15 @@ function 重排夜晚(data: SchemaType, 原因: string): void {
   const 夫 = data.户['301']?.夫;
   if (夫) Object.assign(夫, { _居住模式: '提前通知', _预约回楼起: -1, _预约回楼至: -1, 状态: '外出' });
 }
-export function 同步安若妍换掉时间节点(data: SchemaType): void {
+export function 恢复安若妍换掉失效亲密检查点(data: SchemaType): boolean {
   const 路线 = data.系统._安若妍换掉;
-  if (路线.绑定亲密场次标识 && !安若妍换掉真实亲密已绑定(data)) {
-    重排夜晚(data, '本次绑定场次已经失效；套装与试机记录保留，请等待重新预约。');
-    return;
-  }
+  if (已完成(data) || !当前步骤需要绑定(路线) || 安若妍换掉真实亲密已绑定(data)) return false;
+  重排夜晚(data, '本次绑定场次已经失效；套装与试机记录保留，请等待重新预约。');
+  return true;
+}
+export function 同步安若妍换掉时间节点(data: SchemaType): void {
+  if (已完成(data) || 恢复安若妍换掉失效亲密检查点(data)) return;
+  const 路线 = data.系统._安若妍换掉;
   const 当前 = 取绝对时段(data);
   if (
     路线.阶段 === '等待预约夜' &&
@@ -345,9 +380,7 @@ export function 执行安若妍换掉地点动作(
   路线.当前票 = `${encodeURIComponent(路线.实例)}-${路线.轮次}`;
   路线.当前场景 = 配置.场景;
   路线.阶段 = '固定剧情中';
-  const 夫在场 = ['A1', 'B1', 'B2'].includes(配置.场景) ? '' : '301';
-  const 演员 = `【事件在场妻:301】${夫在场 ? '【事件在场夫:301】' : '【事件关联夫:301】'}`;
-  const 事件 = `【${提交标记}:${配置.场景}:${路线.当前票}】${演员}换掉 · ${场景标题[配置.场景]}。${场景任务[配置.场景]}本楼只有这一拍，不合并后续阶段。`;
+  const 事件 = 构造换掉剧情事件(配置.场景, 路线.当前票);
   return { 成功: true, 变动: true, 提示: 场景标题[配置.场景], 事件 };
 }
 
@@ -480,9 +513,15 @@ export function 结算安若妍换掉亲密收尾(data: SchemaType, result: Sche
 }
 export function 安若妍换掉时间动作阻断原因(data: SchemaType): string {
   const 路线 = data.系统._安若妍换掉;
+  if (已完成(data) || (当前步骤需要绑定(路线) && !安若妍换掉真实亲密已绑定(data))) return '';
   return 夜间阶段.has(路线.阶段) || (路线.阶段 === '固定剧情中' && 路线.江辰已到场)
     ? '《换掉》的预约夜正在301连续进行，请先完成当前流程。'
     : '';
+}
+export function 安若妍换掉等待硬操作(data: SchemaType): boolean {
+  if (已完成(data)) return false;
+  const 阶段 = data.系统._安若妍换掉.阶段;
+  return 阶段 === '待换照' || (['待P1', '待P2'].includes(阶段) && 安若妍换掉真实亲密已绑定(data));
 }
 export function 安若妍换掉剧情演员错误(value: unknown, 妻: readonly string[], 夫: readonly string[]): string {
   const 票 = 解析安若妍换掉剧情事件(value);
