@@ -272,10 +272,10 @@ test('借种是可见但由家庭计划硬门锁定的真实商品，完成前�
   assert.equal(data.背包.filter(id => id === 借种场景ID).length, 1);
 });
 
-test('已实现承接替代占位，102和202共同使用唯一录像带商品', () => {
+test('已实现承接替代操作性占位，301只在不必停完成后保留正式结局占位', () => {
   const 其他门牌 = ['102', '201', '202', '301', '302'];
   const 其他占位 = Object.values(角色剧情占位表).filter(x => x.门牌 !== '101');
-  assert.equal(其他占位.length, 2);
+  assert.equal(其他占位.length, 1);
   assert.deepEqual(
     其他占位
       .filter(x => x.门牌 === '102')
@@ -297,7 +297,7 @@ test('已实现承接替代占位，102和202共同使用唯一录像带商品',
         .filter(x => x.门牌 === 门牌号)
         .map(x => x.类型)
         .sort(),
-      ['操作性剧情', '结局剧情'],
+      ['结局剧情'],
     );
   }
   assert.deepEqual(
@@ -323,9 +323,13 @@ test('已实现承接替代占位，102和202共同使用唯一录像带商品',
   data.系统._摄像头布设['102'] = true;
   data.系统._已完成特殊场景.push('肉偿账本');
 
-  const 上架商品 = 取货架(data).flatMap(x => x.商品);
-  const 上架占位 = 上架商品.filter(x => x.剧情占位);
-  assert.equal(上架占位.length, 2);
+  let 上架商品 = 取货架(data).flatMap(x => x.商品);
+  let 上架占位 = 上架商品.filter(x => x.剧情占位);
+  assert.equal(上架占位.length, 0, '301正式结局占位必须等待《不必停》完成');
+  assert.ok(
+    上架商品.some(x => x.id === '角色路线:301:操作性剧情' && !x.剧情占位 && x.价格 === 680),
+    '301真实《不必停》商品应替代旧操作性剧情占位',
+  );
   assert.ok(上架商品.some(x => x.id === '不再留门'), '202使用真实承接剧情商品');
   assert.ok(
     上架商品.some(x => x.id === '第二机位'),
@@ -339,12 +343,17 @@ test('已实现承接替代占位，102和202共同使用唯一录像带商品',
     上架商品.some(x => x.id === '公寓经营归档册'),
     '302真实承接商品应替代旧操作性剧情占位',
   );
+  data.系统._安若妍不必停.阶段 = '已完成';
+  data.系统._已完成特殊场景.push('不必停');
+  上架商品 = 取货架(data).flatMap(x => x.商品);
+  上架占位 = 上架商品.filter(x => x.剧情占位);
+  assert.equal(上架占位.length, 1);
+  assert.equal(上架占位[0].id, '角色路线:301:结局剧情');
+
   for (const 商品 of 上架占位) {
     assert.equal(角色剧情占位已上架(data, 商品.id), true);
     const 锁定 = 角色剧情占位锁定原因(商品.id).join('；');
-    if (商品.剧情占位.类型 === '操作性剧情') assert.equal(锁定, '');
-    else if (商品.剧情占位.门牌 === '102') assert.match(锁定, /第二机位.*周小满/);
-    else assert.match(锁定, /先完成.*操作性剧情.*待设计/);
+    assert.match(锁定, /先完成安若妍承接线《不必停》/);
 
     const 前现金 = data.现金;
     const 前背包 = [...data.背包];

@@ -296,14 +296,16 @@ test('Schema、schema.json与initvar为《离婚》提供同一组最小v9默认
   for (const key of Object.keys(expected)) assert.match(block, new RegExp(`${key}:`));
 });
 
-test('201结局占位升级为售价1500的真实商品，301两个占位保持不变', () => {
+test('201结局与301操作性剧情升级为真实商品，只保留301正式结局占位', () => {
   assert.equal(舞台.查角色剧情占位(离婚.许曼君离婚场景ID), undefined);
   assert.equal(舞台.道具表[离婚.许曼君离婚商品ID].名称, '许曼君 · 离婚');
   assert.equal(舞台.道具表[离婚.许曼君离婚商品ID].价格, 1500);
   assert.equal(舞台.道具表[离婚.许曼君离婚商品ID].类别, '特殊场景');
-  assert.equal(舞台.查角色剧情占位('角色路线:301:操作性剧情').门牌, '301');
+  assert.equal(舞台.查角色剧情占位('角色路线:301:操作性剧情'), undefined);
+  assert.equal(舞台.道具表['角色路线:301:操作性剧情'].名称, '安若妍 · 不必停');
+  assert.equal(舞台.道具表['角色路线:301:操作性剧情'].价格, 680);
   assert.equal(舞台.查角色剧情占位('角色路线:301:结局剧情').门牌, '301');
-  assert.equal(Object.keys(舞台.角色剧情占位表).length, 2);
+  assert.equal(Object.keys(舞台.角色剧情占位表).length, 1);
 });
 
 test('《分居》完整事实与待离婚交接钥匙是商店上架硬门', () => {

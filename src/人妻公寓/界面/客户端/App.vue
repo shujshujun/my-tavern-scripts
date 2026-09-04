@@ -1577,6 +1577,7 @@ import {
   回国图片,
   双重继承图片,
   许曼君分居图片,
+  安若妍不必停图片,
   许曼君离婚图片,
   录像带双承接图片,
   生产图片,
@@ -2698,12 +2699,21 @@ interface 家庭计划CG载荷 {
     | '双重继承'
     | '302亲密开场'
     | '许曼君分居'
+    | '安若妍不必停'
     | '许曼君离婚'
     | '录像带双承接'
     | '不再留门';
   实例?: string;
 }
 const 当前家庭计划CG = ref<家庭计划CG载荷 | null>(null);
+const 安若妍不必停CG队列 = ref<家庭计划CG载荷[]>([]);
+const 安若妍不必停亲密遮挡CG = /^(?:ARY-NBS-0[78]|ARY-NBS-09-[NP]|ARY-NBS-10-[NP]|ARY-NBS-1[12])$/u;
+function 安若妍不必停CG覆盖普通亲密(文件: string): boolean {
+  return 安若妍不必停亲密遮挡CG.test(文件);
+}
+function 清空安若妍不必停CG队列(): void {
+  安若妍不必停CG队列.value = [];
+}
 const 离婚结果白闪 = ref(false);
 let 离婚结果白闪timer: ReturnType<typeof setTimeout> | undefined;
 let 离婚结果白闪帧: number | undefined;
@@ -2730,8 +2740,9 @@ interface 生产CG载荷 {
 const 当前生产CG = ref<生产CG载荷 | null>(null);
 const 录像带双承接CG队列 = ref<家庭计划CG载荷[]>([]);
 
-function 清空录像带双承接CG队列(): void {
+function 清空录像带双承接CG队列(保留不必停队列 = false): void {
   录像带双承接CG队列.value = [];
+  if (!保留不必停队列) 清空安若妍不必停CG队列();
 }
 
 function 显示录像带双承接CG(文件: string, 标题: string): void {
@@ -2778,6 +2789,7 @@ const 当前家庭计划CG地址 = computed(() => {
   if (载荷.来源 === '双重继承') return 双重继承图片(载荷.文件);
   if (载荷.来源 === '302亲密开场') return 共居302亲密开场图(载荷.文件);
   if (载荷.来源 === '许曼君分居') return 许曼君分居图片(载荷.文件);
+  if (载荷.来源 === '安若妍不必停') return 安若妍不必停图片(载荷.文件);
   if (载荷.来源 === '许曼君离婚') return 许曼君离婚图片(载荷.文件);
   if (载荷.来源 === '录像带双承接') return 录像带双承接图片(载荷.文件);
   return 家庭计划图片(载荷.文件);
@@ -2834,7 +2846,9 @@ const 当前事件CG眉题 = computed(() =>
               ? 'POST-ENDING INTIMACY / 302'
               : 当前家庭计划CG.value?.来源 === '许曼君分居'
                 ? 'SEPARATION / 许曼君分居'
-                : 当前家庭计划CG.value?.来源 === '许曼君离婚'
+                : 当前家庭计划CG.value?.来源 === '安若妍不必停'
+                  ? 'NO NEED TO STOP / 安若妍301'
+                  : 当前家庭计划CG.value?.来源 === '许曼君离婚'
                   ? 'DIVORCE / 许曼君离婚'
                   : 当前家庭计划CG.value?.来源 === '录像带双承接'
                   ? 'VTR DUAL HANDOFF / 录像带双承接'
@@ -2856,7 +2870,11 @@ const 当前事件CG关闭文案 = computed(() =>
               ? '进入亲密场景'
               : 当前家庭计划CG.value?.来源 === '许曼君分居'
                 ? '收起许曼君分居画面'
-                : 当前家庭计划CG.value?.来源 === '许曼君离婚'
+                : 当前家庭计划CG.value?.来源 === '安若妍不必停'
+                  ? 安若妍不必停CG队列.value.length
+                    ? `继续播放（剩余 ${安若妍不必停CG队列.value.length} 张）`
+                    : '收起不必停画面'
+                  : 当前家庭计划CG.value?.来源 === '许曼君离婚'
                   ? '收起许曼君离婚画面'
                   : 当前家庭计划CG.value?.来源 === '录像带双承接'
                   ? 录像带双承接CG队列.value.length
@@ -2872,6 +2890,11 @@ function 关闭当前事件CG(): void {
   }
   if (当前家庭计划CG.value?.来源 === '录像带双承接') {
     当前家庭计划CG.value = 录像带双承接CG队列.value.shift() ?? null;
+    if (!当前家庭计划CG.value) 尝试恢复待处理成人CG();
+    return;
+  }
+  if (当前家庭计划CG.value?.来源 === '安若妍不必停') {
+    当前家庭计划CG.value = 安若妍不必停CG队列.value.shift() ?? null;
     if (!当前家庭计划CG.value) 尝试恢复待处理成人CG();
     return;
   }
@@ -3521,6 +3544,7 @@ const { 房间动作, 当前房间动作, 普通房间动作, 确认已到达动
     家庭计划动作: (动作: 家庭计划地点动作ID) => void 提交界面事务(() => eventEmit('人妻公寓:家庭计划动作', 动作)),
     第二机位动作: 动作 => void 提交界面事务(() => eventEmit('人妻公寓:第二机位动作', 动作)),
     不再留门动作: 动作 => 请求不再留门动作(动作),
+    安若妍不必停动作: 动作 => void 提交界面事务(() => eventEmit('人妻公寓:安若妍不必停动作', 动作)),
     许曼君分居动作: 动作 => void 提交界面事务(() => eventEmit('人妻公寓:许曼君分居动作', 动作)),
     许曼君离婚动作: (动作: 许曼君离婚动作ID) =>
       void 提交界面事务(() => eventEmit('人妻公寓:许曼君离婚动作', 动作)),
@@ -5725,6 +5749,24 @@ onMounted(() => {
     清空借种CG序列();
     清空录像带双承接CG队列();
     当前家庭计划CG.value = { ...载荷, 来源: '许曼君分居' };
+  });
+  eventOn('人妻公寓:安若妍不必停CG', (载荷: 家庭计划CG载荷) => {
+    if (!载荷?.文件 || !安若妍不必停图片(载荷.文件)) return;
+    const 画面: 家庭计划CG载荷 = { ...载荷, 来源: '安若妍不必停' };
+    const 已排入 = [当前家庭计划CG.value, ...安若妍不必停CG队列.value].some(
+      项 => 项?.来源 === '安若妍不必停' && 项.文件 === 画面.文件,
+    );
+    if (已排入) return;
+    // H6—H9只在上层遮挡普通亲密CG；关闭最后一帧后必须恢复遮挡期间最新的普通画面。
+    if (!安若妍不必停CG覆盖普通亲密(画面.文件)) 清空当前成人CG();
+    当前生产CG.value = null;
+    清空借种CG序列();
+    清空录像带双承接CG队列(true);
+    if (当前家庭计划CG.value?.来源 === '安若妍不必停') 安若妍不必停CG队列.value.push(画面);
+    else {
+      清空安若妍不必停CG队列();
+      当前家庭计划CG.value = 画面;
+    }
   });
   eventOn('人妻公寓:许曼君离婚CG', (载荷: 家庭计划CG载荷) => {
     if (!载荷?.文件 || !许曼君离婚图片(载荷.文件)) return;
