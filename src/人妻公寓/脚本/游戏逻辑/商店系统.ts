@@ -1,4 +1,5 @@
 import type { SchemaType } from '../../schema';
+import { 安若妍换掉商品ID, 安若妍换掉商店已上架, 购买安若妍换掉 } from './安若妍换掉系统';
 import type { 门牌 } from '../../stageConfig';
 import { 不再留门任务ID, 不再留门套件ID } from '../../不再留门契约';
 import { 不再留门购买阻断, 不再留门套件可购买, 购买不再留门物件 } from './不再留门系统';
@@ -165,6 +166,7 @@ export function 取货架(data: SchemaType): { 页签: string; 商品: (typeof �
     if (!基础可见) return false;
     if (d.id === 许曼君分居任务ID) return 分居可见;
     if (d.id === 安若妍不必停商品ID) return 安若妍不必停商店已上架(data);
+    if (d.id === 安若妍换掉商品ID) return 安若妍换掉商店已上架(data);
     if (d.id === 许曼君离婚商品ID) return 许曼君离婚商店已上架(data);
     if (d.id === 第二机位任务ID) return 第二机位任务已上架(data);
     if (d.id === 第二机位套件ID) return 第二机位套件已上架(data);
@@ -215,6 +217,7 @@ export function 取货架(data: SchemaType): { 页签: string; 商品: (typeof �
 // ============================================
 
 export function 购买(data: SchemaType, 道具id: string): 商店结果 {
+  if (道具id === 安若妍换掉商品ID) return 购买安若妍换掉(data);
   const 配 = 查道具(道具id);
   if (!配) return { 成功: false, 提示: '货架上没有这件东西。' };
   // 权限必须由脚本端复核。否则旧版界面、第三方主题或手工 eventEmit 可以绕过

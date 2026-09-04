@@ -24,8 +24,8 @@ test('监控、静音会议散会与301 H7进入硬前台决策，但普通行�
 
 test('301 H7只保留继续／暂缓，手机强制展开并阻止普通输入、地图和惩罚性离场', () => {
   assert.match(App源码, /const 安若妍H7等待决定 = computed\(/);
-  assert.match(App源码, /const 安若妍H7决策中 = computed\(\(\) => 安若妍H7等待决定\.value && 当前房间\.value === '301'\)/);
-  assert.match(App源码, /const 可输入 = computed\(\(\) => \{\s*if \(安若妍H7等待决定\.value\) return false;/);
+  assert.match(App源码, /const 安若妍H7决策中 = computed\(\(\) => 当前房间\.value === '301' && \(\s*安若妍H7等待决定\.value \|\| \['待P1', '待P2', '待换照'\]/);
+  assert.match(App源码, /const 可输入 = computed\(\(\) => \{\s*if \(安若妍H7决策中\.value\) return false;/);
   assert.match(App源码, /async function 进入[\s\S]{0,220}if \(安若妍H7决策中\.value && 房间id !== '301'\)/);
   assert.match(App源码, /async function 离开房间[\s\S]{0,180}if \(安若妍H7决策中\.value\)/);
   assert.match(App源码, /:forced-open="安若妍H7决策中 && !场景操作锁"/);

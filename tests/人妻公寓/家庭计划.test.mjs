@@ -272,10 +272,10 @@ test('借种是可见但由家庭计划硬门锁定的真实商品，完成前�
   assert.equal(data.背包.filter(id => id === 借种场景ID).length, 1);
 });
 
-test('已实现承接替代操作性占位，301只在不必停完成后保留正式结局占位', () => {
+test('已实现路线替代占位，301完整承接事实成立后上架换掉', () => {
   const 其他门牌 = ['102', '201', '202', '301', '302'];
   const 其他占位 = Object.values(角色剧情占位表).filter(x => x.门牌 !== '101');
-  assert.equal(其他占位.length, 1);
+  assert.equal(其他占位.length, 0);
   assert.deepEqual(
     其他占位
       .filter(x => x.门牌 === '102')
@@ -297,7 +297,7 @@ test('已实现承接替代操作性占位，301只在不必停完成后保留�
         .filter(x => x.门牌 === 门牌号)
         .map(x => x.类型)
         .sort(),
-      ['结局剧情'],
+      [],
     );
   }
   assert.deepEqual(
@@ -343,12 +343,12 @@ test('已实现承接替代操作性占位，301只在不必停完成后保留�
     上架商品.some(x => x.id === '公寓经营归档册'),
     '302真实承接商品应替代旧操作性剧情占位',
   );
-  data.系统._安若妍不必停.阶段 = '已完成';
+  Object.assign(data.系统._安若妍不必停, { 阶段: '已完成', 江辰已明确看见: true, 江辰已接受互不干涉: true, 提前通知已约定: true });
   data.系统._已完成特殊场景.push('不必停');
   上架商品 = 取货架(data).flatMap(x => x.商品);
   上架占位 = 上架商品.filter(x => x.剧情占位);
-  assert.equal(上架占位.length, 1);
-  assert.equal(上架占位[0].id, '角色路线:301:结局剧情');
+  assert.equal(上架占位.length, 0);
+  assert.ok(上架商品.some(item => item.id === '角色路线:301:结局剧情' && item.名称 === '安若妍 · 换掉' && item.价格 === 1500));
 
   for (const 商品 of 上架占位) {
     assert.equal(角色剧情占位已上架(data, 商品.id), true);

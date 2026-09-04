@@ -4,19 +4,16 @@
 // 顶层按 普通CG/怀孕CG 分线，每线内部用亲密场景五阶段页签；总数与已解锁都按 图库+阶段 计算。
 import { computed, onBeforeUnmount, ref } from 'vue';
 import { 户静态表, type 门牌 } from '../../../stageConfig';
-import {
-  角色CG列表,
-  type CG变体,
-  type 亲密场景CG阶段,
-  type 成人CG项,
-} from '../../../脚本/游戏逻辑/成人CG系统';
+import { 角色CG列表, type CG变体, type 亲密场景CG阶段, type 成人CG项 } from '../../../脚本/游戏逻辑/成人CG系统';
 import { 成人CG基址 } from '../assets';
+import { 安若妍换掉图片, 安若妍换掉CG占位图 } from '../../../脚本/游戏逻辑/安若妍换掉资源';
 import { CG全览模式, CG项可查看, 创建CG全览连击状态, 记录CG全览标题点击 } from './CG图库全览';
 import Ic from './Icon.vue';
 
 const props = defineProps<{
   door: 门牌;
   unlocked: Set<string>;
+  endingMemories?: readonly string[];
 }>();
 
 const emit = defineEmits<{ close: [] }>();
@@ -26,6 +23,19 @@ const 阶段 = ref<亲密场景CG阶段>('intro_no_contact');
 const 页码 = ref(1);
 const 每页 = 15;
 const 预览 = ref<成人CG项 | null>(null);
+const 显示结局回忆 = ref(false);
+const 结局预览 = ref('');
+const 结局图失效 = ref(new Set<string>());
+const 结局回忆 = computed(() =>
+  props.door === '301'
+    ? [...new Set(props.endingMemories ?? [])].filter(id =>
+        /^ARY-RPL-(?:0[1-5]|1[23]|(?:0[6-9]|1[01])-[NP])$/u.test(id),
+      )
+    : [],
+);
+function 结局图片(id: string): string {
+  return 结局图失效.value.has(id) ? 安若妍换掉CG占位图 : 安若妍换掉图片(id) || 安若妍换掉CG占位图;
+}
 /** 本次图库实例的素材失败表；关闭重开即可重新尝试，不污染真实解锁集合。 */
 const 失效CG = ref<ReadonlySet<string>>(new Set());
 const 全览点击状态 = ref(创建CG全览连击状态());
@@ -100,6 +110,7 @@ function 处理全览标题点击(): void {
 }
 
 function 切换变体(变体值: CG变体): void {
+  显示结局回忆.value = false;
   变体.value = 变体值;
   阶段.value = 'intro_no_contact';
   页码.value = 1;
@@ -133,13 +144,23 @@ onBeforeUnmount(() => {
           v-for="(名, 值) in 变体名"
           :key="值"
           class="btn mini"
-          :class="{ on: 变体 === 值 }"
+          :class="{ on: !显示结局回忆 && 变体 === 值 }"
           @click="切换变体(值)"
         >
           {{ 名 }}
         </button>
+        <button
+          v-if="结局回忆.length"
+          type="button"
+          class="btn mini"
+          :class="{ on: 显示结局回忆 }"
+          :aria-pressed="显示结局回忆"
+          @click="显示结局回忆 = true"
+        >
+          结局回忆 {{ 结局回忆.length }}
+        </button>
       </div>
-      <div class="cg-library-tabs">
+      <div v-if="!显示结局回忆" class="cg-library-tabs">
         <button
           v-for="页 in 页签"
           :key="页.值"
@@ -150,7 +171,25 @@ onBeforeUnmount(() => {
           {{ 页.名 }} {{ 页.已解锁 }}/{{ 页.总数 }}
         </button>
       </div>
-      <div v-if="空库提示" class="cg-empty">
+      <div v-if="显示结局回忆" class="sheet-body cg-library-grid">
+        <button
+          v-for="(id, index) in 结局回忆"
+          :key="id"
+          type="button"
+          class="cg-tile"
+          :aria-label="`查看《换掉》回忆 ${index + 1}`"
+          @click="结局预览 = id"
+        >
+          <img
+            :src="结局图片(id)"
+            :alt="`《换掉》回忆 ${index + 1}`"
+            loading="lazy"
+            draggable="false"
+            @error="结局图失效.add(id)"
+          />
+        </button>
+      </div>
+      <div v-else-if="空库提示" class="cg-empty">
         {{ 空库提示 }}
       </div>
       <div v-else class="sheet-body cg-library-grid">
@@ -175,7 +214,7 @@ onBeforeUnmount(() => {
           <span v-else class="cg-lock"><Ic n="lock" /></span>
         </button>
       </div>
-      <div v-if="!空库提示 && 总页数 > 1" class="cg-pagination">
+      <div v-if="!显示结局回忆 && !空库提示 && 总页数 > 1" class="cg-pagination">
         <button class="btn mini" :disabled="页码 <= 1" @click="翻页(-1)">‹ 上一页</button>
         <span>第 {{ 页码 }} / {{ 总页数 }} 页</span>
         <button class="btn mini" :disabled="页码 >= 总页数" @click="翻页(1)">下一页 ›</button>
@@ -187,6 +226,14 @@ onBeforeUnmount(() => {
     <button class="sheet-close cg-preview-close" @click="预览 = null">✕</button>
     <div class="cg-preview-scroller" @click.self="预览 = null">
       <img :src="成人CG地址(预览)" alt="" draggable="false" @error="标记CG失效(预览.id)" />
+    </div>
+  </div>
+  <div v-if="结局预览" class="mask cg-preview-mask" @click.self="结局预览 = ''">
+    <button type="button" class="sheet-close cg-preview-close" aria-label="关闭结局回忆" @click="结局预览 = ''">
+      ✕
+    </button>
+    <div class="cg-preview-scroller" @click.self="结局预览 = ''">
+      <img :src="结局图片(结局预览)" alt="安若妍《换掉》结局回忆" draggable="false" @error="结局图失效.add(结局预览)" />
     </div>
   </div>
 </template>

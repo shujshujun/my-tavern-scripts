@@ -1600,6 +1600,40 @@ const 当前Schema = z.object({
           完成楼层: floorMark(-1),
         })
         .prefault({}),
+      /** 301《换掉》：只在玩家换照时签发结局；照片与可重试副作用分开保存。 */
+      _安若妍换掉: z
+        .object({
+          版本: z.literal(1).catch(1).prefault(1),
+          实例: z.string().prefault(''),
+          来源时间线: z.string().prefault(''),
+          轮次: nonNegInt(0),
+          阶段: z.enum([
+            '未开始', '已购买', '固定剧情中', '待购买拍立得', '等待试机日', '待预约', '待登记',
+            '等待预约夜', '待递相机', '待开场', '前半', '待P1', '中段', '待P2', '后半',
+            '待收尾', '待显影', '待回客厅', '待询问', '待换照', '已完成',
+          ]).catch('未开始').prefault('未开始'),
+          当前场景: z.enum(['', 'A1', 'B1', 'B2', 'C1', 'C2', 'H1', 'P1', 'P2', 'H10', 'H11', 'H12']).catch('').prefault(''),
+          当前票: z.string().prefault(''),
+          道具已使用: bool(),
+          拍立得状态: z.enum(['未购买', '背包', '已交付']).catch('未购买').prefault('未购买'),
+          购买绝对时段: floorMark(-1),
+          登记绝对时段: floorMark(-1),
+          预约夜绝对时段: floorMark(-1),
+          江辰已到场: bool(),
+          江辰已持相机: bool(),
+          绑定亲密场次标识: z.string().prefault(''),
+          已登记亲密楼层: z.array(nonNegInt(0)).catch([]).prefault([]),
+          P1完成: bool(),
+          P2完成: bool(),
+          最终照片体态: z.enum(['', '普通', '孕态']).catch('').prefault(''),
+          最终照片素材ID: z.string().prefault(''),
+          拍摄历史: z.array(z.object({ 场次: z.string(), 照片: z.string(), 楼层: nonNegInt(0) })).catch([]).prefault([]),
+          普通收尾已完成: bool(),
+          亲密结果场次标识: z.string().prefault(''),
+          完成楼层: floorMark(-1),
+          暂停原因: z.string().prefault(''),
+          CG回忆: z.array(z.string()).catch([]).prefault([]),
+        }).prefault({}),
       /** 许曼君承接线《分居》四幕版：一次钥匙封存、真实独住、可选共同夜晚与跨日离婚前交接。 */
       _许曼君分居: z
         .object({

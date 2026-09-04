@@ -1,3 +1,4 @@
+import { 安若妍换掉图片, 安若妍换掉CG占位图 } from '../../安若妍换掉资源';
 import { 户静态表, 门牌列表 } from '../../../../stageConfig';
 import { 姐妹茶话会头像图, 住户答谢会图 as 住户答谢会头像图 } from '../../../../内嵌小图';
 
@@ -40,6 +41,7 @@ export function 朋友圈图片地址(图: unknown): string {
 }
 
 export function 私聊图片地址(图: string): string {
+  if (图.startsWith('@ending/安若妍换掉/')) return 安若妍换掉图片(图.slice('@ending/安若妍换掉/'.length)) || 安若妍换掉CG占位图;
   if (图.startsWith('@production/')) {
     return `${生产素材基址}/${编码资源路径(图.slice('@production/'.length))}.webp`;
   }

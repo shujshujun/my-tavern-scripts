@@ -1208,7 +1208,7 @@
       />
 
       <!-- ═══════════ 角色CG图库：已解锁显示缩略图，未解锁不泄露画面 ═══════════ -->
-      <CgLibrary v-if="CG图库门牌" :key="CG图库门牌" :door="CG图库门牌" :unlocked="已解锁CG" @close="关闭CG图库" />
+      <CgLibrary v-if="CG图库门牌" :key="CG图库门牌" :door="CG图库门牌" :unlocked="已解锁CG" :ending-memories="CG图库门牌 === '301' ? data.系统._安若妍换掉.CG回忆 : []" @close="关闭CG图库" />
 
       <!-- ═══════════ 背包(道具可用:布设/送礼/读信) ═══════════ -->
       <InventoryPopup
@@ -1378,6 +1378,7 @@
 </template>
 
 <script setup lang="ts">
+import { 安若妍换掉图片, 安若妍换掉背景文件, 安若妍换掉CG覆盖普通场次, 安若妍换掉CG占位图 } from '../../脚本/游戏逻辑/安若妍换掉资源';
 import { 场景剧情楼道, 读取场景剧情状态, 读取队首场景剧情 } from '../../脚本/游戏逻辑/场景剧情事务';
 import { 是入住登场事件 } from '../../脚本/游戏逻辑/入住触发门';
 import type { SchemaType } from '../../schema';
@@ -1799,7 +1800,7 @@ watch(
     取消客户端延迟(性爱结果timer);
     if (
       上次性爱结果.value.结束方式 === '脚本收尾' &&
-      上次性爱结果.value.最终位置 === '不必停预约夜暂缓'
+      ['不必停预约夜暂缓', '换掉预约夜暂缓'].includes(上次性爱结果.value.最终位置)
     ) {
       显示性爱结果卡.value = false;
       return;
@@ -1841,7 +1842,10 @@ const 资源详情 = computed(() => {
 // ── 场景与移动(走动零成本纯UI;_场景 与脚本快照共用) ──
 
 const 当前房间 = ref<string | null>(null);
-const 安若妍H7决策中 = computed(() => 安若妍H7等待决定.value && 当前房间.value === '301');
+// 保留既有301前台决策接线，同时覆盖《换掉》的两次拍照和最终换照。
+const 安若妍H7决策中 = computed(() => 当前房间.value === '301' && (
+  安若妍H7等待决定.value || ['待P1', '待P2', '待换照'].includes(data.value.系统._安若妍换掉.阶段)
+));
 const 显示地图 = ref(false);
 /** A6a:地图/房卡迁入 components/地图.vue 后,独立事件结果经此公开接口翻出(组件内守 open+房卡)。 */
 type 地图弹窗公开接口 = { 显示结果: (消息: string) => boolean };
@@ -2065,7 +2069,7 @@ function 确认离开等待场景剧情(): boolean {
 async function 进入(房间id: string, 破门 = false, 保持地图 = false): Promise<boolean> {
   if (场景移动中) return false;
   if (安若妍H7决策中.value && 房间id !== '301') {
-    弹提示('江辰已经站在卧室门边；请先选择继续，或停下并暂缓本次预约夜。', 4600);
+    弹提示(安若妍H7等待决定.value ? '江辰已经站在卧室门边；请先选择继续，或停下并暂缓本次预约夜。' : '请先完成301当前的拍照或换照动作。', 4600);
     return false;
   }
   const 移动身份 = 捕获客户端时间线身份();
@@ -2170,7 +2174,7 @@ async function 进入(房间id: string, 破门 = false, 保持地图 = false): P
 async function 离开房间(): Promise<void> {
   if (场景移动中) return;
   if (安若妍H7决策中.value) {
-    弹提示('现在不能按普通离场处理；请选择继续，或使用“停下，本次暂缓”。', 4600);
+    弹提示(安若妍H7等待决定.value ? '现在不能按普通离场处理；请选择继续，或使用“停下，本次暂缓”。' : '请先完成301当前的拍照或换照动作。', 4600);
     return;
   }
   const 移动身份 = 捕获客户端时间线身份();
@@ -2332,7 +2336,7 @@ const 可用由头 = computed(() => {
 });
 
 const 可输入 = computed(() => {
-  if (安若妍H7等待决定.value) return false;
+  if (安若妍H7决策中.value) return false;
   if (场景剧情活动.value || 场景剧情旧档可认领.value) return false;
   // 只有明确要求玩家回应的等待票开放输入；其余到场票使用专用“开始本段剧情”按钮。
   if (场景剧情等待当前处理.value) return 场景剧情等待回应.value;
@@ -2729,18 +2733,21 @@ interface 家庭计划CG载荷 {
     | '302亲密开场'
     | '许曼君分居'
     | '安若妍不必停'
+    | '安若妍换掉'
     | '许曼君离婚'
     | '不再留门';
   实例?: string;
 }
 const 当前家庭计划CG = ref<家庭计划CG载荷 | null>(null);
 const 安若妍不必停CG队列 = ref<家庭计划CG载荷[]>([]);
+const 安若妍换掉CG队列 = ref<家庭计划CG载荷[]>([]);
 const 安若妍不必停亲密遮挡CG = /^(?:ARY-NBS-0[78]|ARY-NBS-09-[NP]|ARY-NBS-10-[NP]|ARY-NBS-1[12])$/u;
 function 安若妍不必停CG覆盖普通亲密(文件: string): boolean {
   return 安若妍不必停亲密遮挡CG.test(文件);
 }
 function 清空安若妍不必停CG队列(): void {
   安若妍不必停CG队列.value = [];
+  安若妍换掉CG队列.value = [];
 }
 const 离婚结果白闪 = ref(false);
 let 离婚结果白闪timer: ReturnType<typeof setTimeout> | undefined;
@@ -2798,6 +2805,7 @@ const 当前家庭计划CG地址 = computed(() => {
   if (载荷.来源 === '双重继承') return 双重继承图片(载荷.文件);
   if (载荷.来源 === '302亲密开场') return 共居302亲密开场图(载荷.文件);
   if (载荷.来源 === '许曼君分居') return 许曼君分居图片(载荷.文件);
+  if (载荷.来源 === '安若妍换掉') return 安若妍换掉图片(载荷.文件) || 安若妍换掉CG占位图;
   if (载荷.来源 === '安若妍不必停') return 安若妍不必停图片(载荷.文件);
   if (载荷.来源 === '许曼君离婚') return 许曼君离婚图片(载荷.文件);
   return 家庭计划图片(载荷.文件);
@@ -2839,6 +2847,7 @@ watch(
   { immediate: true },
 );
 const 当前事件CG眉题 = computed(() =>
+  当前家庭计划CG.value?.来源 === '安若妍换掉' ? '安若妍 · 换掉' :
   当前事件CG.value === 当前家庭计划CG.value && 当前家庭计划CG.value?.来源 === '不再留门' ? '不再留门' :
   当前借种CG.value
     ? 'BORROW SEED ENDING / 借种结局'
@@ -2861,6 +2870,7 @@ const 当前事件CG眉题 = computed(() =>
                   : 'FAMILY PLAN',
 );
 const 当前事件CG关闭文案 = computed(() =>
+  当前家庭计划CG.value?.来源 === '安若妍换掉' ? (安若妍换掉CG队列.value.length ? '继续查看下一张' : '收起换掉画面') :
   当前事件CG.value === 当前家庭计划CG.value && 当前家庭计划CG.value?.来源 === '不再留门' ? '收起当前画面' :
   当前借种CG.value
     ? '收起借种结局画面'
@@ -2885,6 +2895,11 @@ const 当前事件CG关闭文案 = computed(() =>
                   : '收起家庭计划画面',
 );
 function 关闭当前事件CG(): void {
+  if (当前家庭计划CG.value?.来源 === '安若妍换掉') {
+    当前家庭计划CG.value = 安若妍换掉CG队列.value.shift() ?? null;
+    if (!当前家庭计划CG.value) 尝试恢复待处理成人CG();
+    return;
+  }
   if (当前借种CG.value) {
     当前借种CG.value = 借种CG队列.value.shift() ?? null;
     尝试恢复待处理成人CG();
@@ -3166,6 +3181,10 @@ function 背景图(房间id: string | null): string {
   if (房间id === '101') {
     const 借种文件 = 借种101持久背景文件(data.value);
     if (借种文件) return 借种结局图片(借种文件);
+  }
+  if (房间id === '301') {
+    const 地址 = 安若妍换掉图片(安若妍换掉背景文件(data.value));
+    if (地址) return 地址;
   }
   if (房间id && 门牌列表.includes(房间id as 门牌)) {
     const 文件 = 房间生产背景键(data.value, 房间id as 门牌);
@@ -3542,6 +3561,8 @@ const { 房间动作, 当前房间动作, 普通房间动作, 确认已到达动
     第二机位动作: 动作 => void 提交界面事务(() => eventEmit('人妻公寓:第二机位动作', 动作)),
     不再留门动作: 动作 => 请求不再留门动作(动作),
     安若妍不必停动作: 动作 => void 提交界面事务(() => eventEmit('人妻公寓:安若妍不必停动作', 动作)),
+    安若妍换掉动作: 动作 => void 提交界面事务(() => eventEmit('人妻公寓:安若妍换掉动作', 动作)),
+    安若妍结局后亲密: 选择 => void 提交界面事务(() => eventEmit('人妻公寓:安若妍结局后亲密', 选择)),
     许曼君分居动作: 动作 => void 提交界面事务(() => eventEmit('人妻公寓:许曼君分居动作', 动作)),
     许曼君离婚动作: (动作: 许曼君离婚动作ID) =>
       void 提交界面事务(() => eventEmit('人妻公寓:许曼君离婚动作', 动作)),
@@ -5765,6 +5786,16 @@ onMounted(() => {
     清空借种CG序列();
     清空安若妍不必停CG队列();
     当前家庭计划CG.value = { ...载荷, 来源: '许曼君分居' };
+  });
+  eventOn('人妻公寓:安若妍换掉CG', (载荷: 家庭计划CG载荷) => {
+    if (!载荷?.文件) return;
+    const 画面: 家庭计划CG载荷 = { ...载荷, 来源: '安若妍换掉' };
+    if ([当前家庭计划CG.value, ...安若妍换掉CG队列.value].some(item => item?.来源 === '安若妍换掉' && item.文件 === 画面.文件)) return;
+    if (!安若妍换掉CG覆盖普通场次(画面.文件)) 清空当前成人CG();
+    当前生产CG.value = null;
+    清空借种CG序列();
+    if (当前家庭计划CG.value?.来源 === '安若妍换掉') 安若妍换掉CG队列.value.push(画面);
+    else { 清空安若妍不必停CG队列(); 当前家庭计划CG.value = 画面; }
   });
   eventOn('人妻公寓:安若妍不必停CG', (载荷: 家庭计划CG载荷) => {
     if (!载荷?.文件 || !安若妍不必停图片(载荷.文件)) return;

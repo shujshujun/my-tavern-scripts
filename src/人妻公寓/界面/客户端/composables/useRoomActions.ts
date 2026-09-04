@@ -1,3 +1,4 @@
+import { 安若妍结局后亲密可用, 安若妍换掉地点动作, type 安若妍换掉动作ID } from '../../../脚本/游戏逻辑/安若妍换掉系统';
 /**
  * 房内动作生成器（App A6b 从 App.vue 等价外移）。
  *
@@ -70,6 +71,8 @@ export interface 房间动作事件 {
   第二机位动作: (动作: 第二机位动作ID) => void;
   不再留门动作: (动作: 不再留门动作ID) => void;
   安若妍不必停动作: (动作: 安若妍不必停动作ID) => void;
+  安若妍换掉动作: (动作: 安若妍换掉动作ID) => void;
+  安若妍结局后亲密: (选择: '由我开始' | '让她开始') => void;
   许曼君分居动作: (动作: 许曼君分居动作ID) => void;
   许曼君离婚动作: (动作: 许曼君离婚动作ID) => void;
   许曼君离婚后日常动作: (动作: 许曼君离婚后日常动作ID) => void;
@@ -191,6 +194,18 @@ export function useRoomActions(options: 房间动作选项) {
     if (data.value.系统._安若妍不必停.阶段 === '待H7决定') {
       添加安若妍不必停动作(动作, id);
       return 动作;
+    }
+    if (当前房间.value === id) {
+      if (安若妍结局后亲密可用(data.value, id)) 动作.push({
+        kicker: '301', icon: 'heart', 文案: '和她亲密', 做: () => undefined,
+        选项: (['由我开始', '让她开始'] as const).map(choice => ({ kicker: '301', icon: 'heart', 文案: choice,
+          做: () => { if (!发送中.value && 当前房间.value === id) 事件.安若妍结局后亲密(choice); } })),
+      });
+      for (const a of 安若妍换掉地点动作(data.value, id)) {
+        动作.push({ kicker: a.kicker, icon: a.icon, 文案: a.文案, 禁用: !a.可执行, 提示: a.原因,
+          做: () => { if (!发送中.value && 当前房间.value === id && a.可执行) 事件.安若妍换掉动作(a.id); } });
+      }
+      if (['待P1', '待P2', '待换照'].includes(data.value.系统._安若妍换掉.阶段)) return 动作;
     }
     添加管理任务动作(动作, id);
     添加家庭计划动作(动作, id);

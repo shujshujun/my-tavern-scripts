@@ -1,5 +1,6 @@
 import { Schema, type SchemaType } from '../../../schema';
 import { 不再留门手机只读原因 } from '../../../不再留门契约';
+import { 安若妍换照姐妹群一拍 } from './安若妍换照姐妹群';
 import type { 门牌 } from '../../../stageConfig';
 import { 户静态表, 门牌列表 } from '../../../stageConfig';
 import { seededRandom, 取绝对时段, 当前时段, 旧钟楼跨度转时段 } from '../楼层时钟';
@@ -795,6 +796,9 @@ interface 孕产姐妹群上下文 {
 /** 孕情公开、生产与住院是剧情硬生命周期，不受玩家的普通手机内容频率设置控制。 */
 async function 孕产姐妹群必达拍(上下文: 孕产姐妹群上下文): Promise<入口拍结果> {
   const { data, 库, 楼, 钟, 时间线仍有效 } = 上下文;
+  const 换照结果 = await 安若妍换照姐妹群一拍(data, 库, 楼, { 仍有效: 时间线仍有效 });
+  if (!时间线仍有效()) return '中止';
+  if (换照结果) return '有新';
   const 待孕情 = 已公开孕情成员(data).find(门牌号 => {
     const 场次标识 = data.户[门牌号].妻._怀孕.受孕场次标识;
     if (门牌号 === '101' && 是借种受孕场次(场次标识) && !借种三人合照已拍(data, 场次标识)) return false;
@@ -1015,6 +1019,7 @@ export async function 手机节拍(): Promise<void> {
         时间线仍有效,
       );
       if (!已写必达群) return;
+      if (必达新消息.some(item => item.键 === '301结局:换照:姐妹群照片')) 节拍待补 = true;
       请求刷新手机红点();
       请求手机重绘();
       await 立即持久保存手机聊天变量(时间线租约.聊天标识);
