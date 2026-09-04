@@ -57,7 +57,7 @@ function settleFixed(data, event, floor) {
   return result;
 }
 
-function settleIntimacy(data, floor) {
+function settleIntimacy(data, floor, scale = 3) {
   const old = lodash.cloneDeep(data);
   return resource.结算成功现场楼(data, old, {
     场景: '301',
@@ -66,7 +66,7 @@ function settleIntimacy(data, floor) {
     正文: '安若妍明确继续参与，两人的亲密动作在夫妻卧室内持续。',
     本楼事件: '',
     妻在场: ['301'],
-    实际尺度: { 301: 3 },
+    实际尺度: { 301: scale },
     资源计费: true,
   });
 }
@@ -159,6 +159,9 @@ test('H6-H8暂停不扣体力不涨有效楼，恰好7点体力仍可免费完�
   const h6Commit = commit(data, h6, 40);
   settleFixed(data, h6, 40);
   assert.deepEqual(h6Commit.CG序列, ['ARY-NBS-07', 'ARY-NBS-08']);
+  assert.equal(data.户['301'].夫._居住模式, '预约回楼');
+  assert.equal(data.户['301'].夫.状态, '在家');
+  assert.equal(data.户['301'].夫._预约回楼起, data.系统._绝对时段);
 
   const h7 = h6Commit.后续事件;
   commit(data, h7, 41);
@@ -212,6 +215,8 @@ test('H7选择暂缓只重排预约夜，卷宗和管理员室登记不重做且
   commit(data, h6Commit.后续事件, 71);
   settleFixed(data, h6Commit.后续事件, 71);
 
+  data.系统._绝对时段 = Math.floor(data.系统._绝对时段 / 6) * 6 + 5;
+  const pauseAt = data.系统._绝对时段;
   const choice = route.执行安若妍不必停地点动作(data, '停下本次暂缓', '301', 72);
   assert.equal(choice.需暂停亲密, true);
   const paused = resource.结算安若妍不必停H7暂缓(data, 72);
@@ -222,6 +227,47 @@ test('H7选择暂缓只重排预约夜，卷宗和管理员室登记不重做且
   assert.equal(data.系统._性爱场景.状态, '空闲');
   assert.equal(data.系统._安若妍不必停.绑定亲密场次标识, '');
   assert.match(data.系统._安若妍不必停.暂停原因, /H7选择停下/);
+  assert.ok(data.系统._安若妍不必停.预约夜绝对时段 - pauseAt >= 6, '深夜暂缓也必须真实经过完整世界日');
+  assert.equal(data.户['301'].夫._居住模式, '提前通知');
+  assert.equal(data.户['301'].夫.状态, '外出');
+});
+
+test('前半高尺度凭据跨楼累计，4/4不再因第4楼较缓而卡住或显示5/4', () => {
+  const earlierHigh = startThroughH1(fresh());
+  settleIntimacy(earlierHigh, 100, 3);
+  settleIntimacy(earlierHigh, 101, 2);
+  settleIntimacy(earlierHigh, 102, 2);
+  settleIntimacy(earlierHigh, 103, 2);
+  assert.equal(earlierHigh.系统._安若妍不必停.前半有效楼数, 4);
+  assert.equal(earlierHigh.系统._安若妍不必停.H5高尺度已确认, true);
+  assert.equal(earlierHigh.系统._安若妍不必停.阶段, 'H6中');
+
+  const lateHigh = startThroughH1(fresh());
+  lateHigh.玩家资源.体力.永久上限加成 = 3;
+  lateHigh.玩家资源.体力.当前值 = 8;
+  let fourth;
+  for (let i = 0; i < 4; i += 1) fourth = settleIntimacy(lateHigh, 110 + i, 2);
+  assert.equal(lateHigh.系统._安若妍不必停.阶段, '亲密前半');
+  assert.equal(lateHigh.系统._安若妍不必停.前半有效楼数, 4);
+  assert.match(fourth.提示, /4\/4.*还需要/);
+  settleIntimacy(lateHigh, 114, 3);
+  assert.equal(lateHigh.系统._安若妍不必停.阶段, 'H6中');
+  assert.equal(lateHigh.系统._安若妍不必停.前半有效楼数, 4);
+});
+
+test('深夜把卷宗放进书房后，预约夜至少间隔完整6个世界时段', () => {
+  const data = fresh();
+  Object.assign(data.系统._安若妍不必停, {
+    阶段: 'B3中',
+    当前场景: 'B3放卷宗',
+    当前拍: 1,
+    预约夜绝对时段: -1,
+  });
+  data.系统._绝对时段 = 5;
+  data.背包.push(route.安若妍卷宗箱ID);
+  const result = commit(data, '【安若妍不必停提交:B3放卷宗:1】', 120);
+  assert.equal(result.成功, true);
+  assert.ok(data.系统._安若妍不必停.预约夜绝对时段 - 5 >= 6);
 });
 
 test('H13、客厅两拍与次晨登记只完成承接，不越权签发正式结局', () => {

@@ -96,7 +96,7 @@ test('props/emits 接线、ref 公开接口完整；显示结果严格守 open &
   const 模板段 = 提取模板(App源码);
   assert.match(
     模板段,
-    /<MapPopup\b[\s\S]*?:open="显示地图 && 就绪"[\s\S]*?:data="data"[\s\S]*?:current-room="当前房间"[\s\S]*?:day="天数"[\s\S]*?:weekday="星期"[\s\S]*?:period="时段"[\s\S]*?:lite="省流"[\s\S]*?:sending="发送中 \|\| 场景剧情移动锁"[\s\S]*?:avatar-failed="头像失效"[\s\S]*?:avatar-image="头像图"[\s\S]*?:avatar-name="头像名"[\s\S]*?:room-people="房内的人"[\s\S]*?:window-lit="窗灯"[\s\S]*?:management-badge="管理任务角标"[\s\S]*?:rent-owed="欠租中"[\s\S]*?:room-actions="房间动作"[\s\S]*?@close="关地图"[\s\S]*?@outing="从地图外出"[\s\S]*?@avatar-error="头像失效\[\$event\] = true"[\s\S]*?\/>/,
+    /<MapPopup\b[\s\S]*?:open="显示地图 && 就绪"[\s\S]*?:data="data"[\s\S]*?:current-room="当前房间"[\s\S]*?:day="天数"[\s\S]*?:weekday="星期"[\s\S]*?:period="时段"[\s\S]*?:lite="省流"[\s\S]*?:sending="发送中 \|\| 场景剧情移动锁 \|\| 前台硬决策中"[\s\S]*?:avatar-failed="头像失效"[\s\S]*?:avatar-image="头像图"[\s\S]*?:avatar-name="头像名"[\s\S]*?:room-people="房内的人"[\s\S]*?:window-lit="窗灯"[\s\S]*?:management-badge="管理任务角标"[\s\S]*?:rent-owed="欠租中"[\s\S]*?:room-actions="房间动作"[\s\S]*?@close="关地图"[\s\S]*?@outing="从地图外出"[\s\S]*?@avatar-error="头像失效\[\$event\] = true"[\s\S]*?\/>/,
     'MapPopup tag 全部 props/emits 接线',
   );
   assert.match(

@@ -20,6 +20,8 @@ const props = defineProps<{
   roomId: string | null;
   actionCount: number;
   suppressed: boolean;
+  /** 线路硬选择在手机端必须直接展开，且在选择前不能被把手收起。 */
+  forcedOpen?: boolean;
   actions: (卡动作 & { 分组?: '302共居' })[];
   garbageVisible: boolean;
   videoTapeActive: boolean;
@@ -58,6 +60,7 @@ onScopeDispose(() => {
 // 普通动作仍按旧语义只受「录像带中」门控；垃圾入口原 v-if 没有录像带门控，两类门互不合并。
 const 普通动作可见 = computed(() => !props.videoTapeActive && props.actions.length > 0);
 const 有可见动作 = computed(() => props.garbageVisible || 普通动作可见.value);
+const 实际展开 = computed(() => Boolean(props.forcedOpen || 状态.展开));
 // 晨跑/健身是地点主操作。手机端只要主训练仍可执行，就保持面板可见。
 const 有主训练动作 = computed(() => props.mobile && props.actions.some(动作 => 动作.kicker === 'TRAIN'));
 
@@ -143,6 +146,7 @@ function 触发垃圾(): void {
 }
 
 function 切换(): void {
+  if (props.forcedOpen) return;
   if (状态.展开) {
     当前选择动作.value = null;
     机器.手动收起();
@@ -157,13 +161,13 @@ function 面板交互(): void {
 </script>
 
 <template>
-  <div v-if="有可见动作 && !suppressed" class="in-room-acts" :class="{ 'drawer-open': mobile && 状态.展开 }">
+  <div v-if="有可见动作 && (!suppressed || forcedOpen)" class="in-room-acts" :class="{ 'drawer-open': mobile && 实际展开 }">
     <!-- 手机：流内只留一个总把手，所有房间动作与内部选择都在同一面板。 -->
     <button
       v-if="mobile"
       type="button"
       class="drawer-handle"
-      :aria-expanded="状态.展开"
+      :aria-expanded="实际展开"
       aria-controls="in-room-acts-panel"
       @pointerdown="机器.交互取消自动计时"
       @focus="机器.交互取消自动计时"
@@ -178,7 +182,7 @@ function 面板交互(): void {
 
     <transition :name="mobile ? 'drawer' : ''" :css="mobile">
       <div
-        v-if="mobile ? 状态.展开 || 有主训练动作 : true"
+        v-if="mobile ? 实际展开 || 有主训练动作 : true"
         id="in-room-acts-panel"
         class="drawer-content"
         :class="{ 'drawer-panel': mobile }"

@@ -607,6 +607,7 @@
           <div
             v-if="性爱进行中"
             class="intimacy-stage-dock"
+            v-show="!安若妍H7决策中"
             :class="{ open: 亲密抽屉展开, critical: data.玩家资源.体力.当前值 <= 1 }"
             @click.self="亲密抽屉展开 = false"
           >
@@ -897,7 +898,7 @@
 
         <!-- 房内动作(输入门控收紧后的补位:站在垃圾房/空户里,翻袋撬门不用开地图)。
              手机端与结局后302桌面由 房内操作抽屉.vue 收起瓷砖；其他桌面房间保持原两列。 -->
-        <NoMoreDoorProgress v-if="!录像带任一中 && !静音会议正式中" :data="data" :room="当前房间" :sending="发送中" @action="请求不再留门动作" />
+        <NoMoreDoorProgress v-if="!录像带任一中 && !静音会议正式中 && !安若妍H7决策中" :data="data" :room="当前房间" :sending="发送中" @action="请求不再留门动作" />
         <RoomActionsDrawer
         :desktop-cohabitation-fold="当前房间 === '302'"
         :mobile="移动端"
@@ -905,6 +906,7 @@
         :room-id="当前房间"
         :action-count="可见房内动作数"
         :suppressed="房内操作抑制 || 前台硬决策中"
+        :forced-open="安若妍H7决策中 && !场景操作锁"
         :actions="普通房间动作"
         :garbage-visible="垃圾入口可见"
         :video-tape-active="录像带任一中"
@@ -1162,7 +1164,7 @@
         :weekday="星期"
         :period="时段"
         :lite="省流"
-        :sending="发送中 || 场景剧情移动锁"
+        :sending="发送中 || 场景剧情移动锁 || 前台硬决策中"
         :hospital-visible="医院已解锁(data)"
         :avatar-failed="头像失效"
         :avatar-image="头像图"
@@ -1763,6 +1765,18 @@ const 性爱待失控收尾 = computed(() => 性爱场景.value.状态 === '收�
 const 待确认收尾位置 = ref('');
 const 亲密抽屉展开 = ref(false);
 const 显示性爱结果卡 = ref(false);
+const 安若妍H7等待决定 = computed(() => {
+  const 路线 = data.value.系统._安若妍不必停;
+  const 场景 = data.value.系统._性爱场景;
+  return Boolean(
+    路线.阶段 === '待H7决定' &&
+      路线.绑定亲密场次标识 &&
+      场景.状态 !== '空闲' &&
+      场景.场次标识 === 路线.绑定亲密场次标识 &&
+      Object.keys(场景.参与者).length === 1 &&
+      场景.参与者['301']?.已退出 !== true,
+  );
+});
 let 性爱结果timer: ReturnType<typeof setTimeout> | undefined;
 watch(
   () => [
@@ -1783,6 +1797,13 @@ watch(
   (新标识, 旧标识) => {
     if (!新标识 || 新标识 === 旧标识) return;
     取消客户端延迟(性爱结果timer);
+    if (
+      上次性爱结果.value.结束方式 === '脚本收尾' &&
+      上次性爱结果.value.最终位置 === '不必停预约夜暂缓'
+    ) {
+      显示性爱结果卡.value = false;
+      return;
+    }
     显示性爱结果卡.value = true;
     性爱结果timer = 安排客户端延迟(() => (显示性爱结果卡.value = false), 8000);
   },
@@ -1820,6 +1841,7 @@ const 资源详情 = computed(() => {
 // ── 场景与移动(走动零成本纯UI;_场景 与脚本快照共用) ──
 
 const 当前房间 = ref<string | null>(null);
+const 安若妍H7决策中 = computed(() => 安若妍H7等待决定.value && 当前房间.value === '301');
 const 显示地图 = ref(false);
 /** A6a:地图/房卡迁入 components/地图.vue 后,独立事件结果经此公开接口翻出(组件内守 open+房卡)。 */
 type 地图弹窗公开接口 = { 显示结果: (消息: string) => boolean };
@@ -2042,6 +2064,10 @@ function 确认离开等待场景剧情(): boolean {
 
 async function 进入(房间id: string, 破门 = false, 保持地图 = false): Promise<boolean> {
   if (场景移动中) return false;
+  if (安若妍H7决策中.value && 房间id !== '301') {
+    弹提示('江辰已经站在卧室门边；请先选择继续，或停下并暂缓本次预约夜。', 4600);
+    return false;
+  }
   const 移动身份 = 捕获客户端时间线身份();
   const 准备锁 = 场景剧情准备锁.value;
   if (准备锁) {
@@ -2143,6 +2169,10 @@ async function 进入(房间id: string, 破门 = false, 保持地图 = false): P
 
 async function 离开房间(): Promise<void> {
   if (场景移动中) return;
+  if (安若妍H7决策中.value) {
+    弹提示('现在不能按普通离场处理；请选择继续，或使用“停下，本次暂缓”。', 4600);
+    return;
+  }
   const 移动身份 = 捕获客户端时间线身份();
   if (第二机位现场锁定.value) {
     弹提示(第二机位现场锁提示.value, 4600);
@@ -2302,6 +2332,7 @@ const 可用由头 = computed(() => {
 });
 
 const 可输入 = computed(() => {
+  if (安若妍H7等待决定.value) return false;
   if (场景剧情活动.value || 场景剧情旧档可认领.value) return false;
   // 只有明确要求玩家回应的等待票开放输入；其余到场票使用专用“开始本段剧情”按钮。
   if (场景剧情等待当前处理.value) return 场景剧情等待回应.value;
@@ -5272,9 +5303,11 @@ type 前台决策输入模式 = 'none' | 'blocked' | 'summary';
  * 只有必须先理解当前正文再作答的硬生命周期进入前台决策态。
  * 普通 AI 行动建议与录像带操作各有自己的可选/特殊场景语义，不能被批量升级成全局锁。
  */
-const 前台硬决策中 = computed(() => 偷窥决策中.value || 静音会议待散会选择.value);
+const 前台硬决策中 = computed(
+  () => 偷窥决策中.value || 静音会议待散会选择.value || 安若妍H7决策中.value,
+);
 const 前台决策输入模式 = computed<前台决策输入模式>(() =>
-  偷窥决策中.value ? 'blocked' : 静音会议待散会选择.value ? 'summary' : 'none',
+  偷窥决策中.value || 安若妍H7决策中.value ? 'blocked' : 静音会议待散会选择.value ? 'summary' : 'none',
 );
 
 // ── 房内操作抽屉可见性(App 只算可见动作数、垃圾入口与统一抑制,展开/自动收起在组件内状态机) ──
@@ -5295,6 +5328,23 @@ const 桌面302共居操作折叠 = computed(
 // 发送中 / 静音会议在桌面与手机都抑制；键盘门只在手机生效——桌面输入框 focus 时 键盘打开
 // 不隐藏房内动作(桌面行为原样),与旧 keyboard-open CSS 仅在 max-width:540px 媒体内命中等价。
 const 房内操作抑制 = computed(() => 发送中.value || 静音会议正式中.value || (移动端.value && 键盘打开.value));
+
+watch(安若妍H7决策中, 决策中 => {
+  if (!决策中) return;
+  显示地图.value = false;
+  显示商店.value = false;
+  显示背包.value = false;
+  显示监控.value = false;
+  显示史册.value = false;
+  选中门牌.value = null;
+  CG图库门牌.value = null;
+  垃圾选择开.value = false;
+  读信门牌.value = null;
+  亲密抽屉展开.value = false;
+  键盘打开.value = false;
+  document.documentElement.style.removeProperty('--keyboard-inset');
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+});
 
 /**
  * 接通当拍收掉所有可能在电话之前打开的旧弹窗。按钮硬锁仍保留，但玩家收起手机后

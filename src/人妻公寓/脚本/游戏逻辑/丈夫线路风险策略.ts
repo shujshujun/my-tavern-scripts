@@ -1,5 +1,5 @@
 import type { SchemaType } from '../../schema';
-import type { 门牌 } from '../../stageConfig';
+import { 门牌列表, type 门牌 } from '../../stageConfig';
 
 export type 丈夫线路风险阶段 = '常规' | '承接保护' | '关系转变';
 
@@ -85,8 +85,27 @@ export function 读取丈夫线路风险阶段(data: SchemaType, 门牌号: 门�
   return '常规';
 }
 
-export function 普通丈夫风险已停用(data: SchemaType, 门牌号: 门牌): boolean {
+/**
+ * 角色一旦真实进入承接／结局流程，旧随机剧情就不再拥有该角色。
+ * 这不是只针对丈夫查岗：母亲撞见、换装起疑、旧绿帽开线、通用孕情对质等
+ * 与专属线路事实相驳的随机打断，都必须读取同一个按户真值。
+ */
+export function 角色线路无关打断已停用(data: SchemaType, 门牌号: 门牌): boolean {
   return 读取丈夫线路风险阶段(data, 门牌号) !== '常规';
+}
+
+/**
+ * 当前前台只要有一名已经由承接／结局线路接管的角色，整轮就不再生产任何无关强剧情。
+ * 只检查本轮真实演员，不会因为301已经完成，就把玩家在另一户的普通世界事件永久冻住。
+ */
+export function 前台角色线路无关强剧情已冻结(data: SchemaType, 演员门牌: readonly string[]): boolean {
+  const 唯一演员 = [...new Set(演员门牌.filter((value): value is 门牌 => 门牌列表.includes(value as 门牌)))];
+  return 唯一演员.some(门牌号 => 角色线路无关打断已停用(data, 门牌号));
+}
+
+/** 旧名称保留给丈夫查岗／登门消费者；语义已经并入全角色线路隔离。 */
+export function 普通丈夫风险已停用(data: SchemaType, 门牌号: 门牌): boolean {
+  return 角色线路无关打断已停用(data, 门牌号);
 }
 
 /** 正文与脚本使用同一事实，避免保留数值时旧疑心文案再次制造查岗剧情。 */

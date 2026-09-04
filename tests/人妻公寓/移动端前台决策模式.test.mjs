@@ -9,10 +9,10 @@ const 行动选项源码 = readFileSync(new URL('components/行动选项.vue', �
 const 回合输入源码 = readFileSync(new URL('components/回合输入.vue', 客户端目录), 'utf8');
 const 静音会议会后源码 = readFileSync(new URL('components/静音会议会后.vue', 客户端目录), 'utf8');
 
-test('监控选择与静音会议散会选择进入硬前台决策，但普通行动建议和录像带不被误锁', () => {
+test('监控、静音会议散会与301 H7进入硬前台决策，但普通行动建议和录像带不被误锁', () => {
   assert.match(
     App源码,
-    /const 前台硬决策中 = computed\(\s*\(\) => 偷窥决策中\.value \|\| 静音会议待散会选择\.value,?\s*\);/,
+    /const 前台硬决策中 = computed\([\s\S]{0,180}偷窥决策中\.value \|\| 静音会议待散会选择\.value \|\| 安若妍H7决策中\.value/,
   );
   assert.match(App源码, /const 偷窥决策中 = computed\(\(\) => Boolean\(偷窥待选\.value\)\);/);
   assert.doesNotMatch(
@@ -20,6 +20,17 @@ test('监控选择与静音会议散会选择进入硬前台决策，但普通�
     /const 前台硬决策中 = computed\([^;]*(?:显示选项|录像带交互幕|录像带中)/,
     '普通建议和录像带有各自语义，不能被批量升级成硬决策',
   );
+});
+
+test('301 H7只保留继续／暂缓，手机强制展开并阻止普通输入、地图和惩罚性离场', () => {
+  assert.match(App源码, /const 安若妍H7等待决定 = computed\(/);
+  assert.match(App源码, /const 安若妍H7决策中 = computed\(\(\) => 安若妍H7等待决定\.value && 当前房间\.value === '301'\)/);
+  assert.match(App源码, /const 可输入 = computed\(\(\) => \{\s*if \(安若妍H7等待决定\.value\) return false;/);
+  assert.match(App源码, /async function 进入[\s\S]{0,220}if \(安若妍H7决策中\.value && 房间id !== '301'\)/);
+  assert.match(App源码, /async function 离开房间[\s\S]{0,180}if \(安若妍H7决策中\.value\)/);
+  assert.match(App源码, /:forced-open="安若妍H7决策中 && !场景操作锁"/);
+  assert.match(App源码, /v-if="性爱进行中"[\s\S]{0,80}class="intimacy-stage-dock"[\s\S]{0,80}v-show="!安若妍H7决策中"/);
+  assert.match(App源码, /不必停预约夜暂缓[\s\S]{0,180}显示性爱结果卡\.value = false/);
 });
 
 test('监控硬决策保留正文、收起无关操作，并且选择提交前不乐观清掉持久挂起', () => {
