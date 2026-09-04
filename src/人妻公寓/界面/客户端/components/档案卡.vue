@@ -12,10 +12,12 @@ import { 读取关系线索, 读取开门线索 } from '../../../脚本/游戏�
 import { 家庭计划档案提示 } from '../../../脚本/游戏逻辑/家庭计划系统';
 import { 借种档案提示 } from '../../../脚本/游戏逻辑/借种结局系统';
 import { 读取第二机位档案提示 } from '../../../脚本/游戏逻辑/第二机位系统';
+import { 读取录像带V4档案提示 } from '../../../脚本/游戏逻辑/录像带V4状态';
 import { 读取不再留门档案提示 } from '../../../脚本/游戏逻辑/不再留门系统';
 import { 读取许曼君分居档案提示 } from '../../../脚本/游戏逻辑/许曼君分居系统';
 import { 许曼君离婚档案提示 } from '../../../脚本/游戏逻辑/许曼君离婚系统';
 import { 读取许曼君201钥匙柜卡 } from '../../../脚本/游戏逻辑/许曼君分居钥匙柜';
+import { 读取安若妍不必停档案提示 } from '../../../脚本/游戏逻辑/安若妍不必停系统';
 import { 回国档案提示 } from '../../../脚本/游戏逻辑/回国系统';
 import { 双重继承档案提示 } from '../../../脚本/游戏逻辑/双重继承系统';
 import { CG条目, 角色CG总数全部变体 } from '../../../脚本/游戏逻辑/成人CG系统';
@@ -180,6 +182,9 @@ const 选中借种提示 = computed(() => (props.door === '101' && props.data.�
 const 选中第二机位提示 = computed(() =>
   props.door === '102' && props.data.户['102'] ? 读取第二机位档案提示(props.data) : null,
 );
+const 选中录像带V4提示 = computed(() =>
+  props.door === '102' || props.door === '202' ? 读取录像带V4档案提示(props.data, props.door) : null,
+);
 const 选中不再留门提示 = computed(() => props.door === '202' ? 读取不再留门档案提示(props.data) : null);
 const 选中许曼君分居提示 = computed(() =>
   props.door === '201' && props.data.户['201'] ? 读取许曼君分居档案提示(props.data) : null,
@@ -189,6 +194,9 @@ const 选中许曼君离婚提示 = computed(() =>
 );
 const 选中许曼君钥匙柜 = computed(() =>
   props.door === '201' && props.data.户['201'] ? 读取许曼君201钥匙柜卡(props.data) : null,
+);
+const 选中安若妍不必停提示 = computed(() =>
+  props.door === '301' && props.data.户['301'] ? 读取安若妍不必停档案提示(props.data) : null,
 );
 const 选中回国提示 = computed(() => (props.door === '302' && props.data.户['302'] ? 回国档案提示(props.data) : null));
 const 选中双重继承提示 = computed(() =>
@@ -628,6 +636,22 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
           <span>{{ 选中第二机位提示.进度 }}</span>
         </p>
       </section>
+      <section v-if="选中录像带V4提示" class="dsec second-camera-task" aria-label="录像带下一步">
+        <header class="second-camera-task-head">
+          <span class="second-camera-task-icon" aria-hidden="true"><Ic n="film" /></span>
+          <span class="second-camera-task-title">
+            <b>录像带</b>
+            <small>{{ 选中录像带V4提示.状态 }}</small>
+          </span>
+          <span v-if="选中录像带V4提示.完成" class="second-camera-task-done">已完成</span>
+        </header>
+        <p class="second-camera-task-next">{{ 选中录像带V4提示.下一步 }}</p>
+        <p v-if="选中录像带V4提示.补充" class="second-camera-task-note">{{ 选中录像带V4提示.补充 }}</p>
+        <p v-if="选中录像带V4提示.进度" class="second-camera-task-progress">
+          <Ic n="clock" aria-hidden="true" />
+          <span>{{ 选中录像带V4提示.进度 }}</span>
+        </p>
+      </section>
       <section v-if="选中许曼君分居提示" class="dsec second-camera-task" aria-label="许曼君分居下一步">
         <header class="second-camera-task-head">
           <span class="second-camera-task-icon" aria-hidden="true"><Ic n="lock" /></span>
@@ -660,6 +684,22 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
         </header>
         <p class="second-camera-task-next">{{ 选中许曼君离婚提示.下一步 }}</p>
         <p v-if="选中许曼君离婚提示.补充" class="second-camera-task-note">私密抽屉：{{ 选中许曼君离婚提示.补充 }}</p>
+      </section>
+      <section v-if="选中安若妍不必停提示" class="dsec second-camera-task" aria-label="不必停下一步">
+        <header class="second-camera-task-head">
+          <span class="second-camera-task-icon" aria-hidden="true"><Ic n="story" /></span>
+          <span class="second-camera-task-title">
+            <b>不必停</b>
+            <small>{{ 选中安若妍不必停提示.状态 }}</small>
+          </span>
+          <span v-if="选中安若妍不必停提示.完成" class="second-camera-task-done">已完成</span>
+        </header>
+        <p class="second-camera-task-next">{{ 选中安若妍不必停提示.下一步 }}</p>
+        <p v-if="选中安若妍不必停提示.补充" class="second-camera-task-note">{{ 选中安若妍不必停提示.补充 }}</p>
+        <p v-if="选中安若妍不必停提示.进度" class="second-camera-task-progress">
+          <Ic n="clock" aria-hidden="true" />
+          <span>{{ 选中安若妍不必停提示.进度 }}</span>
+        </p>
       </section>
       <section v-if="选中回国提示" class="dsec second-camera-task" aria-label="回国下一步">
         <header class="second-camera-task-head">
