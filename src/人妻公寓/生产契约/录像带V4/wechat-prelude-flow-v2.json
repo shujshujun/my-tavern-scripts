@@ -39,10 +39,7 @@
     "lateDelivery": "first safe WeChat opportunity at or after due day"
   },
   "wechat": {
-    "threads": [
-      "沈静仪",
-      "周小满"
-    ],
+    "threads": ["沈静仪", "周小满"],
     "order": "either thread may be handled first",
     "playerReplyPolicy": "allow several natural replies; one reply is required between lock confirmation and consent confirmation in each thread",
     "factsRequiredBeforeDeparture": [
@@ -171,7 +168,7 @@
     "production code is intentionally unchanged in this design-only pass"
   ],
   "scenePreludeContext": "本场监控开始前的准备已经完成：{{user}}先在商店购买剧情道具“录像带”，随后购买两把贞操锁，分别赠给沈静仪和周小满，由沈静仪交给丈夫顾国栋、周小满交给丈夫何俊生。第二把锁送达后经过两天，两位人妻已经在微信中分别确认两名丈夫自愿戴上锁具并同意观看录像；几轮聊天收尾时，她们通知{{user}}已经准备出发，并提醒直接点击“监控”。监控系统随后自动把玩家的场景切换到302并打开观看界面，玩家不需要先手动前往302。这些都是当前监控剧情开始前已经成立的事实，不在19幕监控画面中重新演一遍。",
-  "installed": false,
+  "installed": true,
   "productionUnlocked": false,
   "supersedes": "output/imagegen/video-tape-ending/v4-repair/wechat-prelude-flow-v1.json",
   "supersedesSha256": "218FFC0D39D3C20F5188F9B43E80C5A250DC0EFB71862D8B8655AD9B1841378B",

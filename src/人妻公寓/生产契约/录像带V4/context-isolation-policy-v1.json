@@ -115,6 +115,6 @@
       "VTR explicit-dialogue sentinel must not enter the next ordinary prompt"
     ]
   },
-  "installed": false,
+  "installed": true,
   "productionUnlocked": false
 }

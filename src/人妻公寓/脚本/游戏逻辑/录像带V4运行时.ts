@@ -1,5 +1,5 @@
 import type { SchemaType } from '../../schema';
-import { 读取录像带V4候选, 读取录像带V4镜头卡, type 录像带V4候选记录, type 录像带V4镜头卡 } from './录像带V4契约';
+import { 读取录像带V4产品, 读取录像带V4镜头卡, type 录像带V4产品记录, type 录像带V4镜头卡 } from './录像带V4契约';
 import {
   录像带V4固定日常结果摘要,
   录像带V4画面键,
@@ -16,10 +16,10 @@ export interface 录像带V4客户端快照 {
   共享幕次: number;
   当前房间: 录像带V4房间;
   画面键: string;
-  候选ID: string;
-  候选文件: string;
-  候选地址: string;
-  候选SHA256: string;
+  产品ID: string;
+  产品文件: string;
+  产品地址: string;
+  产品SHA256: string;
   标题: string;
   正文: string;
   时间码秒: number;
@@ -29,9 +29,10 @@ export interface 录像带V4客户端快照 {
   可切房: boolean;
   可下一幕: boolean;
   可完成: boolean;
-  候选模式: true;
-  formalAccepted: false;
-  installed: false;
+  候选模式: false;
+  formalAccepted: true;
+  installed: true;
+  productionUnlocked: false;
 }
 
 function 是房间(值: unknown): 值 is 录像带V4房间 {
@@ -47,22 +48,22 @@ function 文件名(路径: string): string {
 }
 
 /**
- * V4候选尚未正式接受或安装，生产包不得静态导入38张PNG。只有本地验收环境显式提供
- * `__RQGY_VTR_V4_CANDIDATE_BASE__`（或调用方传入基址）时才生成图片URL；正式环境为空时
- * 舞台显示带REC/CAM/时间码的监控占位，不会偷请求未发布标签。
+ * V4的38张WebP产品已经本地安装，但外部不可变素材标签尚未发布。生产包不得静态导入图片；
+ * 只有验收环境显式提供`__RQGY_VTR_V4_ASSET_BASE__`（或调用方传入基址）时才生成URL。
+ * 正式环境为空时舞台显示带REC/CAM/时间码的监控占位，不会偷请求虚构或可变标签。
  */
-export function 读取录像带V4候选基址(): string {
-  return String((globalThis as Record<string, unknown>).__RQGY_VTR_V4_CANDIDATE_BASE__ ?? '')
+export function 读取录像带V4素材基址(): string {
+  return String((globalThis as Record<string, unknown>).__RQGY_VTR_V4_ASSET_BASE__ ?? '')
     .trim()
     .replace(/\/+$/u, '');
 }
 
-export function 录像带V4候选图片地址(候选: 录像带V4候选记录 | undefined, 基址 = 读取录像带V4候选基址()): string {
+export function 录像带V4产品图片地址(产品: 录像带V4产品记录 | undefined, 基址 = 读取录像带V4素材基址()): string {
   const 根 = String(基址 ?? '')
     .trim()
     .replace(/\/+$/u, '');
-  const 名 = 候选 ? 文件名(候选.output) : '';
-  if (!根 || !/^VTR-V4-(?:102|202)-B(?:0[1-9]|1[0-9])(?:-draw\d+)?\.png$/u.test(名)) return '';
+  const 名 = 产品 ? 文件名(产品.productFile) : '';
+  if (!根 || !/^VTR-V4-(?:102|202)-B(?:0[1-9]|1[0-9])\.webp$/u.test(名)) return '';
   return `${根}/${encodeURIComponent(名)}`;
 }
 
@@ -175,7 +176,8 @@ export function 录像带V4正文越拍原因(卡: 录像带V4镜头卡, 正文:
   const 陪看人妻 = 卡.room === '102' ? '周小满' : '沈静仪';
   const 平板妻子 = 卡.room === '102' ? '沈静仪' : '周小满';
   if (文本.includes(另一丈夫)) return `正文串入了另一房间的丈夫${另一丈夫}`;
-  if (/(?:CAM-(?:102|202)|\bREC\b|时间码|扫描线|监控框|客户端按钮)/iu.test(文本)) return '正文描写了只属于客户端覆盖层的界面元素';
+  if (/(?:CAM-(?:102|202)|\bREC\b|时间码|扫描线|监控框|客户端按钮)/iu.test(文本))
+    return '正文描写了只属于客户端覆盖层的界面元素';
 
   const 接触句 = 文本
     .split(/[。！？；;\n]/u)
@@ -248,8 +250,7 @@ export function 录像带V4正文越拍原因(卡: 录像带V4镜头卡, 正文:
     const 有平板录像 =
       /平板.{0,20}(?:过去|录像|记录|画面|妻子|老婆|太太)|(?:过去|录像|记录|画面|妻子|老婆|太太).{0,20}平板/u.test(文本);
     const 明确播错人 =
-      !文本.includes(平板妻子) &&
-      new RegExp(`平板(?:里|中|上|画面里|屏幕里).{0,16}${陪看人妻}`, 'u').test(文本);
+      !文本.includes(平板妻子) && new RegExp(`平板(?:里|中|上|画面里|屏幕里).{0,16}${陪看人妻}`, 'u').test(文本);
     if (!有平板录像 || 明确播错人) return `第2幕没有正确建立平板中的${平板妻子}过去录像`;
   }
   if (幕次 === 3 && !/(?:授权|白色卡|白卡|卡片|条件)/u.test(文本)) return '第3幕没有完成授权卡或观看条件核对';
@@ -282,7 +283,7 @@ export function 构造录像带V4客户端快照(data: SchemaType, 正文 = ''):
   const 幕次 = 场景.共享幕次;
   const 房间 = 场景.当前房间 as 录像带V4房间;
   const 画面键 = 幕次 >= 1 ? 录像带V4画面键(房间, 幕次) : '';
-  const 候选 = 幕次 >= 1 ? 读取录像带V4候选(房间, 幕次) : undefined;
+  const 产品 = 幕次 >= 1 ? 读取录像带V4产品(房间, 幕次) : undefined;
   const 卡 = 幕次 >= 1 ? 读取录像带V4镜头卡(房间, 幕次) : undefined;
   const 已收束 = 场景.锁具状态['102'] === 'settled' && 场景.锁具状态['202'] === 'settled';
   return {
@@ -293,10 +294,10 @@ export function 构造录像带V4客户端快照(data: SchemaType, 正文 = ''):
     共享幕次: 幕次,
     当前房间: 房间,
     画面键,
-    候选ID: 候选?.id ?? '',
-    候选文件: 候选 ? 文件名(候选.output) : '',
-    候选地址: 录像带V4候选图片地址(候选),
-    候选SHA256: 候选?.outputSha256 ?? '',
+    产品ID: 产品?.id ?? '',
+    产品文件: 产品?.productFile ?? '',
+    产品地址: 录像带V4产品图片地址(产品),
+    产品SHA256: 产品?.productSha256 ?? '',
     标题: 卡?.title ?? (激活 ? '录像带V4 · 等待第1幕' : ''),
     正文: String(正文 ?? '').trim(),
     时间码秒: 场景.时间码秒,
@@ -306,9 +307,10 @@ export function 构造录像带V4客户端快照(data: SchemaType, 正文 = ''):
     可切房: 激活 && 幕次 >= 1 && 幕次 < 19,
     可下一幕: 激活 && 幕次 >= 1 && 幕次 < 19,
     可完成: 激活 && 幕次 === 19 && 已收束,
-    候选模式: true,
-    formalAccepted: false,
-    installed: false,
+    候选模式: false,
+    formalAccepted: true,
+    installed: true,
+    productionUnlocked: false,
   };
 }
 

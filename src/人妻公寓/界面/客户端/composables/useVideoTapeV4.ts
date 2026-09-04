@@ -81,7 +81,7 @@ export function useVideoTapeV4(options: 录像带V4客户端选项) {
   });
 
   const 录像带V4中 = computed(() => 录像带V4快照.value.激活);
-  const 录像带V4图片地址 = computed(() => 录像带V4快照.value.候选地址);
+  const 录像带V4图片地址 = computed(() => 录像带V4快照.value.产品地址);
 
   function 新操作标识(类型: 录像带V4操作类型): string {
     操作序号 += 1;

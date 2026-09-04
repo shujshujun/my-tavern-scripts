@@ -36,7 +36,10 @@
     },
     {
       "id": "cam",
-      "textByRoom": {"102": "CAM-102", "202": "CAM-202"},
+      "textByRoom": {
+        "102": "CAM-102",
+        "202": "CAM-202"
+      },
       "placement": "top-right",
       "visibility": "always while a VTR CG is visible"
     },
@@ -92,6 +95,6 @@
     "force image failure and assert fallback still visibly belongs to the monitor UI",
     "assert every raw candidate provenance retains monitorOverlayBaked=false"
   ],
-  "installed": false,
+  "installed": true,
   "productionUnlocked": false
 }

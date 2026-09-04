@@ -60,7 +60,7 @@ test('客户端从任意普通地点点击监控后复用真实移动到302，�
   assert.match(客户端, /<VideoTapeV4Controls/u);
 });
 
-test('V4舞台的每张候选或失败占位都经过同一REC、CAM、时间码和监控框', () => {
+test('V4舞台的每张产品图或失败占位都经过同一REC、CAM、时间码和监控框', () => {
   assert.match(舞台, />REC</u);
   assert.match(舞台, /CAM-\{\{ snapshot\.当前房间 \}\}/u);
   assert.match(舞台, /格式化时间码/u);
@@ -90,10 +90,12 @@ test('操作区保留102、202与下一幕/结束，并提供生成取消和不�
   assert.match(组合器, /请求V4操作\('开始'\)/u);
 });
 
-test('38张候选不静态打包或偷装正式目录，只允许显式开发候选基址', () => {
-  assert.match(运行时, /__RQGY_VTR_V4_CANDIDATE_BASE__/u);
-  assert.match(运行时, /formalAccepted:\s*false/u);
-  assert.match(运行时, /installed:\s*false/u);
+test('38张WebP产品已本地安装但不静态打包，外部发布前只允许显式素材基址', () => {
+  assert.match(运行时, /__RQGY_VTR_V4_ASSET_BASE__/u);
+  assert.doesNotMatch(运行时, /__RQGY_VTR_V4_CANDIDATE_BASE__/u);
+  assert.match(运行时, /formalAccepted:\s*true/u);
+  assert.match(运行时, /installed:\s*true/u);
+  assert.match(运行时, /productionUnlocked:\s*false/u);
   assert.doesNotMatch(客户端 + 组合器 + 舞台, /final-candidates\/VTR-V4-[^'"`]+\.png/u);
-  assert.doesNotMatch(客户端 + 组合器 + 舞台, /\.png\?url/u);
+  assert.doesNotMatch(客户端 + 组合器 + 舞台 + 运行时, /\.(?:png|webp)\?url/u);
 });

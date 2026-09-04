@@ -49,8 +49,8 @@ function 图片加载失败(event: Event): void {
       <div class="vtr-v4-picture-area">
         <figure
           class="vtr-v4-monitor-frame"
-          :data-candidate-id="snapshot.候选ID"
-          :data-candidate-sha256="snapshot.候选SHA256"
+          :data-product-id="snapshot.产品ID"
+          :data-product-sha256="snapshot.产品SHA256"
         >
           <img
             v-if="图片可显示"
@@ -63,7 +63,7 @@ function 图片加载失败(event: Event): void {
           />
           <div v-else class="vtr-v4-fallback" role="img" aria-label="录像带监控画面暂不可用">
             <b>MONITOR SIGNAL</b>
-            <span>{{ snapshot.候选ID || 'CAM-102 / STANDBY' }}</span>
+            <span>{{ snapshot.产品ID || 'CAM-102 / STANDBY' }}</span>
             <small>画面资源暂不可用，剧情状态与本幕正文仍会安全保留。</small>
           </div>
 

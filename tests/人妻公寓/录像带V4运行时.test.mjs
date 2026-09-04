@@ -18,12 +18,12 @@ const { Schema } = require('../../src/人妻公寓/schema.ts');
 const {
   构造录像带V4行动文本,
   构造录像带V4客户端快照,
-  录像带V4候选图片地址,
+  录像带V4产品图片地址,
   录像带V4正文越拍原因,
 } = require('../../src/人妻公寓/脚本/游戏逻辑/录像带V4运行时.ts');
 const {
   录像带V4镜头卡们,
-  读取录像带V4候选,
+  读取录像带V4产品,
   读取录像带V4镜头卡,
 } = require('../../src/人妻公寓/脚本/游戏逻辑/录像带V4契约.ts');
 
@@ -37,19 +37,19 @@ function 场景数据() {
   return data;
 }
 
-test('候选原图不被安装进生产包；只有显式开发基址才产生可请求地址', () => {
-  const 候选 = 读取录像带V4候选('102', 8);
-  assert.ok(候选);
-  assert.equal(录像带V4候选图片地址(候选, ''), '');
+test('WebP产品不被静态打进生产包；外部标签发布前只有显式素材基址才产生可请求地址', () => {
+  const 产品 = 读取录像带V4产品('102', 8);
+  assert.ok(产品);
+  assert.equal(录像带V4产品图片地址(产品, ''), '');
   assert.equal(
-    录像带V4候选图片地址(候选, 'https://assets.example/vtr-v4/'),
-    'https://assets.example/vtr-v4/VTR-V4-102-B08-draw2.png',
+    录像带V4产品图片地址(产品, 'https://assets.example/vtr-v4/'),
+    'https://assets.example/vtr-v4/VTR-V4-102-B08.webp',
   );
 });
 
-test('38个运行时快照逐一绑定正确CAM、候选文件、SHA与时间码', () => {
-  const 旧基址 = globalThis.__RQGY_VTR_V4_CANDIDATE_BASE__;
-  globalThis.__RQGY_VTR_V4_CANDIDATE_BASE__ = 'https://assets.example/vtr-v4';
+test('38个运行时快照逐一绑定正确CAM、WebP产品、SHA与时间码', () => {
+  const 旧基址 = globalThis.__RQGY_VTR_V4_ASSET_BASE__;
+  globalThis.__RQGY_VTR_V4_ASSET_BASE__ = 'https://assets.example/vtr-v4';
   try {
     const 已见 = new Set();
     for (const 房间 of ['102', '202']) {
@@ -63,23 +63,24 @@ test('38个运行时快照逐一绑定正确CAM、候选文件、SHA与时间码
         const 快照 = 构造录像带V4客户端快照(data, `${房间}-${幕次}`);
         assert.equal(快照.当前房间, 房间);
         assert.equal(快照.画面键, `VTR-V4-${房间}-B${String(幕次).padStart(2, '0')}`);
-        assert.equal(快照.候选ID, 快照.画面键);
-        assert.match(
-          快照.候选文件,
-          new RegExp(`^VTR-V4-${房间}-B${String(幕次).padStart(2, '0')}(?:-draw\\d+)?\\.png$`, 'u'),
-        );
-        assert.match(快照.候选SHA256, /^[A-F0-9]{64}$/u);
-        assert.match(快照.候选地址, /^https:\/\/assets\.example\/vtr-v4\/VTR-V4-/u);
+        assert.equal(快照.产品ID, 快照.画面键);
+        assert.equal(快照.产品文件, `VTR-V4-${房间}-B${String(幕次).padStart(2, '0')}.webp`);
+        assert.match(快照.产品SHA256, /^[A-F0-9]{64}$/u);
+        assert.match(快照.产品地址, /^https:\/\/assets\.example\/vtr-v4\/VTR-V4-.*\.webp$/u);
+        assert.equal(快照.候选模式, false);
+        assert.equal(快照.formalAccepted, true);
+        assert.equal(快照.installed, true);
+        assert.equal(快照.productionUnlocked, false);
         assert.equal(快照.时间码秒, 幕次 * 8);
         assert.equal(快照.正文, `${房间}-${幕次}`);
         assert.equal(快照.可完成, 幕次 === 19);
-        已见.add(快照.候选SHA256);
+        已见.add(快照.产品SHA256);
       }
     }
     assert.equal(已见.size, 38);
   } finally {
-    if (旧基址 === undefined) delete globalThis.__RQGY_VTR_V4_CANDIDATE_BASE__;
-    else globalThis.__RQGY_VTR_V4_CANDIDATE_BASE__ = 旧基址;
+    if (旧基址 === undefined) delete globalThis.__RQGY_VTR_V4_ASSET_BASE__;
+    else globalThis.__RQGY_VTR_V4_ASSET_BASE__ = 旧基址;
   }
 });
 
@@ -109,10 +110,7 @@ test('逐幕正文硬校验拒绝串房、界面串词、现场接触和提前�
   );
   assert.match(录像带V4正文越拍原因(第二幕, '何俊生看着平板里的沈静仪。'), /当前CAM|另一房间/u);
   assert.match(录像带V4正文越拍原因(第二幕, '顾国栋看见CAM-102和REC灯。'), /客户端覆盖层/u);
-  assert.match(
-    录像带V4正文越拍原因(第二幕, '顾国栋看着平板里的沈静仪。周小满伸手帮他套弄下身。'),
-    /无接触边界/u,
-  );
+  assert.match(录像带V4正文越拍原因(第二幕, '顾国栋看着平板里的沈静仪。周小满伸手帮他套弄下身。'), /无接触边界/u);
   assert.match(录像带V4正文越拍原因(第二幕, '顾国栋看着平板里的沈静仪，随后解锁。'), /第4幕之前/u);
   assert.match(
     录像带V4正文越拍原因(第二幕, '顾国栋看见平板里播放的是周小满的过去录像。'),
@@ -130,19 +128,28 @@ test('逐幕正文硬校验拒绝串房、界面串词、现场接触和提前�
     '',
     '普通室内走位不得被误判为离场',
   );
-  assert.equal(录像带V4正文越拍原因(第十五幕, '何俊生仍未射精。沈静仪看着平板中的片尾，按下停录遥控器，录制停止。'), '');
+  assert.equal(
+    录像带V4正文越拍原因(第十五幕, '何俊生仍未射精。沈静仪看着平板中的片尾，按下停录遥控器，录制停止。'),
+    '',
+  );
   assert.match(
     录像带V4正文越拍原因(第十五幕, '何俊生仍未射精，片刻后却射了。沈静仪才按下停录遥控器。'),
     /第16幕之前/u,
     '同一句先否定后肯定时也必须识别后一个越拍事实',
   );
   assert.equal(录像带V4正文越拍原因(第十六幕, '何俊生只用自己的手射精了，沈静仪始终保持距离，尚未开始清理复锁。'), '');
-  assert.equal(录像带V4正文越拍原因(第十七幕, '顾国栋清理后亲自把装置重新锁上，拔出钥匙；周小满还没有进行目视核验。'), '');
+  assert.equal(
+    录像带V4正文越拍原因(第十七幕, '顾国栋清理后亲自把装置重新锁上，拔出钥匙；周小满还没有进行目视核验。'),
+    '',
+  );
   assert.match(
     录像带V4正文越拍原因(第十七幕, '顾国栋亲自把装置重新锁上，拔出钥匙；周小满还没有进行目视核验。'),
     /没有同时写出丈夫本人清理与复锁/u,
   );
-  assert.equal(录像带V4正文越拍原因(第十八幕, '顾国栋站好，周小满保持距离完成目视核验，确认装置已经锁好；钥匙尚未交接。'), '');
+  assert.equal(
+    录像带V4正文越拍原因(第十八幕, '顾国栋站好，周小满保持距离完成目视核验，确认装置已经锁好；钥匙尚未交接。'),
+    '',
+  );
   assert.equal(录像带V4正文越拍原因(第十九幕, '何俊生把平板和钥匙交出，沈静仪收走后离开202，桌上留下完成凭条。'), '');
   assert.match(
     录像带V4正文越拍原因(第十九幕, '何俊生把平板和钥匙交出，沈静仪收走后离开202。'),
