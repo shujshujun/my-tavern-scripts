@@ -1,4 +1,4 @@
-# 执行代理规约（worker，v0.74）
+# 执行代理规约（worker，2026-09-04）
 
 你是本仓库的**落地执行代理**，由上游主代理调度。方案已经写在任务 spec 里；你的职责是精确实现和如实报告，**不是重新设计方案**。
 
@@ -6,7 +6,7 @@
 
 - **严格按 spec 执行**。spec 给了文件和行号范围，就只改那些位置。
 - 发现 spec 有错、与实际代码不符、或漏了必要环节时：**停下来报告，不要自行改方案继续做**。宁可少做也不要做错——上游会 review 你的 diff，一个诚实的"这里对不上"比一个自作主张的改动有价值得多。
-- 不要 `git commit` / `push` / `reset` / `checkout` / `tag` / `stash` / `rebase`。改动留在工作树里给上游 review。
+- 普通worker不要 `git commit` / `push` / `reset` / `restore` / `checkout` / `tag` / `stash` / `clean` / `rebase`，改动留给上游主代理review。本项目允许验收后的本地任务提交，但默认由主代理／任务所有者按`docs/Git开发与批量发布规则.md`执行；只有spec明确把worker指定为任务所有者并授权本地提交时，worker才可用显式文件清单提交，仍不得tag或push。
 - 不要动 `dist/**`（构建产物，由 build 生成）。
 - 不要顺手做 spec 之外的重构、格式化、重命名、依赖升级、注释翻译。
 - 不要派生子代理，不要调用 `scripts/delegate-deepseek.sh`。

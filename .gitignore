@@ -15,3 +15,22 @@ components.d.ts
 .claude/
 
 .delegate/
+
+# Local agent, audit and browser scratch (never release inputs)
+/.codex-tmp/
+/.playwright-cli/
+/.impeccable/
+/.codex-relay-probe.mjs
+/.rq_*
+/probe*.txt
+/NUL
+/__pycache__/
+/scripts/__pycache__/
+/tmp/
+
+# Generated visual QA and disposable local fixtures
+/output/playwright/
+/output/prototypes/
+/output/test-saves/
+/output/wardrobe-review/
+/tests/.tmp-*
