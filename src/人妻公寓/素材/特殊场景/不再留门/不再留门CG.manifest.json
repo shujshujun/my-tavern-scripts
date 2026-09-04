@@ -1,0 +1,167 @@
+{
+  "schemaVersion": "rqgy-no-more-door-product-manifest-v1",
+  "updatedAt": "2026-09-04",
+  "route": "周小满202承接线:不再留门",
+  "status": "product-webp-ready-awaiting-external-publish",
+  "runtimeSlots": 8,
+  "acceptedFiles": 8,
+  "format": "webp",
+  "dimensions": {
+    "width": 1536,
+    "height": 1024,
+    "aspectRatio": "3:2"
+  },
+  "encoder": {
+    "library": "Pillow 12.3.0",
+    "format": "WEBP",
+    "quality": 93,
+    "method": 6,
+    "exact": true,
+    "resize": false
+  },
+  "qualityEvidence": {
+    "evaluatedQualities": [
+      88,
+      90,
+      92,
+      93,
+      95
+    ],
+    "selectionReason": "Q93在不缩放前提下保留最低39.5684dB PSNR，同时仍节省88%以上产品字节；最低指标与成人合成代表图均完成原尺寸目视复核。",
+    "minimumPsnrDb": 39.5684,
+    "averagePsnrDb": 42.5993,
+    "maximumMeanAbsoluteError": 1.8221,
+    "sourceBytes": 17306046,
+    "productBytes": 2000490,
+    "savedBytes": 15305556,
+    "savedPercent": 88.441,
+    "visualReview": "source_and_q93_worst_case_original_view_passed"
+  },
+  "sourceEvidence": {
+    "narrativePlan": "output/imagegen/rqgy-no-more-door-20260902/narrative-plan.json",
+    "narrativePlanSha256": "CD60514913E3732FCEB872FECA46B5D24FC44A9BCF269D0AF4FB45F792465BB3",
+    "verification": "output/imagegen/rqgy-no-more-door-20260902/verification.json",
+    "verificationSha256": "A739C6483F5874691936CB5AF7ED8C886BA445CC41BAC0B2BDF06414F8971F87",
+    "acceptedOriginalsPreserved": 8,
+    "rejectedOriginalsPreserved": 2
+  },
+  "publish": {
+    "immutableTag": "",
+    "runtimeDirectory": "src/人妻公寓/素材/特殊场景/不再留门",
+    "globalPreviewOverride": "__RQGY_NMD_ASSET_BASE__"
+  },
+  "items": [
+    {
+      "id": "ZXM-NMD-01",
+      "semantic": "公寓外偶遇",
+      "sourcePath": "output/imagegen/rqgy-no-more-door-20260902/candidates/ZXM-NMD-01-draw1.png",
+      "sourceSha256": "A0733ABFD463857FA58CC170B69C15D71B4BD08E190EF0208A385E012FFE868F",
+      "sourceBytes": 2839938,
+      "productFile": "ZXM-NMD-01.webp",
+      "productSha256": "472C1BD403504AFFD9F0F778F2177F1D1E910ACEC6C70EA288B4AA8A3C3385DB",
+      "productBytes": 469744,
+      "width": 1536,
+      "height": 1024,
+      "psnrDb": 39.5819,
+      "meanAbsoluteError": 1.8221
+    },
+    {
+      "id": "ZXM-NMD-02",
+      "semantic": "亲吻取证",
+      "sourcePath": "output/imagegen/rqgy-no-more-door-20260902/candidates/ZXM-NMD-02-draw1.png",
+      "sourceSha256": "DFA258349892CA3C8D0593968730E7E7E5A66F592D7063E84796B9C8ECCDBF8A",
+      "sourceBytes": 2749522,
+      "productFile": "ZXM-NMD-02.webp",
+      "productSha256": "15181CE1989B90DCEF3E897DCFA2557EAC16C69D7BBC73FA8ABC065AF343B907",
+      "productBytes": 449606,
+      "width": 1536,
+      "height": 1024,
+      "psnrDb": 39.5684,
+      "meanAbsoluteError": 1.8184
+    },
+    {
+      "id": "ZXM-NMD-03",
+      "semantic": "202看照片",
+      "sourcePath": "output/imagegen/rqgy-no-more-door-20260902/candidates/ZXM-NMD-03-draw1.png",
+      "sourceSha256": "586D64848A087A749812A2A02F26ACF4EE0200EC16D95A37DA7DC32B38A7B989",
+      "sourceBytes": 1816989,
+      "productFile": "ZXM-NMD-03.webp",
+      "productSha256": "0422B8B1C44598A49D8147BB2AD4B6980A6F0EB4563C9BC61D975B9A2D85D9F9",
+      "productBytes": 174632,
+      "width": 1536,
+      "height": 1024,
+      "psnrDb": 43.5057,
+      "meanAbsoluteError": 1.1239
+    },
+    {
+      "id": "ZXM-NMD-04",
+      "semantic": "她的决定",
+      "sourcePath": "output/imagegen/rqgy-no-more-door-20260902/candidates/ZXM-NMD-04-draw1.png",
+      "sourceSha256": "6778715615808DBC21FA0E9CAD8DB31BF83CB4754B8B3ADDA7347DA538C50DA8",
+      "sourceBytes": 1764561,
+      "productFile": "ZXM-NMD-04.webp",
+      "productSha256": "15FEC3F45C6A5A40568FCBD4B6BB2EFB2D94EA869B383E946E7933E4EA469BAD",
+      "productBytes": 160500,
+      "width": 1536,
+      "height": 1024,
+      "psnrDb": 42.8319,
+      "meanAbsoluteError": 1.172
+    },
+    {
+      "id": "ZXM-NMD-05",
+      "semantic": "202设备已安装",
+      "sourcePath": "output/imagegen/rqgy-no-more-door-20260902/candidates/ZXM-NMD-05-draw1.png",
+      "sourceSha256": "7EA2B9D130674D27E2C5C602DF048E62204B8A5F356959D2548BB8BBD6AD3F8D",
+      "sourceBytes": 1668496,
+      "productFile": "ZXM-NMD-05.webp",
+      "productSha256": "8F612AFA008DDDD22F2DCDCFFF42E56E15B2CF75C29AD4D3A7D7B9A6D377D301",
+      "productBytes": 115312,
+      "width": 1536,
+      "height": 1024,
+      "psnrDb": 45.8826,
+      "meanAbsoluteError": 0.9163
+    },
+    {
+      "id": "ZXM-NMD-06",
+      "semantic": "她亲自开录",
+      "sourcePath": "output/imagegen/rqgy-no-more-door-20260902/candidates/ZXM-NMD-06-draw2.png",
+      "sourceSha256": "A95DA610B43C242963B4373EC7C69FB7D51C793E940E9848E23E1C1614D0F066",
+      "sourceBytes": 2210283,
+      "productFile": "ZXM-NMD-06.webp",
+      "productSha256": "C718AA62DD4194776702C64C168E2BC3FC789852946FF0B9C389B30F0737A1E3",
+      "productBytes": 226446,
+      "width": 1536,
+      "height": 1024,
+      "psnrDb": 43.2824,
+      "meanAbsoluteError": 1.2849
+    },
+    {
+      "id": "ZXM-NMD-07",
+      "semantic": "她封存记录",
+      "sourcePath": "output/imagegen/rqgy-no-more-door-20260902/candidates/ZXM-NMD-07-draw2.png",
+      "sourceSha256": "A3EDBCD771817A87F80B0E57B85158ECEEBDA26C6E3194C06519202A01F445F1",
+      "sourceBytes": 2183142,
+      "productFile": "ZXM-NMD-07.webp",
+      "productSha256": "D779A4900094879C8BAD3539F47707C60A91A535D58B8B9FE7AF9C4981EA58D9",
+      "productBytes": 225472,
+      "width": 1536,
+      "height": 1024,
+      "psnrDb": 43.2744,
+      "meanAbsoluteError": 1.2817
+    },
+    {
+      "id": "ZXM-NMD-08",
+      "semantic": "302母带归档",
+      "sourcePath": "output/imagegen/rqgy-no-more-door-20260902/candidates/ZXM-NMD-08-draw1.png",
+      "sourceSha256": "999CB9BCF9366B78BB01B15DF929176FAE1DE8520D5EC6CFDD222225489EC204",
+      "sourceBytes": 2073115,
+      "productFile": "ZXM-NMD-08.webp",
+      "productSha256": "4EF40BB8EF71FC8E2595E2182452816591FF9893F18ACB6A21CDD3C29343E5DB",
+      "productBytes": 178778,
+      "width": 1536,
+      "height": 1024,
+      "psnrDb": 42.8674,
+      "meanAbsoluteError": 1.293
+    }
+  ]
+}

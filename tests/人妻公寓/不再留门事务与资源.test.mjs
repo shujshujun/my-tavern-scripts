@@ -1,9 +1,11 @@
 /* eslint-disable import-x/no-nodejs-modules -- Node regression harness */
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import lodash from 'lodash';
 import { 填入本版周线完成夹具 } from './不再留门.fixture.mjs';
@@ -19,6 +21,30 @@ const v4 = require('../../src/人妻公寓/脚本/游戏逻辑/录像带V4状态
 const assets = require('../../src/人妻公寓/界面/客户端/不再留门资源.ts');
 const { 创建受控生成等待 } = require('../../src/人妻公寓/脚本/游戏逻辑/受控生成等待.ts');
 const read = file => readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8');
+const 仓库根 = fileURLToPath(new URL('../..', import.meta.url));
+const 证据根 = process.env.RQGY_CG_EVIDENCE_ROOT ? path.resolve(process.env.RQGY_CG_EVIDENCE_ROOT) : 仓库根;
+
+function webpSize(bytes) {
+  assert.equal(bytes.subarray(0, 4).toString('ascii'), 'RIFF', 'WebP缺少RIFF');
+  assert.equal(bytes.subarray(8, 12).toString('ascii'), 'WEBP', 'WebP签名无效');
+  const kind = bytes.subarray(12, 16).toString('ascii');
+  if (kind === 'VP8X') {
+    return [
+      1 + bytes[24] + (bytes[25] << 8) + (bytes[26] << 16),
+      1 + bytes[27] + (bytes[28] << 8) + (bytes[29] << 16),
+    ];
+  }
+  if (kind === 'VP8L') {
+    assert.equal(bytes[20], 0x2f, 'VP8L特征字节无效');
+    return [
+      1 + bytes[21] + ((bytes[22] & 0x3f) << 8),
+      1 + ((bytes[22] & 0xc0) >> 6) + (bytes[23] << 2) + ((bytes[24] & 0x0f) << 10),
+    ];
+  }
+  const marker = bytes.indexOf(Buffer.from([0x9d, 0x01, 0x2a]), 20);
+  assert.notEqual(marker, -1, `无法解析${kind || '未知'} WebP尺寸`);
+  return [bytes.readUInt16LE(marker + 3) & 0x3fff, bytes.readUInt16LE(marker + 5) & 0x3fff];
+}
 
 const indexSource = read('src/人妻公寓/脚本/游戏逻辑/index.ts');
 const ast = ts.createSourceFile('index.ts', indexSource, ts.ScriptTarget.Latest, true);
@@ -292,16 +318,41 @@ test('V4旧档仅购买保持未用；真实备锁、赠锁与活动场次按各
   assert.deepEqual(stale, onlyBought);
 });
 
-test('8张PNG与审核SHA一致；照片唯一CG02，反应/造型/光照/地点/实例各自校验', () => {
-  const verification = JSON.parse(read('output/imagegen/rqgy-no-more-door-20260902/verification.json'));
+test('8张WebP产品图与审核源图双向闭合；照片唯一CG02，反应/造型/光照/地点/实例各自校验', () => {
+  const verification = JSON.parse(
+    readFileSync(path.join(证据根, 'output/imagegen/rqgy-no-more-door-20260902/verification.json'), 'utf8'),
+  );
+  const manifest = JSON.parse(read('src/人妻公寓/素材/特殊场景/不再留门/不再留门CG.manifest.json'));
   assert.equal(verification.finals.length, 8);
   assert.equal(assets.不再留门CG清单.length, 8);
-  for (const item of verification.finals) {
-    const buffer = readFileSync(new URL(`../../${item.path}`, import.meta.url));
-    assert.equal(buffer.readUInt32BE(16), 1536);
-    assert.equal(buffer.readUInt32BE(20), 1024);
-    assert.equal(createHash('sha256').update(buffer).digest('hex').toUpperCase(), item.sha256);
+  assert.equal(manifest.status, 'product-webp-ready-awaiting-external-publish');
+  assert.equal(manifest.format, 'webp');
+  assert.equal(manifest.encoder.quality, 93);
+  assert.equal(manifest.encoder.method, 6);
+  assert.equal(manifest.encoder.resize, false);
+  assert.equal(manifest.items.length, 8);
+  assert.equal(manifest.sourceEvidence.acceptedOriginalsPreserved, 8);
+  assert.equal(manifest.sourceEvidence.rejectedOriginalsPreserved, 2);
+  const productRoot = path.join(仓库根, 'src/人妻公寓/素材/特殊场景/不再留门');
+  const productFiles = readdirSync(productRoot)
+    .filter(file => /\.(?:png|webp)$/u.test(file))
+    .sort();
+  assert.deepEqual(productFiles, manifest.items.map(item => item.productFile).sort());
+  for (const item of manifest.items) {
+    const source = readFileSync(path.join(证据根, item.sourcePath));
+    const product = readFileSync(path.join(productRoot, item.productFile));
+    assert.equal(createHash('sha256').update(source).digest('hex').toUpperCase(), item.sourceSha256, item.id);
+    assert.equal(source.length, item.sourceBytes, item.id);
+    assert.deepEqual(webpSize(product), [1536, 1024], item.id);
+    assert.equal(createHash('sha256').update(product).digest('hex').toUpperCase(), item.productSha256, item.id);
+    assert.equal(product.length, item.productBytes, item.id);
+    assert.equal(item.productFile, `${item.id}.webp`, item.id);
+    assert.ok(item.productBytes < item.sourceBytes, `${item.id}产品图必须小于源图`);
   }
+  assert.ok(manifest.qualityEvidence.savedPercent > 80);
+  globalThis.__RQGY_NMD_ASSET_BASE__ = 'https://assets.example.test/no-more-door/';
+  assert.equal(assets.不再留门图片('ZXM-NMD-01'), 'https://assets.example.test/no-more-door/ZXM-NMD-01.webp');
+  delete globalThis.__RQGY_NMD_ASSET_BASE__;
   const d = stateFor('交付副本');
   assert.equal(assets.不再留门CG允许(d, 'ZXM-NMD-02'), true);
   assert.equal(assets.不再留门CG允许(d, 'ZXM-NMD-03', d.系统._不再留门.实例, '202'), true);

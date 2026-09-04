@@ -13,10 +13,10 @@ export const 不再留门CG清单 = Object.freeze([
   ['ZXM-NMD-07', '她封存记录'],
   ['ZXM-NMD-08', '302母带归档'],
 ] as const);
-/** 原件未发布；验收服务器或后续发布配置提供基址。没有基址时保持可读回执。 */
+/** WebP产品尚未发布；验收服务器或后续发布配置提供基址。没有基址时保持可读回执。 */
 export const 不再留门素材配置 = Object.freeze({
   产品目录: 'src/人妻公寓/素材/特殊场景/不再留门',
-  扩展名: 'png',
+  扩展名: 'webp',
   已发布基址: '',
 });
 export function 不再留门图片(文件: string): string {
@@ -24,7 +24,7 @@ export function 不再留门图片(文件: string): string {
   const base = String((globalThis as Record<string, unknown>).__RQGY_NMD_ASSET_BASE__ ?? 不再留门素材配置.已发布基址)
     .trim()
     .replace(/\/+$/, '');
-  return base ? `${base}/${文件}.png` : '';
+  return base ? `${base}/${文件}.webp` : '';
 }
 export function 不再留门CG标题(文件: string): string {
   return 不再留门CG清单.find(([id]) => id === 文件)?.[1] ?? '不再留门';
