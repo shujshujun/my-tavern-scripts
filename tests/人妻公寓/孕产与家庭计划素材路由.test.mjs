@@ -126,6 +126,18 @@ test('家庭计划旧图片的迟到失败只淘汰自己的请求，不得关�
     /\.family-plan-stage img \{[\s\S]{0,160}position: absolute;[\s\S]{0,100}inset: 0;[\s\S]{0,160}object-fit: contain;/u,
     '事件CG必须被舞台边界绝对约束并完整显示，不能由固有宽高撑出容器后只截到顶部',
   );
+  assert.match(舞台源码, /min-height: 44px;/u, '手机端继续按钮必须保持至少44px触控高度');
+  assert.match(舞台源码, /touch-action: manipulation;/u, '继续按钮不依赖桌面端鼠标行为');
+  assert.match(
+    舞台源码,
+    /@media \(max-width: 540px\)[\s\S]*safe-area-inset-left[\s\S]*safe-area-inset-bottom[\s\S]*safe-area-inset-right/u,
+    '手机竖屏与横屏都要避让左右刘海与底部Home Indicator',
+  );
+  assert.match(
+    舞台源码,
+    /max-width: calc\([\s\S]{0,160}108px[\s\S]{0,160}safe-area-inset-right/u,
+    '长标题必须在继续按钮之前换行，不能在小屏上与操作重叠',
+  );
   assert.match(
     客户端源码,
     /function 当前事件CG加载失败\(失败地址: string\)[\s\S]{0,160}失败地址 !== 当前事件CG地址\.value[\s\S]{0,160}关闭当前事件CG\(\)/u,
@@ -140,11 +152,16 @@ test('借种、生产与家庭计划画面共用事件舞台时，候选拥有�
 
   assert.match(
     客户端源码,
-    /当前事件CG = computed\(\(\) => 当前借种CG\.value \?\? 当前生产CG\.value \?\? 当前家庭计划CG\.value\)/u,
+    /当前事件CG = computed\(\(\) => 当前借种CG\.value \?\? 当前生产CG\.value \?\? \([\s\S]*?不再留门CG允许[\s\S]*?\? null : 当前家庭计划CG\.value\)/u,
   );
   assert.match(
     客户端源码,
-    /当前事件CG地址 = computed\(\(\) =>[\s\S]{0,100}当前借种CG\.value[\s\S]{0,100}借种结局图片\([^)]+\)[\s\S]{0,100}当前生产CG\.value[\s\S]{0,100}生产图片\([^)]+\)[\s\S]{0,100}当前家庭计划CG地址\.value/u,
+    /当前事件CG原始地址 = computed\(\(\) =>[\s\S]{0,100}当前借种CG\.value[\s\S]{0,100}借种结局图片\([^)]+\)[\s\S]{0,100}当前生产CG\.value[\s\S]{0,100}生产图片\([^)]+\)[\s\S]{0,100}当前家庭计划CG地址\.value/u,
+  );
+  assert.match(
+    客户端源码,
+    /当前事件CG地址 = computed\(\(\) =>[\s\S]{0,160}当前事件CG原始地址\.value[\s\S]{0,160}#rqgy-event-\$\{当前事件CG请求epoch\.value\}/u,
+    '事件舞台地址保留原资源优先级，并以请求世代隔离迟到的图片失败回调',
   );
   assert.match(客户端源码, /eventOn\('人妻公寓:生产CG',[\s\S]{0,220}当前家庭计划CG\.value = null/u);
   assert.match(逻辑源码, /当前事件尚未结束，家庭计划暂不能继续/u);

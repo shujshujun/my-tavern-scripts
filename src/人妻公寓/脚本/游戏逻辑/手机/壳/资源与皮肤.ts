@@ -1,4 +1,5 @@
 import { 户静态表, 门牌列表 } from '../../../../stageConfig';
+import { 姐妹茶话会头像图, 住户答谢会图 as 住户答谢会头像图 } from '../../../../内嵌小图';
 
 /**
  * 手机壳资源与皮肤（拆分方案 P7）：ROOT_ID/素材基址/成人素材基址/私聊图片地址/
@@ -9,6 +10,11 @@ import { 户静态表, 门牌列表 } from '../../../../stageConfig';
  */
 
 export const ROOT_ID = 'rq-phone-root';
+/** 两张新群像都很小，直接内联进手机脚本，避免继续请求不含这些文件的 rq0.55 旧素材快照。 */
+const 内嵌群头像: Readonly<Partial<Record<string, string>>> = {
+  群: 住户答谢会头像图,
+  姐妹群: 姐妹茶话会头像图,
+};
 // ⚠ 与 App.vue 素材基址同步：Discord 测试版发布 tag=rq0.55。
 export const 素材基址 = 'https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.55/dist/人妻公寓/素材';
 export const 成人素材基址 = 'https://testingcf.jsdelivr.net/gh/shujun8520-design/qgy-assets@cg2/cg1';
@@ -265,6 +271,22 @@ export const 手机CSS = `
 #${ROOT_ID} .rqp-call .acts button{width:60px;height:60px;border-radius:50%;border:none;font-size:24px;cursor:pointer;color:#fff;}
 #${ROOT_ID} .rqp-call .acts .ok{background:#07c160;}
 #${ROOT_ID} .rqp-call .acts .no{background:#fa5151;}
+/* 《双重继承》小手机视频通话：CG是主背景，父亲气泡与输入保持微信UI层。 */
+#${ROOT_ID} .rqp-video-talk{position:relative;background:linear-gradient(180deg,#262a31,#16181d);overflow:hidden;color:#fff;}
+#${ROOT_ID} .rqp-video-bg{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:center 42%;display:block;z-index:0;}
+#${ROOT_ID} .rqp-video-bg.is-missing{display:none;}
+#${ROOT_ID} .rqp-video-shade{position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(180deg,rgba(7,9,13,.20),rgba(7,9,13,.03) 38%,rgba(7,9,13,.38) 72%,rgba(7,9,13,.72));}
+#${ROOT_ID} .rqp-video-meta{position:relative;z-index:3;display:flex;align-items:center;justify-content:space-between;gap:8px;margin:8px 10px 0;padding:6px 8px;border-radius:9px;background:rgba(10,12,17,.52);backdrop-filter:blur(8px);color:#fff;font-size:10px;line-height:1.3;}
+#${ROOT_ID} .rqp-video-meta b{font-size:11px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#${ROOT_ID} .rqp-video-meta span{flex:none;opacity:.76;font-variant-numeric:tabular-nums;}
+#${ROOT_ID} .rqp-video-talk .rqp-bubbles{position:relative;z-index:3;min-height:100%;justify-content:flex-end;padding-top:54px;padding-bottom:14px;}
+#${ROOT_ID} .rqp-video-talk .rqp-line{filter:drop-shadow(0 2px 4px rgba(0,0,0,.28));}
+#${ROOT_ID} .rqp-video-talk .rqp-b.ta{background:rgba(28,30,36,.82);color:#fff;backdrop-filter:blur(8px);}
+#${ROOT_ID} .rqp-video-talk .rqp-b.ta::before{border-right-color:rgba(28,30,36,.82);}
+#${ROOT_ID} .rqp-video-talk .rqp-b.me{background:rgba(7,193,96,.88);color:#fff;}
+#${ROOT_ID} .rqp-video-talk .rqp-b.sys{color:rgba(255,255,255,.82);text-shadow:0 1px 3px rgba(0,0,0,.65);}
+#${ROOT_ID} .rqp-video-ending{position:relative;z-index:4;margin:0 10px 8px;border:1px solid rgba(255,255,255,.24);border-radius:8px;background:rgba(18,20,25,.70);color:#fff;padding:8px 10px;font-size:11px;cursor:pointer;backdrop-filter:blur(8px);}
+#${ROOT_ID} .rqp-video-ending:disabled{opacity:.45;cursor:default;}
 #${ROOT_ID} .rqp-set{padding:16px 16px max(18px,env(safe-area-inset-bottom));display:flex;flex:1;min-height:0;flex-direction:column;gap:10px;background:#fff;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;}
 #${ROOT_ID} .rqp-set .rqp-api-section{display:flex;flex-direction:column;gap:10px;}
 #${ROOT_ID} .rqp-set .custom-api-fields{display:flex;flex-direction:column;gap:10px;}
@@ -314,7 +336,8 @@ export function 头像块(名: string): string {
           : '';
   // 头像名通常来自静态表，但朋友圈旧档仍可能携带任意字符串。文件段必须编码；错误回退
   // 使用常量文本，不能把持久字符串再次拼进内联事件属性。
-  return `<span class="rqp-ava${语义框}"><img src="${素材基址}/头像/${encodeURIComponent(String(文件))}.webp" onerror="var p=this.parentElement;if(p)p.textContent='?'"/></span>`;
+  const 地址 = 内嵌群头像[文件] ?? `${素材基址}/头像/${encodeURIComponent(String(文件))}.webp`;
+  return `<span class="rqp-ava${语义框}"><img src="${地址}" onerror="var p=this.parentElement;if(p)p.textContent='?'"/></span>`;
 }
 
 /** 群消息正文以「发言人:内容」保存；气泡头像必须跟发言人走，不能永远显示群头像。 */

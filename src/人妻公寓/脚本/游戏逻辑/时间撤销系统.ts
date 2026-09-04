@@ -5,7 +5,7 @@ import { 孕期时段数 } from './生产系统';
 import type { 时间推进地点, 时间推进方式 } from './时间推进系统';
 
 /** 时间事务结束后仍停留在原地的合法撤销入口。 */
-export const 时间撤销地点 = ['管理员室', '302', '晨跑公园', '健身房'] as const satisfies readonly 时间推进地点[];
+export const 时间撤销地点 = ['管理员室', '302', '201', '天台', '晨跑公园', '健身房'] as const satisfies readonly 时间推进地点[];
 
 export function 是时间撤销地点(地点: string | null | undefined): 地点 is 时间推进地点 {
   return 时间撤销地点.includes(地点 as (typeof 时间撤销地点)[number]);

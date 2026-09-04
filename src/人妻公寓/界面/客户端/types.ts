@@ -17,12 +17,31 @@ export interface 由头日记录 {
   已用: string[];
 }
 
+export interface 卡动作选项 {
+  kicker: string;
+  icon: string;
+  文案: string;
+  提示?: string;
+  /** 需要持续按住才执行的结构化操作；松手过早只走短按失败回调。 */
+  长按毫秒?: number;
+  短按?: () => void | Promise<void>;
+  做: () => void | Promise<void>;
+}
+
 export interface 卡动作 {
   kicker: string;
   icon: string;
   文案: string;
+  /** 302共居生产者的稳定分组标记；桌面端据此折叠，禁止靠中文文案猜动作。 */
+  分组?: '302共居';
   类?: string;
   做: () => void | Promise<void>;
+  /** 单块瓷砖内部的轻量二选一；不新增第二层抽屉或新的业务状态机。 */
+  选项?: readonly 卡动作选项[];
+  /** 永久能力已解锁但当前现实条件不满足时保留瓷砖身份，并明确置灰。 */
+  禁用?: boolean;
+  /** 禁用原因或额外说明；地图房卡与房内抽屉都应显示。 */
+  提示?: string;
 }
 
 export type 客户端时间方式 = '推进一时段' | '睡到次日早晨' | '小憩' | '晨跑' | '健身';

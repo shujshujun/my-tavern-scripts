@@ -92,8 +92,12 @@ test('隔离正文把常见美化 HTML 转为可读纯文本，不把字面标�
   );
 });
 
-const Index源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
-const 隔离事件源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/隔离事件引擎.ts', import.meta.url), 'utf8');
+function 读取源码(路径) {
+  return readFileSync(路径, 'utf8').replace(/\r\n?/gu, '\n');
+}
+
+const Index源 = 读取源码(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url));
+const 隔离事件源 = 读取源码(new URL('../../src/人妻公寓/脚本/游戏逻辑/隔离事件引擎.ts', import.meta.url));
 
 function 截段(源, 开始标记, 结束标记) {
   const 开始 = 源.indexOf(开始标记);

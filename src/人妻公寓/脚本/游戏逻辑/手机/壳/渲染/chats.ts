@@ -1,6 +1,7 @@
 import { 头像块, el } from '../资源与皮肤';
 import { 会话有未读 } from '../../数据层';
 import { 获取会议会话禁用原因 } from '../../静音会议旁路';
+import { 回国姐妹群默认昵称, 读取回国姐妹群昵称 } from '../../../回国系统';
 import { 微信好友 } from '../../通知桥';
 import { 渲染底栏, 渲染头, type 渲染上下文 } from './共享';
 
@@ -18,7 +19,10 @@ export function 渲染chats(上下文: 渲染上下文): void {
       ),
     );
   }
-  const 友们 = data ? 微信好友(data) : [{ id: '父亲', 名: '爸', 类: '父亲' as const }];
+  const 姐妹群昵称 = 读取回国姐妹群昵称(库.消息) ?? 回国姐妹群默认昵称;
+  const 友们 = (data ? 微信好友(data) : [{ id: '父亲', 名: '爸', 类: '父亲' as const }]).map(友 =>
+    友.id === '姐妹群' ? { ...友, 名: 姐妹群昵称 } : 友,
+  );
   for (const 友 of 友们) {
     const 条 = 库.消息.filter(m => m.会话 === 友.id && 在当前时间线(m));
     const 尾 = 条[条.length - 1];
@@ -28,7 +32,7 @@ export function 渲染chats(上下文: 渲染上下文): void {
     const r = el(
       'div',
       `rqp-row${会议参与 ? ' meeting-participant' : 禁用原因 ? ' meeting-frozen' : ''}`,
-      `${头像块(友.类 === '群' ? (友.id === '姐妹群' ? '姐妹群' : '群') : 友.类 === '父亲' ? '父亲' : 友.名)}<span class="mid"><b>${友.名}</b><i>${尾 ? (尾.类 === '撤回' ? (尾.发 === '我' ? '[你撤回了一条消息]' : '[她撤回了一条消息]') : 尾.类 === '通话' ? '[语音通话]' : _.escape(尾.文.slice(0, 24))) : ''}</i></span>${未读 ? '<span class="dot"></span>' : ''}`,
+      `${头像块(友.类 === '群' ? (友.id === '姐妹群' ? '姐妹群' : '群') : 友.类 === '父亲' ? '父亲' : 友.名)}<span class="mid"><b>${_.escape(友.名)}</b><i>${尾 ? (尾.类 === '撤回' ? (尾.发 === '我' ? '[你撤回了一条消息]' : '[她撤回了一条消息]') : 尾.类 === '通话' ? '[语音通话]' : _.escape(尾.文.slice(0, 24))) : ''}</i></span>${未读 ? '<span class="dot"></span>' : ''}`,
     );
     if (禁用原因) r.title = 禁用原因;
     r.addEventListener('click', () => {

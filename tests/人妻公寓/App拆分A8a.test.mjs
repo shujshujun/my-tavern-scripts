@@ -261,16 +261,28 @@ test('story-wrap/立绘/成人 CG/亲密抽屉/scene-bar/选项/输入/dock 保�
   const 亲密位置 = 模板段.indexOf('class="intimacy-stage-dock"');
   assert.ok(立绘位置 !== -1 && 卷轴位置 !== -1 && 亲密位置 !== -1, '立绘/卷轴/亲密抽屉都应存在');
   assert.ok(立绘位置 < 卷轴位置 && 卷轴位置 < 亲密位置, '立绘在卷轴前、亲密抽屉在卷轴后');
-  assert.match(App源码, /'story-special-interaction': 录像带交互幕 \|\| 静音会议交互幕/, 'story-wrap 场景态保持');
-  assert.match(App源码, /v-if="!录像带中 && !静音会议交互幕"/, '隐藏正文钮门控保持');
+  assert.match(
+    App源码,
+    /'story-special-interaction': 录像带交互幕 \|\| 录像带V4中 \|\| 静音会议交互幕/,
+    'story-wrap 同时承接旧录像带、V4与静音会议场景态',
+  );
+  assert.match(App源码, /v-if="!录像带任一中 && !静音会议交互幕"/, '隐藏正文钮对两代录像带统一让位');
   assert.match(App源码, /^\.portrait \{/m, 'App 仍保留立绘规则');
   assert.match(App源码, /^\.adult-cg-stage \{/m, 'App 仍保留成人 CG 规则');
   assert.match(App源码, /class="who-chip mini"/, 'scene-bar 头像行仍在 App');
   // A8b:行动选项/输入已迁入两个新组件,App 只留 props 接线与完整组合门,组件根自持门控
-  assert.match(App源码, /<ActionOptions\b[\s\S]*?:open="显示选项 && !录像带中 && !静音会议交互幕 && !静音会议待散会选择 && !静音会议自由待选择 && !前台硬决策中"/, '行动选项接线保持并避让硬决策');
+  assert.match(
+    App源码,
+    /<ActionOptions\b[\s\S]*?:open="\s*显示选项 && !录像带任一中 && !静音会议交互幕 && !静音会议待散会选择 && !静音会议自由待选择 && !前台硬决策中\s*"/,
+    '行动选项对两代录像带统一让位并避让硬决策',
+  );
   assert.match(行动选项源码, /<template v-if="open">/, '行动选项组件拥有根门控');
   assert.match(回合输入源码, /v-if="decisionMode === 'none' && !videoActive && !formalMeeting"/, '推进时间钮门控在回合输入组件');
-  assert.match(App源码, /v-if="!录像带中 && !前台硬决策中" class="dock"/, 'dock 保持录像带门并避让硬决策');
+  assert.match(
+    App源码,
+    /v-if="!录像带任一中 && !前台硬决策中 && !母亲视频终幕已接通 && !双重继承最终收束锁"\s+class="dock"/,
+    'dock 对两代录像带统一让位，并避让硬决策、母亲视频终幕与终幕后钥匙收束',
+  );
   assert.match(App源码, /useMuteMeeting/, 'useMuteMeeting 边界不回退');
   assert.match(App源码, /import MuteMeetingPreparation from '\.\/components\/静音会议筹备\.vue';/, 'A7b1 组件仍挂');
   assert.match(App源码, /import VideoTapeStage from '\.\/components\/录像带舞台\.vue';/, 'A7a 舞台仍挂');

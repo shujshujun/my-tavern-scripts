@@ -1,5 +1,6 @@
 /* eslint-disable import-x/no-nodejs-modules -- Node-only regression test */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import test from 'node:test';
 
@@ -30,6 +31,9 @@ const { Schema, 创建户节点 } = require('../../src/人妻公寓/schema.ts');
 const { 道具表, 经济配置 } = require('../../src/人妻公寓/stageConfig.ts');
 const { 取货架, 购买 } = require('../../src/人妻公寓/脚本/游戏逻辑/商店系统.ts');
 const { 使用运作 } = require('../../src/人妻公寓/脚本/游戏逻辑/经济系统.ts');
+const 客户端素材源码 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/assets.ts', import.meta.url), 'utf8');
+const App源码 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
+const 内嵌小图源码 = readFileSync(new URL('../../src/人妻公寓/内嵌小图.ts', import.meta.url), 'utf8');
 
 function 建数据({ 时段 = 10, 风闻 = 60 } = {}) {
   const data = Schema.parse({ 户: { 101: 创建户节点(0) } });
@@ -57,6 +61,15 @@ test('住户答谢会作为高价强效商品上架，并完成购买到使用�
   assert.match(使用结果.提示, /风闻 -25/);
   assert.equal(data.风闻, 35);
   assert.equal(data.背包.includes('住户答谢会'), false);
+});
+
+test('住户答谢会生成图以内联小资源接入商店和背包，不依赖旧素材标签', () => {
+  assert.match(客户端素材源码, /住户答谢会图 as 住户答谢会道具图/);
+  assert.match(客户端素材源码, /from '\.\.\/\.\.\/内嵌小图'/);
+  assert.match(客户端素材源码, /export \{[\s\S]{0,300}住户答谢会道具图,[\s\S]{0,300}\};/);
+  assert.match(App源码, /住户答谢会道具图/);
+  assert.match(App源码, /住户答谢会:\s*住户答谢会道具图/);
+  assert.match(内嵌小图源码, /export const 住户答谢会图 = 'data:image\/webp;base64,/);
 });
 
 test('聚餐与答谢会互相占用共享冷却，失败时不消耗背包商品', () => {

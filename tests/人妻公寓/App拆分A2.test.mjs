@@ -190,7 +190,11 @@ test('监控：组件只展示并 emit 四个具名事件；App 看监控与借�
   assert.match(监控源码, /@click="emit\('confirmBorrowSeedOffline'\)"/, '点击断线卡只 emit，不在组件写业务状态');
   assert.match(App源码, /:borrow-seed-offline="借种监控待确认"/, 'App 注入断线资格');
   assert.match(App源码, /@confirm-borrow-seed-offline="提交借种监控断线确认"/, 'App 把断线确认接回业务事件');
-  assert.match(App源码, /v-if="监控列表\.length \|\| 借种监控待确认"/, '无剩余摄像头时仍能从302打开断线卡');
+  assert.match(
+    App源码,
+    /v-if="监控列表\.length \|\| 借种监控待确认 \|\| 录像带V4监控就绪"/,
+    '无剩余摄像头时仍能从302打开借种断线卡，V4就绪时也必须显示同一监控入口',
+  );
   assert.match(App源码, /const 监控列表 = computed<门牌\[\]>/, '监控列表响应式逻辑仍留 App');
 });
 

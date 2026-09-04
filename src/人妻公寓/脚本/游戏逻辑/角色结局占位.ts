@@ -1,6 +1,7 @@
 import type { SchemaType } from '../../schema';
 import { 户静态表, 查角色剧情占位, type 角色剧情占位配置 } from '../../stageConfig';
 import { 阶段性癖已完成 } from './阶段性癖状态';
+import { 许曼君分居已完成 } from './许曼君分居系统';
 
 /**
  * 尚待设计的后半程路线沿用同一门槛：角色达到 L5，且唯一阶段主题已经永久完成。
@@ -10,13 +11,17 @@ export function 角色剧情占位已上架(data: SchemaType, id: string): boole
   const 占位 = 查角色剧情占位(id);
   if (!占位) return false;
   const 妻 = data.户[占位.门牌]?.妻;
-  return !!妻 && 妻.当前阶段 >= 5 && 阶段性癖已完成(data, 占位.门牌);
+  if (!妻 || 妻.当前阶段 < 5 || !阶段性癖已完成(data, 占位.门牌)) return false;
+  if (占位.门牌 === '201' && 占位.类型 === '结局剧情') return 许曼君分居已完成(data);
+  return true;
 }
 
 /** 结局占位把“操作性剧情在前”的关系直接写明，但不伪造尚不存在的完成状态。 */
 export function 角色剧情占位锁定原因(id: string): string[] {
   const 占位 = 查角色剧情占位(id);
   if (!占位 || 占位.类型 === '操作性剧情') return [];
+  if (占位.门牌 === '102') return ['先完成沈静仪《第二机位》，并等待周小满承接线完成后合流'];
+  if (占位.门牌 === '201') return ['先完成许曼君承接线《分居》'];
   return [`先完成${户静态表[占位.门牌].妻名}的操作性剧情（当前待设计）`];
 }
 

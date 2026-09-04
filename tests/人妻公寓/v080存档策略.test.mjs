@@ -381,7 +381,9 @@ test('v0.80 仍有业务消费者的状态继续保留', () => {
   assert.equal(data.系统._荣耀洞拍, -1);
   assert.equal(data.系统._荣耀洞动态时段, -1);
 
-  assert.match(商店源码, /妻\._穿戴锁\.push\(槽\)/);
+  assert.match(商店源码, /应用赠礼穿戴\(data, 门牌号, 道具id\)/);
+  const 衣柜源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/衣柜系统.ts', import.meta.url), 'utf8');
+  assert.match(衣柜源码, /妻\._穿戴锁\.push\(项\.槽\)/);
   assert.match(守护源码, /妻快照\._穿戴锁\.includes\(槽\)/);
   assert.match(回合源码, /data\.系统\._难度 = 档/);
   assert.match(经济源码, /难度表\[data\.系统\._难度\]/);

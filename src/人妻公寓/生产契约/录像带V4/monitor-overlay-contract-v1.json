@@ -1,0 +1,97 @@
+{
+  "schemaVersion": "rqgy-vtr-v4-monitor-overlay-contract-v1",
+  "createdAt": "2026-09-02",
+  "status": "design-only-not-wired",
+  "sourceTask": {
+    "title": "继续制作录像带CG",
+    "id": "01a059bb-8efa-7be2-8939-1584867d5f33"
+  },
+  "userRequirement": "Every CG actually shown to the player must visibly carry REC so the monitoring viewpoint is never ambiguous.",
+  "assetPolicy": {
+    "rawPngOverlayBaked": false,
+    "reason": "Keep accepted source pixels reusable and prevent duplicate or stale CAM/timecode labels.",
+    "runtimeOverlayRequired": true
+  },
+  "coverage": {
+    "rooms": ["102", "202"],
+    "beatsPerRoom": 19,
+    "candidateCount": 38,
+    "displayedPerPlaythrough": 19,
+    "exceptions": [],
+    "includes": [
+      "beat 1 locked waiting",
+      "beats 2 through 16 tablet and action scenes",
+      "beat 17 cleanup and self-relock",
+      "beat 18 reused locked-state storyboard",
+      "beat 19 handoff and exit"
+    ]
+  },
+  "requiredRuntimeElements": [
+    {
+      "id": "rec",
+      "text": "REC",
+      "placement": "top-left",
+      "visibility": "always while a VTR CG is visible",
+      "animation": "optional subtle pulse; text itself may never disappear"
+    },
+    {
+      "id": "cam",
+      "textByRoom": {"102": "CAM-102", "202": "CAM-202"},
+      "placement": "top-right",
+      "visibility": "always while a VTR CG is visible"
+    },
+    {
+      "id": "timecode",
+      "format": "HH:MM:SS",
+      "placement": "bottom-left",
+      "visibility": "always while a VTR CG is visible",
+      "semantics": "scene-local synthetic monitor timecode; monotonic within the VTR session"
+    },
+    {
+      "id": "monitor-frame",
+      "placement": "full-image edge",
+      "visibility": "always while a VTR CG is visible",
+      "semantics": "subtle frame/scanline treatment that never obscures image evidence"
+    }
+  ],
+  "layoutSafety": {
+    "bottomRightReservedForActionInset": true,
+    "labelsMayNotCoverTablet": true,
+    "labelsMayNotCoverLockEvidence": true,
+    "labelsMayNotCoverHandoffObjects": true,
+    "overlayScalesWithContainImageRect": true,
+    "overlayStaysVisibleInFullscreen": true,
+    "overlayStaysVisibleDuringRoomSwitch": true,
+    "overlayStaysVisibleOnBeat19UntilSceneExit": true,
+    "fallbackMaintainsMonitorIdentity": true
+  },
+  "stateBinding": {
+    "rec": "VTR scene active and a candidate/fallback display is mounted",
+    "cam": "current selected room",
+    "timecode": "VTR scene session clock or deterministic beat-derived fallback",
+    "image": "current hidden beat plus selected room",
+    "atomicUpdate": "CAM label and image swap in the same render commit"
+  },
+  "aiPromptPolicy": {
+    "injectOverlayInstructionsIntoStoryAI": false,
+    "reason": "REC/CAM/timecode are UI facts. Story AI already receives the current CAM and should not narrate interface chrome."
+  },
+  "currentImplementationEvidence": {
+    "compositionPlan": "output/imagegen/video-tape-ending/v4-repair/composition-plan-v2.json",
+    "compositionPlanMeaning": "monitorOverlay is runtime-only; REC/CAM/timecode remains runtime-only",
+    "legacyStage": "src/人妻公寓/界面/客户端/components/录像带舞台.vue",
+    "legacyStageHasRecOverlay": false,
+    "legacyStageMeaning": "old three-image dual-screen stage; not evidence that V4 overlay is implemented"
+  },
+  "requiredTests": [
+    "render all 19 beats in CAM-102 and assert REC, CAM-102, and timecode",
+    "render all 19 beats in CAM-202 and assert REC, CAM-202, and timecode",
+    "switch rooms and assert image plus CAM label update atomically while REC remains",
+    "render beat 18 and assert overlay does not cover the reused lock inset",
+    "render beat 19 and assert REC remains until the VTR scene closes",
+    "force image failure and assert fallback still visibly belongs to the monitor UI",
+    "assert every raw candidate provenance retains monitorOverlayBaked=false"
+  ],
+  "installed": false,
+  "productionUnlocked": false
+}

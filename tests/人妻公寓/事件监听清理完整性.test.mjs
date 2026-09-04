@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const 源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
+const 源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8').replace(
+  /\r\n?/gu,
+  '\n',
+);
 
 function 本地监听事件() {
   return new Set([...源码.matchAll(/eventOn\(\s*['"](人妻公寓:[^'"]+)['"]/g)].map(匹配 => 匹配[1]));

@@ -1,23 +1,26 @@
 <script setup lang="ts">
 /**
- * 房内操作抽屉（手机端房内操作上滑抽屉）。
+ * 房内操作抽屉。
  *
- * 包住「翻垃圾」入口与普通房间动作瓷砖；桌面保持原流式两列布局，手机在流内只留一个
- * 44px 把手，面板绝对定位向上覆盖正文，不参与正文高度计算。展开/自动收起/新增提示等
- * 纯 UI 临时状态由 composables/抽屉状态机.ts 承载，动作点击后直接调用原回调并立即收起，
- * 不包装、不等待、不重放；垃圾选择弹窗仍在 App，本组件只发 openGarbage 事件。
+ * 手机端继续只有这一层总抽屉；桌面端保持原来的直接瓷砖。少数动作可以在同一面板内展开
+ * 一个轻量选择区，例如302结局后的“和她亲密”只展开“由我开始／让她开始”，不会再套
+ * 第二层抽屉，也不会在组件里保存业务状态。
  */
-import { computed, reactive, watchEffect, onScopeDispose } from 'vue';
+import { computed, onScopeDispose, reactive, ref, watch, watchEffect } from 'vue';
 import Ic from './Icon.vue';
 import { 创建抽屉状态机, type 抽屉状态, type 抽屉状态机 } from '../composables/抽屉状态机';
-import type { 卡动作 } from '../types';
+import type { 卡动作, 卡动作选项 } from '../types';
 
 const props = defineProps<{
+  /** 保留父组件当前可选参数签名；本组件不据此改变桌面展示。 */
+  desktopCohabitationFold?: boolean;
   mobile: boolean;
+  /** 保留父组件既有签名；桌面现在始终直接展示瓷砖。 */
+  desktopCollapsible: boolean;
   roomId: string | null;
   actionCount: number;
   suppressed: boolean;
-  actions: 卡动作[];
+  actions: (卡动作 & { 分组?: '302共居' })[];
   garbageVisible: boolean;
   videoTapeActive: boolean;
 }>();
@@ -26,6 +29,9 @@ const emit = defineEmits<{ openGarbage: [] }>();
 
 const 状态 = reactive<抽屉状态>({ 展开: false, 新增提示: false });
 const 机器: 抽屉状态机 = 创建抽屉状态机({ 状态 });
+const 当前选择动作 = ref<卡动作 | null>(null);
+const 当前长按选项 = ref<卡动作选项 | null>(null);
+let 长按计时: ReturnType<typeof setTimeout> | undefined;
 
 // 单一响应式入口：进入房间与 actionCount 可能同一 tick 更新，全量输入交给状态机自行比对。
 watchEffect(() => {
@@ -37,28 +43,112 @@ watchEffect(() => {
   });
 });
 
-onScopeDispose(() => 机器.销毁());
+watch(
+  () => [props.roomId, props.suppressed, props.actions.map(动作 => `${动作.kicker}:${动作.文案}`).join('\u0000')] as const,
+  () => {
+    当前选择动作.value = null;
+  },
+);
+
+onScopeDispose(() => {
+  clearTimeout(长按计时);
+  机器.销毁();
+});
 
 // 普通动作仍按旧语义只受「录像带中」门控；垃圾入口原 v-if 没有录像带门控，两类门互不合并。
 const 普通动作可见 = computed(() => !props.videoTapeActive && props.actions.length > 0);
 const 有可见动作 = computed(() => props.garbageVisible || 普通动作可见.value);
-// 晨跑/健身是地点的主操作，不是可有可无的二级菜单。0.74 抽屉化后自动收起会让公园
-// 的 TRAIN 瓷砖看起来凭空消失；手机端只要主训练仍可执行，就保持面板可见。
+// 晨跑/健身是地点主操作。手机端只要主训练仍可执行，就保持面板可见。
 const 有主训练动作 = computed(() => props.mobile && props.actions.some(动作 => 动作.kicker === 'TRAIN'));
 
 function 触发动作(动作: 卡动作): void {
-  机器.手动收起(); // 点击任一房内动作后收起；不包装、不等待原回调
-  动作.做();
+  if (动作.禁用) return;
+  if (动作.选项?.length) {
+    当前选择动作.value = 当前选择动作.value === 动作 ? null : 动作;
+    if (props.mobile) 机器.交互取消自动计时();
+    return;
+  }
+  当前选择动作.value = null;
+  机器.手动收起();
+  void 动作.做();
+}
+
+function 触发动作选项(选项: 卡动作选项): void {
+  if (选项.长按毫秒) return;
+  当前选择动作.value = null;
+  机器.手动收起();
+  void 选项.做();
+}
+
+function 启动长按倒计时(选项: 卡动作选项): void {
+  if (!选项.长按毫秒 || 当前长按选项.value) return;
+  当前长按选项.value = 选项;
+  clearTimeout(长按计时);
+  长按计时 = setTimeout(() => {
+    if (当前长按选项.value !== 选项) return;
+    当前长按选项.value = null;
+    长按计时 = undefined;
+    当前选择动作.value = null;
+    机器.手动收起();
+    void 选项.做();
+  }, 选项.长按毫秒);
+}
+
+function 记录未完成长按(选项: 卡动作选项): void {
+  if (!选项.长按毫秒 || 当前长按选项.value !== 选项) return;
+  clearTimeout(长按计时);
+  长按计时 = undefined;
+  当前长按选项.value = null;
+  // 过早松手只记一次失败，不执行成功动作；关闭当前选择后由新状态重新渲染失败次数。
+  当前选择动作.value = null;
+  void 选项.短按?.();
+}
+
+function 开始长按选项(选项: 卡动作选项, event: PointerEvent): void {
+  if (!选项.长按毫秒 || 当前长按选项.value) return;
+  event.preventDefault();
+  (event.currentTarget as HTMLElement | null)?.setPointerCapture?.(event.pointerId);
+  启动长按倒计时(选项);
+}
+
+function 结束长按选项(选项: 卡动作选项, event: PointerEvent): void {
+  if (!选项.长按毫秒 || 当前长按选项.value !== 选项) return;
+  event.preventDefault();
+  记录未完成长按(选项);
+}
+
+function 开始键盘长按(选项: 卡动作选项, event: KeyboardEvent): void {
+  if (!选项.长按毫秒 || event.repeat || 当前长按选项.value) return;
+  event.preventDefault();
+  启动长按倒计时(选项);
+}
+
+function 结束键盘长按(选项: 卡动作选项, event: KeyboardEvent): void {
+  if (!选项.长按毫秒 || 当前长按选项.value !== 选项) return;
+  event.preventDefault();
+  记录未完成长按(选项);
+}
+
+function 取消长按选项(选项: 卡动作选项): void {
+  if (当前长按选项.value !== 选项) return;
+  clearTimeout(长按计时);
+  长按计时 = undefined;
+  当前长按选项.value = null;
 }
 
 function 触发垃圾(): void {
+  当前选择动作.value = null;
   机器.手动收起();
   emit('openGarbage');
 }
 
 function 切换(): void {
-  if (状态.展开) 机器.手动收起();
-  else 机器.手动展开();
+  if (状态.展开) {
+    当前选择动作.value = null;
+    机器.手动收起();
+  } else {
+    机器.手动展开();
+  }
 }
 
 function 面板交互(): void {
@@ -68,7 +158,7 @@ function 面板交互(): void {
 
 <template>
   <div v-if="有可见动作 && !suppressed" class="in-room-acts" :class="{ 'drawer-open': mobile && 状态.展开 }">
-    <!-- 手机：流内只留把手，面板向上覆盖 -->
+    <!-- 手机：流内只留一个总把手，所有房间动作与内部选择都在同一面板。 -->
     <button
       v-if="mobile"
       type="button"
@@ -86,7 +176,6 @@ function 面板交互(): void {
       </transition>
     </button>
 
-    <!-- 桌面保持流内两列；手机在展开时以绝对面板承载同一份瓷砖，不参与正文高度计算 -->
     <transition :name="mobile ? 'drawer' : ''" :css="mobile">
       <div
         v-if="mobile ? 状态.展开 || 有主训练动作 : true"
@@ -107,25 +196,65 @@ function 面板交互(): void {
           </button>
         </div>
         <div v-if="普通动作可见" class="scene-acts">
-          <button v-for="(动作, i) in actions" :key="i" class="tile" :class="动作.类" @click="触发动作(动作)">
+          <button
+            v-for="(动作, i) in actions"
+            :key="`${动作.kicker}:${动作.文案}:${i}`"
+            class="tile"
+            :class="[{ selected: 当前选择动作 === 动作 }, 动作.类]"
+            :disabled="动作.禁用"
+            :title="动作.提示 || undefined"
+            :aria-expanded="动作.选项?.length ? 当前选择动作 === 动作 : undefined"
+            @click="触发动作(动作)"
+          >
             <Ic :n="动作.icon" />
             <span class="act-kicker">{{ 动作.kicker }}</span>
             <strong>{{ 动作.文案 }}</strong>
+            <small v-if="动作.提示">{{ 动作.提示 }}</small>
           </button>
         </div>
+        <transition name="choice-panel">
+          <section v-if="当前选择动作?.选项?.length" class="action-choice" aria-label="选择开场方式">
+            <header>
+              <span><small>PRIVATE SCENE</small><b>{{ 当前选择动作.文案 }}</b></span>
+              <button type="button" aria-label="关闭选择" @click="当前选择动作 = null">✕</button>
+            </header>
+            <div class="action-choice-grid">
+              <button
+                v-for="选项 in 当前选择动作.选项"
+                :key="`${选项.kicker}:${选项.文案}`"
+                type="button"
+                class="choice-tile"
+                :class="{ holding: 当前长按选项 === 选项 }"
+                :title="选项.提示 || undefined"
+                @pointerdown="开始长按选项(选项, $event)"
+                @pointerup="结束长按选项(选项, $event)"
+                @pointercancel="取消长按选项(选项)"
+                @keydown.enter="开始键盘长按(选项, $event)"
+                @keyup.enter="结束键盘长按(选项, $event)"
+                @keydown.space="开始键盘长按(选项, $event)"
+                @keyup.space="结束键盘长按(选项, $event)"
+                @blur="取消长按选项(选项)"
+                @click="触发动作选项(选项)"
+              >
+                <Ic :n="选项.icon" />
+                <span class="act-kicker">{{ 选项.kicker }}</span>
+                <strong>{{ 选项.文案 }}</strong>
+                <small v-if="选项.提示">{{ 选项.提示 }}</small>
+              </button>
+            </div>
+          </section>
+        </transition>
       </div>
     </transition>
   </div>
 </template>
 
 <style scoped>
-/* ── 房内动作根容器：App 的 keyboard-open 隐藏选择器以 .in-room-acts 命中本根 ── */
 .in-room-acts {
   position: relative;
   flex: none;
 }
 
-/* 桌面与手机面板共用的瓷砖/两列/垃圾入口（自 App 等价迁移，scoped 自持） */
 .scene-acts {
   flex: none;
   display: grid;
@@ -178,11 +307,47 @@ function 面板交互(): void {
   border-radius: 14px;
   cursor: pointer;
   box-shadow: 0 2px 8px rgba(30, 26, 38, 0.08);
-  /* 只过渡 hover 实际变化的属性，不动画布局属性 */
   transition:
     transform 0.16s,
     border-color 0.16s,
     box-shadow 0.16s;
+}
+
+.choice-tile {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 12px 8px 10px;
+  font-family: inherit;
+  color: var(--ink);
+  text-align: center;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 14px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(30, 26, 38, 0.08);
+  transition:
+    transform 0.16s,
+    border-color 0.16s,
+    box-shadow 0.16s;
+}
+
+.choice-tile.holding::after {
+  position: absolute;
+  inset: auto 0 0;
+  height: 4px;
+  background: currentColor;
+  content: '';
+  transform-origin: left center;
+  animation: hold-progress 1.2s linear forwards;
+}
+
+@keyframes hold-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
 }
 
 .tile .ic {
@@ -192,13 +357,38 @@ function 面板交互(): void {
   margin-bottom: 2px;
 }
 
-.tile strong {
+.choice-tile .ic {
+  width: 30px;
+  height: 30px;
+  color: var(--blue);
+  margin-bottom: 2px;
+}
+
+.tile strong,
+.choice-tile strong {
   font-size: 0.82em;
   font-weight: 700;
   line-height: 1.35;
 }
 
-.tile:hover {
+.tile small,
+.choice-tile small {
+  margin-top: 3px;
+  color: var(--ink-faint);
+  font-size: 0.66em;
+  line-height: 1.35;
+}
+
+.tile:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  transform: none;
+  box-shadow: 0 2px 8px rgba(30, 26, 38, 0.05);
+}
+
+.tile:not(:disabled):hover,
+.choice-tile:hover,
+.tile.selected {
   transform: translateY(-2px);
   border-color: rgba(38, 169, 244, 0.55);
   box-shadow: 0 8px 20px rgba(38, 169, 244, 0.22);
@@ -226,11 +416,92 @@ function 面板交互(): void {
   opacity: 0.75;
 }
 
+.action-choice {
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid rgba(190, 159, 112, 0.46);
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(43, 35, 29, 0.08), rgba(38, 169, 244, 0.05));
+}
+
+.action-choice header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.action-choice header span {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.action-choice header small {
+  font-family: var(--font-mono);
+  font-size: var(--font-micro);
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+}
+
+.action-choice header b {
+  font-size: 0.86em;
+}
+
+.action-choice header button {
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--paper-card);
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+
+.action-choice-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.action-choice-grid .choice-tile:only-child {
+  grid-column: 1 / -1;
+}
+
+.tile:focus-visible,
+.choice-tile:focus-visible,
+.action-choice header button:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+.choice-panel-enter-active,
+.choice-panel-leave-active {
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease;
+}
+
+.choice-panel-enter-from,
+.choice-panel-leave-to {
+  opacity: 0;
+  transform: translateY(5px);
+}
+
 :global(html.rq-dark .tile) {
   background: #2c2e40;
 }
 
-/* ── 手机抽屉：把手 + 向上覆盖的面板 ── */
+:global(html.rq-dark .choice-tile) {
+  background: #2c2e40;
+}
+
+:global(html.rq-dark .action-choice) {
+  background: linear-gradient(145deg, rgba(226, 190, 133, 0.1), rgba(71, 123, 234, 0.08));
+}
+
+/* ── 手机抽屉：把手 + 向上覆盖的单层面板 ── */
 .drawer-handle {
   display: flex;
   align-items: center;
@@ -282,7 +553,6 @@ function 面板交互(): void {
   border-radius: 999px;
 }
 
-/* 桌面：内容保持流内；手机：绝对定位向上覆盖，不参与正文高度计算 */
 .drawer-content {
   min-width: 0;
 }
@@ -303,7 +573,6 @@ function 面板交互(): void {
   box-shadow: var(--card-shadow);
 }
 
-/* 过渡只动 transform/opacity（180-240ms）；rq-still 与系统减动效全部禁用 */
 .drawer-enter-active,
 .drawer-leave-active {
   transition:
@@ -335,8 +604,15 @@ function 面板交互(): void {
   .drawer-leave-active,
   .new-hint-enter-active,
   .new-hint-leave-active,
+  .choice-panel-enter-active,
+  .choice-panel-leave-active,
   .drawer-handle .handle-arrow {
     transition: none;
+  }
+
+  .choice-tile.holding::after {
+    animation: none;
+    transform: scaleX(1);
   }
 }
 
@@ -344,17 +620,26 @@ function 面板交互(): void {
 :global(html.rq-still .drawer-leave-active),
 :global(html.rq-still .new-hint-enter-active),
 :global(html.rq-still .new-hint-leave-active),
+:global(html.rq-still .choice-panel-enter-active),
+:global(html.rq-still .choice-panel-leave-active),
 :global(html.rq-still .drawer-handle .handle-arrow) {
   transition: none;
 }
 
-/* 手机窄屏：两列瓷砖最小宽度归零并允许长文案换行，禁止横向溢出 */
+:global(html.rq-still .choice-tile.holding::after) {
+  animation: none;
+  transform: scaleX(1);
+}
+
 @media (max-width: 540px) {
-  .scene-acts {
+  .scene-acts,
+  .action-choice-grid {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 
-  .scene-acts .tile strong {
+  .scene-acts .tile strong,
+  .choice-tile strong,
+  .choice-tile small {
     overflow-wrap: anywhere;
   }
 }

@@ -26,6 +26,7 @@ const {
   借种开场事件,
   借种医院待产CG,
   借种离线监控待确认,
+  借种档案提示,
   借种启动条件提示,
   借种三人合照可拍,
   借种三人日常,
@@ -89,6 +90,7 @@ const 监控组件源码 = readFileSync(
   new URL('../../src/人妻公寓/界面/客户端/components/监控.vue', import.meta.url),
   'utf8',
 );
+const 档案源码 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/components/档案卡.vue', import.meta.url), 'utf8');
 const 客户端素材源码 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/assets.ts', import.meta.url), 'utf8');
 const 手机资源源码 = readFileSync(
   new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/壳/资源与皮肤.ts', import.meta.url),
@@ -109,6 +111,56 @@ function 建数据({ 摄像头 = true, 带票 = true } = {}) {
   data.户['101'].妻.堕落值 = 90;
   return data;
 }
+
+test('夏乔角色页只在家庭计划完成后显示借种，并覆盖购买、拆机、断线、赴约、进行中与完成', () => {
+  const 未开放 = 建数据({ 带票: false });
+  未开放.系统._家庭计划.阶段 = '待赴约';
+  assert.equal(借种档案提示(未开放), null, '家庭计划完成前不得剧透结局名');
+
+  const data = 建数据({ 带票: false });
+  let 提示 = 借种档案提示(data);
+  assert.match(提示?.状态 ?? '', /开放/);
+  assert.match(提示?.下一步 ?? '', /商店.*借种|借种.*商店/);
+
+  data.背包.push('借种');
+  提示 = 借种档案提示(data);
+  assert.match(提示?.下一步 ?? '', /101.*拆|拆.*101/);
+
+  data.系统._摄像头布设['101'] = false;
+  data.系统._特殊场景前置.push(借种摄像头已拆键);
+  提示 = 借种档案提示(data);
+  assert.match(提示?.下一步 ?? '', /302.*(?:断线|无信号)|(?:断线|无信号).*302/);
+
+  data.系统._特殊场景前置.push(借种断线已确认键);
+  提示 = 借种档案提示(data);
+  assert.match(提示?.下一步 ?? '', /前往101|开始.*借种/);
+  data.系统._绝对时段 = 6;
+  提示 = 借种档案提示(data);
+  assert.match(提示?.下一步 ?? '', /星期一|晚上|深夜/);
+  data.系统._绝对时段 = 4;
+
+  data.系统._特殊场景.id = '借种';
+  data.系统._特殊场景.阶段 = '开场';
+  data.系统._特殊场景.当前拍 = 1;
+  提示 = 借种档案提示(data);
+  assert.match(提示?.状态 ?? '', /进行中/);
+  assert.match(提示?.下一步 ?? '', /101.*回应|开场|确认/);
+
+  data.系统._特殊场景.阶段 = '亲密';
+  data.系统._特殊场景.当前拍 = 2;
+  提示 = 借种档案提示(data);
+  assert.match(提示?.下一步 ?? '', /亲密|收尾/);
+
+  data.系统._特殊场景.id = '';
+  data.系统._已完成特殊场景.push('借种');
+  提示 = 借种档案提示(data);
+  assert.equal(提示?.完成, true);
+  assert.match(提示?.下一步 ?? '', /阳性|合照|家庭/);
+
+  assert.match(档案源码, /借种档案提示/);
+  assert.match(档案源码, /选中借种提示/);
+  assert.match(档案源码, /借种下一步/);
+});
 
 function 有效普通受孕输入(场次标识 = '普通:101:1') {
   return {
@@ -755,12 +807,15 @@ test('唯一 A 实现接通后端事件、房间瓷砖与照片消费者，手�
   }
   assert.match(房间动作源码, /借种三人合照可拍[\s\S]*拍摄借种三人合照/u);
   assert.match(房间动作源码, /借种产后家庭合照可拍[\s\S]*拍摄借种产后家庭合照/u);
-  assert.match(玩家资源源码, /结算借种亲密收尾[\s\S]*if \(!借种结算\.接管\)[\s\S]*判定受孕\(/u);
+  assert.match(
+    玩家资源源码,
+    /结算借种亲密收尾[\s\S]*if \(!借种结算\.接管 && !选项\.跳过受孕\)[\s\S]*判定受孕\(/u,
+  );
   assert.match(孕情通知源码, /借种三人合照已拍[\s\S]*借种三人合照私聊键/u);
   assert.match(群聊节拍源码, /借种三人合照已拍[\s\S]*借种_三人镜面合照/u);
   assert.match(孕情通知源码, /借种产后家庭合照已拍[\s\S]*借种_产后家庭合照/u);
   assert.match(群聊节拍源码, /借种产后家庭合照已拍[\s\S]*生产姐妹群已触发[\s\S]*借种_产后家庭合照/u);
-  assert.match(客户端源码, /v-if="监控列表\.length \|\| 借种监控待确认"/u);
+  assert.match(客户端源码, /v-if="监控列表\.length \|\| 借种监控待确认 \|\| 录像带V4监控就绪"/u);
   assert.match(客户端源码, /:borrow-seed-offline="借种监控待确认"/u);
   assert.match(客户端源码, /eventOn\('人妻公寓:借种CG'/u);
   assert.match(客户端源码, /借种结局图片\(当前借种CG\.value\.文件\)/u);

@@ -24,7 +24,11 @@ test('v0.80运行时只允许外置变量解析，不保留正文变量直出或
   ]) {
     assert.doesNotMatch(回合引擎, new RegExp(旧语义), `回合引擎不得保留：${旧语义}`);
   }
-  assert.match(回合引擎, /const 正文模型覆盖 = \{ chat_history: \{ with_depth_entries: false \} \};/);
+  assert.match(
+    回合引擎,
+    /const 正文模型覆盖 = \{[\s\S]*?chat_history: \{[\s\S]*?with_depth_entries: false,[\s\S]*?自由阶段历史 \? \{ prompts: 自由阶段历史 \} : \{\}[\s\S]*?\};/,
+    '正文模型仍关闭深度世界书历史，只允许302自由阶段按当前地点替换聊天历史',
+  );
   assert.match(回合引擎, /async function 内置外置变量解析/);
   assert.equal((回合引擎.match(/content: 变量结算令/g) ?? []).length, 2, '只接数据库代发与自定义解析模型');
   assert.match(

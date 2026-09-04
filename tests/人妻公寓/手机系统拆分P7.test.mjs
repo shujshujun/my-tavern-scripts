@@ -45,6 +45,8 @@ function 执行TS片段(片段, 导出名) {
 function 资源主体() {
   const 主体 = 资源与皮肤源码.slice(资源与皮肤源码.indexOf('export const ROOT_ID'));
   const 数据桩 = `
+const 姐妹茶话会头像图 = 'data:image/webp;base64,sisters';
+const 住户答谢会头像图 = 'data:image/webp;base64,thanks';
 const 门牌列表 = ['101', '102', '103'];
 const 户静态表 = {
   '101': { 妻名: '夏乔', 夫名: '阿远' },
@@ -57,6 +59,11 @@ const 户静态表 = {
 
 test('壳/资源与皮肤 真实拥有全部资源定义，内核无重复声明', () => {
   // 新所有者真实声明（spec 迁移清单逐项）
+  assert.match(
+    资源与皮肤源码,
+    /import \{ 姐妹茶话会头像图, 住户答谢会图 as 住户答谢会头像图 \} from '\.\.\/\.\.\/\.\.\/\.\.\/内嵌小图';/,
+    '群头像必须来自普通 TS 叶子模块，避免 Node 测试无法加载 Webpack 专用 ?url',
+  );
   assert.match(资源与皮肤源码, /export const ROOT_ID = 'rq-phone-root';/);
   assert.match(
     资源与皮肤源码,
@@ -154,7 +161,8 @@ test('资源与皮肤 不反向 import 内核/门面，只依赖 stageConfig 叶
     /from '\.\.\/内核'|from '\.\/内核'|from '\.\.\/手机系统'|from '\.\/手机系统'|from '\.\/壳\/会话瞬态'|from '\.\/壳\/挂载'|from '\.\/壳\/红点与开合'|from '\.\/渲染/,
     '资源与皮肤 不得反向 import 内核/门面或任何壳层上层模块',
   );
-  assert.match(资源与皮肤源码, /from '\.\.\/\.\.\/\.\.\/\.\.\/stageConfig'/, '资源与皮肤 只依赖 stageConfig 等叶子');
+  assert.match(资源与皮肤源码, /from '\.\.\/\.\.\/\.\.\/\.\.\/stageConfig'/, '资源与皮肤 保留 stageConfig 叶子依赖');
+  assert.match(资源与皮肤源码, /from '\.\.\/\.\.\/\.\.\/\.\.\/内嵌小图'/, '新群像只额外依赖纯数据叶子');
 });
 
 test('两个素材基址版本与 @adult/、普通微信圈地址编码/后缀规则保持', () => {
@@ -259,9 +267,13 @@ test('头像块父亲/丈夫影子规则、姐妹群/群头像规则保持', () 
   // 主角特殊框、群/姐妹群群像框
   assert.match(头像块('主角'), /avatar-main/);
   assert.match(头像块('群'), /avatar-group/);
-  assert.match(decodeURIComponent(头像块('群')), /头像\/群\.webp/);
+  assert.match(头像块('群'), /data:image\/webp;base64,thanks/, '楼务群必须使用内嵌住户答谢会群像，不能继续请求缺失远程图');
   assert.match(头像块('姐妹群'), /avatar-group/);
-  assert.match(decodeURIComponent(头像块('姐妹群')), /头像\/姐妹群\.webp/);
+  assert.match(
+    头像块('姐妹群'),
+    /data:image\/webp;base64,sisters/,
+    '姐妹茶话会必须使用内嵌群头像，不能继续请求旧素材标签里不存在的文件',
+  );
   // 陌生名字回退本人图而非影子
   assert.doesNotMatch(头像块('路人'), /avatar-/);
   assert.match(decodeURIComponent(头像块('路人')), /头像\/路人\.webp/);

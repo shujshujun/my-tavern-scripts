@@ -7,6 +7,8 @@ import { 事件角色标记, 读场景 } from './snapshotSystem';
 import { 登记胜任变动 } from './胜任系统';
 import { 有场景剧情阻塞 } from './场景剧情事务';
 import { 亲密强制中止事件标记 } from './玩家资源系统';
+import { 双重继承阻止普通父亲联络 } from './父亲联络策略';
+import { 普通丈夫风险已停用 } from './丈夫线路风险策略';
 
 /**
  * 丈夫打断系统(2026-07-19 用户提案拍板,顺序3>1>2的第一件):
@@ -99,6 +101,9 @@ function 取丈夫打断候选(data: SchemaType, 焦点: readonly 门牌[]) {
   if (!节点 || !配?.夫名) return;
   const 夫 = 节点.夫;
 
+  // 普通亲密账承载的录制与跨日等待也属于承接流程；保护按该户真实进度持续。
+  if (普通丈夫风险已停用(data, 门牌号)) return;
+
   const 绝对时段 = 取绝对时段(data);
   // 运作窗口兑现:钓鱼券冻结期他满脑子鱼塘,不查岗
   if (疑心冻结中(夫, 绝对时段)) return;
@@ -158,6 +163,8 @@ export function 处于反讽格(节点: 户节点Type): boolean {
 const 父亲来电概率 = 0.18; // 〔调参〕每时段档一掷
 
 export function 父亲来电打断(data: SchemaType, 焦点: 门牌[], _消息楼层: number): void {
+  if (双重继承阻止普通父亲联络(data)) return;
+  if (普通丈夫风险已停用(data, '302')) return;
   if (有场景剧情阻塞(data)) return;
   if (焦点[0] !== '302') return;
   const 节点 = data.户['302'];

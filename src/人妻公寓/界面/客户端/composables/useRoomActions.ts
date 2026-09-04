@@ -15,10 +15,29 @@ import { 列出地点管理任务, 管理任务选项 } from '../../../脚本/�
 import { 列出阶段线路候选详情, type 阶段线路候选 } from '../../../脚本/游戏逻辑/阶段线路系统';
 import { 玩家当前日 } from '../../../脚本/游戏逻辑/玩家资源系统';
 import { 阶段性癖可开启 } from '../../../脚本/游戏逻辑/阶段性癖状态';
+import { 家庭计划地点动作, type 家庭计划地点动作ID } from '../../../脚本/游戏逻辑/家庭计划系统';
+import { 第二机位地点动作, type 第二机位动作ID } from '../../../脚本/游戏逻辑/第二机位系统';
+import { 不再留门地点动作, type 不再留门动作ID } from '../../../脚本/游戏逻辑/不再留门系统';
 import {
-  家庭计划地点动作,
-  type 家庭计划地点动作ID,
-} from '../../../脚本/游戏逻辑/家庭计划系统';
+  许曼君分居地点动作,
+  读取201留宿可用状态,
+  type 许曼君分居动作ID,
+} from '../../../脚本/游戏逻辑/许曼君分居系统';
+import {
+  许曼君离婚地点动作,
+  type 许曼君离婚动作ID,
+} from '../../../脚本/游戏逻辑/许曼君离婚系统';
+import {
+  许曼君离婚后日常地点动作,
+  type 许曼君离婚后日常动作ID,
+} from '../../../脚本/游戏逻辑/许曼君离婚后日常系统';
+import { 回国地点动作, type 回国地点动作ID } from '../../../脚本/游戏逻辑/回国系统';
+import {
+  双重继承地点动作,
+  双重继承等待最终收束,
+  type 双重继承动作ID,
+} from '../../../脚本/游戏逻辑/双重继承系统';
+import { 母亲共居地点动作, type 共居动作ID } from '../../../脚本/游戏逻辑/302共居系统';
 import { 生产地点动作, type 生产地点动作ID } from '../../../脚本/游戏逻辑/生产系统';
 import {
   借种场景运行中,
@@ -44,6 +63,14 @@ export interface 房间动作事件 {
   处理管理任务: (载荷: { 任务id: string; 选项id: string; 地点: string }) => void;
   开启阶段性癖: (门牌号: 门牌) => void;
   家庭计划动作: (动作: 家庭计划地点动作ID) => void;
+  第二机位动作: (动作: 第二机位动作ID) => void;
+  不再留门动作: (动作: 不再留门动作ID) => void;
+  许曼君分居动作: (动作: 许曼君分居动作ID) => void;
+  许曼君离婚动作: (动作: 许曼君离婚动作ID) => void;
+  许曼君离婚后日常动作: (动作: 许曼君离婚后日常动作ID) => void;
+  回国动作: (动作: 回国地点动作ID) => void;
+  双重继承动作: (动作: 双重继承动作ID) => void;
+  母亲共居动作: (动作: 共居动作ID) => void;
   拆除借种摄像头: () => void;
   启动借种: () => void;
   查看借种阳性结果: () => void;
@@ -63,6 +90,8 @@ export interface 房间动作选项 {
   绝对时段: Readonly<Ref<number>>;
   /** 文本事务锁；楼务瓷砖与到达确认复用。 */
   发送中: Ref<boolean>;
+  /** 只允许最后钥匙动作完成自己的锁；真实生成、保存和其他剧情仍由 App 关闭此许可。 */
+  最终收束操作可用?: Readonly<Ref<boolean>>;
   /** 撤销资格；晨跑/健身/302/管理员室亮撤销动作。 */
   时间撤销可用: Readonly<Ref<boolean>>;
   /** 本次进入是否撬门而入；撬进空屋才有翻现金一说。 */
@@ -147,8 +176,27 @@ export function useRoomActions(options: 房间动作选项) {
     if (!id) return [];
     const 房 = 查房间(id);
     const 动作: 卡动作[] = [];
+    // 视频后的硬转场只允许302最后一枚总钥匙瓷砖；普通聊天、亲密、楼务和地点动作全部暂时隐藏。
+    if (双重继承等待最终收束(data.value)) {
+      添加双重继承动作(动作, id);
+      return 动作;
+    }
     添加管理任务动作(动作, id);
     添加家庭计划动作(动作, id);
+    添加第二机位动作(动作, id);
+    if (当前房间.value === id) {
+      for (const a of 不再留门地点动作(data.value, id)) {
+        动作.push({ kicker: a.kicker, icon: a.icon, 文案: a.文案, 禁用: !a.可执行, 提示: a.原因, 做: () => {
+          if (!发送中.value && 当前房间.value === id && a.可执行) 事件.不再留门动作(a.id);
+        } });
+      }
+    }
+    添加许曼君分居动作(动作, id);
+    添加许曼君离婚动作(动作, id);
+    添加许曼君离婚后日常动作(动作, id);
+    添加回国动作(动作, id);
+    添加双重继承动作(动作, id);
+    添加母亲共居动作(动作, id);
     添加生产动作(动作, id);
     添加借种产后家庭合照动作(动作, id);
 
@@ -281,7 +329,8 @@ export function useRoomActions(options: 房间动作选项) {
             动作.push({
               kicker: 'GIFT',
               icon: 'gift',
-              文案: 礼物 === '香烟' ? `递${户静态表[id as 门牌].夫名}一包烟` : `送${户静态表[id as 门牌].夫名}两张球赛票`,
+              文案:
+                礼物 === '香烟' ? `递${户静态表[id as 门牌].夫名}一包烟` : `送${户静态表[id as 门牌].夫名}两张球赛票`,
               做: async () => {
                 if (!(await 确认已到达动作地点(id))) return;
                 事件.丈夫礼物({ 门牌: id, 道具id: 礼物 });
@@ -344,6 +393,28 @@ export function useRoomActions(options: 房间动作选项) {
       if (当前房间.value === id) {
         添加借种动作(动作, id);
         添加地点线路动作(动作, id);
+        if (id === '201') {
+          const 留宿 = 读取201留宿可用状态(data.value, id, 绝对时段.value);
+          if (留宿.已解锁) {
+            动作.push({
+              kicker: 'REST',
+              icon: 'moon',
+              文案: '在201过夜（睡到次日早晨）',
+              禁用: !留宿.可执行,
+              提示: 留宿.可执行 ? '许曼君已经允许你在现实条件合适时整夜留宿201。' : 留宿.原因,
+              做: () => {
+                if (!留宿.可执行) {
+                  弹提示(留宿.原因 || '当前不能在201留宿。');
+                  return;
+                }
+                发起时间推进('睡到次日早晨');
+              },
+            });
+          }
+          if (时间撤销可用.value) {
+            动作.push({ kicker: 'UNDO', icon: 'rewind', 文案: '撤销刚才的时间推进', 做: 发起时间撤销 });
+          }
+        }
       }
       return 动作;
     }
@@ -521,6 +592,159 @@ export function useRoomActions(options: 房间动作选项) {
     }
   }
 
+  /** 《第二机位》只在玩家真实到达102／302后显示当前唯一硬动作。 */
+  function 添加第二机位动作(动作: 卡动作[], 地点: string): void {
+    if (当前房间.value !== 地点) return;
+    for (const 候选 of 第二机位地点动作(data.value, 地点)) {
+      动作.push({
+        kicker: 候选.kicker,
+        icon: 候选.icon,
+        文案: 候选.文案,
+        做: () => {
+          if (发送中.value || 当前房间.value !== 地点) return;
+          事件.第二机位动作(候选.id);
+        },
+      });
+    }
+  }
+
+  /** 《分居》只在玩家真实到达201、管理员室、信箱区、大堂或公寓外部后显示当前硬动作。 */
+  function 添加许曼君分居动作(动作: 卡动作[], 地点: string): void {
+    if (当前房间.value !== 地点) return;
+    for (const 候选 of 许曼君分居地点动作(data.value, 地点)) {
+      动作.push({
+        kicker: 候选.kicker,
+        icon: 候选.icon,
+        文案: 候选.文案,
+        做: () => {
+          if (发送中.value || 当前房间.value !== 地点) return;
+          事件.许曼君分居动作(候选.id);
+        },
+      });
+    }
+  }
+
+  /** 《离婚》只读取唯一状态机；结构化目标、H8确认和戒印长按都留在同一块瓷砖内部。 */
+  function 添加许曼君离婚动作(动作: 卡动作[], 地点: string): void {
+    if (当前房间.value !== 地点) return;
+    for (const 候选 of 许曼君离婚地点动作(data.value, 地点)) {
+      动作.push({
+        kicker: 候选.kicker,
+        icon: 候选.icon,
+        文案: 候选.文案,
+        提示: 候选.提示,
+        选项: 候选.选项?.map(选项 => ({
+          kicker: 选项.kicker,
+          icon: 候选.icon,
+          文案: 选项.文案,
+          提示: 选项.提示,
+          长按毫秒: 选项.长按毫秒,
+          短按: 选项.短按动作
+            ? () => {
+                if (发送中.value || 当前房间.value !== 地点) return;
+                事件.许曼君离婚动作(选项.短按动作!);
+              }
+            : undefined,
+          做: () => {
+            if (发送中.value || 当前房间.value !== 地点) return;
+            事件.许曼君离婚动作(选项.id);
+          },
+        })),
+        做: () => {
+          if (发送中.value || 当前房间.value !== 地点 || 候选.选项?.length) return;
+          事件.许曼君离婚动作(候选.id);
+        },
+      });
+    }
+  }
+
+  /** 正式《离婚》后只占一块201日常瓷砖：D1内部选立场，D2原位替换为唯一收针动作。 */
+  function 添加许曼君离婚后日常动作(动作: 卡动作[], 地点: string): void {
+    if (当前房间.value !== 地点) return;
+    for (const 候选 of 许曼君离婚后日常地点动作(data.value, 地点)) {
+      动作.push({
+        kicker: 候选.kicker,
+        icon: 候选.icon,
+        文案: 候选.文案,
+        提示: 候选.提示,
+        选项: 候选.选项?.map(选项 => ({
+          kicker: 选项.kicker,
+          icon: 选项.icon,
+          文案: 选项.文案,
+          提示: 选项.提示,
+          做: () => {
+            if (发送中.value || 当前房间.value !== 地点) return;
+            事件.许曼君离婚后日常动作(选项.id);
+          },
+        })),
+        做: () => {
+          if (发送中.value || 当前房间.value !== 地点 || 候选.id !== '把今天这件事做完') return;
+          事件.许曼君离婚后日常动作(候选.id);
+        },
+      });
+    }
+  }
+
+  /** 《回国》按当前硬阶段只在302、管理员室或大堂露出唯一下一步。 */
+  function 添加回国动作(动作: 卡动作[], 地点: string): void {
+    if (当前房间.value !== 地点) return;
+    for (const 候选 of 回国地点动作(data.value, 地点)) {
+      动作.push({
+        kicker: 候选.kicker,
+        icon: 候选.icon,
+        文案: 候选.文案,
+        做: () => {
+          if (发送中.value || 当前房间.value !== 地点) return;
+          事件.回国动作(候选.id);
+        },
+      });
+    }
+  }
+
+  /** 《双重继承》公共验收、管理员室交权、总钥匙与早餐都只在玩家真实到场后出现。 */
+  function 添加双重继承动作(动作: 卡动作[], 地点: string): void {
+    if (当前房间.value !== 地点) return;
+    for (const 候选 of 双重继承地点动作(data.value, 地点)) {
+      动作.push({
+        kicker: 候选.kicker,
+        icon: 候选.icon,
+        文案: 候选.文案,
+        做: () => {
+          const 自有收束 = 候选.id === '归位总钥匙' && options.最终收束操作可用?.value === true;
+          if ((发送中.value && !自有收束) || 当前房间.value !== 地点) return;
+          事件.双重继承动作(候选.id);
+        },
+      });
+    }
+  }
+
+  /** 302结局后只露出一块亲密入口；内部二选一只决定开场，随后复用普通亲密场景。 */
+  function 添加母亲共居动作(动作: 卡动作[], 地点: string): void {
+    if (当前房间.value !== 地点) return;
+    for (const 候选 of 母亲共居地点动作(data.value, 地点)) {
+      动作.push({
+        分组: '302共居' as const,
+        kicker: 候选.kicker,
+        icon: 候选.icon,
+        文案: 候选.文案,
+        禁用: !候选.可执行,
+        提示: 候选.原因 || '选择由你开始，或让她先开始。',
+        选项: 候选.选项.map(选项 => ({
+          kicker: 选项.kicker,
+          icon: 选项.icon,
+          文案: 选项.文案,
+          提示: 选项.提示,
+          做: () => {
+            if (发送中.value || 当前房间.value !== 地点 || !候选.可执行) return;
+            事件.母亲共居动作(选项.id);
+          },
+        })),
+        // 有选项的瓷砖由房内操作组件展开；保留空操作只为兼容普通卡动作接口。
+        做: () => undefined,
+      });
+    }
+  }
+
   function 添加借种动作(动作: 卡动作[], 地点: string): void {
     if (地点 !== '101' || 当前房间.value !== 地点) return;
     if (借种场景运行中(data.value) && data.value.系统._性爱场景.状态 === '空闲') {
@@ -641,11 +865,7 @@ export function useRoomActions(options: 房间动作选项) {
         },
       });
     }
-    if (
-      当前房间.value === 地点 &&
-      (地点 === '302' || 地点 === '厨房') &&
-      阶段性癖可开启(data.value, '302')
-    ) {
+    if (当前房间.value === 地点 && (地点 === '302' || 地点 === '厨房') && 阶段性癖可开启(data.value, '302')) {
       动作.push({
         kicker: 'STORY',
         icon: 'favor',

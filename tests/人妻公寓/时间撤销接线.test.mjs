@@ -3,10 +3,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const App源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
-const 合成源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/composables/useRoomActions.ts', import.meta.url), 'utf8');
-const Index源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
-const 撤销源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/时间撤销系统.ts', import.meta.url), 'utf8');
+function 读取源码(路径) {
+  return readFileSync(路径, 'utf8').replace(/\r\n?/gu, '\n');
+}
+
+const App源 = 读取源码(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url));
+const 合成源 = 读取源码(new URL('../../src/人妻公寓/界面/客户端/composables/useRoomActions.ts', import.meta.url));
+const Index源 = 读取源码(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url));
+const 撤销源 = 读取源码(new URL('../../src/人妻公寓/脚本/游戏逻辑/时间撤销系统.ts', import.meta.url));
 
 function 截段(源, 开始标记, 结束标记) {
   const 开始 = 源.indexOf(开始标记);

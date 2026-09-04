@@ -169,8 +169,8 @@ test('组件模板关键契约全量保持：点位/角标优先级/头像/兜�
   assert.match(模板段, /<small>OUTING \/ 外出<\/small><b>走出公寓<\/b>/, '外出三行文案');
   assert.match(模板段, /晨跑 · 健身房 · 更多地点准备中/, '外出副文案');
   assert.match(模板段, /<transition name="card-pop">/, '房卡弹卡过渡');
-  assert.match(模板段, /v-if="房卡" class="rc-mask" @click\.self="房卡 = null"/, '房卡 mask.self');
-  assert.match(模板段, /class="sheet-close" @click="房卡 = null">✕/, '房卡 ✕');
+  assert.match(模板段, /v-if="房卡" class="rc-mask" @click\.self="关闭房卡"/, '房卡 mask.self 统一清理选择态');
+  assert.match(模板段, /class="sheet-close" @click="关闭房卡">✕/, '房卡 ✕ 统一清理选择态');
   assert.match(模板段, /class="rm-hero" :class="\{ pub: !\/\^\\d\+\$\/\.test\(房卡\) \}"/, 'hero pub 分支');
   assert.match(模板段, /class="who-chip mini" :title="名"/, '在场头像 chip');
   assert.match(模板段, /<em>\{\{ 房卡在场 \}\}<\/em>/, '房卡在场');
@@ -178,9 +178,16 @@ test('组件模板关键契约全量保持：点位/角标优先级/头像/兜�
   assert.match(模板段, /class="rc-mood">\{\{ 房卡氛围 \}\}/, '氛围');
   assert.match(
     模板段,
-    /v-for="\(动作, i\) in 房卡动作"[\s\S]*?:class="动作\.类"[\s\S]*?:disabled="sending"[\s\S]*?@click="动作\.做\(\)"/,
-    '动作两列+发送中 disabled',
+    /v-for="\(动作, i\) in 房卡动作"[\s\S]*?type="button"[\s\S]*?:class="\[动作\.类, \{ selected: 当前房卡选择 === 动作 \}\]"[\s\S]*?:disabled="sending \|\| 动作\.禁用"[\s\S]*?:title="动作\.提示 \|\| undefined"[\s\S]*?:aria-expanded="动作\.选项\?\.length \? 当前房卡选择 === 动作 : undefined"[\s\S]*?@click="触发房卡动作\(动作\)"/,
+    '动作两列受门控；普通动作执行，有选项动作展开同层选择',
   );
+  assert.doesNotMatch(模板段, /@click="动作\.做\(\)"/, '地图房卡不得再把带选项动作当普通空函数直接执行');
+  assert.match(
+    模板段,
+    /<transition name="room-choice">[\s\S]*?v-if="当前房卡选择\?\.选项\?\.length"[\s\S]*?v-for="选项 in 当前房卡选择\.选项"[\s\S]*?@pointerdown="开始房卡长按\(选项, \$event\)"[\s\S]*?@pointerup="结束房卡长按\(选项, \$event\)"[\s\S]*?@pointercancel="取消房卡长按\(选项\)"[\s\S]*?@keydown\.enter="开始房卡键盘长按\(选项, \$event\)"[\s\S]*?@keyup\.space="结束房卡键盘长按\(选项, \$event\)"[\s\S]*?@click="触发房卡选项\(选项\)"/,
+    '二级选项在房卡内展开，并支持鼠标、触摸与键盘长按',
+  );
+  assert.match(模板段, /<small v-if="动作\.提示">\{\{ 动作\.提示 \}\}<\/small>/, '禁用或补充原因留在房卡瓷砖内');
   assert.match(模板段, /<span class="act-kicker">\{\{ 动作\.kicker \}\}<\/span>/, '动作 kicker');
   assert.match(模板段, /<strong>\{\{ 动作\.文案 \}\}<\/strong>/, '动作文案');
   assert.match(模板段, /<span v-if="!房卡动作\.length" class="rc-empty">门上贴着招租启事,还没有住户<\/span>/, '空房文案');
@@ -208,12 +215,32 @@ test('组件局部状态/派生完整；素材来自 ../assets，无 ?url；关�
     '外部关图 watch 清房卡与结果',
   );
   assert.match(地图源码, /function 点房\(房间id: string\) \{\s*if \(props\.sending\) return;/, '点房发送中守卫');
-  assert.match(地图源码, /结果卡\.value = '';\s*房卡\.value = 房卡\.value === 房间id \? null : 房间id;/, '点房清结果+同房切换关闭');
+  assert.match(
+    地图源码,
+    /function 点房\(房间id: string\)[\s\S]{0,140}清房卡动作选择\(\);\s*结果卡\.value = '';\s*房卡\.value = 房卡\.value === 房间id \? null : 房间id;/,
+    '点房先清二级选择与长按，再清结果并切换房卡',
+  );
+  assert.match(
+    地图源码,
+    /function 关闭房卡\(\): void \{\s*清房卡动作选择\(\);\s*房卡\.value = null;\s*\}/,
+    '房卡关闭必须同步取消长按与选择态',
+  );
   assert.match(地图源码, /function 请求关闭\(\): void \{\s*清房卡与结果\(\);\s*emit\('close'\);\s*\}/, '请求关闭先清再 emit');
   assert.match(地图源码, /function 请求外出\(\): void \{\s*清房卡与结果\(\);\s*emit\('outing'\);\s*\}/, '请求外出先清再 emit');
   assert.match(地图源码, /import \{ 素材基址 \} from '\.\.\/assets'/, '组件从 ../assets 导入素材基址');
   assert.match(地图源码, /import type \{ SchemaType \} from '\.\.\/\.\.\/\.\.\/schema'/, '组件从 ../../../schema type 导入 SchemaType');
-  assert.match(地图源码, /import type \{ 卡动作 \} from '\.\.\/types'/, '组件从 ../types type 导入 卡动作');
+  assert.match(地图源码, /import type \{ 卡动作, 卡动作选项 \} from '\.\.\/types'/, '组件从 ../types 导入动作与二级选项契约');
+  assert.match(地图源码, /onScopeDispose\(\(\) => clearTimeout\(房卡长按计时\)\)/, '组件卸载时清长按计时');
+  assert.match(
+    地图源码,
+    /function 记录房卡未完成长按[\s\S]*?void 选项\.短按\?\.\(\)/,
+    '提前松手必须调用选项短按补偿，不得误执行长按动作',
+  );
+  assert.match(
+    地图源码,
+    /setTimeout\(\(\) => \{[\s\S]*?void 选项\.做\(\);[\s\S]*?\}, 选项\.长按毫秒\)/,
+    '达到规定时长后才执行正式长按动作',
+  );
   assert.match(地图源码, /import \{ 户静态表, 查房间, type 门牌 \} from '\.\.\/\.\.\/\.\.\/stageConfig'/, '组件从 stageConfig 导入户静态表/查房间/门牌');
   assert.match(地图源码, /import Ic from '\.\/Icon\.vue'/, '组件导入 Icon');
   assert.match(地图源码, /const 用画布地图 = computed\(\(\) => !props\.lite && !立面失效\.value\)/, '用画布地图 = !lite && !立面失效');
@@ -324,7 +351,11 @@ test('dark/lite/mobile 地图规则迁移，App 无地图专属残留；A1–A5b
   assert.match(App源码, /:global\(html\.rq-dark\) \.todo-bar,[\s\S]{0,40}\.clue-card \{/, 'App 保留 dark todo-bar/clue-card');
   assert.match(地图源码, /:global\(html\.rq-dark\) \.clue-card \{/, '组件复制 dark clue-card');
   assert.doesNotMatch(App源码, /:global\(html\.rq-dark\) \.tile \{/, 'App 不再持有 dark tile(随房内动作迁抽屉)');
-  assert.match(地图源码, /:global\(html\.rq-dark\) \.tile \{/, '地图复制 dark tile');
+  assert.match(
+    地图源码,
+    /:global\(html\.rq-dark\) \.tile,\s*:global\(html\.rq-dark\) \.room-choice-tile \{/,
+    '地图同时持有主瓷砖与二级选项的 dark 样式',
+  );
   assert.match(抽屉源码, /:global\(html\.rq-dark \.tile\) \{/, '抽屉组件持有可正确编译的 dark tile');
   assert.doesNotMatch(App源码, /\.map-stage \{|\.outing-launch \{/, 'App 无移动端 map-stage/outing 残留');
   assert.match(地图源码, /@media \(max-width: 540px\)[\s\S]*?transform: scale\(1\.24\);/, '移动端画布放大在组件');

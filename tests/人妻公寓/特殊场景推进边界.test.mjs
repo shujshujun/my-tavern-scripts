@@ -27,6 +27,7 @@ const {
   启动静音会议,
   开始录像带首送,
   启动录像带,
+  通过录像带互动,
   推进特殊场景,
   请求结束静音会议,
   特殊场景玩家行动前,
@@ -130,6 +131,56 @@ test('录像带只接受与当前阶段完全一致的房间和拍数', () => {
 
   推进特殊场景(data, '【特殊场景·录像带·102-2】当前第二拍');
   assert.equal(data.系统._特殊场景.阶段, '102-3');
+});
+
+test('新录像带票启动独立双承接场景，六段成功正文消费38张图并完成正式结局', () => {
+  const data = Schema.parse({
+    户: { 102: 创建户节点(0), 202: 创建户节点(0) },
+    背包: ['录像带'],
+    系统: { _特殊场景前置: ['录像带:102', '录像带:202'] },
+  });
+  data.户['102'].妻.当前阶段 = 4;
+  data.户['202'].妻.当前阶段 = 4;
+  const 启动 = 启动录像带(data, 40);
+  assert.equal(启动.成功, true, 启动.提示);
+  assert.equal(data.系统._特殊场景.id, '录像带双承接');
+  assert.equal(data.系统._特殊场景.阶段, '等待102');
+  assert.match(data.系统._录像带双承接.场次标识, /^vtr-v2:40:/u);
+  assert.equal(data.背包.includes('录像带'), false);
+
+  const CG = [];
+  assert.equal(通过录像带互动(data, '102').成功, true);
+  for (const 拍 of [1, 2, 3]) {
+    const 结果 = 推进特殊场景(data, `【特殊场景·录像带双承接·102-${拍}】成功正文`);
+    assert.ok(结果);
+    CG.push(...结果);
+  }
+  assert.equal(data.系统._特殊场景.阶段, '等待202');
+  assert.equal(data.系统._录像带双承接.房间['102'].硬状态, 'visually-verified');
+  assert.equal(data.系统._录像带双承接.房间['102'].外层序号, 8);
+
+  assert.equal(通过录像带互动(data, '202').成功, true);
+  for (const 拍 of [1, 2, 3]) {
+    const 结果 = 推进特殊场景(data, `【特殊场景·录像带双承接·202-${拍}】成功正文`);
+    assert.ok(结果);
+    CG.push(...结果);
+  }
+  assert.equal(CG.length, 38);
+  assert.equal(new Set(CG.map(载荷 => `${载荷.房间}:${载荷.轨道}:${载荷.序号}`)).size, 38);
+  assert.equal(data.系统._特殊场景.id, '');
+  assert.equal(data.系统._录像带双承接.状态, '已完成');
+  assert.equal(data.系统._已完成特殊场景.includes('录像带结局'), true);
+  assert.equal(data.系统._已完成特殊场景.includes('录像带'), false);
+});
+
+test('旧录像带运行中存档仍走旧三拍标签，不会被正式双承接批次自动升级', () => {
+  const data = 建录像带状态('102-1');
+  const 结果 = 推进特殊场景(data, '【特殊场景·录像带·102-1】旧存档正文');
+  assert.equal(结果, undefined);
+  assert.equal(data.系统._特殊场景.id, '录像带');
+  assert.equal(data.系统._特殊场景.阶段, '102-2');
+  assert.equal(data.系统._录像带双承接.场次标识, '');
+  assert.equal(data.系统._录像带双承接.状态, '未开始');
 });
 
 function 建静音会议收尾状态(堕落值, 余波 = false) {

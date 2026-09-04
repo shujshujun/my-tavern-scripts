@@ -205,8 +205,11 @@ test('props/emits 与 App 接线完整；close/三类图片 error/CG/卸载/晋�
   assert.match(档案卡源码, /@click\.self="emit\('close'\)"/, 'mask.self 只 emit close');
   assert.match(档案卡源码, /@error="emit\('avatarError', 选中档案\.妻名\)"/, '头像失败 emit 妻名');
   assert.match(档案卡源码, /@error="emit\('avatarError', '影子'\)"/, '丈夫头像失败 emit 影子');
-  assert.match(档案卡源码, /@error="emit\('portraitError', 选中档案\.立绘图\)"/, '立绘失败 emit 立绘图');
-  assert.match(档案卡源码, /@error="emit\('itemError', a\.图id\)"/, '道具图失败 emit 图id');
+  assert.match(档案卡源码, /:key="选中档案\.立绘图"[\s\S]*?@error="档案立绘出错"/, '切换立绘时按真实URL重建图片节点');
+  assert.match(档案卡源码, /function 档案立绘出错\(event: Event\)[\s\S]*?getAttribute\('src'\)[\s\S]*?emit\('portraitError', 图\)/, '立绘错误读取事件图片URL，不误标后来切换的角色');
+  assert.match(档案卡源码, /@error="仪容图片出错\(a\.图id, \$event\)"/, '仪容图错误交给按事件图片URL隔离的失败记录');
+  assert.match(档案卡源码, /仪容失效图\.value\[图\] = true/, '角色成品失败不能污染其他角色的同款图');
+  assert.match(档案卡源码, /if \(图 === props\.itemImage\(id\)\) emit\('itemError', id\)/, '通用商品图的失败仍向 App emit 原图id');
   assert.match(档案卡源码, /@click\.stop="emit\('openCg', 选中档案\.门牌\)"/, 'CG 按钮 emit 门牌');
   assert.doesNotMatch(档案卡源码, /unload|卸载|曾开发/, '档案不再提供旧性癖装卸入口');
   assert.match(档案卡源码, /@click="emit\('advance', 选中档案\.门牌\)"/, '晋阶 emit 门牌');
@@ -224,7 +227,7 @@ test('档案模板关键契约全量保持：头像/立绘/三轴/心镜/仪容/
   assert.match(模板段, /v-if="选中档案\.立绘图"/, '立绘候选存在门');
   assert.match(
     档案卡源码,
-    /角色立绘候选\(户静态表\[m\]\.妻名, 当前立绘SKU, 怀孕公开\)\.find\([\s\S]*?!props\.portraitFailed\[src\]/,
+    /角色立绘候选\(户静态表\[m\]\.妻名, 当前立绘SKU, 怀孕公开, \{ 妆容SKU: 妻\._穿着SKU\.妆容, 特殊: 妻\.特殊 \}\)\.find\([\s\S]*?!props\.portraitFailed\[src\]/,
     '立绘失败后由统一候选解析器逐级回退',
   );
   assert.match(模板段, /v-for="轴 in 选中档案\.三轴"/, '三轴循环');
@@ -241,7 +244,7 @@ test('档案模板关键契约全量保持：头像/立绘/三轴/心镜/仪容/
   assert.match(模板段, /v-for="a in 选中档案\.仪容项"[\s\S]*?:key="a\.标 \+ a\.值"/, '仪容项循环');
   assert.match(模板段, /:class="\{ initial: a\.图id\?\.startsWith\('初始外装_'\) \}"/, '初始外装标记');
   assert.match(模板段, /loading="lazy"/, '仪容图 lazy');
-  assert.match(模板段, /<b v-else aria-hidden="true">衣<\/b>/, '道具图失败回退 衣');
+  assert.match(模板段, /<b v-else>\{\{ 仪容图片\(a\.图id\) \? '加载失败' : '待配图' \}\}<\/b>/, '缺图和加载失败分别明确回退');
   assert.match(模板段, /v-if="选中档案\.妻\.当前阶段 >= 2" class="dsec dossier-card"/, '阶段2起显示CG图库入口');
   assert.match(模板段, /CG \{\{ 选中档案\.CG进度\.已解锁 \}\}\/\{\{ 选中档案\.CG进度\.总数 \}\} ›/, 'CG 进度文案');
   assert.match(模板段, /<div v-if="选中档案\.妻\.当前阶段 >= 3" class="dev-grid">/, '身体开发数值仍从阶段3才显示');

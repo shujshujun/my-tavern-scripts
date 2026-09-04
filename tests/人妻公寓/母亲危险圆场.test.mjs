@@ -203,7 +203,7 @@ test('待接来电冻结圆场事实，接听时原样转入活动父亲通话',
 
 test('父亲生成读取冻结圆场快照并区分免责与纯剧情，不扩充第三个通话角色', () => {
   const start = 父亲通话源码.indexOf('type 母亲圆场快照');
-  const end = 父亲通话源码.indexOf('/**\n * `待回复.序号`', start);
+  const end = 父亲通话源码.indexOf(' * `待回复.序号`', start);
   const implementation = 父亲通话源码.slice(start, end);
 
   assert.ok(start >= 0 && end > start);

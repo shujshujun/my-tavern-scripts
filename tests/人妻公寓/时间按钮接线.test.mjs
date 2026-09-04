@@ -15,12 +15,16 @@ delete require.extensions['.json'];
 require.extensions['.json'] = jsonLoader;
 globalThis._ = require('lodash');
 
-const App源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
-const 回合输入源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/components/回合输入.vue', import.meta.url), 'utf8');
-const 合成源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/composables/useRoomActions.ts', import.meta.url), 'utf8');
-const Index源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
-const 时钟源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/楼层时钟.ts', import.meta.url), 'utf8');
-const 隔离事件源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/隔离事件引擎.ts', import.meta.url), 'utf8');
+function 读取源码(路径) {
+  return readFileSync(路径, 'utf8').replace(/\r\n?/gu, '\n');
+}
+
+const App源 = 读取源码(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url));
+const 回合输入源 = 读取源码(new URL('../../src/人妻公寓/界面/客户端/components/回合输入.vue', import.meta.url));
+const 合成源 = 读取源码(new URL('../../src/人妻公寓/界面/客户端/composables/useRoomActions.ts', import.meta.url));
+const Index源 = 读取源码(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url));
+const 时钟源 = 读取源码(new URL('../../src/人妻公寓/脚本/游戏逻辑/楼层时钟.ts', import.meta.url));
+const 隔离事件源 = 读取源码(new URL('../../src/人妻公寓/脚本/游戏逻辑/隔离事件引擎.ts', import.meta.url));
 const { Schema, 当前MVU数据版本 } = require('../../src/人妻公寓/schema.ts');
 const { 执行时间推进事务 } = require('../../src/人妻公寓/脚本/游戏逻辑/时间推进系统.ts');
 
@@ -54,7 +58,7 @@ function 收集业务源码(目录) {
   for (const 项 of readdirSync(目录, { withFileTypes: true })) {
     const 路径 = join(目录, 项.name);
     if (项.isDirectory()) 文本.push(...收集业务源码(路径));
-    else if (['.ts', '.vue'].includes(extname(项.name))) 文本.push(readFileSync(路径, 'utf8'));
+    else if (['.ts', '.vue'].includes(extname(项.name))) 文本.push(读取源码(路径));
   }
   return 文本;
 }
@@ -206,7 +210,6 @@ test('入口硬门限制睡眠与活动地点，普通推进保留原地点并�
   assert.ok(执行位置 > 0 && 切场景位置 > 0);
 
   const 门们 = [
-    "方式 === '睡到次日早晨' && 当前房间 !== '管理员室' && 当前房间 !== '302'",
     "方式 === '小憩' && 当前房间 !== '管理员室' && 当前房间 !== '302'",
     "方式 === '晨跑' && 当前房间 !== '晨跑公园'",
     "方式 === '健身' && 当前房间 !== '健身房'",
@@ -215,6 +218,8 @@ test('入口硬门限制睡眠与活动地点，普通推进保留原地点并�
     'if (脚本写入中)',
     'if (隔离事件进行中())',
     'data.系统._特殊场景.id || data.系统._荣耀洞拍 >= 0',
+    'const 分居硬动作 = 许曼君分居时间动作阻断原因(data)',
+    'if (分居硬动作)',
     'data.系统._父亲通话.标识 || data.系统._父亲通话.状态',
     "_.get(getVariables({ type: 'chat' }), '_侦探.偷窥待选')",
     'const 活动剧情 = 读取活动场景剧情(data)',
@@ -229,10 +234,18 @@ test('入口硬门限制睡眠与活动地点，普通推进保留原地点并�
     assert.ok(位置 < 切场景位置, `硬门必须先于聊天场景清理：${门}`);
     assert.ok(位置 < 执行位置, `硬门必须先于时间事务：${门}`);
   }
+  assert.match(
+    处理段,
+    /if \(方式 === '睡到次日早晨'\) \{[\s\S]{0,100}当前房间 === '201'[\s\S]{0,160}读取201留宿可用状态\(data, 当前房间\)[\s\S]{0,180}!留宿\.可执行[\s\S]{0,220}当前房间 !== '管理员室' && 当前房间 !== '302'/,
+    '睡眠入口仅让共享纯函数确认可用的201越过原管理员室／302地点门',
+  );
   assert.doesNotMatch(处理段, /方式 === '推进一时段' && 当前房间 !== '管理员室'/);
+  assert.match(接线段, /const 时间结束房间: 时间推进地点 = 归一化睡醒地点\(/);
+  assert.match(接线段, /方式 === '推进一时段'\s*\? 当前房间/);
   assert.match(
     接线段,
-    /const 时间结束房间: 时间推进地点 =\s*方式 === '推进一时段'[\s\S]{0,80}\? 当前房间[\s\S]{0,160}当前房间 === '晨跑公园'[\s\S]{0,80}当前房间 === '健身房'/,
+    /当前房间 === '302' \|\| 当前房间 === '201' \|\| 当前房间 === '晨跑公园' \|\| 当前房间 === '健身房'/,
+    '睡眠／活动的合法结束地点应原样保留，其他非普通推进动作才回管理员室',
   );
   assert.match(接线段, /function 写时间结束场景[\s\S]{0,180}房间id: 房间/);
   assert.match(处理段, /写时间结束场景\(vars, 时间结束房间, 当前消息楼\)/);

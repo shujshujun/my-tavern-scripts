@@ -39,6 +39,7 @@ const App源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App
 const 背包源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/components/背包.vue', import.meta.url), 'utf8');
 const 商店源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/components/商店.vue', import.meta.url), 'utf8');
 const 档案卡源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/components/档案卡.vue', import.meta.url), 'utf8');
+const 游戏逻辑源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
 
 function 建三户数据() {
   const data = Schema.parse({
@@ -139,6 +140,11 @@ test('普通五户 2→3 第一夜只允许晚上请求，白天和深夜都不�
     assert.equal(data.户[门牌].妻.当前阶段, 3);
     assert.equal(data.风闻, 3, '正式晋阶应登记三点攻略风闻');
   }
+});
+
+test('普通五户2→3转折票带稳定首夜标记，高阶段转折不冒充第一夜', () => {
+  assert.match(游戏逻辑源, /妻\.当前阶段 === 3[\s\S]{0,180}普通首夜事件标记/);
+  assert.match(游戏逻辑源, /\$\{第一夜标记\}\$\{第一夜\}/);
 });
 
 test('界面与后端使用同一夜间门：错误时段显示等待而不是仍给可点按钮', () => {

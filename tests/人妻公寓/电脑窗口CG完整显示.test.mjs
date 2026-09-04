@@ -36,16 +36,20 @@ test('模板把 正文隐藏 ref 派生到 story-visual-only class；隐藏按�
   assert.match(故事标签, /'story-visual-only': 正文隐藏,/, '正文隐藏 ref 应派生纯画面 class story-visual-only');
   assert.match(故事标签, /'story-adult-cg': 显示成人CG,/, '成人 CG class 仍只跟 显示成人CG');
   assert.match(故事标签, /'story-glory': !!荣耀洞图,/, 'story-glory 保持');
-  assert.match(故事标签, /'story-special-interaction': 录像带交互幕 \|\| 静音会议交互幕,/, 'story-special-interaction 保持');
+  assert.match(
+    故事标签,
+    /'story-special-interaction': 录像带交互幕 \|\| 录像带V4中 \|\| 静音会议交互幕,/,
+    'story-special-interaction 同时覆盖旧录像带、V4与静音会议',
+  );
   assert.match(故事标签, /'story-mute-meeting': 静音会议显示组合图,/, 'story-mute-meeting 保持');
   assert.match(故事标签, /'story-intimacy-open': 性爱进行中 && 亲密抽屉展开,/, 'story-intimacy-open 保持');
   assert.match(模板段, /class="story-hide-btn"/, '隐藏正文钮仍在');
-  assert.match(模板段, /v-if="!录像带中 && !静音会议交互幕"/, '隐藏正文钮门控保持');
+  assert.match(模板段, /v-if="!录像带任一中 && !静音会议交互幕"/, '隐藏正文钮对两代录像带统一让位');
   assert.match(模板段, /@click\.stop="正文隐藏 = !正文隐藏"/, '隐藏按钮仍切换 正文隐藏');
   assert.match(
     模板段,
-    /:veiled="正文隐藏 \|\| 录像带交互幕 \|\| 静音会议交互幕 \|\| !!当前事件CG"/,
-    '正文卷轴仍按 正文隐藏 渐隐，家庭计划或生产专属画面打开时也必须遮住正文',
+    /:veiled="正文隐藏 \|\| 录像带交互幕 \|\| 录像带V4中 \|\| 静音会议交互幕 \|\| !!当前事件CG"/,
+    '正文卷轴仍按 正文隐藏 渐隐，V4、家庭计划或生产专属画面打开时也必须遮住正文',
   );
 });
 

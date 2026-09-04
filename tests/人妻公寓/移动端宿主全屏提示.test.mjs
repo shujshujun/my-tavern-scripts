@@ -3,9 +3,13 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 
-const 游戏逻辑源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
-const 客户端源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
-const 界面偏好源 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/composables/useUIPrefs.ts', import.meta.url), 'utf8');
+function 读取源码(路径) {
+  return readFileSync(路径, 'utf8').replace(/\r\n?/gu, '\n');
+}
+
+const 游戏逻辑源 = 读取源码(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url));
+const 客户端源 = 读取源码(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url));
+const 界面偏好源 = 读取源码(new URL('../../src/人妻公寓/界面/客户端/composables/useUIPrefs.ts', import.meta.url));
 
 function 截段(源, 开始标记, 结束标记) {
   const 开始 = 源.indexOf(开始标记);

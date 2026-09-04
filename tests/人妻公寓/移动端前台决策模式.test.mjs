@@ -25,9 +25,15 @@ test('监控选择与静音会议散会选择进入硬前台决策，但普通�
 test('监控硬决策保留正文、收起无关操作，并且选择提交前不乐观清掉持久挂起', () => {
   assert.match(App源码, /<div class="page" :class="\{ 'foreground-decision': 前台硬决策中 \}">/);
   assert.match(App源码, /:suppressed="房内操作抑制 \|\| 前台硬决策中"/);
-  assert.match(App源码, /:open="显示选项[^\n]*&& !前台硬决策中"/);
+  assert.match(
+    App源码,
+    /:open="\s*显示选项 && !录像带任一中 && !静音会议交互幕 && !静音会议待散会选择 && !静音会议自由待选择 && !前台硬决策中\s*"/,
+  );
   assert.match(App源码, /:decision-mode="前台决策输入模式"/);
-  assert.match(App源码, /<nav v-if="!录像带中 && !前台硬决策中"/);
+  assert.match(
+    App源码,
+    /<nav\s+v-if="!录像带任一中 && !前台硬决策中 && !母亲视频终幕已接通 && !双重继承最终收束锁"/,
+  );
   assert.match(App源码, /前台硬决策中\s*\? '请先完成当前画面的判断'/);
 
   assert.match(App源码, /class="peep-card"[\s\S]{0,220}collapsed: 偷窥决策收起/);

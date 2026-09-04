@@ -2,10 +2,10 @@
 // 地图全屏画面与房卡(日式 gal 移动画面,App A6a 拆分):
 // 纯展示 + 局部状态(房卡/结果卡/立面失效/楼层组/描点坐标)留在组件;
 // 场景与移动业务(进入/离开/写场景/房间动作/关地图/从地图外出)仍由 App 持有,经 props/emits 往来。
-import { computed, ref, watch } from 'vue';
+import { computed, onScopeDispose, ref, watch } from 'vue';
 import type { SchemaType } from '../../../schema';
 import { 户静态表, 查房间, type 门牌 } from '../../../stageConfig';
-import type { 卡动作 } from '../types';
+import type { 卡动作, 卡动作选项 } from '../types';
 import { 素材基址 } from '../assets';
 import Ic from './Icon.vue';
 
@@ -27,6 +27,8 @@ const props = defineProps<{
   managementBadge: (roomId: string) => '' | '楼务' | '逾期';
   rentOwed: (roomId: string) => boolean;
   roomActions: (roomId: string | null) => 卡动作[];
+  doubleInheritanceProgress: string;
+  inspectionMark: (roomId: string) => '' | 'INSPECT' | 'DONE';
 }>();
 
 const emit = defineEmits<{
@@ -39,10 +41,26 @@ const emit = defineEmits<{
 
 const 房卡 = ref<string | null>(null);
 const 结果卡 = ref('');
+const 当前房卡选择 = ref<卡动作 | null>(null);
+const 当前房卡长按选项 = ref<卡动作选项 | null>(null);
+let 房卡长按计时: ReturnType<typeof setTimeout> | undefined;
+
+function 清房卡动作选择(): void {
+  clearTimeout(房卡长按计时);
+  房卡长按计时 = undefined;
+  当前房卡长按选项.value = null;
+  当前房卡选择.value = null;
+}
 
 function 清房卡与结果(): void {
+  清房卡动作选择();
   房卡.value = null;
   结果卡.value = '';
+}
+
+function 关闭房卡(): void {
+  清房卡动作选择();
+  房卡.value = null;
 }
 
 /** 会议启动、进入/离开等外部关图也会走到 open=false,统一清房卡与结果卡。 */
@@ -55,6 +73,7 @@ watch(
 
 function 点房(房间id: string) {
   if (props.sending) return;
+  清房卡动作选择();
   结果卡.value = '';
   房卡.value = 房卡.value === 房间id ? null : 房间id;
 }
@@ -97,6 +116,97 @@ const 房卡在场 = computed(() => (房卡.value ? props.roomPeople(房卡.valu
 
 const 房卡动作 = computed<卡动作[]>(() => props.roomActions(房卡.value));
 
+watch(
+  () =>
+    [
+      房卡.value,
+      房卡动作.value
+        .map(
+          动作 =>
+            `${动作.kicker}:${动作.文案}:${动作.提示 ?? ''}:${动作.选项
+              ?.map(选项 => `${选项.kicker}:${选项.文案}:${选项.提示 ?? ''}`)
+              .join('|') ?? ''}`,
+        )
+        .join('\u0000'),
+    ] as const,
+  () => 清房卡动作选择(),
+);
+
+onScopeDispose(() => clearTimeout(房卡长按计时));
+
+function 触发房卡动作(动作: 卡动作): void {
+  if (props.sending || 动作.禁用) return;
+  clearTimeout(房卡长按计时);
+  房卡长按计时 = undefined;
+  当前房卡长按选项.value = null;
+  if (动作.选项?.length) {
+    当前房卡选择.value = 当前房卡选择.value === 动作 ? null : 动作;
+    return;
+  }
+  当前房卡选择.value = null;
+  void 动作.做();
+}
+
+function 触发房卡选项(选项: 卡动作选项): void {
+  if (props.sending || 选项.长按毫秒) return;
+  当前房卡选择.value = null;
+  void 选项.做();
+}
+
+function 启动房卡长按倒计时(选项: 卡动作选项): void {
+  if (props.sending || !选项.长按毫秒 || 当前房卡长按选项.value) return;
+  当前房卡长按选项.value = 选项;
+  clearTimeout(房卡长按计时);
+  房卡长按计时 = setTimeout(() => {
+    if (当前房卡长按选项.value !== 选项) return;
+    当前房卡长按选项.value = null;
+    房卡长按计时 = undefined;
+    当前房卡选择.value = null;
+    void 选项.做();
+  }, 选项.长按毫秒);
+}
+
+function 记录房卡未完成长按(选项: 卡动作选项): void {
+  if (!选项.长按毫秒 || 当前房卡长按选项.value !== 选项) return;
+  clearTimeout(房卡长按计时);
+  房卡长按计时 = undefined;
+  当前房卡长按选项.value = null;
+  当前房卡选择.value = null;
+  void 选项.短按?.();
+}
+
+function 开始房卡长按(选项: 卡动作选项, event: PointerEvent): void {
+  if (!选项.长按毫秒 || 当前房卡长按选项.value) return;
+  event.preventDefault();
+  (event.currentTarget as HTMLElement | null)?.setPointerCapture?.(event.pointerId);
+  启动房卡长按倒计时(选项);
+}
+
+function 结束房卡长按(选项: 卡动作选项, event: PointerEvent): void {
+  if (!选项.长按毫秒 || 当前房卡长按选项.value !== 选项) return;
+  event.preventDefault();
+  记录房卡未完成长按(选项);
+}
+
+function 开始房卡键盘长按(选项: 卡动作选项, event: KeyboardEvent): void {
+  if (!选项.长按毫秒 || event.repeat || 当前房卡长按选项.value) return;
+  event.preventDefault();
+  启动房卡长按倒计时(选项);
+}
+
+function 结束房卡键盘长按(选项: 卡动作选项, event: KeyboardEvent): void {
+  if (!选项.长按毫秒 || 当前房卡长按选项.value !== 选项) return;
+  event.preventDefault();
+  记录房卡未完成长按(选项);
+}
+
+function 取消房卡长按(选项: 卡动作选项): void {
+  if (当前房卡长按选项.value !== 选项) return;
+  clearTimeout(房卡长按计时);
+  房卡长按计时 = undefined;
+  当前房卡长按选项.value = null;
+}
+
 // ── 地图数据(公寓立面:3F→1F 每层两户,顶=天台,底=公共区) ──
 
 const 楼层组 = computed(() => [
@@ -136,7 +246,8 @@ const 时段问候 = computed(
 );
 
 function 房内首字(房间id: string): string {
-  return props.roomPeople(房间id)
+  return props
+    .roomPeople(房间id)
     .map(n => n[0])
     .join(' ');
 }
@@ -198,6 +309,9 @@ const 地图点位 = computed(() =>
           <b>第 {{ day }} 天 · {{ weekday }}</b
           ><em>{{ 时段问候 }}</em>
         </div>
+        <p v-if="doubleInheritanceProgress" class="handover-progress" aria-label="父亲现场检查">
+          {{ doubleInheritanceProgress }}
+        </p>
       </div>
 
       <!-- 立面画布(rq0.12 描点地图:徽章钉在画里的门窗上;时段=同一张画调色,点位永不漂) -->
@@ -221,6 +335,12 @@ const 地图点位 = computed(() =>
           >
             <span class="spot-plate">{{ 点.名 }}</span>
             <span v-if="点.空置" class="spot-note">招租</span>
+            <span
+              v-else-if="inspectionMark(点.id)"
+              class="spot-note inspect"
+              :class="{ done: inspectionMark(点.id) === 'DONE' }"
+              >{{ inspectionMark(点.id) }}</span
+            >
             <span
               v-else-if="managementBadge(点.id)"
               class="spot-note duty"
@@ -256,6 +376,7 @@ const 地图点位 = computed(() =>
           <div class="roofline">
             <button class="roof-card" :class="{ here: currentRoom === '天台' }" @click="点房('天台')">
               <span class="unit-name">天台</span>
+              <span v-if="inspectionMark('天台')" class="unit-task">{{ inspectionMark('天台') }}</span>
               <span class="unit-occ">{{ 房内首字('天台') }}</span>
             </button>
           </div>
@@ -284,19 +405,14 @@ const 地图点位 = computed(() =>
               @click="点房(房.id)"
             >
               <span class="unit-sub">{{ 房.名称 }}</span>
+              <span v-if="inspectionMark(房.id)" class="unit-task">{{ inspectionMark(房.id) }}</span>
               <span class="unit-occ">{{ 房内首字(房.id) }}</span>
             </button>
           </div>
         </div>
       </div>
 
-      <button
-        v-if="hospitalVisible"
-        class="hospital-launch"
-        type="button"
-        :disabled="sending"
-        @click="点房('医院')"
-      >
+      <button v-if="hospitalVisible" class="hospital-launch" type="button" :disabled="sending" @click="点房('医院')">
         <span><small>MATERNITY / 产科</small><b>前往市立医院</b></span>
         <em>预产消息已读 · 产科入口开放</em>
         <Ic n="arrow" />
@@ -310,9 +426,9 @@ const 地图点位 = computed(() =>
 
       <!-- 房间弹窗(gal 式:遮罩层+居中卡;hero 色带头+瓷砖大按钮;翻垃圾/撬门都在这里) -->
       <transition name="card-pop">
-        <div v-if="房卡" class="rc-mask" @click.self="房卡 = null">
+        <div v-if="房卡" class="rc-mask" @click.self="关闭房卡">
           <div :key="房卡" class="room-modal">
-            <button class="sheet-close" @click="房卡 = null">✕</button>
+            <button class="sheet-close" @click="关闭房卡">✕</button>
             <div class="rm-hero" :class="{ pub: !/^\d+$/.test(房卡) }">
               <div class="ui-kicker light">{{ 房卡kicker }}</div>
               <b>{{ 房卡名称 }}</b>
@@ -337,17 +453,54 @@ const 地图点位 = computed(() =>
               <button
                 v-for="(动作, i) in 房卡动作"
                 :key="i"
+                type="button"
                 class="tile"
-                :class="动作.类"
-                :disabled="sending"
-                @click="动作.做()"
+                :class="[动作.类, { selected: 当前房卡选择 === 动作 }]"
+                :disabled="sending || 动作.禁用"
+                :title="动作.提示 || undefined"
+                :aria-expanded="动作.选项?.length ? 当前房卡选择 === 动作 : undefined"
+                @click="触发房卡动作(动作)"
               >
                 <Ic :n="动作.icon" />
                 <span class="act-kicker">{{ 动作.kicker }}</span>
                 <strong>{{ 动作.文案 }}</strong>
+                <small v-if="动作.提示">{{ 动作.提示 }}</small>
               </button>
               <span v-if="!房卡动作.length" class="rc-empty">门上贴着招租启事,还没有住户</span>
             </div>
+            <transition name="room-choice">
+              <section v-if="当前房卡选择?.选项?.length" class="room-action-choice" aria-label="选择房间动作">
+                <header>
+                  <span><small>SELECT ACTION</small><b>{{ 当前房卡选择.文案 }}</b></span>
+                  <button type="button" aria-label="关闭选择" @click="清房卡动作选择">✕</button>
+                </header>
+                <div class="room-action-choice-grid">
+                  <button
+                    v-for="选项 in 当前房卡选择.选项"
+                    :key="`${选项.kicker}:${选项.文案}`"
+                    type="button"
+                    class="room-choice-tile"
+                    :class="{ holding: 当前房卡长按选项 === 选项 }"
+                    :disabled="sending"
+                    :title="选项.提示 || undefined"
+                    @pointerdown="开始房卡长按(选项, $event)"
+                    @pointerup="结束房卡长按(选项, $event)"
+                    @pointercancel="取消房卡长按(选项)"
+                    @keydown.enter="开始房卡键盘长按(选项, $event)"
+                    @keyup.enter="结束房卡键盘长按(选项, $event)"
+                    @keydown.space="开始房卡键盘长按(选项, $event)"
+                    @keyup.space="结束房卡键盘长按(选项, $event)"
+                    @blur="取消房卡长按(选项)"
+                    @click="触发房卡选项(选项)"
+                  >
+                    <Ic :n="选项.icon" />
+                    <span class="act-kicker">{{ 选项.kicker }}</span>
+                    <strong>{{ 选项.文案 }}</strong>
+                    <small v-if="选项.提示">{{ 选项.提示 }}</small>
+                  </button>
+                </div>
+              </section>
+            </transition>
             <transition name="clue-flip">
               <div v-if="结果卡" :key="结果卡" class="clue-card">{{ 结果卡 }}</div>
             </transition>
@@ -646,6 +799,14 @@ const 地图点位 = computed(() =>
   opacity: 0.85;
 }
 
+.handover-progress {
+  margin: 5px 0 0;
+  color: #7b5422;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
 /* 楼体:白墙楼卡 + 窗灯 */
 .bldg {
   position: relative;
@@ -923,6 +1084,151 @@ const 地图点位 = computed(() =>
   padding: 0 14px;
 }
 
+.room-action-choice {
+  margin: 8px 14px 0;
+  padding: 10px;
+  background: rgba(243, 249, 255, 0.96);
+  border: 1px solid rgba(38, 169, 244, 0.22);
+  border-radius: 14px;
+}
+
+.room-action-choice > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.room-action-choice > header span {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.room-action-choice > header small {
+  color: var(--blue);
+  font: 800 var(--font-micro) / 1.2 var(--font-mono);
+  letter-spacing: 0.12em;
+}
+
+.room-action-choice > header b {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 0.78em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.room-action-choice > header button {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  color: var(--ink-soft);
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.room-action-choice-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.room-choice-tile {
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 7px 9px;
+  color: var(--ink);
+  text-align: center;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(30, 26, 38, 0.06);
+  touch-action: manipulation;
+  user-select: none;
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.room-choice-tile:only-child {
+  grid-column: 1 / -1;
+}
+
+.room-choice-tile .ic {
+  width: 27px;
+  height: 27px;
+  color: var(--blue);
+}
+
+.room-choice-tile strong {
+  max-width: 100%;
+  font-size: 0.76em;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.room-choice-tile small {
+  color: var(--ink-faint);
+  font-size: 0.64em;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.room-choice-tile:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.room-choice-tile.holding::after {
+  position: absolute;
+  inset: auto 0 0;
+  height: 4px;
+  background: currentColor;
+  content: '';
+  transform-origin: left center;
+  animation: room-hold-progress 1.2s linear forwards;
+}
+
+.room-choice-tile:focus-visible,
+.room-action-choice > header button:focus-visible {
+  outline: 3px solid rgba(38, 169, 244, 0.42);
+  outline-offset: 2px;
+}
+
+.room-choice-enter-active,
+.room-choice-leave-active {
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease;
+}
+
+.room-choice-enter-from,
+.room-choice-leave-to {
+  opacity: 0;
+  transform: translateY(-5px);
+}
+
+@keyframes room-hold-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
 /* 瓷砖(与 App 正文房内动作行/垃圾选择共享,按所有权在两侧各持一份) */
 .tile {
   display: flex;
@@ -954,7 +1260,23 @@ const 地图点位 = computed(() =>
   line-height: 1.35;
 }
 
-.tile:hover {
+.tile small {
+  margin-top: 3px;
+  color: var(--ink-faint);
+  font-size: 0.66em;
+  line-height: 1.35;
+}
+
+.tile:disabled {
+  cursor: not-allowed;
+  opacity: 0.58;
+  transform: none;
+  box-shadow: 0 2px 8px rgba(30, 26, 38, 0.05);
+}
+
+.tile:not(:disabled):hover,
+.tile.selected,
+.room-choice-tile:not(:disabled):hover {
   transform: translateY(-2px);
   border-color: rgba(38, 169, 244, 0.55);
   box-shadow: 0 8px 20px rgba(38, 169, 244, 0.22);
@@ -1243,6 +1565,23 @@ const 地图点位 = computed(() =>
   background: rgba(192, 57, 43, 0.94);
 }
 
+.spot-note.inspect {
+  color: #fff8dd;
+  background: linear-gradient(135deg, #a96d18, #d7a443);
+}
+
+.spot-note.inspect.done {
+  color: #e9fff0;
+  background: linear-gradient(135deg, #417452, #69a679);
+}
+
+.unit-task {
+  color: #8c5d18;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
 .spot-faces {
   display: inline-flex;
   align-items: center;
@@ -1359,8 +1698,18 @@ const 地图点位 = computed(() =>
 
 /* ═══ 地图的夜间/省流/移动端覆盖(App 合写选择器按所有权拆分,其余对象仍留 App) ═══ */
 
-:global(html.rq-dark) .tile {
+:global(html.rq-dark) .tile,
+:global(html.rq-dark) .room-choice-tile {
   background: #2c2e40;
+}
+
+:global(html.rq-dark) .room-action-choice {
+  background: rgba(38, 41, 58, 0.96);
+  border-color: rgba(86, 180, 235, 0.24);
+}
+
+:global(html.rq-dark) .room-action-choice > header b {
+  color: #f4edf2;
 }
 
 :global(html.rq-dark) .outing-launch {

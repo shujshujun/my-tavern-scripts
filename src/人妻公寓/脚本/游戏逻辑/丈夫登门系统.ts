@@ -5,6 +5,7 @@ import { 读取世界时间 } from './楼层时钟';
 import { 处于医院硬锁 } from './生产系统';
 import { 降低风闻 } from './风闻系统';
 import { 夏乔家庭计划后果有效 } from './借种结局状态';
+import { 普通丈夫风险已停用 } from './丈夫线路风险策略';
 
 export const 丈夫登门触发疑心 = 50;
 export const 喜讯奖励 = { 疑心降低: 20, 信任提高: 10, 风闻降低: 15 } as const;
@@ -58,6 +59,17 @@ export function 解析丈夫特殊登门变体(data: SchemaType, 门牌号: 门�
   return '';
 }
 
+/** 等待账保留供回档／恢复使用；已实际入场的登门继续收束，专属家庭后果单独生效。 */
+export function 丈夫登门需要处理(data: SchemaType, 门牌号: 门牌): boolean {
+  const 账 = 登门账(data, 门牌号);
+  if (!账 || 门牌号 === '302') return false;
+  if (账.状态 === '进行中') return true;
+  if (账.状态 !== '待触发') return false;
+  const 特殊 = 解析丈夫特殊登门变体(data, 门牌号);
+  if (特殊 === '夏乔不登门') return false;
+  return Boolean(特殊) || !普通丈夫风险已停用(data, 门牌号);
+}
+
 /** 孕情微信已送达、已经曝光且疑心达到门槛时登记睡前强制访问；重复扫描无副作用。 */
 export function 同步丈夫登门排期(data: SchemaType): 门牌[] {
   const 新排期: 门牌[] = [];
@@ -68,6 +80,7 @@ export function 同步丈夫登门排期(data: SchemaType): 门牌[] {
     if (!节点 || 节点.妻._怀孕.状态 !== '已告知') continue;
     const 特殊 = 解析丈夫特殊登门变体(data, 门牌号);
     if (特殊 === '夏乔不登门') continue;
+    if (!特殊 && 普通丈夫风险已停用(data, 门牌号)) continue;
     if (!特殊 && (!节点.妻._怀孕.已曝光 || 节点.夫.疑心值 < 丈夫登门触发疑心)) continue;
     const 账 = 节点.妻._怀孕.丈夫登门;
     if (账.状态 !== '无') continue;
@@ -87,7 +100,7 @@ export function 安眠药可圆场(data: SchemaType, 门牌号: 门牌): boolean
   // 夏乔知情家庭计划的三胎全部由专属语义接管，安眠药不能把感谢／带酒／不上门改写成通用喜讯。
   if (门牌号 === '101' && 夏乔借种后果有效(data)) return false;
   const 账 = 登门账(data, 门牌号);
-  return !!账 && 账.状态 === '待触发' && !账.隐藏圆场;
+  return !!账 && 账.状态 === '待触发' && 丈夫登门需要处理(data, 门牌号) && !账.隐藏圆场;
 }
 
 export function 丈夫登门药物窗口已开启(data: SchemaType): boolean {
@@ -197,7 +210,7 @@ function 构造丈夫登门节拍(data: SchemaType, 门牌号: 门牌, 地点: s
 export function 读取待触发丈夫登门(data: SchemaType): 门牌 | null {
   return (
     (Object.keys(data.户) as 门牌[])
-      .filter(门牌号 => 门牌号 !== '302' && 登门账(data, 门牌号)?.状态 === '待触发')
+      .filter(门牌号 => 登门账(data, 门牌号)?.状态 === '待触发' && 丈夫登门需要处理(data, 门牌号))
       .filter(门牌号 => !处于医院硬锁(data, 门牌号))
       .sort((a, b) => {
         const 时差 = (登门账(data, a)?.排期绝对时段 ?? -1) - (登门账(data, b)?.排期绝对时段 ?? -1);

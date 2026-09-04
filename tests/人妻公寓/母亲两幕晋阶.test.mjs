@@ -169,6 +169,14 @@ test('主回合与原生逃生路径都只在冻结票据成功提交分支结�
   assert.match(原生提交分支, /提交母亲两幕事件\(newData, 本楼事件\)/);
 });
 
+test('母亲首夜后续普通楼的主回合稽查读取临时亲密许可阶段，不会按阶段2重写回接吻', () => {
+  const source = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/回合引擎.ts', import.meta.url), 'utf8');
+  assert.match(
+    source,
+    /const 阶段表 = Object\.fromEntries\(焦点妻们\.map\(m => \[m, 亲密场景许可阶段\(data, m, 本楼事件\)\]\)\)/,
+  );
+});
+
 test('早餐属于强制正文事件，空正文在固定0楼与原生逃生路径都保留票据', () => {
   const 早餐票据 = '【事件在场妻:302】【早饭桌】第二天一早，妈把早餐摆到桌上。';
   const 冻结票据 = {
@@ -195,7 +203,7 @@ test('早餐属于强制正文事件，空正文在固定0楼与原生逃生路�
 
   const indexSource = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
   const 原生空正文门 = indexSource.slice(
-    indexSource.indexOf('const 本轮有效正文 ='),
+    indexSource.indexOf('let 本轮有效正文 ='),
     indexSource.indexOf('// 手动"重新处理变量"'),
   );
   assert.match(原生空正文门, /事件必须有正文\(本楼事件\)/);

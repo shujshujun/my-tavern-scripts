@@ -155,7 +155,30 @@ test('运行中的主回合捕获时间线世代，分支变化后跳过旧快�
   assert.match(主回合, /临时楼降序楼层\(/);
   assert.doesNotMatch(主回合, /SillyTavern\.chat\?\.\[楼层\] === 引用/);
   assert.match(主回合, /if \(本轮时间线仍有效\(\) && chat快照\)/);
-  assert.match(主回合, /await updateVariablesWith\([\s\S]*_上次回合[\s\S]*确认本轮事务有效/);
+
+  const 写状态 = 主回合.slice(
+    主回合.indexOf('const 写成功回合聊天状态'),
+    主回合.indexOf('if (选项.已持MVU操作租约)'),
+  );
+  assert.match(写状态, /_上次回合/);
+  const 核心聊天提交 = 主回合.slice(
+    主回合.indexOf('if (选项.成功核心聊天结算)'),
+    主回合.indexOf('// 正式楼与必要聊天状态已经同成同败'),
+  );
+  assert.match(
+    核心聊天提交,
+    /updateVariablesWith\(\s*vars => \{\s*确认本轮事务有效\(\);\s*写成功回合聊天状态\(vars\);[\s\S]*?成功核心聊天结算![\s\S]*?\{ type: 'chat' \},\s*\);\s*确认本轮事务有效\(\)/,
+    '核心聊天状态必须在 updater 内和 await 后双重复核当前时间线',
+  );
+  const 普通聊天提交 = 主回合.slice(
+    主回合.indexOf('if (!成功聊天状态已提交)'),
+    主回合.indexOf('const CG亲密'),
+  );
+  assert.match(
+    普通聊天提交,
+    /updateVariablesWith\(\s*vars => \{\s*确认本轮事务有效\(\);\s*return 写成功回合聊天状态\(vars\);[\s\S]*?\{ type: 'chat' \},\s*\);\s*确认本轮事务有效\(\)/,
+    '普通回合的 `_上次回合` 写入同样必须在 updater 内和 await 后复核时间线',
+  );
 });
 
 test('重掷、回档与重开先作废旧手机和时间线世代，失效后不把旧快照补偿进新分支', () => {

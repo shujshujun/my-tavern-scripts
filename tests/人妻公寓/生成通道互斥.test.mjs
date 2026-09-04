@@ -12,21 +12,16 @@ import {
   清空生成租约,
 } from '../../src/人妻公寓/脚本/游戏逻辑/生成通道互斥.ts';
 
-const 回合源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/回合引擎.ts', import.meta.url), 'utf8');
-const 入口源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
-const 客户端源码 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
-const 生成引擎源码 = readFileSync(
-  new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/生成引擎.ts', import.meta.url),
-  'utf8',
-);
-const 交互源码 = readFileSync(
-  new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/交互/邀约与发消息.ts', import.meta.url),
-  'utf8',
-);
-const 会话瞬态源码 = readFileSync(
-  new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/壳/会话瞬态.ts', import.meta.url),
-  'utf8',
-);
+function 读取源码(路径) {
+  return readFileSync(路径, 'utf8').replace(/\r\n?/gu, '\n');
+}
+
+const 回合源码 = 读取源码(new URL('../../src/人妻公寓/脚本/游戏逻辑/回合引擎.ts', import.meta.url));
+const 入口源码 = 读取源码(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url));
+const 客户端源码 = 读取源码(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url));
+const 生成引擎源码 = 读取源码(new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/生成引擎.ts', import.meta.url));
+const 交互源码 = 读取源码(new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/交互/邀约与发消息.ts', import.meta.url));
+const 会话瞬态源码 = 读取源码(new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/壳/会话瞬态.ts', import.meta.url));
 
 test('A1 空闲时前台可取得；前台占用时手机取得失败；前台释放后手机可取得', () => {
   清空生成租约();
@@ -240,10 +235,11 @@ test('B5 普通业务写与正文启动双向互斥，生成中商店和背包�
     '变量重生成也必须在取得前台槽前拒绝已有普通业务事务',
   );
 
-  const dock起 = 客户端源码.indexOf('<nav v-if="!录像带中 && !前台硬决策中" class="dock"');
+  const 商店标签位 = 客户端源码.indexOf('<span>商店</span>');
+  const dock起 = 客户端源码.lastIndexOf('<nav', 商店标签位);
   const dock止 = 客户端源码.indexOf('</nav>', dock起);
   const dock源码 = 客户端源码.slice(dock起, dock止);
-  const 商店按钮 = dock源码.slice(dock源码.indexOf('<span>商店</span>') - 700, dock源码.indexOf('<span>商店</span>') + 100);
+  const 商店按钮 = dock源码.slice(dock源码.indexOf('<span>商店</span>') - 900, dock源码.indexOf('<span>商店</span>') + 100);
   const 背包按钮 = dock源码.slice(dock源码.indexOf('<span>背包</span>') - 500, dock源码.indexOf('<span>背包</span>') + 100);
   assert.match(商店按钮, /:disabled="[^"]*发送中/, '正文生成中商店入口必须禁用');
   assert.match(背包按钮, /:disabled="[^"]*发送中/, '正文生成中背包入口必须禁用');

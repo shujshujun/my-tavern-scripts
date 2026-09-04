@@ -104,10 +104,15 @@ test('固定大按钮显示当前到下一时段，满状态点击前二次确�
   assert.match(回合输入源, /currentPeriodLabel/);
   assert.match(回合输入源, /推进到\{\{ nextPeriodLabel \}\}/);
   assert.match(回合输入源, /\.global-time-advance\s*\{[\s\S]{0,260}min-height:\s*56px/);
-  // 二次确认与深夜硬门仍在 App 推进固定时段
+  // 二次确认与深夜硬门仍在 App 推进固定时段；201只有经共享纯函数确认可用时才加入真实睡眠提示。
   assert.match(App源, /玩家资源已满/);
   assert.match(App源, /window\.confirm\([\s\S]{0,260}什么也没做[\s\S]{0,120}确定推进到/);
-  assert.match(App源, /时段\.value === '深夜'[\s\S]{0,220}管理员室或 302 睡觉[\s\S]{0,160}不能跨到第二天/);
+  assert.match(回合输入源, /deepNightHint/);
+  assert.match(
+    App源,
+    /const 深夜睡眠提示 = computed\([\s\S]{0,360}读取201留宿可用状态[\s\S]{0,220}可直接使用201的留宿瓷砖[\s\S]{0,180}请回管理员室或 302 睡觉/,
+  );
+  assert.match(App源, /时段\.value === '深夜'[\s\S]{0,220}深夜睡眠提示\.value[\s\S]{0,160}不能跨到第二天/);
   assert.match(App源, /发起时间推进\('推进一时段'\)/);
   // App 导入并挂载 RoundInput，推进按钮唯一入口经组件接线
   assert.match(App源, /import RoundInput from '\.\/components\/回合输入\.vue';/);

@@ -32,6 +32,7 @@ const { 户静态表, 角色剧情占位表, 道具表 } = require('../../src/�
 const { 购买, 取货架 } = require('../../src/人妻公寓/脚本/游戏逻辑/商店系统.ts');
 const {
   家庭计划101背景文件,
+  家庭计划档案提示,
   家庭计划地点动作,
   家庭计划已上架,
   准备家庭计划监控,
@@ -50,6 +51,7 @@ const index源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏�
 const 侦探源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/侦探系统.ts', import.meta.url), 'utf8');
 const 通知源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/通知桥.ts', import.meta.url), 'utf8');
 const 客户端源码 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/App.vue', import.meta.url), 'utf8');
+const 档案源码 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/components/档案卡.vue', import.meta.url), 'utf8');
 
 function 建夏乔完成数据() {
   const data = Schema.parse({ 户: { 101: 创建户节点(0) }, 系统: { _绝对时段: 0 }, 现金: 3000 });
@@ -92,6 +94,49 @@ test('上架、购买与重复购买由后端硬门负责', () => {
   const 二买 = 购买(data, '家庭计划套件');
   assert.equal(二买.成功, false);
   assert.equal(data.现金, 前现金 - 道具表.家庭计划套件.价格, '重复购买不得再次扣钱');
+});
+
+test('夏乔角色页从家庭计划解锁起常驻显示当前步骤，未解锁不剧透且完成后引向借种', () => {
+  const 未解锁 = Schema.parse({ 户: { 101: 创建户节点(0) } });
+  未解锁.户['101'].妻.当前阶段 = 5;
+  assert.equal(家庭计划档案提示(未解锁), null, '缺少永久孕欲时不得提前显示承接剧情');
+
+  const data = 建夏乔完成数据();
+  let 提示 = 家庭计划档案提示(data);
+  assert.match(提示?.状态 ?? '', /开放/);
+  assert.match(提示?.下一步 ?? '', /商店|家庭计划套件/);
+
+  const 阶段预期 = [
+    ['待安装', /101.*安装|安装.*101/],
+    ['待投资料', /信箱区.*资料|资料.*信箱区/],
+    ['待观察资料', /302.*监控|监控.*302/],
+    ['待写磁贴', /管理员室.*磁贴|磁贴.*管理员室/],
+    ['待送磁贴', /101.*信封|信封.*101/],
+    ['待确认人选', /302.*监控|监控.*302/],
+    ['待微信', /微信|手机/],
+    ['待赴约', /101.*赴约|赴约.*101/],
+  ];
+  for (const [阶段, 下一步] of 阶段预期) {
+    data.系统._家庭计划 = { 阶段, 最早继续日: 0, 完成楼层: -1 };
+    提示 = 家庭计划档案提示(data);
+    assert.match(提示?.下一步 ?? '', 下一步, 阶段);
+    assert.equal(提示?.完成, undefined, 阶段);
+  }
+
+  data.系统._家庭计划 = { 阶段: '待观察资料', 最早继续日: 3, 完成楼层: -1 };
+  data.系统._绝对时段 = 0;
+  提示 = 家庭计划档案提示(data);
+  assert.match(提示?.状态 ?? '', /等待/);
+  assert.match(提示?.下一步 ?? '', /第\s*4\s*天|等到/);
+
+  data.系统._家庭计划 = { 阶段: '已完成', 最早继续日: 0, 完成楼层: 99 };
+  提示 = 家庭计划档案提示(data);
+  assert.equal(提示?.完成, true);
+  assert.match(提示?.下一步 ?? '', /借种/);
+
+  assert.match(档案源码, /家庭计划档案提示/);
+  assert.match(档案源码, /选中家庭计划提示/);
+  assert.match(档案源码, /家庭计划下一步/);
 });
 
 test('五日流程逐日推进，监控只准备票据、有效提交才改变状态', () => {
@@ -227,11 +272,26 @@ test('借种是可见但由家庭计划硬门锁定的真实商品，完成前�
   assert.equal(data.背包.filter(id => id === 借种场景ID).length, 1);
 });
 
-test('其余五名角色各有操作性剧情与结局剧情占位，达到 L5 并完成阶段主题后成对上架', () => {
+test('已实现承接替代占位，102和202共同使用唯一录像带商品', () => {
   const 其他门牌 = ['102', '201', '202', '301', '302'];
   const 其他占位 = Object.values(角色剧情占位表).filter(x => x.门牌 !== '101');
-  assert.equal(其他占位.length, 10);
-  for (const 门牌号 of 其他门牌) {
+  assert.equal(其他占位.length, 2);
+  assert.deepEqual(
+    其他占位
+      .filter(x => x.门牌 === '102')
+      .map(x => x.类型)
+      .sort(),
+    [],
+  );
+  assert.deepEqual(
+    其他占位
+      .filter(x => x.门牌 === '201')
+      .map(x => x.类型)
+      .sort(),
+    [],
+  );
+  assert.deepEqual(其他占位.filter(x => x.门牌 === '202'), []);
+  for (const 门牌号 of ['301']) {
     assert.deepEqual(
       其他占位
         .filter(x => x.门牌 === 门牌号)
@@ -240,11 +300,16 @@ test('其余五名角色各有操作性剧情与结局剧情占位，达到 L5 �
       ['操作性剧情', '结局剧情'],
     );
   }
+  assert.deepEqual(
+    其他占位.filter(x => x.门牌 === '302'),
+    [],
+  );
 
   const data = Schema.parse({
     户: Object.fromEntries(其他门牌.map(门牌号 => [门牌号, 创建户节点(0)])),
     现金: 9000,
   });
+  data.系统._母亲入列 = true;
   for (const 门牌号 of 其他门牌) {
     const 本人占位 = 其他占位.filter(x => x.门牌 === 门牌号);
     data.户[门牌号].妻.当前阶段 = 5;
@@ -255,15 +320,31 @@ test('其余五名角色各有操作性剧情与结局剧情占位，达到 L5 �
     );
     data.户[门牌号].妻.阶段性癖 = 户静态表[门牌号].招牌性癖;
   }
+  data.系统._摄像头布设['102'] = true;
+  data.系统._已完成特殊场景.push('肉偿账本');
 
-  const 上架占位 = 取货架(data)
-    .flatMap(x => x.商品)
-    .filter(x => x.剧情占位);
-  assert.equal(上架占位.length, 10);
+  const 上架商品 = 取货架(data).flatMap(x => x.商品);
+  const 上架占位 = 上架商品.filter(x => x.剧情占位);
+  assert.equal(上架占位.length, 2);
+  assert.ok(上架商品.some(x => x.id === '不再留门'), '202使用真实承接剧情商品');
+  assert.ok(
+    上架商品.some(x => x.id === '第二机位'),
+    '102真实承接商品应替代旧操作性剧情占位',
+  );
+  assert.ok(
+    上架商品.some(x => x.id === '许曼君分居'),
+    '201真实《分居》承接商品应替代旧操作性剧情占位',
+  );
+  assert.ok(
+    上架商品.some(x => x.id === '公寓经营归档册'),
+    '302真实承接商品应替代旧操作性剧情占位',
+  );
   for (const 商品 of 上架占位) {
     assert.equal(角色剧情占位已上架(data, 商品.id), true);
-    if (商品.剧情占位.类型 === '操作性剧情') assert.deepEqual(角色剧情占位锁定原因(商品.id), []);
-    else assert.match(角色剧情占位锁定原因(商品.id).join('；'), /先完成.*操作性剧情.*待设计/);
+    const 锁定 = 角色剧情占位锁定原因(商品.id).join('；');
+    if (商品.剧情占位.类型 === '操作性剧情') assert.equal(锁定, '');
+    else if (商品.剧情占位.门牌 === '102') assert.match(锁定, /第二机位.*周小满/);
+    else assert.match(锁定, /先完成.*操作性剧情.*待设计/);
 
     const 前现金 = data.现金;
     const 前背包 = [...data.背包];

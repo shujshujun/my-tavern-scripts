@@ -44,6 +44,8 @@ function 载入手机生成行为(data, 当前场景 = '垃圾房') {
   let 请求数 = 0;
   const 提示 = [];
   const stubs = {
+    // 此组只测普通场景和已接父亲电话，手机未被202录制占用。
+    '../../../不再留门契约': { 不再留门手机只读原因: () => '' },
     './运行时上下文': { 当前手机数据: () => data },
     '../../../stageConfig': { 户静态表: {} },
     './配置': { 读配置: () => ({ ai来源: '正文', base: '', key: '', model: '' }) },
@@ -115,7 +117,11 @@ test('Schema、schema.json 与初始变量只有一套活动场景事务', () =>
   assert.match(schema, /_场景剧情事务:[\s\S]*目标场景:[\s\S]*内容:[\s\S]*请求世代:[\s\S]*状态:/);
   assert.doesNotMatch(schema, /_场景剧情:\s*z/);
   assert.match(initvar, /_场景剧情序号: 0/);
-  assert.match(initvar, /_场景剧情事务: \{ id: "", 标题: "", 目标场景:/);
+  assert.match(
+    initvar,
+    /_场景剧情事务:\s*\n\s*\{\s*id: '',\s*标题: '',\s*目标场景:/,
+    '初始变量以换行键和单行对象保存同一套活动场景事务',
+  );
   assert.doesNotMatch(initvar, /_场景剧情: \{ 活动:/);
 
   const props = schemaJson.properties?.系统?.properties ?? {};
@@ -217,8 +223,8 @@ test('父亲通话与时间推进遵守同一场景事务边界', () => {
   assert.match(time, /取阻塞时间的待发送事件\(data\.系统\._待发送事件\)/);
   assert.match(
     time,
-    /function 场景剧情阻塞当前时间动作\(data: SchemaType, 当前地点: string\)[\s\S]{0,260}读取活动场景剧情\(data\)[\s\S]{0,260}等待场景剧情阻塞当前场景\(读取队首场景剧情\(data\.系统\._待发送事件\), 当前地点\)/,
-    '活动事务全局阻塞；等待票只在同场或未知地点时阻塞当前时间动作',
+    /function 场景剧情阻塞当前时间动作\(data: SchemaType, 当前地点: string\)[\s\S]{0,320}读取活动场景剧情\(data\)[\s\S]{0,320}场景剧情连续锁场\(等待\?\.内容\)[\s\S]{0,120}等待场景剧情阻塞当前场景\(等待, 当前地点\)/,
+    '活动事务与连续现场全局阻塞；普通等待票仍只在同场或未知地点时阻塞当前时间动作',
   );
   assert.match(time, /场景剧情阻塞当前时间动作\(data, 请求\.当前地点\)/);
   assert.match(time, /还有尚未完成的强制事件/);

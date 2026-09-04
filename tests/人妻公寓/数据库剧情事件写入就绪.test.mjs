@@ -238,3 +238,16 @@ test('数据库补楼任务的时间线校验失效时立即终止，不能把�
   assert.match(函数, /if \(已记录\.has\(楼层\)\) continue;/, '只有当前楼已存在才允许 continue');
   assert.doesNotMatch(函数, /!提交校验\(\) \|\| 已记录\.has\(楼层\)\) continue/);
 });
+
+test('回合后骨架写入必须等待重掷/临时楼数据库时间线恢复，超时留待后续补写而不误报 SQLite 失败', () => {
+  const 引擎 = 读('src/人妻公寓/脚本/游戏逻辑/回合引擎.ts');
+  const 起 = 引擎.indexOf('function 安排数据库回合后处理');
+  const 止 = 引擎.indexOf('/** 静音会议的成功正文', 起);
+  assert.ok(起 >= 0 && 止 > 起);
+  const 函数 = 引擎.slice(起, 止);
+  const 等待位置 = 函数.indexOf('await 等待数据库时间线就绪()');
+  const 写入位置 = 函数.indexOf('await 记录数据库回合骨架(');
+  assert.ok(等待位置 >= 0 && 等待位置 < 写入位置, '脚本 UPSERT 前必须先等消息级数据库回放稳定');
+  assert.match(函数, /if \(!数据库时间线可用\)[\s\S]*?留待后续成功回合补写[\s\S]*?return;/);
+  assert.match(函数, /if \(!参数\.提交校验\(\)\) return;/, '等待跨越异步边界后必须重新确认当前回合仍有效');
+});

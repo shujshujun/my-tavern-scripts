@@ -25,6 +25,7 @@ defineProps<{
   variableRegenerationState: '不可用' | '未配置' | '可用' | '进行中' | '已完成';
   videoActive: boolean;
   period: string;
+  deepNightHint: string;
   currentPeriodLabel: string;
   nextPeriodLabel: string;
   decisionMode: 'none' | 'blocked' | 'summary';
@@ -158,7 +159,7 @@ defineExpose({ 聚焦 });
     <Ic n="clock" />
     <span>
       <b>推进时间</b>
-      <small v-if="period === '深夜'">请回管理员室或 302 睡觉</small>
+      <small v-if="period === '深夜'">{{ deepNightHint || '请回管理员室或 302 睡觉' }}</small>
       <small v-else>{{ currentPeriodLabel }} → 推进到{{ nextPeriodLabel }}</small>
     </span>
   </button>

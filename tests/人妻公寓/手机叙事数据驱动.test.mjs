@@ -48,7 +48,14 @@ test('朋友圈和攻略动态生成失败不落本地文案，也不推进发�
   assert.doesNotMatch(素材源码, /朋友圈兜底文案/);
   assert.doesNotMatch(素材源码, /兜底\s*:/);
   assert.doesNotMatch(节拍源码, /取朋友圈兜底|取攻略兜底/);
-  assert.match(节拍源码, /if \(!文\) continue;/);
+  const 朋友圈段 = 节拍源码.slice(
+    节拍源码.indexOf('async function 朋友圈近期流'),
+    节拍源码.indexOf('async function 主动私聊'),
+  );
+  const 拒绝位 = 朋友圈段.indexOf('if (!文 ||');
+  const 写圈位 = 朋友圈段.indexOf('库.圈.unshift(条);');
+  const 推水位 = 朋友圈段.indexOf('库.节拍[键] = 钟;', 写圈位);
+  assert.ok(拒绝位 >= 0 && 写圈位 > 拒绝位 && 推水位 > 写圈位, '文案失败必须先 continue，成功落圈后才推进水位');
   assert.match(节拍源码, /只有通过 AI 文案验收才推进角色的朋友圈节拍/);
 });
 

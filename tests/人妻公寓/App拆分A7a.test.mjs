@@ -257,19 +257,23 @@ test('专属 CSS 所有权：录像带规则迁入组件；App 不再持有 shar
 
 test('App 其他录像带门控原样；A1–A6 边界未回退；无中文首字符组件 tag；源码不触碰 dist', () => {
   // 正文/离房/选项/输入/dock/场景动作与场景氛围门控
-  assert.match(App源码, /'story-special-interaction': 录像带交互幕 \|\| 静音会议交互幕/, 'story-wrap 场景态保持');
-  assert.match(App源码, /v-if="!录像带中 && !静音会议交互幕"/, '隐藏正文钮门控保持');
+  assert.match(
+    App源码,
+    /'story-special-interaction': 录像带交互幕 \|\| 录像带V4中 \|\| 静音会议交互幕/,
+    'story-wrap 同时承接旧录像带、V4与静音会议场景态',
+  );
+  assert.match(App源码, /v-if="!录像带任一中 && !静音会议交互幕"/, '隐藏正文钮对两代录像带统一让位');
   // A8a 后 story-veiled 映射归属 正文卷轴.vue:App 只保留 props 门控表达式,组件根负责 class 映射
   assert.match(
     App源码,
-    /:veiled="正文隐藏 \|\| 录像带交互幕 \|\| 静音会议交互幕 \|\| !!当前事件CG"/,
-    'App 的 StoryScroll 保留原隐层门控，并让家庭计划或生产事件画面遮住正文',
+    /:veiled="正文隐藏 \|\| 录像带交互幕 \|\| 录像带V4中 \|\| 静音会议交互幕 \|\| !!当前事件CG"/,
+    'App 的 StoryScroll 保留原隐层门控，并让V4、家庭计划或生产事件画面遮住正文',
   );
   assert.match(正文卷轴源码, /:class="\{ 'story-veiled': veiled \}"/, '组件根把 veiled 映射到 story-veiled');
-  assert.match(App源码, /v-if="当前房间 && !录像带中"/, '离房钮门控保持');
+  assert.match(App源码, /v-if="当前房间 && !录像带任一中"/, '离房钮对两代录像带统一关闭');
   // 普通房内动作瓷砖迁入 房内操作抽屉.vue：录像带门控等价保留在组件，App 接线动作数组与统一抑制
   assert.match(App源码, /:actions="普通房间动作"/, 'App 把普通房间动作传给抽屉组件');
-  assert.match(App源码, /:video-tape-active="录像带中"/, 'App 接线录像带门控');
+  assert.match(App源码, /:video-tape-active="录像带任一中"/, 'App 接线两代录像带统一门控');
   assert.match(App源码, /:suppressed="房内操作抑制 \|\| 前台硬决策中"/, 'App 接线统一抑制与硬决策门');
   assert.match(
     抽屉源码,
@@ -277,18 +281,30 @@ test('App 其他录像带门控原样；A1–A6 边界未回退；无中文首�
     '录像带门控等价保留在组件',
   );
   // A8b:行动选项/推进时间门控迁入 行动选项.vue / 回合输入.vue,App 只留完整组合门接线
-  assert.match(App源码, /:open="显示选项 && !录像带中 && !静音会议交互幕 && !静音会议待散会选择 && !静音会议自由待选择 && !前台硬决策中"/, '行动选项门控保持并避让硬决策');
+  assert.match(
+    App源码,
+    /:open="\s*显示选项 && !录像带任一中 && !静音会议交互幕 && !静音会议待散会选择 && !静音会议自由待选择 && !前台硬决策中\s*"/,
+    '行动选项对两代录像带统一让位并避让硬决策',
+  );
   assert.match(行动选项源码, /<template v-if="open">/, '行动选项组件根自持 v-if="open"');
-  assert.match(App源码, /:video-active="录像带中"/, '推进时间钮门控保持(App video-active)');
+  assert.match(App源码, /:video-active="录像带任一中"/, '推进时间钮对两代录像带统一关闭(App video-active)');
   assert.match(App源码, /:formal-meeting="静音会议正式中"/, '推进时间钮门控保持(App formal-meeting)');
   assert.match(回合输入源码, /v-if="decisionMode === 'none' && !videoActive && !formalMeeting"/, '推进时间钮组件根自持门控');
-  assert.match(App源码, /v-if="!录像带中 && !前台硬决策中" class="dock"/, 'dock 保持录像带门并避让硬决策');
+  assert.match(
+    App源码,
+    /v-if="!录像带任一中 && !前台硬决策中 && !母亲视频终幕已接通 && !双重继承最终收束锁"\s+class="dock"/,
+    'dock 对两代录像带统一让位，并避让硬决策、母亲视频终幕与终幕后钥匙收束',
+  );
   assert.match(
     App源码,
     /if \(录像带中\.value\) \{[\s\S]*?录像带阶段\.value !== '等待102'[\s\S]*?录像带阶段\.value !== '等待202'/,
     '输入可用门控保持',
   );
-  assert.match(App源码, /房间id === '管理员室' && data\.value\?\.系统\?\._特殊场景\?\.id === '录像带'/, '录像带房内名单保持');
+  assert.match(
+    App源码,
+    /if \(录像带V4中\.value\) return false;\s*if \(录像带中\.value\) \{\s*return id === '管理员室' && 录像带阶段\.value !== '等待102' && 录像带阶段\.value !== '等待202';/,
+    'V4关闭普通输入，旧录像带仍只在管理员室非等待阶段开放原输入',
+  );
   assert.match(App源码, /@play-tape="使用录像带"/, '背包播放录像带接线保持');
   // A1–A6 边界未回退
   assert.match(App源码, /import Ic from '\.\/components\/Icon\.vue';/, 'App 仍导入 A1 Icon');

@@ -309,7 +309,7 @@ test('两组件以 scoped src 用弹窗基础.css；专属 CSS 所有权正确�
 
 test('App 其他消费者仍获得 省流/立绘显示/移动端/暗色/全屏中/进真全屏；正文隐藏仍在 App；无中文首字符组件 tag', () => {
   assert.match(地图源码, /const 用画布地图 = computed\(\(\) => !props\.lite && !立面失效\.value\)/, '省流被地图消费(A6a 迁入地图组件)');
-  assert.match(App源码, /v-if="立绘显示 && !显示成人CG/, '立绘显示被舞台消费');
+  assert.match(App源码, /v-if="\s*立绘显示 &&\s*!显示成人CG/, '立绘显示被舞台消费');
   assert.match(App源码, /v-if="移动端 && 数据库运行文案"/, '移动端被数据库横幅消费');
   assert.match(App源码, /:title="暗色 \? '切回日间模式' : '切换夜间模式'" @click="切换主题"/, '暗色被主题钮消费');
   assert.match(App源码, /v-if="显示移动端全屏引导"/, '显示移动端全屏引导被 CTA 消费');

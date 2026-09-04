@@ -24,7 +24,7 @@ const 转义 = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const 驼峰转中划线 = s => s.replace(/([A-Z])/g, '-$1').toLowerCase();
 
-/** 回合输入组件 props 契约（21 项：原 20 项 + 前台决策输入模式） */
+/** 回合输入组件 props 契约（22 项：原21项 + 条件式深夜睡眠提示） */
 const 期望props = [
   'open',
   'text',
@@ -44,6 +44,7 @@ const 期望props = [
   'variableRegenerationState',
   'videoActive',
   'period',
+  'deepNightHint',
   'currentPeriodLabel',
   'nextPeriodLabel',
   'decisionMode',
@@ -141,7 +142,7 @@ test('App 不再内联 option-row/quill/reroll/global-time 模板；两组件拥
   assert.match(回合输入模板, /:disabled="sending \|\| prefaceWriting"/, '推进时间 disabled');
   assert.match(回合输入模板, /<Ic n="clock" \/>/, '推进时间 clock 图标');
   assert.match(回合输入模板, />推进时间<\/b>/, '推进时间主文案');
-  assert.match(回合输入模板, /请回管理员室或 302 睡觉/, '深夜文案原样');
+  assert.match(回合输入模板, /deepNightHint \|\| '请回管理员室或 302 睡觉'/, '深夜文案由App注入，缺失时仍保留原兜底');
   assert.match(回合输入模板, /currentPeriodLabel \}\} → 推进到\{\{ nextPeriodLabel \}\}/, '非深夜时段文案');
   assert.match(回合输入模板, /@click="emit\('advanceTime'\)"/, '推进时间只 emit advanceTime');
 });
@@ -176,7 +177,7 @@ test('props/emits 强类型完整，App 逐项接线存在，所有 handler 参�
   assert.match(选项props, /options: readonly string\[\];/, 'options 强类型 readonly string[]');
   assert.equal((选项emits.match(/^ {2}[A-Za-z]+(?=:)/gm) || []).length, 1, '行动选项 emits 应为 1 项');
   assert.match(选项emits, /select: \[option: string\]/, 'select 参数为 string');
-  assert.equal((输入props.match(/^ {2}[A-Za-z]+(?=:)/gm) || []).length, 21, '回合输入 props 应为 21 项');
+  assert.equal((输入props.match(/^ {2}[A-Za-z]+(?=:)/gm) || []).length, 22, '回合输入 props 应为 22 项');
   assert.equal((输入emits.match(/^ {2}[A-Za-z]+(?=:)/gm) || []).length, 10, '回合输入 emits 应为 10 项');
   for (const 名 of 期望props) {
     assert.match(输入props, new RegExp(`\\b${名}:`), `props 契约应有 ${名}`);
@@ -189,6 +190,7 @@ test('props/emits 强类型完整，App 逐项接线存在，所有 handler 参�
     'turnRoom: string | null;',
     'failedAction: string;',
     'sendLabel: string;',
+    'deepNightHint: string;',
     "variableRegenerationState: '不可用' | '未配置' | '可用' | '进行中' | '已完成';",
     "decisionMode: 'none' | 'blocked' | 'summary';",
     'updateText: [text: string];',
@@ -198,8 +200,8 @@ test('props/emits 强类型完整，App 逐项接线存在，所有 handler 参�
   // App 接线：行动选项 open/mobile/options/select
   assert.match(
     App源码,
-    /:open="显示选项 && !录像带中 && !静音会议交互幕 && !静音会议待散会选择 && !静音会议自由待选择 && !前台硬决策中"/,
-    'App 接线 ActionOptions :open',
+    /:open="\s*显示选项 && !录像带任一中 && !静音会议交互幕 && !静音会议待散会选择 && !静音会议自由待选择 && !前台硬决策中\s*"/,
+    'App 接线 ActionOptions :open，并对两代录像带统一让位',
   );
   assert.match(App源码, /:mobile="移动端"/, 'App 接线 ActionOptions :mobile');
   assert.match(App源码, /:options="行动选项"/, 'App 接线 ActionOptions :options');
@@ -233,8 +235,8 @@ test('ActionOptions 完整组合门控，组件只映射 open；RoundInput 输�
   const App模板 = 提取模板(App源码);
   assert.match(
     App模板,
-    /<ActionOptions\b[\s\S]*?:open="显示选项 && !录像带中 && !静音会议交互幕 && !静音会议待散会选择 && !静音会议自由待选择 && !前台硬决策中"/,
-    'App 端行动选项完整组合门',
+    /<ActionOptions\b[\s\S]*?:open="\s*显示选项 && !录像带任一中 && !静音会议交互幕 && !静音会议待散会选择 && !静音会议自由待选择 && !前台硬决策中\s*"/,
+    'App 端行动选项完整组合门包含旧录像带与V4统一门控',
   );
   const 选项模板 = 提取模板(行动选项源码);
   assert.match(选项模板, /<template v-if="open">/, '组件只按 open 显示');
@@ -441,7 +443,7 @@ test('两个新组件在原相对顺序；A1–A8a 边界不回退；无中文�
   const 录像带位置 = 模板段.indexOf('<VideoTapeControls');
   const 输入位置 = 模板段.indexOf('<RoundInput');
   const 会后位置 = 模板段.indexOf('<MuteMeetingAfter');
-  const dock位置 = 模板段.indexOf('<nav v-if="!录像带中 && !前台硬决策中" class="dock"');
+  const dock位置 = 模板段.lastIndexOf('<nav', 模板段.indexOf('<span>商店</span>'));
   assert.ok(
     选项位置 !== -1 && 录像带位置 !== -1 && 输入位置 !== -1 && 会后位置 !== -1 && dock位置 !== -1,
     '五锚点都应存在',

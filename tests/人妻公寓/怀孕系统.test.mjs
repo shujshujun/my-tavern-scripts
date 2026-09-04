@@ -462,8 +462,8 @@ test('主界面与档案卡共用孕态服装解析器，且不新增孕情信�
   const 入口源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
 
   assert.match(资源源码, /approved.*\$\{妻名\}\/服装_\$\{sku\}_孕态\.webp/s);
-  assert.match(App源码, /角色立绘候选\(妻名, sku, 怀孕已公开\(data\.value, m\)\)\.find/);
-  assert.match(档案源码, /角色立绘候选\(户静态表\[m\]\.妻名, 当前立绘SKU, 怀孕公开\)\.find/);
+  assert.match(App源码, /角色立绘候选\(\s*妻名,\s*sku,\s*怀孕已公开\(data\.value, m\),\s*妻 \? \{ 妆容SKU: 妻\._穿着SKU\.妆容, 特殊: 妻\.特殊 \} : undefined,?\s*\)\.find/);
+  assert.match(档案源码, /角色立绘候选\(户静态表\[m\]\.妻名, 当前立绘SKU, 怀孕公开, \{ 妆容SKU: 妻\._穿着SKU\.妆容, 特殊: 妻\.特殊 \}\)\.find/);
   assert.match(档案源码, /!props\.portraitFailed\[src\]/);
   assert.match(App源码, /怀孕态: 怀孕公开 \? 'pregnant'/);
   assert.match(档案源码, /sheet dossier" :class="\{ pregnant: 选中档案\.怀孕公开 \}"/);

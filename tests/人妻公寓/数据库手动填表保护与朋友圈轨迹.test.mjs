@@ -80,6 +80,66 @@ ${保护}`,
   );
 }
 
+function 载入V2安全全选() {
+  const 段 = 截源(
+    数据库源,
+    'async function 执行数据库手动面板安全全选',
+    '\nfunction 数据库手动受保护表选择按钮',
+  );
+  return 执行TS(段, ['执行数据库手动面板安全全选'], {
+    是脚本所有权表名: 名称 => 名称 === 'RQ_剧情事件' || 名称 === 'RQ_社交轨迹',
+    安全点击数据库面板控件: (control, 允许重放按钮) => {
+      允许重放按钮?.add(control);
+      control.click();
+    },
+  });
+}
+
+function 构造V2选择器模拟(初始选择) {
+  const 顺序 = ['RQ_剧情事件', 'RQ_人物长期记忆', 'RQ_承诺与伏笔', 'RQ_社交轨迹', '纪要表'];
+  let 父级选择 = 顺序.filter(名称 => 初始选择.includes(名称));
+  let 子级Props选择 = new Set(父级选择);
+  const 控件 = new Map();
+  const 项们 = 顺序.map(名称 => {
+    const checkbox = {
+      disabled: false,
+      setAttribute() {},
+      getAttribute: 属性 => (属性 === 'aria-checked' && 子级Props选择.has(名称) ? 'true' : 'false'),
+      click() {
+        if (this.disabled) return;
+        const 下一选择 = new Set(子级Props选择);
+        if (下一选择.has(名称)) 下一选择.delete(名称);
+        else 下一选择.add(名称);
+        父级选择 = 顺序.filter(键 => 下一选择.has(键));
+        Promise.resolve().then(() => {
+          子级Props选择 = new Set(父级选择);
+        });
+      },
+    };
+    控件.set(名称, checkbox);
+    return {
+      querySelector: 选择器 => {
+        if (选择器 === '.acu-checkbox__label') return { textContent: 名称 };
+        if (选择器 === 'button.acu-checkbox[role="checkbox"]') return checkbox;
+        return null;
+      },
+    };
+  });
+  const panel = { querySelectorAll: 选择器 => (选择器 === '.acu-v2-table-selector__item' ? 项们 : []) };
+  const doc = {
+    querySelectorAll: 选择器 => {
+      if (选择器 === '#form-fill-manual-panel') return [panel];
+      if (选择器 === '[id$="-manual-table-selector"]') return [];
+      return [];
+    },
+  };
+  return {
+    doc,
+    读取选择: () => [...父级选择],
+    读取控件: 名称 => 控件.get(名称),
+  };
+}
+
 function 载入朋友圈纯函数() {
   const 纯函数段 = 截源(朋友圈记忆源, 'export function 构造朋友圈长期记忆事件键', '\nexport async function 同步朋友圈长期记忆');
   const 执行键段 = 截源(朋友圈记忆源, 'export function 构造朋友圈长期记忆执行键', '\n/**\n * 手机核心提交完成后');
@@ -152,6 +212,43 @@ test('手动填表硬保护同时覆盖公开选择 API、旧设置页与新版 
   assert.match(数据库源, /安装数据库手动填表API保护/);
   assert.match(数据库源, /包装手动更新/);
   assert.match(数据库源, /恢复进入本卡前的手动填表选择失败/);
+});
+
+test('V2 运行态属性刷新不能重新放开脚本表，全选与脚本表点击必须在捕获阶段同步拦截', () => {
+  const 保护段 = 截源(数据库源, 'function 收集可访问数据库文档', '\n安装数据库手动填表保护();');
+  assert.match(
+    保护段,
+    /observer\.observe\(doc\.documentElement,\s*\{[\s\S]*?attributes:\s*true[\s\S]*?attributeFilter:\s*\[[^\]]*['"]disabled['"][^\]]*['"]aria-checked['"][^\]]*\]/,
+    'runtimeReady 从 false 变 true 时只改 disabled/aria-checked；观察器必须重新扫描，不能只监听 childList',
+  );
+  assert.match(
+    保护段,
+    /if\s*\(数据库手动受保护表选择按钮\(control\)\)\s*\{[\s\S]*?event\.preventDefault\(\)[\s\S]*?event\.stopImmediatePropagation\(\)/,
+    '受保护表被 Vue 或用户重新启用后，下一次点击必须在插件 handler 前同步阻断',
+  );
+  assert.match(
+    保护段,
+    /if\s*\(是新版全选\s*\|\|\s*是旧版全选\)\s*\{[\s\S]*?event\.preventDefault\(\)[\s\S]*?event\.stopImmediatePropagation\(\)[\s\S]*?执行数据库手动面板安全全选/,
+    '全选不能先让 V2 把五表写进内部 ref 再异步纠正，必须同步改为仅选择安全表',
+  );
+  assert.match(
+    保护段,
+    /if\s*\(!数据库手动面板选择已确认安全\(doc\)\)\s*\{[\s\S]*?本次执行已阻止/,
+    '执行重放前必须从 V2 可见 ref 投影确认两张脚本表都未选；API 设置安全不能替代组件内部状态',
+  );
+});
+
+test('V2 安全全选等待每次 Vue props 提交：从空选择或误选五表都收敛为另外三表', async () => {
+  const { 执行数据库手动面板安全全选 } = 载入V2安全全选();
+  const 安全集 = ['RQ_人物长期记忆', 'RQ_承诺与伏笔', '纪要表'];
+  for (const 初始 of [[], ['RQ_剧情事件', ...安全集, 'RQ_社交轨迹']]) {
+    const 模拟 = 构造V2选择器模拟(初始);
+    assert.equal(await 执行数据库手动面板安全全选(模拟.doc, new WeakSet()), true);
+    await Promise.resolve();
+    assert.deepEqual(模拟.读取选择(), 安全集);
+    assert.equal(模拟.读取控件('RQ_剧情事件').disabled, true);
+    assert.equal(模拟.读取控件('RQ_社交轨迹').disabled, true);
+  }
 });
 
 test('公开 API 保护：全选、清空默认和直接 manualUpdate 都先过滤，离开本卡恢复原选择与原方法', async () => {

@@ -1,0 +1,194 @@
+{
+  "schemaVersion": "rqgy-vtr-v4-wechat-prelude-v2",
+  "createdAt": "2026-09-02",
+  "status": "design-only-not-wired",
+  "outsideMonitorBeatCount": true,
+  "monitorBeatCountUnchanged": 19,
+  "latestUserOverride": true,
+  "sequence": [
+    "purchase plot item 录像带",
+    "purchase two male chastity locks",
+    "gift one lock to Shen Jingyi and one to Zhou Xiaoman",
+    "each wife gives the lock to her own husband",
+    "start two-day wait when the second gift is accepted",
+    "after two days, WeChat confirms both husbands voluntarily locked",
+    "player may exchange several messages in either thread",
+    "WeChat confirms both husbands knowingly consent to watch",
+    "the second completed thread emits one joint departure notification",
+    "monitorReady becomes true; player clicks monitoring; the monitor system automatically switches location to 302 and opens the viewer"
+  ],
+  "giftTargets": [
+    {
+      "wifeRoom": "102",
+      "wife": "沈静仪",
+      "husband": "顾国栋",
+      "monitorDestination": "202"
+    },
+    {
+      "wifeRoom": "202",
+      "wife": "周小满",
+      "husband": "何俊生",
+      "monitorDestination": "102"
+    }
+  ],
+  "timer": {
+    "startsWhen": "second distinct wife accepts her lock",
+    "durationDays": 2,
+    "clock": "persistent absolute in-game day",
+    "earlyMessageAllowed": false,
+    "lateDelivery": "first safe WeChat opportunity at or after due day"
+  },
+  "wechat": {
+    "threads": [
+      "沈静仪",
+      "周小满"
+    ],
+    "order": "either thread may be handled first",
+    "playerReplyPolicy": "allow several natural replies; one reply is required between lock confirmation and consent confirmation in each thread",
+    "factsRequiredBeforeDeparture": [
+      "顾国栋 voluntarily locked",
+      "顾国栋 knowingly consents to watch",
+      "何俊生 voluntarily locked",
+      "何俊生 knowingly consents to watch"
+    ],
+    "departureNotification": "exactly once, emitted by whichever wife thread completes the fourth confirmation",
+    "monitorReminder": "we are ready to leave; click monitoring; the monitor system automatically switches to 302 and opens the viewer",
+    "cards": [
+      {
+        "id": "VTR-WX-ZXM-LOCKED",
+        "wifeRoom": "202",
+        "speaker": "周小满",
+        "husband": "何俊生",
+        "stage": "lock-confirmation",
+        "trigger": "two-day wait elapsed and Zhou Xiaoman thread has not reported",
+        "facts": "第二把贞操锁送达已经满两天；何俊生已经自愿戴上周小满收到的那一把；录像观看尚未开始。",
+        "direction": "周小满用娇软、藏着坏笑的微信口吻先报告戴锁结果，可以取笑何俊生嘴硬或装轻松，但不提前代替他确认观看同意。",
+        "goal": "让玩家从微信明确知道何俊生已经戴上锁具，并自然留下继续追问的空间。",
+        "stop": "何俊生的戴锁事实已确认；观看同意留给后续聊天。",
+        "aiPrompt": "第二把贞操锁送达已经满两天；何俊生已经自愿戴上周小满收到的那一把；录像观看尚未开始。周小满用娇软、藏着坏笑的微信口吻先报告戴锁结果，可以取笑何俊生嘴硬或装轻松，但不提前代替他确认观看同意。让玩家从微信明确知道何俊生已经戴上锁具，并自然留下继续追问的空间。聊天在这里收住：何俊生的戴锁事实已确认；观看同意留给后续聊天。"
+      },
+      {
+        "id": "VTR-WX-ZXM-CONSENT",
+        "wifeRoom": "202",
+        "speaker": "周小满",
+        "husband": "何俊生",
+        "stage": "watch-consent",
+        "trigger": "player replied after Zhou Xiaoman lock confirmation",
+        "facts": "何俊生已经戴锁；周小满随后把录像带观看方式和现场条件说清，他在知道内容与流程的情况下同意观看。",
+        "direction": "周小满回应玩家刚才的话，再用口语化、戏谑的方式讲何俊生怎样故作轻松地答应；重点是自愿与他的真实反应，不把话写成正式授权书。",
+        "goal": "让玩家明确知道何俊生已经同意观看，同时让周小满的人格和夫妻间的微妙反应成立。",
+        "stop": "何俊生的戴锁与观看同意均已确认；等待沈静仪一侧也完成确认。",
+        "aiPrompt": "何俊生已经戴锁；周小满随后把录像带观看方式和现场条件说清，他在知道内容与流程的情况下同意观看。周小满回应玩家刚才的话，再用口语化、戏谑的方式讲何俊生怎样故作轻松地答应；重点是自愿与他的真实反应，不把话写成正式授权书。让玩家明确知道何俊生已经同意观看，同时让周小满的人格和夫妻间的微妙反应成立。聊天在这里收住：何俊生的戴锁与观看同意均已确认；等待沈静仪一侧也完成确认。"
+      },
+      {
+        "id": "VTR-WX-ZXM-DEPARTURE",
+        "wifeRoom": "202",
+        "speaker": "周小满",
+        "husband": "何俊生",
+        "stage": "departure-ready",
+        "trigger": "both husbands confirmed locked and consenting; Zhou Xiaoman was the second thread to complete",
+        "facts": "顾国栋与何俊生都已经戴锁并同意观看；沈静仪也准备完毕；周小满即将前往102，沈静仪即将前往202。",
+        "direction": "周小满用轻软、兴奋又带坏笑的口吻结束聊天，告诉玩家两人准备出发；提醒玩家直接点击“监控”，系统会自动切到302并打开观看界面，不再继续解释录像内容。",
+        "goal": "形成唯一一次联合出发通知，让玩家知道下一步只需点击“监控”，不需要先手动前往302。",
+        "stop": "出发通知已送达，监控入口进入就绪；点击后由监控系统自动切换到302，这条消息不会再次发送。",
+        "aiPrompt": "顾国栋与何俊生都已经戴锁并同意观看；沈静仪也准备完毕；周小满即将前往102，沈静仪即将前往202。周小满用轻软、兴奋又带坏笑的口吻结束聊天，告诉玩家两人准备出发；提醒玩家直接点击“监控”，系统会自动切到302并打开观看界面，不再继续解释录像内容。形成唯一一次联合出发通知，让玩家知道下一步只需点击“监控”，不需要先手动前往302。聊天在这里收住：出发通知已送达，监控入口进入就绪；点击后由监控系统自动切换到302，这条消息不会再次发送。"
+      },
+      {
+        "id": "VTR-WX-SJY-LOCKED",
+        "wifeRoom": "102",
+        "speaker": "沈静仪",
+        "husband": "顾国栋",
+        "stage": "lock-confirmation",
+        "trigger": "two-day wait elapsed and Shen Jingyi thread has not reported",
+        "facts": "第二把贞操锁送达已经满两天；顾国栋已经在理解用途后自愿戴上沈静仪收到的那一把；录像观看尚未开始。",
+        "direction": "沈静仪用平静、简短、准确的微信语气报告结果，说明顾国栋自己完成佩戴；可以提及他的迟疑，但不把确认写成审讯或规章。",
+        "goal": "让玩家从微信明确知道顾国栋已经戴上锁具，并自然留下继续询问观看安排的空间。",
+        "stop": "顾国栋的戴锁事实已确认；观看同意留给后续聊天。",
+        "aiPrompt": "第二把贞操锁送达已经满两天；顾国栋已经在理解用途后自愿戴上沈静仪收到的那一把；录像观看尚未开始。沈静仪用平静、简短、准确的微信语气报告结果，说明顾国栋自己完成佩戴；可以提及他的迟疑，但不把确认写成审讯或规章。让玩家从微信明确知道顾国栋已经戴上锁具，并自然留下继续询问观看安排的空间。聊天在这里收住：顾国栋的戴锁事实已确认；观看同意留给后续聊天。"
+      },
+      {
+        "id": "VTR-WX-SJY-CONSENT",
+        "wifeRoom": "102",
+        "speaker": "沈静仪",
+        "husband": "顾国栋",
+        "stage": "watch-consent",
+        "trigger": "player replied after Shen Jingyi lock confirmation",
+        "facts": "顾国栋已经戴锁；沈静仪随后把录像内容性质、观看方式和现场条件说清，他在知情情况下明确同意观看。",
+        "direction": "沈静仪先回应玩家刚才的话，再冷静概括顾国栋如何确认；重点是他本人理解并接受，不用夸张羞辱抢走这一阶段的确认作用。",
+        "goal": "让玩家明确知道顾国栋已经同意观看，同时保留沈静仪克制、掌控安排的性格。",
+        "stop": "顾国栋的戴锁与观看同意均已确认；等待周小满一侧也完成确认。",
+        "aiPrompt": "顾国栋已经戴锁；沈静仪随后把录像内容性质、观看方式和现场条件说清，他在知情情况下明确同意观看。沈静仪先回应玩家刚才的话，再冷静概括顾国栋如何确认；重点是他本人理解并接受，不用夸张羞辱抢走这一阶段的确认作用。让玩家明确知道顾国栋已经同意观看，同时保留沈静仪克制、掌控安排的性格。聊天在这里收住：顾国栋的戴锁与观看同意均已确认；等待周小满一侧也完成确认。"
+      },
+      {
+        "id": "VTR-WX-SJY-DEPARTURE",
+        "wifeRoom": "102",
+        "speaker": "沈静仪",
+        "husband": "顾国栋",
+        "stage": "departure-ready",
+        "trigger": "both husbands confirmed locked and consenting; Shen Jingyi was the second thread to complete",
+        "facts": "顾国栋与何俊生都已经戴锁并同意观看；周小满也准备完毕；周小满即将前往102，沈静仪即将前往202。",
+        "direction": "沈静仪用稳定、明确的口吻结束聊天，告知两人现在出发；说明玩家只需点击“监控”，系统会自动切到302并打开观看界面，不重复前面的确认细节。",
+        "goal": "形成唯一一次联合出发通知，让玩家知道下一步只需点击“监控”，不需要先手动前往302。",
+        "stop": "出发通知已送达，监控入口进入就绪；点击后由监控系统自动切换到302，这条消息不会再次发送。",
+        "aiPrompt": "顾国栋与何俊生都已经戴锁并同意观看；周小满也准备完毕；周小满即将前往102，沈静仪即将前往202。沈静仪用稳定、明确的口吻结束聊天，告知两人现在出发；说明玩家只需点击“监控”，系统会自动切到302并打开观看界面，不重复前面的确认细节。形成唯一一次联合出发通知，让玩家知道下一步只需点击“监控”，不需要先手动前往302。聊天在这里收住：出发通知已送达，监控入口进入就绪；点击后由监控系统自动切换到302，这条消息不会再次发送。"
+      }
+    ]
+  },
+  "stateSemantics": {
+    "plotItemPurchased": false,
+    "lockGiftAccepted": {
+      "102": false,
+      "202": false
+    },
+    "secondGiftAcceptedDay": null,
+    "wechatDueDay": null,
+    "husbandLockedConfirmed": {
+      "102": false,
+      "202": false
+    },
+    "watchConsentConfirmed": {
+      "102": false,
+      "202": false
+    },
+    "departureNotified": false,
+    "monitorReady": false
+  },
+  "gates": {
+    "locksCannotCountBeforePlotItemPurchase": true,
+    "timerCannotStartBeforeBothDistinctGifts": true,
+    "departureCannotNotifyBeforeBothLockAndConsentConfirmations": true,
+    "monitorCannotStartBeforeDepartureNotification": true,
+    "notificationIsIdempotent": true,
+    "monitorDoesNotAutoStart": true,
+    "manualTravelTo302Required": false,
+    "monitorClickAutoTransfersTo302": true
+  },
+  "currentImplementationGap": [
+    "legacy code allows the lock route before purchasing the plot item",
+    "legacy gift handling immediately runs two in-room prelude turns",
+    "legacy completion records keys as handed to the player",
+    "legacy flow has no two-day timer, WeChat confirmation, or monitorReady gate",
+    "production code is intentionally unchanged in this design-only pass"
+  ],
+  "scenePreludeContext": "本场监控开始前的准备已经完成：{{user}}先在商店购买剧情道具“录像带”，随后购买两把贞操锁，分别赠给沈静仪和周小满，由沈静仪交给丈夫顾国栋、周小满交给丈夫何俊生。第二把锁送达后经过两天，两位人妻已经在微信中分别确认两名丈夫自愿戴上锁具并同意观看录像；几轮聊天收尾时，她们通知{{user}}已经准备出发，并提醒直接点击“监控”。监控系统随后自动把玩家的场景切换到302并打开观看界面，玩家不需要先手动前往302。这些都是当前监控剧情开始前已经成立的事实，不在19幕监控画面中重新演一遍。",
+  "installed": false,
+  "productionUnlocked": false,
+  "supersedes": "output/imagegen/video-tape-ending/v4-repair/wechat-prelude-flow-v1.json",
+  "supersedesSha256": "218FFC0D39D3C20F5188F9B43E80C5A250DC0EFB71862D8B8655AD9B1841378B",
+  "correction": {
+    "userConfirmedAt": "2026-09-02",
+    "incorrectV1Meaning": "player manually goes or returns to 302 before opening monitoring",
+    "correctMeaning": "player clicks monitoring from the current ordinary scene; the monitoring system automatically switches the real location to 302 and opens the viewer",
+    "sourceEvidence": [
+      "src/人妻公寓/脚本/游戏逻辑/index.ts: monitor entry states the client has completed the real move before emitting 监控回合",
+      "src/人妻公寓/界面/客户端/App.vue: 监控回合 handler only syncs the already-completed move to 302"
+    ]
+  },
+  "monitorEntry": {
+    "playerAction": "click monitoring",
+    "manualTravelRequired": false,
+    "automaticLocationSwitch": "302",
+    "viewerOpensAfterSwitch": true,
+    "monitorStillDoesNotAutoStartBeforeClick": true
+  }
+}

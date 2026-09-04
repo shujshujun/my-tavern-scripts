@@ -41,9 +41,9 @@ export function 渲染moments(上下文: 渲染上下文): void {
       'rqw-post',
       `${头像块(c.谁)}<div class="rqw-r"><span class="rqw-name">${_.escape(c.谁)}${c.私 ? `<i class="rqw-only">${手机图标('lock')}仅你可见</i>` : ''}</span>` +
         `<div class="rqw-text">${正文}</div>` +
-        (c.私
+        (c.私?.图序
           ? `<span class="rqw-photo private"><img class="rqw-img" src="${朋友圈图片地址(`仅你可见/${c.谁}_${c.私.图序}`)}" loading="lazy" onerror="this.parentElement.remove()"/></span>`
-          : c.图
+          : !c.私 && c.图
             ? `<span class="rqw-photo current"><img class="rqw-img" src="${朋友圈图片地址(c.图)}" loading="lazy" onerror="this.parentElement.remove()"/></span>`
             : '') +
         `<div class="rqw-foot"><span class="rqw-time">${手机记录时间字(c.时)}</span><span class="rqw-dots">••</span></div>` +

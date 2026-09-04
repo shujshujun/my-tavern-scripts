@@ -90,13 +90,17 @@ test('父亲收尾先触发核心结束事件，数据库同步为后置非阻�
     父亲通话源.indexOf('async function 完成父亲通话'),
     父亲通话源.indexOf('export async function 结束通话'),
   );
+  const 记忆段 = 父亲通话源.slice(
+    父亲通话源.indexOf('function 父亲通话长期记忆条目'),
+    父亲通话源.indexOf('async function 完成父亲通话'),
+  );
   const 结束事件位 = 完成段.indexOf("eventEmit('人妻公寓:父亲通话结束'");
-  // 注释里也会出现“同步社交轨迹”，必须按真实调用定位，避免先匹配到结束事件前的注释文本。
-  const 数据库位 = 完成段.indexOf('void 同步社交轨迹(');
+  const 数据库位 = 完成段.indexOf('void 提交父亲通话长期记忆(');
   assert.ok(结束事件位 >= 0 && 数据库位 > 结束事件位, '核心结束事件必须先于数据库同步触发');
-  assert.match(完成段, /void 同步社交轨迹\(/, '数据库同步必须是 fire-and-forget，不得 await');
-  assert.doesNotMatch(完成段, /await 同步社交轨迹/, '数据库失败不得阻塞或延长通话收尾');
-  assert.match(完成段, /事件键: `RQP-来电-\$\{最新\.标识\}`/, '数据库事件键保持幂等');
+  assert.match(完成段, /void 提交父亲通话长期记忆\(/, '数据库同步必须是 fire-and-forget，不得 await');
+  assert.doesNotMatch(完成段, /await 提交父亲通话长期记忆/, '数据库失败不得阻塞或延长通话收尾');
+  assert.match(记忆段, /写入器: 父亲通话长期记忆写入器 = 同步社交轨迹/, '生产默认写入器仍是数据库桥');
+  assert.match(记忆段, /事件键: `RQP-来电-\$\{通话\.标识\}`/, '数据库事件键保持幂等');
   assert.match(完成段, /写入结果\s*=>\s*\{[\s\S]{0,120}写入结果 === '失败'/, '三态结果只把真正失败记为不可用');
   assert.doesNotMatch(完成段, /if \(!已写\)/, '字符串三态不得再按旧布尔值判断，否则“失败”也会被当成真');
   assert.match(完成段, /console\.(info|warn)\([^\n]*长期记忆/, '数据库失败只记录日志，不弹“电话没保存完整”');

@@ -341,7 +341,14 @@ export function 构造AI可写变量视图(
         妆容: 规范AI表现文本(妻源.妆容),
       };
       if (范围.亲密妻.includes(门牌号) || 候选.includes(门牌号)) {
-        妻.堕落值 = 妻源.堕落值;
+        const 已完成特殊场景 = _.get(stat as Record<string, unknown>, '系统._已完成特殊场景') as unknown;
+        const 母亲自由共居 =
+          门牌号 === '302' &&
+          (_.get(stat as Record<string, unknown>, '系统._双重继承.阶段') === '已完成' ||
+            (Array.isArray(已完成特殊场景) && (已完成特殊场景 as unknown[]).some(id => id === '双重继承')));
+        // 302结局后的堕落轴只保留作旧档／图库兼容，不再要求解析模型继续围绕攻略深浅工作；
+        // 身体开发仍是实际亲密行为的长期结果，因此仅在真实亲密候选／提交范围中保留。
+        if (!母亲自由共居) 妻.堕落值 = 妻源.堕落值;
         妻.身体开发 = _.pick((妻源.身体开发 ?? {}) as Record<string, unknown>, ['小嘴', '胸部', '小屄', '屁穴']);
       }
       可写户.妻 = 妻;

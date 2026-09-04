@@ -229,7 +229,7 @@ test('群聊不变量：楼务公开边界、姐妹群复用共享一拍、逐�
   assert.match(楼务段, /m\.会话 === '群' && m\.类 !== '撤回'/);
   const 手动段 = 截源(交互源码, '/** 玩家手动群消息的 AI 接话', '// ── 单聊/群聊发送');
   assert.match(手动段, /await 楼务群一拍\(data, 库, 楼, 起因, 控制\)/);
-  assert.match(手动段, /await 姐妹群一拍\(data, 库, 楼, 起因, 控制\)/);
+  assert.match(手动段, /await 姐妹群一拍\(data, 库, 楼, 起因, 控制(?:, \{ 玩家刚发言: true[^}]*\})?\)/);
   assert.match(手动段, /Math\.min\(1800, 650 \+ 消息\.文\.length \* 28\)/);
   // v0.80 群聊不再无条件写已读：已读由 chat 页前台渲染确认。
   assert.doesNotMatch(手动段, /读到改/);

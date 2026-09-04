@@ -98,6 +98,8 @@ function 图片加载失败(event: Event): void {
 
 .family-plan-caption b {
   font-size: 14px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .family-plan-stage button {
@@ -105,6 +107,9 @@ function 图片加载失败(event: Event): void {
   right: 16px;
   bottom: 16px;
   min-width: 68px;
+  min-height: 44px;
+  display: grid;
+  place-items: center;
   padding: 8px 13px;
   border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: 999px;
@@ -112,6 +117,7 @@ function 图片加载失败(event: Event): void {
   color: #fff;
   font: 700 12px/1 inherit;
   cursor: pointer;
+  touch-action: manipulation;
   backdrop-filter: blur(8px);
 }
 
@@ -127,12 +133,17 @@ function 图片加载失败(event: Event): void {
 
 @media (max-width: 540px) {
   .family-plan-caption {
-    left: 10px;
-    bottom: 10px;
+    left: max(10px, env(safe-area-inset-left, 0px));
+    bottom: max(10px, env(safe-area-inset-bottom, 0px));
+    max-width: calc(
+      100% - 108px - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)
+    );
+    padding: 7px 9px;
   }
   .family-plan-stage button {
-    right: 10px;
-    bottom: 10px;
+    right: max(10px, env(safe-area-inset-right, 0px));
+    bottom: max(10px, env(safe-area-inset-bottom, 0px));
+    min-width: 72px;
   }
 }
 </style>

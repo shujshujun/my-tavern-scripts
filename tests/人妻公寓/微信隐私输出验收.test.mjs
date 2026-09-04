@@ -80,7 +80,7 @@ test('父亲来电兼容自己的中英文冒号与自然折行，但仍拒绝�
 
 test('父亲生产调用保留原始行边界，先通过严格安全验收再落通话记录', () => {
   const 开始 = 父亲通话源码.indexOf('async function 父亲台词');
-  const 结束 = 父亲通话源码.indexOf('/**\n * `待回复.序号`', 开始);
+  const 结束 = 父亲通话源码.indexOf(' * `待回复.序号`', 开始);
   const 父亲段 = 父亲通话源码.slice(开始, 结束);
   assert.ok(开始 >= 0 && 结束 > 开始);
   assert.doesNotMatch(父亲段, /微信短文本\(/);
@@ -93,6 +93,8 @@ test('群聊输出逐条拒绝私聊、亲密和婚姻隐私，失败时整批�
   assert.equal(验收群聊隐私('夏乔:她和管理员最近挺暧昧', '楼务'), false);
   assert.equal(验收群聊隐私('夏乔:我看见她半夜从管理员房间出来', '楼务'), false);
   assert.equal(验收群聊隐私('沈静仪:他私聊里答应今晚来我家', '姐妹'), false);
+  assert.equal(验收群聊隐私('母亲:我跟他早就不只是普通母子关系了', '回国茶话会'), true);
+  assert.equal(验收群聊隐私('母亲:我看过那盘CAM-2母带', '回国茶话会'), false);
   assert.doesNotMatch(输出安全源码, /群聊安全回退/);
   assert.doesNotMatch(生成引擎源码, /群聊安全回退/);
   assert.match(生成引擎源码, /没有可安全写入的真实模型输出，本轮不写群聊/);

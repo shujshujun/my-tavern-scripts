@@ -29,7 +29,18 @@ interface 背包展示项 {
   信门牌?: 门牌 | null;
   可布设: boolean;
   可使用录像带: boolean;
+  录像带使用文案?: string;
+  录像带使用原因?: string;
+  可使用不再留门?: boolean;
+  不再留门使用原因?: string;
+  路线说明?: string;
+  证据图?: string;
+  证据说明?: string;
   可筹备静音会议: boolean;
+  可使用回国归档册: boolean;
+  可使用双重继承: boolean;
+  可使用许曼君离婚: boolean;
+  许曼君离婚使用原因?: string;
   可用资源: boolean;
   可用运作: boolean;
   全局线路候选?: 阶段线路候选;
@@ -54,7 +65,11 @@ const emit = defineEmits<{
   useResource: [itemId: string];
   useOperation: [itemId: string, door?: 门牌, candidate?: 阶段线路候选];
   playTape: [];
+  useNoMoreDoor: [];
   prepareMeeting: [];
+  useReturnFile: [];
+  useDoubleInheritance: [];
+  useXumanjunDivorce: [];
   gift: [itemId: string, door: 门牌];
 }>();
 </script>
@@ -83,6 +98,15 @@ const emit = defineEmits<{
               >{{ 项.名称 }} <em class="ware-kind-label">{{ 项.视觉.标 }}</em></b
             >
             <span class="ware-desc">{{ 项.描述 }}</span>
+            <span v-if="项.路线说明" class="ware-desc">{{ 项.路线说明 }}</span>
+            <span v-if="项.录像带使用原因" class="ware-desc">{{ 项.录像带使用原因 }}</span>
+            <span v-if="项.可使用不再留门 && 项.不再留门使用原因" class="ware-desc">{{ 项.不再留门使用原因 }}</span>
+            <span v-if="项.可使用许曼君离婚 && 项.许曼君离婚使用原因" class="ware-desc">{{ 项.许曼君离婚使用原因 }}</span>
+            <details v-if="项.证据说明" class="bag-evidence">
+              <summary>查看保存的照片</summary>
+              <img v-if="项.证据图 && !itemFailed['不再留门照片预览']" :src="项.证据图" alt="同一份街外证据照片" width="1536" height="1024" @error="emit('imageError', '不再留门照片预览')" />
+              <p>{{ 项.证据说明 }}</p>
+            </details>
           </span>
           <span class="ware-acts">
             <button v-if="项.可读信" class="btn mini" :disabled="sending" @click="emit('read', 项.信门牌!)">读</button>
@@ -98,11 +122,26 @@ const emit = defineEmits<{
             >
               {{ 项.全局线路候选 ? `用于${户静态表[项.全局线路候选.门牌].妻名}的线索` : '使用' }}
             </button>
-            <button v-if="项.可使用录像带" class="btn mini rite" :disabled="sending" @click="emit('playTape')">
-              在管理员室播放
+            <button v-if="项.可使用不再留门" class="btn mini rite" :disabled="sending || !!项.不再留门使用原因" @click="emit('useNoMoreDoor')">在202使用</button>
+            <button v-if="项.可使用录像带" class="btn mini rite" :disabled="sending || !!项.录像带使用原因" @click="emit('playTape')">
+              {{ 项.录像带使用文案 || '在管理员室播放' }}
             </button>
             <button v-if="项.可筹备静音会议" class="btn mini rite" :disabled="sending" @click="emit('prepareMeeting')">
               筹备会议
+            </button>
+            <button v-if="项.可使用回国归档册" class="btn mini rite" :disabled="sending" @click="emit('useReturnFile')">
+              在管理员室归档
+            </button>
+            <button v-if="项.可使用双重继承" class="btn mini rite" :disabled="sending" @click="emit('useDoubleInheritance')">
+              在管理员室准备交接
+            </button>
+            <button
+              v-if="项.可使用许曼君离婚"
+              class="btn mini rite"
+              :disabled="sending || !!项.许曼君离婚使用原因"
+              @click="emit('useXumanjunDivorce')"
+            >
+              在201使用
             </button>
             <button
               v-for="夫 in 项.运作对象"
@@ -175,4 +214,7 @@ const emit = defineEmits<{
 .gift-target:disabled {
   opacity: 0.7;
 }
+.bag-evidence { display: block; max-width: 100%; }
+.bag-evidence summary { padding: 10px 0; min-height: 44px; box-sizing: border-box; cursor: pointer; }
+.bag-evidence img { display: block; width: 100%; height: auto; object-fit: contain; }
 </style>

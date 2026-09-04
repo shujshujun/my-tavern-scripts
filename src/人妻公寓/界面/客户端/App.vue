@@ -407,22 +407,30 @@
               'story-family-plan': !!当前事件CG,
               'story-family-plan-portrait': !!当前事件CG?.保留夏乔,
               'story-visual-only': 正文隐藏,
-              'story-special-interaction': 录像带交互幕 || 静音会议交互幕,
+              'story-special-interaction': 录像带交互幕 || 录像带V4中 || 静音会议交互幕,
               'story-mute-meeting': 静音会议显示组合图,
               'story-intimacy-open': 性爱进行中 && 亲密抽屉展开,
+              'story-mother-video': 母亲视频终幕已接通,
+              'story-divorce-flash': 离婚结果白闪,
             },
           ]"
           :style="[场景色, 场景图样式]"
         >
           <!-- 隐藏正文(2026-07-19 用户点单,gal惯例):渐隐文字层欣赏立绘;只认这颗钮,再按恢复(误触不弹回) -->
           <button
-            v-if="!录像带中 && !静音会议交互幕"
+            v-if="!录像带任一中 && !静音会议交互幕"
             class="story-hide-btn"
             :title="正文隐藏 ? '显示正文' : '隐藏正文,欣赏画面'"
             @click.stop="正文隐藏 = !正文隐藏"
           >
             <Ic :n="正文隐藏 ? 'eye' : 'eyeOff'" />
           </button>
+          <div v-if="第二机位REC" class="second-camera-rec" aria-label="第二机位正在录制">
+            <span class="second-camera-rec__dot" />
+            <b>REC</b>
+            <em>CAM-2</em>
+          </div>
+          <div v-if="不再留门REC" class="second-camera-rec" aria-label="202本次录制进行中"><span class="second-camera-rec__dot" /><b>REC</b><em>202</em></div>
           <MuteMeetingStage
             :formal="静音会议正式中"
             :interaction-open="静音会议交互幕"
@@ -442,6 +450,13 @@
             :tap-count="录像带连点计数"
             :tap-target="录像带连点目标"
             :sending="发送中"
+          />
+          <VideoTapeV4Stage
+            :open="录像带V4中"
+            :snapshot="录像带V4快照"
+            :image-url="录像带V4图片地址"
+            :sending="录像带V4操作锁"
+            @image-error="录像带V4图片加载失败"
           />
           <FamilyPlanStage
             :open="!!当前事件CG"
@@ -489,7 +504,22 @@
           />
           <Transition name="fade">
             <div
-              v-if="显示成人CG && !静音会议显示组合图"
+              v-if="母亲视频终幕已接通 && 母亲视频终幕CG地址"
+              class="mother-video-stage"
+              :data-cg-id="母亲视频终幕CG?.id ?? ''"
+            >
+              <img
+                :src="母亲视频终幕CG地址"
+                :data-cg-id="母亲视频终幕CG?.id ?? ''"
+                alt=""
+                draggable="false"
+                @error="母亲视频终幕CG加载失败"
+              />
+            </div>
+          </Transition>
+          <Transition name="fade">
+            <div
+              v-if="显示成人CG && !静音会议显示组合图 && !母亲视频终幕已接通"
               class="adult-cg-stage"
               :class="{ 'adult-cg-stage-double': 当前成人CG显示槽位.length > 1 }"
               :style="{ '--adult-cg-img': `url(${当前成人CG地址})` }"
@@ -515,7 +545,13 @@
             </div>
           </Transition>
           <TransitionGroup
-            v-if="立绘显示 && !显示成人CG && !静音会议显示组合图 && (!当前事件CG || 当前事件CG.保留夏乔)"
+            v-if="
+              立绘显示 &&
+              !显示成人CG &&
+              !静音会议显示组合图 &&
+              !母亲视频终幕已接通 &&
+              (!当前事件CG || 当前事件CG.保留夏乔)
+            "
             name="fade"
           >
             <span
@@ -538,8 +574,8 @@
           <!-- 正文卷轴:只演当前幕,且幕跟着房间走——人走了戏就收,回来戏还在(氛围色随位置)(A8a 迁入 components/正文卷轴.vue) -->
           <StoryScroll
             ref="正文卷轴"
-            :veiled="正文隐藏 || 录像带交互幕 || 静音会议交互幕 || !!当前事件CG"
-            :in-scene="在幕中"
+            :veiled="正文隐藏 || 录像带交互幕 || 录像带V4中 || 静音会议交互幕 || !!当前事件CG"
+            :in-scene="母亲视频终幕已接通 || 在幕中"
             :sending="发送中"
             :current-room="当前房间"
             :room-people="当前房间 ? 房内的人(当前房间) : []"
@@ -725,23 +761,29 @@
           </span>
           <span v-else class="scene-occ">{{ 当前房间 ? '此刻没有别人' : '该去敲谁的门?' }}</span>
           <button
-            v-if="当前房间 && !录像带中"
+            v-if="当前房间 && !录像带任一中"
             class="btn icon"
             :disabled="发送中 || 静音会议正式中 || 场景剧情移动锁 || 前台硬决策中"
             :title="
               前台硬决策中
                 ? '请先完成当前画面的判断'
                 : 静音会议正式中
-                ? '会议进行中，无法离开管理员室'
-                : 场景剧情移动锁
-                  ? `「${场景剧情状态?.标题 ?? 录像带前置标题 ?? '当前剧情'}」尚未完成，当前场景已锁定`
-                  : '离开当前房间'
+                  ? '会议进行中，无法离开管理员室'
+                  : 场景剧情移动锁
+                    ? `「${场景剧情状态?.标题 ?? 录像带前置标题 ?? '当前剧情'}」尚未完成，当前场景已锁定`
+                    : '离开当前房间'
             "
             @click="离开房间"
           >
             <Ic n="exit" />离开
           </button>
         </div>
+        <section v-if="母亲视频终幕已接通" class="mother-video-lock-note" role="status" aria-live="polite">
+          {{ 母亲视频终幕锁提示 }}
+        </section>
+        <section v-else-if="双重继承最终收束锁" class="mother-video-lock-note" role="status" aria-live="polite">
+          机场视频已经结束 · 只剩公寓楼总钥匙的最后现实动作
+        </section>
         <MuteMeetingLockNote :open="静音会议正式中" />
         <section
           v-if="场景剧情状态"
@@ -751,7 +793,9 @@
           aria-live="polite"
         >
           <header>
-            <span><small>SCENE EVENT</small><b>{{ 场景剧情状态.标题 }}</b></span>
+            <span
+              ><small>SCENE EVENT</small><b>{{ 场景剧情状态.标题 }}</b></span
+            >
             <em>{{ 场景剧情活动 ? '场景已锁定' : `等待 ${场景剧情目标名}` }}</em>
           </header>
           <p>{{ 场景剧情锁定说明 }}</p>
@@ -795,17 +839,16 @@
             </button>
           </div>
         </section>
-        <section
-          v-else-if="录像带前置中"
-          class="scene-story-lock active"
-          role="status"
-          aria-live="polite"
-        >
+        <section v-else-if="录像带前置中" class="scene-story-lock active" role="status" aria-live="polite">
           <header>
-            <span><small>SCENE EVENT</small><b>{{ 录像带前置标题 }}</b></span>
+            <span
+              ><small>SCENE EVENT</small><b>{{ 录像带前置标题 }}</b></span
+            >
             <em>场景已锁定</em>
           </header>
-          <p>这段前置必须留在{{ 录像带前置场景名 }}继续。请在输入框回应当前人物；生成失败时仍在原地重试，不能切换地点。</p>
+          <p>
+            这段前置必须留在{{ 录像带前置场景名 }}继续。请在输入框回应当前人物；生成失败时仍在原地重试，不能切换地点。
+          </p>
         </section>
 
         <transition name="scene-result">
@@ -853,17 +896,20 @@
         </transition>
 
         <!-- 房内动作(输入门控收紧后的补位:站在垃圾房/空户里,翻袋撬门不用开地图)。
-             手机端由 房内操作抽屉.vue 收成上滑抽屉,桌面保持原两列;垃圾选择弹窗留在抽屉外。 -->
+             手机端与结局后302桌面由 房内操作抽屉.vue 收起瓷砖；其他桌面房间保持原两列。 -->
+        <NoMoreDoorProgress v-if="!录像带任一中 && !静音会议正式中" :data="data" :room="当前房间" :sending="发送中" @action="请求不再留门动作" />
         <RoomActionsDrawer
-          :mobile="移动端"
-          :room-id="当前房间"
-          :action-count="可见房内动作数"
-          :suppressed="房内操作抑制 || 前台硬决策中"
-          :actions="普通房间动作"
-          :garbage-visible="垃圾入口可见"
-          :video-tape-active="录像带中"
-          @open-garbage="垃圾选择开 = true"
-        />
+        :desktop-cohabitation-fold="当前房间 === '302'"
+        :mobile="移动端"
+        :desktop-collapsible="桌面302共居操作折叠"
+        :room-id="当前房间"
+        :action-count="可见房内动作数"
+        :suppressed="房内操作抑制 || 前台硬决策中"
+        :actions="普通房间动作"
+        :garbage-visible="垃圾入口可见"
+        :video-tape-active="录像带任一中"
+        @open-garbage="垃圾选择开 = true"
+      />
         <transition name="card-pop">
           <div v-if="垃圾选择开" class="garbage-mask" @click.self="垃圾选择开 = false">
             <section class="garbage-modal" aria-modal="true" aria-label="选择垃圾袋">
@@ -933,7 +979,9 @@
         <!-- 行动选项(AI 每轮给 4 条,点了直接发送;gal 式居中选择条,纸条底=AI 水彩件) -->
         <ActionOptions
           :key="行动选项世代"
-          :open="显示选项 && !录像带中 && !静音会议交互幕 && !静音会议待散会选择 && !静音会议自由待选择 && !前台硬决策中"
+          :open="
+            显示选项 && !录像带任一中 && !静音会议交互幕 && !静音会议待散会选择 && !静音会议自由待选择 && !前台硬决策中
+          "
           :mobile="移动端"
           :options="行动选项"
           @select="点选项"
@@ -949,6 +997,18 @@
           @open102="打开102录像"
           @tap202="连续点击202录像"
           @recover="自动重连202"
+        />
+
+        <VideoTapeV4Controls
+          :open="录像带V4中"
+          :snapshot="录像带V4快照"
+          :sending="发送中"
+          :locked="录像带V4操作锁"
+          @select-room="选择录像带V4房间"
+          @next="进入录像带V4下一幕"
+          @finish="结束录像带V4监控"
+          @cancel="取消回合"
+          @abort="安全退出录像带V4"
         />
 
         <MuteMeetingAfter
@@ -969,52 +1029,62 @@
         />
 
         <!-- 游戏内输入(玩家不碰酒馆输入框) -->
-        <RoundInput
-          ref="回合输入"
-          :open="可输入 && !偷窥决策中"
-          :text="输入文本"
-          :sending="发送中 || Boolean(场景剧情准备锁)"
-          :preface-writing="由头写入中"
-          :can-submit="当前行动可提交"
-          :send-label="发送按钮文案"
-          :resource-allowed="当前资源门槛.可行动"
-          :resource-hint="当前资源门槛.提示"
-          :formal-meeting="静音会议正式中"
-          :can-reroll="可重掷"
-          :current-room="当前房间"
-          :turn-room="回合房间"
-          :failed-action="失败行动"
-          :retry-action="待重试行动"
-          :retrying="取消后自动重试"
-          :variable-regeneration-state="变量重生成状态"
-          :video-active="录像带中"
-          :period="时段"
-          :current-period-label="当前时段显示"
-          :next-period-label="下一时段显示"
-          :decision-mode="前台决策输入模式"
-          @update-text="输入文本 = $event"
-          @submit="发送"
-          @focus="输入聚焦"
-          @blur="输入失焦"
-          @undo="撤回"
-          @reroll="重掷"
-          @retry-failed="重试失败行动"
-          @abandon-and-retry="放弃并重试"
-          @regenerate-variables="发起变量重生成"
-          @advance-time="推进固定时段"
-        />
+        <template v-if="!母亲视频终幕已接通 && !录像带V4中">
+          <RoundInput
+            v-if="!双重继承最终收束锁"
+            ref="回合输入"
+            :open="可输入 && !偷窥决策中"
+            :text="输入文本"
+            :sending="发送中 || Boolean(场景剧情准备锁)"
+            :preface-writing="由头写入中"
+            :can-submit="当前行动可提交"
+            :send-label="发送按钮文案"
+            :resource-allowed="当前资源门槛.可行动"
+            :resource-hint="当前资源门槛.提示"
+            :formal-meeting="静音会议正式中"
+            :can-reroll="可重掷"
+            :current-room="当前房间"
+            :turn-room="回合房间"
+            :failed-action="失败行动"
+            :retry-action="待重试行动"
+            :retrying="取消后自动重试"
+            :variable-regeneration-state="变量重生成状态"
+            :video-active="录像带任一中"
+            :period="时段"
+            :deep-night-hint="深夜睡眠提示"
+            :current-period-label="当前时段显示"
+            :next-period-label="下一时段显示"
+            :decision-mode="前台决策输入模式"
+            @update-text="输入文本 = $event"
+            @submit="发送"
+            @focus="输入聚焦"
+            @blur="输入失焦"
+            @undo="撤回"
+            @reroll="重掷"
+            @retry-failed="重试失败行动"
+            @abandon-and-retry="放弃并重试"
+            @regenerate-variables="发起变量重生成"
+            @advance-time="推进固定时段"
+          />
+        </template>
 
         <!-- 功能区:gal 式底部 dock(大图标按钮,与数据 HUD 分离) -->
-        <nav v-if="!录像带中 && !前台硬决策中" class="dock" :class="{ 'mute-meeting-dock': 静音会议正式中 }">
+        <nav
+          v-if="!录像带任一中 && !前台硬决策中 && !母亲视频终幕已接通 && !双重继承最终收束锁"
+          class="dock"
+          :class="{ 'mute-meeting-dock': 静音会议正式中 }"
+        >
           <button
             class="dock-btn primary"
-            :disabled="发送中 || 静音会议正式中 || 场景剧情移动锁"
+            :disabled="发送中 || 静音会议正式中 || 场景剧情移动锁 || 第二机位现场锁定"
             :title="
               静音会议正式中
                 ? '会议进行中，地图已锁定'
-                : 场景剧情移动锁
-                  ? '当前强制剧情尚未完成，不能离开场景'
-                  : '打开地图'
+                : 第二机位现场锁定
+                  ? 第二机位现场锁提示
+                  : 场景剧情移动锁
+                    ? '当前强制剧情尚未完成，不能离开场景'
+                    : '打开地图'
             "
             @click="显示地图 = true"
           >
@@ -1058,11 +1128,21 @@
             <Ic n="bag" /><span>背包</span>
           </button>
           <button
-            v-if="监控列表.length || 借种监控待确认"
+            v-if="监控列表.length || 借种监控待确认 || 录像带V4监控就绪"
             class="dock-btn"
             :disabled="发送中 || 静音会议正式中 || 场景剧情锁定"
-            :title="发送中 ? '当前内容正在生成，监控暂不可用' : 场景剧情锁定 ? '当前强制剧情尚未完成，监控暂不可用' : '你装下的眼睛'"
-            @click="显示监控 = true"
+            :title="
+              发送中
+                ? '当前内容正在生成，监控暂不可用'
+                : 场景剧情锁定
+                  ? '当前强制剧情尚未完成，监控暂不可用'
+                  : 录像带V4监控就绪
+                    ? data.系统._录像带V4.阶段 === '已安全中断'
+                      ? '上次场次已安全退出；点击后系统自动切换到302并从第1幕重新开始'
+                      : '两户已经准备完毕；点击后系统自动切换到302并打开录像带监控'
+                    : '你装下的眼睛'
+            "
+            @click="打开监控入口"
           >
             <Ic n="cctv" /><span>监控</span>
           </button>
@@ -1092,6 +1172,8 @@
         :management-badge="管理任务角标"
         :rent-owed="欠租中"
         :room-actions="房间动作"
+        :double-inheritance-progress="双重继承检查进度"
+        :inspection-mark="地点检查标记"
         @close="关地图"
         @outing="从地图外出"
         @avatar-error="头像失效[$event] = true"
@@ -1120,6 +1202,7 @@
         @open-cg="打开CG图库"
         @advance="晋阶"
         @ask-money="开口要钱"
+        @wardrobe-action="操作衣柜"
       />
 
       <!-- ═══════════ 角色CG图库：已解锁显示缩略图，未解锁不泄露画面 ═══════════ -->
@@ -1139,7 +1222,11 @@
         @use-resource="用资源道具"
         @use-operation="用运作"
         @play-tape="使用录像带"
+        @use-no-more-door="请求不再留门动作('使用道具')"
         @prepare-meeting="打开静音会议筹备"
+        @use-return-file="使用回国经营归档册"
+        @use-double-inheritance="使用双重继承场景票"
+        @use-xumanjun-divorce="使用许曼君离婚封存盒"
         @gift="送出"
       />
 
@@ -1320,16 +1407,16 @@ import { 余波有冻结效力 } from '../../脚本/游戏逻辑/冷落系统';
 import { 怀孕已公开 } from '../../脚本/游戏逻辑/怀孕系统';
 import { 借种离线监控待确认 } from '../../脚本/游戏逻辑/借种结局系统';
 import { 借种101持久背景文件 } from '../../脚本/游戏逻辑/借种结局状态';
+import { 录像带V4录像带可购买, 录像带V4贞操锁可购买数量, 录像带V4已经使用, 录像带V4使用阻断 } from '../../脚本/游戏逻辑/录像带V4状态';
+import { 不再留门购买阻断, 不再留门套件可购买, 不再留门动作阻断, 不再留门真实录制已绑定, 不再留门录制现场错误, 读取不再留门档案提示, type 不再留门动作ID } from '../../脚本/游戏逻辑/不再留门系统';
+import { 不再留门图片, 不再留门CG标题, 不再留门CG允许, 不再留门背景文件 } from './不再留门资源';
+import { 母亲视频通话已接通, 母亲视频通话当前CG, 母亲视频通话待接听 } from '../../脚本/游戏逻辑/母亲视频通话系统';
 import { 处于医院硬锁, 医院已解锁, 房间生产背景键, type 生产地点动作ID } from '../../脚本/游戏逻辑/生产系统';
 import { 安眠药可圆场, 丈夫登门药物窗口已开启 } from '../../脚本/游戏逻辑/丈夫登门系统';
 import { 全部阶段性癖已完成, 读取阶段性癖状态, 阶段性癖门牌 } from '../../脚本/游戏逻辑/阶段性癖状态';
 import { 列出地点管理任务 } from '../../脚本/游戏逻辑/管理任务系统';
 import { 规范荣耀洞上次时段 } from '../../脚本/游戏逻辑/荣耀洞';
-import {
-  列出阶段线路候选详情,
-  母亲药物窗口已开启,
-  type 阶段线路候选,
-} from '../../脚本/游戏逻辑/阶段线路系统';
+import { 列出阶段线路候选详情, 母亲药物窗口已开启, type 阶段线路候选 } from '../../脚本/游戏逻辑/阶段线路系统';
 import {
   家庭计划101背景文件,
   家庭计划卡状态,
@@ -1337,10 +1424,51 @@ import {
   家庭计划已上架,
   type 家庭计划地点动作ID,
 } from '../../脚本/游戏逻辑/家庭计划系统';
+import {
+  沈静仪母带ID,
+  第二机位任务ID,
+  第二机位套件ID,
+  第二机位任务已上架,
+  第二机位套件已上架,
+  第二机位REC显示,
+  第二机位房间背景文件,
+  第二机位离场锁提示,
+} from '../../脚本/游戏逻辑/第二机位系统';
+import { 读取201留宿可用状态, 许曼君分居房间背景文件 } from '../../脚本/游戏逻辑/许曼君分居系统';
+import {
+  许曼君离婚CG标题,
+  许曼君离婚地点动作,
+  许曼君离婚检查点CG,
+  许曼君离婚结局背景CG,
+  许曼君离婚商品ID,
+  type 许曼君离婚动作ID,
+} from '../../脚本/游戏逻辑/许曼君离婚系统';
+import type { 许曼君离婚后日常动作ID } from '../../脚本/游戏逻辑/许曼君离婚后日常系统';
+import {
+  回国已上锁箱ID,
+  回国经营归档册ID,
+  回国私人物件箱ID,
+  回国经营归档册已上架,
+  回国私人物件箱已上架,
+  type 回国地点动作ID,
+} from '../../脚本/游戏逻辑/回国系统';
+import {
+  双重继承等待最终收束,
+  双重继承公共检查进度,
+  双重继承地图检查标记,
+  双重继承父亲同行地点,
+  双重继承母亲在管理员室,
+  type 双重继承动作ID,
+  双重继承场景票ID,
+  双重继承商店已上架,
+} from '../../脚本/游戏逻辑/双重继承系统';
+import { 母亲共居背景状态, 母亲共居已开启, type 共居动作ID  } from '../../脚本/游戏逻辑/302共居系统';
 import { 角色剧情占位价格文案, 角色剧情占位已上架, 角色剧情占位锁定原因 } from '../../脚本/游戏逻辑/角色结局占位';
 // 客户端只需要无副作用的聊天身份读取；禁止经手机系统兼容门面把宿主渲染组合根打进 iframe。
 import { 当前聊天ID } from '../../脚本/游戏逻辑/手机/运行时上下文';
 import { MVU操作进行中 } from '../../脚本/游戏逻辑/mvuIO';
+import { 当前可见立绘SKU } from '../../脚本/游戏逻辑/衣柜系统';
+import { 衣柜商品修正图 } from './穿戴成品图';
 import { 当前时间线切换世代 } from '../../脚本/游戏逻辑/时间线切换协调';
 // 纯函数模块：客户端直连可安全用于目标时段的地图赴约位置派生。
 import { 手机邀约计划成员, 手机邀约计划状态, type 手机邀约计划 } from '../../脚本/游戏逻辑/手机/邀约计划';
@@ -1371,14 +1499,9 @@ import {
   type 成人CG项,
 } from '../../脚本/游戏逻辑/成人CG系统';
 import { useDataStore } from './store';
-import {
-  创建CG加载槽位,
-  完成CG槽位加载,
-  选择CG显示槽位,
-  替换失败CG槽位,
-  type CG加载槽位,
-} from './cgLoadState';
+import { 创建CG加载槽位, 完成CG槽位加载, 选择CG显示槽位, 替换失败CG槽位, type CG加载槽位 } from './cgLoadState';
 import { 选择借种CG序列, type 借种CG帧 } from './借种CG序列';
+import { 解析录像带双承接CG载荷 } from './录像带双承接平板资源';
 import { 计算场景同步, type 场景聊天状态 } from './场景状态同步';
 import {
   创建正文幕归属,
@@ -1391,6 +1514,7 @@ import { 同步画幅 } from './viewport';
 import { useUIPrefs } from './composables/useUIPrefs';
 import { useRoomActions } from './composables/useRoomActions';
 import { useVideoTape } from './composables/useVideoTape';
+import { useVideoTapeV4 } from './composables/useVideoTapeV4';
 import { useMuteMeeting } from './composables/useMuteMeeting';
 import {
   创建CG信号交接,
@@ -1421,6 +1545,8 @@ import DossierPopup from './components/档案卡.vue';
 import MapPopup from './components/地图.vue';
 import VideoTapeStage from './components/录像带舞台.vue';
 import VideoTapeControls from './components/录像带操作.vue';
+import VideoTapeV4Stage from './components/录像带V4舞台.vue';
+import VideoTapeV4Controls from './components/录像带V4操作.vue';
 import ActionOptions from './components/行动选项.vue';
 import MuteMeetingPreparation from './components/静音会议筹备.vue';
 import MuteMeetingStage from './components/静音会议舞台.vue';
@@ -1430,11 +1556,14 @@ import MuteMeetingAfter from './components/静音会议会后.vue';
 import RoundInput from './components/回合输入.vue';
 import StoryScroll from './components/正文卷轴.vue';
 import RoomActionsDrawer from './components/房内操作抽屉.vue';
+import NoMoreDoorProgress from './components/不再留门进展.vue';
 import FamilyPlanStage from './components/家庭计划演出.vue';
 import {
   公寓外部背景图,
   晨跑公园背景图,
   健身房背景图,
+  共居302背景图,
+  共居302亲密开场图,
   清醒咖啡道具图,
   集中胶囊道具图,
   运动饮料道具图,
@@ -1442,9 +1571,17 @@ import {
   安全套道具图,
   专注训练手册道具图,
   蛋白粉道具图,
+  住户答谢会道具图,
   家庭计划图片,
+  第二机位图片,
+  回国图片,
+  双重继承图片,
+  许曼君分居图片,
+  许曼君离婚图片,
+  录像带双承接图片,
   生产图片,
   借种结局图片,
+  母亲视频通话CG图片,
   素材基址,
   角色立绘候选,
   成人CG基址,
@@ -1846,6 +1983,7 @@ async function 写场景(房间id: string | null, 破门 = false, 待提交状�
   if (旧房间 !== 房间id) {
     清空当前成人CG();
     当前家庭计划CG.value = null;
+    清空录像带双承接CG队列();
     当前生产CG.value = null;
     清空借种CG序列();
     最近CG信号 = null;
@@ -1914,8 +2052,20 @@ async function 进入(房间id: string, 破门 = false, 保持地图 = false): P
       return false;
     }
   }
+  if (房间id !== 当前房间.value && 第二机位现场锁定.value) {
+    弹提示(第二机位现场锁提示.value, 4600);
+    return false;
+  }
+  if (录像带V4活动.value && 房间id !== '302') {
+    弹提示('录像带监控正在302播放；结束监控前不能切换地点。', 4600);
+    return false;
+  }
   if (录像带前置中.value && 房间id !== 录像带前置场景.value) {
     弹提示(`「${录像带前置标题.value}」还没有完成，必须留在${录像带前置场景名.value}继续。`, 4400);
+    return false;
+  }
+  if (场景剧情连续锁场.value && 房间id !== 当前房间.value) {
+    弹提示(`「${场景剧情状态.value?.标题 ?? '连续现场'}」的连续剧情尚未完成，请留在当前地点回应。`, 4400);
     return false;
   }
   if (场景剧情等待当前处理.value && 房间id !== 当前房间.value && !确认离开等待场景剧情()) {
@@ -1995,12 +2145,24 @@ async function 进入(房间id: string, 破门 = false, 保持地图 = false): P
 async function 离开房间(): Promise<void> {
   if (场景移动中) return;
   const 移动身份 = 捕获客户端时间线身份();
+  if (第二机位现场锁定.value) {
+    弹提示(第二机位现场锁提示.value, 4600);
+    return;
+  }
+  if (录像带V4活动.value) {
+    弹提示('录像带监控正在302播放；请先完成或安全收束当前场次。', 4600);
+    return;
+  }
   if (场景剧情准备锁.value) {
     弹提示(`正在触发「${场景剧情准备锁.value.标题}」，场景正在锁定，请勿离开。`, 4400);
     return;
   }
   if (录像带前置中.value) {
     弹提示(`「${录像带前置标题.value}」还没有完成，不能离开${录像带前置场景名.value}。`, 4400);
+    return;
+  }
+  if (场景剧情连续锁场.value) {
+    弹提示(`「${场景剧情状态.value?.标题 ?? '连续现场'}」的连续现场尚未完成，请留在当前地点回应。`, 4400);
     return;
   }
   if (场景剧情等待当前处理.value && !确认离开等待场景剧情()) return;
@@ -2074,6 +2236,7 @@ function 同步场景自变量() {
       正文幕归属状态.value = 作废正文幕归属(正文幕归属状态.value);
       清空当前成人CG();
       当前家庭计划CG.value = null;
+      清空录像带双承接CG队列();
       当前生产CG.value = null;
       当前借种CG.value = null;
       最近CG信号 = null;
@@ -2161,6 +2324,7 @@ const 可输入 = computed(() => {
     if (静音会议场景.value.阶段.includes('自由')) return 静音会议继续已选.value;
     return false;
   }
+  if (录像带V4中.value) return false;
   if (录像带中.value) {
     return id === '管理员室' && 录像带阶段.value !== '等待102' && 录像带阶段.value !== '等待202';
   }
@@ -2242,10 +2406,19 @@ function 发起时间推进(方式: 客户端时间方式): void {
   });
 }
 
+const 深夜睡眠提示 = computed(() => {
+  if (时段.value !== '深夜') return '';
+  if (当前房间.value === '201') {
+    const 留宿 = 读取201留宿可用状态(data.value, '201', 绝对时段.value);
+    if (留宿.可执行) return '可直接使用201的留宿瓷砖睡到次日早晨';
+  }
+  return '请回管理员室或 302 睡觉';
+});
+
 function 推进固定时段(): void {
   if (发送中.value || 由头写入中.value) return;
   if (时段.value === '深夜') {
-    弹提示('已经是深夜，请回管理员室或 302 睡觉。普通等待不能跨到第二天。', 4000);
+    弹提示(`已经是深夜，${深夜睡眠提示.value}。普通等待不能跨到第二天。`, 4000);
     return;
   }
   if (玩家资源已满(data.value)) {
@@ -2283,7 +2456,30 @@ const 欠租总笔数 = computed(() => 欠租账.value.reduce((和, 项) => 和 
 
 // ── 手机(P4:设备本体在酒馆页面层,游戏界面只管跳动指示与红点) ──
 
-const 手机来电 = computed(() => (data.value?.系统?._待接来电?.期 ?? -1) >= 0);
+const 母亲视频终幕待接听 = computed(() => 母亲视频通话待接听(data.value));
+const 母亲视频终幕已接通 = computed(() => 母亲视频通话已接通(data.value));
+const 双重继承最终收束锁 = computed(() => 双重继承等待最终收束(data.value));
+const 母亲视频终幕锁提示 = computed(() =>
+  data.value?.系统._母亲视频通话终幕.状态 === '终幕中'
+    ? '父亲已经挂断 · 母亲的终幕仍在302继续'
+    : '视频通话仍在进行中 · 打开右下角手机继续回应父亲',
+);
+const 母亲视频终幕CG = computed(() => 母亲视频通话当前CG(data.value));
+const 母亲视频终幕失效CG = ref('');
+const 母亲视频终幕CG地址 = computed(() => {
+  const id = 母亲视频终幕CG.value?.id ?? '';
+  return id && 母亲视频终幕失效CG.value !== id ? 母亲视频通话CG图片(id) : '';
+});
+function 母亲视频终幕CG加载失败(): void {
+  母亲视频终幕失效CG.value = 母亲视频终幕CG.value?.id ?? '';
+}
+watch(
+  () => 母亲视频终幕CG.value?.id ?? '',
+  (新id, 旧id) => {
+    if (新id !== 旧id) 母亲视频终幕失效CG.value = '';
+  },
+);
+const 手机来电 = computed(() => (data.value?.系统?._待接来电?.期 ?? -1) >= 0 || 母亲视频终幕待接听.value);
 const 手机未读 = ref(false);
 
 /** 这次开手机是不是替玩家退的真全屏——是的话,收手机时自动送回去(2026-07-20 玩家点单) */
@@ -2354,11 +2550,20 @@ function 房内的人(房间id: string): string[] {
       名单.push(户静态表[m].夫名);
     }
   }
-  if (房间id === '管理员室' && data.value?.系统?._特殊场景?.id === '录像带') {
+  if (
+    房间id === '管理员室' &&
+    ['录像带', '录像带双承接'].includes(data.value?.系统?._特殊场景?.id)
+  ) {
     for (const 门牌号 of ['102', '202'] as const) {
       const 名 = 户静态表[门牌号].妻名;
       if (!名单.includes(名)) 名单.push(名);
     }
+  }
+  const 父亲同行 = 双重继承父亲同行地点(data.value, 当前房间.value);
+  if (父亲同行 === 房间id && !名单.includes('父亲')) 名单.push('父亲');
+  if (房间id === '管理员室' && 双重继承母亲在管理员室(data.value)) {
+    if (!名单.includes('母亲')) 名单.push('母亲');
+    if (!名单.includes('父亲')) 名单.push('父亲');
   }
   return 名单;
 }
@@ -2376,6 +2581,10 @@ function 妻在玩家身边(m: 门牌): boolean {
 }
 
 const 当前房间名 = computed(() => (当前房间.value ? (查房间(当前房间.value)?.名称 ?? 当前房间.value) : ''));
+const 双重继承检查进度 = computed(() => 双重继承公共检查进度(data.value));
+function 地点检查标记(地点: string): '' | 'INSPECT' | 'DONE' {
+  return 双重继承地图检查标记(data.value, 地点);
+}
 
 // ── 到场卡与氛围色(移动的沉浸反馈:每个地点有自己的"开场镜头"和颜色) ──
 
@@ -2482,8 +2691,36 @@ interface 家庭计划CG载荷 {
   文件: string;
   标题: string;
   保留夏乔?: boolean;
+  来源?:
+    | '家庭计划'
+    | '第二机位'
+    | '回国'
+    | '双重继承'
+    | '302亲密开场'
+    | '许曼君分居'
+    | '许曼君离婚'
+    | '录像带双承接'
+    | '不再留门';
+  实例?: string;
 }
 const 当前家庭计划CG = ref<家庭计划CG载荷 | null>(null);
+const 离婚结果白闪 = ref(false);
+let 离婚结果白闪timer: ReturnType<typeof setTimeout> | undefined;
+let 离婚结果白闪帧: number | undefined;
+
+function 触发离婚结果白闪(): void {
+  离婚结果白闪.value = false;
+  clearTimeout(离婚结果白闪timer);
+  if (离婚结果白闪帧 !== undefined) cancelAnimationFrame(离婚结果白闪帧);
+  离婚结果白闪帧 = requestAnimationFrame(() => {
+    离婚结果白闪帧 = undefined;
+    离婚结果白闪.value = true;
+    离婚结果白闪timer = setTimeout(() => {
+      离婚结果白闪.value = false;
+      离婚结果白闪timer = undefined;
+    }, 360);
+  });
+}
 interface 生产CG载荷 {
   文件: string;
   标题: string;
@@ -2491,6 +2728,24 @@ interface 生产CG载荷 {
   保留夏乔?: boolean;
 }
 const 当前生产CG = ref<生产CG载荷 | null>(null);
+const 录像带双承接CG队列 = ref<家庭计划CG载荷[]>([]);
+
+function 清空录像带双承接CG队列(): void {
+  录像带双承接CG队列.value = [];
+}
+
+function 显示录像带双承接CG(文件: string, 标题: string): void {
+  const 载荷: 家庭计划CG载荷 = { 文件, 标题, 来源: '录像带双承接' };
+  const 已排入 = [当前家庭计划CG.value, ...录像带双承接CG队列.value].some(
+    项 => 项?.来源 === '录像带双承接' && 项.文件 === 文件,
+  );
+  if (已排入) return;
+  清空当前成人CG();
+  当前生产CG.value = null;
+  清空借种CG序列();
+  if (当前家庭计划CG.value?.来源 === '录像带双承接') 录像带双承接CG队列.value.push(载荷);
+  else 当前家庭计划CG.value = 载荷;
+}
 interface 借种CG载荷 extends 借种CG帧 {
   后续?: 借种CG帧[];
 }
@@ -2513,20 +2768,101 @@ function 清空借种CG场次瞬态(): void {
   借种CG来源键 = '';
   借种CG本场已展示.clear();
 }
-const 当前事件CG = computed(() => 当前借种CG.value ?? 当前生产CG.value ?? 当前家庭计划CG.value);
-const 当前家庭计划CG地址 = computed(() => (当前家庭计划CG.value ? 家庭计划图片(当前家庭计划CG.value.文件) : ''));
-const 当前事件CG地址 = computed(() =>
+const 当前事件CG = computed(() => 当前借种CG.value ?? 当前生产CG.value ?? (当前家庭计划CG.value?.来源 === '不再留门' && (!不再留门CG允许(data.value, 当前家庭计划CG.value.文件, 当前家庭计划CG.value.实例, 当前房间.value) || !不再留门图片(当前家庭计划CG.value.文件)) ? null : 当前家庭计划CG.value));
+const 当前家庭计划CG地址 = computed(() => {
+  const 载荷 = 当前家庭计划CG.value;
+  if (!载荷) return '';
+  if (载荷.来源 === '不再留门') return 不再留门CG允许(data.value, 载荷.文件, 载荷.实例, 当前房间.value) ? 不再留门图片(载荷.文件) : '';
+  if (载荷.来源 === '第二机位') return 第二机位图片(载荷.文件);
+  if (载荷.来源 === '回国') return 回国图片(载荷.文件);
+  if (载荷.来源 === '双重继承') return 双重继承图片(载荷.文件);
+  if (载荷.来源 === '302亲密开场') return 共居302亲密开场图(载荷.文件);
+  if (载荷.来源 === '许曼君分居') return 许曼君分居图片(载荷.文件);
+  if (载荷.来源 === '许曼君离婚') return 许曼君离婚图片(载荷.文件);
+  if (载荷.来源 === '录像带双承接') return 录像带双承接图片(载荷.文件);
+  return 家庭计划图片(载荷.文件);
+});
+const 当前事件CG请求epoch = ref(0);
+watch([当前借种CG, 当前生产CG, 当前家庭计划CG], () => {
+  当前事件CG请求epoch.value += 1;
+});
+const 当前事件CG原始地址 = computed(() =>
   当前借种CG.value
     ? 借种结局图片(当前借种CG.value.文件)
     : 当前生产CG.value
       ? 生产图片(当前生产CG.value.文件)
       : 当前家庭计划CG地址.value,
 );
+// URL fragment不改变实际资源路径，但把同URL的新DOM请求与旧迟到error分开；组件既有
+// data-image-url身份与:key会携带这个epoch，避免回档/重试后的旧失败关闭新画面。
+const 当前事件CG地址 = computed(() =>
+  当前事件CG原始地址.value
+    ? `${当前事件CG原始地址.value.replace(/#.*$/u, '')}#rqgy-event-${当前事件CG请求epoch.value}`
+    : '',
+);
+watch(
+  [
+    当前房间,
+    () => data.value?.系统?._许曼君离婚?.阶段,
+    () => data.value?.系统?._许曼君离婚?.H阶段,
+    () => data.value?.系统?._许曼君离婚?.H8状态,
+    () => data.value?.系统?._许曼君离婚?.终幕目标,
+  ],
+  () => {
+    if (当前借种CG.value || 当前生产CG.value || 当前家庭计划CG.value) return;
+    const 文件 = 许曼君离婚检查点CG(data.value, 当前房间.value ?? '');
+    if (!文件 || !许曼君离婚图片(文件)) return;
+    清空当前成人CG();
+    清空录像带双承接CG队列();
+    当前家庭计划CG.value = { 文件, 标题: 许曼君离婚CG标题(文件), 来源: '许曼君离婚' };
+  },
+  { immediate: true },
+);
 const 当前事件CG眉题 = computed(() =>
-  当前借种CG.value ? 'BORROW SEED ENDING / 借种结局' : 当前生产CG.value ? 'PRODUCTION / 生产' : 'FAMILY PLAN',
+  当前事件CG.value === 当前家庭计划CG.value && 当前家庭计划CG.value?.来源 === '不再留门' ? '不再留门' :
+  当前借种CG.value
+    ? 'BORROW SEED ENDING / 借种结局'
+    : 当前生产CG.value
+      ? 'PRODUCTION / 生产'
+      : 当前家庭计划CG.value?.来源 === '第二机位'
+        ? 'SECOND CAMERA / 第二机位'
+        : 当前家庭计划CG.value?.来源 === '回国'
+          ? 'RETURN HOME / 回国'
+          : 当前家庭计划CG.value?.来源 === '双重继承'
+            ? 'DOUBLE INHERITANCE / 双重继承'
+            : 当前家庭计划CG.value?.来源 === '302亲密开场'
+              ? 'POST-ENDING INTIMACY / 302'
+              : 当前家庭计划CG.value?.来源 === '许曼君分居'
+                ? 'SEPARATION / 许曼君分居'
+                : 当前家庭计划CG.value?.来源 === '许曼君离婚'
+                  ? 'DIVORCE / 许曼君离婚'
+                  : 当前家庭计划CG.value?.来源 === '录像带双承接'
+                  ? 'VTR DUAL HANDOFF / 录像带双承接'
+                  : 'FAMILY PLAN',
 );
 const 当前事件CG关闭文案 = computed(() =>
-  当前借种CG.value ? '收起借种结局画面' : 当前生产CG.value ? '收起生产剧情画面' : '收起家庭计划画面',
+  当前事件CG.value === 当前家庭计划CG.value && 当前家庭计划CG.value?.来源 === '不再留门' ? '收起当前画面' :
+  当前借种CG.value
+    ? '收起借种结局画面'
+    : 当前生产CG.value
+      ? '收起生产剧情画面'
+      : 当前家庭计划CG.value?.来源 === '第二机位'
+        ? '收起第二机位画面'
+        : 当前家庭计划CG.value?.来源 === '回国'
+          ? '收起回国画面'
+          : 当前家庭计划CG.value?.来源 === '双重继承'
+            ? '收起双重继承画面'
+            : 当前家庭计划CG.value?.来源 === '302亲密开场'
+              ? '进入亲密场景'
+              : 当前家庭计划CG.value?.来源 === '许曼君分居'
+                ? '收起许曼君分居画面'
+                : 当前家庭计划CG.value?.来源 === '许曼君离婚'
+                  ? '收起许曼君离婚画面'
+                  : 当前家庭计划CG.value?.来源 === '录像带双承接'
+                  ? 录像带双承接CG队列.value.length
+                    ? `继续播放（剩余 ${录像带双承接CG队列.value.length} 张）`
+                    : '收起录像带双承接画面'
+                  : '收起家庭计划画面',
 );
 function 关闭当前事件CG(): void {
   if (当前借种CG.value) {
@@ -2534,14 +2870,24 @@ function 关闭当前事件CG(): void {
     尝试恢复待处理成人CG();
     return;
   }
+  if (当前家庭计划CG.value?.来源 === '录像带双承接') {
+    当前家庭计划CG.value = 录像带双承接CG队列.value.shift() ?? null;
+    if (!当前家庭计划CG.value) 尝试恢复待处理成人CG();
+    return;
+  }
   if (当前生产CG.value) 当前生产CG.value = null;
   else 当前家庭计划CG.value = null;
   尝试恢复待处理成人CG();
 }
+function 当前事件CG类型(): string {
+  if (当前借种CG.value) return '借种结局';
+  if (当前生产CG.value) return '生产';
+  return 当前家庭计划CG.value?.来源 ?? '家庭计划';
+}
 function 当前事件CG加载失败(失败地址: string): void {
   // 图片请求可能在事件节点切换或其他画面抢占后才迟到失败；只允许仍是当前地址的请求收口。
   if (!失败地址 || 失败地址 !== 当前事件CG地址.value) return;
-  const 类型 = 当前借种CG.value ? '借种结局' : 当前生产CG.value ? '生产' : '家庭计划';
+  const 类型 = 当前事件CG类型();
   关闭当前事件CG();
   弹提示(`${类型}画面加载失败，任务进度不受影响。`, 4200);
 }
@@ -2612,13 +2958,7 @@ function 处理CG回合信号(
   if (是加载重试 && 失败身份) {
     const 候选 = 选择成人CG组(信号, 已解锁CG.value, 成人CG本次失效);
     成人CG请求epoch += 1;
-    const 结果 = 替换失败CG槽位(
-      当前成人CG槽位.value,
-      失败身份.id,
-      失败身份.epoch,
-      候选,
-      成人CG请求epoch,
-    );
+    const 结果 = 替换失败CG槽位(当前成人CG槽位.value, 失败身份.id, 失败身份.epoch, 候选, 成人CG请求epoch);
     if (!结果.已处理) return;
     当前成人CG槽位.value = 结果.槽位;
     if (!结果.槽位.length) 当前成人CG展示键 = '';
@@ -2707,9 +3047,10 @@ const 本地道具图: Partial<Record<string, string>> = {
   安全套: 安全套道具图,
   专注训练手册: 专注训练手册道具图,
   蛋白粉: 蛋白粉道具图,
+  住户答谢会: 住户答谢会道具图,
 };
 function 道具图(id: string): string {
-  return 本地道具图[id] ?? `${素材基址}/道具/${id}.webp`;
+  return 衣柜商品修正图(id) || 本地道具图[id] || `${素材基址}/道具/${id}.webp`;
 }
 
 const 道具图失效 = ref<Record<string, boolean>>({});
@@ -2764,19 +3105,35 @@ const 立绘列表 = computed<立绘项[]>(() => {
     return 洞件 && !立绘失效.value[洞件] ? [{ src: 洞件, style: 立绘槽(1, 0) }] : [];
   }
   const 静音演员 = 当前房间.value === '管理员室' && 静音会议正式中.value ? 静音会议演出妻.value : undefined;
-  const 图 = (静音演员 ?? 可见门牌.value.filter(k => 妻现位(k) === 当前房间.value))
+  const 演出门牌 = [...(静音演员 ?? 可见门牌.value.filter(k => 妻现位(k) === 当前房间.value))];
+  if (当前房间.value === '管理员室' && 双重继承母亲在管理员室(data.value) && !演出门牌.includes('302')) {
+    演出门牌.push('302');
+  }
+  const 图 = 演出门牌
     .map(m => {
-      // 立绘跟随最后换上的衣服；尚未生成 `_立绘` 时优先恢复内衣差分，再回退外装。
+      // 按实际遮挡关系读主图，旧档的“最后选择内衣”缓存不能盖过外衣。
       const 妻名 = 户静态表[m].妻名;
-      const 穿着 = data.value.户[m]?.妻._穿着SKU;
-      const sku = 穿着?._立绘 ?? 穿着?.内衣 ?? 穿着?.外装;
-      return 角色立绘候选(妻名, sku, 怀孕已公开(data.value, m)).find(src => !立绘失效.value[src]) ?? '';
+      const 妻 = data.value.户[m]?.妻;
+      const sku = 妻 ? 当前可见立绘SKU(妻) : '';
+      return (
+        角色立绘候选(
+          妻名,
+          sku,
+          怀孕已公开(data.value, m),
+          妻 ? { 妆容SKU: 妻._穿着SKU.妆容, 特殊: 妻.特殊 } : undefined,
+        ).find(src => !立绘失效.value[src]) ?? ''
+      );
     })
     .filter(src => !立绘失效.value[src])
     .slice(0, 6);
   const n = 图.length;
   return 图.map((src, i) => ({ src, style: 立绘槽(n, i) }));
 });
+
+const 第二机位REC = computed(() => 当前房间.value === '102' && 第二机位REC显示(data.value));
+const 不再留门REC = computed(() => 当前房间.value === '202' && 不再留门真实录制已绑定(data.value));
+const 第二机位现场锁提示 = computed(() => (当前房间.value === '102' ? 第二机位离场锁提示(data.value) : ''));
+const 第二机位现场锁定 = computed(() => Boolean(第二机位现场锁提示.value));
 
 function 背景图(房间id: string | null): string {
   const 本地背景: Partial<Record<string, string>> = {
@@ -2798,6 +3155,31 @@ function 背景图(房间id: string | null): string {
     const 文件 = 家庭计划101背景文件(data.value);
     if (文件) return 家庭计划图片(文件);
   }
+  // 201正式离婚背景高于分居背景、低于孕产/育儿；未配置真实素材基址时安全回退。
+  if (房间id === '201') {
+    const 离婚CG = 许曼君离婚结局背景CG(data.value, 房间id);
+    if (离婚CG) {
+      const 地址 = 许曼君离婚图片(离婚CG);
+      if (地址) return 地址;
+    }
+  }
+  // 201分居环境差分必须低于孕产／育儿背景；已有孩子时由轻量状态层表达分居，不能盖掉长期育儿后果。
+  if (房间id === '201') {
+    const 文件 = 许曼君分居房间背景文件(data.value, 房间id);
+    if (文件) return 许曼君分居图片(文件);
+  }
+  // 第二机位环境差分低于孕产、借种与家庭计划等更具体的家庭状态，避免资料柜母带覆盖医院／产后房间。
+  if (房间id) {
+    const 周设备 = 不再留门背景文件(data.value, 房间id);
+    if (周设备 && 不再留门图片(周设备)) return 不再留门图片(周设备);
+    const 第二机位文件 = 第二机位房间背景文件(data.value, 房间id);
+    if (第二机位文件) return 第二机位图片(第二机位文件);
+  }
+  // 302共居背景低于孕产、医院与具体特殊场景，只替换最终通用房间底图。
+  if (房间id === '302') {
+    const 共居图 = 共居302背景图(母亲共居背景状态(data.value, 房间id));
+    if (共居图) return 共居图;
+  }
   // 楼道没有专属图,借楼梯间的(同一栋楼的筒子间气质)
   return `${素材基址}/背景/${房间id && 房间色[房间id] ? 房间id : '楼梯间'}.webp`;
 }
@@ -2810,7 +3192,7 @@ const 夫名集 = new Set(
 );
 
 function 头像名(名: string): string {
-  return 夫名集.has(名) ? '影子' : 名;
+  return 名 === '父亲' || 夫名集.has(名) ? '影子' : 名;
 }
 
 // ── 头像行(脚本每回合把焦点/在场落 chat 变量 _在场) ──
@@ -2854,6 +3236,9 @@ const 头像列表 = computed(() =>
 
 const 输入文本 = ref('');
 const 发送中 = ref(false);
+const 录像带V4活动 = computed(
+  () => data.value.系统._特殊场景.id === '录像带V4' && data.value.系统._录像带V4.场景.状态 === '观看中',
+);
 const 场景剧情状态 = computed(() => (data.value?.系统 ? 读取场景剧情状态(data.value) : null));
 /**
  * 业务已经在脚本候选中建立场景票、但 MVU 尚未完成持久写回的极短窗口。
@@ -2862,22 +3247,14 @@ const 场景剧情状态 = computed(() => (data.value?.系统 ? 读取场景剧�
 const 场景剧情准备锁 = ref<{ 标题: string; 目标场景: string } | null>(null);
 let 场景剧情准备事件序号 = 0;
 const 场景剧情活动 = computed(() => 场景剧情状态.value?.活动 === true);
-const 等待场景剧情状态 = computed(() =>
-  场景剧情状态.value && !场景剧情状态.value.活动 ? 场景剧情状态.value : null,
-);
+const 等待场景剧情状态 = computed(() => (场景剧情状态.value && !场景剧情状态.value.活动 ? 场景剧情状态.value : null));
 const 场景剧情队首 = computed(() => 读取队首场景剧情(data.value.系统._待发送事件));
 const 场景剧情是入住等待 = computed(() =>
   Boolean(等待场景剧情状态.value && 场景剧情队首.value && 是入住登场事件(场景剧情队首.value.内容)),
 );
-const 场景剧情旧档入住等待 = computed(() =>
-  Boolean(场景剧情是入住等待.value && 场景剧情队首.value?.目标场景 === null),
-);
+const 场景剧情旧档入住等待 = computed(() => Boolean(场景剧情是入住等待.value && 场景剧情队首.value?.目标场景 === null));
 const 场景剧情旧档可认领 = computed(() =>
-  Boolean(
-    等待场景剧情状态.value &&
-      场景剧情队首.value?.目标场景 === null &&
-      !场景剧情是入住等待.value,
-  ),
+  Boolean(等待场景剧情状态.value && 场景剧情队首.value?.目标场景 === null && !场景剧情是入住等待.value),
 );
 const 当前场景剧情标识 = computed(() => 当前房间.value ?? 场景剧情楼道);
 const 场景剧情目标 = computed(() => 场景剧情状态.value?.目标场景 ?? null);
@@ -2885,12 +3262,9 @@ const 场景剧情在目标地点 = computed(() => {
   const 目标 = 场景剧情目标.value;
   return 目标 !== null && 目标 === 当前场景剧情标识.value;
 });
-const 场景剧情等待当前处理 = computed(() =>
-  Boolean(等待场景剧情状态.value && 场景剧情在目标地点.value),
-);
-const 场景剧情等待回应 = computed(() =>
-  Boolean(场景剧情等待当前处理.value && 等待场景剧情状态.value?.需要玩家回应),
-);
+const 场景剧情等待当前处理 = computed(() => Boolean(等待场景剧情状态.value && 场景剧情在目标地点.value));
+const 场景剧情等待回应 = computed(() => Boolean(场景剧情等待当前处理.value && 等待场景剧情状态.value?.需要玩家回应));
+const 场景剧情连续锁场 = computed(() => Boolean(场景剧情等待当前处理.value && 等待场景剧情状态.value?.连续锁场));
 const 场景剧情未知旧档等待 = computed(() =>
   Boolean(等待场景剧情状态.value?.目标场景 === null && !场景剧情是入住等待.value),
 );
@@ -2905,28 +3279,52 @@ const 录像带前置标题 = computed(() => {
 });
 /**
  * 功能锁与移动锁分开：活动票在错误地点恢复时必须允许玩家打开地图并返回目标；
- * 活动票到场后硬锁移动。尚未激活的等待票只锁其他会改状态的入口，离开前明确确认，
- * 离开后仍固定在原目标等待，绝不能跟随玩家改演到新地点。
+ * 活动票到场后硬锁移动；显式连续锁场的后续拍同样留在原地。普通尚未激活等待票
+ * 只锁其他会改状态的入口，离开前明确确认，离开后仍固定在原目标等待，绝不能跟随玩家改演到新地点。
  */
 const 普通场景剧情功能锁 = computed(
-  () =>
-    Boolean(场景剧情准备锁.value) ||
-    场景剧情活动.value ||
-    场景剧情等待当前处理.value ||
-    场景剧情未知旧档等待.value,
+  () => Boolean(场景剧情准备锁.value) || 场景剧情活动.value || 场景剧情等待当前处理.value || 场景剧情未知旧档等待.value,
 );
 const 普通场景剧情移动锁 = computed(
-  () => Boolean(场景剧情准备锁.value) || (场景剧情活动.value && 场景剧情在目标地点.value),
+  () => Boolean(场景剧情准备锁.value) || (场景剧情活动.value && 场景剧情在目标地点.value) || 场景剧情连续锁场.value,
 );
-/** 录像带首送有自己的两拍状态机：同样锁场和其他功能，但保留输入框回应当前拍。 */
-const 场景剧情锁定 = computed(() => 普通场景剧情功能锁.value || 录像带前置中.value);
-const 场景剧情移动锁 = computed(() => 普通场景剧情移动锁.value || 录像带前置中.value);
+/**
+ * 录像带首送有自己的两拍状态机；母亲视频接通后则由微信取得唯一输入权，
+ * 地图、普通操作与正文输入全部保持硬锁，收起小手机也不能解除。
+ */
+const 场景剧情锁定 = computed(
+  () =>
+    普通场景剧情功能锁.value ||
+    录像带前置中.value ||
+    录像带V4活动.value ||
+    母亲视频终幕已接通.value ||
+    双重继承最终收束锁.value,
+);
+const 场景剧情移动锁 = computed(
+  () =>
+    普通场景剧情移动锁.value ||
+    录像带前置中.value ||
+    录像带V4活动.value ||
+    母亲视频终幕已接通.value ||
+    双重继承最终收束锁.value,
+);
 // 商店、背包、档案与房内动作的脚本 listener 会同步把整表事务排入 MVU 队列，但脚本的
 // 生成/准备事件要到后续任务拍才会把 发送中 点亮。此本地门覆盖两次 click 之间的缝隙。
 const 界面事务提交中 = ref(false);
 let 界面事务提交世代 = 0;
 let 界面事务观察timer: ReturnType<typeof setInterval> | undefined;
 const 场景操作锁 = computed(() => 发送中.value || 场景剧情锁定.value || 界面事务提交中.value);
+const 最终收束操作可用 = computed(
+  () =>
+    双重继承最终收束锁.value &&
+    当前房间.value === '302' &&
+    !发送中.value &&
+    !界面事务提交中.value &&
+    !普通场景剧情功能锁.value &&
+    !录像带前置中.value &&
+    !母亲视频终幕已接通.value &&
+    !场景移动中,
+);
 
 function 释放界面事务提交(世代 = 界面事务提交世代): void {
   if (世代 !== 界面事务提交世代) return;
@@ -2949,13 +3347,7 @@ function 观察界面事务收口(本次世代: number): void {
 
 /** 纯 UI 业务的唯一同步提交门：先占门，再把事件交给脚本同步入队。 */
 function 提交界面事务(任务: () => void | Promise<void>, 允许场景剧情锁 = false): boolean {
-  if (
-    发送中.value ||
-    界面事务提交中.value ||
-    (!允许场景剧情锁 && 场景剧情锁定.value) ||
-    场景移动中
-  )
-    return false;
+  if (发送中.value || 界面事务提交中.value || (!允许场景剧情锁 && 场景剧情锁定.value) || 场景移动中) return false;
   if (MVU操作进行中()) {
     弹提示('另一项操作正在保存，请等它完成后再试。');
     return false;
@@ -2981,6 +3373,46 @@ function 提交界面事务(任务: () => void | Promise<void>, 允许场景剧�
   );
   return true;
 }
+
+const 录像带V4操作锁 = computed(() => 发送中.value || 界面事务提交中.value);
+const {
+  录像带V4监控就绪,
+  录像带V4快照,
+  录像带V4中,
+  录像带V4图片地址,
+  选择房间: 选择录像带V4房间,
+  下一幕: 进入录像带V4下一幕,
+  结束监控: 结束录像带V4监控,
+  刷新录像带V4界面,
+} = useVideoTapeV4({
+  data,
+  发送中: 录像带V4操作锁,
+  请求操作: 载荷 => {
+    void 提交界面事务(() => eventEmit('人妻公寓:录像带V4操作', 载荷), true);
+  },
+  请求完成: () => {
+    void 提交界面事务(() => eventEmit('人妻公寓:完成录像带V4'), true);
+  },
+});
+
+function 录像带V4图片加载失败(地址: string): void {
+  if (地址) console.warn('[人妻公寓·录像带V4] 候选画面加载失败；仅关闭当前展示，硬状态不变:', 地址);
+}
+
+function 安全退出录像带V4(): void {
+  if (录像带V4操作锁.value || !录像带V4中.value || 录像带V4快照.value.可完成) return;
+  const 幕次 = 录像带V4快照.value.共享幕次;
+  const 安全动作 =
+    幕次 >= 4
+      ? '系统会立即停止播放，让两名丈夫分别自行复锁，并由陪看人远距核验。'
+      : '系统会在解锁前停止播放，两名丈夫保持锁定。';
+  const 确认 = window.confirm(
+    `${安全动作}\n\n本场不会结算，录像带会收回背包；下次点击“监控”将从第1幕重新开始。仍要安全退出吗？`,
+  );
+  if (!确认) return;
+  void 提交界面事务(() => eventEmit('人妻公寓:安全中断录像带V4'), true);
+}
+
 const 场景剧情目标名 = computed(() => {
   const 目标 = 场景剧情目标.value;
   if (目标 === null) return '原触发场景';
@@ -3042,6 +3474,10 @@ const 变量重生成状态 = ref<变量重生成状态值>('不可用');
 watch(发送中, 正在生成 => {
   if (正在生成) 亲密抽屉展开.value = false;
 });
+watch(
+  () => !发送中.value && 不再留门录制现场错误(data.value, 当前房间.value ?? ''),
+  原因 => { if (原因) eventEmit('人妻公寓:检查场景剧情', 当前房间.value || '楼道'); },
+);
 const 由头写入中 = ref(false);
 // ── 房内动作生成(App A6b:逻辑与破门局部状态迁入 composables/useRoomActions.ts) ──
 // App 只注入运行态 refs 与业务事件回调;事件名与载荷保持原样,composable 不直连事件总线。
@@ -3051,6 +3487,7 @@ const { 房间动作, 当前房间动作, 普通房间动作, 确认已到达动
   时段,
   绝对时段,
   发送中: 场景操作锁,
+  最终收束操作可用,
   时间撤销可用,
   已破门进入,
   荣耀洞可用,
@@ -3064,8 +3501,7 @@ const { 房间动作, 当前房间动作, 普通房间动作, 确认已到达动
   启动阶段线路剧情,
   事件: {
     对饮: id => void 提交界面事务(() => eventEmit('人妻公寓:对饮', id)),
-    丈夫礼物: ({ 门牌, 道具id }) =>
-      void 提交界面事务(() => eventEmit('人妻公寓:丈夫礼物', { 门牌, 道具id })),
+    丈夫礼物: ({ 门牌, 道具id }) => void 提交界面事务(() => eventEmit('人妻公寓:丈夫礼物', { 门牌, 道具id })),
     催租: ({ 门牌, 选择 }) => void 提交界面事务(() => eventEmit('人妻公寓:催租', { 门牌, 选择 })),
     空房偷窃: id => void 提交界面事务(() => eventEmit('人妻公寓:空房偷窃', id)),
     拆除借种摄像头: () => void 提交界面事务(() => eventEmit('人妻公寓:拆除借种摄像头')),
@@ -3075,16 +3511,29 @@ const { 房间动作, 当前房间动作, 普通房间动作, 确认已到达动
     拍摄借种产后家庭合照: () => void 提交界面事务(() => eventEmit('人妻公寓:拍摄借种产后家庭合照')),
     停止借种: () => void 提交界面事务(() => eventEmit('人妻公寓:停止借种')),
     借种三人日常: () => void 提交界面事务(() => eventEmit('人妻公寓:借种三人日常')),
-    借种朋友圈选择: 选择 =>
-      void 提交界面事务(() => eventEmit('人妻公寓:借种朋友圈选择', 选择)),
+    借种朋友圈选择: 选择 => void 提交界面事务(() => eventEmit('人妻公寓:借种朋友圈选择', 选择)),
     打听: m => void 提交界面事务(() => eventEmit('人妻公寓:打听', m)),
     荣耀洞: () => void 提交界面事务(() => eventEmit('人妻公寓:荣耀洞')),
     捡金币: id => void 提交界面事务(() => eventEmit('人妻公寓:捡金币', id)),
     处理管理任务: ({ 任务id, 选项id, 地点 }) =>
       void 提交界面事务(() => eventEmit('人妻公寓:处理管理任务', { 任务id, 选项id, 地点 })),
     开启阶段性癖: m => void 提交界面事务(() => eventEmit('人妻公寓:开启阶段性癖', m)),
-    家庭计划动作: (动作: 家庭计划地点动作ID) =>
-      void 提交界面事务(() => eventEmit('人妻公寓:家庭计划动作', 动作)),
+    家庭计划动作: (动作: 家庭计划地点动作ID) => void 提交界面事务(() => eventEmit('人妻公寓:家庭计划动作', 动作)),
+    第二机位动作: 动作 => void 提交界面事务(() => eventEmit('人妻公寓:第二机位动作', 动作)),
+    不再留门动作: 动作 => 请求不再留门动作(动作),
+    许曼君分居动作: 动作 => void 提交界面事务(() => eventEmit('人妻公寓:许曼君分居动作', 动作)),
+    许曼君离婚动作: (动作: 许曼君离婚动作ID) =>
+      void 提交界面事务(() => eventEmit('人妻公寓:许曼君离婚动作', 动作)),
+    许曼君离婚后日常动作: (动作: 许曼君离婚后日常动作ID) =>
+      void 提交界面事务(() => eventEmit('人妻公寓:许曼君离婚后日常动作', 动作)),
+    回国动作: (动作: 回国地点动作ID) => void 提交界面事务(() => eventEmit('人妻公寓:回国动作', 动作)),
+    双重继承动作: (动作: 双重继承动作ID) =>
+      void 提交界面事务(
+        () => eventEmit('人妻公寓:双重继承动作', 动作),
+        动作 === '归位总钥匙' && 最终收束操作可用.value,
+      ),
+    母亲共居动作: (动作: 共居动作ID) =>
+      void 提交界面事务(() => eventEmit('人妻公寓:302共居动作', 动作)),
     生产动作: (载荷: { 门牌: 门牌; 动作: 生产地点动作ID; 预期绝对时段: number }) =>
       void 提交界面事务(() => eventEmit('人妻公寓:生产动作', 载荷)),
   },
@@ -3123,6 +3572,7 @@ const {
     (store as unknown as { flush?: () => void }).flush?.();
   },
 });
+const 录像带任一中 = computed(() => 录像带中.value || 录像带V4中.value);
 
 function 使用录像带() {
   if (
@@ -3132,6 +3582,10 @@ function 使用录像带() {
   ) {
     显示背包.value = false;
   }
+}
+
+function 请求不再留门动作(动作: 不再留门动作ID) {
+  if (提交界面事务(() => eventEmit('人妻公寓:不再留门动作', 动作))) 显示背包.value = false;
 }
 
 const 运行阶段 = ref('');
@@ -3146,9 +3600,7 @@ const 键盘打开 = ref(false);
 const 当前资源门槛 = computed(() => {
   const 文本 = 输入文本.value.trim();
   const 系统 = data.value.系统;
-  const 免资源 = Boolean(
-    场景剧情活动.value || 场景剧情等待当前处理.value || 系统._特殊场景.id || 静音会议正式中.value,
-  );
+  const 免资源 = Boolean(场景剧情活动.value || 场景剧情等待当前处理.value || 系统._特殊场景.id || 静音会议正式中.value);
   return 免资源 || !文本 ? { 可行动: true, 种类: '精力' as const, 提示: '' } : 行动资源门槛(data.value, 文本);
 });
 const 当前行动可提交 = computed(
@@ -3169,10 +3621,10 @@ const 发送按钮文案 = computed(() =>
       : 场景剧情准备锁.value
         ? '正在准备剧情'
         : 静音会议待散会选择.value
-      ? '宣布散会'
-      : 性爱待失控收尾.value
-        ? '演出收尾'
-        : '行动',
+          ? '宣布散会'
+          : 性爱待失控收尾.value
+            ? '演出收尾'
+            : '行动',
 );
 /** 回合输入组件公开接口:App 不再持有 textarea DOM,聚焦经组件 defineExpose 转发 */
 type 回合输入公开接口 = { 聚焦: () => void };
@@ -3587,16 +4039,12 @@ let 行动选项内容签名 = '';
 
 function 当前行动选项时间线身份(): string {
   const 上下文 = 当前回合恢复上下文();
-  return 上下文
-    ? `${上下文.时间线世代}\u0000${上下文.聊天ID}\u0000${上下文.锚楼}\u0000${上下文.锚签名}`
-    : '';
+  return 上下文 ? `${上下文.时间线世代}\u0000${上下文.聊天ID}\u0000${上下文.锚楼}\u0000${上下文.锚签名}` : '';
 }
 
 function 行动选项仍有效(文本: string, 世代: number): boolean {
   return (
-    世代 === 行动选项世代.value &&
-    行动选项时间线身份 === 当前行动选项时间线身份() &&
-    行动选项.value.includes(文本)
+    世代 === 行动选项世代.value && 行动选项时间线身份 === 当前行动选项时间线身份() && 行动选项.value.includes(文本)
   );
 }
 
@@ -3687,6 +4135,15 @@ function 信物门牌(名: string): 门牌 | null {
   return (门牌列表.find(k => 户静态表[k].妻名 === m[1]) ?? null) as 门牌 | null;
 }
 
+function 许曼君离婚封存盒使用原因(): string {
+  const 地点 = 当前房间.value ?? '';
+  if (许曼君离婚地点动作(data.value, 地点).some(动作 => 动作.id === '使用红色封存盒')) return '';
+  if (data.value.系统._许曼君离婚.阶段 !== '已购买') return '这只红色封存盒已经使用、已经进入后续流程，或当前存档状态已经变化。';
+  if (地点 !== '201') return '请先亲自到201，再从背包使用红色封存盒。';
+  if (!['傍晚', '晚上'].includes(时段.value)) return '只能在201的傍晚或晚上使用。';
+  return '许曼君不在201，或当前亲密、医院、电话、特殊场景／强剧情尚未结束。';
+}
+
 /** 134张道具不再都伪装成同一种商品缩略图：按真实用途进入四套卡片语法。 */
 function 道具视觉信息(配?: 道具配置, 可读信 = false): { 类: 道具视觉类型; 标: string; 图: string } {
   if (可读信) return { 类: 'evidence', 标: '证物', 图: 'letter' };
@@ -3743,14 +4200,31 @@ const 背包列表 = computed(() =>
       可布设: id === '针孔摄像头' && 在户内 && !房内有人在(当前房间.value!),
       可使用录像带:
         id === '录像带' &&
-        当前房间.value === '管理员室' &&
-        !data.value.系统._特殊场景.id &&
-        !data.value.系统._已完成特殊场景.includes('录像带'),
+        (旧录像带遗留商品可见() ? 当前房间.value === '管理员室' : !录像带V4已经使用(data.value)),
+      录像带使用文案: 旧录像带遗留商品可见() ? '在管理员室播放' : '使用并开始筹备',
+      录像带使用原因: id === '录像带' && !旧录像带遗留商品可见() ? 录像带V4使用阻断(data.value) : '',
+      可使用不再留门: id === '不再留门' && !data.value.系统._不再留门.道具已使用,
+      不再留门使用原因: id === '不再留门' ? 不再留门动作阻断(data.value, '使用道具', 当前房间.value ?? '') : '',
+      路线说明: id === '不再留门' ? 读取不再留门档案提示(data.value)?.下一步 : '',
+      证据图: id === '何俊生的街外照片' && 不再留门CG允许(data.value, 'ZXM-NMD-02') ? 不再留门图片('ZXM-NMD-02') : '',
+      证据说明: id === '何俊生的街外照片' ? 读取不再留门档案提示(data.value)?.补充 : '',
       可筹备静音会议:
         id === '静音会议' &&
         当前房间.value === '管理员室' &&
         !data.value.系统._特殊场景.id &&
         !data.value.系统._已完成特殊场景.includes('静音会议'),
+      可使用回国归档册:
+        id === 回国经营归档册ID &&
+        当前房间.value === '管理员室' &&
+        data.value.系统._回国.阶段 === '待使用经营归档册' &&
+        !data.value.系统._特殊场景.id,
+      可使用双重继承:
+        id === 双重继承场景票ID &&
+        当前房间.value === '管理员室' &&
+        data.value.系统._双重继承.阶段 === '待使用双重继承' &&
+        !data.value.系统._特殊场景.id,
+      可使用许曼君离婚: id === 许曼君离婚商品ID,
+      许曼君离婚使用原因: id === 许曼君离婚商品ID ? 许曼君离婚封存盒使用原因() : '',
       // 安全套只允许在空闲时为下一场准备；进行中不展示一个注定会被后端拒绝的按钮。
       可用资源: !!配?.资源效果 && !(id === '安全套' && 性爱进行中.value),
       // 礼物等可送出:须与她同处一室；普通药物不走“送”，安眠药只在丈夫登门圆场窗口例外。
@@ -3761,12 +4235,19 @@ const 背包列表 = computed(() =>
           : !配?.常驻 &&
               id !== '录像带' &&
               id !== '静音会议' &&
+              id !== 第二机位套件ID &&
+              id !== 沈静仪母带ID &&
+              id !== 回国经营归档册ID &&
+              id !== 回国私人物件箱ID &&
+              id !== 回国已上锁箱ID &&
+              id !== 双重继承场景票ID &&
               !信门牌 &&
               id !== '针孔摄像头' &&
+              (配?.类别 !== '特殊场景' || id === '男用贞操带') &&
               !['补给', '运作', '工具', '药物', '性癖'].includes(配?.类别 ?? '')
             ? [
                 ...可见门牌.value
-                  .filter(m => 妻在玩家身边(m))
+                  .filter(m => 妻在玩家身边(m) && (id !== '男用贞操带' || 录像带贞操锁可送门牌(m)))
                   .map(m => (m === '302' && 母亲赠送项 ? 母亲赠送项 : { 门牌: m, 妻名: 户静态表[m].妻名 })),
                 ...(当前房间.value === '302' && 母亲赠送项 ? [母亲赠送项] : []),
               ].filter((v, i, a) => a.findIndex(x => x.门牌 === v.门牌) === i)
@@ -3803,14 +4284,63 @@ function 用资源道具(道具id: string) {
   if (提交界面事务(() => eventEmit('人妻公寓:使用资源道具', 道具id))) 显示背包.value = false;
 }
 
+function 使用回国经营归档册() {
+  if (提交界面事务(() => eventEmit('人妻公寓:使用回国经营归档册'))) 显示背包.value = false;
+}
+
+function 使用双重继承场景票() {
+  if (提交界面事务(() => eventEmit('人妻公寓:使用双重继承场景票'))) 显示背包.value = false;
+}
+
+function 使用许曼君离婚封存盒() {
+  if (提交界面事务(() => eventEmit('人妻公寓:许曼君离婚动作', '使用红色封存盒' satisfies 许曼君离婚动作ID))) {
+    显示背包.value = false;
+  }
+}
+
 // ── 商店(P3 八页签框架:工具/人情/运作常驻,余者随进度亮起——商店自己就是进度条) ──
 
 const 显示商店 = ref(false);
 
-const 货架 = computed(() => {
-  const 全部 = Object.values(道具表).filter(
-    d => (d.价格 ?? 0) > 0 || d.特殊剧情占位 || (!!d.剧情占位 && 角色剧情占位已上架(data.value, d.id)),
+function 旧录像带遗留商品可见(): boolean {
+  if (data.value.系统._已完成特殊场景.some(id => id === '录像带' || id === '录像带结局')) return false;
+  if (data.value.系统._录像带V4.录像带已购买 || data.value.系统._录像带V4.阶段 !== '未开始') return false;
+  return Boolean(
+    data.value.系统._特殊场景前置.some(key => key === '录像带:102' || key === '录像带:202') ||
+      ['录像带前置', '录像带', '录像带双承接'].includes(data.value.系统._特殊场景.id),
   );
+}
+
+function 录像带剧情商品可见(道具id: '录像带' | '男用贞操带'): boolean {
+  if (旧录像带遗留商品可见()) return true;
+  return 道具id === '录像带'
+    ? 录像带V4录像带可购买(data.value)
+    : 录像带V4贞操锁可购买数量(data.value) > 0;
+}
+
+function 录像带贞操锁可送门牌(门牌号: 门牌): boolean {
+  if (门牌号 !== '102' && 门牌号 !== '202') return false;
+  const V4 = data.value.系统._录像带V4;
+  if (V4.录像带已购买 || V4.阶段 !== '未开始') {
+    return 录像带V4已经使用(data.value) && V4.阶段 === '待购赠锁' && !V4.赠锁[门牌号].已接收;
+  }
+  return !data.value.系统._特殊场景前置.includes(`录像带:${门牌号}`);
+}
+
+const 货架 = computed(() => {
+  const 全部 = Object.values(道具表).filter(d => {
+    const 基础可见 = (d.价格 ?? 0) > 0 || d.特殊剧情占位 || (!!d.剧情占位 && 角色剧情占位已上架(data.value, d.id));
+    if (!基础可见) return false;
+    if (d.id === 第二机位任务ID) return 第二机位任务已上架(data.value);
+    if (d.id === 第二机位套件ID) return 第二机位套件已上架(data.value);
+    if (d.id === '不再留门') return true;
+    if (d.id === '便携录制套件') return 不再留门套件可购买(data.value);
+    if (d.id === 回国经营归档册ID) return 回国经营归档册已上架(data.value);
+    if (d.id === 回国私人物件箱ID) return 回国私人物件箱已上架(data.value);
+    if (d.id === 双重继承场景票ID) return 双重继承商店已上架(data.value);
+    if (d.id === '录像带' || d.id === '男用贞操带') return 录像带剧情商品可见(d.id);
+    return true;
+  });
   const 按类 = (类: 道具配置['类别']) => 全部.filter(d => d.类别 === 类);
   const 户们 = Object.values(data.value?.户 ?? {});
   const 最高阶段 = 户们.reduce((高, 节点) => Math.max(高, 节点.妻.当前阶段), 0);
@@ -3851,8 +4381,13 @@ const 货架 = computed(() => {
 });
 
 function 商品锁定原因(商品: 道具配置): string[] {
+  if (商品.id === '不再留门') return [不再留门购买阻断(data.value)].filter(Boolean);
   if (商品.剧情占位) return 角色剧情占位锁定原因(商品.id);
   if (商品.特殊剧情占位) return [];
+  if (商品.id === '男用贞操带') return [];
+  if (商品.id === '录像带' && !旧录像带遗留商品可见()) {
+    return 录像带V4录像带可购买(data.value) ? [] : ['须先完成两条承接，并将两份真实母带归档到302'];
+  }
   const 性癖门牌 = 阶段性癖门牌(商品.id);
   if (性癖门牌) {
     const 状态 = 读取阶段性癖状态(data.value, 性癖门牌);
@@ -3924,6 +4459,10 @@ function 送出(道具id: string, 门牌号: 门牌) {
   if (提交界面事务(() => eventEmit('人妻公寓:送礼', { 道具id, 门牌: 门牌号 }))) 显示背包.value = false;
 }
 
+function 操作衣柜(动作: import('../../脚本/游戏逻辑/衣柜系统').衣柜动作) {
+  提交界面事务(() => eventEmit('人妻公寓:衣柜动作', 动作));
+}
+
 // ── 侦探:翻垃圾 / 摄像头 / 偷窥选细节 / 读信 ──
 
 const 垃圾袋列表 = computed(() => 可见门牌.value.map(m => ({ 门牌: m, 妻名: 户静态表[m].妻名 })));
@@ -3955,9 +4494,7 @@ const 显示监控 = ref(false);
  * store 拉回新账之前读到旧数据,之后又无人再刷;computed 跟着 store 走,数据一到位自动弹。
  * 布设名单只读 stat 主账，与背包在同一个楼层快照中同生共死。
  */
-const 借种监控待确认 = computed(
-  () => 当前房间.value === '302' && 借种离线监控待确认(data.value),
-);
+const 借种监控待确认 = computed(() => 当前房间.value === '302' && 借种离线监控待确认(data.value));
 
 function 提交借种监控断线确认() {
   if (!借种监控待确认.value) return;
@@ -3968,6 +4505,25 @@ const 监控列表 = computed<门牌[]>(() => {
   const 布设 = (data.value?.系统 as { _摄像头布设?: Record<string, boolean> } | undefined)?._摄像头布设 ?? {};
   return 门牌列表.filter(m => 布设[m]);
 });
+
+async function 打开监控入口(): Promise<void> {
+  if (!录像带V4监控就绪.value) {
+    显示监控.value = true;
+    return;
+  }
+  if (!(await 确认已到达动作地点('302'))) return;
+  if (!录像带V4监控就绪.value) {
+    弹提示('录像带监控资格已经变化，请重新查看微信确认。', 4800);
+    return;
+  }
+  if (提交界面事务(() => eventEmit('人妻公寓:启动录像带V4监控'))) {
+    显示监控.value = false;
+    显示地图.value = false;
+    显示商店.value = false;
+    显示背包.value = false;
+    显示史册.value = false;
+  }
+}
 
 async function 看监控(门牌号: 门牌) {
   if (场景操作锁.value || 场景移动中) return;
@@ -4068,8 +4624,40 @@ async function 打开史册() {
   if (容器) 容器.scrollTop = 容器.scrollHeight;
 }
 
-/** 正文书页只演当前幕:从最后一条玩家行动起;完整历史在史册 */
+/**
+ * 母亲视频通话的玩家行动只存在于小手机气泡；主舞台只显示脚本持久化的现场正文，
+ * 避免同一句微信回答在手机与正文各出现一次。普通场景仍从最后一条玩家行动起演当前幕。
+ */
+const 母亲视频现场正文条目 = computed<卷轴条[]>(() => {
+  if (!母亲视频终幕已接通.value) return [];
+  const 记录 = data.value?.系统._母亲视频通话终幕.现场正文记录 ?? [];
+  return 记录.map(条 => ({
+    谁: '叙事',
+    文本: 提取正文舞台文本(条.文)
+      .split(/\n+/)
+      .map(段 => 段.trim())
+      .filter(Boolean),
+    事件id: `母亲视频通话:${条.序号}:${条.CG}`,
+    _排序: 条.序号,
+  }));
+});
+
+const 双重继承终幕后转场条目 = computed<卷轴条[]>(() =>
+  双重继承最终收束锁.value
+    ? [
+        {
+          谁: '叙事',
+          文本: ['手机里的画面已经暗下去。机场那头的声音彻底消失，母亲也把手机接回了手中。302里只剩下你和她。'],
+          事件id: '双重继承:终幕后确定性转场',
+          _排序: Number.MAX_SAFE_INTEGER,
+        },
+      ]
+    : [],
+);
+
 const 当前幕 = computed(() => {
+  if (母亲视频终幕已接通.value) return 母亲视频现场正文条目.value;
+  if (双重继承最终收束锁.value) return 双重继承终幕后转场条目.value;
   const 列表 = 卷轴.value;
   if (!列表.length) return [];
   let 起 = 列表.length - 1;
@@ -4101,7 +4689,10 @@ function 刷新美化正则提醒(): void {
   }
   if (签名 === 已提示美化正则签名) return;
   已提示美化正则签名 = 签名;
-  弹提示(`检测到正文显示美化正则：${名称们.join('、')}。游戏只使用最终纯文字，请在当前预设中关闭这些美化正则；删除/隐藏思维链的正则可以保留。`, 10000);
+  弹提示(
+    `检测到正文显示美化正则：${名称们.join('、')}。游戏只使用最终纯文字，请在当前预设中关闭这些美化正则；删除/隐藏思维链的正则可以保留。`,
+    10000,
+  );
 }
 
 async function 滚到底() {
@@ -4330,9 +4921,7 @@ const {
 });
 
 /** 760px 以上才真正挂载第二张；窄窗与手机不下载、也不误计第二张解锁。 */
-const 当前成人CG显示槽位 = computed(() =>
-  选择CG显示槽位(当前成人CG槽位.value, 成人CG双列.value),
-);
+const 当前成人CG显示槽位 = computed(() => 选择CG显示槽位(当前成人CG槽位.value, 成人CG双列.value));
 
 /** 同源浏览器 Window 在运行时暴露 eval，可动态 import 酒馆正在运行的模块实例；标准 Window 类型未声明该成员，此处局部做结构扩展，不改全局 Window。 */
 type 宿主窗口接口 = Window & { eval: (source: string) => unknown };
@@ -4361,8 +4950,8 @@ let 原生弹窗轮询: number | undefined;
 function 等待酒馆显示原始提示词按钮(弹窗文档: Document): Promise<HTMLElement | null> {
   const 已有按钮 = new Set(弹窗文档.querySelectorAll<HTMLElement>('#showRawPrompt'));
   const 查找新按钮 = (): HTMLElement | null =>
-    [...
-      弹窗文档.querySelectorAll<HTMLElement>(
+    [
+      ...弹窗文档.querySelectorAll<HTMLElement>(
         'dialog[open] #showRawPrompt, [role="dialog"] #showRawPrompt, .popup[open] #showRawPrompt',
       ),
     ].find(按钮 => !已有按钮.has(按钮)) ?? null;
@@ -4693,23 +5282,57 @@ type 前台决策输入模式 = 'none' | 'blocked' | 'summary';
  * 只有必须先理解当前正文再作答的硬生命周期进入前台决策态。
  * 普通 AI 行动建议与录像带操作各有自己的可选/特殊场景语义，不能被批量升级成全局锁。
  */
-const 前台硬决策中 = computed(
-  () => 偷窥决策中.value || 静音会议待散会选择.value,
-);
+const 前台硬决策中 = computed(() => 偷窥决策中.value || 静音会议待散会选择.value);
 const 前台决策输入模式 = computed<前台决策输入模式>(() =>
   偷窥决策中.value ? 'blocked' : 静音会议待散会选择.value ? 'summary' : 'none',
 );
 
 // ── 房内操作抽屉可见性(App 只算可见动作数、垃圾入口与统一抑制,展开/自动收起在组件内状态机) ──
-// 普通动作只在 !录像带中 时计入;垃圾入口保持原 v-if 语义(垃圾房且有袋,不受录像带门控)。
+// 普通动作只在任一录像带场景之外计入；垃圾入口本身保持原地点语义，但V4硬锁会统一抑制操作。
 const 垃圾入口可见 = computed(() => 当前房间.value === '垃圾房' && 垃圾袋列表.value.length > 0);
-const 普通动作可见数 = computed(() => (录像带中.value ? 0 : 普通房间动作.value.length));
+const 普通动作可见数 = computed(() => (录像带任一中.value ? 0 : 普通房间动作.value.length));
 const 可见房内动作数 = computed(() =>
-  场景剧情锁定.value ? 0 : 普通动作可见数.value + (垃圾入口可见.value ? 1 : 0),
+  双重继承最终收束锁.value
+    ? 普通动作可见数.value
+    : 场景剧情锁定.value
+      ? 0
+      : 普通动作可见数.value + (垃圾入口可见.value ? 1 : 0),
+);
+/** 结局后302动作会长期增加；桌面也只在这个房间折叠，其他房间继续直接展示两列瓷砖。 */
+const 桌面302共居操作折叠 = computed(
+  () => !移动端.value && 当前房间.value === '302' && 母亲共居已开启(data.value),
 );
 // 发送中 / 静音会议在桌面与手机都抑制；键盘门只在手机生效——桌面输入框 focus 时 键盘打开
 // 不隐藏房内动作(桌面行为原样),与旧 keyboard-open CSS 仅在 max-width:540px 媒体内命中等价。
 const 房内操作抑制 = computed(() => 发送中.value || 静音会议正式中.value || (移动端.value && 键盘打开.value));
+
+/**
+ * 接通当拍收掉所有可能在电话之前打开的旧弹窗。按钮硬锁仍保留，但玩家收起手机后
+ * 不应看见一张停在背后的地图、商店、档案或监控窗口，误以为这些入口仍可操作。
+ */
+watch(
+  母亲视频终幕已接通,
+  已接通 => {
+    if (!已接通) return;
+    显示地图.value = false;
+    显示商店.value = false;
+    显示背包.value = false;
+    显示监控.value = false;
+    显示史册.value = false;
+    选中门牌.value = null;
+    CG图库门牌.value = null;
+    垃圾选择开.value = false;
+    读信门牌.value = null;
+    亲密抽屉展开.value = false;
+    // 事件CG是纯界面瞬态，不受预约函数的持久强场景检查覆盖；若玩家此前没有手动收起，
+    // 必须在视频接通时主动清掉，否则它会盖住同帧视频背景与现场正文。
+    清空借种CG序列();
+    当前生产CG.value = null;
+    当前家庭计划CG.value = null;
+    清空录像带双承接CG队列();
+  },
+  { immediate: true },
+);
 
 /** 背包票进入筹备(A5a 契约)：guard 与关背包顺序保留，重置/使用事件/800ms pull/sync 在 composable 请求打开。 */
 function 打开静音会议筹备() {
@@ -4799,6 +5422,7 @@ function 客户端聊天切换(): void {
   重置静音会议时间线界面();
   清空当前成人CG();
   当前家庭计划CG.value = null;
+  清空录像带双承接CG队列();
   当前生产CG.value = null;
   清空借种CG场次瞬态();
   最近CG信号 = null;
@@ -5030,6 +5654,14 @@ onMounted(() => {
     }
   });
   eventOn('人妻公寓:CG回合信号', (信号: CG回合信号) => {
+    // 《最后一笔》H3成功后由普通201亲密舞台接管。横向DIV-07只负责目标选择，
+    // 不能继续作为“可恢复遮挡”压住H3本楼已经成立的竖向普通／孕肚CG。
+    if (
+      当前家庭计划CG.value?.来源 === '许曼君离婚' &&
+      String(信号?.行动 ?? '').includes('【许曼君离婚H3】')
+    ) {
+      当前家庭计划CG.value = null;
+    }
     // 荣耀洞/医院是语义硬隔离，普通成人 CG 永久丢弃；借种、生产、家庭计划事件图只是
     // 临时视觉遮挡，保留遮挡期间最新信号，最后一帧关闭后再恢复，不能无声吞掉。
     const 阻塞 = 荣耀洞图.value || 当前房间.value === '医院' ? '硬隔离' : 当前事件CG.value ? '可恢复遮挡' : '无';
@@ -5046,19 +5678,81 @@ onMounted(() => {
     清空当前成人CG();
     当前生产CG.value = null;
     清空借种CG序列();
-    当前家庭计划CG.value = 载荷;
+    清空录像带双承接CG队列();
+    当前家庭计划CG.value = { ...载荷, 来源: '家庭计划' };
+  });
+  eventOn('人妻公寓:不再留门CG', (载荷: { 文件: string; 实例: string }) => {
+    if (!载荷?.文件 || !不再留门CG允许(data.value, 载荷.文件, 载荷.实例, 当前房间.value) || !不再留门图片(载荷.文件)) return;
+    清空当前成人CG(); 当前生产CG.value = null; 清空借种CG序列(); 清空录像带双承接CG队列();
+    当前家庭计划CG.value = { ...载荷, 标题: 不再留门CG标题(载荷.文件), 来源: '不再留门' };
+  });
+  eventOn('人妻公寓:第二机位CG', (载荷: 家庭计划CG载荷) => {
+    if (!载荷?.文件) return;
+    清空当前成人CG();
+    当前生产CG.value = null;
+    清空借种CG序列();
+    清空录像带双承接CG队列();
+    当前家庭计划CG.value = { ...载荷, 来源: '第二机位' };
+  });
+  eventOn('人妻公寓:回国CG', (载荷: 家庭计划CG载荷) => {
+    if (!载荷?.文件) return;
+    清空当前成人CG();
+    当前生产CG.value = null;
+    清空借种CG序列();
+    清空录像带双承接CG队列();
+    当前家庭计划CG.value = { ...载荷, 来源: '回国' };
+  });
+  eventOn('人妻公寓:双重继承CG', (载荷: 家庭计划CG载荷) => {
+    if (!载荷?.文件) return;
+    清空当前成人CG();
+    当前生产CG.value = null;
+    清空借种CG序列();
+    清空录像带双承接CG队列();
+    当前家庭计划CG.value = { ...载荷, 来源: '双重继承' };
+  });
+  eventOn('人妻公寓:302亲密开场CG', (载荷: 家庭计划CG载荷) => {
+    if (!载荷?.文件 || !共居302亲密开场图(载荷.文件)) return;
+    // 专属开场只在上层短暂覆盖；收起后继续显示同一成功首楼已选中的普通亲密CG。
+    当前生产CG.value = null;
+    清空借种CG序列();
+    清空录像带双承接CG队列();
+    当前家庭计划CG.value = { ...载荷, 来源: '302亲密开场' };
+  });
+  eventOn('人妻公寓:许曼君分居CG', (载荷: 家庭计划CG载荷) => {
+    if (!载荷?.文件) return;
+    清空当前成人CG();
+    当前生产CG.value = null;
+    清空借种CG序列();
+    清空录像带双承接CG队列();
+    当前家庭计划CG.value = { ...载荷, 来源: '许曼君分居' };
+  });
+  eventOn('人妻公寓:许曼君离婚CG', (载荷: 家庭计划CG载荷) => {
+    if (!载荷?.文件 || !许曼君离婚图片(载荷.文件)) return;
+    清空当前成人CG();
+    当前生产CG.value = null;
+    清空借种CG序列();
+    清空录像带双承接CG队列();
+    当前家庭计划CG.value = { ...载荷, 来源: '许曼君离婚' };
+    if (/^XMJ-DIV-1[1-3]$/u.test(载荷.文件)) 触发离婚结果白闪();
+  });
+  eventOn('人妻公寓:录像带双承接CG', (载荷: unknown) => {
+    const 帧 = 解析录像带双承接CG载荷(载荷);
+    if (!帧) return;
+    显示录像带双承接CG(帧.文件, 帧.标题);
   });
   eventOn('人妻公寓:生产CG', (载荷: 生产CG载荷) => {
     if (!载荷?.文件) return;
     清空当前成人CG();
     当前家庭计划CG.value = null;
     清空借种CG序列();
+    清空录像带双承接CG队列();
     当前生产CG.value = 载荷;
   });
   eventOn('人妻公寓:借种CG', (载荷: 借种CG载荷) => {
     if (!载荷?.文件) return;
     清空当前成人CG();
     当前家庭计划CG.value = null;
+    清空录像带双承接CG队列();
     当前生产CG.value = null;
     显示借种CG序列([载荷, ...(载荷.后续 ?? [])]);
   });
@@ -5121,9 +5815,7 @@ onMounted(() => {
     // 撤回物理删除了刚才的独立演出；客户端没有足够的持久凭据证明存活旧楼属于当前房间，
     // 因而只能作废当前幕，不能仅凭恢复后的房间名把旧正文冒充成这一条时间线的新幕。
     正文幕归属状态.value =
-      载荷?.类型 === '撤回'
-        ? 作废正文幕归属(正文幕归属状态.value)
-        : 创建正文幕归属(当前房间.value);
+      载荷?.类型 === '撤回' ? 作废正文幕归属(正文幕归属状态.value) : 创建正文幕归属(当前房间.value);
     await 取卷轴();
     刷新可重掷();
     try {
@@ -5136,6 +5828,7 @@ onMounted(() => {
     刷新在场();
     刷新行动选项();
     刷新偷窥待选();
+    刷新录像带V4界面();
   });
   eventOn('人妻公寓:回合失败', async (原因: string) => {
     场景剧情准备锁.value = null;
@@ -5182,6 +5875,7 @@ onMounted(() => {
       刷新行动选项();
       // 监控生成失败时脚本已清账，结果仍为空；若只是答案提交失败，持久挂起仍在并在这里恢复。
       刷新偷窥待选();
+      刷新录像带V4界面();
     } finally {
       发送中.value = false;
     }
@@ -5205,6 +5899,30 @@ onMounted(() => {
   eventOn('人妻公寓:监控回合', () => {
     // 查看入口已经成功回到302；这里只按宿主真值同步画面，不能再发起一次未经等待的移动。
     同步场景自变量();
+  });
+  eventOn('人妻公寓:录像带V4状态', async () => {
+    try {
+      await Promise.resolve((store as unknown as { pull?: () => void | Promise<void> }).pull?.());
+    } catch {
+      /* 轮询仍会兜底；VTR正文只读当前聊天的专用日志。 */
+    }
+    await nextTick();
+    同步场景自变量();
+    刷新录像带V4界面();
+    if (录像带V4中.value) {
+      显示地图.value = false;
+      显示商店.value = false;
+      显示背包.value = false;
+      显示监控.value = false;
+      显示史册.value = false;
+      选中门牌.value = null;
+      CG图库门牌.value = null;
+      清空当前成人CG();
+      当前家庭计划CG.value = null;
+      当前生产CG.value = null;
+      清空借种CG序列();
+      清空录像带双承接CG队列();
+    }
   });
   eventOn('人妻公寓:特殊场景状态', () => {
     try {
@@ -5298,6 +6016,8 @@ onUnmounted(() => {
   eventClearAll();
   clearInterval(心跳timer);
   clearInterval(生成等待timer);
+  clearTimeout(离婚结果白闪timer);
+  if (离婚结果白闪帧 !== undefined) cancelAnimationFrame(离婚结果白闪帧);
   释放界面事务提交();
   window.clearInterval(原生弹窗轮询);
   清空客户端延迟任务();
@@ -5738,6 +6458,34 @@ onUnmounted(() => {
   transition: background 0.5s ease;
 }
 
+.story-wrap.story-divorce-flash::after {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  background: #fff;
+  content: '';
+  animation: divorce-result-flash 0.36s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes divorce-result-flash {
+  0% { opacity: 0; }
+  18% { opacity: 0.82; }
+  100% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .story-wrap.story-divorce-flash::after {
+    display: none;
+    animation: none;
+  }
+}
+
+:global(html.rq-still) .story-wrap.story-divorce-flash::after {
+  display: none;
+  animation: none;
+}
+
 /* 展开亲密管理时，正文舞台可能只剩一个 48px 底栏高；允许抽屉从舞台底边向上覆盖，
    而不是继承残余高度后被 overflow:hidden 裁成不可点击的窄缝。 */
 .story-wrap.story-intimacy-open {
@@ -5751,6 +6499,52 @@ onUnmounted(() => {
 
 .story-wrap.story-special-interaction {
   background: #0d1117;
+}
+
+/* 母亲视频终幕：与小手机读取同一CG，但主舞台只保留暗化、柔化的氛围层。 */
+.mother-video-lock-note {
+  margin: 8px 0;
+  padding: 9px 12px;
+  border: 1px solid rgba(123, 173, 220, 0.34);
+  border-radius: 10px;
+  background: rgba(20, 29, 42, 0.82);
+  color: #dcecff;
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+  letter-spacing: 0.02em;
+  box-shadow: 0 4px 16px rgba(4, 10, 18, 0.18);
+}
+
+.story-wrap.story-mother-video {
+  background: #14161c;
+}
+
+.mother-video-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: #14161c;
+}
+
+.mother-video-stage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 42%;
+  filter: blur(8px) brightness(0.44) saturate(0.78);
+  transform: scale(1.06);
+}
+
+.mother-video-stage::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+  background:
+    linear-gradient(90deg, rgba(13, 15, 21, 0.62), rgba(13, 15, 21, 0.22) 42%, rgba(13, 15, 21, 0.42)),
+    linear-gradient(180deg, rgba(10, 12, 17, 0.18), rgba(10, 12, 17, 0.54));
 }
 
 /* 成人CG：窄窗单图、宽桌面最多双图。两槽等权 contain；余白由首图统一模糊铺底。 */
@@ -8860,6 +9654,54 @@ button.battery:focus-visible {
   }
 }
 
+.second-camera-rec {
+  position: absolute;
+  top: 14px;
+  right: 54px;
+  z-index: 34;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border: 1px solid rgba(255, 255, 255, 0.44);
+  border-radius: 999px;
+  color: #fff;
+  background: rgba(18, 12, 12, 0.7);
+  box-shadow: 0 5px 18px rgba(0, 0, 0, 0.28);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  pointer-events: none;
+  backdrop-filter: blur(7px);
+}
+
+.second-camera-rec__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ff4f52;
+  box-shadow: 0 0 0 4px rgba(255, 79, 82, 0.17);
+  animation: second-camera-rec-pulse 1.2s ease-in-out infinite;
+}
+
+.second-camera-rec b,
+.second-camera-rec em {
+  font: inherit;
+  font-style: normal;
+}
+
+.second-camera-rec em {
+  opacity: 0.72;
+}
+
+:global(html.rq-still) .second-camera-rec__dot {
+  animation: none;
+}
+
+@keyframes second-camera-rec-pulse {
+  50% {
+    opacity: 0.42;
+  }
+}
 
 .scene-plot-lock {
   display: flex;

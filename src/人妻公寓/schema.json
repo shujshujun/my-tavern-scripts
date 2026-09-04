@@ -427,6 +427,13 @@
                   "type": "string"
                 }
               },
+              "_衣柜": {
+                "default": [],
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
               "_要钱次数": {
                 "default": 0,
                 "type": "number"
@@ -470,6 +477,33 @@
                 "type": "number"
               },
               "_外出至": {
+                "default": -1,
+                "type": "number"
+              },
+              "_剧情外出起": {
+                "default": -1,
+                "type": "number"
+              },
+              "_剧情外出至": {
+                "default": -1,
+                "type": "number"
+              },
+              "_居住模式": {
+                "default": "普通作息",
+                "type": "string",
+                "enum": [
+                  "普通作息",
+                  "路线外住",
+                  "预约回楼",
+                  "待离婚交接",
+                  "正式退居"
+                ]
+              },
+              "_预约回楼起": {
+                "default": -1,
+                "type": "number"
+              },
+              "_预约回楼至": {
                 "default": -1,
                 "type": "number"
               },
@@ -820,6 +854,230 @@
             }
           }
         },
+        "_录像带双承接": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "版本": {
+              "default": 2,
+              "type": "number",
+              "const": 2
+            },
+            "场次标识": {
+              "default": "",
+              "type": "string"
+            },
+            "状态": {
+              "default": "未开始",
+              "type": "string",
+              "enum": [
+                "未开始",
+                "进行中",
+                "待安全收束",
+                "待双路结算",
+                "已安全中断",
+                "已完成"
+              ]
+            },
+            "房间": {
+              "default": {},
+              "type": "object",
+              "properties": {
+                "102": {
+                  "default": {},
+                  "$ref": "#/$defs/__schema0"
+                },
+                "202": {
+                  "default": {},
+                  "$ref": "#/$defs/__schema0"
+                }
+              }
+            }
+          }
+        },
+        "_录像带V4": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "版本": {
+              "default": 4,
+              "type": "number",
+              "const": 4
+            },
+            "阶段": {
+              "default": "未开始",
+              "type": "string",
+              "enum": [
+                "未开始",
+                "待购录像带",
+                "待使用录像带",
+                "待购赠锁",
+                "等待两日",
+                "微信确认中",
+                "监控就绪",
+                "观看中",
+                "已安全中断",
+                "已完成"
+              ]
+            },
+            "录像带已购买": {
+              "default": false,
+              "type": "boolean"
+            },
+            "入口规则版本": {
+              "default": 0,
+              "anyOf": [
+                {
+                  "type": "number",
+                  "const": 0
+                },
+                {
+                  "type": "number",
+                  "const": 1
+                }
+              ]
+            },
+            "录像带已使用": {
+              "default": false,
+              "type": "boolean"
+            },
+            "赠锁": {
+              "default": {},
+              "type": "object",
+              "properties": {
+                "102": {
+                  "default": {},
+                  "$ref": "#/$defs/__schema1"
+                },
+                "202": {
+                  "default": {},
+                  "$ref": "#/$defs/__schema1"
+                }
+              }
+            },
+            "第二把送达绝对时段": {
+              "default": -1,
+              "type": "number"
+            },
+            "微信到期绝对时段": {
+              "default": -1,
+              "type": "number"
+            },
+            "微信": {
+              "default": {},
+              "type": "object",
+              "properties": {
+                "102": {
+                  "default": {},
+                  "$ref": "#/$defs/__schema2"
+                },
+                "202": {
+                  "default": {},
+                  "$ref": "#/$defs/__schema2"
+                },
+                "两户确认完成": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "联合出发已通知": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "通知线程": {
+                  "default": "",
+                  "type": "string",
+                  "enum": [
+                    "102",
+                    "202",
+                    ""
+                  ]
+                },
+                "监控就绪": {
+                  "default": false,
+                  "type": "boolean"
+                }
+              }
+            },
+            "场景": {
+              "default": {},
+              "type": "object",
+              "properties": {
+                "场次标识": {
+                  "default": "",
+                  "type": "string"
+                },
+                "状态": {
+                  "default": "未开始",
+                  "type": "string",
+                  "enum": [
+                    "未开始",
+                    "观看中",
+                    "已安全中断",
+                    "已完成"
+                  ]
+                },
+                "共享幕次": {
+                  "default": 0,
+                  "type": "number"
+                },
+                "当前房间": {
+                  "default": "102",
+                  "type": "string",
+                  "enum": [
+                    "102",
+                    "202"
+                  ]
+                },
+                "请求世代": {
+                  "default": 0,
+                  "type": "number"
+                },
+                "已提交画面键": {
+                  "default": [],
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "已提交操作键": {
+                  "default": [],
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "时间码秒": {
+                  "default": 0,
+                  "type": "number"
+                },
+                "失败次数": {
+                  "default": 0,
+                  "type": "number"
+                },
+                "中断原因": {
+                  "default": "",
+                  "type": "string"
+                },
+                "锁具状态": {
+                  "default": {},
+                  "type": "object",
+                  "properties": {
+                    "102": {
+                      "$ref": "#/$defs/__schema3"
+                    },
+                    "202": {
+                      "$ref": "#/$defs/__schema3"
+                    }
+                  }
+                }
+              }
+            },
+            "结果摘要": {
+              "default": "",
+              "type": "string"
+            }
+          }
+        },
         "_家庭计划": {
           "default": {},
           "type": "object",
@@ -847,6 +1105,1208 @@
             "完成楼层": {
               "default": -1,
               "type": "number"
+            }
+          }
+        },
+        "_不再留门": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "版本": {
+              "default": 1,
+              "type": "number",
+              "const": 1
+            },
+            "实例": {
+              "default": "",
+              "type": "string"
+            },
+            "来源时间线": {
+              "default": "",
+              "type": "string"
+            },
+            "道具已使用": {
+              "default": false,
+              "type": "boolean"
+            },
+            "阶段": {
+              "default": "未开始",
+              "type": "string",
+              "enum": [
+                "未开始",
+                "开场中",
+                "待目击",
+                "目击中",
+                "可拍",
+                "持有照片",
+                "出示中",
+                "待交付",
+                "待决定",
+                "决定中",
+                "待准备",
+                "待开录",
+                "开录中",
+                "录制中",
+                "待转存",
+                "待封存",
+                "封存中",
+                "待归档",
+                "已完成"
+              ]
+            },
+            "当前场景": {
+              "default": "",
+              "type": "string",
+              "enum": [
+                "",
+                "A1",
+                "A2",
+                "A4",
+                "A5",
+                "A7",
+                "A9"
+              ]
+            },
+            "当前拍": {
+              "default": 0,
+              "type": "number"
+            },
+            "修订": {
+              "default": 0,
+              "type": "number"
+            },
+            "已提交票": {
+              "default": "",
+              "type": "string"
+            },
+            "开场时段": {
+              "default": -1,
+              "type": "number"
+            },
+            "机会最早时段": {
+              "default": -1,
+              "type": "number"
+            },
+            "可拍时段": {
+              "default": -1,
+              "type": "number"
+            },
+            "目击历史": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "default": 0,
+                "type": "number"
+              }
+            },
+            "照片": {
+              "default": {},
+              "type": "object",
+              "properties": {
+                "id": {
+                  "default": "",
+                  "type": "string"
+                },
+                "时间线": {
+                  "default": "",
+                  "type": "string"
+                },
+                "拍摄时段": {
+                  "default": -1,
+                  "type": "number"
+                },
+                "地点": {
+                  "default": "",
+                  "type": "string"
+                },
+                "人物": {
+                  "default": [],
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "画面": {
+                  "default": "",
+                  "type": "string"
+                },
+                "原件位置": {
+                  "default": "",
+                  "type": "string",
+                  "enum": [
+                    "",
+                    "玩家手机"
+                  ]
+                },
+                "已看过": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "出示楼层": {
+                  "default": -1,
+                  "type": "number"
+                },
+                "副本持有人": {
+                  "default": "",
+                  "type": "string",
+                  "enum": [
+                    "",
+                    "周小满"
+                  ]
+                },
+                "交付楼层": {
+                  "default": -1,
+                  "type": "number"
+                }
+              }
+            },
+            "动机已表达": {
+              "default": false,
+              "type": "boolean"
+            },
+            "录制提议": {
+              "default": false,
+              "type": "boolean"
+            },
+            "许可": {
+              "default": "未确认",
+              "type": "string",
+              "enum": [
+                "未确认",
+                "同意本次",
+                "已撤回"
+              ]
+            },
+            "停止默认等待": {
+              "default": false,
+              "type": "boolean"
+            },
+            "同意时段": {
+              "default": -1,
+              "type": "number"
+            },
+            "设备位置": {
+              "default": "无",
+              "type": "string",
+              "enum": [
+                "202",
+                "无",
+                "背包"
+              ]
+            },
+            "预约起": {
+              "default": -1,
+              "type": "number"
+            },
+            "预约至": {
+              "default": -1,
+              "type": "number"
+            },
+            "录制次数": {
+              "default": 0,
+              "type": "number"
+            },
+            "记录": {
+              "default": {},
+              "type": "object",
+              "properties": {
+                "id": {
+                  "default": "",
+                  "type": "string"
+                },
+                "场次标识": {
+                  "default": "",
+                  "type": "string"
+                },
+                "来源实例": {
+                  "default": "",
+                  "type": "string"
+                },
+                "地点": {
+                  "default": "",
+                  "type": "string"
+                },
+                "参与者": {
+                  "default": [],
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "开始时段": {
+                  "default": -1,
+                  "type": "number"
+                },
+                "开始楼层": {
+                  "default": -1,
+                  "type": "number"
+                },
+                "造型": {
+                  "default": "",
+                  "type": "string"
+                },
+                "许可范围": {
+                  "default": "",
+                  "type": "string"
+                },
+                "正文楼层": {
+                  "default": [],
+                  "type": "array",
+                  "items": {
+                    "default": 0,
+                    "type": "number"
+                  }
+                },
+                "正常完成": {
+                  "default": false,
+                  "type": "boolean"
+                },
+                "完成楼层": {
+                  "default": -1,
+                  "type": "number"
+                },
+                "位置": {
+                  "default": "无",
+                  "type": "string",
+                  "enum": [
+                    "无",
+                    "手机",
+                    "介质",
+                    "封盒",
+                    "已放弃"
+                  ]
+                }
+              }
+            },
+            "放弃记录": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "母带": {
+              "default": {},
+              "type": "object",
+              "properties": {
+                "id": {
+                  "default": "",
+                  "type": "string"
+                },
+                "来源记录": {
+                  "default": "",
+                  "type": "string"
+                },
+                "位置": {
+                  "default": "无",
+                  "type": "string",
+                  "enum": [
+                    "无",
+                    "玩家背包",
+                    "302资料柜"
+                  ]
+                },
+                "封存楼层": {
+                  "default": -1,
+                  "type": "number"
+                },
+                "归档楼层": {
+                  "default": -1,
+                  "type": "number"
+                }
+              }
+            }
+          }
+        },
+        "_第二机位": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "阶段": {
+              "default": "未开始",
+              "type": "string",
+              "enum": [
+                "未开始",
+                "待门缝",
+                "待复核",
+                "待对饮",
+                "待告知",
+                "待购套件",
+                "待赴约",
+                "待开录",
+                "录制中",
+                "待封存",
+                "待归档",
+                "已完成"
+              ]
+            },
+            "最早继续日": {
+              "default": -1,
+              "type": "number"
+            },
+            "录制场次标识": {
+              "default": "",
+              "type": "string"
+            },
+            "完成楼层": {
+              "default": -1,
+              "type": "number"
+            }
+          }
+        },
+        "_许曼君分居": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "方案版本": {
+              "default": 2,
+              "type": "number",
+              "const": 2
+            },
+            "阶段": {
+              "default": "未开始",
+              "type": "string",
+              "enum": [
+                "未开始",
+                "待初谈",
+                "待三人摊牌",
+                "待登记外住",
+                "独住观察中",
+                "待独住后谈话",
+                "待最终取物",
+                "等待私下决定",
+                "待私下决定",
+                "待管理员室交接",
+                "待钥匙转交接",
+                "已完成"
+              ]
+            },
+            "当前场景": {
+              "default": "",
+              "type": "string",
+              "enum": [
+                "",
+                "第一幕初谈",
+                "第二幕摊牌",
+                "第三幕独住后",
+                "共同夜晚开场",
+                "第四幕取物提案",
+                "第四幕私下决定",
+                "第四幕管理员室交接"
+              ]
+            },
+            "当前拍": {
+              "default": 0,
+              "type": "number"
+            },
+            "最早继续时段": {
+              "default": -1,
+              "type": "number"
+            },
+            "初谈参与方式": {
+              "default": "未决定",
+              "type": "string",
+              "enum": [
+                "未决定",
+                "当面在场",
+                "先夫妻谈",
+                "暂缓"
+              ]
+            },
+            "工资卡状态": {
+              "default": "仍由许曼君保管",
+              "type": "string",
+              "enum": [
+                "仍由许曼君保管",
+                "已归还赵国强"
+              ]
+            },
+            "钥匙位置": {
+              "default": "赵国强持有",
+              "type": "string",
+              "enum": [
+                "赵国强持有",
+                "管理员室201钥匙格"
+              ]
+            },
+            "钥匙用途": {
+              "default": "普通住户",
+              "type": "string",
+              "enum": [
+                "普通住户",
+                "临时外住",
+                "待离婚交接",
+                "正式退居"
+              ]
+            },
+            "封条修订": {
+              "default": 0,
+              "type": "number"
+            },
+            "封条完整": {
+              "default": false,
+              "type": "boolean"
+            },
+            "预约时段": {
+              "default": -1,
+              "type": "number"
+            },
+            "预约截止时段": {
+              "default": -1,
+              "type": "number"
+            },
+            "预约用途": {
+              "default": "",
+              "type": "string"
+            },
+            "预约状态": {
+              "default": "无",
+              "type": "string",
+              "enum": [
+                "无",
+                "待到期",
+                "进行中",
+                "已完成"
+              ]
+            },
+            "丈夫已知玩家关系": {
+              "default": false,
+              "type": "boolean"
+            },
+            "丈夫已选择外住": {
+              "default": false,
+              "type": "boolean"
+            },
+            "外住起点": {
+              "default": -1,
+              "type": "number"
+            },
+            "独住夜起点": {
+              "default": -1,
+              "type": "number"
+            },
+            "独住夜已完成": {
+              "default": false,
+              "type": "boolean"
+            },
+            "独住环境已确认": {
+              "default": false,
+              "type": "boolean"
+            },
+            "出车表已收起": {
+              "default": false,
+              "type": "boolean"
+            },
+            "共同夜晚状态": {
+              "default": "未邀请",
+              "type": "string",
+              "enum": [
+                "未邀请",
+                "待接受",
+                "进行中",
+                "已完成",
+                "已放弃"
+              ]
+            },
+            "共同夜晚最早时段": {
+              "default": -1,
+              "type": "number"
+            },
+            "绑定亲密场次标识": {
+              "default": "",
+              "type": "string"
+            },
+            "绑定亲密完整结果": {
+              "default": "未开始",
+              "type": "string",
+              "enum": [
+                "未开始",
+                "进行中",
+                "未完整",
+                "完整"
+              ]
+            },
+            "留宿201权限": {
+              "default": false,
+              "type": "boolean"
+            },
+            "取物完成时段": {
+              "default": -1,
+              "type": "number"
+            },
+            "生活用品已取完": {
+              "default": false,
+              "type": "boolean"
+            },
+            "修复已提出": {
+              "default": false,
+              "type": "boolean"
+            },
+            "私下决定最早时段": {
+              "default": -1,
+              "type": "number"
+            },
+            "许曼君已拒绝恢复共同生活": {
+              "default": false,
+              "type": "boolean"
+            },
+            "玩家最终关系选择": {
+              "default": "未决定",
+              "type": "string",
+              "enum": [
+                "未决定",
+                "继续关系",
+                "退出关系",
+                "暂不承诺"
+              ]
+            },
+            "双方同意进入办理": {
+              "default": false,
+              "type": "boolean"
+            },
+            "完成楼层": {
+              "default": -1,
+              "type": "number"
+            }
+          }
+        },
+        "_许曼君离婚": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "版本": {
+              "default": 1,
+              "type": "number",
+              "const": 1
+            },
+            "阶段": {
+              "default": "未开始",
+              "type": "string",
+              "enum": [
+                "未开始",
+                "已购买",
+                "待办理",
+                "待公开站位",
+                "待归档旧钥匙",
+                "待归档确认",
+                "待领取新锁",
+                "待换锁",
+                "等待邀请",
+                "待最后一笔",
+                "最后一笔中",
+                "待非成人收束",
+                "已完成"
+              ]
+            },
+            "当前场景": {
+              "default": "",
+              "type": "string",
+              "enum": [
+                "",
+                "预约办理",
+                "办理等待",
+                "办理见证",
+                "归档确认",
+                "H1婚纱开门",
+                "H2开盒",
+                "H7摆目标",
+                "H8结果",
+                "H9封存",
+                "非成人收束"
+              ]
+            },
+            "当前拍": {
+              "default": 0,
+              "type": "number"
+            },
+            "道具已购买": {
+              "default": false,
+              "type": "boolean"
+            },
+            "道具已使用": {
+              "default": false,
+              "type": "boolean"
+            },
+            "办理预约时段": {
+              "default": -1,
+              "type": "number"
+            },
+            "法律离婚已成立": {
+              "default": false,
+              "type": "boolean"
+            },
+            "玩家公开站位选择": {
+              "default": "",
+              "type": "string",
+              "enum": [
+                "",
+                "当着赵国强牵住她",
+                "等赵国强离开再抱她"
+              ]
+            },
+            "旧钥匙状态": {
+              "default": "待离婚交接",
+              "type": "string",
+              "enum": [
+                "待离婚交接",
+                "前住户旧钥匙归档",
+                "旧档未记录"
+              ]
+            },
+            "赵国强正式退居": {
+              "default": false,
+              "type": "boolean"
+            },
+            "新锁芯位置": {
+              "default": "未取得",
+              "type": "string",
+              "enum": [
+                "未取得",
+                "玩家背包",
+                "201已安装",
+                "旧档未记录"
+              ]
+            },
+            "新钥匙位置": {
+              "default": "未取得",
+              "type": "string",
+              "enum": [
+                "未取得",
+                "玩家背包",
+                "许曼君保管",
+                "旧档未记录"
+              ]
+            },
+            "换锁完成": {
+              "default": false,
+              "type": "boolean"
+            },
+            "换锁完成时段": {
+              "default": -1,
+              "type": "number"
+            },
+            "邀请状态": {
+              "default": "未建立",
+              "type": "string",
+              "enum": [
+                "未建立",
+                "等待时段",
+                "待发送",
+                "已送达",
+                "旧档未记录"
+              ]
+            },
+            "邀请最早时段": {
+              "default": -1,
+              "type": "number"
+            },
+            "重试最早时段": {
+              "default": -1,
+              "type": "number"
+            },
+            "H阶段": {
+              "default": "未开始",
+              "type": "string",
+              "enum": [
+                "未开始",
+                "H1",
+                "H2",
+                "待H3",
+                "H3",
+                "H4",
+                "H5",
+                "H6",
+                "H7",
+                "H8",
+                "H8结果待演",
+                "H9",
+                "已完成"
+              ]
+            },
+            "终幕目标": {
+              "default": "",
+              "type": "string",
+              "enum": [
+                "",
+                "红本",
+                "婚戒",
+                "戒印"
+              ]
+            },
+            "绑定亲密场次标识": {
+              "default": "",
+              "type": "string"
+            },
+            "H有效回合": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "default": 0,
+                "type": "number"
+              }
+            },
+            "H8状态": {
+              "default": "未到达",
+              "type": "string",
+              "enum": [
+                "未到达",
+                "待选择",
+                "已停止",
+                "已确认"
+              ]
+            },
+            "戒印长按失败次数": {
+              "default": 0,
+              "type": "number"
+            },
+            "封存盒位置": {
+              "default": "未购买",
+              "type": "string",
+              "enum": [
+                "201",
+                "未购买",
+                "背包",
+                "私密抽屉",
+                "旧档未记录"
+              ]
+            },
+            "封存物件": {
+              "default": "",
+              "type": "string",
+              "enum": [
+                "",
+                "封存的红本",
+                "封存的婚戒",
+                "戒印红本",
+                "旧档未记录"
+              ]
+            },
+            "CG回忆": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "完成分支": {
+              "default": "",
+              "type": "string",
+              "enum": [
+                "",
+                "成人",
+                "非成人",
+                "旧档未记录"
+              ]
+            },
+            "完成楼层": {
+              "default": -1,
+              "type": "number"
+            }
+          }
+        },
+        "_许曼君离婚后日常": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "版本": { "default": 2, "type": "number", "const": 2 },
+            "阶段": { "default": "空闲", "type": "string", "enum": ["空闲", "待收针"] },
+            "当前事件ID": { "default": "", "type": "string" },
+            "当前主题": {
+              "default": "",
+              "type": "string",
+              "enum": ["", "给自己改衣服", "重排201", "给自己留一笔生活钱"]
+            },
+            "当前选择": {
+              "default": "",
+              "type": "string",
+              "enum": ["", "陪她把这件事做完", "把决定留给她", "只处理201房务", "听她把边界说清"]
+            },
+            "当前关系": {
+              "default": "",
+              "type": "string",
+              "enum": ["", "继续关系", "暂不承诺", "退出关系"]
+            },
+            "开始时段": { "default": -1, "type": "number" },
+            "开始楼层": { "default": -1, "type": "number" },
+            "累计次数": { "default": 0, "type": "number" },
+            "最近事件ID": { "default": "", "type": "string" },
+            "最近主题": {
+              "default": "",
+              "type": "string",
+              "enum": ["", "给自己改衣服", "重排201", "给自己留一笔生活钱"]
+            },
+            "最近选择": {
+              "default": "",
+              "type": "string",
+              "enum": ["", "陪她把这件事做完", "把决定留给她", "只处理201房务", "听她把边界说清"]
+            },
+            "最近关系": {
+              "default": "",
+              "type": "string",
+              "enum": ["", "继续关系", "暂不承诺", "退出关系"]
+            },
+            "最近事件时段": { "default": -1, "type": "number" },
+            "最近事件楼层": { "default": -1, "type": "number" },
+            "下次可用时段": { "default": -1, "type": "number" },
+            "最近摘要": { "default": "", "type": "string" },
+            "近期主题": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["给自己改衣服", "重排201", "给自己留一笔生活钱"]
+              }
+            },
+            "生活整备可用": { "default": false, "type": "boolean" },
+            "生活整备来源事件ID": { "default": "", "type": "string" },
+            "事件记录": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": { "default": "", "type": "string" },
+                  "主题": {
+                    "default": "给自己改衣服",
+                    "type": "string",
+                    "enum": ["给自己改衣服", "重排201", "给自己留一笔生活钱"]
+                  },
+                  "选择": {
+                    "default": "把决定留给她",
+                    "type": "string",
+                    "enum": ["陪她把这件事做完", "把决定留给她", "只处理201房务", "听她把边界说清"]
+                  },
+                  "关系": {
+                    "default": "暂不承诺",
+                    "type": "string",
+                    "enum": ["继续关系", "暂不承诺", "退出关系"]
+                  },
+                  "发生时段": { "default": -1, "type": "number" },
+                  "发生楼层": { "default": -1, "type": "number" },
+                  "摘要": { "default": "", "type": "string" }
+                }
+              }
+            },
+            "待反馈事件": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "事件ID": { "default": "", "type": "string" },
+                  "消息键": { "default": "", "type": "string" },
+                  "可发送时段": { "default": -1, "type": "number" },
+                  "文案": { "default": "", "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "_回国": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "阶段": {
+              "default": "未开始",
+              "type": "string",
+              "enum": [
+                "未开始",
+                "待使用经营归档册",
+                "待父亲回信",
+                "待读回国消息",
+                "待收纳",
+                "待存箱",
+                "待看记录",
+                "待姐妹茶话会",
+                "姐妹茶话会进行中",
+                "待旧委托",
+                "待夜谈",
+                "待父亲询问",
+                "待母亲回复父亲",
+                "待父亲准备答复",
+                "待确认交接意向",
+                "已完成"
+              ]
+            },
+            "最早继续日": {
+              "default": -1,
+              "type": "number"
+            },
+            "父亲最早回信日": {
+              "default": -1,
+              "type": "number"
+            },
+            "父亲最早回信时段": {
+              "default": -1,
+              "type": "number"
+            },
+            "茶话会状态": {
+              "default": "未开始",
+              "type": "string",
+              "enum": [
+                "未开始",
+                "入群演绎",
+                "逐人调侃",
+                "交代正事",
+                "已完成"
+              ]
+            },
+            "茶话会成员快照": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "群名反应已完成": {
+              "default": false,
+              "type": "boolean"
+            },
+            "已点评成员": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "已回应点评成员": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "已回应回国成员": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "母亲已坦白": {
+              "default": false,
+              "type": "boolean"
+            },
+            "玩家已发言": {
+              "default": false,
+              "type": "boolean"
+            },
+            "正事已说明": {
+              "default": false,
+              "type": "boolean"
+            },
+            "正事已收束": {
+              "default": false,
+              "type": "boolean"
+            },
+            "茶话会结构摘要": {
+              "default": "",
+              "type": "string"
+            },
+            "后续私聊待触发成员": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "后续私聊已触发成员": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "后续私聊最早时段": {
+              "default": -1,
+              "type": "number"
+            },
+            "完成楼层": {
+              "default": -1,
+              "type": "number"
+            }
+          }
+        },
+        "_双重继承": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "阶段": {
+              "default": "未开始",
+              "type": "string",
+              "enum": [
+                "未开始",
+                "待使用双重继承",
+                "待父亲回楼",
+                "公共区域检查中",
+                "待管理员室交权",
+                "管理员室剧情中",
+                "待领取公寓楼总钥匙",
+                "等待三日早餐",
+                "早餐剧情中",
+                "待机场视频",
+                "视频已预约",
+                "待总钥匙归位",
+                "已完成"
+              ]
+            },
+            "已检查公共区域": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "最早父亲到楼时段": {
+              "default": -1,
+              "type": "number"
+            },
+            "最早早餐日": {
+              "default": -1,
+              "type": "number"
+            },
+            "最早视频时段": {
+              "default": -1,
+              "type": "number"
+            },
+            "群聊余波状态": {
+              "default": "未建立",
+              "type": "string",
+              "enum": [
+                "未建立",
+                "待发送",
+                "已完成"
+              ]
+            },
+            "群聊余波最早时段": {
+              "default": -1,
+              "type": "number"
+            },
+            "父亲家常联络序号": {
+              "default": 0,
+              "type": "number"
+            },
+            "下次父亲家常联络时段": {
+              "default": -1,
+              "type": "number"
+            },
+            "启动楼层": {
+              "default": -1,
+              "type": "number"
+            },
+            "完成楼层": {
+              "default": -1,
+              "type": "number"
+            }
+          }
+        },
+        "_302共居": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "版本": {
+              "default": 1,
+              "type": "number",
+              "const": 1
+            },
+            "状态": {
+              "default": "未开启",
+              "type": "string",
+              "enum": [
+                "未开启",
+                "共居"
+              ]
+            },
+            "开始绝对时段": {
+              "default": -1,
+              "type": "number"
+            },
+            "最近事件": {
+              "default": "",
+              "type": "string"
+            },
+            "最近事件时段": {
+              "default": -1,
+              "type": "number"
+            },
+            "里程碑": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "事件序号": {
+              "default": 0,
+              "type": "number"
+            },
+            "事件记录": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "类型": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "发生时段": {
+                    "default": -1,
+                    "type": "number"
+                  },
+                  "摘要": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "朋友圈范围": {
+                    "default": "不发布",
+                    "type": "string",
+                    "enum": [
+                      "公开",
+                      "仅你可见",
+                      "不发布"
+                    ]
+                  }
+                }
+              }
+            },
+            "待反馈事件": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "类型": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "发生时段": {
+                    "default": -1,
+                    "type": "number"
+                  },
+                  "摘要": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "朋友圈范围": {
+                    "default": "不发布",
+                    "type": "string",
+                    "enum": [
+                      "公开",
+                      "仅你可见",
+                      "不发布"
+                    ]
+                  }
+                }
+              }
             }
           }
         },
@@ -1687,6 +3147,10 @@
               "default": "",
               "type": "string"
             },
+            "模式": {
+              "default": "",
+              "type": "string"
+            },
             "状态": {
               "default": "",
               "type": "string"
@@ -1781,8 +3245,208 @@
               "type": "number"
             }
           }
+        },
+        "_母亲视频通话终幕": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "标识": {
+              "default": "",
+              "type": "string"
+            },
+            "状态": {
+              "default": "",
+              "type": "string",
+              "enum": [
+                "",
+                "待接听",
+                "通话中",
+                "等待现场正文",
+                "正文生成中",
+                "正文失败",
+                "结束衔接",
+                "等待最终回答",
+                "终幕中",
+                "已完成"
+              ]
+            },
+            "当前CG": {
+              "default": "",
+              "type": "string"
+            },
+            "微信轮次": {
+              "default": 0,
+              "type": "number"
+            },
+            "待现场正文序号": {
+              "default": 0,
+              "type": "number"
+            },
+            "现场正文请求世代": {
+              "default": 0,
+              "type": "number"
+            },
+            "已完成现场正文序号": {
+              "default": 0,
+              "type": "number"
+            },
+            "上轮现场正文": {
+              "default": "",
+              "type": "string"
+            },
+            "现场正文记录": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "序号": {
+                    "default": 0,
+                    "type": "number"
+                  },
+                  "CG": {
+                    "default": "",
+                    "type": "string"
+                  },
+                  "文": {
+                    "default": "",
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "现场正文失败": {
+              "default": "",
+              "type": "string"
+            },
+            "结束请求": {
+              "default": false,
+              "type": "boolean"
+            },
+            "最终交接已出现": {
+              "default": false,
+              "type": "boolean"
+            },
+            "玩家最终回答已保存": {
+              "default": false,
+              "type": "boolean"
+            },
+            "父亲已挂断": {
+              "default": false,
+              "type": "boolean"
+            },
+            "终幕CG序号": {
+              "default": 0,
+              "type": "number"
+            },
+            "启动楼层": {
+              "default": -1,
+              "type": "number"
+            },
+            "启动绝对时段": {
+              "default": -1,
+              "type": "number"
+            }
+          }
         }
       }
+    }
+  },
+  "$defs": {
+    "__schema0": {
+      "type": "object",
+      "properties": {
+        "状态": {
+          "default": "未开始",
+          "type": "string",
+          "enum": [
+            "未开始",
+            "进行中",
+            "待复锁",
+            "已安全中断",
+            "已结算"
+          ]
+        },
+        "硬状态": {
+          "default": "idle",
+          "type": "string",
+          "enum": [
+            "idle",
+            "locked",
+            "opening-playing-locked",
+            "authorized",
+            "self-unlocked",
+            "full-tape-playing",
+            "husband-completed",
+            "self-relocked",
+            "visually-verified",
+            "settled"
+          ]
+        },
+        "平板序号": {
+          "default": 0,
+          "type": "number"
+        },
+        "外层序号": {
+          "default": 0,
+          "type": "number"
+        },
+        "已提交键": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "中断原因": {
+          "default": "",
+          "type": "string"
+        },
+        "最近提交键": {
+          "default": "",
+          "type": "string"
+        }
+      }
+    },
+    "__schema1": {
+      "type": "object",
+      "properties": {
+        "已接收": {
+          "default": false,
+          "type": "boolean"
+        },
+        "接收绝对时段": {
+          "default": -1,
+          "type": "number"
+        }
+      }
+    },
+    "__schema2": {
+      "type": "object",
+      "properties": {
+        "戴锁已确认": {
+          "default": false,
+          "type": "boolean"
+        },
+        "同意已确认": {
+          "default": false,
+          "type": "boolean"
+        }
+      }
+    },
+    "__schema3": {
+      "default": "idle",
+      "type": "string",
+      "enum": [
+        "idle",
+        "locked",
+        "self-unlocked",
+        "full-tape-playing",
+        "husband-completed",
+        "self-relocked",
+        "visually-verified",
+        "settled"
+      ]
     }
   }
 }

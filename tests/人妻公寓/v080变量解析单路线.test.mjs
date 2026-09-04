@@ -51,7 +51,16 @@ test('v0.80让正文模型始终退出变量处理：官方桥已落地结果不
   const MVU桥 = 读('src/人妻公寓/脚本/MVU/index.ts');
 
   assert.match(引擎, /const 使用MVU外置解析 = MVU解析\.外置模式/);
-  assert.match(引擎, /const 正文模型覆盖 = \{ chat_history: \{ with_depth_entries: false \} \};/);
+  assert.match(
+    引擎,
+    /const 正文模型覆盖 = \{[\s\S]{0,260}chat_history: \{[\s\S]{0,160}with_depth_entries: false/,
+    '正文模型继续关闭世界书变量深度条目；自由阶段只额外替换聊天历史',
+  );
+  assert.match(
+    引擎,
+    /\.\.\.\(自由阶段历史 \? \{ prompts: 自由阶段历史 \} : \{\}\)/,
+    '302结局后可以用压缩历史替换旧终幕上下文，但不恢复正文变量协议',
+  );
   assert.doesNotMatch(引擎, /补模型变量结算|二次变量结算开启|GEMINI变量更新强制令|流式兜底变量块/);
   assert.match(引擎, /let 变量块 = '';/, '正文模型偶然输出的变量协议不进入候选');
   assert.match(

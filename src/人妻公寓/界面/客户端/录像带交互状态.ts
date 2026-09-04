@@ -30,7 +30,7 @@ function 规范失败次数(值: unknown): number {
 }
 
 function 是录像带202连点幕(场景: unknown): 场景 is 录像带场景快照 {
-  return 是记录(场景) && 场景.id === '录像带' && 场景.阶段 === '等待202';
+  return 是记录(场景) && ['录像带', '录像带双承接'].includes(String(场景.id)) && 场景.阶段 === '等待202';
 }
 
 /**

@@ -2,6 +2,7 @@ import type { SchemaType } from '../../schema';
 import { 难度表, 户静态表, 经济配置, type 门牌 } from '../../stageConfig';
 import { 每天时段数 } from './楼层时钟';
 import { 登记胜任变动 } from './胜任系统';
+import { 双重继承阻止普通父亲联络 } from './父亲联络策略';
 
 export const 风闻阈值 = {
   留意: 25,
@@ -428,6 +429,7 @@ function 合并报表(原报表: string, 新条目: string): string {
 }
 
 function 写入紧急父亲来电(data: SchemaType): void {
+  if (双重继承阻止普通父亲联络(data)) return;
   const 通牒中 = data.系统._通牒期 >= 0;
   const 活动 = data.系统._父亲通话;
   if (活动.标识 && 活动.期 >= 0 && 活动.状态 === '通话中') {

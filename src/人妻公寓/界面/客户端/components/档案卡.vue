@@ -9,9 +9,22 @@ import { 怀孕已公开 } from '../../../脚本/游戏逻辑/怀孕系统';
 import { 每日堕落上限 } from '../../../脚本/游戏逻辑/守护系统';
 import { 可晋阶, 可启动母亲药物首夜, 普通首夜时段已满足, 晋阶预约现场已满足 } from '../../../脚本/游戏逻辑/结算系统';
 import { 读取关系线索, 读取开门线索 } from '../../../脚本/游戏逻辑/阶段线路系统';
+import { 家庭计划档案提示 } from '../../../脚本/游戏逻辑/家庭计划系统';
+import { 借种档案提示 } from '../../../脚本/游戏逻辑/借种结局系统';
+import { 读取第二机位档案提示 } from '../../../脚本/游戏逻辑/第二机位系统';
+import { 读取不再留门档案提示 } from '../../../脚本/游戏逻辑/不再留门系统';
+import { 读取许曼君分居档案提示 } from '../../../脚本/游戏逻辑/许曼君分居系统';
+import { 许曼君离婚档案提示 } from '../../../脚本/游戏逻辑/许曼君离婚系统';
+import { 读取许曼君201钥匙柜卡 } from '../../../脚本/游戏逻辑/许曼君分居钥匙柜';
+import { 回国档案提示 } from '../../../脚本/游戏逻辑/回国系统';
+import { 双重继承档案提示 } from '../../../脚本/游戏逻辑/双重继承系统';
 import { CG条目, 角色CG总数全部变体 } from '../../../脚本/游戏逻辑/成人CG系统';
 import { 角色立绘候选 } from '../assets';
 import Ic from './Icon.vue';
+import Wardrobe from './衣柜.vue';
+import { 当前可见立绘SKU, 外装已脱下, type 衣柜动作 } from '../../../脚本/游戏逻辑/衣柜系统';
+import { 衣柜默认状态图, 衣柜物品缩略图 } from '../衣柜素材';
+import { 是完整外装道具 } from '../../../衣柜造型配置';
 
 const props = defineProps<{
   door: 门牌 | null;
@@ -38,17 +51,32 @@ const emit = defineEmits<{
   openCg: [door: 门牌];
   advance: [door: 门牌];
   askMoney: [door: 门牌];
+  wardrobeAction: [action: 衣柜动作];
 }>();
+
+const 显示衣柜 = ref(false);
+const 仪容失效图 = ref<Record<string, boolean>>({});
+function 仪容图片(id: string): string {
+  return props.door ? 衣柜物品缩略图(户静态表[props.door].妻名, id, 怀孕已公开(props.data, props.door), props.itemImage) : '';
+}
+function 仪容图片出错(id: string, event: Event): void {
+  const 图 = (event.target as HTMLImageElement).getAttribute('src');
+  if (!图) return;
+  仪容失效图.value[图] = true;
+  if (图 === props.itemImage(id)) emit('itemError', id);
+}
+function 档案立绘出错(event: Event): void {
+  const 图 = (event.target as HTMLImageElement).getAttribute('src');
+  if (图) emit('portraitError', 图);
+}
 
 const 选中档案 = computed(() => {
   const m = props.door;
   if (!m || !props.ready || !props.data.户[m]) return null;
   const { 妻, 夫 } = props.data.户[m];
-  const 当前立绘SKU = 妻._穿着SKU._立绘 ?? 妻._穿着SKU.内衣 ?? 妻._穿着SKU.外装;
+  const 当前立绘SKU = 当前可见立绘SKU(妻);
   const 怀孕公开 = 怀孕已公开(props.data, m);
-  const 立绘图 = 角色立绘候选(户静态表[m].妻名, 当前立绘SKU, 怀孕公开).find(
-    src => !props.portraitFailed[src],
-  );
+  const 立绘图 = 角色立绘候选(户静态表[m].妻名, 当前立绘SKU, 怀孕公开, { 妆容SKU: 妻._穿着SKU.妆容, 特殊: 妻.特殊 }).find(src => !props.portraitFailed[src]);
   return {
     门牌: m,
     妻名: 户静态表[m].妻名,
@@ -71,14 +99,18 @@ const 选中档案 = computed(() => {
         标,
         值: (图id && 查道具(图id)?.名称) || 细节 || '—',
         细节: 细节 || undefined,
-        图id: 图id && (查道具(图id) || 图id.startsWith('初始外装_')) ? 图id : undefined,
+        图id: 图id && (查道具(图id) || 图id.startsWith('初始外装_') || 衣柜默认状态图(图id)) ? 图id : undefined,
       });
       const 项: { 标: string; 值: string; 细节?: string; 图id?: string }[] = [
-        做项('外装', 妻.外装, 妻._穿着SKU.外装 ?? `初始外装_${户静态表[m].妻名}`),
+        做项('外装', 外装已脱下(妻) ? '未穿外衣' : 妻.外装, 妻._穿着SKU.外装 ?? `初始外装_${户静态表[m].妻名}`),
       ];
       if (妻._穿着SKU.妆容) 项.push(做项('妆容', 妻.妆容 || '素颜', 妻._穿着SKU.妆容));
       if (妻.内衣) 项.push(做项('内衣', 妻.内衣, 妻._穿着SKU.内衣));
-      for (const 件 of 妻.特殊) 项.push(做项('佩饰', 件, 找描述SKU(件)));
+      for (const 件 of 妻.特殊) {
+        const id = 找描述SKU(件);
+        if (是完整外装道具(id) && id === 妻._穿着SKU.外装) continue;
+        项.push(做项('佩饰', 件, id));
+      }
       return 项;
     })(),
     开发: [
@@ -141,8 +173,31 @@ const 选中关系轨迹 = computed(() => {
   if (选中关系线索.value) return { 类型: '线路' as const, ...选中关系线索.value };
   return null;
 });
+const 选中家庭计划提示 = computed(() =>
+  props.door === '101' && props.data.户['101'] ? 家庭计划档案提示(props.data) : null,
+);
+const 选中借种提示 = computed(() => (props.door === '101' && props.data.户['101'] ? 借种档案提示(props.data) : null));
+const 选中第二机位提示 = computed(() =>
+  props.door === '102' && props.data.户['102'] ? 读取第二机位档案提示(props.data) : null,
+);
+const 选中不再留门提示 = computed(() => props.door === '202' ? 读取不再留门档案提示(props.data) : null);
+const 选中许曼君分居提示 = computed(() =>
+  props.door === '201' && props.data.户['201'] ? 读取许曼君分居档案提示(props.data) : null,
+);
+const 选中许曼君离婚提示 = computed(() =>
+  props.door === '201' && props.data.户['201'] ? 许曼君离婚档案提示(props.data) : null,
+);
+const 选中许曼君钥匙柜 = computed(() =>
+  props.door === '201' && props.data.户['201'] ? 读取许曼君201钥匙柜卡(props.data) : null,
+);
+const 选中回国提示 = computed(() => (props.door === '302' && props.data.户['302'] ? 回国档案提示(props.data) : null));
+const 选中双重继承提示 = computed(() =>
+  props.door === '302' && props.data.户['302'] ? 双重继承档案提示(props.data) : null,
+);
+// prettier-ignore -- App拆分A5b 的稳定源码契约要求保留这个 watch 入口形状。
 watch(() => props.door, () => {
   显示关系线索.value = false;
+  显示衣柜.value = false;
 });
 
 /** 头像只显示当前仍有游戏效力的冷落余波，避免阶段1/未入列302的旧档残留误亮。 */
@@ -268,9 +323,10 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
         <div class="dossier-portrait" aria-hidden="true">
           <img
             v-if="选中档案.立绘图"
+            :key="选中档案.立绘图"
             :src="选中档案.立绘图"
             :alt="选中档案.妻名 + '当前立绘'"
-            @error="emit('portraitError', 选中档案.立绘图)"
+            @error="档案立绘出错"
           />
         </div>
       </div>
@@ -305,8 +361,23 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
           <p v-if="选中档案.气质描述" class="dline"><b>气质</b> {{ 选中档案.气质描述 }}</p>
         </div>
         <div class="dsec dossier-card attire-card">
-          <div class="dsec-title"><span>仪 容</span><small>当前穿戴</small></div>
-          <div class="attire-grid">
+          <div class="dsec-title">
+            <span>仪 容</span>
+            <button type="button" class="cg-progress" :aria-expanded="显示衣柜" @click="显示衣柜 = !显示衣柜">
+              <Ic n="dress" />{{ 显示衣柜 ? '收起衣柜' : '打开衣柜' }}
+            </button>
+          </div>
+          <Wardrobe
+            v-if="显示衣柜"
+            :key="选中档案.门牌"
+            :door="选中档案.门牌"
+            :data="data"
+            :sending="sending"
+            :wife-nearby="wifeNearby"
+            :item-image="itemImage"
+            @action="emit('wardrobeAction', $event)"
+          />
+          <div v-else class="attire-grid">
             <div
               v-for="a in 选中档案.仪容项"
               :key="a.标 + a.值"
@@ -318,15 +389,17 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
             >
               <span v-if="a.图id" class="a-pic">
                 <img
-                  v-if="!itemFailed[a.图id]"
-                  :src="itemImage(a.图id)"
+                  v-if="仪容图片(a.图id) && !仪容失效图[仪容图片(a.图id)]"
+                  :key="仪容图片(a.图id)"
+                  :src="仪容图片(a.图id)"
                   :alt="a.值"
                   loading="lazy"
                   draggable="false"
-                  @error="emit('itemError', a.图id)"
+                  @error="仪容图片出错(a.图id, $event)"
                 />
-                <b v-else aria-hidden="true">衣</b>
+                <b v-else>{{ 仪容图片(a.图id) ? '加载失败' : '待配图' }}</b>
               </span>
+              <span v-else class="attire-text-state">{{ a.值 }}</span>
             </div>
           </div>
         </div>
@@ -510,6 +583,110 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
             <span>数值已经到达阶段门前。当前进度 {{ 选中关系轨迹.进度 }}/4，完成剩余关系线索后才能继续推进。</span>
           </p>
         </template>
+      </section>
+      <section v-if="选中家庭计划提示" class="dsec second-camera-task" aria-label="家庭计划下一步">
+        <header class="second-camera-task-head">
+          <span class="second-camera-task-icon" aria-hidden="true"><Ic n="edit" /></span>
+          <span class="second-camera-task-title">
+            <b>家庭计划</b>
+            <small>{{ 选中家庭计划提示.状态 }}</small>
+          </span>
+          <span v-if="选中家庭计划提示.完成" class="second-camera-task-done">已完成</span>
+        </header>
+        <p class="second-camera-task-next">{{ 选中家庭计划提示.下一步 }}</p>
+      </section>
+      <section v-if="选中借种提示" class="dsec second-camera-task" aria-label="借种下一步">
+        <header class="second-camera-task-head">
+          <span class="second-camera-task-icon" aria-hidden="true"><Ic n="story" /></span>
+          <span class="second-camera-task-title">
+            <b>借种</b>
+            <small>{{ 选中借种提示.状态 }}</small>
+          </span>
+          <span v-if="选中借种提示.完成" class="second-camera-task-done">已完成</span>
+        </header>
+        <p class="second-camera-task-next">{{ 选中借种提示.下一步 }}</p>
+        <p v-if="选中借种提示.补充" class="second-camera-task-note">{{ 选中借种提示.补充 }}</p>
+      </section>
+      <section v-if="选中不再留门提示" class="dsec second-camera-task" aria-label="不再留门下一步">
+        <header class="second-camera-task-head"><span class="second-camera-task-title"><b>不再留门</b><small>{{ 选中不再留门提示.状态 }}</small></span></header>
+        <p class="second-camera-task-next">{{ 选中不再留门提示.下一步 }}</p>
+        <p v-if="选中不再留门提示.补充" class="second-camera-task-note">{{ 选中不再留门提示.补充 }}</p>
+      </section>
+      <section v-if="选中第二机位提示" class="dsec second-camera-task" aria-label="第二机位下一步">
+        <header class="second-camera-task-head">
+          <span class="second-camera-task-icon" aria-hidden="true"><Ic n="camera" /></span>
+          <span class="second-camera-task-title">
+            <b>第二机位</b>
+            <small>{{ 选中第二机位提示.状态 }}</small>
+          </span>
+          <span v-if="选中第二机位提示.完成" class="second-camera-task-done">已归档</span>
+        </header>
+        <p class="second-camera-task-next">{{ 选中第二机位提示.下一步 }}</p>
+        <p v-if="选中第二机位提示.补充" class="second-camera-task-note">{{ 选中第二机位提示.补充 }}</p>
+        <p v-if="选中第二机位提示.进度" class="second-camera-task-progress">
+          <Ic n="clock" aria-hidden="true" />
+          <span>{{ 选中第二机位提示.进度 }}</span>
+        </p>
+      </section>
+      <section v-if="选中许曼君分居提示" class="dsec second-camera-task" aria-label="许曼君分居下一步">
+        <header class="second-camera-task-head">
+          <span class="second-camera-task-icon" aria-hidden="true"><Ic n="lock" /></span>
+          <span class="second-camera-task-title">
+            <b>分居</b>
+            <small>{{ 选中许曼君分居提示.状态 }}</small>
+          </span>
+          <span v-if="选中许曼君分居提示.完成" class="second-camera-task-done">已完成</span>
+        </header>
+        <p class="second-camera-task-next">{{ 选中许曼君分居提示.下一步 }}</p>
+        <p v-if="选中许曼君分居提示.补充" class="second-camera-task-note">{{ 选中许曼君分居提示.补充 }}</p>
+        <dl v-if="选中许曼君钥匙柜?.可见" class="separation-key-card" aria-label="201住户钥匙状态">
+          <div><dt>{{ 选中许曼君钥匙柜.标题 }}</dt><dd>{{ 选中许曼君钥匙柜.状态 }}</dd></div>
+          <div><dt>当前保管</dt><dd>{{ 选中许曼君钥匙柜.当前保管 }}</dd></div>
+          <div><dt>封条</dt><dd>{{ 选中许曼君钥匙柜.封条 }}</dd></div>
+          <div v-if="选中许曼君钥匙柜.新锁芯 !== '未取得'"><dt>201新锁芯</dt><dd>{{ 选中许曼君钥匙柜.新锁芯 }}</dd></div>
+          <div v-if="选中许曼君钥匙柜.新钥匙 !== '未取得'"><dt>201新钥匙</dt><dd>{{ 选中许曼君钥匙柜.新钥匙 }}</dd></div>
+          <div v-if="选中许曼君钥匙柜.下一预约 !== '无'"><dt>下一预约</dt><dd>{{ 选中许曼君钥匙柜.下一预约 }}</dd></div>
+          <p>{{ 选中许曼君钥匙柜.说明 }}</p>
+        </dl>
+      </section>
+      <section v-if="选中许曼君离婚提示" class="dsec second-camera-task" aria-label="许曼君离婚下一步">
+        <header class="second-camera-task-head">
+          <span class="second-camera-task-icon" aria-hidden="true"><Ic n="edit" /></span>
+          <span class="second-camera-task-title">
+            <b>离婚</b>
+            <small>{{ 选中许曼君离婚提示.状态 }}</small>
+          </span>
+          <span v-if="选中许曼君离婚提示.完成" class="second-camera-task-done">已完成</span>
+        </header>
+        <p class="second-camera-task-next">{{ 选中许曼君离婚提示.下一步 }}</p>
+        <p v-if="选中许曼君离婚提示.补充" class="second-camera-task-note">私密抽屉：{{ 选中许曼君离婚提示.补充 }}</p>
+      </section>
+      <section v-if="选中回国提示" class="dsec second-camera-task" aria-label="回国下一步">
+        <header class="second-camera-task-head">
+          <span class="second-camera-task-icon" aria-hidden="true"><Ic n="home" /></span>
+          <span class="second-camera-task-title">
+            <b>回国</b>
+            <small>{{ 选中回国提示.状态 }}</small>
+          </span>
+          <span v-if="选中回国提示.完成" class="second-camera-task-done">已完成</span>
+        </header>
+        <p class="second-camera-task-next">{{ 选中回国提示.下一步 }}</p>
+      </section>
+      <section v-if="选中双重继承提示" class="dsec second-camera-task" aria-label="双重继承下一步">
+        <header class="second-camera-task-head">
+          <span class="second-camera-task-icon" aria-hidden="true"><Ic n="home" /></span>
+          <span class="second-camera-task-title">
+            <b>双重继承</b>
+            <small>{{ 选中双重继承提示.状态 }}</small>
+          </span>
+          <span v-if="选中双重继承提示.完成" class="second-camera-task-done">已完成</span>
+        </header>
+        <p class="second-camera-task-next">{{ 选中双重继承提示.下一步 }}</p>
+        <p v-if="选中双重继承提示.补充" class="second-camera-task-note">{{ 选中双重继承提示.补充 }}</p>
+        <p v-if="选中双重继承提示.进度" class="second-camera-task-progress">
+          <Ic n="clock" aria-hidden="true" />
+          <span>{{ 选中双重继承提示.进度 }}</span>
+        </p>
       </section>
       <button
         v-if="选中档案.妻.当前阶段 > 0 && 选中档案.妻.当前阶段 < 5 && 选中档案.妻.裂缝.已确认"
@@ -962,6 +1139,130 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
   color: var(--pink);
 }
 
+.dsec.second-camera-task {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--blue) 32%, var(--line));
+  border-radius: var(--radius);
+  background:
+    linear-gradient(118deg, color-mix(in srgb, var(--blue) 10%, var(--paper-card)), var(--paper-card) 64%),
+    var(--paper-card);
+  box-shadow: 0 6px 18px rgba(48, 76, 119, 0.1);
+}
+
+.second-camera-task-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.second-camera-task-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  color: var(--blue);
+  background: color-mix(in srgb, var(--blue) 12%, var(--paper-card));
+  border: 1px solid color-mix(in srgb, var(--blue) 24%, var(--line));
+  border-radius: 11px;
+}
+
+.second-camera-task-title {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.second-camera-task-title b {
+  color: var(--ink);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+}
+
+.second-camera-task-title small {
+  color: var(--blue);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.second-camera-task-done {
+  margin-left: auto;
+  padding: 3px 7px;
+  color: #236d55;
+  font-size: 11px;
+  font-weight: 800;
+  background: color-mix(in srgb, #3aa77e 12%, var(--paper-card));
+  border: 1px solid color-mix(in srgb, #3aa77e 28%, var(--line));
+  border-radius: 7px;
+}
+
+.second-camera-task-next {
+  margin: 10px 0 0;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.6;
+}
+
+.second-camera-task-note {
+  margin: 5px 0 0;
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.separation-key-card {
+  display: grid;
+  gap: 4px;
+  margin: 9px 0 0;
+  padding: 8px 9px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  line-height: 1.5;
+  background: color-mix(in srgb, var(--blue) 7%, var(--paper-card));
+  border: 1px solid color-mix(in srgb, var(--blue) 18%, var(--line));
+  border-radius: 8px;
+}
+
+.separation-key-card div {
+  display: grid;
+  grid-template-columns: minmax(72px, auto) 1fr;
+  gap: 8px;
+}
+
+.separation-key-card dt {
+  color: var(--ink);
+  font-weight: 750;
+}
+
+.separation-key-card dd,
+.separation-key-card p {
+  margin: 0;
+}
+
+.separation-key-card p {
+  padding-top: 3px;
+  border-top: 1px dashed color-mix(in srgb, var(--blue) 18%, var(--line));
+}
+
+.second-camera-task-progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 7px 8px;
+  color: var(--blue);
+  font-size: 11px;
+  font-weight: 750;
+  background: color-mix(in srgb, var(--blue) 8%, var(--paper-card));
+  border-radius: 8px;
+}
+
+.second-camera-task-progress .ic {
+  flex: 0 0 auto;
+}
+
 :global(html.rq-dark) .relation-clue-open,
 :global(html.rq-dark) .relation-clue-board {
   box-shadow:
@@ -971,6 +1272,10 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
 
 :global(html.rq-dark) .relation-clue-board {
   background: radial-gradient(circle at 100% 0%, rgba(255, 79, 154, 0.12), transparent 34%), var(--paper-card);
+}
+
+:global(html.rq-dark) .second-camera-task {
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22);
 }
 
 :global(html.rq-dark) .relation-action-badge,
@@ -1002,8 +1307,14 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
   .relation-action p,
   .relation-scene-tip,
   .relation-step-copy > span,
-  .relation-wait {
+  .relation-wait,
+  .second-camera-task-next {
     font-size: 13px;
+  }
+
+  .second-camera-task-note,
+  .second-camera-task-progress {
+    font-size: 12px;
   }
 
   .relation-step {
@@ -1505,6 +1816,10 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
 }
 
 /* 仪容图鉴：穿戴 SKU 直接显示商店道具卡，不再拿穿着描述误查图片。 */
+.dossier-card.attire-card {
+  background: var(--field-bg, #fff9fc);
+}
+
 .attire-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, 84px);
@@ -1528,6 +1843,16 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
 
 .a-cell.pic {
   grid-column: span 1;
+}
+
+.attire-text-state {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 8px;
+  color: #745261;
+  text-align: center;
+  line-height: 1.5;
 }
 
 .a-cell .a-pic {

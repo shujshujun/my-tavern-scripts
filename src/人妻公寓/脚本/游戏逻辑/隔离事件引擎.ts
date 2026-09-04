@@ -10,8 +10,9 @@ import { 严格清除协议残留 } from './正文协议安全';
 import { 创建受控生成等待, 受控生成超时错误前缀, type 受控生成等待句柄 } from './受控生成等待';
 import { 当前聊天ID } from './手机/运行时上下文';
 import { 捕获精确聊天快照, 恢复精确聊天快照, 时间状态指纹, type 精确聊天快照 } from './时间撤销系统';
+import { 构造录像带V4提示词包, type 录像带V4历史消息 } from './录像带V4上下文';
 
-export type 隔离事件类型 = '荣耀洞' | '监控' | '晨跑' | '健身' | '睡眠';
+export type 隔离事件类型 = '荣耀洞' | '监控' | '晨跑' | '健身' | '睡眠' | '母亲视频通话' | '录像带V4';
 
 /** 供正文 PROMPT_READY 监听器识别脚本自己的短生成，避免误占原生正文锁。 */
 export const 隔离事件请求标记 = '<rqgy_isolated_event_request>';
@@ -25,6 +26,8 @@ export interface 隔离事件日志条 {
   锚楼: number;
   序: number;
   房间: string;
+  /** VTR专用精确画面身份；普通隔离事件不写。 */
+  画面键?: string;
   提示词?: string;
   时间: number;
 }
@@ -39,6 +42,20 @@ export interface 隔离事件参数 {
   行动: string;
   导演事件: string;
   房间: string;
+  /** VTR专用；同一共享幕切房时据此恢复对应正文。 */
+  画面键?: string;
+}
+
+export interface 录像带V4隔离事件参数 {
+  场次标识: string;
+  房间: '102' | '202';
+  画面键: string;
+  行动: string;
+  系统契约: string;
+  入口胶囊: string;
+  历史: readonly 录像带V4历史消息[];
+  房间摘要: Readonly<{ '102': string; '202': string }>;
+  当前卡: string;
 }
 
 /**
@@ -93,6 +110,25 @@ function 从变量读库(vars: unknown): 隔离事件库 {
 
 function 读库(): 隔离事件库 {
   return 从变量读库(getVariables({ type: 'chat' }));
+}
+
+/** 当前聊天内某个VTR场次的专用日志；返回深拷贝，调用方不能越权改写聊天库。 */
+export function 读取录像带V4隔离日志(场次标识: string): 隔离事件日志条[] {
+  const 线程 = `vtr:${String(场次标识 ?? '').trim()}`;
+  if (!/^vtr:[A-Za-z0-9:_-]{3,160}$/u.test(线程)) return [];
+  return _.cloneDeep(读库().日志.filter(条 => 条.类型 === '录像带V4' && 条.线程 === 线程));
+}
+
+/** 只恢复已经与该画面键同事务提交的可见正文；不存在时返回空串，绝不借用其他CAM或幕次。 */
+export function 读取录像带V4画面正文(场次标识: string, 画面键: string): string {
+  const 键 = String(画面键 ?? '').trim();
+  if (!/^VTR-V4-(?:102|202)-B(?:0[1-9]|1[0-9])$/u.test(键)) return '';
+  const 日志 = 读取录像带V4隔离日志(场次标识);
+  for (let i = 日志.length - 1; i >= 0; i -= 1) {
+    const 条 = 日志[i];
+    if (条.谁 === '叙事' && 条.画面键 === 键 && 条.文本.trim()) return 条.文本.trim();
+  }
+  return '';
 }
 
 export function 净化隔离事件正文(原文: string): string {
@@ -263,6 +299,88 @@ export async function 生成隔离事件草稿(参数: 隔离事件参数): Prom
   }
 }
 
+/**
+ * 《录像带》V4专用AI入口。它只消费七项显式白名单来源，复用现有前台互斥、超时和取消句柄；
+ * 不调用普通预设桥、不读取普通隔离线程，也不应用可能注入日常占位符的最终显示正则。
+ */
+export async function 生成录像带V4隔离草稿(参数: 录像带V4隔离事件参数): Promise<隔离事件草稿> {
+  if (生成中) throw new Error('另一段独立事件正在生成，请等待完成后重试。');
+  if (全局数据库AI租约.在结算()) throw new Error('数据库AI仍在结算上一轮请求，请稍等片刻后重试。');
+  const 前台租约 = 取得前台生成租约();
+  if (!前台租约) {
+    if (手机生成租约持有中()) throw new Error('手机后台消息正在生成，请等待完成后重试。');
+    if (前台生成租约持有中()) throw new Error('正文或另一独立事件正在生成，请等待完成后重试。');
+    throw new Error('生成通道刚被其他请求占用，请稍后重试。');
+  }
+  try {
+    生成中 = true;
+    已取消 = false;
+    eventEmit('人妻公寓:生成开始');
+    const 提示包 = 构造录像带V4提示词包({
+      场次标识: 参数.场次标识,
+      系统契约: [隔离事件请求标记, 参数.系统契约].join('\n'),
+      入口胶囊: 参数.入口胶囊,
+      历史: 参数.历史,
+      房间摘要: 参数.房间摘要,
+      当前卡: 参数.当前卡,
+      玩家输入: 参数.行动,
+    });
+    const 用户输入 = 提示包.orderedPrompts.at(-1);
+    if (!用户输入 || 用户输入.role !== 'user') throw new Error('录像带V4提示词缺少最终玩家输入');
+    const ordered_prompts: ({ role: 'system' | 'user' | 'assistant'; content: string } | 'user_input')[] = [
+      ...提示包.orderedPrompts.slice(0, -1),
+      'user_input',
+    ];
+    const 是DeepSeek = 当前正文模型是DeepSeek();
+    const 生成ID = `rqgy-vtr-v4-${Date.now()}-${++隔离正文请求序号}`;
+    const 等待 = 创建受控生成等待(
+      generateRaw({
+        ordered_prompts,
+        user_input: 用户输入.content,
+        should_stream: 是DeepSeek,
+        generation_id: 生成ID,
+      }),
+      {
+        超时毫秒: 隔离正文生成等待上限毫秒,
+        超时说明: '录像带V4正文超过十分钟未返回',
+        请求停止: () => 停止隔离正文底层请求(生成ID),
+      },
+    );
+    当前隔离正文等待 = 等待;
+    let 原文: unknown;
+    try {
+      原文 = await 等待.结果;
+    } finally {
+      if (当前隔离正文等待 === 等待) 当前隔离正文等待 = null;
+    }
+    if (已取消) throw new Error('已取消——这一幕没有发生');
+    const 正文 = 净化隔离事件正文(String(原文 ?? ''));
+    if (!正文) throw new Error('录像带V4 AI没有返回可显示的正文');
+    return {
+      参数: {
+        类型: '录像带V4',
+        线程: 提示包.线程,
+        行动: 参数.行动,
+        导演事件: 参数.当前卡,
+        房间: 参数.房间,
+        画面键: 参数.画面键,
+      },
+      正文,
+      提示词: 提示包.提示词快照,
+    };
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith(受控生成超时错误前缀)) {
+      console.warn('[人妻公寓·录像带V4] 正文超过十分钟仍未返回，已结束本地等待。');
+      throw new Error('AI服务长时间没有返回完整录像带正文；本幕、画面、摘要与进度均未提交，请重试或更换模型线路。');
+    }
+    throw error;
+  } finally {
+    当前隔离正文等待 = null;
+    生成中 = false;
+    前台租约.释放();
+  }
+}
+
 /** 在调用方已经锁定并校验过的 chat 变量对象中，同步追加一份草稿。 */
 export function 写入隔离事件草稿(vars: Record<string, unknown>, 草稿: 隔离事件草稿, 锚楼: number): void {
   if (!Number.isInteger(锚楼) || 锚楼 < 0) throw new Error('隔离事件日志锚楼无效');
@@ -280,6 +398,7 @@ export function 写入隔离事件草稿(vars: Record<string, unknown>, 草稿: 
       锚楼,
       序: 序起,
       房间: 草稿.参数.房间,
+      ...(草稿.参数.画面键 ? { 画面键: 草稿.参数.画面键 } : {}),
       时间,
     },
     {
@@ -291,9 +410,10 @@ export function 写入隔离事件草稿(vars: Record<string, unknown>, 草稿: 
       锚楼,
       序: 序起 + 1,
       房间: 草稿.参数.房间,
+      ...(草稿.参数.画面键 ? { 画面键: 草稿.参数.画面键 } : {}),
       // 荣耀洞/监控保留史册考古提示；例行训练与睡眠只保留可见反馈，避免把当天正文
       // 素材复制进长期 chat 变量、无谓放大存档。
-      ...(草稿.参数.类型 === '荣耀洞' || 草稿.参数.类型 === '监控' ? { 提示词: 草稿.提示词 } : {}),
+      ...(['荣耀洞', '监控', '录像带V4'].includes(草稿.参数.类型) ? { 提示词: 草稿.提示词 } : {}),
       时间,
     },
   );

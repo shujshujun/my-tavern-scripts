@@ -1,0 +1,120 @@
+{
+  "schemaVersion": "rqgy-vtr-v4-context-isolation-policy-v1",
+  "createdAt": "2026-09-02",
+  "status": "design-only-not-wired",
+  "sourceTask": {
+    "title": "继续制作录像带CG",
+    "id": "01a059bb-8efa-7be2-8939-1584867d5f33"
+  },
+  "problem": "The videotape branch must be isolated in both directions. Daily prompts must not enter videotape generation, and detailed videotape text must not enter later daily generation.",
+  "currentEvidence": {
+    "videotapeProductionGeneratorExists": false,
+    "genericIsolatedEngineReadsOrdinaryChatHistory": false,
+    "genericIsolatedEngineDirectlyImportsSnapshotSystem": false,
+    "genericIsolatedEngineIncludesPresetFrontAndBack": true,
+    "presetBridgeSkipsOnlyChatHistoryMarker": true,
+    "presetBridgeIncludesEveryOtherEnabledNonemptyPrompt": true,
+    "genericThreadHistoryLimit": 4,
+    "riskVerdict": "not-yet-realized-but-boundary-not-sealed"
+  },
+  "designIntent": "Keep all 19 monitor beats coherent inside one persistent special-story branch while preventing routine state, memory, scheduling, phone, location, outfit, and daily relationship prompts from influencing that branch.",
+  "entryGate": {
+    "validateBeforeBranchCreation": [
+      "plot item and two-lock WeChat prelude complete",
+      "both husbands voluntarily locked and consented",
+      "no hospital or recovery conflict",
+      "no active forced story or other special scene",
+      "monitor click is accepted and auto-transfer to 302 succeeds"
+    ],
+    "failureBehavior": "Block entry before creating the branch. Do not pass the blocking daily state to the story model as something it should narrate around.",
+    "entryCapsuleAllowlist": [
+      "current Persona name or {{user}}",
+      "fixed CAM-102 and CAM-202 role mapping",
+      "stable role-specific voice profiles for Zhou Xiaoman and Shen Jingyi",
+      "completed purchase, gift, two-day wait, voluntary lock, and consent facts",
+      "room, wardrobe, device, and tablet continuity frozen by the V4 scene",
+      "shared hidden beat and current selected CAM"
+    ]
+  },
+  "dailyInboundDenylist": [
+    "ordinary chat history",
+    "daily state prompt or MVU state narration",
+    "ordinary current-location prose before monitoring was clicked",
+    "daily schedule, work, sleep, meal, visit, and husband interruption suggestions",
+    "phone unread state, WeChat recent-context summary, Moments, and queued phone text",
+    "database recall, long-term memory capsule, event recommendations, and task suggestions",
+    "daily outfit selection and wardrobe narration",
+    "ordinary intimacy ledger, satisfaction, stamina, and relationship-stage narration",
+    "unrelated pending events and unrelated character knowledge",
+    "normal variable-update protocol, options, state panel, and daily output contract"
+  ],
+  "runtimePromptSourceAllowlist": [
+    "sanitized preset output/safety protocol explicitly marked safe for VTR",
+    "VTR system contract",
+    "VTR entry capsule",
+    "VTR special-branch history",
+    "deterministic per-room continuity summaries",
+    "current unique room and beat card",
+    "current player input inside the monitor UI"
+  ],
+  "runtimeArchitecture": {
+    "branchId": "vtr:<sceneId>",
+    "branchHistory": "Persist every successful VTR user/narrative turn with room, beat, and card metadata. Never share the generic daily-monitor thread.",
+    "currentFocus": "Every request ends with one hard current CAM, one hidden beat, one room mapping, and one current card.",
+    "historyPolicy": "The full VTR log remains in the special branch. Prompt budgeting may use deterministic room summaries plus the most recent relevant VTR turns, but no daily text may fill the freed budget.",
+    "presetPolicy": "Do not call the unfiltered generic preset bridge. Add a VTR-specific filter or dedicated generator that only accepts explicitly safe protocol entries.",
+    "statePolicy": "Freeze VTR-owned role, wardrobe, room, tablet, lock, and beat state for the scene. Daily hard blockers are checked before entry; daily state prompts are not narrated during the branch.",
+    "dailySideEffectsDuringBranch": "Queue unrelated daily notifications and optional events. Do not inject them into VTR or advance them as if ordinary turns had occurred."
+  },
+  "exitBridge": {
+    "dailyReceives": [
+      "fixed completion flag",
+      "explicit approved state changes",
+      "one short deterministic result summary"
+    ],
+    "dailyDoesNotReceive": [
+      "19-beat raw dialogue",
+      "explicit tablet descriptions",
+      "humiliation wording",
+      "husband reaction details",
+      "VTR prompt snapshots or room continuity summaries"
+    ],
+    "queuedDailyWork": "Release after branch completion or safe suspension, preserving original order and idempotency keys."
+  },
+  "failureLifecycle": {
+    "generationFailure": "Do not advance beat, do not update summaries, do not merge anything into daily context.",
+    "cancel": "Keep current image and branch state; no daily result summary.",
+    "saveReload": "Restore branchId, sceneId, current CAM, hidden beat, VTR history, and VTR summaries. Daily context cursor remains at entry.",
+    "switchChatOrBranch": "Old request cannot write into the new timeline.",
+    "safeSuspend": "Suspend the special branch without merging it. Resume from the same beat later.",
+    "complete": "Validate final state, write the fixed result bridge once, close the VTR branch, then restore ordinary generation."
+  },
+  "compatibilityBoundary": {
+    "genericIsolatedEventsUnchanged": true,
+    "genericMonitorUnchanged": true,
+    "gloryHoleTimeAndOtherShortEventsUnchanged": true,
+    "implementationShape": "Add a context-policy parameter or a dedicated VTR generator; do not globally narrow the existing preset bridge.",
+    "oldSaveMigration": "No shipped 19-beat VTR branch exists. New fields default empty; only new VTR starts create a branch."
+  },
+  "requiredDiagnostics": {
+    "storeFullPromptSnapshotEachBeat": true,
+    "snapshotSourceLabels": [
+      "VTR preset protocol",
+      "VTR system",
+      "VTR entry capsule",
+      "VTR history",
+      "VTR summaries",
+      "VTR current card",
+      "VTR player input"
+    ],
+    "rejectUnknownPromptSource": true,
+    "poisonSentinelTests": [
+      "daily location sentinel must not enter VTR",
+      "daily outfit sentinel must not enter VTR",
+      "daily phone or task sentinel must not enter VTR",
+      "VTR explicit-dialogue sentinel must not enter the next ordinary prompt"
+    ]
+  },
+  "installed": false,
+  "productionUnlocked": false
+}

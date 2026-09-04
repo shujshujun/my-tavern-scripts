@@ -1,4 +1,5 @@
 import { 当前手机数据 } from './运行时上下文';
+import { 不再留门手机只读原因 } from '../../../不再留门契约';
 import type { 门牌 } from '../../../stageConfig';
 import { 户静态表 } from '../../../stageConfig';
 import { 读配置 } from './配置';
@@ -312,6 +313,8 @@ export function 普通手机场景剧情只读原因(): string | null {
   // 活动票始终冻结普通手机写入；等待票在已经抵达设计地点，或旧档根本没有可靠目标时冻结。
   // 尚在其他地点等待的结构化搬入／线路票不会打断当前互动，也不会让整部手机长期失去回复能力。
   const 场景剧情数据 = 当前手机数据();
+  const 设备占用 = 不再留门手机只读原因(场景剧情数据);
+  if (设备占用) return 设备占用;
   const 活动场景剧情 = 场景剧情数据 ? 读取活动场景剧情(场景剧情数据) : null;
   const 等待场景剧情 = 场景剧情数据 ? 读取队首场景剧情(场景剧情数据.系统._待发送事件) : null;
   let 当前场景: string | null = null;
@@ -327,7 +330,7 @@ export function 普通手机场景剧情只读原因(): string | null {
 }
 
 export async function 小生成(系统提示: string, 用户提示: string, 控制?: 手机小生成控制): Promise<string> {
-  const 场景剧情只读原因 = 控制?.允许场景剧情期间 ? null : 普通手机场景剧情只读原因();
+  const 场景剧情只读原因 = 不再留门手机只读原因(当前手机数据()) || (控制?.允许场景剧情期间 ? null : 普通手机场景剧情只读原因());
   if (场景剧情只读原因) {
     eventEmit('人妻公寓:提示', `${场景剧情只读原因}，不能启动新的 AI 内容。`);
     return '';

@@ -1,12 +1,14 @@
 import type { SchemaType } from '../../../../schema';
 import { Schema } from '../../../../schema';
+import { 不再留门手机只读原因 } from '../../../../不再留门契约';
 import { 读最近有效stat } from '../../mvuIO';
 import { ROOT_ID, 根文档 } from './资源与皮肤';
 import { 清理失效手机聊天批次 } from './会话瞬态';
 import { 读库, 会话有未读, 朋友圈有未读 } from '../数据层';
-import { 手机楼轴已就绪, 末楼, 当前手机绝对时段 } from '../运行时上下文';
+import { 手机楼轴已就绪, 末楼, 当前手机绝对时段, 当前手机数据 } from '../运行时上下文';
 import { 获取静音会议手机状态, type 静音会议手机状态 } from '../静音会议旁路';
 import { 活动父亲通话, 恢复父亲通话 } from '../交互/父亲通话';
+import { 母亲视频通话待接听 } from '../../母亲视频通话系统';
 import { 挂载手机, 拉回手机视口, 显示手机教程, type 手机页面 } from './挂载';
 
 /**
@@ -89,7 +91,7 @@ export function 有来电(): boolean {
     const rawStat = 读最近有效stat();
     if (!rawStat) return false;
     const data = Schema.parse(rawStat) as SchemaType;
-    return data.系统._待接来电.期 >= 0;
+    return data.系统._待接来电.期 >= 0 || 母亲视频通话待接听(data);
   } catch {
     return false;
   }
@@ -145,12 +147,33 @@ export function 打开手机(直达来电 = false): void {
     eventEmit('人妻公寓:手机收起'); // 客户端听它:开机时替玩家退过真全屏的,收起送回去
     return;
   }
+  const 设备占用 = 不再留门手机只读原因(当前手机数据());
+  if (设备占用) { eventEmit('人妻公寓:提示', 设备占用); return; }
   root.classList.add('open');
   if (会议手机.场景中) 已注册端口?.写入当前页面({ 名: 'chats' });
   else if (活动父亲通话()) 已注册端口?.写入当前页面({ 名: 'talk' });
   else if (直达来电 && 有来电()) 已注册端口?.写入当前页面({ 名: 'call' });
   已注册端口?.渲染();
   void 恢复父亲通话();
+  拉回手机视口();
+  显示手机教程();
+}
+
+/** 剧情瓷砖打开手机并直达指定会话；不伪造已读，真实渲染仍负责提交已读水位。 */
+export function 打开手机会话(会话: string): void {
+  const 设备占用 = 不再留门手机只读原因(当前手机数据());
+  if (设备占用) { eventEmit('人妻公寓:提示', 设备占用); return; }
+  挂载手机();
+  const root = 根文档().getElementById(ROOT_ID);
+  if (!root) return;
+  const 会议手机 = 获取静音会议手机状态();
+  if (会议手机.场景中 && !会议手机.可打开) {
+    eventEmit('人妻公寓:提示', 会议手机.禁用原因);
+    return;
+  }
+  root.classList.add('open');
+  已注册端口?.写入当前页面({ 名: 'chat', 会话 });
+  已注册端口?.渲染();
   拉回手机视口();
   显示手机教程();
 }

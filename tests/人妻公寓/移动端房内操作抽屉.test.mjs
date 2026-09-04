@@ -4,8 +4,8 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import test from 'node:test';
 
-// 手机端房内操作上滑抽屉专项：行为测试直测纯状态机（抽屉状态机.ts），
-// 结构契约测试复核 App.vue 接线、组件与样式所有权。不复制实现逻辑。
+// 手机端房内操作单层抽屉专项：行为测试直测纯状态机（抽屉状态机.ts），
+// 结构契约测试复核 App.vue 接线、组件、同层动作选择与样式所有权。不复制实现逻辑。
 const require = createRequire(import.meta.url);
 process.env.TS_NODE_COMPILER_OPTIONS = JSON.stringify({ module: 'CommonJS', moduleResolution: 'node' });
 require('ts-node/register/transpile-only');
@@ -310,7 +310,7 @@ test('App 导入并常驻接线抽屉组件；垃圾选择弹窗留在组件外�
     /:suppressed="房内操作抑制 \|\| 前台硬决策中"/,
     /:actions="普通房间动作"/,
     /:garbage-visible="垃圾入口可见"/,
-    /:video-tape-active="录像带中"/,
+    /:video-tape-active="录像带任一中"/,
     /@open-garbage="垃圾选择开 = true"/,
   ]) {
     assert.match(组件段, 接线, `App 应接线 ${接线}`);
@@ -323,8 +323,8 @@ test('App 导入并常驻接线抽屉组件；垃圾选择弹窗留在组件外�
   );
   assert.match(
     App源码,
-    /const 普通动作可见数 = computed\(\(\) => \(录像带中\.value \? 0 : 普通房间动作\.value\.length\)\)/,
-    '普通动作只在 !录像带中 时计入,不并入统一抑制',
+    /const 普通动作可见数 = computed\(\(\) => \(录像带任一中\.value \? 0 : 普通房间动作\.value\.length\)\)/,
+    '普通动作只在两代录像带都未运行时计入，不并入统一抑制',
   );
   assert.match(
     App源码,
@@ -359,8 +359,13 @@ test('组件自身：消费 普通房间动作、触发动作收起并直调原�
   );
   assert.match(
     抽屉源码,
-    /function 触发动作\(动作: 卡动作\): void \{\n {2}机器\.手动收起\(\);[\s\S]{0,40}动作\.做\(\);/,
-    '动作点击后先收起,再直调原回调',
+    /function 触发动作\(动作: 卡动作\): void \{[\s\S]*?if \(动作\.选项\?\.length\)[\s\S]*?机器\.手动收起\(\);[\s\S]{0,80}动作\.做\(\);/,
+    '带选项动作只在同层展开；普通动作仍先收起再直调原回调',
+  );
+  assert.match(
+    抽屉源码,
+    /function 触发动作选项\(选项: 卡动作选项\): void \{[\s\S]*?机器\.手动收起\(\);[\s\S]{0,80}选项\.做\(\);/,
+    '同层选项点击后收起总抽屉并直调原业务回调',
   );
   assert.doesNotMatch(抽屉源码, /await\s+动作\.做/, '不得包装/等待原回调');
   assert.doesNotMatch(抽屉源码, /try \{[\s\S]*?动作\.做\(\)[\s\S]*?\} catch/, '不得吞掉原回调异常');
@@ -383,14 +388,14 @@ test('组件自身：消费 普通房间动作、触发动作收起并直调原�
 
 // ═══ 结构契约：手机面板 / 桌面 / ARIA / 样式 ═══
 
-test('手机：把手至少 44px 且只在手机渲染；面板 absolute 向上覆盖、限高滚动、z-index 低于垃圾 modal', () => {
+test('手机把手至少44px且只在手机渲染；面板向上覆盖并限高滚动', () => {
   const 模板段 = 提取模板(抽屉源码);
   assert.match(模板段, /v-if="mobile"[\s\S]*?class="drawer-handle"/, '把手只在手机断点渲染');
   assert.match(模板段, /type="button"[\s\S]*?class="drawer-handle"/, '把手是 button 且 type=button');
   assert.match(模板段, /:aria-expanded="状态\.展开"/, '把手 aria-expanded');
   assert.match(模板段, /aria-controls="in-room-acts-panel"/, '把手 aria-controls');
-  assert.match(模板段, /:role="mobile \? 'region' : undefined"/, '面板在手机断点 role=region');
-  assert.match(模板段, /:aria-label="mobile \? '当前房间可执行操作' : undefined"/, '面板在手机断点有明确 aria-label');
+  assert.match(模板段, /:role="mobile \? 'region' : undefined"/, '手机面板 role=region');
+  assert.match(模板段, /:aria-label="mobile \? '当前房间可执行操作' : undefined"/, '手机面板有明确 aria-label');
   assert.match(
     抽屉源码,
     /\.drawer-handle \{\s*display: flex;\s*align-items: center;\s*gap: 6px;\s*width: 100%;\s*min-height: 44px;/m,
@@ -408,19 +413,21 @@ test('手机：把手至少 44px 且只在手机渲染；面板 absolute 向上�
   assert.match(抽屉源码, /focus-visible/, '把手有清晰 focus-visible');
 });
 
-test('桌面：把手隐藏、内容恒显且流内两列；窄屏两列不横溢', () => {
+test('桌面恒显两列，302只增加同层二选一；窄屏两列不横溢', () => {
   const 模板段 = 提取模板(抽屉源码);
   assert.match(
     模板段,
     /v-if="mobile \? 状态\.展开 \|\| 有主训练动作 : true"/,
     '桌面内容恒显；手机主训练瓷砖即使抽屉自动收起也保持可见',
   );
-  assert.doesNotMatch(抽屉源码, /\.drawer-content \{\s*position: absolute;/, '桌面内容不得绝对定位(不参与正文高度)');
+  assert.doesNotMatch(抽屉源码, /桌面302折叠|desktop-cohab-drawer|room-actions-desktop-cohab/);
+  assert.doesNotMatch(抽屉源码, /\.drawer-content \{\s*position: absolute;/, '桌面内容不得绝对定位');
   assert.match(
     抽屉源码,
     /\.scene-acts \{\s*flex: none;\s*display: grid;\s*grid-template-columns: 1fr 1fr;/,
     '桌面两列保持',
   );
+  assert.match(模板段, /当前选择动作\?\.选项\?\.length[\s\S]*class="action-choice"/, '302二选一留在同一房内操作面板');
   assert.match(抽屉源码, /\.garbage-pick \{\s*flex: none;\s*display: flex;/, '垃圾入口流内保持');
   assert.match(
     抽屉源码,

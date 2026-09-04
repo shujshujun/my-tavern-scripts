@@ -1813,7 +1813,12 @@ function 是脚本所有权表名(value: unknown): boolean {
   return 读取数据库表键名(data).some(项 => 项.名称 === 名称 && 数据库表项受脚本所有权(项));
 }
 
-function 取消新版手动面板受保护选择(doc: Document): boolean {
+function 安全点击数据库面板控件(control: HTMLElement, 允许重放按钮?: WeakSet<Element>): void {
+  允许重放按钮?.add(control);
+  control.click();
+}
+
+function 取消新版手动面板受保护选择(doc: Document, 允许重放按钮?: WeakSet<Element>): boolean {
   let 已取消 = false;
   for (const panel of doc.querySelectorAll<HTMLElement>('#form-fill-manual-panel')) {
     for (const item of panel.querySelectorAll<HTMLElement>('.acu-v2-table-selector__item')) {
@@ -1821,11 +1826,14 @@ function 取消新版手动面板受保护选择(doc: Document): boolean {
       if (!是脚本所有权表名(名称)) continue;
       const checkbox = item.querySelector<HTMLButtonElement>('button.acu-checkbox[role="checkbox"]');
       if (!checkbox) continue;
-      if (checkbox.getAttribute('aria-checked') === 'true' && !checkbox.disabled) {
-        checkbox.click();
+      if (checkbox.getAttribute('aria-checked') === 'true') {
+        // 保护层自己写入的 disabled 不能阻止取消已选状态；Vue props 若仍处于 runtimeReady=false，
+        // 组件 handler 会自行拒绝，此时执行按钮的最终安全核验会继续失败关闭而不重放。
+        checkbox.disabled = false;
+        安全点击数据库面板控件(checkbox, 允许重放按钮);
         已取消 = true;
       }
-      checkbox.disabled = true;
+      if (!checkbox.disabled) checkbox.disabled = true;
       checkbox.setAttribute('aria-disabled', 'true');
       checkbox.title = '本表由《人妻公寓》脚本按真实楼层/事务维护，不参与数据库通用手动填表。';
       item.dataset.rqgyScriptOwned = 'true';
@@ -1841,7 +1849,7 @@ function 取消新版手动面板受保护选择(doc: Document): boolean {
   return 已取消;
 }
 
-function 取消旧版手动面板受保护选择(doc: Document): boolean {
+function 取消旧版手动面板受保护选择(doc: Document, 允许重放按钮?: WeakSet<Element>): boolean {
   let 已取消 = false;
   for (const container of doc.querySelectorAll<HTMLElement>('[id$="-manual-table-selector"]')) {
     for (const label of container.querySelectorAll<HTMLLabelElement>('label')) {
@@ -1849,11 +1857,12 @@ function 取消旧版手动面板受保护选择(doc: Document): boolean {
       if (!是脚本所有权表名(名称)) continue;
       const checkbox = label.querySelector<HTMLInputElement>('input[type="checkbox"][data-key]');
       if (!checkbox) continue;
-      if (checkbox.checked && !checkbox.disabled) {
-        checkbox.click();
+      if (checkbox.checked) {
+        checkbox.disabled = false;
+        安全点击数据库面板控件(checkbox, 允许重放按钮);
         已取消 = true;
       }
-      checkbox.disabled = true;
+      if (!checkbox.disabled) checkbox.disabled = true;
       checkbox.title = '本表由《人妻公寓》脚本维护，不参与数据库通用手动填表。';
       label.dataset.rqgyScriptOwned = 'true';
     }
@@ -1861,10 +1870,111 @@ function 取消旧版手动面板受保护选择(doc: Document): boolean {
   return 已取消;
 }
 
-function 取消数据库手动面板受保护选择(doc: Document): boolean {
-  const 新版已取消 = 取消新版手动面板受保护选择(doc);
-  const 旧版已取消 = 取消旧版手动面板受保护选择(doc);
+function 取消数据库手动面板受保护选择(doc: Document, 允许重放按钮?: WeakSet<Element>): boolean {
+  const 新版已取消 = 取消新版手动面板受保护选择(doc, 允许重放按钮);
+  const 旧版已取消 = 取消旧版手动面板受保护选择(doc, 允许重放按钮);
   return 新版已取消 || 旧版已取消;
+}
+
+/**
+ * spv8.9.2 的 V2 “全选”直接写组件内部 ref，不经过公开 setManualSelectedTables API。
+ * 捕获阶段不能先放行再用 setTimeout 修正；这里改为阻止插件原 handler，并用逐项点击
+ * 同步构造“全部非脚本表”选择，使组件 ref、持久设置与可见勾选始终保持同一安全集合。
+ */
+async function 执行数据库手动面板安全全选(doc: Document, 允许重放按钮: WeakSet<Element>): Promise<boolean> {
+  let 已处理 = false;
+  for (const panel of doc.querySelectorAll<HTMLElement>('#form-fill-manual-panel')) {
+    for (const item of panel.querySelectorAll<HTMLElement>('.acu-v2-table-selector__item')) {
+      const 名称 = item.querySelector<HTMLElement>('.acu-checkbox__label')?.textContent?.trim() ?? '';
+      const checkbox = item.querySelector<HTMLButtonElement>('button.acu-checkbox[role="checkbox"]');
+      if (!checkbox) continue;
+      已处理 = true;
+      if (是脚本所有权表名(名称)) {
+        if (checkbox.getAttribute('aria-checked') === 'true' && !checkbox.disabled) {
+          安全点击数据库面板控件(checkbox, 允许重放按钮);
+          // V2 每个 checkbox 的 toggle 会从当时的 props.selectedKeys 构造下一集合；必须等
+          // Vue 把本次父级 ref 写回子级后再点下一项，否则连续点击会彼此覆盖，只留下末项。
+          await Promise.resolve();
+        }
+        if (!checkbox.disabled) checkbox.disabled = true;
+        checkbox.setAttribute('aria-disabled', 'true');
+        continue;
+      }
+      if (checkbox.getAttribute('aria-checked') !== 'true' && !checkbox.disabled) {
+        安全点击数据库面板控件(checkbox, 允许重放按钮);
+        await Promise.resolve();
+      }
+    }
+  }
+  for (const container of doc.querySelectorAll<HTMLElement>('[id$="-manual-table-selector"]')) {
+    for (const label of container.querySelectorAll<HTMLLabelElement>('label')) {
+      const 名称 = label.querySelector<HTMLElement>('span')?.textContent?.trim() ?? label.textContent?.trim() ?? '';
+      const checkbox = label.querySelector<HTMLInputElement>('input[type="checkbox"][data-key]');
+      if (!checkbox) continue;
+      已处理 = true;
+      if (是脚本所有权表名(名称)) {
+        if (checkbox.checked && !checkbox.disabled) {
+          安全点击数据库面板控件(checkbox, 允许重放按钮);
+          await Promise.resolve();
+        }
+        if (!checkbox.disabled) checkbox.disabled = true;
+        continue;
+      }
+      if (!checkbox.checked && !checkbox.disabled) {
+        安全点击数据库面板控件(checkbox, 允许重放按钮);
+        await Promise.resolve();
+      }
+    }
+  }
+  return 已处理;
+}
+
+function 数据库手动受保护表选择按钮(button: Element): boolean {
+  const 新版项 = button.closest<HTMLElement>('#form-fill-manual-panel .acu-v2-table-selector__item');
+  if (新版项) {
+    const 名称 = 新版项.querySelector<HTMLElement>('.acu-checkbox__label')?.textContent?.trim() ?? '';
+    return 是脚本所有权表名(名称);
+  }
+  const 旧版标签 = button.closest<HTMLLabelElement>('[id$="-manual-table-selector"] label');
+  if (!旧版标签) return false;
+  const 名称 = 旧版标签.querySelector<HTMLElement>('span')?.textContent?.trim() ?? 旧版标签.textContent?.trim() ?? '';
+  return 是脚本所有权表名(名称);
+}
+
+function 当前数据库含脚本所有权表(): boolean {
+  return 当前数据库脚本所有权表名().length > 0;
+}
+
+function 当前数据库脚本所有权表名(): string[] {
+  const api = 取数据库API();
+  if (!api) return [];
+  const data = 当前数据库表数据(api);
+  if (!data) return [];
+  return 读取数据库表键名(data)
+    .filter(数据库表项受脚本所有权)
+    .map(项 => 项.名称);
+}
+
+/** 执行按钮放行的最终边界：当前实际存在的每张脚本表都必须在面板中可识别且明确未选。 */
+function 数据库手动面板选择已确认安全(doc: Document): boolean {
+  const 预期 = new Set(当前数据库脚本所有权表名());
+  if (!预期.size) return true;
+  const 已见 = new Set<string>();
+  for (const item of doc.querySelectorAll<HTMLElement>(
+    '#form-fill-manual-panel .acu-v2-table-selector__item, [id$="-manual-table-selector"] label',
+  )) {
+    const 名称 =
+      item.querySelector<HTMLElement>('.acu-checkbox__label')?.textContent?.trim() ??
+      item.querySelector<HTMLElement>('span')?.textContent?.trim() ??
+      item.textContent?.trim() ??
+      '';
+    if (!预期.has(名称)) continue;
+    已见.add(名称);
+    const 新版 = item.querySelector<HTMLButtonElement>('button.acu-checkbox[role="checkbox"]');
+    const 旧版 = item.querySelector<HTMLInputElement>('input[type="checkbox"][data-key]');
+    if (新版?.getAttribute('aria-checked') === 'true' || 旧版?.checked === true) return false;
+  }
+  return [...预期].every(名称 => 已见.has(名称));
 }
 
 function 事件目标元素(value: EventTarget | null): Element | null {
@@ -1917,38 +2027,67 @@ function 安装数据库手动填表保护(): void {
     }
     const 文档们 = 收集可访问数据库文档();
     for (const doc of 文档们) {
-      取消数据库手动面板受保护选择(doc);
+      取消数据库手动面板受保护选择(doc, 运行态.允许重放按钮);
       if (!运行态.点击监听.has(doc)) {
         const 点击监听: EventListener = event => {
           const target = 事件目标元素(event.target);
           if (!target) return;
-          const button = target.closest('button');
-          if (!button) return;
-          if (运行态.允许重放按钮.has(button)) {
-            运行态.允许重放按钮.delete(button);
+          const control = target.closest('button,input[type="checkbox"]');
+          if (!control) return;
+          if (运行态.允许重放按钮.has(control)) {
+            运行态.允许重放按钮.delete(control);
             return;
           }
-          const 是新版全选 = Boolean(button.closest('#form-fill-manual-panel')) && button.textContent?.trim() === '全选';
-          const 是旧版全选 = button.id.endsWith('-manual-table-select-all');
-          if (是新版全选 || 是旧版全选) {
+          if (!当前数据库含脚本所有权表()) return;
+          if (数据库手动受保护表选择按钮(control)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            取消数据库手动面板受保护选择(doc, 运行态.允许重放按钮);
+            确保数据库手动填表选择安全();
             安排扫描();
             return;
           }
+          const button = control.closest('button');
+          if (!button) return;
+          const 是新版全选 = Boolean(button.closest('#form-fill-manual-panel')) && button.textContent?.trim() === '全选';
+          const 是旧版全选 = button.id.endsWith('-manual-table-select-all');
+          if (是新版全选 || 是旧版全选) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            确保数据库手动填表选择安全();
+            void 执行数据库手动面板安全全选(doc, 运行态.允许重放按钮).finally(() => {
+              if (运行态.已清理) return;
+              确保数据库手动填表选择安全();
+              安排扫描();
+            });
+            return;
+          }
           if (!数据库手动执行按钮(button)) return;
-          const 本文档取消 = 取消数据库手动面板受保护选择(doc);
-          const API安全 = 确保数据库手动填表选择安全();
-          if (!本文档取消) {
-            if (!API安全) 安排扫描();
+          const 本文档取消 = 取消数据库手动面板受保护选择(doc, 运行态.允许重放按钮);
+          确保数据库手动填表选择安全();
+          if (!本文档取消 && 数据库手动面板选择已确认安全(doc)) {
             return;
           }
           event.preventDefault();
           event.stopImmediatePropagation();
           setTimeout(() => {
             if (运行态.已清理 || !button.isConnected) return;
-            取消数据库手动面板受保护选择(doc);
+            取消数据库手动面板受保护选择(doc, 运行态.允许重放按钮);
             确保数据库手动填表选择安全();
-            运行态.允许重放按钮.add(button);
-            (button as HTMLButtonElement).click();
+            void Promise.resolve().then(() => {
+              if (运行态.已清理 || !button.isConnected) return;
+              if (!数据库手动面板选择已确认安全(doc)) {
+                console.warn('[人妻公寓·数据库] 无法证明手动填表目标已排除脚本所有权表，本次执行已阻止。');
+                eventEmit(
+                  '人妻公寓:提示',
+                  '⚠ 已阻止数据库手动填表：无法确认 RQ_剧情事件与 RQ_社交轨迹已从目标中排除。请关闭数据库面板后重试。',
+                );
+                安排扫描();
+                return;
+              }
+              运行态.允许重放按钮.add(button);
+              (button as HTMLButtonElement).click();
+            });
           }, 0);
         };
         doc.addEventListener('click', 点击监听, true);
@@ -1958,7 +2097,12 @@ function 安装数据库手动填表保护(): void {
         const Observer = doc.defaultView?.MutationObserver;
         if (Observer) {
           const observer = new Observer(() => 安排扫描());
-          observer.observe(doc.documentElement, { childList: true, subtree: true });
+          observer.observe(doc.documentElement, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['disabled', 'aria-checked'],
+          });
           运行态.观察器.set(doc, observer);
         }
       }

@@ -27,7 +27,11 @@ export interface 录像带选项 {
 export function useVideoTape(options: 录像带选项) {
   const { data, 发送中, 清空流式输出, 请求使用, 请求互动, 保存失败交互 } = options;
 
-  const 录像带阶段 = computed(() => (data.value?.系统?._特殊场景?.id === '录像带' ? data.value.系统._特殊场景.阶段 : ''));
+  const 录像带阶段 = computed(() =>
+    ['录像带', '录像带双承接'].includes(data.value?.系统?._特殊场景?.id)
+      ? data.value.系统._特殊场景.阶段
+      : '',
+  );
   const 录像带中 = computed(() => !!录像带阶段.value);
   const 录像带本地结果 = ref<'' | '102' | '202'>('');
   const 录像带连点目标 = 10;

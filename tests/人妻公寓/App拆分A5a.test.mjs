@@ -133,7 +133,9 @@ test('背包模板全量保持：动作/disabled/title/候选循环/户静态表
   assert.match(模板段, /@click="emit\('read', 项\.信门牌!\)">读<\/button>/, '读信按钮');
   assert.match(模板段, /@click="emit\('deploy'\)">装在这个房间<\/button>/, '布设按钮');
   assert.match(模板段, /@click="emit\('useResource', 项\.id\)">\s*使用\s*<\/button>/, '使用资源按钮');
-  assert.match(模板段, /@click="emit\('playTape'\)">\s*在管理员室播放\s*<\/button>/, '播放录像带按钮');
+  assert.match(模板段, /@click="emit\('playTape'\)">/, '录像带仍从既有背包事件进入');
+  assert.match(模板段, /项\.录像带使用文案 \|\| '在管理员室播放'/, '新版筹备使用与旧档播放各有明确文案');
+  assert.match(模板段, /:disabled="sending \|\| !!项\.录像带使用原因"/, '使用前置由同一可用判定保护');
   assert.match(模板段, /@click="emit\('prepareMeeting'\)">\s*筹备会议\s*<\/button>/, '筹备会议按钮');
   assert.match(模板段, /:disabled="sending \|\| !夫\.时段可用"/, '运作对象发送中+时段锁');
   assert.doesNotMatch(模板段, /可装载对象|emit\('load'/, '背包不再承载性癖装载');

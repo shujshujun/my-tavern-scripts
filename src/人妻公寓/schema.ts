@@ -301,8 +301,10 @@ function 旧阶段性癖节点已完成(门牌: string, 妻: 原始记录): bool
   const 节点 = 门牌 === '302' ? 1 : 0;
   const 位图 = Number(线路.完成位图);
   const 活跃节点 = Number(线路.活跃节点);
-  return (Number.isFinite(位图) && (Math.floor(位图) & (1 << 节点)) !== 0) ||
-    (Number.isFinite(活跃节点) && Math.floor(活跃节点) > 节点);
+  return (
+    (Number.isFinite(位图) && (Math.floor(位图) & (1 << 节点)) !== 0) ||
+    (Number.isFinite(活跃节点) && Math.floor(活跃节点) > 节点)
+  );
 }
 
 function 迁移阶段性癖(已迁移: 原始记录): void {
@@ -394,12 +396,242 @@ function 补全生产旧档(input: unknown): unknown {
   return 输出;
 }
 
+const 旧许曼君分居阶段 = new Set([
+  '未开始', '待A1', '待A1封套动作', '待A1通知动作', '待A2', '待A3取袋', '待A3大堂', '待A3进入201',
+  '待A3工资卡动作', 'A3进行中', '待第一次接钥匙', '待第一次离楼', '待第一次封存', '待A4独住对话',
+  '待独住离场动作', '待独住夜完成', '待收起出车表', '待亲密邀请', '亲密进行中', 'A4事后进行中',
+  '待A4事后重答', '待A5取袋', '待A5大堂', '待A5进入201', '待A5取物动作', 'A5进行中',
+  '待第二次接钥匙', '待第二次离楼', '待第二次封存', '待A6', 'A6进行中', '待交接状态', '待最终离楼', '已完成',
+]);
+
+function 旧路线布尔(value: unknown): boolean {
+  return value === true || value === 1 || value === 'true' || value === '1';
+}
+
+function 旧路线时段(value: unknown, fallback = -1): number {
+  const result = Number(value);
+  return Number.isFinite(result) ? Math.round(result) : fallback;
+}
+
+function 完整世界日后最早时段(绝对时段: number, 完整日数: number): number {
+  const 每天时段数 = 6;
+  return Math.floor(Math.max(0, 绝对时段) / 每天时段数) * 每天时段数 + (完整日数 + 1) * 每天时段数;
+}
+
+/**
+ * 把2026-09-03封板前的33阶段《分居》草稿收敛到四幕检查点。草稿从未作为正式外部版本发布，
+ * 但本地试玩档仍可能保存其中任一断点；迁移只消费已成立硬事实，不重放已经归还的工资卡、
+ * 已知关系、真实外住、共同夜晚或双方同意办理。旧通知、封存袋与旧剧情票不再是新路线凭据。
+ */
+function 迁移许曼君分居四幕(input: unknown): unknown {
+  if (!是记录(input) || !是记录(input.系统) || !是记录(input.系统._许曼君分居)) return input;
+  const 旧路线 = input.系统._许曼君分居;
+  if (Number(旧路线.方案版本) === 2) return input;
+  const 旧阶段 = String(旧路线.阶段 ?? '未开始');
+  if (!旧许曼君分居阶段.has(旧阶段)) return input;
+
+  const 副本 = _.cloneDeep(input) as 原始记录;
+  const 系统 = 副本.系统 as 原始记录;
+  const 路线 = 系统._许曼君分居 as 原始记录;
+  const 当前绝对时段 = Math.max(0, Math.floor(Number(系统._绝对时段) || 0));
+  const 已完成表 = Array.isArray(系统._已完成特殊场景) ? 系统._已完成特殊场景.map(String) : [];
+  const 已完成 = 旧阶段 === '已完成' || 已完成表.includes('许曼君分居') || 已完成表.includes('分居');
+  const 工资卡已归还 = 路线.工资卡状态 === '已归还赵国强';
+  const 丈夫已知 = 旧路线布尔(路线.丈夫已知玩家关系);
+  const 丈夫已选择外住 = 旧路线布尔(路线.丈夫已选择外住);
+  const 已有一次封存 =
+    旧路线时段(路线.封条修订, 0) >= 1 ||
+    路线.钥匙位置 === '管理员室201钥匙格' ||
+    路线.封存袋位置 === '管理员室入柜';
+  const 独住夜已完成 =
+    旧路线布尔(路线.独住夜已验证) ||
+    旧路线布尔(路线.出车表已收起) ||
+    ['待亲密邀请', '亲密进行中', 'A4事后进行中', '待A4事后重答', '待A5取袋', '待A5大堂',
+      '待A5进入201', '待A5取物动作', 'A5进行中', '待第二次接钥匙', '待第二次离楼', '待第二次封存',
+      '待A6', 'A6进行中', '待交接状态', '待最终离楼', '已完成'].includes(旧阶段);
+  const 生活用品已取完 =
+    旧路线布尔(路线.第二批用品已取) ||
+    ['待第二次接钥匙', '待第二次离楼', '待第二次封存', '待A6', 'A6进行中', '待交接状态', '待最终离楼', '已完成'].includes(旧阶段);
+  const 修复已提出 = 旧路线布尔(路线.修复已提出) || 生活用品已取完;
+  const 旧妻拒绝 = 旧路线布尔(路线.许曼君已拒绝修复);
+  const 旧玩家已承担 = 旧路线布尔(路线.玩家事后承担);
+  const 双方已同意 =
+    旧路线布尔(路线.双方同意进入办理) || ['待交接状态', '待最终离楼', '已完成'].includes(旧阶段);
+  const 拒绝决定已成立 =
+    旧妻拒绝 &&
+    (生活用品已取完 || 修复已提出 || ['待A6', 'A6进行中', '待交接状态', '待最终离楼', '已完成'].includes(旧阶段));
+  const 共同夜晚已完成 = 旧路线布尔(路线.留宿201权限) || 路线.绑定亲密完整结果 === '完整';
+  const 旧亲密进行中 = 路线.绑定亲密完整结果 === '进行中' || 旧阶段 === '亲密进行中';
+  const 旧绑定场次 = String(路线.绑定亲密场次标识 ?? '').trim();
+  const 当前性爱 = 是记录(系统._性爱场景) ? 系统._性爱场景 : undefined;
+  const 当前参与者 = 当前性爱 && 是记录(当前性爱.参与者) ? 当前性爱.参与者 : undefined;
+  const 当前201参与 = 当前参与者 && 是记录(当前参与者['201']) ? 当前参与者['201'] : undefined;
+  const 当前场次标识 = 当前性爱 ? String(当前性爱.场次标识 ?? '').trim() : '';
+  const 旧亲密可续 = Boolean(
+    旧亲密进行中 &&
+      旧绑定场次 &&
+      当前性爱 &&
+      String(当前性爱.状态 ?? '') !== '空闲' &&
+      当前场次标识 === 旧绑定场次 &&
+      String(当前性爱.主焦点门牌 ?? '') === '201' &&
+      当前参与者 &&
+      Object.keys(当前参与者).length === 1 &&
+      当前201参与 &&
+      !旧路线布尔(当前201参与.已退出),
+  );
+  const 已进入外住事实 = 已有一次封存 || 丈夫已选择外住 || 已完成 || 双方已同意;
+  const 外住起点 = 已进入外住事实 ? Math.max(0, 旧路线时段(路线.外住起点, 当前绝对时段)) : -1;
+
+  let 新阶段 = '待初谈';
+  if (旧阶段 === '未开始') 新阶段 = '未开始';
+  else if (已完成) 新阶段 = '已完成';
+  else if (双方已同意) 新阶段 = '待钥匙转交接';
+  else if (['待A6', 'A6进行中'].includes(旧阶段)) 新阶段 = 旧妻拒绝 ? '待管理员室交接' : '待私下决定';
+  else if (生活用品已取完 || 修复已提出 || ['待第二次接钥匙', '待第二次离楼', '待第二次封存'].includes(旧阶段)) {
+    新阶段 = '等待私下决定';
+  } else if (已有一次封存 && 独住夜已完成) {
+    新阶段 = 旧路线布尔(路线.出车表已收起) ? '待最终取物' : '待独住后谈话';
+  } else if (已有一次封存) {
+    新阶段 = '独住观察中';
+  } else if (丈夫已选择外住 || ['待第一次接钥匙', '待第一次离楼', '待第一次封存'].includes(旧阶段)) {
+    新阶段 = '待登记外住';
+  } else if (旧阶段 !== '待A1') {
+    新阶段 = '待三人摊牌';
+  }
+
+  let 当前场景 = '';
+  let 当前拍 = 0;
+  if (拒绝决定已成立 && !双方已同意) {
+    if (旧玩家已承担) {
+      新阶段 = '待管理员室交接';
+    } else {
+      // 旧妻子的决定已经成立，只恢复第四幕第二拍让玩家回答两人的以后，不能重演她的拒绝。
+      新阶段 = '待私下决定';
+      当前场景 = '第四幕私下决定';
+      当前拍 = 1;
+    }
+  }
+
+  const 原预约时段 = 旧路线时段(路线.预约时段);
+  const 保留预约 =
+    (新阶段 === '待三人摊牌' && String(路线.预约用途).includes('三人')) ||
+    (新阶段 === '待最终取物' && String(路线.预约用途).includes('取物')) ||
+    (新阶段 === '待管理员室交接' && String(路线.预约用途).includes('最终'));
+  const 钥匙用途 = 已完成 || 双方已同意 || 路线.钥匙用途 === '待离婚交接'
+    ? '待离婚交接'
+    : 已有一次封存
+      ? '临时外住'
+      : '普通住户';
+  const 共同夜晚状态 = 共同夜晚已完成
+    ? '已完成'
+    : 旧亲密可续
+      ? '进行中'
+      : 独住夜已完成
+        ? '待接受'
+        : '未邀请';
+  const 私下决定最早时段 = 新阶段 === '等待私下决定'
+    ? Math.max(旧路线时段(路线.最早继续时段), 完整世界日后最早时段(当前绝对时段, 1))
+    : 新阶段 === '待私下决定'
+      ? 当前绝对时段
+      : -1;
+
+  系统._许曼君分居 = {
+    方案版本: 2,
+    阶段: 新阶段,
+    当前场景,
+    当前拍,
+    最早继续时段: 私下决定最早时段,
+    初谈参与方式: 旧路线布尔(路线.玩家已当面承担) ? '当面在场' : '未决定',
+    工资卡状态: 工资卡已归还 ? '已归还赵国强' : '仍由许曼君保管',
+    钥匙位置: 已有一次封存 || 已完成 || 双方已同意 ? '管理员室201钥匙格' : '赵国强持有',
+    钥匙用途,
+    封条修订: 已有一次封存 || 已完成 || 双方已同意 ? Math.max(1, 旧路线时段(路线.封条修订, 1)) : 0,
+    封条完整: 已有一次封存 || 已完成 || 双方已同意,
+    预约时段: 保留预约 && 原预约时段 >= 当前绝对时段 ? 原预约时段 : -1,
+    预约截止时段: 保留预约 && 原预约时段 >= 当前绝对时段 ? 原预约时段 : -1,
+    预约用途: 保留预约
+      ? 新阶段预约用途(新阶段)
+      : '',
+    预约状态: 保留预约 && 原预约时段 >= 当前绝对时段 ? '待到期' : '无',
+    丈夫已知玩家关系: 丈夫已知,
+    丈夫已选择外住,
+    外住起点,
+    独住夜起点: 旧路线时段(路线.独住夜起点),
+    独住夜已完成,
+    独住环境已确认: 旧路线布尔(路线.出车表已收起),
+    出车表已收起: 旧路线布尔(路线.出车表已收起),
+    共同夜晚状态,
+    共同夜晚最早时段: 独住夜已完成 ? 当前绝对时段 : -1,
+    绑定亲密场次标识: 旧亲密可续 ? 当前场次标识 : '',
+    绑定亲密完整结果: 共同夜晚已完成 ? '完整' : 旧亲密可续 ? '进行中' : 旧亲密进行中 ? '未完整' : '未开始',
+    留宿201权限: 共同夜晚已完成,
+    取物完成时段: 生活用品已取完 ? Math.max(0, 旧路线时段(路线.第二次离楼时段, 当前绝对时段)) : -1,
+    生活用品已取完,
+    修复已提出,
+    私下决定最早时段,
+    许曼君已拒绝恢复共同生活: 拒绝决定已成立 || 双方已同意,
+    玩家最终关系选择: 旧玩家已承担 ? '继续关系' : '未决定',
+    双方同意进入办理: 双方已同意,
+    完成楼层: 旧路线时段(路线.完成楼层),
+  };
+
+  if (Array.isArray(副本.背包)) {
+    副本.背包 = 副本.背包.filter(item => !['许曼君署名的会面通知', '201临时钥匙封存袋'].includes(String(item)));
+  }
+  if (typeof 系统._待发送事件 === 'string') {
+    系统._待发送事件 = 系统._待发送事件
+      .split('|')
+      .map(item => item.trim())
+      .filter(item => item && !/【许曼君分居提交:(?:A1|A3|A4独住|A4开场|A4事后|A5|A6):\d+】/u.test(item))
+      .join('|');
+  }
+  if (是记录(系统._场景剧情事务) && /【许曼君分居提交:(?:A1|A3|A4独住|A4开场|A4事后|A5|A6):\d+】/u.test(String(系统._场景剧情事务.内容 ?? ''))) {
+    系统._场景剧情事务 = {};
+  }
+  if (是记录(系统._已注入事件) && /【许曼君分居提交:(?:A1|A3|A4独住|A4开场|A4事后|A5|A6):\d+】/u.test(String(系统._已注入事件.内容 ?? ''))) {
+    系统._已注入事件 = {};
+  }
+
+  const 户表 = 是记录(副本.户) ? 副本.户 : undefined;
+  const 户201 = 户表 && 是记录(户表['201']) ? 户表['201'] : undefined;
+  const 夫 = 户201 && 是记录(户201.夫) ? 户201.夫 : undefined;
+  if (夫) {
+    if (钥匙用途 === '待离婚交接') 夫._居住模式 = '待离婚交接';
+    else if (已有一次封存) 夫._居住模式 = '路线外住';
+    else 夫._居住模式 = '普通作息';
+    夫._预约回楼起 = -1;
+    夫._预约回楼至 = -1;
+  }
+  return 副本;
+}
+
+function 新阶段预约用途(阶段: string): string {
+  if (阶段 === '待三人摊牌') return '201三人摊牌';
+  if (阶段 === '待最终取物') return '赵国强回201取物并提出修复';
+  if (阶段 === '待管理员室交接') return '管理员室离婚前钥匙交接';
+  return '';
+}
+
 function 迁移显式MVU版本(input: unknown): unknown {
   const 已迁移 =
     是记录(input) && 是记录(input.系统) && Object.prototype.hasOwnProperty.call(input.系统, '_数据版本')
       ? 迁移MVU存档到当前版本(input)
       : input;
-  return 补全生产旧档(已迁移);
+  const 已补生产 = 补全生产旧档(已迁移);
+  const 已迁移分居 = 迁移许曼君分居四幕(已补生产);
+  if (!是记录(已迁移分居) || !是记录(已迁移分居.系统) || !是记录(已迁移分居.系统._母亲视频通话终幕)) {
+    return 已迁移分居;
+  }
+  const 视频 = 已迁移分居.系统._母亲视频通话终幕;
+  const 旧最终交接字段 = ['最终', '托', '付已出现'].join('');
+  if (!Object.prototype.hasOwnProperty.call(视频, 旧最终交接字段)) return 已迁移分居;
+  const 副本 = _.cloneDeep(已迁移分居) as 原始记录;
+  const 视频副本 = ((副本.系统 as 原始记录)._母亲视频通话终幕 ?? {}) as 原始记录;
+  if (!Object.prototype.hasOwnProperty.call(视频副本, '最终交接已出现')) {
+    视频副本.最终交接已出现 = 视频副本[旧最终交接字段] === true;
+  }
+  delete 视频副本[旧最终交接字段];
+  return 副本;
 }
 
 /**
@@ -611,10 +843,7 @@ const 妻状态 = z
     /** 本胎生产硬账与 `_怀孕` 分离：实际生产后孕肚状态立即关闭，但住院、通知与幂等票据继续存在。 */
     _生产: z
       .object({
-        状态: z
-          .enum(['无', '孕期', '待产通知', '待产', '陪产中', '住院中', '已出院'])
-          .catch('无')
-          .prefault('无'),
+        状态: z.enum(['无', '孕期', '待产通知', '待产', '陪产中', '住院中', '已出院']).catch('无').prefault('无'),
         本胎序号: z.coerce
           .number()
           .catch(0)
@@ -670,6 +899,8 @@ const 妻状态 = z
       .prefault({}),
     /** P5 服饰:槽→穿着中SKU id(立绘差分文件名后缀;脚本写,AI不可见) */
     _穿着SKU: z.record(z.string(), z.string()).catch({}).prefault({}),
+    /** 角色个人衣柜，仅存已赠服饰 ID；脚本维护，不进入 AI 变量视图。 */
+    _衣柜: z.array(z.string()).prefault([]),
     _要钱次数: nonNegInt(0), // P3:L3 要钱按钮累计(≥2 触发"向丈夫开口"疑心+)
     _上次要钱楼层: floorMark(-1),
   })
@@ -692,6 +923,17 @@ const 夫状态 = z
     // ── P3 运作道具窗口(绝对时段语义;机制不可见,AI 只看到剧情皮) ──
     _疑心冻结至: floorMark(-1), // 钓鱼团购券:窗口内疑心只降不涨
     _外出至: floorMark(-1), // 夜班内推/外地项目:窗口内丈夫状态强制外出
+    /** 剧情预约使用闭合起点＋右开终点，避免提前写终点后把丈夫从当前时刻一路强制外出。 */
+    _剧情外出起: floorMark(-1),
+    _剧情外出至: floorMark(-1),
+    /** 后半程丈夫路线的统一居住真值；路线外住不得用超长 `_剧情外出至` 冒充。 */
+    _居住模式: z
+      .enum(['普通作息', '路线外住', '预约回楼', '待离婚交接', '正式退居'])
+      .catch('普通作息')
+      .prefault('普通作息'),
+    /** 预约回楼使用闭合起点＋右开终点；只有居住模式=预约回楼时才生效。 */
+    _预约回楼起: floorMark(-1),
+    _预约回楼至: floorMark(-1),
     _上次出差楼: floorMark(-1), // 外地项目每户冷却
     _上次打断档: floorMark(-1), // 打断系统频控:同户同时段最多打断一次(存时段档号)
   })
@@ -908,6 +1150,68 @@ const 家庭孩子档案 = z.object({
   出生场次标识: z.string().prefault(''),
 });
 
+/**
+ * 正式《录像带》双承接只保存已提交的硬进度；单张 CG 是否成功渲染不进入存档。
+ * 旧 `_特殊场景.id = 录像带` 与无版本五格试播均不迁入这里。
+ */
+const 录像带双承接房间状态 = z.object({
+  状态: z.enum(['未开始', '进行中', '待复锁', '已安全中断', '已结算']).catch('未开始').prefault('未开始'),
+  硬状态: z
+    .enum([
+      'idle',
+      'locked',
+      'opening-playing-locked',
+      'authorized',
+      'self-unlocked',
+      'full-tape-playing',
+      'husband-completed',
+      'self-relocked',
+      'visually-verified',
+      'settled',
+    ])
+    .catch('idle')
+    .prefault('idle'),
+  平板序号: z.coerce
+    .number()
+    .catch(0)
+    .transform(v => (isNaN(v) ? 0 : _.clamp(Math.floor(v), 0, 10)))
+    .prefault(0),
+  外层序号: z.coerce
+    .number()
+    .catch(0)
+    .transform(v => (isNaN(v) ? 0 : _.clamp(Math.floor(v), 0, 9)))
+    .prefault(0),
+  已提交键: z.array(z.string()).catch([]).prefault([]),
+  中断原因: z.string().prefault(''),
+  最近提交键: z.string().prefault(''),
+});
+
+/**
+ * 《录像带》V4 与旧三拍/V2双轨并存但绝不互相迁移。V4只保存可审计硬账、专用摘要与
+ * 操作世代；AI原文留在 `vtr:<sceneId>` 隔离线程，不能进入普通正文历史。
+ */
+const 录像带V4赠锁状态 = z.object({
+  已接收: bool(),
+  接收绝对时段: floorMark(-1),
+});
+const 录像带V4微信线程状态 = z.object({
+  戴锁已确认: bool(),
+  同意已确认: bool(),
+});
+const 录像带V4锁具状态 = z
+  .enum([
+    'idle',
+    'locked',
+    'self-unlocked',
+    'full-tape-playing',
+    'husband-completed',
+    'self-relocked',
+    'visually-verified',
+    'settled',
+  ])
+  .catch('idle')
+  .prefault('idle');
+
 const 当前Schema = z.object({
   /** 门牌号 → 户;未入住无键(休眠),Zod record 容忍缺键(防护10-②) */
   户: z.record(z.string(), 户节点).prefault({}),
@@ -1027,6 +1331,97 @@ const 当前Schema = z.object({
           会场私聊摘要楼层: floorMark(-1),
         })
         .prefault({}),
+      /**
+       * 《录像带》正式 v2 的两户独立轨道与强制复锁生命周期。
+       * 它不复用旧特殊场景三拍状态，旧档缺失时安全补成未开始。
+       */
+      _录像带双承接: z
+        .object({
+          版本: z.literal(2).catch(2).prefault(2),
+          场次标识: z.string().prefault(''),
+          状态: z
+            .enum(['未开始', '进行中', '待安全收束', '待双路结算', '已安全中断', '已完成'])
+            .catch('未开始')
+            .prefault('未开始'),
+          房间: z
+            .object({
+              '102': 录像带双承接房间状态.prefault({}),
+              '202': 录像带双承接房间状态.prefault({}),
+            })
+            .prefault({}),
+        })
+        .prefault({}),
+      /**
+       * 《录像带》V4：购买/赠锁/两日微信与双房共享19幕的唯一硬状态。
+       * 旧 `_特殊场景.id=录像带|录像带双承接` 不会自动写入这里。
+       */
+      _录像带V4: z
+        .object({
+          版本: z.literal(4).catch(4).prefault(4),
+          阶段: z
+            .enum([
+              '未开始',
+              '待购录像带',
+              '待使用录像带',
+              '待购赠锁',
+              '等待两日',
+              '微信确认中',
+              '监控就绪',
+              '观看中',
+              '已安全中断',
+              '已完成',
+            ])
+            .catch('未开始')
+            .prefault('未开始'),
+          录像带已购买: bool(),
+          /** 缺失此版本号的旧实例只按实际赠锁/现场证据继承使用状态。 */
+          入口规则版本: z.union([z.literal(0), z.literal(1)]).prefault(0),
+          录像带已使用: bool(),
+          赠锁: z
+            .object({
+              '102': 录像带V4赠锁状态.prefault({}),
+              '202': 录像带V4赠锁状态.prefault({}),
+            })
+            .prefault({}),
+          第二把送达绝对时段: floorMark(-1),
+          微信到期绝对时段: floorMark(-1),
+          微信: z
+            .object({
+              '102': 录像带V4微信线程状态.prefault({}),
+              '202': 录像带V4微信线程状态.prefault({}),
+              两户确认完成: bool(),
+              联合出发已通知: bool(),
+              通知线程: z.enum(['', '102', '202']).catch('').prefault(''),
+              监控就绪: bool(),
+            })
+            .prefault({}),
+          场景: z
+            .object({
+              场次标识: z.string().prefault(''),
+              状态: z.enum(['未开始', '观看中', '已安全中断', '已完成']).catch('未开始').prefault('未开始'),
+              共享幕次: z.coerce
+                .number()
+                .catch(0)
+                .transform(v => (isNaN(v) ? 0 : _.clamp(Math.floor(v), 0, 19)))
+                .prefault(0),
+              当前房间: z.enum(['102', '202']).catch('102').prefault('102'),
+              请求世代: nonNegInt(0),
+              已提交画面键: z.array(z.string()).catch([]).prefault([]),
+              已提交操作键: z.array(z.string()).catch([]).prefault([]),
+              时间码秒: nonNegInt(0),
+              失败次数: nonNegInt(0),
+              中断原因: z.string().prefault(''),
+              锁具状态: z
+                .object({
+                  '102': 录像带V4锁具状态,
+                  '202': 录像带V4锁具状态,
+                })
+                .prefault({}),
+            })
+            .prefault({}),
+          结果摘要: z.string().prefault(''),
+        })
+        .prefault({}),
       /** 夏乔家庭计划：五日筹备、微信已读与一次性赴约共用的硬生命周期。 */
       _家庭计划: z
         .object({
@@ -1047,6 +1442,393 @@ const 当前Schema = z.object({
             .prefault('未开始'),
           最早继续日: floorMark(-1),
           完成楼层: floorMark(-1),
+        })
+        .prefault({}),
+      /** 周小满《不再留门》：物件权威位置与逐拍事实随同一楼层快照保存。 */
+      _不再留门: z.object({
+        版本: z.literal(1).prefault(1),
+        实例: z.string().prefault(''),
+        来源时间线: z.string().prefault(''),
+        道具已使用: bool(),
+        阶段: z.enum(['未开始', '开场中', '待目击', '目击中', '可拍', '持有照片', '出示中', '待交付', '待决定', '决定中', '待准备', '待开录', '开录中', '录制中', '待转存', '待封存', '封存中', '待归档', '已完成']).prefault('未开始'),
+        当前场景: z.enum(['', 'A1', 'A2', 'A4', 'A5', 'A7', 'A9']).prefault(''),
+        当前拍: nonNegInt(0),
+        修订: nonNegInt(0),
+        已提交票: z.string().prefault(''),
+        开场时段: floorMark(-1),
+        机会最早时段: floorMark(-1),
+        可拍时段: floorMark(-1),
+        目击历史: z.array(nonNegInt(0)).prefault([]),
+        照片: z.object({
+          id: z.string().prefault(''), 时间线: z.string().prefault(''),
+          拍摄时段: floorMark(-1), 地点: z.string().prefault(''),
+          人物: z.array(z.string()).prefault([]), 画面: z.string().prefault(''),
+          原件位置: z.enum(['', '玩家手机']).prefault(''),
+          已看过: bool(), 出示楼层: floorMark(-1),
+          副本持有人: z.enum(['', '周小满']).prefault(''), 交付楼层: floorMark(-1),
+        }).prefault({}),
+        动机已表达: bool(), 录制提议: bool(),
+        许可: z.enum(['未确认', '同意本次', '已撤回']).prefault('未确认'),
+        停止默认等待: bool(), 同意时段: floorMark(-1),
+        设备位置: z.enum(['无', '背包', '202']).prefault('无'),
+        预约起: floorMark(-1), 预约至: floorMark(-1),
+        录制次数: nonNegInt(0),
+        记录: z.object({
+          id: z.string().prefault(''), 场次标识: z.string().prefault(''), 来源实例: z.string().prefault(''),
+          地点: z.string().prefault(''), 参与者: z.array(z.string()).prefault([]),
+          开始时段: floorMark(-1), 开始楼层: floorMark(-1),
+          造型: z.string().prefault(''), 许可范围: z.string().prefault(''),
+          正文楼层: z.array(nonNegInt(0)).prefault([]),
+          正常完成: bool(), 完成楼层: floorMark(-1),
+          位置: z.enum(['无', '手机', '介质', '封盒', '已放弃']).prefault('无'),
+        }).prefault({}),
+        放弃记录: z.array(z.string()).prefault([]),
+        母带: z.object({
+          id: z.string().prefault(''), 来源记录: z.string().prefault(''),
+          位置: z.enum(['无', '玩家背包', '302资料柜']).prefault('无'),
+          封存楼层: floorMark(-1), 归档楼层: floorMark(-1),
+        }).prefault({}),
+      }).prefault({}),
+      /** 沈静仪《第二机位》：门缝、监控复核、对饮空窗、真实录制与302归档共用的硬生命周期。 */
+      _第二机位: z
+        .object({
+          阶段: z
+            .enum([
+              '未开始',
+              '待门缝',
+              '待复核',
+              '待对饮',
+              '待告知',
+              '待购套件',
+              '待赴约',
+              '待开录',
+              '录制中',
+              '待封存',
+              '待归档',
+              '已完成',
+            ])
+            .catch('未开始')
+            .prefault('未开始'),
+          最早继续日: floorMark(-1),
+          /** 只绑定本次CAM-2真实亲密场次；普通102亲密不能误生成母带。 */
+          录制场次标识: z.string().prefault(''),
+          完成楼层: floorMark(-1),
+        })
+        .prefault({}),
+      /** 许曼君承接线《分居》四幕版：一次钥匙封存、真实独住、可选共同夜晚与跨日离婚前交接。 */
+      _许曼君分居: z
+        .object({
+          方案版本: z.literal(2).catch(2).prefault(2),
+          阶段: z
+            .enum([
+              '未开始',
+              '待初谈',
+              '待三人摊牌',
+              '待登记外住',
+              '独住观察中',
+              '待独住后谈话',
+              '待最终取物',
+              '等待私下决定',
+              '待私下决定',
+              '待管理员室交接',
+              '待钥匙转交接',
+              '已完成',
+            ])
+            .catch('未开始')
+            .prefault('未开始'),
+          当前场景: z
+            .enum(['', '第一幕初谈', '第二幕摊牌', '第三幕独住后', '共同夜晚开场', '第四幕取物提案', '第四幕私下决定', '第四幕管理员室交接'])
+            .catch('')
+            .prefault(''),
+          当前拍: nonNegInt(0),
+          最早继续时段: floorMark(-1),
+          初谈参与方式: z.enum(['未决定', '当面在场', '先夫妻谈', '暂缓']).catch('未决定').prefault('未决定'),
+          工资卡状态: z.enum(['仍由许曼君保管', '已归还赵国强']).catch('仍由许曼君保管').prefault('仍由许曼君保管'),
+          钥匙位置: z.enum(['赵国强持有', '管理员室201钥匙格']).catch('赵国强持有').prefault('赵国强持有'),
+          钥匙用途: z.enum(['普通住户', '临时外住', '待离婚交接', '正式退居']).catch('普通住户').prefault('普通住户'),
+          封条修订: nonNegInt(0),
+          封条完整: bool(),
+          预约时段: floorMark(-1),
+          预约截止时段: floorMark(-1),
+          预约用途: z.string().prefault(''),
+          预约状态: z.enum(['无', '待到期', '进行中', '已完成']).catch('无').prefault('无'),
+          丈夫已知玩家关系: bool(),
+          丈夫已选择外住: bool(),
+          外住起点: floorMark(-1),
+          独住夜起点: floorMark(-1),
+          独住夜已完成: bool(),
+          独住环境已确认: bool(),
+          出车表已收起: bool(),
+          共同夜晚状态: z.enum(['未邀请', '待接受', '进行中', '已完成', '已放弃']).catch('未邀请').prefault('未邀请'),
+          共同夜晚最早时段: floorMark(-1),
+          绑定亲密场次标识: z.string().prefault(''),
+          绑定亲密完整结果: z.enum(['未开始', '进行中', '未完整', '完整']).catch('未开始').prefault('未开始'),
+          留宿201权限: bool(),
+          取物完成时段: floorMark(-1),
+          生活用品已取完: bool(),
+          修复已提出: bool(),
+          私下决定最早时段: floorMark(-1),
+          许曼君已拒绝恢复共同生活: bool(),
+          玩家最终关系选择: z.enum(['未决定', '继续关系', '退出关系', '暂不承诺']).catch('未决定').prefault('未决定'),
+          双方同意进入办理: bool(),
+          完成楼层: floorMark(-1),
+        })
+        .prefault({}),
+      /** 许曼君正式结局《离婚》：法律办理、旧钥匙归档、换锁、《最后一笔》与旧档完成事实共用的唯一硬状态。 */
+      _许曼君离婚: z
+        .object({
+          版本: z.literal(1).catch(1).prefault(1),
+          阶段: z
+            .enum([
+              '未开始',
+              '已购买',
+              '待办理',
+              '待公开站位',
+              '待归档旧钥匙',
+              '待归档确认',
+              '待领取新锁',
+              '待换锁',
+              '等待邀请',
+              '待最后一笔',
+              '最后一笔中',
+              '待非成人收束',
+              '已完成',
+            ])
+            .catch('未开始')
+            .prefault('未开始'),
+          当前场景: z
+            .enum(['', '预约办理', '办理等待', '办理见证', '归档确认', 'H1婚纱开门', 'H2开盒', 'H7摆目标', 'H8结果', 'H9封存', '非成人收束'])
+            .catch('')
+            .prefault(''),
+          当前拍: nonNegInt(0),
+          道具已购买: bool(),
+          道具已使用: bool(),
+          办理预约时段: floorMark(-1),
+          法律离婚已成立: bool(),
+          玩家公开站位选择: z
+            .enum(['', '当着赵国强牵住她', '等赵国强离开再抱她'])
+            .catch('')
+            .prefault(''),
+          旧钥匙状态: z
+            .enum(['待离婚交接', '前住户旧钥匙归档', '旧档未记录'])
+            .catch('待离婚交接')
+            .prefault('待离婚交接'),
+          赵国强正式退居: bool(),
+          新锁芯位置: z
+            .enum(['未取得', '玩家背包', '201已安装', '旧档未记录'])
+            .catch('未取得')
+            .prefault('未取得'),
+          新钥匙位置: z
+            .enum(['未取得', '玩家背包', '许曼君保管', '旧档未记录'])
+            .catch('未取得')
+            .prefault('未取得'),
+          换锁完成: bool(),
+          换锁完成时段: floorMark(-1),
+          邀请状态: z
+            .enum(['未建立', '等待时段', '待发送', '已送达', '旧档未记录'])
+            .catch('未建立')
+            .prefault('未建立'),
+          邀请最早时段: floorMark(-1),
+          重试最早时段: floorMark(-1),
+          H阶段: z
+            .enum(['未开始', 'H1', 'H2', '待H3', 'H3', 'H4', 'H5', 'H6', 'H7', 'H8', 'H8结果待演', 'H9', '已完成'])
+            .catch('未开始')
+            .prefault('未开始'),
+          终幕目标: z.enum(['', '红本', '婚戒', '戒印']).catch('').prefault(''),
+          绑定亲密场次标识: z.string().prefault(''),
+          H有效回合: z.array(nonNegInt(0)).prefault([]),
+          H8状态: z.enum(['未到达', '待选择', '已停止', '已确认']).catch('未到达').prefault('未到达'),
+          戒印长按失败次数: nonNegInt(0),
+          封存盒位置: z
+            .enum(['未购买', '背包', '201', '私密抽屉', '旧档未记录'])
+            .catch('未购买')
+            .prefault('未购买'),
+          封存物件: z
+            .enum(['', '封存的红本', '封存的婚戒', '戒印红本', '旧档未记录'])
+            .catch('')
+            .prefault(''),
+          CG回忆: z.array(z.string()).prefault([]),
+          完成分支: z.enum(['', '成人', '非成人', '旧档未记录']).catch('').prefault(''),
+          完成楼层: floorMark(-1),
+        })
+        .prefault({}),
+      /** 正式《离婚》后的独立201日常：真实入口、整日冷却、近期记忆与手机反馈收据。 */
+      _许曼君离婚后日常: z
+        .object({
+          版本: z.literal(2).catch(2).prefault(2),
+          阶段: z.enum(['空闲', '待收针']).catch('空闲').prefault('空闲'),
+          当前事件ID: z.string().prefault(''),
+          当前主题: z.enum(['', '给自己改衣服', '重排201', '给自己留一笔生活钱']).catch('').prefault(''),
+          当前选择: z
+            .enum(['', '陪她把这件事做完', '把决定留给她', '只处理201房务', '听她把边界说清'])
+            .catch('')
+            .prefault(''),
+          当前关系: z.enum(['', '继续关系', '暂不承诺', '退出关系']).catch('').prefault(''),
+          开始时段: floorMark(-1),
+          开始楼层: floorMark(-1),
+          累计次数: nonNegInt(0),
+          最近事件ID: z.string().prefault(''),
+          最近主题: z.enum(['', '给自己改衣服', '重排201', '给自己留一笔生活钱']).catch('').prefault(''),
+          最近选择: z
+            .enum(['', '陪她把这件事做完', '把决定留给她', '只处理201房务', '听她把边界说清'])
+            .catch('')
+            .prefault(''),
+          最近关系: z.enum(['', '继续关系', '暂不承诺', '退出关系']).catch('').prefault(''),
+          最近事件时段: floorMark(-1),
+          最近事件楼层: floorMark(-1),
+          下次可用时段: floorMark(-1),
+          最近摘要: z.string().prefault(''),
+          近期主题: z
+            .array(z.enum(['给自己改衣服', '重排201', '给自己留一笔生活钱']))
+            .catch([])
+            .prefault([]),
+          生活整备可用: bool(),
+          生活整备来源事件ID: z.string().prefault(''),
+          事件记录: z
+            .array(
+              z.object({
+                id: z.string().prefault(''),
+                主题: z.enum(['给自己改衣服', '重排201', '给自己留一笔生活钱']).catch('给自己改衣服').prefault('给自己改衣服'),
+                选择: z
+                  .enum(['陪她把这件事做完', '把决定留给她', '只处理201房务', '听她把边界说清'])
+                  .catch('把决定留给她')
+                  .prefault('把决定留给她'),
+                关系: z.enum(['继续关系', '暂不承诺', '退出关系']).catch('暂不承诺').prefault('暂不承诺'),
+                发生时段: floorMark(-1),
+                发生楼层: floorMark(-1),
+                摘要: z.string().prefault(''),
+              }),
+            )
+            .catch([])
+            .prefault([]),
+          待反馈事件: z
+            .array(
+              z.object({
+                事件ID: z.string().prefault(''),
+                消息键: z.string().prefault(''),
+                可发送时段: floorMark(-1),
+                文案: z.string().prefault(''),
+              }),
+            )
+            .catch([])
+            .prefault([]),
+        })
+        .prefault({}),
+      /** 母亲承接剧情《回国》：经营归档、父亲延迟微信、姐妹茶话会与口头回国意向共用的硬生命周期。 */
+      _回国: z
+        .object({
+          阶段: z
+            .enum([
+              '未开始',
+              '待使用经营归档册',
+              '待父亲回信',
+              '待读回国消息',
+              '待收纳',
+              '待存箱',
+              '待看记录',
+              '待姐妹茶话会',
+              '姐妹茶话会进行中',
+              '待旧委托',
+              '待夜谈',
+              '待父亲询问',
+              '待母亲回复父亲',
+              '待父亲准备答复',
+              '待确认交接意向',
+              '已完成',
+            ])
+            .catch('未开始')
+            .prefault('未开始'),
+          最早继续日: floorMark(-1),
+          父亲最早回信日: floorMark(-1),
+          父亲最早回信时段: floorMark(-1),
+          茶话会状态: z
+            .enum(['未开始', '入群演绎', '逐人调侃', '交代正事', '已完成'])
+            .catch('未开始')
+            .prefault('未开始'),
+          茶话会成员快照: z.array(z.string()).catch([]).prefault([]),
+          群名反应已完成: bool(),
+          已点评成员: z.array(z.string()).catch([]).prefault([]),
+          已回应点评成员: z.array(z.string()).catch([]).prefault([]),
+          已回应回国成员: z.array(z.string()).catch([]).prefault([]),
+          母亲已坦白: bool(),
+          玩家已发言: bool(),
+          正事已说明: bool(),
+          正事已收束: bool(),
+          茶话会结构摘要: z.string().prefault(''),
+          后续私聊待触发成员: z.array(z.string()).catch([]).prefault([]),
+          后续私聊已触发成员: z.array(z.string()).catch([]).prefault([]),
+          后续私聊最早时段: floorMark(-1),
+          完成楼层: floorMark(-1),
+        })
+        .prefault({}),
+      /** 母亲结局《双重继承》：商店场景票、公共验收、完全交权、三日早餐、机场视频与终幕后收束。 */
+      _双重继承: z
+        .object({
+          阶段: z
+            .enum([
+              '未开始',
+              '待使用双重继承',
+              '待父亲回楼',
+              '公共区域检查中',
+              '待管理员室交权',
+              '管理员室剧情中',
+              '待领取公寓楼总钥匙',
+              '等待三日早餐',
+              '早餐剧情中',
+              '待机场视频',
+              '视频已预约',
+              '待总钥匙归位',
+              '已完成',
+            ])
+            .catch('未开始')
+            .prefault('未开始'),
+          已检查公共区域: z.array(z.string()).catch([]).prefault([]),
+          最早父亲到楼时段: floorMark(-1),
+          最早早餐日: floorMark(-1),
+          最早视频时段: floorMark(-1),
+          群聊余波状态: z.enum(['未建立', '待发送', '已完成']).catch('未建立').prefault('未建立'),
+          群聊余波最早时段: floorMark(-1),
+          父亲家常联络序号: nonNegInt(0),
+          下次父亲家常联络时段: floorMark(-1),
+          启动楼层: floorMark(-1),
+          完成楼层: floorMark(-1),
+        })
+        .prefault({}),
+      /** 《双重继承》后的302自由阶段：只保存共居真值、亲密开场记录与待反馈收据。 */
+      _302共居: z
+        .object({
+          版本: z.literal(1).catch(1).prefault(1),
+          状态: z.enum(['未开启', '共居']).catch('未开启').prefault('未开启'),
+          开始绝对时段: floorMark(-1),
+          最近事件: z.string().prefault(''),
+          最近事件时段: floorMark(-1),
+          里程碑: z.array(z.string()).catch([]).prefault([]),
+          事件序号: nonNegInt(0),
+          事件记录: z
+            .array(
+              z.object({
+                id: z.string().prefault(''),
+                类型: z.string().prefault(''),
+                发生时段: floorMark(-1),
+                摘要: z.string().prefault(''),
+                朋友圈范围: z.enum(['公开', '仅你可见', '不发布']).catch('不发布').prefault('不发布'),
+              }),
+            )
+            .catch([])
+            .prefault([]),
+          /** 只保留尚未被手机持久收据确认的反馈；不受12条近期事件裁剪影响。 */
+          待反馈事件: z
+            .array(
+              z.object({
+                id: z.string().prefault(''),
+                类型: z.string().prefault(''),
+                发生时段: floorMark(-1),
+                摘要: z.string().prefault(''),
+                朋友圈范围: z.enum(['公开', '仅你可见', '不发布']).catch('不发布').prefault('不发布'),
+              }),
+            )
+            .catch([])
+            .prefault([]),
         })
         .prefault({}),
       /** 生产完成后追加的家庭文档；不覆盖旧孩子，也不按世界钟逐时段成长。 */
@@ -1266,6 +2048,8 @@ const 当前Schema = z.object({
       _父亲通话: z
         .object({
           标识: z.string().prefault(''),
+          /** 普通楼务电话留空；母亲结局视频固定为“双重继承视频”。 */
+          模式: z.string().prefault(''),
           状态: z.string().prefault(''), // ''=空闲；通话中；收尾中
           期: floorMark(-1),
           分数段: z.string().prefault(''),
@@ -1298,6 +2082,55 @@ const 当前Schema = z.object({
             .prefault({}),
           下次回复序号: nonNegInt(1),
           挂断楼层: floorMark(-1),
+        })
+        .prefault({}),
+      /**
+       * 《双重继承》机场微信视频终幕。30个旧生成任务最终形成53张用户候选，
+       * 加复用005共54张；入场只走一次，普通微信回合只在005起的含入段循环。
+       * 全字段均由脚本写入，正文模型只能读取专用最小快照，不能直接更新。
+       */
+      _母亲视频通话终幕: z
+        .object({
+          标识: z.string().prefault(''),
+          状态: z
+            .enum([
+              '',
+              '待接听',
+              '通话中',
+              '等待现场正文',
+              '正文生成中',
+              '正文失败',
+              '结束衔接',
+              '等待最终回答',
+              '终幕中',
+              '已完成',
+            ])
+            .catch('')
+            .prefault(''),
+          当前CG: z.string().prefault(''),
+          微信轮次: nonNegInt(0),
+          待现场正文序号: nonNegInt(0),
+          现场正文请求世代: nonNegInt(0),
+          已完成现场正文序号: nonNegInt(0),
+          上轮现场正文: z.string().prefault(''),
+          现场正文记录: z
+            .array(
+              z.object({
+                序号: nonNegInt(0),
+                CG: z.string().prefault(''),
+                文: z.string().prefault(''),
+              }),
+            )
+            .catch([])
+            .prefault([]),
+          现场正文失败: z.string().prefault(''),
+          结束请求: bool(),
+          最终交接已出现: bool(),
+          玩家最终回答已保存: bool(),
+          父亲已挂断: bool(),
+          终幕CG序号: nonNegInt(0),
+          启动楼层: floorMark(-1),
+          启动绝对时段: floorMark(-1),
         })
         .prefault({}),
     })
