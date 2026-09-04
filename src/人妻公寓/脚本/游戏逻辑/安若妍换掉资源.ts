@@ -1,12 +1,14 @@
 import type { SchemaType } from '../../schema';
 import { 房间生产背景键 } from './生产系统';
 
-/** 发布前由验收环境注入真实基址；未安装素材时返回空地址。 */
+/** 31张无损WebP已安装；发布前由验收环境注入真实基址。 */
 export const 安若妍换掉素材发布配置 = Object.freeze({
   仓库: '',
   不可变标签: '',
   产品目录: 'src/人妻公寓/素材/特殊场景/安若妍换掉',
-  状态: '待素材' as '待素材' | '已发布',
+  manifest: '安若妍换掉CG.manifest.json',
+  文件数: 31,
+  状态: '待不可变标签' as '待不可变标签' | '已发布',
 });
 export const 安若妍换掉CG占位图 =
   'data:image/svg+xml;charset=utf-8,' +

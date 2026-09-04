@@ -1,0 +1,1053 @@
+{
+  "schemaVersion": "rqgy-anruoyan-301-replace-product-manifest-v1",
+  "updatedAt": "2026-09-05",
+  "route": "安若妍301结局线:换掉",
+  "status": "product-webp-ready-awaiting-external-publish",
+  "runtimeSlots": 13,
+  "acceptedFiles": 31,
+  "storyFiles": 19,
+  "persistentBackgroundFiles": 12,
+  "format": "webp",
+  "dimensions": {
+    "width": 1536,
+    "height": 1024,
+    "aspectRatio": "3:2"
+  },
+  "encoder": {
+    "library": "Pillow 12.3.0",
+    "format": "WEBP",
+    "lossless": true,
+    "quality": 100,
+    "method": 6,
+    "exact": true,
+    "resize": false
+  },
+  "qualityEvidence": {
+    "decodedPixelsIdenticalFiles": 31,
+    "sourceBytes": 58724615,
+    "productBytes": 39923840,
+    "savedBytes": 18800775,
+    "savedPercent": 32.015,
+    "outsideFrameUnchangedBackgrounds": 8,
+    "visualReview": "31张原始分辨率逐图复核通过；2026-09-05用户确认现稿全部接入。"
+  },
+  "bodyStatePolicy": {
+    "strictVariantSlots": [
+      "ARY-RPL-06",
+      "ARY-RPL-07",
+      "ARY-RPL-08",
+      "ARY-RPL-09",
+      "ARY-RPL-10",
+      "ARY-RPL-11"
+    ],
+    "frozenFinalPhotos": {
+      "normal": "ARY-RPL-10-N",
+      "pregnant": "ARY-RPL-10-P"
+    },
+    "backgroundRooms": [
+      "BASE",
+      "BABY1",
+      "BABY2",
+      "BABY3"
+    ],
+    "freezeAt": "P2"
+  },
+  "sourceEvidence": {
+    "manifests": [
+      {
+        "path": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/composite-manifest-v1.json",
+        "sha256": "DBC9B0F1BBAB8000F694097896A88A842FCC84119BADA61BFB9E538E173907BB"
+      },
+      {
+        "path": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/p1-manifest-v1.json",
+        "sha256": "4C8217A81CD5862128470F9E5A1C6885D8D7BEE8480B0B3F6F7C284C51DA29E8"
+      },
+      {
+        "path": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/photo-manifest-v1.json",
+        "sha256": "30B2A9FD5A5ABBF5A4B463A6E7BAD2B525EBD5F31A8581D0249901626BCE056E"
+      },
+      {
+        "path": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/h10-manifest-v1.json",
+        "sha256": "6979FDDC168F86E7C4696267B333C805583EDB3015E9BEB6281A43AA5DCF421E"
+      },
+      {
+        "path": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/h1-manifest-v2.json",
+        "sha256": "670CC02C426FFA47AA2ECB5D25835CFDFBA92F37FADF371E23141590958B9DDE"
+      },
+      {
+        "path": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/builtin-story-manifest-v1.json",
+        "sha256": "3D5FEA621EE3BBBFC0EB4C9C0716480C5484AB167C89452E8022E4C447809AFB"
+      },
+      {
+        "path": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/background-manifest-v1.json",
+        "sha256": "4D2DC8AB44A506D3A090A386251A579B916847A0A9B7C278DDD77BAF723D9351"
+      }
+    ],
+    "acceptedOriginalsPreserved": 31
+  },
+  "publish": {
+    "repository": "",
+    "immutableTag": "",
+    "runtimeDirectory": "src/人妻公寓/素材/特殊场景/安若妍换掉",
+    "globalPreviewOverride": "__RQGY_ARY_REPLACE_ASSET_BASE__"
+  },
+  "items": [
+    {
+      "id": "ARY-RPL-01",
+      "kind": "story",
+      "variant": "shared",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/built-in-candidates/ARY-RPL-01/draw1/ARY-RPL-01_旧结婚照前的计划.png",
+      "sourceSha256": "5E62BF269B7CF800915EA535181DF825BF7BD3B871BB98AC73715EE59C465872",
+      "sourceBytes": 2238540,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/builtin-story-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-01_BUILTIN_draw1.md",
+      "sourceReviewSha256": "83CB0F4A197467673A76258A67A7A17802E922135D5F253706ADC30C37313218",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-01.webp",
+      "productSha256": "8EB94EE2DB440371E4EB0A2FA2B5FB1D32235028563A8243B64FAD835441978C",
+      "productBytes": 1442082,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "F3C077238AD044AFEF7487733BF4AD4FDA1B3CE21BFB36B175C8E22ED696BEA1",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": []
+      }
+    },
+    {
+      "id": "ARY-RPL-02",
+      "kind": "story",
+      "variant": "shared",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/built-in-candidates/ARY-RPL-02/draw1/ARY-RPL-02_拍立得试机.png",
+      "sourceSha256": "F3A59AE23939AA479A6DF2AC902F0A4BE0DD035DFBB22B4C6E687AAFCF057835",
+      "sourceBytes": 2258865,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/builtin-story-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-02_BUILTIN_draw1.md",
+      "sourceReviewSha256": "37E8FD879856E42BBC147D5AEBD07887EC25F1A8AF6B32C5311BE01401AD365E",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-02.webp",
+      "productSha256": "E7849A3AFE9F02D4E1CA25738A63BBA8F6AD1FD1AA5263CBF41FCC20508B0B3D",
+      "productBytes": 1470600,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "695FE04189E7A6040633B8A612C1000D7AF037F9B7888DAD83C390EFF8349ED5",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": []
+      }
+    },
+    {
+      "id": "ARY-RPL-03",
+      "kind": "story",
+      "variant": "shared",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/built-in-candidates/ARY-RPL-03/draw1/ARY-RPL-03_预约江辰明晚回来.png",
+      "sourceSha256": "A63E7B15D4002F71E3CCC120F75337BD6C6840E704BF46009A0C0959B95ED58B",
+      "sourceBytes": 2278240,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/builtin-story-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-03_BUILTIN_draw1.md",
+      "sourceReviewSha256": "D59349CC7D539CA0638351839A8551D23DC4E0F5230C45BE8074FFAE259E5FE2",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-03.webp",
+      "productSha256": "9C8F6D1236753D5D2F61DFEC8A4AC4022DF9DCE6FEC34D12204E8AFFD1F23C17",
+      "productBytes": 1501450,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "67F384D084B9653A40AA879078B860002CABE35B90DC3E37DDDF689ACE1045BF",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": []
+      }
+    },
+    {
+      "id": "ARY-RPL-04",
+      "kind": "story",
+      "variant": "shared",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/built-in-candidates/ARY-RPL-04/draw1/ARY-RPL-04_江辰按约回到301.png",
+      "sourceSha256": "CEA8842AE2976836908545DEDEC97AFF6D4C962AFA7D049D51D69C3FCE5303DE",
+      "sourceBytes": 2125400,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/builtin-story-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-04_BUILTIN_draw1.md",
+      "sourceReviewSha256": "D1D646755F5624576FACD16729868223443FA2DD09252B9B2B9A3964B11680D8",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-04.webp",
+      "productSha256": "617C7A09A6C48D3C51B8CE4C55136B4A0C3A0F03EDCCEE2E9A846CA97B5D4502",
+      "productBytes": 1391584,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "50BA9E6CDAE7F8806F077971917EECD0C1259F6B7D8C2D4BBB39C469F0321B18",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": []
+      }
+    },
+    {
+      "id": "ARY-RPL-05",
+      "kind": "story",
+      "variant": "shared",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/built-in-candidates/ARY-RPL-05/draw2/ARY-RPL-05_把拍立得交给江辰.png",
+      "sourceSha256": "C2D3D2C932754A6848AD1E2C28A14DACD2CEA8307116FAE7041D951D93FA79A1",
+      "sourceBytes": 2123426,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/builtin-story-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-05_BUILTIN_draw2.md",
+      "sourceReviewSha256": "3A1EC5E81562A6C61BDBD88CB76EEE10CD555C51BFF77B93B67873AC0EE57D01",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-05.webp",
+      "productSha256": "835F4A0EFC41B6D8643475174ED7B8D52D79FEB400915D6BA875C1870389C367",
+      "productBytes": 1392180,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "7D559402E6DFEB7BBD2230F1B68106ABE6FB4A731812828D5E929E55A7E36AC9",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": []
+      }
+    },
+    {
+      "id": "ARY-RPL-06-N",
+      "kind": "story",
+      "variant": "normal",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/built-in-candidates/ARY-RPL-06-N/draw1/ARY-RPL-06-N_镜头前开始_普通体态.png",
+      "sourceSha256": "7069D4C520417112F1D3AEAFB75B1B51406CCF5E4015A9E2FD2A23886A4163CF",
+      "sourceBytes": 2315808,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/h1-manifest-v2.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-06-N_BUILTIN_draw1.md",
+      "sourceReviewSha256": "59FB601174586FCE5920262C6EE37191ACA33B5CB1019C34C5A684F93460C198",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-06-N.webp",
+      "productSha256": "78CB38DBBB9BC425B1DB046B0041998322C16FA33EE11B7A6A6C48F68307139F",
+      "productBytes": 1481376,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "409B002630D160B483DDC5300FA006FED0DE2B6D8ED35936FB4FF7EFCEC4FC71",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": []
+      }
+    },
+    {
+      "id": "ARY-RPL-06-P",
+      "kind": "story",
+      "variant": "pregnant",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/built-in-candidates/ARY-RPL-06-P/draw1/ARY-RPL-06-P_镜头前开始_孕态.png",
+      "sourceSha256": "BB0EC725C38F4BB0C321B83E301D58343245F5195AD05913D0023E47D9453535",
+      "sourceBytes": 2291752,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/h1-manifest-v2.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-06-P_BUILTIN_draw1.md",
+      "sourceReviewSha256": "B265019299A8E18E76DACADF896C95B79EAEAAEBCB81F227CC99F7EFCF4D40D9",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-06-P.webp",
+      "productSha256": "6AB86E96E7A9236AD7CBF8237307F65EFECE6B0DF9879079BBD94685341C4511",
+      "productBytes": 1471068,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "23B8A74866125FA8A5D1EB4120FA1BC8ADF015BA6BAE05ED3A43E03C096F9F2A",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": []
+      }
+    },
+    {
+      "id": "ARY-RPL-07-N",
+      "kind": "story",
+      "variant": "normal",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/composites/ARY-RPL-07-N/draw1/ARY-RPL-07-N_P1对镜头摆姿势_普通体态.png",
+      "sourceSha256": "F3FF186B23DC40A24F0D644FB0D00150FE44C600FD9EB75C44335FE94EEE45D4",
+      "sourceBytes": 1666808,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/p1-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-07-N_COMPOSITE_draw1.md",
+      "sourceReviewSha256": "4B50F408E37893B4B43CA0E479C4E67B8CC6FF4F7AA9F7C01118C8318B6850FF",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-07-N.webp",
+      "productSha256": "B3F6168009471231FCEC61F19733C0852678379C08B4316200D9FDFC538A5F84",
+      "productBytes": 1169362,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "194C30CBD9806AD1EB5E5F1CC488184300D19AD9845B501BBDF411365050C99C",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": [
+          "摄影者渐隐叠层存在可见拼接感，主体及剧情用途可辨，作为非阻断观感备注。"
+        ]
+      }
+    },
+    {
+      "id": "ARY-RPL-07-P",
+      "kind": "story",
+      "variant": "pregnant",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/composites/ARY-RPL-07-P/draw1/ARY-RPL-07-P_P1对镜头摆姿势_孕态.png",
+      "sourceSha256": "6FC5B30D12F8B031EA002826B713732EE37918098699EBC6F9073180F87AF738",
+      "sourceBytes": 1592884,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/p1-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-07-P_COMPOSITE_draw1.md",
+      "sourceReviewSha256": "0AA40F5A39B2FFBC7F365214C821C2B7C4CE0FE772F0709F5BE783C48229FA00",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-07-P.webp",
+      "productSha256": "1D5C2A10DFAADB3170F07A8FED114016745E1C6D84640432B40BFDDD061AA659",
+      "productBytes": 1071138,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "4D807B410091A131E1A9E23255D026C164147D6C0E984D5308E7E3DECD84D5B1",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": [
+          "摄影者渐隐叠层存在可见拼接感，主体及剧情用途可辨，作为非阻断观感备注。"
+        ]
+      }
+    },
+    {
+      "id": "ARY-RPL-08-N",
+      "kind": "story",
+      "variant": "normal",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/derived/ARY-RPL-08-N/draw1/ARY-RPL-08-N_P1第一张姿势照_普通体态.png",
+      "sourceSha256": "0073EA3852DBBA4773487A5EB96CABFFD8D7FD5EF117E5DB9B08DAF4743BFD04",
+      "sourceBytes": 1142734,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/p1-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-08-N_PHOTO_draw1.md",
+      "sourceReviewSha256": "1AD0C278A1E64475C66224095AA378447BEB2B82646ABC1C41C0E1F9701EE0ED",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-08-N.webp",
+      "productSha256": "25DB7FD0E4CFEFC03A00ADCCB5A41A40E5616D029342014A750C61E0C3D41BB9",
+      "productBytes": 818274,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "3079498CFE617E72E3342EA66BA996A17F833161A54CB63EFCFAA1E57C34AABE",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": []
+      }
+    },
+    {
+      "id": "ARY-RPL-08-P",
+      "kind": "story",
+      "variant": "pregnant",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/derived/ARY-RPL-08-P/draw1/ARY-RPL-08-P_P1第一张姿势照_孕态.png",
+      "sourceSha256": "EEA9C6DB232086E85FAA2CBA5A31491B2366CAC3B88667E6183C79CF8647BCC9",
+      "sourceBytes": 1108826,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/p1-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-08-P_PHOTO_draw1.md",
+      "sourceReviewSha256": "CA2C94B0DE7874264D57EB4CC88C7DB53D86E4189606B555B92C0E700AC07B72",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-08-P.webp",
+      "productSha256": "518FE79410CE00A634FD6A73B22686B7ADD20C9E8F900FBE78F4C80EE21E5C73",
+      "productBytes": 770506,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "534C5934171008601DD7D2BF6A809DE92467F9B74178AABBE25A7C2B837C3DF1",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": []
+      }
+    },
+    {
+      "id": "ARY-RPL-09-N",
+      "kind": "story",
+      "variant": "normal",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/composites/ARY-RPL-09-N/draw3/ARY-RPL-09-N_P2一起做鬼脸_普通体态.png",
+      "sourceSha256": "EA00FEF5E16D8FF22D3B7E8BAE1A4695838C6341048AD737D4020DD0BEC4FDAE",
+      "sourceBytes": 1692980,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/composite-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-09-N_COMPOSITE_draw3.md",
+      "sourceReviewSha256": "3060E291FAEFCD9A887FED562DEB8DBB398F8D51061A89DE8358AB018D4EA0B0",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-09-N.webp",
+      "productSha256": "37D256DDDA578DB8A5C7ADA9C603602C630317ECB9779D01ADC2C9079EE16A8E",
+      "productBytes": 1177038,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "FDD44250FBACD3B8F6F2365D02663DA0DDE48224A8E0A40E695795B4EA13EEE2",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": []
+      }
+    },
+    {
+      "id": "ARY-RPL-09-P",
+      "kind": "story",
+      "variant": "pregnant",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/composites/ARY-RPL-09-P/draw4/ARY-RPL-09-P_P2一起做鬼脸_孕态.png",
+      "sourceSha256": "50AF6E07DDC8357E42AC5679DFA41D36FFD47D610FA3D88339D6C28E0DEC8A60",
+      "sourceBytes": 1751090,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/composite-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-09-P_COMPOSITE_draw4.md",
+      "sourceReviewSha256": "F17D9D87C5EDE85BEBA9A6C79FD7890113F6CD29AB629E06E9377267BB29EB77",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-09-P.webp",
+      "productSha256": "C911F431D2AC08F75EB377D04F81998B5CD993364DF68475596BA4ECD86A0EE0",
+      "productBytes": 1197204,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "8948EED70255EC58CA8420C20CFE26410144F65118364F7644463822F4485C33",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": [
+          "摄影者渐隐叠层存在可见拼接感，主体及剧情用途可辨，作为非阻断观感备注。"
+        ]
+      }
+    },
+    {
+      "id": "ARY-RPL-10-N",
+      "kind": "story",
+      "variant": "normal",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/derived/ARY-RPL-10-N/draw1/ARY-RPL-10-N_P2最终鬼脸照片_普通体态.png",
+      "sourceSha256": "619CC87C183EF2C186565940C4039C52662EFAC77D3ED7F6483EBBA55A8247AB",
+      "sourceBytes": 1194602,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/photo-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-10-N_PHOTO_draw1.md",
+      "sourceReviewSha256": "0A4D8F120865AB32AF9BF697BE1ED3B30F51EFCE348B3197C6BCB0000B1C8ADA",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-10-N.webp",
+      "productSha256": "3466A48969CCD1791426637D4D90D641BA1F44BA14248674A1D0F37B46FB183F",
+      "productBytes": 841956,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "87A23BCA457A45A695559C420E31CF42E6404A526343F72466BDC6FECEA80D6E",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": []
+      }
+    },
+    {
+      "id": "ARY-RPL-10-P",
+      "kind": "story",
+      "variant": "pregnant",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/derived/ARY-RPL-10-P/draw1/ARY-RPL-10-P_P2最终鬼脸照片_孕态.png",
+      "sourceSha256": "4D6281FA00CBE4C5A1556FB0E19057ACAD4D19C3BFB2955A41E672E3DCBE7369",
+      "sourceBytes": 1192852,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/photo-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-10-P_PHOTO_draw1.md",
+      "sourceReviewSha256": "6B155453BBB60820E780652A2B3C94E70A65AD51AAE321CC41B7B307EE01C7C7",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-10-P.webp",
+      "productSha256": "0D42AE11CC082749E4A33E8751E2627A50E5E96B200DF108A94091AD286282AF",
+      "productBytes": 829518,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "FB1D0632F3BCCC143D7AA701CA6DDF2438C1E0D0454CF6E6A1EE7D3FEFC5EB01",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": []
+      }
+    },
+    {
+      "id": "ARY-RPL-11-N",
+      "kind": "story",
+      "variant": "normal",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/composites/ARY-RPL-11-N/draw1/ARY-RPL-11-N_事后照片显影_普通体态.png",
+      "sourceSha256": "AE3AA1AED4AB56F26A2739AC8C48160E425F4F076B1529C6390EC3EE779FC3BF",
+      "sourceBytes": 2054263,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/h10-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-11-N_COMPOSITE_draw1.md",
+      "sourceReviewSha256": "1FEB2E173598766DCFB407194C73CA230DDA1F7A9CC4B55AB96C387BAE2B586E",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-11-N.webp",
+      "productSha256": "DE316B3826DF9EF230D263CBEB0CEED12B01C39B127AA045987A7AFD16CDEC13",
+      "productBytes": 1401264,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "088B418E72CEB069588F5BDB9C2596520B8CA56F6F952B4C1368EEA0A75A2B11",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": []
+      }
+    },
+    {
+      "id": "ARY-RPL-11-P",
+      "kind": "story",
+      "variant": "pregnant",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/composites/ARY-RPL-11-P/draw1/ARY-RPL-11-P_事后照片显影_孕态.png",
+      "sourceSha256": "8B494926832204E204122AC4B9068F62DF7E7E59226538EDFED809A9D3450831",
+      "sourceBytes": 2013517,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/h10-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-11-P_COMPOSITE_draw1.md",
+      "sourceReviewSha256": "CEDBF3001CE7EA716074907C827E47F4EEF0F2C508789A58D6BC2F59A73027DD",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-11-P.webp",
+      "productSha256": "EF913CBC5240E9B3738F5F8A15297CC5112EC6B800A5AF5D90E97D316A54CE23",
+      "productBytes": 1378786,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "0742F0AA9FCD7BE6F8B3A98BFB0C4713F25444BA206950AC6FD8776C7562260E",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": []
+      }
+    },
+    {
+      "id": "ARY-RPL-12",
+      "kind": "story",
+      "variant": "shared",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/built-in-candidates/ARY-RPL-12/draw1/ARY-RPL-12_旧照与新照片对照.png",
+      "sourceSha256": "2032E19C30922113727F3E3EAE4D415548EEDF1314CE26243BDFD976F8C6C149",
+      "sourceBytes": 2250620,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/builtin-story-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-12_BUILTIN_draw1.md",
+      "sourceReviewSha256": "015E6E33A4707C7AA2D9638436669419BB66B443EEE9AE1B4F4FF11C74B5E0CC",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-12.webp",
+      "productSha256": "D3BB2CA2BA8B7AA2D3AC3B7159EF9749BB1ECFBDA66442D9F08D3ECA1BF3E348",
+      "productBytes": 1445536,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "FFE619E983E77646395E68E32644E514FCCA2D3271B1D7A7C49854273E5DD2DE",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": []
+      }
+    },
+    {
+      "id": "ARY-RPL-13",
+      "kind": "story",
+      "variant": "shared",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/built-in-candidates/ARY-RPL-13/draw1/ARY-RPL-13_换掉没问题吧.png",
+      "sourceSha256": "4A27CD4849979F54CF609194BCFF1EBB96F2A52C45B5121CF160FCDB7C791BCB",
+      "sourceBytes": 2238897,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/builtin-story-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-13_BUILTIN_draw1.md",
+      "sourceReviewSha256": "B2948A9F787B36ADA9CD5100FEAC0E7BB624BBD20BACD53ADA4FE219F6C15171",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-13.webp",
+      "productSha256": "26B00F5ACCC4E706C5463AFCA793D3396EEF58ECF01CD794BC97205A56DD002F",
+      "productBytes": 1442836,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "1030287482E10A82674DF92506B101787A347A3A4C47643237180F1932FAD35F",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": []
+      }
+    },
+    {
+      "id": "ARY-RPL-BG-BABY1-POST-N",
+      "kind": "persistent_background",
+      "variant": "normal",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/composites/ARY-RPL-BG-BABY1-POST-N/draw1/ARY-RPL-BG-BABY1-POST-N_301第一胎房间_结局后鬼脸照_普通体态.png",
+      "sourceSha256": "AEAF3DED5CA443DC5BBCD74B1AE2B034099F9A260748048DD4EF86B312543FBD",
+      "sourceBytes": 1780462,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/background-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-BG-BABY1-POST-N_COMPOSITE_draw1.md",
+      "sourceReviewSha256": "6944E7E680C7431556778E7FA0B1D8D99BE552A5376EA95154881427173CB921",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-BG-BABY1-POST-N.webp",
+      "productSha256": "119B6B1B61C2629BB374B2A3E631DEE92A36818A9EFBD4FA927E27D4E3B8EBE5",
+      "productBytes": 1289872,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "33040128A58D0EC421B5B0424C2CA6D50901682F97AA537EA147F33CDE9386E2",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": [
+          "墙上竖框内照片较小且存在横向压缩感，换照结果与照片版本可辨。"
+        ]
+      },
+      "preBackgroundId": "ARY-RPL-BG-BABY1-PRE",
+      "finalPhotoId": "ARY-RPL-10-N",
+      "frameQuad": [
+        [
+          1257,
+          276
+        ],
+        [
+          1337,
+          232
+        ],
+        [
+          1337,
+          451
+        ],
+        [
+          1257,
+          469
+        ]
+      ]
+    },
+    {
+      "id": "ARY-RPL-BG-BABY1-POST-P",
+      "kind": "persistent_background",
+      "variant": "pregnant",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/composites/ARY-RPL-BG-BABY1-POST-P/draw1/ARY-RPL-BG-BABY1-POST-P_301第一胎房间_结局后鬼脸照_孕态.png",
+      "sourceSha256": "11E2FF86AE679C7841CD615AA1CAD468746F075555A302B93E196C3568F6434D",
+      "sourceBytes": 1780732,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/background-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-BG-BABY1-POST-P_COMPOSITE_draw1.md",
+      "sourceReviewSha256": "B91CFB30F75D5077634FC192CBDB4B59CDCE4ADED456295840EA230BBE2DB4A8",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-BG-BABY1-POST-P.webp",
+      "productSha256": "75FFE54946F56E0BF16D665FA02FFF33ECA0A94412EF2AB790D9AA1977159C8E",
+      "productBytes": 1289752,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "D42E87C209E5B0936388410625CF0B3BC90376671E0E7BAF4C6B8A90537C333B",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": [
+          "墙上竖框内照片较小且存在横向压缩感，换照结果与照片版本可辨。"
+        ]
+      },
+      "preBackgroundId": "ARY-RPL-BG-BABY1-PRE",
+      "finalPhotoId": "ARY-RPL-10-P",
+      "frameQuad": [
+        [
+          1257,
+          276
+        ],
+        [
+          1337,
+          232
+        ],
+        [
+          1337,
+          451
+        ],
+        [
+          1257,
+          469
+        ]
+      ]
+    },
+    {
+      "id": "ARY-RPL-BG-BABY1-PRE",
+      "kind": "persistent_background",
+      "variant": "shared",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/built-in-candidates/ARY-RPL-BG-BABY1-PRE/draw1/ARY-RPL-BG-BABY1-PRE_301第一胎房间_结局前旧结婚照.png",
+      "sourceSha256": "844C1FAFACEE7714B87A00F7D77206CCDFAE035E8D07F9DBCB2DC8EA8BF4F7C8",
+      "sourceBytes": 1922205,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/background-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-BG-BABY1-PRE_BUILTIN_draw1.md",
+      "sourceReviewSha256": "DC5B60FE76CA2EAF5D660BD86B609AFC0C6512C72505A576E1FB5A0D1140A4BD",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-BG-BABY1-PRE.webp",
+      "productSha256": "11F3D15D89A3B0068B488CAE3EF34D4C3084E7DA78E9311F21CB373E925183B8",
+      "productBytes": 1289442,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "EECF8ACCF524D3928AEEAC9033DEB5FA5C51774C2DB6443296FBEAF311B0451E",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": []
+      }
+    },
+    {
+      "id": "ARY-RPL-BG-BABY2-POST-N",
+      "kind": "persistent_background",
+      "variant": "normal",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/composites/ARY-RPL-BG-BABY2-POST-N/draw1/ARY-RPL-BG-BABY2-POST-N_301第二胎房间_结局后鬼脸照_普通体态.png",
+      "sourceSha256": "E0D5EA3296CEA259E9BE116B34A3A0721013AEA4F00E44910E5E0B0B8B3C98EB",
+      "sourceBytes": 1927412,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/background-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-BG-BABY2-POST-N_COMPOSITE_draw1.md",
+      "sourceReviewSha256": "4E2F50FCEB2EC8FD4A18E13B82CE578A324DCCA5142AC4F339178E8C4E90CDC5",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-BG-BABY2-POST-N.webp",
+      "productSha256": "69C8EBE321B8015288B8231E063B3BBCB2E5B1F6CE608B6756C846B3F7894A41",
+      "productBytes": 1381550,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "BDB505E77318655637996B15E8C63D1E713172E257B7FD304A0A4D562A628FF9",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": [
+          "墙上竖框内照片较小且存在横向压缩感，换照结果与照片版本可辨。"
+        ]
+      },
+      "preBackgroundId": "ARY-RPL-BG-BABY2-PRE",
+      "finalPhotoId": "ARY-RPL-10-N",
+      "frameQuad": [
+        [
+          1257,
+          276
+        ],
+        [
+          1337,
+          232
+        ],
+        [
+          1337,
+          451
+        ],
+        [
+          1257,
+          469
+        ]
+      ]
+    },
+    {
+      "id": "ARY-RPL-BG-BABY2-POST-P",
+      "kind": "persistent_background",
+      "variant": "pregnant",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/composites/ARY-RPL-BG-BABY2-POST-P/draw1/ARY-RPL-BG-BABY2-POST-P_301第二胎房间_结局后鬼脸照_孕态.png",
+      "sourceSha256": "5815728A07235237CF8A3E8BB459EC7F741D3A35F9C3C80B144E98819A9C688A",
+      "sourceBytes": 1927680,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/background-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-BG-BABY2-POST-P_COMPOSITE_draw1.md",
+      "sourceReviewSha256": "171E7C0BAD642D2CA545BC415A34C02D57F85E3306E5A8DC35052E51DCC2EE22",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-BG-BABY2-POST-P.webp",
+      "productSha256": "A35055B0C7EB1B5232C6FBBC6C2EACB255F981FB05F1B4A85502A557034E7EFC",
+      "productBytes": 1381646,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "84D3033EB60CF3183455498D994C75F3907FEF728EA666030EA5481A6826B2F9",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": [
+          "墙上竖框内照片较小且存在横向压缩感，换照结果与照片版本可辨。"
+        ]
+      },
+      "preBackgroundId": "ARY-RPL-BG-BABY2-PRE",
+      "finalPhotoId": "ARY-RPL-10-P",
+      "frameQuad": [
+        [
+          1257,
+          276
+        ],
+        [
+          1337,
+          232
+        ],
+        [
+          1337,
+          451
+        ],
+        [
+          1257,
+          469
+        ]
+      ]
+    },
+    {
+      "id": "ARY-RPL-BG-BABY2-PRE",
+      "kind": "persistent_background",
+      "variant": "shared",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/built-in-candidates/ARY-RPL-BG-BABY2-PRE/draw1/ARY-RPL-BG-BABY2-PRE_301第二胎房间_结局前旧结婚照.png",
+      "sourceSha256": "F359086AE6DD4067A5D6B098F8092C0BB3F4B97C1A44470E5C2F796814D77824",
+      "sourceBytes": 2071671,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/background-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-BG-BABY2-PRE_BUILTIN_draw1.md",
+      "sourceReviewSha256": "4C12CB19A0857B298AF42892B631146CCB49A7A39ACBAB8FDBF0DF6C897BEB97",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-BG-BABY2-PRE.webp",
+      "productSha256": "8E9A43A2034DBD83F72183A0C8DC45CE90903EF97143F45258D35C3B76894B9C",
+      "productBytes": 1381594,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "08D0448BCF2A172DD7665C552FD2FD2F4C70CF1511E24A9CBA22A8C2360DF781",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": []
+      }
+    },
+    {
+      "id": "ARY-RPL-BG-BABY3-POST-N",
+      "kind": "persistent_background",
+      "variant": "normal",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/composites/ARY-RPL-BG-BABY3-POST-N/draw1/ARY-RPL-BG-BABY3-POST-N_301第三胎房间_结局后鬼脸照_普通体态.png",
+      "sourceSha256": "4427A93ACB492186C009D1192B05E3A4EB98001B5EBBF76B61FAB1716835D699",
+      "sourceBytes": 2021303,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/background-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-BG-BABY3-POST-N_COMPOSITE_draw1.md",
+      "sourceReviewSha256": "FD3D4F6D3D2D6255D3B0E83240759A3CEC133FA89FAE9EDA626411199BA69A1F",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-BG-BABY3-POST-N.webp",
+      "productSha256": "3FB9E71D16AC8A12E1A07A4AA60251963677219D6536EC699A8BE7AE177D7F18",
+      "productBytes": 1439270,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "A1C9FAD857F733876BA9344916D2ADB006B5681ABBA79ECAE031376B3F12A69C",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": [
+          "墙上竖框内照片较小且存在横向压缩感，换照结果与照片版本可辨。"
+        ]
+      },
+      "preBackgroundId": "ARY-RPL-BG-BABY3-PRE",
+      "finalPhotoId": "ARY-RPL-10-N",
+      "frameQuad": [
+        [
+          1257,
+          276
+        ],
+        [
+          1337,
+          232
+        ],
+        [
+          1337,
+          451
+        ],
+        [
+          1257,
+          469
+        ]
+      ]
+    },
+    {
+      "id": "ARY-RPL-BG-BABY3-POST-P",
+      "kind": "persistent_background",
+      "variant": "pregnant",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/composites/ARY-RPL-BG-BABY3-POST-P/draw1/ARY-RPL-BG-BABY3-POST-P_301第三胎房间_结局后鬼脸照_孕态.png",
+      "sourceSha256": "AAFACB2097D52FBF645B81FA36A6E4062AA91C533389BDE7C13AA9525913BE86",
+      "sourceBytes": 2021517,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/background-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-BG-BABY3-POST-P_COMPOSITE_draw1.md",
+      "sourceReviewSha256": "31F70297368446D7658AC37E7EE397C5AE1B8A9ADB3A5480996811F7ACF9808A",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-BG-BABY3-POST-P.webp",
+      "productSha256": "C6223E4ED5C0080A9CBEC5F53A416A804F29C3012A28D3D2706A15FB354DBE34",
+      "productBytes": 1439572,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "9BCA9590B486CDEB5E40920A3DFC294DEB34286236E10651BD4BFE41946A40A1",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": [
+          "墙上竖框内照片较小且存在横向压缩感，换照结果与照片版本可辨。"
+        ]
+      },
+      "preBackgroundId": "ARY-RPL-BG-BABY3-PRE",
+      "finalPhotoId": "ARY-RPL-10-P",
+      "frameQuad": [
+        [
+          1257,
+          276
+        ],
+        [
+          1337,
+          232
+        ],
+        [
+          1337,
+          451
+        ],
+        [
+          1257,
+          469
+        ]
+      ]
+    },
+    {
+      "id": "ARY-RPL-BG-BABY3-PRE",
+      "kind": "persistent_background",
+      "variant": "shared",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/built-in-candidates/ARY-RPL-BG-BABY3-PRE/draw1/ARY-RPL-BG-BABY3-PRE_301第三胎房间_结局前旧结婚照.png",
+      "sourceSha256": "EC6E11331212581901C36DC1D71D7EE66BBE0D6F7E36DB2EE86A69FC9F2D620B",
+      "sourceBytes": 2177131,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/background-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-BG-BABY3-PRE_BUILTIN_draw1.md",
+      "sourceReviewSha256": "2AE9540280C374024C8C7C5574B99B45CE6F89402B2E7FAF04BF64F6F79097DD",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-BG-BABY3-PRE.webp",
+      "productSha256": "D7545EDABE826F0F79341FFCE76690849A1ED51D2773DA2ACB0716C66E67A755",
+      "productBytes": 1440752,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "FC1D4046C1E0C538AFCAFB9944FD706EEA3E18461AE7EE4BA65F841EE0B1475F",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": []
+      }
+    },
+    {
+      "id": "ARY-RPL-BG-BASE-POST-N",
+      "kind": "persistent_background",
+      "variant": "normal",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/composites/ARY-RPL-BG-BASE-POST-N/draw1/ARY-RPL-BG-BASE-POST-N_301普通房间_结局后鬼脸照_普通体态.png",
+      "sourceSha256": "BD38BFEEBD525525B0ECB8F0B55A2D1A854FD25103373004E88F47447D3BBFAA",
+      "sourceBytes": 1801944,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/background-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-BG-BASE-POST-N_COMPOSITE_draw1.md",
+      "sourceReviewSha256": "943AD4A99FAB41749B6E18C880190DA15F11B48AC597BB52D64ED442FD4FDCC0",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-BG-BASE-POST-N.webp",
+      "productSha256": "21513D562740368F0417817DE70B3EAD0208AB113C799973DC4F30DEB18337B1",
+      "productBytes": 1299010,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "6ED1BD423D0C6F9F8AA79EF3B7819F63F3DA389CD0FDE5D2FD63B4B6E77902D4",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": [
+          "墙上竖框内照片较小且存在横向压缩感，换照结果与照片版本可辨。"
+        ]
+      },
+      "preBackgroundId": "ARY-RPL-BG-BASE-PRE",
+      "finalPhotoId": "ARY-RPL-10-N",
+      "frameQuad": [
+        [
+          1257,
+          276
+        ],
+        [
+          1337,
+          232
+        ],
+        [
+          1337,
+          451
+        ],
+        [
+          1257,
+          469
+        ]
+      ]
+    },
+    {
+      "id": "ARY-RPL-BG-BASE-POST-P",
+      "kind": "persistent_background",
+      "variant": "pregnant",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/composites/ARY-RPL-BG-BASE-POST-P/draw1/ARY-RPL-BG-BASE-POST-P_301普通房间_结局后鬼脸照_孕态.png",
+      "sourceSha256": "D91608448242E10BC2918D3DF16A45497EA6BC2F3F1BCAEC415E5CFFE911B0A1",
+      "sourceBytes": 1801862,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/background-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-BG-BASE-POST-P_COMPOSITE_draw1.md",
+      "sourceReviewSha256": "C77ED8FBF8B5A703BD50E0C8E66F8EE0D80546F00C1E6603E04423F9012CE999",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-BG-BASE-POST-P.webp",
+      "productSha256": "FE36BD1A58D9EDEF29F76A66880A2F2E483F03A5FCBEE0101BA055E04091C7AB",
+      "productBytes": 1299010,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "9816E1BB8C7ACAFAF8E560366FAEE6688B5D1F7831C8EA01EF7E52C6AAF10BE1",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": [
+          "墙上竖框内照片较小且存在横向压缩感，换照结果与照片版本可辨。"
+        ]
+      },
+      "preBackgroundId": "ARY-RPL-BG-BASE-PRE",
+      "finalPhotoId": "ARY-RPL-10-P",
+      "frameQuad": [
+        [
+          1257,
+          276
+        ],
+        [
+          1337,
+          232
+        ],
+        [
+          1337,
+          451
+        ],
+        [
+          1257,
+          469
+        ]
+      ]
+    },
+    {
+      "id": "ARY-RPL-BG-BASE-PRE",
+      "kind": "persistent_background",
+      "variant": "shared",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/built-in-candidates/ARY-RPL-BG-BASE-PRE/draw1/ARY-RPL-BG-BASE-PRE_301普通房间_结局前旧结婚照.png",
+      "sourceSha256": "0AC0F6EF8642EF09EC194794EC3B0A635E0B1E8492468228CD5B6B746D68DF56",
+      "sourceBytes": 1958592,
+      "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/background-manifest-v1.json",
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-replace/reviews/ARY-RPL-BG-BASE-PRE_BUILTIN_draw1.md",
+      "sourceReviewSha256": "F5B84F11D7F9992BEFC8577E082F033DC81A77DE3619A6DCA23E75E65669C639",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-RPL-BG-BASE-PRE.webp",
+      "productSha256": "2DA0FE5F344FF16221BF9A59AE3DE94E03E9B8262DCB1B86E1CEB63E47B7CF0E",
+      "productBytes": 1298612,
+      "width": 1536,
+      "height": 1024,
+      "decodedRgbSha256": "B64F69377E7E02D2ECFFD9D2CD87425D5180E2253CD2139BA47B12BDAEF3DAFF",
+      "decodedPixelsMatchSource": true,
+      "visualReview": {
+        "date": "2026-09-05",
+        "detail": "original",
+        "verdict": "pass",
+        "notes": []
+      }
+    }
+  ]
+}
