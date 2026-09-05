@@ -185,7 +185,7 @@ export const 数据库事件待整理摘要 = '【待数据库AI整理】正文�
 /** 开局正文是脚本固定文本，对应摘要也由脚本确定；可安全修复 v0.90 已知的 RQ-1 错绑。 */
 export const 数据库固定开局摘要 = '父亲来电交代公寓管理与收租要求，玩家开始接手管理工作';
 /**
- * 脚本兜底摘要的稳定尾句。它不是“待整理”占位（不参与漏楼补写，避免每回合重复补同一批行），
+ * 脚本兜底摘要的稳定尾句。它不是“待整理”占位（无同楼可靠摘要时不重复补写），
  * 但同楼后来拿到真摘要时（重掷、改写同一楼）允许被覆盖，不让一次漏块永久钉死该行。
  * 注意：`同步数据库回合` 的 UPSERT 里内联了同一句字面量（SQL 的 CASE 分支不能用占位符），
  * 改这里必须同步改那条 SQL；`tests/人妻公寓/数据库五表与事件摘要.test.mjs` 有一致性断言。
@@ -254,7 +254,7 @@ export function 数据库事件摘要为脚本兜底(value: unknown): boolean {
 }
 
 /**
- * 判断旧 `结果摘要` 是否明显是整篇正文污染（多段、含包装标签或对话引用、长到无法收口）。
+ * 判断 `结果摘要` 是否明显是正文污染（多段、包装标签、明确的对白原句或长到无法收口）。
  * 命中时禁止 slice 正文冒充摘要，必须走纪要概览或安全短句迁移。
  * 仅仅“写超了上限”不再算污染——那一类交给 `摘要按句收口` 按完整句子收尾。
  */
@@ -266,7 +266,10 @@ function 判断结果摘要为正文(结果: string): boolean {
   if (Array.from(压缩).length > 摘要可收口上限) return true;
   if (/[\r\n]/.test(原文)) return true; // 多段
   if (/<[^>]{1,40}>|{{|}}|```/.test(压缩)) return true; // 包装标签/模板残留
-  if (/[「」『』]/.test(压缩) || /“[^”]{1,60}”/.test(压缩)) return true; // 含对话引用
+  // 引号本身也用于物件名；只识别明确的发言引述或独立对白句，不能把标签名称当正文。
+  if (/(?:说|问|回答|回应|答|喊)(?:道|着)?\s*[:：]?\s*[“「『"]/.test(压缩)) return true;
+  if (/(?:^|[。！？]\s*)(?:[^“「『"。！？]{1,24}[:：]\s*)?[“「『"][^”」』"]*[。！？!?][”」』"]/.test(压缩)) return true;
+  if (/^[“「『"][^”」』"]+[”」』"][。！？!?]?$/.test(压缩)) return true;
   return false;
 }
 
@@ -299,6 +302,7 @@ export function 提取回合事件摘要(原文: string): string | null {
   if (!压缩) return null; // 必须非空
   if (/[<>]|{{|}}|```/.test(压缩)) return null; // 拒绝 HTML/协议/模板
   if (/^(?:system|developer|assistant|user)\s*[:：]/i.test(压缩)) return null; // 拒绝角色标题伪装
+  if (判断结果摘要为正文(压缩)) return null;
   const 干净 = 摘要按句收口(压缩);
   if (!干净) return null; // 超长且无法按完整句子收口：交给保守摘要，不硬切正文
   // 与整篇正文等价：摘要几乎原文出现在正文里（模型把正文塞进摘要）时拒绝。
@@ -2687,13 +2691,16 @@ export async function 修复数据库固定开局摘要(额外提交校验: () =
 }
 
 /**
- * 当前 SQLite 时间线里已经存在且摘要完成的 RQ 事件楼层。旧“待整理”/空摘要故意不算完成，
- * 让历史补写用该楼自身消息元数据与玩家行动收敛成安全摘要，而不是等待未来正文猜测。
+ * 当前 SQLite 时间线里已经存在的 RQ 事件楼层。旧“待整理”/空摘要继续按原规则补写；
+ * 新版兜底仅在同楼已具备可靠元数据且事件键对应时重新进入补写，不拿未来正文猜旧结果。
  */
-export function 读取数据库剧情事件已记录楼层(截止楼层: number): Set<number> | null {
+export function 读取数据库剧情事件已记录楼层(
+  截止楼层: number,
+  同楼有可靠摘要: (楼层: number) => boolean = () => false,
+): Set<number> | null {
   const 截止 = Number.isInteger(截止楼层) && 截止楼层 >= 0 ? 截止楼层 : Number.MAX_SAFE_INTEGER;
   const result = 执行SQLite查询(
-    `SELECT floor_no, result_summary
+    `SELECT floor_no, result_summary, event_code
        FROM rq_events
       WHERE floor_no <= ?
       ORDER BY floor_no DESC
@@ -2707,6 +2714,11 @@ export function 读取数据库剧情事件已记录楼层(截止楼层: number)
   return new Set(
     rows
       .filter(row => !数据库事件摘要待整理(row.result_summary))
+      .filter(row => !(
+        数据库事件摘要为脚本兜底(row.result_summary) &&
+        row.event_code === `RQ-${Number(row.floor_no)}` &&
+        同楼有可靠摘要(Number(row.floor_no))
+      ))
       .map(row => Number(row.floor_no))
       .filter(楼层 => Number.isInteger(楼层) && 楼层 >= 0),
   );

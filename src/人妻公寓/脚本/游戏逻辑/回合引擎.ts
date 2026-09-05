@@ -89,6 +89,9 @@ import {
   同步数据库回合,
   覆盖数据库剧情事件摘要,
   提取回合事件摘要,
+  规范事件摘要,
+  数据库事件摘要待整理,
+  数据库事件摘要为脚本兜底,
   脚本保守回合摘要,
   数据库固定开局摘要,
   数据库状态,
@@ -1761,9 +1764,15 @@ async function 记录数据库回合骨架(
  */
 async function 补齐缺失数据库事件骨架(截止楼层: number, 提交校验: () => boolean = () => true): Promise<number> {
   if (!提交校验() || !数据库状态().已装游戏模板) return 0;
-  const 已记录 = 读取数据库剧情事件已记录楼层(截止楼层);
-  if (!已记录) return 0;
   const 消息表 = (SillyTavern.chat ?? []) as 宿主聊天消息[];
+  const 已记录 = 读取数据库剧情事件已记录楼层(截止楼层, 楼层 => {
+    const 消息 = 消息表[楼层];
+    if (!消息 || 宿主消息是玩家(消息) || !宿主消息文本(消息) || 消息.extra?.[临时楼标记键] === true) return false;
+    const 元数据 = 消息.extra?.[数据库事件元数据键] as Partial<数据库事件元数据> | undefined;
+    if (typeof 元数据?.结果摘要 !== 'string' || 数据库事件摘要待整理(元数据.结果摘要)) return false;
+    return !数据库事件摘要为脚本兜底(规范事件摘要(元数据.结果摘要, 元数据.玩家行动 ?? ''));
+  });
+  if (!已记录) return 0;
   let 已补写 = 0;
   for (let 楼层 = Math.min(截止楼层, 消息表.length - 1); 楼层 >= 1 && 已补写 < 12; 楼层 -= 1) {
     if (!提交校验()) return 已补写;
