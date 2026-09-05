@@ -8,6 +8,7 @@ import {
 import { 全局数据库AI租约 } from './数据库AI租约';
 import { 胶囊预算选择 } from './胶囊预算';
 import { 折叠检测文本, 规范可读文本 } from './记忆文本规范';
+import { 排除已撤回微信摘要, 移除微信摘要来源标记 } from './微信摘要来源';
 import {
   判定数据库脚本写入能力,
   type 数据库脚本写入能力结果,
@@ -447,10 +448,10 @@ function 解析微信进展数据(value: unknown): 微信进展数据 | null {
 
 function 渲染微信进展数据(data: 微信进展数据): string {
   return [
-    data.f.length ? `已确认：${data.f.join('、')}` : '',
-    data.a.length ? `双方约定：${data.a.join('、')}` : '',
-    data.b.length ? `边界：${data.b.join('、')}` : '',
-    data.p.length ? `尚未解决：${data.p.join('、')}` : '',
+    data.f.length ? `已确认：${data.f.map(移除微信摘要来源标记).join('、')}` : '',
+    data.a.length ? `双方约定：${data.a.map(移除微信摘要来源标记).join('、')}` : '',
+    data.b.length ? `边界：${data.b.map(移除微信摘要来源标记).join('、')}` : '',
+    data.p.length ? `尚未解决：${data.p.map(移除微信摘要来源标记).join('、')}` : '',
   ]
     .filter(Boolean)
     .join('；');
@@ -3177,6 +3178,8 @@ export interface 微信进展引用 {
   人物: string;
   /** 当前手机时间线上仍然成立的摘要版本键，按新到旧排列。 */
   有效事件键: readonly string[];
+  /** 当前会话仍存活的玩家撤回墓碑，按消息来源精准排除被撤回的摘要条目。 */
+  撤回来源?: readonly string[];
 }
 
 /** 手机摘要器只按当前分支的脚本专属事件键读取本人上一版摘要，不扫描或暴露聊天原文。 */
@@ -3206,6 +3209,7 @@ export function 读取微信进展胶囊(引用: readonly 微信进展引用[], 
     .map(item => ({
       人物: item.人物.trim(),
       有效事件键: _.uniq(item.有效事件键.filter(key => key.startsWith('RQP-微信进展-'))).slice(0, 20),
+      撤回来源: new Set(item.撤回来源 ?? []),
     }))
     .filter(item => item.人物 && item.有效事件键.length);
   if (!有效引用.length || !数据库状态().已装游戏模板) return '';
@@ -3222,7 +3226,7 @@ export function 读取微信进展胶囊(引用: readonly 微信进展引用[], 
       for (const key of item.有效事件键) {
         const row = 行索引.get(`${item.人物}\n${key}`);
         const data = 解析微信进展数据(row?.result);
-        const 进展 = data ? 渲染微信进展数据(data) : '';
+        const 进展 = data ? 渲染微信进展数据(排除已撤回微信摘要(data, item.撤回来源)) : '';
         if (!进展) continue;
         每人最新.set(item.人物, 进展);
         break;

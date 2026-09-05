@@ -1,6 +1,6 @@
 import type { SchemaType } from '../../../schema';
 import type { 门牌 } from '../../../stageConfig';
-import { 户静态表 } from '../../../stageConfig';
+import { 户静态表, 门牌列表 } from '../../../stageConfig';
 import { 当前时间线切换世代 } from '../时间线切换协调';
 import { 格式化游戏内时间 } from '../楼层时钟';
 import { 读取当前手机时间线租约世代 } from '../手机时间线租约';
@@ -11,11 +11,14 @@ import {
   数据库状态,
   读取微信进展摘要,
   序列化微信进展数据,
+  规范微信进展数据,
   type 微信进展引用,
 } from '../数据库桥';
 import { 编译近期微信胶囊, 楼务微信消息仍有效, 筛选待正文承接人物 } from '../微信正文承接';
-import { 编译角色跨渠道见闻 } from '../微信跨渠道见闻';
-import { 合并本地群聊进展摘要, 合并本地微信进展摘要 } from '../微信本地进展摘要';
+import { 编译角色跨渠道见闻, 角色可知群消息, 规范社交接收门牌 } from '../微信跨渠道见闻';
+import { 胶囊预算选择 } from '../胶囊预算';
+import { 合并本地群聊进展摘要, 合并本地微信进展摘要, type 本地微信摘要消息 } from '../微信本地进展摘要';
+import { 微信摘要消息来源, 排除已撤回微信摘要, 移除微信摘要来源标记 } from '../微信摘要来源';
 import { 末楼, 当前手机数据, 当前聊天ID } from './运行时上下文';
 import { 读配置 } from './配置';
 import { 读库, 压缩微信会话记录, 手机可见单条硬上限 } from './数据层';
@@ -48,6 +51,9 @@ interface 微信摘要消息 {
   类: string;
   图: string;
   序?: number;
+  接收门牌?: 门牌[];
+  锚签名?: string;
+  来源?: string;
 }
 
 interface 微信摘要点 {
@@ -122,6 +128,49 @@ function 推进摘要哈希(hash: number, text: string): number {
   return hash >>> 0;
 }
 
+/** 来源标签只用于记忆撤回，不改变已经稳定发布的摘要版本键。 */
+function 微信摘要签名消息(消息: 微信摘要消息): Omit<微信摘要消息, '来源'> {
+  const { 来源: _来源, ...签名 } = 消息;
+  return 签名;
+}
+
+export function 读取会话撤回摘要来源(会话: string, 截止楼: number): Set<string> {
+  return new Set(
+    读库()
+      .消息.filter(
+        消息 => 消息.会话 === 会话 && 消息.楼 <= 截止楼 && 消息.发 === '我' && 消息.类 === '撤回' && 消息.标识,
+      )
+      .map(微信摘要消息来源)
+      .filter((id): id is string => !!id),
+  );
+}
+
+function 清理会话旧摘要(摘要: string | undefined, 会话: string, 截止楼: number): string | undefined {
+  if (!摘要) return undefined;
+  try {
+    const 结构 = 规范微信进展数据(JSON.parse(摘要));
+    return 结构 ? JSON.stringify(排除已撤回微信摘要(结构, 读取会话撤回摘要来源(会话, 截止楼))) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** 新消息尚未整理时，已确认版本可能在最近120条之前；逐批查当前仍存活的来源键。 */
+function 读取存活微信摘要(人物: string, 键们: readonly string[], 截止楼: number): ReturnType<typeof 读取微信进展摘要> {
+  if (!数据库状态().已装游戏模板) return null;
+  const 键 = _.uniq(键们);
+  for (let 起 = 0; 起 < 键.length; 起 += 120) {
+    const 记录 = 读取微信进展摘要(人物, 键.slice(起, 起 + 120), 截止楼);
+    if (记录) return 记录;
+  }
+  return null;
+}
+
+function 可读微信摘要引用(人物: string, 候选: readonly string[], 截止楼: number): string[] {
+  const 旧 = 读取存活微信摘要(人物, 候选, 截止楼);
+  return _.uniq([...(旧 ? [旧.事件键] : []), ...候选]).slice(0, 20);
+}
+
 /** 活跃任务（包括已扣分但仍可补办者）继续进入短期聊天、SQLite 摘要与本人正文承接。 */
 export function 有效楼务任务id集合(data: SchemaType | null = 当前手机数据()): Set<string> {
   if (!data) return new Set();
@@ -153,6 +202,7 @@ function 取微信摘要快照(门牌号: 门牌, 截止楼 = 末楼(), 有效�
       类: item.类 ?? '文本',
       图: item.图 ?? '',
       ...(Number.isSafeInteger(item.序) && item.序! >= 0 ? { 序: item.序 } : {}),
+      来源: 微信摘要消息来源(item),
     }));
   let hashA = 推进摘要哈希(2166136261, `${聊天ID}\u0000${门牌号}`);
   let hashB = 推进摘要哈希(2246822507, `${门牌号}\u0000${聊天ID}`);
@@ -160,7 +210,7 @@ function 取微信摘要快照(门牌号: 门牌, 截止楼 = 末楼(), 有效�
   let 当前回复点索引 = -1;
   const 点: 微信摘要点[] = [];
   const 推入本人主动点 = (item: 微信摘要消息, index: number): void => {
-    const 稳定串 = JSON.stringify([聊天ID, 门牌号, '本人主动', item]);
+    const 稳定串 = JSON.stringify([聊天ID, 门牌号, '本人主动', 微信摘要签名消息(item)]);
     const 稳定A = 推进摘要哈希(2166136261, 稳定串);
     const 稳定B = 推进摘要哈希(2246822507, `${稳定串.length}:${稳定串}`);
     const 稳定序 = Number.isSafeInteger(item.序) ? item.序 : item.时;
@@ -192,7 +242,7 @@ function 取微信摘要快照(门牌号: 门牌, 截止楼 = 末楼(), 有效�
       // 事件键只由“最后一只玩家气泡 + 本轮最后一只回复气泡”生成，
       // 不再依赖可能被安全压缩的整段历史前缀。多气泡回复会原地更新同一点，
       // 确保摘要包含本批最后一只真正落库的回复。
-      const 稳定串 = JSON.stringify([聊天ID, 门牌号, 最后玩家消息.项, item]);
+      const 稳定串 = JSON.stringify([聊天ID, 门牌号, 微信摘要签名消息(最后玩家消息.项), 微信摘要签名消息(item)]);
       const 稳定A = 推进摘要哈希(2166136261, 稳定串);
       const 稳定B = 推进摘要哈希(2246822507, `${稳定串.length}:${稳定串}`);
       const 稳定序 = Number.isSafeInteger(item.序) ? item.序 : item.时;
@@ -236,13 +286,14 @@ export function 当前微信摘要引用(门牌号们: readonly 门牌[], 截止
   return _.uniq(门牌号们)
     .map(门牌号 => {
       const 快照 = 取微信摘要快照(门牌号, 截止楼);
+      const 人物 = 户静态表[门牌号]?.妻名 ?? '';
+      const 候选 = [...(快照?.点 ?? [])]
+        .reverse()
+        .flatMap(item => [item.事件键, ...item.兼容事件键.map(兼容 => 兼容.事件键)]);
       return {
-        人物: 户静态表[门牌号]?.妻名 ?? '',
-        有效事件键: (快照?.点 ?? [])
-          .slice(-20)
-          .reverse()
-          .flatMap(item => [item.事件键, ...item.兼容事件键.map(兼容 => 兼容.事件键)])
-          .slice(0, 20),
+        人物,
+        撤回来源: [...读取会话撤回摘要来源(门牌号, 截止楼)],
+        有效事件键: 可读微信摘要引用(人物, 候选, 截止楼),
       };
     })
     .filter(item => item.人物 && item.有效事件键.length);
@@ -268,12 +319,14 @@ export function 读取近期微信胶囊(
     ? 筛选待正文承接人物(消息, 可靠在场人物, 截止楼, 截止时段, 有效楼务任务id们)
     : 可靠在场人物;
   const 私聊 = 编译近期微信胶囊(消息, 人物, 截止楼, 截止时段, 有效楼务任务id们);
+  const 群摘要 = 选项.仅本楼已完成往返 ? '' : 读取角色群聊见闻胶囊(门牌号们, 截止楼, 1000);
   return (
     私聊 +
     编译角色跨渠道见闻(库, 可靠在场人物, 截止楼, 截止时段, new Set(有效楼务任务id们), {
       仅本楼: 选项.仅本楼已完成往返,
       预算: 5000 - 私聊.length,
-    })
+    }) +
+    群摘要
   );
 }
 
@@ -311,12 +364,8 @@ async function 刷新微信进展摘要(
   if (!(await 确认微信摘要SQLite可写()) || !微信摘要请求仍有效()) return;
   const 妻名 = 户静态表[门牌号]?.妻名;
   if (!妻名) return;
-  const 活动键 = 快照.点
-    .slice(-120)
-    .reverse()
-    .flatMap(item => [item.事件键, ...item.兼容事件键.map(兼容 => 兼容.事件键)])
-    .slice(0, 120);
-  const 旧记录 = 读取微信进展摘要(妻名, 活动键, 当前点.楼);
+  const 活动键 = [...快照.点].reverse().flatMap(item => [item.事件键, ...item.兼容事件键.map(兼容 => 兼容.事件键)]);
+  const 旧记录 = 读取存活微信摘要(妻名, 活动键, 当前点.楼);
   if (旧记录?.事件键 === 当前点.事件键) {
     await 压缩微信会话记录(门牌号, 私聊原始消息上限, 微信摘要请求仍有效);
     return;
@@ -324,12 +373,14 @@ async function 刷新微信进展摘要(
   const 旧匹配 = 旧记录 ? 查找微信摘要点(快照, 旧记录.事件键) : undefined;
   // 兼容旧滚动键时从该轮玩家气泡重放：多气泡回复才能由旧首泡摘要升级到最终泡摘要。
   const 起点 = 旧匹配 ? (旧匹配.兼容截止索引 === undefined ? 旧匹配.点.截止索引 + 1 : 旧匹配.点.玩家索引) : 0;
-  const 增量 = 快照.消息
-    .slice(起点, 当前点.截止索引 + 1)
-    .map(item => ({ 说话者: item.发 === '我' ? '玩家' : 妻名, 内容: item.文.slice(0, 手机可见记忆输入上限) }));
+  const 增量 = 快照.消息.slice(起点, 当前点.截止索引 + 1).map(item => ({
+    说话者: item.发 === '我' ? '玩家' : 妻名,
+    内容: item.文.slice(0, 手机可见记忆输入上限),
+    来源: item.来源,
+  }));
   if (!增量.length && !旧记录) return;
   try {
-    const 结果 = 序列化微信进展数据(合并本地微信进展摘要(旧记录?.摘要, 妻名, 增量));
+    const 结果 = 序列化微信进展数据(合并本地微信进展摘要(清理会话旧摘要(旧记录?.摘要, 门牌号, 当前点.楼), 妻名, 增量));
     if (!微信摘要请求仍有效()) return;
     if (!结果) return;
     const 写入结果 = await 同步社交轨迹(
@@ -367,11 +418,15 @@ function 群聊记忆主体(会话: '群' | '姐妹群'): string {
   return 会话 === '姐妹群' ? '姐妹茶话会' : '公寓住户群';
 }
 
-function 取群聊摘要快照(会话: '群' | '姐妹群', 截止楼 = 末楼()): 微信摘要快照 | null {
+function 取群聊摘要快照(会话: '群' | '姐妹群', 截止楼 = 末楼(), 接收者?: 门牌): 微信摘要快照 | null {
   const 聊天ID = 当前聊天ID();
   if (!聊天ID) return null;
-  const 消息 = 读库()
-    .消息.filter(
+  const 当前消息 = 读库().消息;
+  const 可读消息 = 接收者
+    ? 角色可知群消息(当前消息, 接收者, 截止楼, Number.MAX_SAFE_INTEGER, 有效楼务任务id集合())
+    : 当前消息;
+  const 消息 = 可读消息
+    .filter(
       item =>
         item.会话 === 会话 &&
         item.楼 <= 截止楼 &&
@@ -387,14 +442,16 @@ function 取群聊摘要快照(会话: '群' | '姐妹群', 截止楼 = 末楼()
       类: item.类 ?? '文本',
       图: item.图 ?? '',
       ...(Number.isSafeInteger(item.序) && item.序! >= 0 ? { 序: item.序 } : {}),
+      ...(接收者 ? { 接收门牌: 规范社交接收门牌(item.接收门牌), 锚签名: item.锚签名 } : {}),
+      来源: 微信摘要消息来源(item),
     }));
   const 点 = 消息.map((item, index): 微信摘要点 => {
-    const token = JSON.stringify([聊天ID, 会话, item]);
+    const token = JSON.stringify([聊天ID, 会话, ...(接收者 ? [接收者] : []), 微信摘要签名消息(item)]);
     const hashA = 推进摘要哈希(2166136261, token);
     const hashB = 推进摘要哈希(2246822507, `${token.length}:${token}`);
     const 稳定序 = Number.isSafeInteger(item.序) ? item.序 : item.时;
     return {
-      事件键: `RQP-微信进展-${会话}-${item.楼}-${稳定序}-${hashA.toString(36)}${hashB.toString(36)}`,
+      事件键: `RQP-微信进展-${会话}${接收者 ? `:接收:${接收者}` : ''}-${item.楼}-${稳定序}-${hashA.toString(36)}${hashB.toString(36)}`,
       兼容事件键: [],
       玩家索引: index,
       截止索引: index,
@@ -406,10 +463,8 @@ function 取群聊摘要快照(会话: '群' | '姐妹群', 截止楼 = 末楼()
 
 /** 只授权当前分支仍存在的群摘要版本；私聊事件键不会进入这份清单。 */
 export function 当前群聊摘要引用(会话: '群' | '姐妹群', 截止楼 = 末楼()): string[] {
-  return (取群聊摘要快照(会话, 截止楼)?.点 ?? [])
-    .slice(-20)
-    .reverse()
-    .map(item => item.事件键);
+  const 候选 = [...(取群聊摘要快照(会话, 截止楼)?.点 ?? [])].reverse().map(item => item.事件键);
+  return 可读微信摘要引用(群聊记忆主体(会话), 候选, 截止楼);
 }
 
 function 群聊摘要快照仍有效(
@@ -428,10 +483,98 @@ function 群聊摘要快照仍有效(
   );
 }
 
-function 解析群摘要消息(消息: 微信摘要消息): { 说话者: string; 内容: string } | null {
-  if (消息.发 === '我') return { 说话者: '玩家', 内容: 消息.文.slice(0, 手机可见记忆输入上限) };
+function 解析群摘要消息(消息: 微信摘要消息): 本地微信摘要消息 | null {
+  if (消息.发 === '我') return { 说话者: '玩家', 内容: 消息.文.slice(0, 手机可见记忆输入上限), 来源: 消息.来源 };
   const 匹配 = 消息.文.match(/^([^:：\n]{1,20})[:：]\s*(.+)$/u);
-  return 匹配 ? { 说话者: 匹配[1].trim(), 内容: 匹配[2].trim().slice(0, 手机可见记忆输入上限) } : null;
+  return 匹配 ? { 说话者: 匹配[1].trim(), 内容: 匹配[2].trim().slice(0, 手机可见记忆输入上限), 来源: 消息.来源 } : null;
+}
+
+function 角色群见闻主体(会话: '群' | '姐妹群', m: 门牌): string {
+  return `${户静态表[m].妻名}·${群聊记忆主体(会话)}见闻`;
+}
+
+/** 只读取当前分支仍有本人来源锚的版本；旧全群摘要不转成某个人的经历。 */
+export function 读取角色群聊见闻胶囊(
+  人物: readonly 门牌[],
+  截止楼: number,
+  预算 = 1200,
+  限定会话?: '群' | '姐妹群',
+): string {
+  const 逐人行: string[][] = [];
+  for (const m of _.uniq(人物)) {
+    const 行: string[] = [];
+    for (const 会话 of ['群', '姐妹群'] as const) {
+      if (限定会话 && 会话 !== 限定会话) continue;
+      const 快照 = 取群聊摘要快照(会话, 截止楼, m);
+      if (!快照?.点.length) continue;
+      const 记录 = 读取存活微信摘要(
+        角色群见闻主体(会话, m),
+        [...快照.点].reverse().map(点 => 点.事件键),
+        截止楼,
+      );
+      if (!记录) continue;
+      let 数据;
+      try {
+        数据 = 规范微信进展数据(JSON.parse(记录.摘要));
+      } catch {
+        continue;
+      }
+      if (!数据) continue;
+      数据 = 排除已撤回微信摘要(数据, 读取会话撤回摘要来源(会话, 截止楼));
+      const 片段 = [...数据.a.slice(-2), ...数据.b.slice(-1), ...数据.p.slice(-2), ...数据.f.slice(-2)];
+      for (const 片 of 片段)
+        行.push(`- [${户静态表[m].妻名}实际收到的${群聊记忆主体(会话)}旧话] ${移除微信摘要来源标记(片)}`);
+    }
+    if (行.length) 逐人行.push(行);
+  }
+  const 开头 =
+    '\n<人妻公寓个人群聊记忆>\n以下摘要只来自标注本人实际收到或说过的群消息，不能转授给其他人物。它证明有人曾这样表达，不证明计划已履行、传闻属实或当事人的当前状态。按本人的当前关系与玩家本轮话题自然接续，不必安排其他人到场。\n';
+  const 结尾 = '\n</人妻公寓个人群聊记忆>';
+  const 每人预算 = Math.floor((预算 - 开头.length - 结尾.length - 逐人行.length) / (逐人行.length || 1));
+  const 候选 = 逐人行.flatMap(行 => 胶囊预算选择('', '', 行, 每人预算));
+  const 保留 = 胶囊预算选择(开头, 结尾, 候选, 预算);
+  return 保留.length ? 开头 + 保留.join('\n') + 结尾 : '';
+}
+
+/** 逐人的确认收据齐全后才可压缩原文；部分写入成功可在下次按同锚幂等续办。 */
+async function 保存群成员见闻摘要(会话: '群' | '姐妹群', 请求仍有效: () => boolean): Promise<boolean> {
+  for (const m of 门牌列表) {
+    if (!请求仍有效()) return false;
+    const 快照 = 取群聊摘要快照(会话, 末楼(), m);
+    const 点 = 快照?.点.at(-1);
+    if (!快照 || !点) continue;
+    const 主体 = 角色群见闻主体(会话, m);
+    const 旧 = 读取存活微信摘要(
+      主体,
+      [...快照.点].reverse().map(项 => 项.事件键),
+      点.楼,
+    );
+    if (旧?.事件键 === 点.事件键) continue;
+    const 旧点 = 旧 ? 快照.点.find(项 => 项.事件键 === 旧.事件键) : undefined;
+    const 增量 = 快照.消息
+      .slice((旧点?.截止索引 ?? -1) + 1)
+      .map(解析群摘要消息)
+      .filter((项): 项 is { 说话者: string; 内容: string } => !!项);
+    const 结果 = 序列化微信进展数据(
+      合并本地群聊进展摘要(清理会话旧摘要(旧?.摘要, 会话, 点.楼), 群聊记忆主体(会话), 增量),
+    );
+    if (!结果) return false;
+    const 同锚 = () => 请求仍有效() && 取群聊摘要快照(会话, 末楼(), m)?.点.at(-1)?.事件键 === 点.事件键;
+    const 写入 = await 同步社交轨迹(
+      {
+        类型: '微信进展',
+        人物: 主体,
+        事件: `${户静态表[m].妻名}实际收到的${群聊记忆主体(会话)}消息`,
+        结果,
+        时间: 格式化游戏内时间(快照.消息.at(-1)!.时),
+        楼层: 点.楼,
+        事件键: 点.事件键,
+      },
+      同锚,
+    );
+    if (写入 !== '已确认' || !同锚()) return false;
+  }
+  return 请求仍有效();
 }
 
 async function 刷新群聊进展摘要(
@@ -450,11 +593,14 @@ async function 刷新群聊进展摘要(
   if (!db.可写表格 || !db.已装游戏模板) return;
   if (!(await 确认微信摘要SQLite可写()) || !请求仍有效()) return;
   const 主体 = 群聊记忆主体(会话);
-  const 活动键 = 快照.点
-    .slice(-120)
-    .reverse()
-    .map(item => item.事件键);
-  const 旧记录 = 读取微信进展摘要(主体, 活动键, 当前点.楼);
+  const 活动键 = [...快照.点].reverse().map(item => item.事件键);
+  const 旧记录 = 读取存活微信摘要(主体, 活动键, 当前点.楼);
+  try {
+    if (!(await 保存群成员见闻摘要(会话, 请求仍有效))) return;
+  } catch (error) {
+    console.warn(`[人妻公寓·手机] ${主体}的个人见闻尚未保存，保留原始消息。`, error);
+    return;
+  }
   if (旧记录?.事件键 === 当前点.事件键) {
     await 压缩微信会话记录(会话, 群聊原始消息上限, 请求仍有效);
     return;
@@ -467,7 +613,7 @@ async function 刷新群聊进展摘要(
     .filter((item): item is { 说话者: string; 内容: string } => !!item);
   if (!增量.length) return;
   try {
-    const 结果 = 序列化微信进展数据(合并本地群聊进展摘要(旧记录?.摘要, 主体, 增量));
+    const 结果 = 序列化微信进展数据(合并本地群聊进展摘要(清理会话旧摘要(旧记录?.摘要, 会话, 当前点.楼), 主体, 增量));
     if (!请求仍有效() || !结果) return;
     const 写入结果 = await 同步社交轨迹(
       {
