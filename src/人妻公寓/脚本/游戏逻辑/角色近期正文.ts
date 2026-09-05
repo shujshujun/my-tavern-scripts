@@ -1,4 +1,5 @@
 import { 户静态表, type 门牌 } from '../../stageConfig';
+import { 临时楼标记键 } from './临时回合楼';
 
 /** 每个成功助手楼冻结的本轮可靠在场妻；旧楼没有该凭据时不猜测角色归属。 */
 export const 回合在场妻键 = '_rqgy回合在场妻';
@@ -23,7 +24,13 @@ export function 构造角色近期正文(
     .slice(-14)
     .filter(消息 => {
       const 在场妻 = 消息.extra?.[回合在场妻键];
-      return !消息.is_user && Boolean(消息.mes) && Array.isArray(在场妻) && 在场妻.includes(门牌号);
+      return (
+        !消息.is_user &&
+        消息.extra?.[临时楼标记键] !== true &&
+        Boolean(消息.mes) &&
+        Array.isArray(在场妻) &&
+        在场妻.includes(门牌号)
+      );
     })
     .map(消息 => 清洗(String(消息.mes ?? '')).slice(-900))
     .filter(正文 => Boolean(正文.trim()))

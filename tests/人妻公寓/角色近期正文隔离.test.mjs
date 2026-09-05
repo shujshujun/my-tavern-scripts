@@ -12,6 +12,8 @@ const require = createRequire(import.meta.url);
 require('ts-node/register/transpile-only');
 
 const { 回合在场妻键, 构造角色近期正文 } = require('../../src/人妻公寓/脚本/游戏逻辑/角色近期正文.ts');
+const { 编译本人见证正文 } = require('../../src/人妻公寓/脚本/游戏逻辑/微信可知正文.ts');
+const { 临时楼标记键 } = require('../../src/人妻公寓/脚本/游戏逻辑/临时回合楼.ts');
 
 const 读 = 路径 => readFileSync(new URL(`../../${路径}`, import.meta.url), 'utf8');
 const 清洗 = 文本 => String(文本).trim();
@@ -55,6 +57,28 @@ test('多人真实同场正文可分别服务每位在场妻，不能服务第�
   assert.match(构造角色近期正文(消息, '101', 清洗), /一起确认/);
   assert.match(构造角色近期正文(消息, '102', 清洗), /一起确认/);
   assert.equal(构造角色近期正文(消息, '201', 清洗), '');
+});
+
+test('在场元数据存在的临时助手楼仍不能成为经历；转正、失败删除与切换角色分别处理', () => {
+  const stable = 助手楼('夏乔记得你们讨论过相框。', ['101']);
+  const pending = 助手楼('许曼君这段尚未通过提交。', ['201'], { [临时楼标记键]: true });
+  assert.equal(构造角色近期正文([stable, pending], '201', 清洗), '');
+  assert.equal(编译本人见证正文('201', ['201'], [stable, pending]), '');
+  assert.match(编译本人见证正文('101', ['201'], [stable, pending]), /讨论过相框/);
+  pending.extra[临时楼标记键] = false;
+  assert.match(编译本人见证正文('201', [], [stable, pending]), /这段尚未通过提交/);
+  assert.equal(编译本人见证正文('201', ['201'], [stable]), '');
+});
+
+test('手机正文见闻排除旧无凭据与思考段，仍可接续本人之前的正式正文', () => {
+  const messages = [
+    助手楼('旧档里的夏乔经历没有元数据。', undefined),
+    助手楼('<think>内部推演不属于角色听到的内容</think><content>夏乔把刚才的安排又说了一遍。</content>', ['101']),
+    助手楼('许曼君的另一段私下对话。', ['201']),
+  ];
+  const result = 编译本人见证正文('101', ['201'], messages);
+  assert.match(result, /刚才的安排/);
+  assert.doesNotMatch(result, /旧档里的|内部推演|许曼君/);
 });
 
 test('只看全局最近14条且最多保留目标角色最后4条，用户楼和空正文被排除', () => {

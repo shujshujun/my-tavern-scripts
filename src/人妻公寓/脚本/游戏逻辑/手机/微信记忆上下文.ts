@@ -47,11 +47,8 @@ export interface 群聊记忆上下文 {
 
 function 读取本人见证正文(门牌号: 门牌): string {
   try {
-    const vars = getVariables({ type: 'chat' });
-    const 妻在场 = _.get(vars, '_在场.妻在场');
-    const 在场 = Array.isArray(妻在场) ? 妻在场.filter((项): 项 is string => typeof 项 === 'string') : [];
     const chat = (SillyTavern as unknown as { chat?: 微信可知正文消息[] }).chat ?? [];
-    return 编译本人见证正文(门牌号, 在场, chat);
+    return 编译本人见证正文(门牌号, [], chat);
   } catch {
     return '';
   }

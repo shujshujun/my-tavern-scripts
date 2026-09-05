@@ -6,7 +6,9 @@ import { 安若妍换掉商品ID } from '../安若妍换掉系统';
 import { 安若妍换掉背景文件 } from '../安若妍换掉资源';
 import { 构建角色结局后生活社交语义 } from '../结局后生活社交语义';
 import { 构建结局社交画像 } from './结局社交语义';
+import { 验收姐妹群跨线事实 } from './姐妹群已知事实';
 import { 解析姐妹群公开事实 } from './姐妹群公开事实';
+import { 角色可知群消息 } from '../微信跨渠道见闻';
 import { 读取群聊记忆上下文 } from './微信记忆上下文';
 import { 小生成, 微信群文本, type 手机小生成控制 } from './生成引擎';
 import { 手机可见单条硬上限, type 微信库, type 微信消息 } from './数据层';
@@ -16,56 +18,21 @@ export const 换照姐妹群反应前缀 = '301结局:换照:姐妹群反应:';
 
 /** 301照片已发送后，校验仍未公开的跨线事实；当前照片的画面与拍摄者均属于本次公开范围。 */
 export function 验收换照群公开事实(消息: string, 既有消息: readonly 微信消息[]): boolean {
-  if (!既有消息.some(item => item.会话 === '姐妹群' && item.类 === '照片' && item.键 === 换照姐妹群照片键))
-    return false;
-  const 文 = 消息.normalize('NFKC').trim();
-  const match = /^([^:：\n]+)[:：]\s*(.+)$/u.exec(文);
-  if (!match) return false;
-  const 发言人 = match[1].trim();
-  const 正文 = match[2];
-  const 公开 = 解析姐妹群公开事实(既有消息);
-  // 只匹配传播其他记录／证据的具体表述；普通提及摄影、亲密或家庭成员不会单独触发拒收。
-  if (
-    /(?:公开|告诉大家|发到群里|给大家看).{0,24}(?:私聊记录|母带|外遇证据|CAM-?2录像|协议细节)|(?:私聊记录|母带|外遇证据|CAM-?2录像|协议细节).{0,24}(?:具体内容|原文是|写的是|告诉大家|发到群里|给大家看)/iu.test(
-      正文,
-    )
-  )
-    return false;
-  if (!公开.借种家庭结构已公开) {
-    const 指向夏乔家庭 =
-      /(?:陆嘉明.{0,24}(?:知情|知道|同意|接受|默许).{0,24}(?:管理员|玩家|关系|家庭安排|家庭结构)|夏乔.{0,24}(?:生物学父亲|孩子(?:的)?父亲|家庭安排))/u.test(
-        正文,
-      );
-    const 夏乔自述家庭 =
-      发言人 === 户静态表['101'].妻名 &&
-      /(?:我(?:的)?(?:丈夫|老公)).{0,24}(?:知情|知道|同意|接受).{0,24}(?:管理员|玩家|关系|家庭安排|家庭结构)|(?:我们三个|我们(?:的家庭)|我(?:的)?孩子(?:的)?父亲).{0,24}(?:知情|同意|接受|管理员|玩家)/u.test(
-        正文,
-      );
-    if (指向夏乔家庭 || 夏乔自述家庭) return false;
-  }
-  const 涉及母亲 = 发言人 === 户静态表['302'].妻名 || /母亲|妈妈|302/u.test(正文);
-  if (涉及母亲) {
-    if (/机场.{0,24}(?:隐秘现场|镜头死角|镜头外的|隐瞒父亲)/u.test(正文)) return false;
-    if (
-      /(?:父亲|爸爸|你爸|他爸).{0,12}(?:已经|早就|其实|确实|明明)(?:知道|知情|看穿|发现|默许|成全).{0,24}(?:我|母亲|妈妈|302).{0,12}(?:管理员|玩家|关系)/u.test(
-        正文,
-      )
-    )
-      return false;
-    if (
-      !公开.母亲关系已公开 &&
-      /(?:母亲|妈妈|我).{0,8}(?:和|跟|与).{0,8}(?:儿子|管理员|玩家).{0,12}(?:恋人|爱人|伴侣|情人|在一起|同床|共枕)|(?:母亲|妈妈).{0,8}(?:真实关系|隐秘关系)/u.test(
-        正文,
-      )
-    )
-      return false;
-  }
-  return true;
+  return (
+    既有消息.some(item => item.会话 === '姐妹群' && item.类 === '照片' && item.键 === 换照姐妹群照片键) &&
+    验收姐妹群跨线事实(消息, 既有消息)
+  );
 }
 
-export function 构造换照成员差分(data: SchemaType, 门牌号: 门牌, 消息: readonly 微信消息[]) {
+export function 构造换照成员差分(
+  data: SchemaType,
+  门牌号: 门牌,
+  消息: readonly 微信消息[],
+  楼 = Number.MAX_SAFE_INTEGER,
+) {
   const profile = 构建结局社交画像(data, 门牌号, 消息);
   const life = 构建角色结局后生活社交语义(data, 门牌号);
+  const 已知 = 解析姐妹群公开事实(角色可知群消息(消息, 门牌号, 楼, 取绝对时段(data)));
   return {
     门牌: 门牌号,
     姓名: profile.姓名,
@@ -76,8 +43,10 @@ export function 构造换照成员差分(data: SchemaType, 门牌号: 门牌, �
     本人当前阶段: profile.当前阶段,
     本人群内已知事实: profile.群内允许事实,
     本人群聊口吻: profile.群聊口吻变化,
-    本次照片允许知道的事实:
-      '安若妍已经公开301换照结果；照片记录她与玩家的亲密场景，两人面对镜头做鬼脸；江辰按约拍摄，玩家亲手换进原相框。',
+    本人实际接收的公开说明: 已知,
+    本次照片允许知道的事实: 已知.安若妍换照已公开
+      ? '安若妍已经公开301换照结果；照片记录她与玩家的亲密场景，两人面对镜头做鬼脸；江辰按约拍摄，玩家亲手换进原相框。'
+      : '本人尚未收到原照片，只从本轮实际听到的内容回应或追问，不冒充亲眼见过画面。',
   };
 }
 export function 换照群反应数量合格(lines: readonly string[], names: ReadonlySet<string>): boolean {
@@ -125,7 +94,7 @@ export async function 安若妍换照姐妹群一拍(
     return true;
   }
   if (members.length < 3) return false;
-  const profiles = members.map(member => 构造换照成员差分(data, member, 库.消息));
+  const profiles = members.map(member => 构造换照成员差分(data, member, 库.消息, 楼));
   const memory = 读取群聊记忆上下文('姐妹群', 库, 楼, members);
   const text = await 小生成(
     '为都市生活游戏生成姐妹群收到301换照照片后的反应。只输出6至9行“姓名:内容”，至少3人发言，至少4条来自安若妍之外，安若妍最多回应2条。' +
@@ -142,7 +111,12 @@ export async function 安若妍换照姐妹群一拍(
     console.warn('[301换照姐妹群] 本批次未满足条数与成员分布，保留待重试。');
     return false;
   }
-  if (lines.some(line => !验收换照群公开事实(line, 库.消息))) {
+  if (
+    lines.some(line => {
+      const m = members.find(member => line.startsWith(`${户静态表[member].妻名}:`));
+      return !m || !验收姐妹群跨线事实(line, 角色可知群消息(库.消息, m, 楼, time));
+    })
+  ) {
     console.warn('[301换照姐妹群] 本批次未通过本线公开事实校验，保留待重试。');
     return false;
   }

@@ -35,17 +35,12 @@ test('角色主动私聊、玩家发起私聊与姐妹群都消费结局后差�
   assert.match(私聊, /for \(const \[序, 解析回复\] of 可提交回复们\.entries\(\)\)/);
 });
 
-test('母亲公开评论只区分正式交接与未来安全公开事实，亲密开场不会复活旧日常分类', () => {
-  assert.doesNotMatch(节拍, /const 母亲共居朋友圈评论口吻/);
-  assert.match(节拍, /角色对母亲共居动态评论池\(data, 门牌号, 事件类型\)/);
-  assert.match(节拍, /母亲共居公开评论\(data, 钟, '双重继承公开交接', '公开交接'\)/);
-  assert.match(节拍, /母亲共居公开评论\(data, 钟, 待发\.id, 待发\.类型, 2\)/);
-  assert.match(后效, /母亲共居公开评论类别 = '公开交接' \| '普通公开'/);
-  assert.match(后效, /302亲密场次从不自动公开/);
-  for (const 门牌 of ['101', '102', '201', '202', '301']) {
-    assert.match(后效, new RegExp(`'${门牌}': \\{[\\s\\S]*?公开交接:[\\s\\S]*?普通公开:`));
-  }
-  assert.doesNotMatch(后效, /共同用餐:|提前说明:|她先吃:|谈开分歧:/);
+test('母亲公开事件使用共同的阶段评论流程，私密事件继续没有公开评论', () => {
+  assert.doesNotMatch(节拍, /function 母亲共居公开评论|角色对母亲共居动态评论池/);
+  assert.match(节拍, /const 评 = await 结局日常动态评论\(data, '302', 文, 钟, 仍有效/);
+  assert.match(节拍, /评: 私密 \? \[\] : await 结局日常动态评论/);
+  assert.match(节拍, /const 已生成交接 = await 生成302公开交接朋友圈[\s\S]{0,130}if \(!时间线仍有效\(\)\) return/);
+  assert.doesNotMatch(后效, /const 评论池|export function 角色对母亲共居动态评论池/);
 });
 
 test('母亲后效范围明确排除新增个人外出、共同出游与购物玩法', () => {

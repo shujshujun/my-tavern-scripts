@@ -1,8 +1,12 @@
 import { 折叠检测文本, 规范可读文本 } from './记忆文本规范';
+import { 门牌列表, type 门牌 } from '../../stageConfig';
+import { 构造角色近期正文 } from './角色近期正文';
+import { 提取正文舞台文本 } from './正文输出边界';
 
 export interface 微信可知正文消息 {
   mes?: string;
   is_user?: boolean;
+  extra?: Record<string, unknown> | null;
 }
 
 const 指令风险 =
@@ -21,15 +25,13 @@ export function 净化微信只读文本(value: unknown, 上限: number): string
   return 文.slice(-上限);
 }
 
-/** 只有上一成功正文明确在场的妻子才能读到该正文尾巴。 */
-export function 编译本人见证正文(门牌号: string, 妻在场: readonly string[], chat: readonly 微信可知正文消息[]): string {
-  if (!妻在场.includes(门牌号)) return '';
-  for (let index = chat.length - 1; index >= 0; index -= 1) {
-    const 消息 = chat[index];
-    if (!消息?.is_user && 消息?.mes) {
-      const 文 = 净化微信只读文本(消息.mes, 300);
-      if (文) return 文;
-    }
-  }
-  return '';
+/** 当前名单参数只保留旧调用兼容；已发生经历以正式消息自身的持久在场凭据为准。 */
+export function 编译本人见证正文(
+  门牌号: string,
+  _妻在场: readonly string[],
+  chat: readonly 微信可知正文消息[],
+): string {
+  if (!门牌列表.includes(门牌号 as 门牌)) return '';
+  const 文 = 构造角色近期正文(chat, 门牌号 as 门牌, 正文 => 净化微信只读文本(提取正文舞台文本(正文), 300));
+  return 净化微信只读文本(文, 900);
 }

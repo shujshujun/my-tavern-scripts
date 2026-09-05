@@ -15,6 +15,7 @@ const {
 const 手机源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/手机系统.ts', import.meta.url), 'utf8');
 const 交互源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/交互/邀约与发消息.ts', import.meta.url), 'utf8');
 const 节拍引擎源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/节拍引擎.ts', import.meta.url), 'utf8');
+const 记忆上下文源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/微信记忆上下文.ts', import.meta.url), 'utf8');
 const 数据层源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/数据层.ts', import.meta.url), 'utf8');
 // P7B2:聊天页与会话列表页已迁至 ./壳/渲染。
 const 聊天页源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/手机/壳/渲染/chat.ts', import.meta.url), 'utf8');
@@ -75,8 +76,9 @@ test('手机接入长按和右键菜单，并按发送方显示撤回提示', ()
 });
 
 test('三类聊天上下文都排除撤回墓碑', () => {
-  // 姐妹群自动上下文在节拍引擎，楼务群手动接话与妻回复批次上下文在交互模块。
-  assert.match(节拍引擎源码, /m\.会话 === '姐妹群' && m\.类 !== '撤回'/);
+  // 姐妹群自动上下文委托共同记忆读口；楼务群手动接话与妻回复批次在交互模块。
+  assert.match(节拍引擎源码, /读取群聊记忆上下文\('姐妹群', 库, 楼, 成员\)/);
+  assert.match(记忆上下文源码, /消息\.会话 === 会话 && 消息\.类 !== '撤回'/);
   assert.match(交互源码, /m\.会话 === '群' && m\.类 !== '撤回'/);
   assert.match(交互源码, /m\.会话 === 会话 && m\.类 !== '撤回'/);
 });

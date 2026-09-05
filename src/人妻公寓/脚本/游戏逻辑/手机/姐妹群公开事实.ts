@@ -49,3 +49,16 @@ export function 解析姐妹群公开事实(消息: readonly 姐妹群公开消�
   }
   return { 借种家庭结构已公开, 母亲关系已公开, 安若妍换照已公开 };
 }
+
+/** 已完成状态只决定本人身份；是否听过他人的公开说明由实际接收记录决定。 */
+export function 构建姐妹群逐人知情(成员: readonly 门牌[], 消息: readonly 微信消息[], 楼: number, 时: number) {
+  return 成员.map(m => ({
+    门牌: m,
+    姓名: 户静态表[m].妻名,
+    本人已经收到的公开事实: 解析姐妹群公开事实(角色可知群消息(消息, m, 楼, 时)),
+  }));
+}
+import type { 门牌 } from '../../../stageConfig';
+import { 户静态表 } from '../../../stageConfig';
+import type { 微信消息 } from './数据层';
+import { 角色可知群消息 } from '../微信跨渠道见闻';

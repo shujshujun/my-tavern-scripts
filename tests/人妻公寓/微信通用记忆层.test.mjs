@@ -17,10 +17,7 @@ const 节拍源 = readFileSync(new URL('./节拍引擎.ts', 手机根), 'utf8');
 const 摘要源 = readFileSync(new URL('./摘要系统.ts', 手机根), 'utf8');
 const 记忆源 = readFileSync(new URL('./微信记忆上下文.ts', 手机根), 'utf8');
 const 数据源 = readFileSync(new URL('./数据层.ts', 手机根), 'utf8');
-const 数据库桥源 = readFileSync(
-  new URL('../../src/人妻公寓/脚本/游戏逻辑/数据库桥.ts', import.meta.url),
-  'utf8',
-);
+const 数据库桥源 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/数据库桥.ts', import.meta.url), 'utf8');
 
 test('私聊摘要不再只填事实：双方确认、本人边界和待续话题各归自己的有界槽位', () => {
   const 约定 = 合并本地微信进展摘要('', '夏乔', [
@@ -139,13 +136,17 @@ test('保护消息不占普通气泡配额，上限为零时也只留下保护�
   );
 });
 
-test('正文尾巴只能授权给最近一楼真正在场的本人', () => {
+test('正文尾巴只归消息凭据证明的本人，不按当前名单猜测过去在场', () => {
   const chat = [
     { is_user: true, mes: '我和林悦说话。' },
-    { is_user: false, mes: '<div>林悦把信封收进抽屉，说这件事只有你们知道。</div>' },
+    {
+      is_user: false,
+      mes: '<div>林悦把信封收进抽屉，说这件事只有你们知道。</div>',
+      extra: { _rqgy回合在场妻: ['102'] },
+    },
   ];
-  assert.equal(编译本人见证正文('101', ['102'], chat), '');
-  assert.match(编译本人见证正文('102', ['102'], chat), /林悦把信封收进抽屉/);
+  assert.equal(编译本人见证正文('101', ['101'], chat), '');
+  assert.match(编译本人见证正文('102', [], chat), /林悦把信封收进抽屉/);
 });
 
 test('SQLite 摘要只有获得确认后才压缩原始消息；后台待确认保持原文且不误判数据库不可用', () => {

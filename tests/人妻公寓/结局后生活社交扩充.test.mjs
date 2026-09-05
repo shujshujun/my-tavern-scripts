@@ -10,18 +10,19 @@ require('ts-node/register/transpile-only');
 globalThis._ = require('lodash');
 
 const { Schema, 创建户节点 } = require('../../src/人妻公寓/schema.ts');
+const { 公开动态评论者方向 } = require('../../src/人妻公寓/脚本/游戏逻辑/手机/结局后日常反馈.ts');
 const 共居 = require('../../src/人妻公寓/脚本/游戏逻辑/302共居系统.ts');
 const 社交 = require('../../src/人妻公寓/脚本/游戏逻辑/结局后生活社交语义.ts');
 
 function 基础数据(绝对时段 = 6) {
   const data = Schema.parse({
     户: {
-      '101': 创建户节点(0),
-      '102': 创建户节点(0),
-      '201': 创建户节点(0),
-      '202': 创建户节点(0),
-      '301': 创建户节点(0),
-      '302': 创建户节点(0),
+      101: 创建户节点(0),
+      102: 创建户节点(0),
+      201: 创建户节点(0),
+      202: 创建户节点(0),
+      301: 创建户节点(0),
+      302: 创建户节点(0),
     },
     系统: {
       _数据版本: 9,
@@ -79,7 +80,7 @@ test('母亲主动与玩家主动私聊承接真实亲密结果，但不能远�
     当前行为: '乳交',
     有效楼数: 5,
     参与者: {
-      '302': {
+      302: {
         满意度: 5,
         满意目标: 5,
         偏好命中: ['胸前哺育'],
@@ -109,18 +110,17 @@ test('手机节拍不再从旧饭桌日常生成302主动私聊或仅你可见�
   );
 });
 
-test('302公开评论池只区分正式交接与安全普通公开，不再维护旧日常事件分类', () => {
+test('公开评论采用本人阶段输入，201已保存的退出选择继续有效', () => {
   const data = 基础数据();
-  assert.equal(社交.母亲共居公开评论类别('公开交接'), '公开交接');
-  assert.equal(社交.母亲共居公开评论类别('其他安全公开事实'), '普通公开');
-  for (const room of ['101', '102', '201', '202', '301']) {
-    const handover = 社交.角色对母亲共居动态评论池(data, room, '公开交接');
-    const generic = 社交.角色对母亲共居动态评论池(data, room, '其他安全公开事实');
-    assert.equal(handover.length, 2);
-    assert.equal(generic.length, 2);
-    assert.notDeepEqual(handover, generic);
-    assert.doesNotMatch([...handover, ...generic].join('\n'), /真实关系|亲密场次|机场视频/);
-  }
+  const before = 公开动态评论者方向(data, '201');
+  data.系统._已完成特殊场景.push(社交.许曼君正式离婚完成ID);
+  data.系统._许曼君分居.玩家最终关系选择 = '退出关系';
+  const after = 公开动态评论者方向(data, '201');
+  assert.notEqual(after, before);
+  assert.match(after, /独立生活/);
+  assert.doesNotMatch(after, /公开交接|亲密场次|机场视频/);
+  delete data.户['201'];
+  assert.equal(公开动态评论者方向(data, '201'), '');
 });
 
 test('102与202共享录像带完成事实，但生活、丈夫和社交方向保持角色差异', () => {

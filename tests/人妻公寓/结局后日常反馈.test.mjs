@@ -14,6 +14,8 @@ const { 户静态表, 门牌列表 } = require('../../src/人妻公寓/stageConf
 const policy = require('../../src/人妻公寓/脚本/游戏逻辑/手机/结局后日常反馈.ts');
 const facts = require('../../src/人妻公寓/脚本/游戏逻辑/结局后生活社交语义.ts');
 const { 读取医院内容策略 } = require('../../src/人妻公寓/脚本/游戏逻辑/生产系统.ts');
+const { 母亲共居已开启, 母亲公开交接最早时段 } = require('../../src/人妻公寓/脚本/游戏逻辑/302共居系统.ts');
+const { 朋友圈节拍键 } = require('../../src/人妻公寓/脚本/游戏逻辑/手机/数据层.ts');
 const { 已入住微信妻友门牌 } = require('../../src/人妻公寓/脚本/游戏逻辑/微信好友规则.ts');
 const { 验收群聊隐私 } = require('../../src/人妻公寓/脚本/游戏逻辑/手机输出安全.ts');
 const { 解析微信群消息, 验收单条群消息 } = require('../../src/人妻公寓/脚本/游戏逻辑/手机群聊格式.ts');
@@ -176,4 +178,44 @@ test('生产入口接线：结局旧档停止深夜撤回，私密动态消费�
   assert.match(publicFeed, /库\.圈\.unshift\(条\)[\s\S]*条\.评 = await 结局日常动态评论/);
   assert.match(publicFeed, /if \(!时间线仍有效\(\)\) return '中止'/);
   assert.match(publicFeed, /结局后普通图策略\(data, m, '公开朋友圈'/);
+});
+
+test('母亲公开交接使用当前角色评论，生成失败仍发布一次，失效请求不发布', async () => {
+  const data = fresh();
+  data.系统._母亲入列 = true;
+  data.系统._302共居.状态 = '共居';
+  data.系统._302共居.开始绝对时段 = 0;
+  const eventKey = 'RQP-朋友圈-302-双重继承-公开交接';
+  const exists = load('朋友圈已有长期键', {});
+  const build = response =>
+    load('生成302公开交接朋友圈', {
+      户静态表,
+      母亲共居已开启,
+      母亲公开交接最早时段,
+      朋友圈节拍键,
+      朋友圈已有长期键: exists,
+      母亲公开交接朋友圈键: eventKey,
+      结局日常动态评论: commentsEnvironment(response).fn,
+    });
+  const initial = { 圈: [], 节拍: {} };
+  const failed = build(() => {
+    throw new Error('comment timeout');
+  });
+  assert.equal(await failed(data, initial, 5, 30, () => true), true);
+  assert.equal(initial.圈.length, 1);
+  assert.deepEqual(initial.圈[0].评, []);
+  assert.match(initial.圈[0].文, /楼里的事也正式交给他自己拿主意/);
+  assert.equal(await failed(data, initial, 5, 30, () => true), false);
+  const success = build(() => '夏乔:以后报修直接找管理员就好。\n沈静仪:交接清楚就好。');
+  const next = { 圈: [], 节拍: {} };
+  assert.equal(await success(data, next, 5, 30, () => true), true);
+  assert.equal(next.圈[0].评.length, 2);
+  let valid = true;
+  const late = build(() => {
+    valid = false;
+    return '夏乔:交接好了。';
+  });
+  const cancelled = { 圈: [], 节拍: {} };
+  assert.equal(await late(data, cancelled, 5, 30, () => valid), false);
+  assert.deepEqual(cancelled.圈, []);
 });
