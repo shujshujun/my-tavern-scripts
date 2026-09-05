@@ -135,14 +135,15 @@
     "uid": "sheet_rq_social_history",
     "name": "RQ_社交轨迹",
     "sourceData": {
-      "note": "记录会影响社交连续性的微信进展、重要朋友圈、手机邀约、父亲来电和赠礼结果，仅由游戏脚本按真实业务事务写入。普通晒饭、天气和同质化日常动态不入表；仅你可见、关键路线公开动态、换装余波晒装等重要朋友圈由脚本附带稳定凭据后写入。事件键统一使用 RQP- 前缀并绑定创建楼、游戏时间或事件身份；通用填表AI不得插入、更新或删除本表，避免把后续楼的肢体接触或关系变化提前写进上一楼。\n【本表写摘要，不写原文】事件与结果只保存脚本验证后的结构化概括，不保存微信原句、朋友圈原文、正文对话或模型推测。\n【列定义】\n- 列1: 类型 - 脚本写入的“微信进展”“朋友圈”“邀约”“来电”或“赠礼”。\n- 列2: 人物 - 对方的《人妻公寓》已有姓名。\n- 列3: 事件 - 脚本冻结的业务事件概括。\n- 列4: 结果 - 脚本验证后的关系影响。\n- 列5: 游戏时间 - 脚本世界钟冻结的“第N天 时段”。\n- 列6: 最后楼层 - 本条最后一次真实更新对应的楼层。\n- 列7: 事件键 - RQP- 开头的稳定业务键，全表唯一。",
+      "note": "记录会影响社交连续性的微信进展、重要朋友圈、手机邀约、父亲来电和赠礼结果，仅由游戏脚本按真实业务事务写入。普通晒饭、天气和同质化日常动态不入表；仅你可见、关键路线公开动态、换装余波晒装等重要朋友圈由脚本附带稳定凭据后写入。事件键统一使用 RQP- 前缀并绑定创建楼、游戏时间或事件身份；通用填表AI不得插入、更新或删除本表，避免把后续楼的肢体接触或关系变化提前写进上一楼。\n【本表写摘要，不写原文】事件与结果只保存脚本验证后的结构化概括，不保存微信原句、朋友圈原文、正文对话或模型推测。\n【列定义】\n- 列1: 类型 - 脚本写入的“微信进展”“朋友圈”“邀约”“来电”或“赠礼”。\n- 列2: 人物 - 对方的《人妻公寓》已有姓名。\n- 列3: 事件 - 脚本冻结的业务事件概括。\n- 列4: 结果 - 脚本验证后的权威结果；微信进展保存v1结构与来源追踪，用于撤回、回档和逐人记忆，常规视图隐藏。\n- 列5: 游戏时间 - 脚本世界钟冻结的“第N天 时段”。\n- 列6: 最后楼层 - 本条最后一次真实更新对应的楼层。\n- 列7: 事件键 - RQP- 开头的稳定业务键，全表唯一，常规视图隐藏。\n- 列8: 结果说明 - 根据权威结果生成的可读概括，展示时省略协议字段和来源标记，与结果同次更新。",
       "initNode": "无重要社交事件时保持空表。",
       "deleteNode": "禁止；本表仅由《人妻公寓》游戏脚本维护。",
       "updateNode": "禁止；同一事件的脚本更新由稳定 RQP- 事件键精确 UPSERT。",
       "insertNode": "禁止；新社交事务由《人妻公寓》游戏脚本在成功提交点写入。",
-      "ddl": "CREATE TABLE rq_social_history (\n  row_id INTEGER PRIMARY KEY, -- row_id\n  event_type TEXT NOT NULL, -- 类型\n  character_name TEXT NOT NULL, -- 人物\n  event_text TEXT NOT NULL, -- 事件\n  result TEXT, -- 结果\n  game_time TEXT, -- 游戏时间\n  last_floor INTEGER, -- 最后楼层\n  event_key TEXT NOT NULL UNIQUE -- 事件键\n);"
+      "ddl": "CREATE TABLE rq_social_history (\n  row_id INTEGER PRIMARY KEY, -- row_id\n  event_type TEXT NOT NULL, -- 类型\n  character_name TEXT NOT NULL, -- 人物\n  event_text TEXT NOT NULL, -- 事件\n  result TEXT, -- 结果\n  game_time TEXT, -- 游戏时间\n  last_floor INTEGER, -- 最后楼层\n  event_key TEXT NOT NULL UNIQUE, -- 事件键\n  display_result TEXT -- 结果说明\n);",
+      "hiddenPhysicalColumns": ["result", "event_key"]
     },
-    "content": [["row_id", "类型", "人物", "事件", "结果", "游戏时间", "最后楼层", "事件键"]],
+    "content": [["row_id", "类型", "人物", "事件", "结果", "游戏时间", "最后楼层", "事件键", "结果说明"]],
     "updateConfig": {
       "uiSentinel": -1,
       "contextDepth": 0,

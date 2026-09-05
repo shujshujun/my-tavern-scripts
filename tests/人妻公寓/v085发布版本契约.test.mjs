@@ -42,7 +42,7 @@ test('v0.85 发布契约：数据库五表通过拼音列冲突修复并保留 0
   const 数据库桥 = 读('src/人妻公寓/脚本/游戏逻辑/数据库桥.ts');
   const 社交表 = 模板.sheet_rq_social_history;
 
-  assert.deepEqual(社交表.content[0], ['row_id', '类型', '人物', '事件', '结果', '游戏时间', '最后楼层', '事件键']);
+  assert.deepEqual(社交表.content[0].slice(0, 8), ['row_id', '类型', '人物', '事件', '结果', '游戏时间', '最后楼层', '事件键']);
   assert.match(社交表.sourceData.ddl, /game_time TEXT, -- 游戏时间/);
   assert.match(社交表.sourceData.note, /列5: 游戏时间/);
   assert.doesNotMatch(JSON.stringify(社交表.content[0]), /"事件","结果","时间"/);

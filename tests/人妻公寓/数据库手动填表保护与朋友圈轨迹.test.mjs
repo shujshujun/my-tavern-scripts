@@ -27,11 +27,12 @@ function 执行TS(源码, exports, globals = {}) {
   }).outputText;
   const module = { exports: {} };
   const names = Object.keys(globals);
-  Function('module', 'exports', ...names, `${js}\nmodule.exports = { ${exports.join(', ')} };`)(
-    module,
-    module.exports,
-    ...names.map(name => globals[name]),
-  );
+  Function(
+    'module',
+    'exports',
+    ...names,
+    `${js}\nmodule.exports = { ${exports.join(', ')} };`,
+  )(module, module.exports, ...names.map(name => globals[name]));
   return module.exports;
 }
 
@@ -41,10 +42,8 @@ function 载入手动选择纯函数() {
   return 执行TS(
     `const 数据库脚本所有权表名 = ['RQ_剧情事件', 'RQ_社交轨迹'] as const;
 const 数据库脚本所有权表名集 = new Set<string>(数据库脚本所有权表名);
-const 游戏表头 = {
-  RQ_剧情事件: ['row_id', '楼层', '时间', '地点', '参与者', '玩家行动', '结果摘要', '事件编码'],
-  RQ_社交轨迹: ['row_id', '类型', '人物', '事件', '结果', '游戏时间', '最后楼层', '事件键'],
-};
+${截源(数据库源, 'const 游戏表头:', '\nconst 安装目标表')}
+${截源(数据库源, 'function 游戏表头兼容', '\n/** SP·数据库')}
 interface 数据表 { name?: string; content?: unknown[][]; }
 ${解析}
 ${选择}`,
@@ -67,10 +66,8 @@ interface 数据库API {
 interface 数据库V2API { manualUpdate?: () => Promise<boolean>; }
 const 数据库脚本所有权表名 = ['RQ_剧情事件', 'RQ_社交轨迹'] as const;
 const 数据库脚本所有权表名集 = new Set<string>(数据库脚本所有权表名);
-const 游戏表头 = {
-  RQ_剧情事件: ['row_id', '楼层', '时间', '地点', '参与者', '玩家行动', '结果摘要', '事件编码'],
-  RQ_社交轨迹: ['row_id', '类型', '人物', '事件', '结果', '游戏时间', '最后楼层', '事件键'],
-};
+${截源(数据库源, 'const 游戏表头:', '\nconst 安装目标表')}
+${截源(数据库源, 'function 游戏表头兼容', '\n/** SP·数据库')}
 let 测试API: (数据库API & 数据库V2API) | null = null;
 function 设置测试API(api: 数据库API & 数据库V2API) { 测试API = api; }
 function 取数据库API() { return 测试API; }
@@ -81,11 +78,7 @@ ${保护}`,
 }
 
 function 载入V2安全全选() {
-  const 段 = 截源(
-    数据库源,
-    'async function 执行数据库手动面板安全全选',
-    '\nfunction 数据库手动受保护表选择按钮',
-  );
+  const 段 = 截源(数据库源, 'async function 执行数据库手动面板安全全选', '\nfunction 数据库手动受保护表选择按钮');
   return 执行TS(段, ['执行数据库手动面板安全全选'], {
     是脚本所有权表名: 名称 => 名称 === 'RQ_剧情事件' || 名称 === 'RQ_社交轨迹',
     安全点击数据库面板控件: (control, 允许重放按钮) => {
@@ -141,38 +134,48 @@ function 构造V2选择器模拟(初始选择) {
 }
 
 function 载入朋友圈纯函数() {
-  const 纯函数段 = 截源(朋友圈记忆源, 'export function 构造朋友圈长期记忆事件键', '\nexport async function 同步朋友圈长期记忆');
+  const 纯函数段 = 截源(
+    朋友圈记忆源,
+    'export function 构造朋友圈长期记忆事件键',
+    '\nexport async function 同步朋友圈长期记忆',
+  );
   const 执行键段 = 截源(朋友圈记忆源, 'export function 构造朋友圈长期记忆执行键', '\n/**\n * 手机核心提交完成后');
-  return 执行TS(`${纯函数段}\n${执行键段}`, ['构造朋友圈长期记忆事件键', '构造朋友圈社交轨迹', '构造朋友圈长期记忆执行键'], {
-    格式化游戏内时间: 时 => `第${Math.floor(时 / 6) + 1}天 时段${时 % 6}`,
-  });
+  return 执行TS(
+    `${纯函数段}\n${执行键段}`,
+    ['构造朋友圈长期记忆事件键', '构造朋友圈社交轨迹', '构造朋友圈长期记忆执行键'],
+    {
+      格式化游戏内时间: 时 => `第${Math.floor(时 / 6) + 1}天 时段${时 % 6}`,
+    },
+  );
 }
 
 function 载入朋友圈队列(控制) {
   const 段 = 朋友圈记忆源.slice(朋友圈记忆源.indexOf('export function 构造朋友圈长期记忆事件键'));
-  return 执行TS(
-    段,
-    ['构造朋友圈长期记忆事件键', '排队同步朋友圈长期记忆'],
-    {
-      格式化游戏内时间: 时 => `时段${时}`,
-      当前聊天ID: () => 控制.聊天ID,
-      读取当前手机时间线租约世代: () => 控制.世代,
-      同步社交轨迹: async (条目, 仍有效) => {
-        if (!仍有效()) return '失败';
-        控制.调用.push(条目.事件键);
-        return '已确认';
-      },
+  return 执行TS(段, ['构造朋友圈长期记忆事件键', '排队同步朋友圈长期记忆'], {
+    格式化游戏内时间: 时 => `时段${时}`,
+    当前聊天ID: () => 控制.聊天ID,
+    读取当前手机时间线租约世代: () => 控制.世代,
+    同步社交轨迹: async (条目, 仍有效) => {
+      if (!仍有效()) return '失败';
+      控制.调用.push(条目.事件键);
+      return '已确认';
     },
-  );
+  });
 }
 
 test('手动填表选择：默认全选和显式选择都物理排除两张脚本表，同时保留自定义表', () => {
   const { 计算数据库手动填表安全选择 } = 载入手动选择纯函数();
   const data = {
-    sheet_rq_events: { name: 'RQ_剧情事件', content: [['row_id', '楼层', '时间', '地点', '参与者', '玩家行动', '结果摘要', '事件编码']] },
+    sheet_rq_events: {
+      name: 'RQ_剧情事件',
+      content: [['row_id', '楼层', '时间', '地点', '参与者', '玩家行动', '结果摘要', '事件编码']],
+    },
     sheet_memory: { name: 'RQ_人物长期记忆' },
     sheet_promises: { name: 'RQ_承诺与伏笔' },
-    sheet_social: { name: 'RQ_社交轨迹', content: [['row_id', '类型', '人物', '事件', '结果', '游戏时间', '最后楼层', '事件键']] },
+    sheet_social: {
+      name: 'RQ_社交轨迹',
+      content: [['row_id', '类型', '人物', '事件', '结果', '游戏时间', '最后楼层', '事件键']],
+    },
     sheet_summary: { name: '纪要表' },
     sheet_custom: { name: '作者自定义表' },
     sheet_same_name_custom: { name: 'RQ_剧情事件', content: [['row_id', '作者自定义列']] },
@@ -181,7 +184,13 @@ test('手动填表选择：默认全选和显式选择都物理排除两张脚�
 
   const 默认 = 计算数据库手动填表安全选择(data, [], false);
   assert.deepEqual(默认.受保护表键, ['sheet_rq_events', 'sheet_social']);
-  assert.deepEqual(默认.安全选择, ['sheet_memory', 'sheet_promises', 'sheet_summary', 'sheet_custom', 'sheet_same_name_custom']);
+  assert.deepEqual(默认.安全选择, [
+    'sheet_memory',
+    'sheet_promises',
+    'sheet_summary',
+    'sheet_custom',
+    'sheet_same_name_custom',
+  ]);
   assert.equal(默认.需要写回, true);
 
   const 显式 = 计算数据库手动填表安全选择(
@@ -195,6 +204,11 @@ test('手动填表选择：默认全选和显式选择都物理排除两张脚�
   const 已安全 = 计算数据库手动填表安全选择(data, ['sheet_custom', 'sheet_memory'], true);
   assert.deepEqual(已安全.安全选择, ['sheet_custom', 'sheet_memory']);
   assert.equal(已安全.需要写回, false);
+
+  data.sheet_social = structuredClone(模板.sheet_rq_social_history);
+  const 新表默认 = 计算数据库手动填表安全选择(data, [], false);
+  assert.deepEqual(新表默认.受保护表键, ['sheet_rq_events', 'sheet_social']);
+  assert.deepEqual(新表默认.安全选择, 默认.安全选择);
 });
 
 test('手动填表硬保护同时覆盖公开选择 API、旧设置页与新版 V2 面板执行按钮', () => {
@@ -255,9 +269,15 @@ test('公开 API 保护：全选、清空默认和直接 manualUpdate 都先过�
   const { 设置测试API, 确保数据库手动填表选择安全, 安装数据库手动填表API保护, 恢复数据库手动填表API保护 } =
     载入手动API保护();
   const 表 = {
-    sheet_event: { name: 'RQ_剧情事件', content: [['row_id', '楼层', '时间', '地点', '参与者', '玩家行动', '结果摘要', '事件编码']] },
+    sheet_event: {
+      name: 'RQ_剧情事件',
+      content: [['row_id', '楼层', '时间', '地点', '参与者', '玩家行动', '结果摘要', '事件编码']],
+    },
     sheet_memory: { name: 'RQ_人物长期记忆' },
-    sheet_social: { name: 'RQ_社交轨迹', content: [['row_id', '类型', '人物', '事件', '结果', '游戏时间', '最后楼层', '事件键']] },
+    sheet_social: {
+      name: 'RQ_社交轨迹',
+      content: [['row_id', '类型', '人物', '事件', '结果', '游戏时间', '最后楼层', '事件键']],
+    },
     sheet_custom: { name: '自定义表' },
   };
   let selectedTables = [];
@@ -352,10 +372,7 @@ test('朋友圈长期记忆：只有脚本标记的重要动态入社交轨迹�
   assert.equal(条目.事件键, 事件键);
   assert.doesNotMatch(JSON.stringify(条目), /这句玩家可见原文/);
 
-  assert.equal(
-    构造朋友圈社交轨迹({ ...重要动态, 长期记忆: { ...重要动态.长期记忆, 事件键: '朋友圈-坏键' } }),
-    null,
-  );
+  assert.equal(构造朋友圈社交轨迹({ ...重要动态, 长期记忆: { ...重要动态.长期记忆, 事件键: '朋友圈-坏键' } }), null);
   const 本聊天 = 构造朋友圈长期记忆执行键('chat-a', 3, 事件键);
   assert.notEqual(本聊天, 构造朋友圈长期记忆执行键('chat-b', 3, 事件键), '切聊天后同业务键必须重新写当前聊天数据库');
   assert.notEqual(本聊天, 构造朋友圈长期记忆执行键('chat-a', 4, 事件键), '回档/swipe 世代变化后不得沿用旧分支确认缓存');

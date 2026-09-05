@@ -1,19 +1,12 @@
 import 数据库模板文本 from '../../人妻公寓数据库模板.json?raw';
 import { 提取数据库脚本版本 } from './数据库版本';
-import {
-  数据库异步写栅栏,
-  数据库时间线栅栏,
-  type 数据库时间线持久状态,
-} from './数据库时间线栅栏';
+import { 数据库异步写栅栏, 数据库时间线栅栏, type 数据库时间线持久状态 } from './数据库时间线栅栏';
 import { 全局数据库AI租约 } from './数据库AI租约';
 import { 胶囊预算选择 } from './胶囊预算';
 import { 折叠检测文本, 规范可读文本 } from './记忆文本规范';
 import { 排除已撤回微信摘要, 移除微信摘要来源标记 } from './微信摘要来源';
-import {
-  判定数据库脚本写入能力,
-  type 数据库脚本写入能力结果,
-  type 数据库脚本写入静态能力,
-} from './数据库脚本写入能力';
+import { 按列名迁移游戏表 } from './数据库表格迁移';
+import { 判定数据库脚本写入能力, type 数据库脚本写入能力结果, type 数据库脚本写入静态能力 } from './数据库脚本写入能力';
 
 export { 等待数据库脚本写入能力稳定 } from './数据库脚本写入能力';
 export type { 数据库脚本写入能力结果 } from './数据库脚本写入能力';
@@ -73,6 +66,7 @@ interface 数据库API {
   setUpdateConfigParams?: (params: { autoUpdateTokenThreshold?: number }) => boolean | Promise<boolean>;
   importTemplateFromData?: (templateData: object | string, options?: 模板导入选项) => Promise<模板导入结果>;
   exportTableAsJson?: () => unknown;
+  importTableAsJson?: (json: string, options?: { persist: boolean }) => Promise<boolean>;
   insertRow?: (tableName: string, data: Record<string, unknown>) => Promise<number>;
   updateRow?: (tableName: string, rowIndex: number, data: Record<string, unknown>) => Promise<boolean>;
   querySql?: SQL查询方法;
@@ -107,6 +101,7 @@ interface 数据表 {
     insertNode?: string;
     updateNode?: string;
     deleteNode?: string;
+    hiddenPhysicalColumns?: string[];
   };
   updateConfig?: {
     contextDepth?: number;
@@ -127,7 +122,7 @@ const 游戏表头: Record<(typeof 游戏表名)[number], readonly string[]> = {
   RQ_剧情事件: ['row_id', '楼层', '时间', '地点', '参与者', '玩家行动', '结果摘要', '事件编码'],
   RQ_人物长期记忆: ['row_id', '人物', '主题', '记忆', '未来影响', '最后时间', '最后楼层', '可信度'],
   RQ_承诺与伏笔: ['row_id', '事项', '相关人物', '内容', '状态', '最后进展', '最后时间', '最后楼层'],
-  RQ_社交轨迹: ['row_id', '类型', '人物', '事件', '结果', '游戏时间', '最后楼层', '事件键'],
+  RQ_社交轨迹: ['row_id', '类型', '人物', '事件', '结果', '游戏时间', '最后楼层', '事件键', '结果说明'],
   纪要表: ['row_id', '编码索引', '时间跨度', '概览', '纪要', '重要对话'],
 };
 
@@ -149,7 +144,20 @@ const 默认通用表处置: Readonly<Record<string, readonly (readonly string[]
   ],
   重要角色表: [
     ['row_id', '姓名', '性别/年龄', '一句话介绍', '外貌特征', '持有的重要物品', '是否离场', '过往经历'],
-    ['row_id', '姓名', '性别', '年龄', '一句话介绍', '外貌特征', '穿着打扮', '所在地点', '在场状态', '人际关系', '过往经历', '交互选项'],
+    [
+      'row_id',
+      '姓名',
+      '性别',
+      '年龄',
+      '一句话介绍',
+      '外貌特征',
+      '穿着打扮',
+      '所在地点',
+      '在场状态',
+      '人际关系',
+      '过往经历',
+      '交互选项',
+    ],
   ],
   主角技能表: [['row_id', '技能名称', '技能类型', '等级/阶段', '效果描述']],
   背包物品表: [['row_id', '物品名称', '数量', '描述/效果', '类别']],
@@ -219,7 +227,12 @@ export function 摘要按句收口(压缩文本: string): string {
 
 /** 同步边界：玩家行动最终不超过 80 字；换行压缩为单行。 */
 export function 规范玩家行动(行动: string): string {
-  return 截断字符(String(行动 ?? '').replace(/\s+/g, ' ').trim(), 玩家行动上限);
+  return 截断字符(
+    String(行动 ?? '')
+      .replace(/\s+/g, ' ')
+      .trim(),
+    玩家行动上限,
+  );
 }
 
 /** 模型漏块/块无效或收到长正文时的安全摘要：围绕该玩家行动完成本轮记录，不虚构结果。 */
@@ -298,7 +311,9 @@ function 表头是否命中默认通用表(sheet: 数据表 | null, name: string
   const 候选表头列表 = 默认通用表处置[name];
   if (!候选表头列表) return false;
   const headers = (sheet?.content?.[0] ?? []).map(String);
-  return 候选表头列表.some(候选 => headers.length === 候选.length && headers.every((cell, index) => cell === 候选[index]));
+  return 候选表头列表.some(
+    候选 => headers.length === 候选.length && headers.every((cell, index) => cell === 候选[index]),
+  );
 }
 
 /**
@@ -309,11 +324,18 @@ function 迁移官方纪要表内容(旧表: 数据表, 新表: 数据表): bool
   const 旧内容 = 旧表.content ?? [];
   const 新表头 = (新表.content?.[0] ?? []).map(String);
   const 目标表头 = ['row_id', '编码索引', '时间跨度', '概览', '纪要', '重要对话'];
-  if (旧内容.length < 1 || 新表头.length !== 目标表头.length || 新表头.some((列名, index) => 列名 !== 目标表头[index])) {
+  if (
+    旧内容.length < 1 ||
+    新表头.length !== 目标表头.length ||
+    新表头.some((列名, index) => 列名 !== 目标表头[index])
+  ) {
     return false;
   }
   const 旧表头 = 旧内容[0].map(String);
   const 索引 = (列名: string) => 旧表头.indexOf(列名);
+  if (new Set(旧表头).size !== 旧表头.length || 旧表头.some(列名 => ![...目标表头, '地点'].includes(列名)))
+    return false;
+  if (旧内容.slice(1).some(行 => !Array.isArray(行) || 行.length > 旧表头.length)) return false;
   if (['row_id', '编码索引', '时间跨度', '概览', '纪要'].some(列名 => 索引(列名) < 0)) return false;
   const 地点列 = 索引('地点');
   const 对话列 = 索引('重要对话');
@@ -338,6 +360,7 @@ const 旧版游戏记忆表头候选: Partial<Record<(typeof 游戏表名)[numbe
   RQ_人物长期记忆: [['row_id', '人物', '主题', '记忆', '未来影响', '最后楼层', '可信度']],
   RQ_承诺与伏笔: [['row_id', '事项', '相关人物', '内容', '状态', '最后进展', '最后楼层']],
   RQ_社交轨迹: [
+    ['row_id', '类型', '人物', '事件', '结果', '游戏时间', '最后楼层', '事件键'],
     ['row_id', '类型', '人物', '事件', '结果', '最后楼层', '事件键'],
     ['row_id', '类型', '人物', '事件', '结果', '时间', '最后楼层', '事件键'],
   ],
@@ -360,6 +383,7 @@ export function 迁移游戏记忆表时间列(旧表: 数据表, 新表: 数据
   if (!旧目标表头候选.some(候选 => 相同表头(旧表头, 候选)) || !相同表头(新表头, 新目标表头)) {
     return false;
   }
+  if (旧内容.slice(1).some(行 => !Array.isArray(行) || 行.length > 旧表头.length)) return false;
   const 旧索引 = new Map(旧表头.map((列名, index) => [列名, index]));
   const 取旧列索引 = (列名: string): number | undefined => {
     if (表名 === 'RQ_社交轨迹' && 列名 === '游戏时间') return 旧索引.get('游戏时间') ?? 旧索引.get('时间');
@@ -783,13 +807,13 @@ function 执行SQLite查询(sql: string, params: unknown[] = [], limit = 20): SQ
       return null;
     }
     if (!SQL查询结果有效(result)) {
-      写SQLite探测缓存(api, false);
+      刷新SQLite能力缓存();
       return null;
     }
     写SQLite探测缓存(api, true);
     return result;
   } catch {
-    写SQLite探测缓存(api, false);
+    刷新SQLite能力缓存();
     return null;
   }
 }
@@ -1501,6 +1525,7 @@ export function 数据库状态(): {
   有SQL接口: boolean;
   有SQL写入接口: boolean;
   已装游戏模板: boolean;
+  社交结果说明可用: boolean;
   脚本所有权模板已启用: boolean;
   剧情事件AI摘要已启用: boolean;
   版本: string;
@@ -1511,16 +1536,19 @@ export function 数据库状态(): {
   const api = 取数据库API();
   const 填表参数 = 读取数据库填表参数(api);
   let 已装游戏模板 = false;
+  let 社交结果说明可用 = false;
   let 脚本所有权模板已启用 = false;
   let 剧情事件AI摘要已启用 = false;
   try {
     const 模板 = 解析数据库数据(api?.getTableTemplate?.());
+    社交结果说明可用 = (取表(模板, 'RQ_社交轨迹')?.content?.[0] ?? []).includes('结果说明');
     已装游戏模板 = 游戏表名.every(name => 表结构可用(取表(模板, name), 游戏表头[name]));
     脚本所有权模板已启用 = 已装游戏模板 && 脚本所有权模板配置可用(模板);
     剧情事件AI摘要已启用 = 已装游戏模板 && 剧情事件AI摘要配置可用(模板);
     // 一些旧版没有 getTableTemplate，但会通过导出接口返回当前聊天的完整表结构。
     if (!已装游戏模板 && typeof api?.exportTableAsJson === 'function') {
       const 数据 = 解析数据库数据(api.exportTableAsJson());
+      社交结果说明可用 = (取表(数据, 'RQ_社交轨迹')?.content?.[0] ?? []).includes('结果说明');
       已装游戏模板 = 游戏表名.every(name => 表结构可用(取表(数据, name), 游戏表头[name]));
       脚本所有权模板已启用 = 已装游戏模板 && 脚本所有权模板配置可用(数据);
       剧情事件AI摘要已启用 = 已装游戏模板 && 剧情事件AI摘要配置可用(数据);
@@ -1537,6 +1565,7 @@ export function 数据库状态(): {
     有SQL接口: !!api && !!取SQL查询方法(api),
     有SQL写入接口: typeof api?.executeSqlMutation === 'function',
     已装游戏模板,
+    社交结果说明可用,
     脚本所有权模板已启用,
     剧情事件AI摘要已启用,
     版本: 读取数据库脚本版本(),
@@ -1574,7 +1603,7 @@ function 数据库表项受脚本所有权(项: 数据库表键名项): boolean 
   if (!数据库脚本所有权表名集.has(项.名称)) return false;
   const expected = 游戏表头[项.名称 as keyof typeof 游戏表头];
   const headers = (项.表.content?.[0] ?? []).map(String);
-  return !!expected && headers.length === expected.length && headers.every((列名, index) => 列名 === expected[index]);
+  return !!expected && 游戏表头兼容(项.名称, headers, expected);
 }
 
 /**
@@ -2336,6 +2365,54 @@ function 迁移旧RQ事件数据(rq事件表: 数据表, 纪要表: 数据表 | 
   }
 }
 
+/** 模板协调保留旧行，不会采用模板中的新增列值；显示迁移另走插件公开的持久化数据提交。 */
+async function 完成社交显示迁移(api: 数据库API, 聊天标识: string): Promise<boolean> {
+  const 仍有效 = () => 仍是同一聊天(聊天标识) && 取数据库API() === api;
+  if (!仍有效()) return false;
+  const 当前数据 = 解析数据库数据(api.exportTableAsJson?.());
+  const 目标数据 = _.cloneDeep(当前数据);
+  const 表 = 取表(目标数据, 'RQ_社交轨迹');
+  if (!表结构可用(表, 游戏表头.RQ_社交轨迹)) return false;
+  const 表头 = (表!.content?.[0] ?? []).map(String);
+  const 结果列 = 表头.indexOf('结果');
+  const 说明列 = 表头.indexOf('结果说明');
+  if (说明列 < 0 || !表?.sourceData) return false;
+  for (const row of 表.content!.slice(1)) {
+    const 原始结果 = String(row[结果列] ?? '');
+    const 微信数据 = 解析微信进展数据(原始结果);
+    row[说明列] = 微信数据 ? 渲染微信进展数据(微信数据) : 原始结果;
+  }
+  // 协调后物理列名由插件保持，须从当前DDL映射获取，不能用新模板的SQL别名猜测。
+  const 隐藏列 = ['结果', '事件键'].map(
+    列名 => 表.sourceData!.ddl?.match(new RegExp(`^\\s*([\\w]+)\\s+[^\\n]*--\\s*${列名}\\s*$`, 'm'))?.[1],
+  );
+  if (隐藏列.some(列 => !列)) return false;
+  表.sourceData.hiddenPhysicalColumns = [
+    ...new Set([...(表.sourceData.hiddenPhysicalColumns ?? []), ...(隐藏列 as string[])]),
+  ];
+  if (_.isEqual(当前数据, 目标数据)) return true;
+  if (typeof api.importTableAsJson !== 'function' || !仍有效()) return false;
+  // 当前实值在本次同步段读取；只补显示字段和列投影，其他表及原结果/事件键逐值保留。
+  // 插件通过正常data_replace日志落在当前正式楼，不清空旧checkpoint或改写其他聊天。
+  if ((await api.importTableAsJson(JSON.stringify(目标数据), { persist: true })) !== true || !仍有效()) return false;
+  const 回读 = 解析数据库数据(api.exportTableAsJson?.());
+  // 插件可能把数值单元格序列化成字符串；比较完整行值与投影，不能只看接口返回成功。
+  const 规范核对 = (data: unknown) =>
+    Object.entries(data && typeof data === 'object' ? data : {})
+      .filter(([key]) => key.startsWith('sheet_'))
+      .map(([key, value]) => {
+        const sheet = value as 数据表;
+        return {
+          key,
+          name: sheet.name,
+          content: sheet.content?.map(row => row.map(cell => (cell == null ? null : String(cell)))),
+          hidden: sheet.sourceData?.hiddenPhysicalColumns ?? [],
+        };
+      })
+      .sort((a, b) => a.key.localeCompare(b.key));
+  return _.isEqual(规范核对(回读), 规范核对(目标数据));
+}
+
 export async function 安装人妻公寓数据库模板(): Promise<{ success: boolean; message: string }> {
   const api = 取数据库API();
   if (typeof api?.importTemplateFromData !== 'function') {
@@ -2359,12 +2436,41 @@ export async function 安装人妻公寓数据库模板(): Promise<{ success: bo
             (当前数据 as { mate?: { type?: string } }).mate?.type === 'chatSheets'
           ? (_.cloneDeep(当前数据) as Record<string, unknown>)
           : { mate: 游戏模板.mate };
-    // getTableTemplate 负责结构，exportTableAsJson 才是当前合并后的实值；导入前把所有同表头数据灌回模板，
-    // 否则给现有数据库加游戏表时，可能把其他作者表格的游玩进度退回模板初始值。
+    for (const 集合 of [当前模板, 当前数据]) {
+      const 名称集 = new Set<string>();
+      for (const [key, value] of Object.entries(集合 && typeof 集合 === 'object' ? 集合 : {})) {
+        const 名称 = (value as 数据表 | null)?.name;
+        if (!key.startsWith('sheet_') || !名称) continue;
+        if (名称集.has(名称)) {
+          return { success: false, message: `未更新：存在多个同名表“${名称}”，无法确定数据归属；本次没有提交替换。` };
+        }
+        名称集.add(名称);
+      }
+    }
+    // 有些插件模板快照只含覆盖结构，运行态还含其他作者的聊天表，不能漏掉这些表。
+    for (const [key, value] of Object.entries(当前数据 && typeof 当前数据 === 'object' ? 当前数据 : {})) {
+      const sheet = value as 数据表 | null;
+      if (!key.startsWith('sheet_') || !sheet?.name || 取表(当前模板, sheet.name)) continue;
+      let targetKey = key;
+      let suffix = 2;
+      while (当前模板[targetKey]) targetKey = `${key}_${suffix++}`;
+      当前模板[targetKey] = { ..._.cloneDeep(sheet), uid: targetKey };
+    }
+    // getTableTemplate 负责结构，exportTableAsJson 才是当前合并后的实值。
+    // 游戏表即使列序不同也必须先取实值，再由下方迁移器核对；不能静默退回模板初值。
     for (const value of Object.values(当前模板)) {
       const sheet = value as 数据表 | null;
       const 实值表 = sheet?.name ? 取表(当前数据, sheet.name) : undefined;
-      if (实值表?.content?.length && sheet?.content?.length && _.isEqual(实值表.content[0], sheet.content[0])) {
+      if (实值表?.content?.length && sheet) {
+        if (
+          !安装目标表.includes(sheet.name as (typeof 安装目标表)[number]) &&
+          !_.isEqual(实值表.content[0], sheet.content?.[0])
+        ) {
+          return {
+            success: false,
+            message: `未更新：${sheet.name} 的模板与当前数据列不一致；请先核对原表，本次没有提交替换。`,
+          };
+        }
         sheet.content = _.cloneDeep(实值表.content);
       }
     }
@@ -2401,14 +2507,29 @@ export async function 安装人妻公寓数据库模板(): Promise<{ success: bo
       const sheet = _.cloneDeep(value) as 数据表 & { uid?: string };
       sheet.uid = targetKey;
       const 旧表 = sheet.name ? 旧游戏表.get(sheet.name) : undefined;
-      if (旧表?.content?.length && sheet.content?.length && _.isEqual(旧表.content[0], sheet.content[0])) {
-        sheet.content = _.cloneDeep(旧表.content);
+      if (旧表?.content?.length && 按列名迁移游戏表(旧表, sheet, sheet.name === 'RQ_社交轨迹' ? ['结果说明'] : [])) {
+        // 保留同名列的实值，也兼容列顺序调整；未知新增列不能在替换时丢弃。
       } else if (旧表 && 迁移游戏记忆表时间列(旧表, sheet)) {
         // 旧版三张记忆表只缺人类可读时间列；逐列搬运，绝不根据消息楼伪造第几天。
-      } else if (sheet.name === '纪要表' && 旧表) {
-        迁移官方纪要表内容(旧表, sheet);
+      } else if (sheet.name === '纪要表' && 旧表 && 迁移官方纪要表内容(旧表, sheet)) {
+        // 两种已知官方纪要结构按原迁移规则保留。
+      } else if (旧表) {
+        return {
+          success: false,
+          message: `未更新：${sheet.name} 的旧列结构无法无损对应。请先核对原表列名；本次没有提交替换，原数据保留。`,
+        };
       }
       if (sheet.name === 'RQ_剧情事件') 迁移旧RQ事件数据(sheet, 旧纪要表);
+      if (sheet.name === 'RQ_社交轨迹') {
+        const headers = (sheet.content?.[0] ?? []).map(String);
+        const 原始列 = headers.indexOf('结果');
+        const 说明列 = headers.indexOf('结果说明');
+        for (const row of sheet.content?.slice(1) ?? []) {
+          const 原始结果 = String(row[原始列] ?? '');
+          const 微信数据 = 解析微信进展数据(原始结果);
+          row[说明列] = 微信数据 ? 渲染微信进展数据(微信数据) : 原始结果;
+        }
+      }
       当前模板[targetKey] = sheet;
     }
     const result = await api.importTemplateFromData(当前模板, {
@@ -2425,6 +2546,12 @@ export async function 安装人妻公寓数据库模板(): Promise<{ success: bo
       return {
         success: false,
         message: `数据库安装未完成：${细节 || '模板已保存但运行态未同步，请打开数据库设置检查 SQLite/表格状态后重试。'}`,
+      };
+    }
+    if (!(await 完成社交显示迁移(api, 聊天标识))) {
+      return {
+        success: false,
+        message: '表结构已更新，社交结果说明尚未完成持久化核对；原结果与事件键继续保留，请在当前聊天重试安装/更新。',
       };
     }
     确保数据库手动填表选择安全(当前模板);
@@ -2495,9 +2622,7 @@ const 固定开局摘要修复SQL = `UPDATE rq_events
  * 只修复内容完全确定的固定开场。其他楼层即使疑似错绑也不能靠字符串猜测后批量重置；
  * 正确摘要与未知坏摘要无法可靠区分，自动清空会破坏长期记忆并制造额外填表费用。
  */
-export async function 修复数据库固定开局摘要(
-  额外提交校验: () => boolean = () => true,
-): Promise<固定开局摘要修复结果> {
+export async function 修复数据库固定开局摘要(额外提交校验: () => boolean = () => true): Promise<固定开局摘要修复结果> {
   if (!数据库状态().已装游戏模板 || !额外提交校验()) return '失败';
   const 聊天标识 = 当前聊天标识();
   const 查询SQL = `SELECT floor_no, time_text, location, participants, player_action, result_summary, event_code
@@ -2768,7 +2893,8 @@ export async function 同步社交轨迹(
   额外提交校验: () => boolean = () => true,
 ): Promise<数据库社交写入结果> {
   const api = 取数据库API();
-  if (!api || !数据库状态().已装游戏模板 || !额外提交校验()) return '失败';
+  const 状态 = 数据库状态();
+  if (!api || !状态.已装游戏模板 || !额外提交校验()) return '失败';
   const 聊天标识 = 当前聊天标识();
   try {
     const 微信数据 = 条目.类型 === '微信进展' ? 解析微信进展数据(条目.结果) : null;
@@ -2783,31 +2909,43 @@ export async function 同步社交轨迹(
       事件键: 条目.事件键,
     };
     if (!额外提交校验()) return '失败';
-    const 查询SQL = `SELECT event_type, character_name, event_text, result, game_time, last_floor, event_key
+    const 有说明列 = 状态.社交结果说明可用;
+    const 说明 = 微信数据 ? 渲染微信进展数据(微信数据) : String(data.结果);
+    const 扩展列 = 有说明列 ? ', display_result' : '';
+    const 查询SQL = `SELECT event_type, character_name, event_text, result, game_time, last_floor, event_key${扩展列}
            FROM rq_social_history
           WHERE event_key = ?
           LIMIT 1`;
     const upsertSQL = `INSERT INTO rq_social_history
-        (event_type, character_name, event_text, result, game_time, last_floor, event_key)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+        (event_type, character_name, event_text, result, game_time, last_floor, event_key${扩展列})
+       VALUES (?, ?, ?, ?, ?, ?, ?${有说明列 ? ', ?' : ''})
        ON CONFLICT(event_key) DO UPDATE SET
          event_type = excluded.event_type,
          character_name = excluded.character_name,
          event_text = excluded.event_text,
          result = excluded.result,
          game_time = excluded.game_time,
-         last_floor = excluded.last_floor`;
+         last_floor = excluded.last_floor${有说明列 ? ', display_result = excluded.display_result' : ''}`;
     const 失效补偿 = 构造SQLite唯一行失效补偿({
       描述: `社交事件 ${data.事件键} 的旧行`,
       查询SQL,
       查询参数: [data.事件键],
       删除SQL: 'DELETE FROM rq_social_history WHERE event_key = ?',
       恢复SQL: upsertSQL,
-      恢复列: ['event_type', 'character_name', 'event_text', 'result', 'game_time', 'last_floor', 'event_key'],
+      恢复列: [
+        'event_type',
+        'character_name',
+        'event_text',
+        'result',
+        'game_time',
+        'last_floor',
+        'event_key',
+        ...(有说明列 ? ['display_result'] : []),
+      ],
     });
     const SQL写入状态 = await 执行SQLite写入(
       upsertSQL,
-      [data.类型, data.人物, data.事件, data.结果, data.时间, data.最后楼层, data.事件键],
+      [data.类型, data.人物, data.事件, data.结果, data.时间, data.最后楼层, data.事件键, ...(有说明列 ? [说明] : [])],
       聊天标识,
       额外提交校验,
       失效补偿,
@@ -2817,19 +2955,16 @@ export async function 同步社交轨迹(
     if (SQL写入状态 === '已提交待定') return '待确认';
     if (
       SQL写入状态 === '需核对' &&
-      核对SQLite记录(
-        查询SQL,
-        [data.事件键],
-        {
-          event_type: data.类型,
-          character_name: data.人物,
-          event_text: data.事件,
-          result: data.结果,
-          game_time: data.时间,
-          last_floor: data.最后楼层,
-          event_key: data.事件键,
-        },
-      ) === true
+      核对SQLite记录(查询SQL, [data.事件键], {
+        event_type: data.类型,
+        character_name: data.人物,
+        event_text: data.事件,
+        result: data.结果,
+        game_time: data.时间,
+        last_floor: data.最后楼层,
+        event_key: data.事件键,
+        ...(有说明列 ? { display_result: 说明 } : {}),
+      }) === true
     ) {
       return '已确认';
     }
@@ -2849,14 +2984,18 @@ function 取表(data: unknown, name: string): 数据表 | undefined {
   }) as 数据表 | undefined;
 }
 
+function 游戏表头兼容(name: string, headers: readonly string[], expectedHeaders: readonly string[]): boolean {
+  const 相同 = (目标: readonly string[]) => headers.length === 目标.length && headers.every((列, i) => 列 === 目标[i]);
+  if (相同(expectedHeaders)) return true;
+  return name === 'RQ_社交轨迹' && expectedHeaders.at(-1) === '结果说明' && 相同(expectedHeaders.slice(0, -1));
+}
+
 /** SP·数据库 spv8.9.1 会按 DDL 字段后的 `-- 中文表头` 注释做双向映射；缺任一映射会拒绝 hydrate。 */
 function 表结构可用(sheet: 数据表 | undefined, expectedHeaders: readonly string[]): boolean {
   const headers = (sheet?.content?.[0] ?? []).map(String);
-  if (!_.isEqual(headers, expectedHeaders)) return false;
+  if (!游戏表头兼容(sheet?.name ?? '', headers, expectedHeaders)) return false;
   const ddl = sheet?.sourceData?.ddl ?? '';
-  return expectedHeaders
-    .slice(1)
-    .every(header => new RegExp(`--\\s*${_.escapeRegExp(header)}\\s*(?:\\r?\\n|$)`).test(ddl));
+  return headers.slice(1).every(header => new RegExp(`--\\s*${_.escapeRegExp(header)}\\s*(?:\\r?\\n|$)`).test(ddl));
 }
 
 function 行转文本(

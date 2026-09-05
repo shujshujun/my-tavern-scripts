@@ -35,11 +35,17 @@ test('聊天模板固定为五张有用记忆表，七张默认硬状态/选项�
     ['RQ_剧情事件', 'RQ_人物长期记忆', 'RQ_承诺与伏笔', 'RQ_社交轨迹', '纪要表'],
   );
   for (const name of ['全局数据表', '主角信息表', '重要角色表', '主角技能表', '背包物品表', '任务与事件表', '选项表']) {
-    assert.equal(表.some(sheet => sheet.name === name), false, `${name} 不应继续安装`);
+    assert.equal(
+      表.some(sheet => sheet.name === name),
+      false,
+      `${name} 不应继续安装`,
+    );
   }
   const 取 = name => 表.find(sheet => sheet.name === name);
   for (const sheet of 表) {
-    assert.ok(sheet.content[0].length <= 8, `${sheet.name} 不得超过数据库官方建议的 7～8 列上限`);
+    const 隐藏列数 = sheet.sourceData.hiddenPhysicalColumns?.length ?? 0;
+    assert.ok(sheet.content[0].length - 隐藏列数 <= 8, `${sheet.name} 可见列保持精简`);
+    if (sheet.updateConfig.updateFrequency > 0) assert.ok(sheet.content[0].length <= 8, '通用AI填表仍保持原列预算');
   }
   assert.equal(取('RQ_剧情事件').updateConfig.updateFrequency, 0);
   assert.equal(取('RQ_剧情事件').updateConfig.batchSize, 1);
@@ -90,13 +96,18 @@ test('聊天模板固定为五张有用记忆表，七张默认硬状态/选项�
     '游戏时间',
     '最后楼层',
     '事件键',
+    '结果说明',
   ]);
   assert.match(取('RQ_剧情事件').sourceData.note, /固定(?:写|为)“第N天 时段”/);
   assert.match(取('RQ_人物长期记忆').sourceData.ddl, /last_time TEXT, -- 最后时间/);
   assert.match(取('RQ_承诺与伏笔').sourceData.ddl, /last_time TEXT, -- 最后时间/);
   assert.match(取('RQ_社交轨迹').sourceData.ddl, /game_time TEXT, -- 游戏时间/);
   for (const name of ['RQ_人物长期记忆', 'RQ_承诺与伏笔']) {
-    assert.match(取(name).sourceData.updateNode, /SQL示例: UPDATE[\s\S]* WHERE /, `${name} 的 UPDATE 示例必须带业务键 WHERE`);
+    assert.match(
+      取(name).sourceData.updateNode,
+      /SQL示例: UPDATE[\s\S]* WHERE /,
+      `${name} 的 UPDATE 示例必须带业务键 WHERE`,
+    );
   }
   assert.equal(取('RQ_社交轨迹').updateConfig.updateFrequency, 0);
   assert.match(取('RQ_社交轨迹').sourceData.updateNode, /禁止.*脚本更新/);
@@ -128,16 +139,11 @@ test('摘要边界拒绝正文截断、漏块和无法收口的超长值；写�
     数据库事件摘要为脚本兜底,
   } = 载入摘要纯函数();
   assert.equal(规范玩家行动('行'.repeat(90)), '行'.repeat(80));
-  assert.equal(
-    提取回合事件摘要('正文。\n<rq_event_summary>玩家修好101室水管</rq_event_summary>'),
-    '玩家修好101室水管',
-  );
+  assert.equal(提取回合事件摘要('正文。\n<rq_event_summary>玩家修好101室水管</rq_event_summary>'), '玩家修好101室水管');
   assert.equal(提取回合事件摘要('正文。<rq_event_summary>未闭合'), null);
   // 模型偶尔连输两块（先草稿后定稿）：取最后一块，而不是整块判废落回兜底句。
   assert.equal(
-    提取回合事件摘要(
-      '正文。<rq_event_summary>第一条</rq_event_summary><rq_event_summary>第二条</rq_event_summary>',
-    ),
+    提取回合事件摘要('正文。<rq_event_summary>第一条</rq_event_summary><rq_event_summary>第二条</rq_event_summary>'),
     '第二条',
   );
   // 摘要块内换行不再判废，压成单行后继续走长度与收口规则。
@@ -212,16 +218,26 @@ test('旧版三张记忆表按列名保留全部旧行，只把无法可靠推�
     {
       名: 'RQ_社交轨迹',
       旧表头: ['row_id', '类型', '人物', '事件', '结果', '最后楼层', '事件键'],
-      新表头: ['row_id', '类型', '人物', '事件', '结果', '游戏时间', '最后楼层', '事件键'],
+      新表头: ['row_id', '类型', '人物', '事件', '结果', '游戏时间', '最后楼层', '事件键', '结果说明'],
       旧行: [9, '邀约', '夏乔', '约她看房。', '她答应了。', 22, '邀约-夏乔-看房'],
-      新行: [9, '邀约', '夏乔', '约她看房。', '她答应了。', '', 22, '邀约-夏乔-看房'],
+      新行: [9, '邀约', '夏乔', '约她看房。', '她答应了。', '', 22, '邀约-夏乔-看房', ''],
     },
     {
       名: 'RQ_社交轨迹',
       旧表头: ['row_id', '类型', '人物', '事件', '结果', '时间', '最后楼层', '事件键'],
-      新表头: ['row_id', '类型', '人物', '事件', '结果', '游戏时间', '最后楼层', '事件键'],
+      新表头: ['row_id', '类型', '人物', '事件', '结果', '游戏时间', '最后楼层', '事件键', '结果说明'],
       旧行: [10, '微信进展', '夏乔', '整理了最近私聊。', '她愿意继续聊看房。', '第4天 早上', 24, 'RQP-微信进展-101'],
-      新行: [10, '微信进展', '夏乔', '整理了最近私聊。', '她愿意继续聊看房。', '第4天 早上', 24, 'RQP-微信进展-101'],
+      新行: [
+        10,
+        '微信进展',
+        '夏乔',
+        '整理了最近私聊。',
+        '她愿意继续聊看房。',
+        '第4天 早上',
+        24,
+        'RQP-微信进展-101',
+        '',
+      ],
     },
   ];
   for (const 案例项 of 案例) {
@@ -372,7 +388,10 @@ test('固定开场错绑摘要只按楼1、RQ-1与开始新游戏三重硬键修
 
     const update = db.prepare(sql);
     assert.equal(update.run(摘要, 摘要).changes, 1, '只修复已知固定开场行');
-    assert.equal(db.prepare('SELECT result_summary FROM rqjuqingshijian WHERE floor_no = 1').get().result_summary, 摘要);
+    assert.equal(
+      db.prepare('SELECT result_summary FROM rqjuqingshijian WHERE floor_no = 1').get().result_summary,
+      摘要,
+    );
     assert.equal(
       db.prepare('SELECT result_summary FROM rqjuqingshijian WHERE floor_no = 3').get().result_summary,
       '正确的第三楼摘要',
@@ -454,10 +473,7 @@ test('剧情事件 UPSERT 经 spv8.9.2 重绑定到物理表后仍可执行，�
   // UPSERT 的 CASE 分支不能用占位符，只能内联字面量；它必须与导出常量逐字一致。
   const 标记 = 数据库源.match(/export const 脚本保守摘要标记 = '([^']+)';/);
   assert.ok(标记, '数据库桥必须导出脚本兜底摘要标记');
-  assert.ok(
-    match[1].includes(`'%${标记[1]}%'`),
-    'UPSERT 内联的兜底摘要字面量必须与 脚本保守摘要标记 完全一致',
-  );
+  assert.ok(match[1].includes(`'%${标记[1]}%'`), 'UPSERT 内联的兜底摘要字面量必须与 脚本保守摘要标记 完全一致');
 
   // 需核对回读分支：本次带来真摘要而库里仍是兜底句时不得判为已确认，
   // 否则一次未生效的覆盖会被当成写入成功，兜底句永久留下。
