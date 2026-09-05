@@ -1,18 +1,8 @@
 import type { SchemaType } from '../../schema';
+import { 同步阶段世界书投影, 作废阶段世界书缓存, type 阶段世界书投影 } from './阶段世界书同步器';
 import { 安若妍换掉商品ID, 安若妍换掉快照提示, 读取安若妍游戏阶段 } from './安若妍换掉系统';
 
 export const 换掉阶段世界书条目名 = '[人妻公寓]301婚姻与照片阶段';
-let 队列: Promise<unknown> = Promise.resolve();
-let 世代 = 0;
-const 签名 = new Map<string, string>();
-const 请求 = new Map<string, number>();
-function 聊天ID(): string {
-  try {
-    return String(SillyTavern.getCurrentChatId?.() ?? '');
-  } catch {
-    return '';
-  }
-}
 export function 构造301换掉阶段世界书内容(data: SchemaType): string {
   const 阶段 = 读取安若妍游戏阶段(data);
   const 阶段说明 = `安若妍当前游戏阶段：${阶段}。`;
@@ -42,97 +32,14 @@ export function 构造301换掉阶段世界书内容(data: SchemaType): string {
     .filter(Boolean)
     .join('\n');
 }
-export function 同步301换掉阶段世界书(
-  data: SchemaType,
-  stillValid: () => boolean = () => true,
-  force = false,
-): Promise<boolean> {
-  const chat = 聊天ID();
-  const content = 构造301换掉阶段世界书内容(data);
-  const phase = 读取安若妍游戏阶段(data);
-  const enabled = Boolean(data.户['301']);
-  let targetBook = typeof getChatWorldbookName === 'function' ? getChatWorldbookName('current') : null;
-  const contentSignature = (name: string | null) => `${name ?? ''}\u0000${enabled}\u0000${content}`;
-  const generation = 世代;
-  if (!chat || !stillValid() || typeof updateWorldbookWith !== 'function') return Promise.resolve(false);
-  const serial = (请求.get(chat) ?? 0) + 1;
-  请求.set(chat, serial);
-  if (!force && 签名.get(chat) === contentSignature(targetBook)) return Promise.resolve(true);
-  // 写入开始后，旧缓存不能证明世界书仍是旧内容；回档必须能排入一次重建。
-  签名.delete(chat);
-  const valid = () => stillValid() && 世代 === generation && 请求.get(chat) === serial && 聊天ID() === chat &&
-    (!targetBook || typeof getChatWorldbookName !== 'function' || getChatWorldbookName('current') === targetBook);
-  const work = 队列
-    .catch(() => undefined)
-    .then(async () => {
-      if (!valid()) return false;
-      const existing = typeof getChatWorldbookName === 'function' ? getChatWorldbookName('current') : null;
-      if (!existing && !enabled) return true;
-      if (!existing && typeof getOrCreateChatWorldbook !== 'function') return false;
-      const book = existing || (await getOrCreateChatWorldbook('current'));
-      targetBook = book;
-      if (!book || !valid()) return false;
-      await updateWorldbookWith(
-        book,
-        entries => {
-          if (!valid()) return entries;
-          const entry = entries.find(item => item.name === 换掉阶段世界书条目名);
-          if (entry) {
-            entry.content = content;
-            entry.enabled = enabled;
-            entry.strategy = { ...entry.strategy, type: 'constant' };
-            entry.position = { type: 'after_character_definition', role: 'system', depth: 0, order: 103 };
-            entry.probability = 100;
-            entry.extra = { ...entry.extra, rqgy301换掉阶段投影版本: 2, rqgy301游戏阶段: phase };
-            for (const duplicate of entries) {
-              if (duplicate !== entry && duplicate.name === 换掉阶段世界书条目名) duplicate.enabled = false;
-            }
-          } else if (enabled) {
-            entries.push({
-              uid: entries.reduce((max, item) => Math.max(max, Number.isInteger(item.uid) ? item.uid : 0), 0) + 1,
-              name: 换掉阶段世界书条目名,
-              enabled: true,
-              strategy: {
-                type: 'constant',
-                keys: [],
-                keys_secondary: { logic: 'and_any', keys: [] },
-                scan_depth: 'same_as_global',
-              },
-              position: { type: 'after_character_definition', role: 'system', depth: 0, order: 103 },
-              content,
-              probability: 100,
-              recursion: { prevent_incoming: true, prevent_outgoing: true, delay_until: null },
-              effect: { sticky: null, cooldown: null, delay: null },
-              extra: { rqgy301换掉阶段投影版本: 2, rqgy301游戏阶段: phase },
-            });
-          }
-          return entries;
-        },
-        { render: 'debounced' },
-      );
-      if (!valid()) return false;
-      签名.set(chat, contentSignature(book));
-      return true;
-    })
-    .catch(error => {
-      console.warn('[人妻公寓·301] 阶段世界书等待重试：', error);
-      return false;
-    });
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const current = Promise.race([
-    work,
-    new Promise<boolean>(resolve => {
-      timer = setTimeout(() => {
-        if (valid()) 请求.set(chat, serial + 1);
-        resolve(false);
-      }, 4000);
-    }),
-  ]).finally(() => clearTimeout(timer));
-  队列 = current;
-  return current;
+export function 构造301阶段世界书投影(data: SchemaType): 阶段世界书投影 {
+  return { 名称: 换掉阶段世界书条目名, 内容: 构造301换掉阶段世界书内容(data),
+    启用: Boolean(data.户['301']), 允许建书: Boolean(data.户['301']), 顺序: 103,
+    元数据: { rqgy301换掉阶段投影版本: 2, rqgy301游戏阶段: 读取安若妍游戏阶段(data) } };
+}
+export function 同步301换掉阶段世界书(data: SchemaType, stillValid: () => boolean = () => true, force = false): Promise<boolean> {
+  return 同步阶段世界书投影([构造301阶段世界书投影(data)], stillValid, force);
 }
 export function 作废301换掉阶段世界书同步缓存(): void {
-  世代++;
-  签名.clear();
-  请求.clear();
+  作废阶段世界书缓存([换掉阶段世界书条目名]);
 }

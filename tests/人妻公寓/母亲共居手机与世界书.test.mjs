@@ -12,9 +12,10 @@ test('旧手机生产者已经降为无写入兼容门面', () => {
   assert.doesNotMatch(source, /库\.圈\.(?:push|unshift)|库\.消息\.push/);
 });
 
-test('旧世界书导出委托唯一聊天级同步器，不再维护第二套条目', () => {
+test('旧世界书导出委托六户投影，302保留稳定条目名称', () => {
   const source = read('src/人妻公寓/脚本/游戏逻辑/结局世界书同步.ts');
-  assert.match(source, /同步302阶段世界书\(data, 仍有效, true\)/);
+  assert.match(source, /同步全部角色阶段世界书\(data, 仍有效, true\)/);
+  assert.match(source, /构造302阶段世界书投影\(data\)/);
   assert.match(source, /结局世界书条目名 = 共居阶段世界书条目名/);
   assert.doesNotMatch(source, /createWorldbookEntries|getWorldbook\(/);
 });

@@ -77,11 +77,13 @@ test('母亲共居硬反馈拥有独立待发队列、最终朋友圈CAS和持�
 
 test('当前聊天世界书使用聊天级API并在切聊时作废缓存，不写角色主世界书', () => {
   const worldbook = read('src/人妻公寓/脚本/游戏逻辑/302共居世界书.ts');
+  const publisher = read('src/人妻公寓/脚本/游戏逻辑/阶段世界书同步器.ts');
   const index = read('src/人妻公寓/脚本/游戏逻辑/index.ts');
-  assert.match(worldbook, /getOrCreateChatWorldbook\('current'\)/);
-  assert.match(worldbook, /updateWorldbookWith/);
-  assert.doesNotMatch(worldbook, /getCharWorldbookNames|rebindCharWorldbooks/);
-  assert.match(index, /作废302阶段世界书同步缓存\(\)/);
+  assert.match(worldbook, /同步阶段世界书投影\(\[构造302阶段世界书投影\(data\)\]/);
+  assert.match(publisher, /getOrCreateChatWorldbook\('current'\)/);
+  assert.match(publisher, /updateWorldbookWith/);
+  assert.doesNotMatch(worldbook + publisher, /getCharWorldbookNames|rebindCharWorldbooks/);
+  assert.match(index, /作废全部角色阶段世界书缓存\(\)/);
 });
 
 test('302结局后冷落预警自身直接排除母亲，其他门牌继续走原扫描', () => {

@@ -410,10 +410,10 @@ test('201动态世界书区分结局前、法律已离但未封板、三种完�
 test('201世界书接入启动、有效提交、回档/重掷、重开和切聊缓存失效生命周期', () => {
   const index = read('src/人妻公寓/脚本/游戏逻辑/index.ts');
   const engine = read('src/人妻公寓/脚本/游戏逻辑/回合引擎.ts');
-  assert.match(index, /同步201离婚阶段世界书/u);
-  assert.match(index, /作废201离婚阶段世界书同步缓存/u);
-  assert.ok((index.match(/同步201离婚阶段世界书/g) ?? []).length >= 4);
-  assert.ok((engine.match(/同步201离婚阶段世界书/g) ?? []).length >= 4);
+  assert.match(index, /同步全部角色阶段世界书/u);
+  assert.match(index, /作废全部角色阶段世界书缓存/u);
+  assert.ok((index.match(/同步全部角色阶段世界书/g) ?? []).length >= 4);
+  assert.ok((engine.match(/同步全部角色阶段世界书/g) ?? []).length >= 4);
   assert.doesNotMatch(read('src/人妻公寓/脚本/游戏逻辑/201离婚世界书.ts'), /角色卡主世界书|setCharacterWorldbook/u);
 });
 
@@ -437,7 +437,7 @@ test('时间推进核心提交后会重算201世界书；同步失败只记日�
   assert.notEqual(start, -1);
   assert.notEqual(end, -1);
   const successTail = index.slice(start, end);
-  assert.match(successTail, /同步201离婚阶段世界书\(候选/u);
+  assert.match(successTail, /同步全部角色阶段世界书\(候选/u);
   assert.match(successTail, /catch \(同步错误\)/u);
   assert.match(successTail, /不反向回滚/u);
   assert.match(index, /许曼君离婚时间动作阻断原因/u);

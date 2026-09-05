@@ -1,20 +1,8 @@
 import type { SchemaType } from '../../schema';
 import { 许曼君离婚已完成 } from './许曼君离婚系统';
+import { 同步阶段世界书投影, 作废阶段世界书缓存, type 阶段世界书投影 } from './阶段世界书同步器';
 
 export const 离婚阶段世界书条目名 = '[人妻公寓]201婚姻与生活阶段' as const;
-
-let 世界书同步队列: Promise<unknown> = Promise.resolve();
-const 已同步签名 = new Map<string, string>();
-
-function 当前聊天标识(): string {
-  try {
-    const st = SillyTavern as unknown as { getCurrentChatId?: () => string | number | null };
-    const id = st.getCurrentChatId?.();
-    return id === null || id === undefined ? '' : String(id);
-  } catch {
-    return '';
-  }
-}
 
 function 关系边界(data: SchemaType): string {
   const relation = data.系统._许曼君分居.玩家最终关系选择;
@@ -96,43 +84,21 @@ function 完整完成内容(data: SchemaType): string {
   ].join('\n');
 }
 
-export function 构造201离婚阶段世界书内容(data: SchemaType): string {
-  if (许曼君离婚已完成(data)) return 完整完成内容(data);
-  if (data.系统._许曼君离婚.法律离婚已成立) return 法律离婚待终幕内容(data);
-  return 结局前内容(data);
+export function 读取201游戏阶段(data: SchemaType): string {
+  if (!data.户['201']) return '未入住';
+  if (许曼君离婚已完成(data)) return '结局后自由生活';
+  if (data.系统._许曼君离婚.法律离婚已成立) return '法律离婚待终幕';
+  if (data.系统._许曼君离婚.阶段 !== '未开始') return '结局进行中';
+  if (data.系统._许曼君分居.阶段 === '已完成') return '承接完成';
+  return data.系统._许曼君分居.阶段 === '未开始' ? '关系发展中' : '承接进行中';
 }
-
-function 世界书条目模板(content: string, uid: number): WorldbookEntry {
-  return {
-    uid,
-    name: 离婚阶段世界书条目名,
-    enabled: true,
-    strategy: {
-      type: 'constant',
-      keys: [],
-      keys_secondary: { logic: 'and_any', keys: [] },
-      scan_depth: 'same_as_global',
-    },
-    position: {
-      type: 'after_character_definition',
-      role: 'system',
-      depth: 0,
-      order: 102,
-    },
-    content,
-    probability: 100,
-    recursion: {
-      prevent_incoming: true,
-      prevent_outgoing: true,
-      delay_until: null,
-    },
-    effect: {
-      sticky: null,
-      cooldown: null,
-      delay: null,
-    },
-    extra: { rqgy201离婚阶段投影版本: 1 },
-  };
+export function 构造201离婚阶段世界书内容(data: SchemaType): string {
+  const phase = 读取201游戏阶段(data);
+  const header = '许曼君当前游戏阶段：' + phase + '。';
+  if (phase === '未入住') return header;
+  const content = 许曼君离婚已完成(data) ? 完整完成内容(data)
+    : data.系统._许曼君离婚.法律离婚已成立 ? 法律离婚待终幕内容(data) : 结局前内容(data);
+  return header + '\n' + content;
 }
 
 function 应建立聊天世界书(data: SchemaType): boolean {
@@ -144,79 +110,16 @@ function 应建立聊天世界书(data: SchemaType): boolean {
   );
 }
 
-/**
- * 只更新当前聊天绑定世界书。stat_data始终是唯一真值；同步失败不会回滚法律、钥匙、换锁、
- * 关系或结局状态，下一个启动、有效回合、时间变化或切聊同步点会按当前真值重试。
- */
-export function 同步201离婚阶段世界书(
-  data: SchemaType,
-  stillValid: () => boolean = () => true,
-  force = false,
-): Promise<boolean> {
-  const chatId = 当前聊天标识();
-  const content = 构造201离婚阶段世界书内容(data);
-  const signature = [
-    data.系统._许曼君分居.阶段,
-    data.系统._许曼君分居.玩家最终关系选择,
-    data.系统._许曼君分居.钥匙用途,
-    data.系统._许曼君离婚.阶段,
-    data.系统._许曼君离婚.法律离婚已成立,
-    data.系统._许曼君离婚.赵国强正式退居,
-    data.系统._许曼君离婚.旧钥匙状态,
-    data.系统._许曼君离婚.换锁完成,
-    许曼君离婚已完成(data),
-    content,
-  ].join('|');
-  if (!chatId || !stillValid()) return Promise.resolve(false);
-  if (!force && 已同步签名.get(chatId) === signature) return Promise.resolve(true);
-  if (typeof updateWorldbookWith !== 'function') return Promise.resolve(false);
-
-  const existingBook = typeof getChatWorldbookName === 'function' ? getChatWorldbookName('current') : null;
-  if (!existingBook && !应建立聊天世界书(data)) return Promise.resolve(true);
-  if (!existingBook && typeof getOrCreateChatWorldbook !== 'function') return Promise.resolve(false);
-
-  const current = 世界书同步队列
-    .catch(() => undefined)
-    .then(async () => {
-      if (!stillValid() || 当前聊天标识() !== chatId) return false;
-      const bookName = existingBook || (await getOrCreateChatWorldbook('current'));
-      if (!bookName || !stillValid() || 当前聊天标识() !== chatId) return false;
-      await updateWorldbookWith(
-        bookName,
-        entries => {
-          if (!stillValid() || 当前聊天标识() !== chatId) return entries;
-          const index = entries.findIndex(entry => entry.name === 离婚阶段世界书条目名);
-          if (index >= 0) {
-            entries[index] = {
-              ...entries[index],
-              enabled: true,
-              strategy: { ...entries[index].strategy, type: 'constant' },
-              content,
-              probability: 100,
-              extra: { ...(entries[index].extra ?? {}), rqgy201离婚阶段投影版本: 1 },
-            };
-          } else {
-            const maxUid = entries.reduce((max, entry) => Math.max(max, Number.isInteger(entry.uid) ? entry.uid : 0), 0);
-            entries.push(世界书条目模板(content, maxUid + 1));
-          }
-          return entries;
-        },
-        { render: 'debounced' },
-      );
-      if (!stillValid() || 当前聊天标识() !== chatId) return false;
-      已同步签名.set(chatId, signature);
-      return true;
-    })
-    .catch(error => {
-      console.warn('[人妻公寓·201离婚] 当前聊天世界书同步失败（不影响游戏真值，下个同步点重试）:', error);
-      return false;
-    });
-  世界书同步队列 = current;
-  return current;
+export function 构造201阶段世界书投影(data: SchemaType): 阶段世界书投影 {
+  return { 名称: 离婚阶段世界书条目名, 内容: 构造201离婚阶段世界书内容(data),
+    启用: Boolean(data.户['201']), 允许建书: 应建立聊天世界书(data), 顺序: 102,
+    元数据: { rqgy201离婚阶段投影版本: 2, 游戏阶段: 读取201游戏阶段(data) } };
 }
-
+export function 同步201离婚阶段世界书(data: SchemaType, stillValid: () => boolean = () => true, force = false): Promise<boolean> {
+  return 同步阶段世界书投影([构造201阶段世界书投影(data)], stillValid, force);
+}
 export function 作废201离婚阶段世界书同步缓存(): void {
-  已同步签名.clear();
+  作废阶段世界书缓存([离婚阶段世界书条目名]);
 }
 
 /** 兼容此前已写测试与局部调用；生产入口统一使用带“阶段”的权威命名。 */

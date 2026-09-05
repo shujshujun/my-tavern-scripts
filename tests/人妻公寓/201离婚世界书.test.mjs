@@ -216,13 +216,14 @@ test('写入失败不污染缓存，下个同步点可重试；失效租约不�
   }
 });
 
-test('生产生命周期同时接线201与302世界书，切聊/回档会作废两套缓存', () => {
+test('生产生命周期通过全角色入口同步201与302，切聊/回档作废共享缓存', () => {
   const index = read('src/人妻公寓/脚本/游戏逻辑/index.ts');
   const engine = read('src/人妻公寓/脚本/游戏逻辑/回合引擎.ts');
   for (const source of [index, engine]) {
-    assert.match(source, /同步201离婚阶段世界书/u);
-    assert.match(source, /同步302阶段世界书/u);
-    assert.match(source, /作废201离婚阶段世界书同步缓存/u);
-    assert.match(source, /作废302阶段世界书同步缓存/u);
+    assert.match(source, /同步全部角色阶段世界书/u);
+    assert.match(source, /作废全部角色阶段世界书缓存/u);
   }
+  const aggregate = read('src/人妻公寓/脚本/游戏逻辑/结局世界书同步.ts');
+  assert.match(aggregate, /构造201阶段世界书投影\(data\)/u);
+  assert.match(aggregate, /构造302阶段世界书投影\(data\)/u);
 });

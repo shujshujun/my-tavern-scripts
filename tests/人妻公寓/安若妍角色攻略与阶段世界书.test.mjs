@@ -86,9 +86,10 @@ test('完成硬操作在保存后刷新阶段，保存前冻结聊天归属', ()
   const from = src.indexOf("eventOn('人妻公寓:安若妍换掉动作'");
   const to = src.indexOf("eventOn('人妻公寓:许曼君分居动作'", from);
   const block = src.slice(from, to);
-  assert.equal((block.match(/同步301换掉阶段世界书\(data, 仍在本次时间线, true\)/g) ?? []).length, 2);
-  assert.match(block, /const chat = 当前聊天ID\(\)[\s\S]*const saved = await 落地[\s\S]*saved && 结果.成功[\s\S]*同步301换掉阶段世界书/);
-  assert.match(block, /已落地 && 结果.成功 && 仍在本次时间线\(\)[\s\S]*将301丈夫到访改为提前通知[\s\S]*同步301换掉阶段世界书/);
+  assert.ok((block.match(/await 落地\(/g) ?? []).length >= 2);
+  assert.match(block, /const chat = 当前聊天ID\(\)[\s\S]*const saved = await 落地[\s\S]*saved && 结果.成功/);
+  const writer = src.slice(src.indexOf('async function 落地('), src.indexOf('const 家庭计划CG标题'));
+  assert.match(writer, /const 落地聊天 = 当前聊天ID\(\)[\s\S]*await 脚本写入[\s\S]*同步全部角色阶段世界书\(data, 落地仍有效\)/);
 });
 
 test('游戏阶段由当前事实派生，正式完成后替换为自由生活且回档可逆', () => {

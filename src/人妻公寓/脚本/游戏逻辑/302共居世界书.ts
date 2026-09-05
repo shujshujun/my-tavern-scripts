@@ -1,25 +1,13 @@
 import type { SchemaType } from '../../schema';
+import { 同步阶段世界书投影, 作废阶段世界书缓存, type 阶段世界书投影 } from './阶段世界书同步器';
 
 export const 共居阶段世界书条目名 = '[人妻公寓]当前管理与302生活阶段' as const;
-
-let 世界书同步队列: Promise<unknown> = Promise.resolve();
-const 已同步签名 = new Map<string, string>();
-
-function 当前聊天标识(): string {
-  try {
-    const st = SillyTavern as unknown as { getCurrentChatId?: () => string | number | null };
-    const id = st.getCurrentChatId?.();
-    return id === null || id === undefined ? '' : String(id);
-  } catch {
-    return '';
-  }
-}
 
 function 双重继承完成(data: SchemaType): boolean {
   return data.系统._双重继承.阶段 === '已完成' || data.系统._已完成特殊场景.includes('双重继承');
 }
 
-export function 构造302阶段世界书内容(data: SchemaType): string {
+function 构造302阶段原内容(data: SchemaType): string {
   if (双重继承完成(data)) {
     return [
       '当前聊天已经完成《双重继承》。',
@@ -43,101 +31,25 @@ export function 构造302阶段世界书内容(data: SchemaType): string {
       ].join('\n');
 }
 
-function 世界书条目模板(content: string, uid: number): WorldbookEntry {
-  return {
-    uid,
-    name: 共居阶段世界书条目名,
-    enabled: true,
-    strategy: {
-      type: 'constant',
-      keys: [],
-      keys_secondary: { logic: 'and_any', keys: [] },
-      scan_depth: 'same_as_global',
-    },
-    position: {
-      type: 'after_character_definition',
-      role: 'system',
-      depth: 0,
-      order: 101,
-    },
-    content,
-    probability: 100,
-    recursion: {
-      prevent_incoming: true,
-      prevent_outgoing: true,
-      delay_until: null,
-    },
-    effect: {
-      sticky: null,
-      cooldown: null,
-      delay: null,
-    },
-    extra: { rqgy302阶段投影版本: 1 },
-  };
+export function 读取302游戏阶段(data: SchemaType): string {
+  if (!data.户['302']) return '未入住';
+  if (双重继承完成(data)) return '结局后自由生活';
+  if (data.系统._双重继承.阶段 !== '未开始') return '结局进行中';
+  if (data.系统._回国.阶段 === '已完成' || data.系统._已完成特殊场景.includes('回国')) return '承接完成';
+  return data.系统._回国.阶段 === '未开始' ? '关系发展中' : '承接进行中';
 }
-
-/**
- * 只更新当前聊天绑定的世界书，不修改角色卡主世界书。它是可重建派生：失败不回滚结局，
- * 下一次启动、切聊、回档或有效回合会按当前stat再次同步。
- */
-export function 同步302阶段世界书(
-  data: SchemaType,
-  仍有效: () => boolean = () => true,
-  强制 = false,
-): Promise<boolean> {
-  const 聊天标识 = 当前聊天标识();
-  const 内容 = 构造302阶段世界书内容(data);
-  const 签名 = `${data.系统._双重继承.阶段}|${data.系统._回国.阶段}|${内容}`;
-  if (!聊天标识 || !仍有效()) return Promise.resolve(false);
-  if (!强制 && 已同步签名.get(聊天标识) === 签名) return Promise.resolve(true);
-  if (typeof updateWorldbookWith !== 'function') return Promise.resolve(false);
-  const 应建立聊天世界书 =
-    双重继承完成(data) || data.系统._回国.阶段 !== '未开始' || data.系统._双重继承.阶段 !== '未开始';
-  const 已有聊天世界书 = typeof getChatWorldbookName === 'function' ? getChatWorldbookName('current') : null;
-  // 全新聊天尚未进入母亲线时，静态世界书的阶段中性事实已经足够；不为一条“尚未开始”投影制造空世界书。
-  if (!已有聊天世界书 && !应建立聊天世界书) return Promise.resolve(true);
-  if (!已有聊天世界书 && typeof getOrCreateChatWorldbook !== 'function') return Promise.resolve(false);
-
-  const 本次 = 世界书同步队列
-    .catch(() => undefined)
-    .then(async () => {
-      if (!仍有效() || 当前聊天标识() !== 聊天标识) return false;
-      const 世界书名 = 已有聊天世界书 || (await getOrCreateChatWorldbook('current'));
-      if (!世界书名 || !仍有效() || 当前聊天标识() !== 聊天标识) return false;
-      await updateWorldbookWith(
-        世界书名,
-        条目们 => {
-          if (!仍有效() || 当前聊天标识() !== 聊天标识) return 条目们;
-          const 索引 = 条目们.findIndex(条目 => 条目.name === 共居阶段世界书条目名);
-          if (索引 >= 0) {
-            条目们[索引] = {
-              ...条目们[索引],
-              enabled: true,
-              strategy: { ...条目们[索引].strategy, type: 'constant' },
-              content: 内容,
-              probability: 100,
-              extra: { ...(条目们[索引].extra ?? {}), rqgy302阶段投影版本: 1 },
-            };
-          } else {
-            const 最大uid = 条目们.reduce((最大, 条目) => Math.max(最大, Number.isInteger(条目.uid) ? 条目.uid : 0), 0);
-            条目们.push(世界书条目模板(内容, 最大uid + 1));
-          }
-          return 条目们;
-        },
-        { render: 'debounced' },
-      );
-      if (!仍有效() || 当前聊天标识() !== 聊天标识) return false;
-      已同步签名.set(聊天标识, 签名);
-      return true;
-    })
-    .catch(error => {
-      console.warn('[人妻公寓·302共居] 当前聊天世界书同步失败（不影响游戏真值，下个同步点重试）:', error);
-      return false;
-    });
-  世界书同步队列 = 本次;
-  return 本次;
+export function 构造302阶段世界书内容(data: SchemaType): string {
+  const phase = 读取302游戏阶段(data);
+  return '母亲当前游戏阶段：' + phase + '。' + (phase === '未入住' ? '' : '\n' + 构造302阶段原内容(data));
 }
-
+export function 构造302阶段世界书投影(data: SchemaType): 阶段世界书投影 {
+  return { 名称: 共居阶段世界书条目名, 内容: 构造302阶段世界书内容(data), 启用: Boolean(data.户['302']),
+    允许建书: 双重继承完成(data) || data.系统._回国.阶段 !== '未开始' || data.系统._双重继承.阶段 !== '未开始',
+    顺序: 101, 元数据: { rqgy302阶段投影版本: 2, 游戏阶段: 读取302游戏阶段(data) } };
+}
+export function 同步302阶段世界书(data: SchemaType, 仍有效: () => boolean = () => true, 强制 = false): Promise<boolean> {
+  return 同步阶段世界书投影([构造302阶段世界书投影(data)], 仍有效, 强制);
+}
 export function 作废302阶段世界书同步缓存(): void {
-  已同步签名.clear();
+  作废阶段世界书缓存([共居阶段世界书条目名]);
 }
