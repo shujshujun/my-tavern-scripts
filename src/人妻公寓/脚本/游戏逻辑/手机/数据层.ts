@@ -29,7 +29,8 @@ import {
   手机邀约计划键,
   type 手机邀约计划,
 } from './邀约计划';
-import { 手机楼轴已就绪, 末楼, 当前聊天ID, 当前手机绝对时段 } from './运行时上下文';
+import { 手机楼轴已就绪, 末楼, 当前聊天ID, 当前手机绝对时段, 当前手机数据 } from './运行时上下文';
+import { 当前社交接收门牌, 规范社交接收门牌 } from '../微信跨渠道见闻';
 import { 请求刷新手机红点 } from './UI刷新';
 import { 朋友圈允许公开互动 } from './朋友圈隐私';
 import type { 朋友圈主题 } from './内容素材表';
@@ -104,6 +105,8 @@ export interface 朋友圈长期记忆凭据 {
 }
 
 export interface 朋友圈条 {
+  /** 发布时实际开放给哪些角色；仅你可见动态只记录发布者。 */
+  接收门牌?: string[];
   楼: number;
   /** 发布时的绝对时段；真实消息楼只负责回档裁剪。 */
   时: number;
@@ -256,6 +259,7 @@ function 手机时间记录数组<T extends { 楼: number; 时: number }>(值: u
 
 function 清理消息可选字段(原: Record<string, unknown>): 微信消息 {
   const 消息 = { ...原 } as unknown as 微信消息;
+  if (原.接收门牌 !== undefined) 消息.接收门牌 = 规范社交接收门牌(原.接收门牌);
   if (原.类 !== undefined && !['文本', '照片', '撤回', '通话'].includes(String(原.类))) delete 消息.类;
   for (const 字段 of ['键', '群昵称', '图', '标识', '锚签名'] as const) {
     if (原[字段] !== undefined && typeof 原[字段] !== 'string') delete 消息[字段];
@@ -266,9 +270,7 @@ function 清理消息可选字段(原: Record<string, unknown>): 微信消息 {
     } else {
       const 标识 = typeof 原.引用.标识 === 'string' && 原.引用.标识 ? 原.引用.标识 : undefined;
       const 序 =
-        typeof 原.引用.序 === 'number' && 原.引用.序 >= 0 && Number.isSafeInteger(原.引用.序)
-          ? 原.引用.序
-          : undefined;
+        typeof 原.引用.序 === 'number' && 原.引用.序 >= 0 && Number.isSafeInteger(原.引用.序) ? 原.引用.序 : undefined;
       if (标识 === undefined && 序 === undefined) delete 消息.引用;
       else 消息.引用 = { ...(标识 !== undefined ? { 标识 } : {}), ...(序 !== undefined ? { 序 } : {}) };
     }
@@ -298,6 +300,7 @@ function 规范朋友圈容器(值: unknown): 朋友圈条[] {
   return 数组或空<unknown>(值).flatMap(记录 => {
     if (!是手机时间记录(记录) || typeof 记录.谁 !== 'string' || !记录.谁 || typeof 记录.文 !== 'string') return [];
     const 动态 = { ...记录 } as unknown as 朋友圈条;
+    if (记录.接收门牌 !== undefined) 动态.接收门牌 = 规范社交接收门牌(记录.接收门牌);
     if (记录.图 !== undefined && typeof 记录.图 !== 'string') delete 动态.图;
     return [动态];
   });
@@ -327,8 +330,7 @@ function 已发图片映射(值: unknown): 已发私聊图缓存 {
   return 结果;
 }
 
-type 已归一微信原始库 = Partial<微信库> &
-  Pick<微信库, '消息' | '圈' | '读到' | '读时' | '节拍' | '已发私聊图'>;
+type 已归一微信原始库 = Partial<微信库> & Pick<微信库, '消息' | '圈' | '读到' | '读时' | '节拍' | '已发私聊图'>;
 
 /**
  * `_微信` 没有 Schema 保护，所有读写入口都先在浅拷贝上归一 JSON-like 容器。
@@ -360,11 +362,7 @@ function 读取微信原始候选(
   return { 库: 归一微信原始库(选择.值), 选择 };
 }
 
-function 写入当前聊天微信刷新镜像(
-  预期聊天ID: string,
-  微信: unknown,
-  当前绝对时段 = 当前手机绝对时段(),
-): boolean {
+function 写入当前聊天微信刷新镜像(预期聊天ID: string, 微信: unknown, 当前绝对时段 = 当前手机绝对时段()): boolean {
   if (!预期聊天ID || 当前聊天ID() !== 预期聊天ID) return false;
   return 写入微信刷新镜像(预期聊天ID, 微信, 当前绝对时段);
 }
@@ -538,8 +536,7 @@ async function 记录当前微信刷新恢复副本(预期聊天ID: string): Pro
         return vars;
       }
       if (!是普通对象(选择.值)) return vars;
-      if (读取微信持久修订(库) <= 0)
-        推进微信持久修订(库 as Record<string, unknown>, 预期聊天ID, 当前绝对时段);
+      if (读取微信持久修订(库) <= 0) 推进微信持久修订(库 as Record<string, unknown>, 预期聊天ID, 当前绝对时段);
       _.set(vars, '_微信', 库);
       快照 = _.cloneDeep(库);
       快照绝对时段 = 当前绝对时段;
@@ -613,7 +610,9 @@ export async function 立即持久保存手机聊天变量(预期聊天ID = 当�
       if (!接口) {
         if (!已警告缺少手机硬保存接口) {
           已警告缺少手机硬保存接口 = true;
-          console.warn('[人妻公寓·手机] 宿主没有暴露 saveMetadata/saveChat；微信已写刷新恢复镜像，并沿用防抖保存兼容路径。');
+          console.warn(
+            '[人妻公寓·手机] 宿主没有暴露 saveMetadata/saveChat；微信已写刷新恢复镜像，并沿用防抖保存兼容路径。',
+          );
         }
         return 镜像已准备;
       }
@@ -698,7 +697,10 @@ function 排队回写微信刷新恢复(选择: 微信刷新恢复选择, 预期
   const 任务 = 恢复微信刷新恢复副本(预期聊天ID)
     .catch(error => console.error('[人妻公寓·手机] 微信刷新恢复副本回写失败:', error))
     .finally(() => 微信刷新自愈任务.delete(任务键));
-  微信刷新自愈任务.set(任务键, 任务.then(() => undefined));
+  微信刷新自愈任务.set(
+    任务键,
+    任务.then(() => undefined),
+  );
 }
 
 /**
@@ -950,9 +952,7 @@ export async function 写库增量(
         const 序 = 记录安全序(项);
         if (序 !== null && 序 > 最大序) 最大序 = 序;
       }
-      const 活朋友圈键 = new Set(
-        新鲜.圈.map(朋友圈稳定事件键).filter((键): 键 is string => Boolean(键)),
-      );
+      const 活朋友圈键 = new Set(新鲜.圈.map(朋友圈稳定事件键).filter((键): 键 is string => Boolean(键)));
       const 新圈 = 增.新圈
         .map(条 => 带当前手机分支锚(条))
         .filter(条 => {
@@ -964,7 +964,13 @@ export async function 写库增量(
         });
       // 无稳定键的普通动态照常允许重复；脚本硬事件在最终变量回调内CAS去重，
       // 热重载的两个生产者即使同时通过生成前检查，也只能插入一条当前分支记录。
-      for (const 条 of 新圈) 条.序 = ++最大序;
+      const 接收状态 = 当前手机数据();
+      for (const 条 of 新圈) {
+        条.序 = ++最大序;
+        条.接收门牌 = 朋友圈允许公开互动(条)
+          ? 当前社交接收门牌(接收状态, '朋友圈')
+          : 门牌列表.filter(m => 户静态表[m].妻名 === 条.谁);
+      }
       新鲜.圈.unshift(...新圈);
       // 脚本事件键是分支内幂等真值。只认当前楼仍存活的键：未裁的未来消息
       // 不能阻止回档后同一事件重演。
@@ -983,6 +989,7 @@ export async function 写库增量(
         if (消息.标识 && 活玩家标识.has(消息.标识)) continue;
         // 去重通过才代表这条真的会插入当前库，此刻才分配单调序（不信任调用方快照里的序）。
         消息.序 = ++最大序;
+        消息.接收门牌 = 当前社交接收门牌(接收状态, 消息.会话);
         新鲜.消息.push(消息);
         实际插入消息数 += 1;
         if (消息.键) {
@@ -1088,10 +1095,7 @@ export async function 压缩微信会话记录(
         原消息,
         会话,
         普通气泡上限,
-        消息 =>
-          会话消息未读(水位库, 消息, 当前楼, 当前绝对时段) ||
-          图片轮换保护.has(消息) ||
-          消息 === 最新玩家联系,
+        消息 => 会话消息未读(水位库, 消息, 当前楼, 当前绝对时段) || 图片轮换保护.has(消息) || 消息 === 最新玩家联系,
       );
       有变化 = 新消息.length !== 原消息.length;
       if (有变化) {

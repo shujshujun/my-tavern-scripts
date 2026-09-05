@@ -755,7 +755,7 @@ async function 楼务群一拍(
   if (!成员.length) return false;
   const 时 = 取绝对时段(data);
   const 名单 = 成员.map(m => `${户静态表[m].妻名}(${m}室住户)`).join('、');
-  const 群记忆 = 读取群聊记忆上下文('群', 库, 楼);
+  const 群记忆 = 读取群聊记忆上下文('群', 库, 楼, 成员);
   const 有效楼务任务id = 有效楼务任务id集合(data);
   const 近况消息 = 群记忆.近期消息
     .filter(m => m.会话 === '群' && m.类 !== '撤回' && 楼务微信消息仍有效(m, 有效楼务任务id))

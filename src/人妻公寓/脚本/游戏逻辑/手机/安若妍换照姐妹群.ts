@@ -126,7 +126,7 @@ export async function 安若妍换照姐妹群一拍(
   }
   if (members.length < 3) return false;
   const profiles = members.map(member => 构造换照成员差分(data, member, 库.消息));
-  const memory = 读取群聊记忆上下文('姐妹群', 库, 楼);
+  const memory = 读取群聊记忆上下文('姐妹群', 库, 楼, members);
   const text = await 小生成(
     '为都市生活游戏生成姐妹群收到301换照照片后的反应。只输出6至9行“姓名:内容”，至少3人发言，至少4条来自安若妍之外，安若妍最多回应2条。' +
       '围绕本次照片、拍摄安排和客厅变化交流。按每人自己的结局进度区分口吻；尚未完成时保留当前阶段的态度，已完成时可以更从容，但不能透露本人未公开的经历。' +
