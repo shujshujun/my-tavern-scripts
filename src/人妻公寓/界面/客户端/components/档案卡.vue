@@ -18,6 +18,7 @@ import { 读取许曼君分居档案提示 } from '../../../脚本/游戏逻辑/
 import { 许曼君离婚档案提示 } from '../../../脚本/游戏逻辑/许曼君离婚系统';
 import { 读取许曼君201钥匙柜卡 } from '../../../脚本/游戏逻辑/许曼君分居钥匙柜';
 import { 读取安若妍不必停档案提示 } from '../../../脚本/游戏逻辑/安若妍不必停系统';
+import { 读取安若妍换掉档案提示, 安若妍换掉攻略步骤 } from '../../../脚本/游戏逻辑/安若妍换掉系统';
 import { 回国档案提示 } from '../../../脚本/游戏逻辑/回国系统';
 import { 双重继承档案提示 } from '../../../脚本/游戏逻辑/双重继承系统';
 import { CG条目, 角色CG总数全部变体 } from '../../../脚本/游戏逻辑/成人CG系统';
@@ -197,6 +198,9 @@ const 选中许曼君钥匙柜 = computed(() =>
 );
 const 选中安若妍不必停提示 = computed(() =>
   props.door === '301' && props.data.户['301'] ? 读取安若妍不必停档案提示(props.data) : null,
+);
+const 选中安若妍换掉提示 = computed(() =>
+  props.door === '301' && props.data.户['301'] ? 读取安若妍换掉档案提示(props.data) : null,
 );
 const 选中回国提示 = computed(() => (props.door === '302' && props.data.户['302'] ? 回国档案提示(props.data) : null));
 const 选中双重继承提示 = computed(() =>
@@ -700,6 +704,26 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
           <Ic n="clock" aria-hidden="true" />
           <span>{{ 选中安若妍不必停提示.进度 }}</span>
         </p>
+      </section>
+      <section v-if="选中安若妍换掉提示" class="dsec second-camera-task" aria-label="换掉下一步">
+        <header class="second-camera-task-head">
+          <span class="second-camera-task-icon" aria-hidden="true"><Ic n="story" /></span>
+          <span class="second-camera-task-title">
+            <b>换掉</b>
+            <small>{{ 选中安若妍换掉提示.状态 }}</small>
+          </span>
+          <span v-if="选中安若妍换掉提示.完成" class="second-camera-task-done">已完成</span>
+        </header>
+        <p class="second-camera-task-next">{{ 选中安若妍换掉提示.下一步 }}</p>
+        <p v-if="选中安若妍换掉提示.补充" class="second-camera-task-note">{{ 选中安若妍换掉提示.补充 }}</p>
+        <p v-if="选中安若妍换掉提示.进度" class="second-camera-task-progress">
+          <Ic n="clock" aria-hidden="true" />
+          <span>{{ 选中安若妍换掉提示.进度 }}</span>
+        </p>
+        <details v-if="!选中安若妍换掉提示.完成" class="second-camera-task-note">
+          <summary>查看全线步骤</summary>
+          <ol><li v-for="步骤 in 安若妍换掉攻略步骤" :key="步骤">{{ 步骤 }}</li></ol>
+        </details>
       </section>
       <section v-if="选中回国提示" class="dsec second-camera-task" aria-label="回国下一步">
         <header class="second-camera-task-head">

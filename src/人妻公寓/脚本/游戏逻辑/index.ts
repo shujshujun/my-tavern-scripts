@@ -5209,12 +5209,13 @@ function 挂载监听() {
       const 准备 = () => 执行安若妍换掉地点动作(data, 动作, 地点, 当前楼层(),
         String(当前聊天ID()) + '@' + 当前时间线切换世代());
       if (['购买拍立得', '登记江辰到访', '换掉结婚照', '暂缓预约夜'].includes(动作)) {
+        const chat = 当前聊天ID(); const generation = 当前时间线切换世代();
+        const 仍在本次时间线 = () => 当前聊天ID() === chat && 当前时间线切换世代() === generation;
         const 结果 = 准备();
         const saved = await 落地({ 提示: 结果.提示, 变动: 结果.变动 }, raw, data);
-        if (saved && 结果.成功 && 动作 === '换掉结婚照') {
-          const chat = 当前聊天ID(); const generation = 当前时间线切换世代();
-          await 同步301换掉阶段世界书(data, () => 当前聊天ID() === chat && 当前时间线切换世代() === generation);
-          eventEmit('人妻公寓:回合完成', { 更新正文幕: false });
+        if (saved && 结果.成功 && 动作 === '换掉结婚照' && 仍在本次时间线()) {
+          await 同步301换掉阶段世界书(data, 仍在本次时间线, true);
+          if (仍在本次时间线()) eventEmit('人妻公寓:回合完成', { 更新正文幕: false });
         }
         return;
       }
@@ -5276,9 +5277,14 @@ function 挂载监听() {
       }
 
       if (纯硬操作) {
+        const chat = 当前聊天ID(); const generation = 当前时间线切换世代();
+        const 仍在本次时间线 = () => 当前聊天ID() === chat && 当前时间线切换世代() === generation;
         const 结果 = 准备();
         const 已落地 = await 落地({ 提示: 结果.提示, 变动: 结果.变动 }, raw, data);
-        if (已落地 && 结果.成功) 播放安若妍不必停CG(结果);
+        if (已落地 && 结果.成功 && 仍在本次时间线()) {
+          if (动作 === '将301丈夫到访改为提前通知') await 同步301换掉阶段世界书(data, 仍在本次时间线, true);
+          if (仍在本次时间线()) 播放安若妍不必停CG(结果);
+        }
         return;
       }
 
