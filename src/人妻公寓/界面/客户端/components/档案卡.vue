@@ -498,12 +498,12 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
       <template v-else>
         <p class="dline"><b>情绪</b> {{ 选中档案.妻.当前情绪 }}</p>
         <p class="dline"><b>{{ 选中档案.夫称谓 }}</b> {{ 选中档案.夫名 }} —— 此刻{{ 选中档案.夫状态 }}</p>
-        <p class="dsealed">
+        <p v-if="!选中档案.阶段体验" class="dsealed">
           她的日子隔着一扇门——裂缝线索 {{ 选中档案.妻.裂缝.碎片进度 }}/4。看清她的裂缝,才看得见她。
           <template v-if="选中档案.妻.裂缝.碎片进度 >= 4">线索齐了:背包里那封拼起来的东西,读一读。</template>
         </p>
         <div class="dsec clue-board">
-          <div class="dsec-title">线 索</div>
+          <div class="dsec-title">{{ 选中档案.阶段体验 ? '线索档案' : '线 索' }}</div>
           <div class="clue-slots">
             <div
               v-for="(槽, i) in evidenceSlots"
@@ -512,7 +512,7 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
               :class="{ found: !!选中线索[i] }"
             >
               <span class="clue-source"><Ic :n="槽.图" />{{ 槽.标 }}</span>
-              <p>{{ 选中线索[i] || '尚未取得' }}</p>
+              <p>{{ 选中线索[i] || (选中档案.阶段体验 ? '未记录' : '尚未取得') }}</p>
               <i>{{ 选中线索[i] ? '已归档' : '空槽' }}</i>
             </div>
           </div>
