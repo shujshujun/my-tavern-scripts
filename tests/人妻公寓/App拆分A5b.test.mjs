@@ -222,7 +222,7 @@ test('档案模板关键契约全量保持：头像/立绘/三轴/心镜/仪容/
   assert.match(模板段, /v-if="!avatarFailed\[选中档案\.妻名\]"/, '头像失败门');
   assert.match(模板段, /class="avatar-glyph big img"[\s\S]*?:src="avatarImage\(选中档案\.妻名\)"/, '头像图+失败回退');
   assert.match(模板段, /ROOM \{\{ 选中档案\.门牌 \}\} · RESIDENT FILE/, 'role kicker');
-  assert.match(模板段, /:title="'阶段:' \+ 选中档案\.阶段标题"/, 'hearts 阶段 title');
+  assert.match(模板段, /:title="\(选中档案\.阶段体验 \? '已达攻略阶段:' : '阶段:'\) \+ 选中档案\.阶段标题"/, 'hearts保留已达攻略进度，当前相处另行显示');
   assert.match(模板段, /<i v-for="n in 5" :key="n" :class="\{ on: n <= 选中档案\.妻\.当前阶段 \}">♥<\/i>/, '五心');
   assert.match(模板段, /v-if="选中档案\.立绘图"/, '立绘候选存在门');
   assert.match(
@@ -253,11 +253,11 @@ test('档案模板关键契约全量保持：头像/立绘/三轴/心镜/仪容/
   assert.match(模板段, /v-if="选中档案\.阶段性癖"/, '阶段性癖完成后才显示');
   assert.match(模板段, /阶 段 性 癖/, '阶段性癖只读标题');
   assert.match(模板段, /class="kink-chip on">\{\{ 选中档案\.阶段性癖 \}\}/, '阶段性癖只读芯片');
-  assert.match(模板段, /她 的 丈 夫/, '丈夫区块标题');
+  assert.match(模板段, /她的\{\{ 选中档案\.夫称谓 \}\}/, '配偶称谓随当前法律身份变化');
   assert.match(模板段, /v-if="!avatarFailed\['影子'\]"/, '丈夫头像失败门');
   assert.match(模板段, /:src="avatarImage\('影子'\)"/, '丈夫头像图');
   assert.match(模板段, /此刻\{\{ 选中档案\.夫状态 \}\}/, '夫状态');
-  assert.match(模板段, /aria-label="丈夫疑心与信任风险盘"/, '风险盘 aria');
+  assert.match(模板段, /:aria-label="选中档案\.夫称谓 \+ '疑心与信任读数'"/, '读数aria保留当前配偶称谓');
   assert.match(模板段, /<Ic n="lock" \/> 信任[\s\S]*?<Ic n="peep" \/> 疑心/, '风险盘图标');
   assert.match(
     模板段,
@@ -389,7 +389,7 @@ test('档案专属 CSS 已从 App 移到组件；基础 popup scoped 引入；av
   assert.match(档案卡源码, /<style scoped src="\.\/弹窗基础\.css"><\/style>/, '应引入弹窗基础.css');
   // 组件复制 avatar base/img/dark；App 保留其他头像所需
   for (const selector of ['.avatar-glyph {', '.avatar-glyph.img {', ':global(html.rq-dark) .avatar-glyph {']) {
-    assert.match(档案卡源码, new RegExp(转义(selector)), `组件应复制 ${selector}`);
+    assert.match(档案卡源码, new RegExp(转义(selector.replace(':global(html.rq-dark)', 'html.rq-dark'))), `组件应保留目标并使用有效的作用域选择器：${selector}`);
     assert.match(App源码, new RegExp(转义(selector)), `App 应保留 ${selector}`);
   }
   assert.match(App源码, /\.avatar\.focus \.avatar-glyph/, 'App 保留头像 focus 规则');
@@ -414,7 +414,7 @@ test('dark/mobile 档案规则完整迁移；rq-still 来自弹窗基础；App �
     '.dossier-portrait {',
     '.dev-grid {',
   ]) {
-    assert.match(档案卡源码, new RegExp(转义(selector)), `档案组件应持有 ${selector}`);
+    assert.match(档案卡源码, new RegExp(转义(selector.replace(':global(html.rq-dark)', 'html.rq-dark'))), `档案组件应持有 ${selector}`);
     assert.doesNotMatch(App源码, new RegExp(转义(selector)), `App 不应再持有 ${selector}`);
   }
   assert.match(档案卡源码, /@media \(max-width: 540px\)/, '档案移动端组在组件');

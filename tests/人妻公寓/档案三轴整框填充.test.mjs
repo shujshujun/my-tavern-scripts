@@ -87,7 +87,7 @@ test('4. 标签/数值/堕落说明位于填充层上方；深色模式低亮度
   );
   assert.match(
     样式段,
-    /:global\(html\.rq-dark\) \.dossier-axes \.axis-row\.fav::before \{[^}]*rgba\(255, 79, 154, [^}]*\}/s,
+    /html\.rq-dark \.dossier-axes \.axis-row\.fav::before \{[^}]*rgba\(255, 79, 154, [^}]*\}/s,
     '深色模式粉填充降透明度',
   );
   assert.match(

@@ -39,16 +39,16 @@ function 基础数据(绝对时段 = 6) {
   return data;
 }
 
-test('302结局后社交只承接亲密入口与真实结果，不复活日常按钮', () => {
+test('302普通RP承接当前关系与言行，界面仍保留原有两种开场动作', () => {
   const data = 基础数据();
   const semantics = 社交.构建角色结局后生活社交语义(data, '302');
   assert.equal(semantics.阶段, '双重继承共居');
   assert.equal(semantics.已开启, true);
   assert.match(semantics.生活事实, /稳定的结局后私人关系/);
-  assert.match(semantics.普通正文纪律, /唯一的“和她亲密”入口/);
-  assert.match(semantics.普通正文纪律, /由自己开始|让母亲开始/);
-  assert.match(semantics.普通正文纪律, /复用普通亲密场景/);
-  assert.match(semantics.普通正文纪律, /已废弃的日常操作菜单不再进入正文提示/);
+  assert.match(semantics.普通正文纪律, /当下的言行/);
+  assert.match(semantics.普通正文纪律, /本轮输入继续/);
+  assert.match(semantics.普通正文纪律, /现有场次推进/);
+  assert.doesNotMatch(semantics.普通正文纪律, /只通过.*入口|日常操作菜单/u);
   assert.deepEqual([...共居.共居动作列表], ['由我开始', '让她开始']);
 });
 

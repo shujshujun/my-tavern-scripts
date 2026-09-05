@@ -56,7 +56,7 @@ test('关系轨迹面板具备开门入口、四节点状态、无障碍展开�
   assert.match(档案卡源码, /aria-controls="relation-trace-panel"/);
   assert.match(档案卡源码, /class="relation-step"[\s\S]*?done:[\s\S]*?current:[\s\S]*?future:/);
   assert.match(档案卡源码, /class="relation-action"/);
-  assert.match(档案卡源码, /:global\(html\.rq-dark\) \.relation-clue-board/);
+  assert.match(档案卡源码, /html\.rq-dark \.relation-clue-board/);
   assert.match(档案卡源码, /@media \(max-width: 540px\)[\s\S]*?\.relation-clue-open/);
 
   const 关系样式起点 = 档案卡源码.indexOf('.relation-clue-open');

@@ -5,6 +5,7 @@ import type { SchemaType } from '../../../schema';
 import { 户静态表, 查考古, 查性癖, 查裂缝, 查道具, 道具表, 阶段标题, type 门牌 } from '../../../stageConfig';
 import { 当前天数, 丈夫在楼 } from '../../../脚本/游戏逻辑/楼层时钟';
 import { 余波有冻结效力 } from '../../../脚本/游戏逻辑/冷落系统';
+import { 读取角色阶段体验 } from '../../../脚本/游戏逻辑/角色阶段体验';
 import { 怀孕已公开 } from '../../../脚本/游戏逻辑/怀孕系统';
 import { 每日堕落上限 } from '../../../脚本/游戏逻辑/守护系统';
 import { 可晋阶, 可启动母亲药物首夜, 普通首夜时段已满足, 晋阶预约现场已满足 } from '../../../脚本/游戏逻辑/结算系统';
@@ -77,6 +78,7 @@ const 选中档案 = computed(() => {
   const m = props.door;
   if (!m || !props.ready || !props.data.户[m]) return null;
   const { 妻, 夫 } = props.data.户[m];
+  const 阶段体验 = 读取角色阶段体验(props.data, m);
   const 当前立绘SKU = 当前可见立绘SKU(妻);
   const 怀孕公开 = 怀孕已公开(props.data, m);
   const 立绘图 = 角色立绘候选(户静态表[m].妻名, 当前立绘SKU, 怀孕公开, { 妆容SKU: 妻._穿着SKU.妆容, 特殊: 妻.特殊 }).find(src => !props.portraitFailed[src]);
@@ -84,6 +86,8 @@ const 选中档案 = computed(() => {
     门牌: m,
     妻名: 户静态表[m].妻名,
     夫名: 户静态表[m].夫名 || '她丈夫',
+    夫称谓: 阶段体验?.配偶称谓 ?? '丈夫',
+    阶段体验,
     夫状态: 丈夫在楼(props.data.户[m], m, props.absolutePeriod),
     阶段标题: 阶段标题(妻.当前阶段, m),
     气质描述: 户静态表[m].初始?.气质描述 ?? '',
@@ -326,10 +330,10 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
           <span class="dossier-id">
             <span class="dossier-role">ROOM {{ 选中档案.门牌 }} · RESIDENT FILE</span>
             <span class="dossier-name">{{ 选中档案.妻名 }}</span>
-            <span class="hearts" :title="'阶段:' + 选中档案.阶段标题">
+            <span class="hearts" :title="(选中档案.阶段体验 ? '已达攻略阶段:' : '阶段:') + 选中档案.阶段标题">
               <i v-for="n in 5" :key="n" :class="{ on: n <= 选中档案.妻.当前阶段 }">♥</i>
             </span>
-            <span class="dossier-stage" :title="选中档案.阶段标题">{{ 选中档案.阶段标题 }}</span>
+            <span class="dossier-stage" :title="选中档案.阶段体验?.标题 ?? 选中档案.阶段标题">{{ 选中档案.阶段体验?.标题 ?? 选中档案.阶段标题 }}</span>
           </span>
         </div>
         <div class="dossier-portrait" aria-hidden="true">
@@ -364,6 +368,12 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
           </small>
         </div>
       </div>
+
+      <section v-if="选中档案.阶段体验" class="dsec dossier-card" aria-label="当前相处阶段">
+        <div class="dsec-title stage-life-title">{{ 选中档案.阶段体验.标题 }}</div>
+        <p class="dline">{{ 选中档案.阶段体验.简介 }}</p>
+        <p class="dline">{{ data.系统._坏结局 ? '本次故事已经结束，可以查看已有回忆。' : 选中档案.阶段体验.继续方式 }}</p>
+      </section>
 
       <template v-if="选中档案.妻.裂缝.已确认">
         <div class="dsec dossier-card mind-card">
@@ -439,13 +449,13 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
         </div>
         <!-- 丈夫状态栏(解锁后:双轴可见——疑心是风险表,信任是钥匙) -->
         <div class="dsec husband dossier-card">
-          <div class="dsec-title">她 的 丈 夫</div>
+          <div class="dsec-title">她的{{ 选中档案.夫称谓 }}</div>
           <div class="hb-row">
             <img
               v-if="!avatarFailed['影子']"
               class="avatar-glyph hb img"
               :src="avatarImage('影子')"
-              alt="丈夫"
+              :alt="选中档案.夫称谓"
               @error="emit('avatarError', '影子')"
             />
             <span v-else class="avatar-glyph hb">{{ 选中档案.夫名[0] }}</span>
@@ -454,7 +464,8 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
               <small>此刻{{ 选中档案.夫状态 }}</small>
             </span>
           </div>
-          <div class="husband-risk" aria-label="丈夫疑心与信任风险盘">
+          <p v-if="选中档案.阶段体验" class="dline">{{ 选中档案.阶段体验.配偶说明 }}</p>
+          <div class="husband-risk" :aria-label="选中档案.夫称谓 + '疑心与信任读数'">
             <span class="trust"><Ic n="lock" /> 信任</span>
             <i
               class="risk-needle"
@@ -486,7 +497,7 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
       </template>
       <template v-else>
         <p class="dline"><b>情绪</b> {{ 选中档案.妻.当前情绪 }}</p>
-        <p class="dline"><b>丈夫</b> {{ 选中档案.夫名 }} —— 此刻{{ 选中档案.夫状态 }}</p>
+        <p class="dline"><b>{{ 选中档案.夫称谓 }}</b> {{ 选中档案.夫名 }} —— 此刻{{ 选中档案.夫状态 }}</p>
         <p class="dsealed">
           她的日子隔着一扇门——裂缝线索 {{ 选中档案.妻.裂缝.碎片进度 }}/4。看清她的裂缝,才看得见她。
           <template v-if="选中档案.妻.裂缝.碎片进度 >= 4">线索齐了:背包里那封拼起来的东西,读一读。</template>
@@ -509,9 +520,9 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
       </template>
 
       <div v-if="选中档案.妻.裂缝.已确认 && 选中裂缝" class="dsec">
-        <div class="dsec-title">裂 缝</div>
+        <div class="dsec-title">{{ 选中档案.阶段体验 ? '已知往事' : '裂 缝' }}</div>
         <p class="dline">{{ 选中裂缝.诊断 }}</p>
-        <p class="dline crack-hint">✦ {{ 选中裂缝.对症提示 }}</p>
+        <p v-if="!选中档案.阶段体验" class="dline crack-hint">✦ {{ 选中裂缝.对症提示 }}</p>
       </div>
 
       <button
@@ -1327,23 +1338,23 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
   flex: 0 0 auto;
 }
 
-:global(html.rq-dark) .relation-clue-open,
-:global(html.rq-dark) .relation-clue-board {
+html.rq-dark .relation-clue-open,
+html.rq-dark .relation-clue-board {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.06),
     0 8px 22px rgba(0, 0, 0, 0.22);
 }
 
-:global(html.rq-dark) .relation-clue-board {
+html.rq-dark .relation-clue-board {
   background: radial-gradient(circle at 100% 0%, rgba(255, 79, 154, 0.12), transparent 34%), var(--paper-card);
 }
 
-:global(html.rq-dark) .second-camera-task {
+html.rq-dark .second-camera-task {
   box-shadow: 0 8px 22px rgba(0, 0, 0, 0.22);
 }
 
-:global(html.rq-dark) .relation-action-badge,
-:global(html.rq-dark) .relation-wait {
+html.rq-dark .relation-action-badge,
+html.rq-dark .relation-wait {
   color: #ff9fc5;
 }
 
@@ -1534,6 +1545,11 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
   background: rgba(255, 255, 255, 0.76);
   border: 1px solid rgba(255, 79, 154, 0.13);
   box-shadow: 0 3px 10px rgba(44, 40, 56, 0.05);
+}
+
+.sheet.dossier .dsec-title.stage-life-title {
+  color: var(--ink);
+  font-weight: 700;
 }
 
 /* 三轴整框填充:整个好感/堕落/婚姻卡本身就是进度条,::before 按 --level 从左向右 scaleX 填满卡片 */
@@ -2000,51 +2016,51 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
   text-shadow: 0 0 6px rgba(255, 79, 154, 0.4);
 }
 
-:global(html.rq-dark) .hearts i {
+html.rq-dark .hearts i {
   color: rgba(255, 255, 255, 0.14);
 }
 
-:global(html.rq-dark) .hearts i.on {
+html.rq-dark .hearts i.on {
   color: var(--pink);
 }
 
-:global(html.rq-dark) .sheet.dossier {
+html.rq-dark .sheet.dossier {
   background: linear-gradient(180deg, rgba(45, 43, 59, 0.99), rgba(34, 38, 53, 0.99));
 }
 
-:global(html.rq-dark) .dossier-hero {
+html.rq-dark .dossier-hero {
   background:
     radial-gradient(circle at 18% 30%, rgba(255, 255, 255, 0.08), transparent 32%),
     linear-gradient(125deg, rgba(115, 54, 83, 0.72), rgba(46, 78, 108, 0.72) 58%, rgba(106, 85, 42, 0.58));
   border-bottom-color: rgba(255, 255, 255, 0.09);
 }
 
-:global(html.rq-dark) .dossier-card,
-:global(html.rq-dark) .dossier-axes .axis-row,
-:global(html.rq-dark) .a-cell {
+html.rq-dark .dossier-card,
+html.rq-dark .dossier-axes .axis-row,
+html.rq-dark .a-cell {
   background: rgba(44, 46, 62, 0.82);
   border-color: rgba(255, 255, 255, 0.08);
 }
 
 /* 深色模式整框填充:用较低透明度的语义色,让深色卡底透出,浅色文字保持可读 */
-:global(html.rq-dark) .dossier-axes .axis-row.fav::before {
+html.rq-dark .dossier-axes .axis-row.fav::before {
   background: linear-gradient(90deg, rgba(255, 79, 154, 0.45), rgba(255, 79, 154, 0.18));
 }
 
-:global(html.rq-dark) .dossier-axes .axis-row.sin::before {
+html.rq-dark .dossier-axes .axis-row.sin::before {
   background: linear-gradient(90deg, rgba(229, 83, 63, 0.45), rgba(229, 83, 63, 0.18));
 }
 
-:global(html.rq-dark) .dossier-axes .axis-row.marr::before {
+html.rq-dark .dossier-axes .axis-row.marr::before {
   background: linear-gradient(90deg, rgba(32, 223, 173, 0.45), rgba(32, 223, 173, 0.18));
 }
 
-:global(html.rq-dark) .a-cell .a-pic {
+html.rq-dark .a-cell .a-pic {
   background: #343648;
   border-right-color: rgba(255, 255, 255, 0.08);
 }
 
-:global(html.rq-dark) .avatar-glyph {
+html.rq-dark .avatar-glyph {
   --avatar-ring-color: #3a3d52;
 
   background: linear-gradient(160deg, rgba(255, 79, 154, 0.3), rgba(255, 79, 154, 0.16));
@@ -2052,7 +2068,7 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
   color: #ff9ec4;
 }
 
-:global(html.rq-dark) .avatar-glyph.pregnant {
+html.rq-dark .avatar-glyph.pregnant {
   --avatar-ring-color: #f0aeb4;
 
   box-shadow:
@@ -2061,7 +2077,7 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
     0 3px 12px rgba(0, 0, 0, 0.34);
 }
 
-:global(html.rq-dark) .sheet.dossier.pregnant {
+html.rq-dark .sheet.dossier.pregnant {
   --pregnancy-accent: #f0aeb4;
 
   background:
@@ -2069,7 +2085,7 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
     linear-gradient(180deg, rgba(42, 34, 42, 0.99), rgba(31, 31, 41, 0.99));
 }
 
-:global(html.rq-dark) .sheet.dossier.pregnant .dossier-hero {
+html.rq-dark .sheet.dossier.pregnant .dossier-hero {
   background:
     radial-gradient(circle at 18% 28%, rgba(255, 255, 255, 0.08), transparent 34%),
     linear-gradient(125deg, rgba(118, 68, 77, 0.72), rgba(83, 62, 82, 0.7) 58%, rgba(101, 78, 54, 0.56));

@@ -304,8 +304,8 @@ test('自由阶段历史封存和聊天级世界书保留，但不再向AI注入
   }
 
   const worldbook = 共居世界书.构造302阶段世界书内容(data);
-  assert.match(worldbook, /“和她亲密”|和她亲密/);
-  assert.match(worldbook, /既有普通亲密场景/);
+  assert.match(worldbook, /玩家当前言行继续/);
+  assert.match(worldbook, /一次亲密开场接到后续相处/);
   assert.doesNotMatch(worldbook, /每日饭桌|晚归|陪坐|爽约/);
 });
 
