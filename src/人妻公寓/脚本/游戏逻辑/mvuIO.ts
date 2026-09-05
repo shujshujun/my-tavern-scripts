@@ -5,6 +5,7 @@ import { 取绝对时段 } from './楼层时钟';
 import { 当前时间线切换世代 } from './时间线切换协调';
 import { 同步场景剧情事务 } from './场景剧情事务';
 import { 规范AI表现文本 } from './AI表现文本安全';
+import { 清理线路失效待演打断 } from './线路待演打断';
 
 /**
  * 脚本侧 MVU 读写共享模块
@@ -165,6 +166,7 @@ function 当前消息楼层(): number {
 export async function 脚本写入(raw: object, data?: SchemaType, 选项: 脚本写入选项 = {}): Promise<void> {
   确认MVU提交仍有效();
   if (data) {
+    清理线路失效待演打断(data);
     const 旧raw = _.get(raw, 'stat_data');
     if (选项.记录成长 !== false && 旧raw && !_.isEmpty(旧raw)) {
       try {
