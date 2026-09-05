@@ -311,7 +311,7 @@ test('三个共享提示纪律只有一个定义，文本和调用点未弱化',
   assert.match(生成引擎源码, /export function 称呼纪律\(\): string \{/);
   assert.match(生成引擎源码, /对方是公寓管理员,名叫"\$\{玩家名\(\)\}"/);
   assert.match(生成引擎源码, /严禁臆造别的姓氏或称呼\(如"王师傅\/李哥"\)/);
-  assert.match(生成引擎源码, /export function 家庭事实\(m: 门牌\): string \{/);
+  assert.match(生成引擎源码, /export function 家庭事实\(m: 门牌, data: SchemaType\): string \{/);
   assert.match(生成引擎源码, /提到丈夫只能用这个名字,严禁写错或换成别人/);
   assert.match(生成引擎源码, /export const 口吻纪律 =/);
   assert.match(生成引擎源码, /口吻连续性:微信里的她必须和现实中的态度连续/);
@@ -321,10 +321,10 @@ test('三个共享提示纪律只有一个定义，文本和调用点未弱化',
   // P6:自动朋友圈/私聊/群聊调用点已迁至节拍引擎
   assert.match(节拍引擎源码, /\$\{称呼纪律\(\)\}[\s\S]{0,600}\$\{口吻纪律\}/);
   assert.match(节拍引擎源码, /称呼纪律\(\) \+/);
-  assert.match(节拍引擎源码, /\$\{家庭事实\(m\)\}/);
+  assert.match(节拍引擎源码, /\$\{家庭事实\(m, data\)\}/);
   // P8:交互模块仍有手动邀约/私聊调用点：口吻纪律作为小生成系统提示拼接，家庭事实/称呼纪律可执行调用存在
-  assert.match(交互源码, /\$\{家庭事实\(m\)\}/);
-  assert.match(交互源码, /\$\{家庭事实\(门牌号\)\}/);
+  assert.match(交互源码, /\$\{家庭事实\(m, data\)\}/);
+  assert.match(交互源码, /\$\{家庭事实\(门牌号, data\)\}/);
   assert.match(交互源码, /\$\{称呼纪律\(\)\}/);
   assert.match(交互源码, /await 小生成\([\s\S]{0,600}口吻纪律/);
   // 调用点仍从生成引擎 import（真实共享，不是各写一份）

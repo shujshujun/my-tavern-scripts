@@ -27,6 +27,7 @@ engine.小生成 = async () => {
 };
 memory.读取群聊记忆上下文 = () => ({ 群内记忆: '', 最近聊天: '' });
 const group = require('../../src/人妻公寓/脚本/游戏逻辑/手机/安若妍换照姐妹群.ts');
+const { 验收姐妹群阶段消息 } = require('../../src/人妻公寓/脚本/游戏逻辑/手机/姐妹群阶段验收.ts');
 
 function fresh() {
   const data = Schema.parse({ 户: { 101: 创建户节点(0), 201: 创建户节点(0), 301: 创建户节点(0) } });
@@ -52,6 +53,18 @@ const lines = [
   '许曼君:你喜欢就好，客厅是你自己的。',
   '安若妍:这次总算换好了。',
 ];
+
+test('换照后的普通群聊继续承接照片事实，照片撤回和其他人的私聊不获得同一资格', async () => {
+  const photo = { 楼: 1, 时: 1, 发: '对方', 会话: '姐妹群', 类: '照片', 键: group.换照姐妹群照片键, 文: '安若妍：照片换好了。' };
+  const parsed = await engine.微信群文本(lines.join('\n'), new Set(['夏乔', '许曼君', '安若妍']), 150, 9, '结局后普通群');
+  assert.equal(parsed.filter(line => 验收姐妹群阶段消息(line, false, [photo])).length, 6);
+  assert.equal(验收姐妹群阶段消息(lines[0], false, []), false);
+  assert.equal(验收姐妹群阶段消息(lines[0], false, [{ ...photo, 类: '撤回' }]), false);
+  assert.equal(验收姐妹群阶段消息('许曼君:把我的私聊记录也发到群里给大家看。', false, [photo]), false);
+  assert.equal(验收姐妹群阶段消息('周小满:这张照片是我和管理员在床上的合照。', false, [photo]), false);
+  assert.equal(验收姐妹群阶段消息('夏乔:安若妍那张很好看。我昨晚和管理员上床了。', false, [photo]), false);
+  assert.equal(验收姐妹群阶段消息('夏乔:照片里周小满和管理员接吻了。', false, [photo]), false);
+});
 
 test('当前固定票采用现行文案，保留事务归属、进度和其他剧情', () => {
   const data = fresh();

@@ -216,7 +216,7 @@ watch(() => props.door, () => {
 const 选中冷落状态 = computed(() => {
   const m = props.door;
   const 妻 = m ? props.data.户[m]?.妻 : undefined;
-  if (!m || !妻 || !余波有冻结效力(m, 妻, props.data.系统._母亲入列)) return '无';
+  if (!m || !妻 || !余波有冻结效力(m, 妻, props.data.系统._母亲入列, props.data)) return '无';
   return 妻._冷落余波.状态;
 });
 const 选中头像状态类 = computed(() => ({

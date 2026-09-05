@@ -17,7 +17,7 @@ for (const [界面, 源码] of [
     assert.match(源码, /import \{ 余波有冻结效力 \} from '.+\/冷落系统'/);
     assert.match(
       源码,
-      /余波有冻结效力\(m, 妻, (?:props\.)?data(?:\.value)?\.系统\._母亲入列\)/,
+      /余波有冻结效力\(m, 妻, (?:props\.)?data(?:\.value)?\.系统\._母亲入列, (?:props\.)?data(?:\.value)?\)/,
       `${界面}必须与堕落冻结共用同一资格判定`,
     );
   });

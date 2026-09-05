@@ -69,6 +69,41 @@ export function 角色结局后阶段(data: SchemaType, 门牌号: 门牌): 角�
   return '未进入后效';
 }
 
+/** 当前私人关系覆盖攻略期的试探底色；当次情绪和住院等状态由调用者另外提供。 */
+export function 角色阶段私聊基础(data: SchemaType, 门牌号: 门牌): string {
+  const 后效 = 构建角色结局后生活社交语义(data, 门牌号);
+  return 后效.已开启 ? `${后效.生活事实}${后效.玩家私聊纪律}${后效.丈夫边界}` : '';
+}
+
+export function 角色正式结局已完成(data: SchemaType, 门牌号: 门牌): boolean {
+  const 阶段 = 角色结局后阶段(data, 门牌号);
+  return 阶段 !== '未进入后效' && 阶段 !== '分居完成' && 阶段 !== '法律离婚待终幕';
+}
+
+/** 201已作出的退出选择及旧档未决定状态，不由手机图片反向恢复私人关系。 */
+export function 角色当前仅保留事务往来(data: SchemaType, 门牌号: 门牌): boolean {
+  return 门牌号 === '201' && 角色结局后阶段(data, 门牌号) !== '未进入后效' &&
+    !['继续关系', '暂不承诺'].includes(data.系统._许曼君分居.玩家最终关系选择);
+}
+
+/** 谜底词只约束尚未公开的事实。公开孕情不等于公开丈夫病史或家庭结构。 */
+export function 当前阶段谜底禁词(
+  data: SchemaType,
+  门牌号: 门牌,
+  原词: readonly string[],
+  渠道: '公开' | '私聊',
+): readonly string[] {
+  if (渠道 === '私聊' && 角色结局后阶段(data, 门牌号) !== '未进入后效') return [];
+  if (门牌号 !== '101') return 原词;
+  const 孕情已告知 = data.户['101']?.妻._怀孕.状态 === '已告知';
+  const 计划板已发布 = data.系统._特殊场景前置.some(键 => /^借种:三人合照:朋友圈选择:发布:.+/u.test(键));
+  return 原词.filter(词 => {
+    if (词 === '备孕' || 词 === '叶酸') return !孕情已告知 && !计划板已发布;
+    if (词 === '检查单') return !孕情已告知;
+    return true;
+  });
+}
+
 function 空语义(门牌号: 门牌): 角色结局后生活社交语义 {
   return {
     门牌: 门牌号,

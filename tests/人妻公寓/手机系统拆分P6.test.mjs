@@ -222,15 +222,15 @@ test('姐妹群一拍导出并由交互模块 import，攻略私聊提示只有�
   );
 
   // 攻略私聊提示 定义唯一在生成引擎；节拍与交互模块都从生成引擎 import，不得复制。
-  assert.match(生成引擎源码, /export function 攻略私聊提示\(m: 门牌, 阶段: number, 已确认: boolean\): string \{/);
+  assert.match(生成引擎源码, /export function 攻略私聊提示\(m: 门牌, 阶段: number, 已确认: boolean, data: SchemaType\): string \{/);
   assert.match(生成引擎源码, /from '\.\/内容素材表'/);
   assert.match(生成引擎源码, /攻略动态方向\[m\]\.口吻/);
   assert.doesNotMatch(节拍引擎源码, /function 攻略私聊提示/);
   assert.doesNotMatch(内核源码, /function 攻略私聊提示/);
   assert.match(节拍引擎源码, /攻略私聊提示,/);
   assert.match(交互源码, /攻略私聊提示,/);
-  assert.match(节拍引擎源码, /: 攻略私聊提示\(m, 阶段, 节点\.妻\.裂缝\.已确认\)/, '自动主动私聊仍消费共享提示');
-  assert.match(交互源码, /: 攻略私聊提示\(门牌号, 节点\.妻\.当前阶段, 节点\.妻\.裂缝\.已确认\)/, '妻回复仍消费共享提示');
+  assert.match(节拍引擎源码, /: 攻略私聊提示\(m, 阶段, 节点\.妻\.裂缝\.已确认, data\)/, '自动主动私聊仍消费共享提示');
+  assert.match(交互源码, /: 攻略私聊提示\(门牌号, 节点\.妻\.当前阶段, 节点\.妻\.裂缝\.已确认, data\)/, '妻回复仍消费共享提示');
 });
 
 test('节拍引擎不 import 内核/门面，P2–P5 模块无反向依赖', () => {

@@ -1,21 +1,49 @@
-import type { SchemaType } from '../../schema';
-import { 门牌列表, type 门牌 } from '../../stageConfig';
+import { 门牌列表, 许曼君离婚场景ID, type 门牌 } from '../../stageConfig';
 
 export type 丈夫线路风险阶段 = '常规' | '承接保护' | '关系转变';
 
-function 已完成(data: SchemaType, id: string): boolean {
-  return data.系统._已完成特殊场景.includes(id);
+/** 只读事实口，同时服务完整存档与成长/守护层的窄视图；缺失字段不代表已经开线。 */
+export interface 角色线路事实输入 {
+  户: Partial<Record<门牌, {
+    妻?: { _生产?: { 家庭计划知情?: boolean } };
+    夫?: { _居住模式?: string };
+  }>>;
+  背包?: readonly string[];
+  系统: {
+    _已完成特殊场景?: readonly string[];
+    _特殊场景前置?: readonly string[];
+    _家庭计划?: { 阶段?: string };
+    _第二机位?: { 阶段?: string };
+    _不再留门?: { 道具已使用?: boolean };
+    _安若妍不必停?: { 阶段?: string; 江辰已接受互不干涉?: boolean; 提前通知已约定?: boolean };
+    _许曼君分居?: { 阶段?: string; 丈夫已知玩家关系?: boolean; 当前场景?: string; 当前拍?: number };
+    _双重继承?: { 阶段?: string };
+    _回国?: { 阶段?: string };
+    _录像带V4?: {
+      阶段?: string;
+      录像带已使用?: boolean;
+      录像带已购买?: boolean;
+      入口规则版本?: number;
+      场景?: { 场次标识?: string };
+      赠锁?: Partial<Record<'102' | '202', { 已接收?: boolean }>>;
+    };
+  };
+}
+
+function 已完成(data: 角色线路事实输入, id: string): boolean {
+  return data.系统._已完成特殊场景?.includes(id) === true;
 }
 
 /** 只消费真实使用／赠送／场次凭据；购买后的等待阶段不能单独证明已启动。 */
-function 共享录像带已开始(data: SchemaType): boolean {
+function 共享录像带已开始(data: 角色线路事实输入): boolean {
   const tape = data.系统._录像带V4;
+  if (!tape) return false;
   return Boolean(
     tape.录像带已使用 ||
-    tape.场景.场次标识 ||
-    tape.赠锁['102'].已接收 ||
-    tape.赠锁['202'].已接收 ||
-    (tape.入口规则版本 === 0 && tape.录像带已购买 && tape.阶段 === '待购赠锁' && data.背包.includes('男用贞操带')),
+    tape.场景?.场次标识 ||
+    tape.赠锁?.['102']?.已接收 ||
+    tape.赠锁?.['202']?.已接收 ||
+    (tape.入口规则版本 === 0 && tape.录像带已购买 && tape.阶段 === '待购赠锁' && data.背包?.includes('男用贞操带')),
   );
 }
 
@@ -23,62 +51,63 @@ function 共享录像带已开始(data: SchemaType): boolean {
  * 旧查岗与通用孕情对质共用的按户规则。保护随已有存档事实派生，回档自然恢复；
  * 不改疑心、信任、作息、婚姻身份，也不替未实现的结局签发完成状态。
  */
-export function 读取丈夫线路风险阶段(data: SchemaType, 门牌号: 门牌): 丈夫线路风险阶段 {
+export function 读取丈夫线路风险阶段(data: 角色线路事实输入, 门牌号: 门牌): 丈夫线路风险阶段 {
   const 户 = data.户[门牌号];
   if (!户) return '常规';
 
   if (门牌号 === '101') {
-    const 阶段 = data.系统._家庭计划.阶段;
-    if (阶段 === '已完成' || 已完成(data, '借种') || 户.妻._生产.家庭计划知情) return '关系转变';
-    return 阶段 !== '未开始' && 阶段 !== '待安装' ? '承接保护' : '常规';
+    const 阶段 = data.系统._家庭计划?.阶段;
+    if (阶段 === '已完成' || 已完成(data, '借种') || 户.妻?._生产?.家庭计划知情) return '关系转变';
+    return 阶段 && 阶段 !== '未开始' && 阶段 !== '待安装' ? '承接保护' : '常规';
   }
 
   if (门牌号 === '102' || 门牌号 === '202') {
-    if (data.系统._录像带V4.阶段 === '已完成' || 已完成(data, '录像带结局') || 已完成(data, '录像带')) {
+    if (data.系统._录像带V4?.阶段 === '已完成' || 已完成(data, '录像带结局') || 已完成(data, '录像带')) {
       return '关系转变';
     }
-    if (共享录像带已开始(data) || data.系统._特殊场景前置.includes(`录像带:${门牌号}`)) return '承接保护';
+    if (共享录像带已开始(data) || data.系统._特殊场景前置?.includes(`录像带:${门牌号}`)) return '承接保护';
     if (门牌号 === '102') {
-      const 阶段 = data.系统._第二机位.阶段;
-      return (阶段 !== '未开始' && 阶段 !== '待门缝') || 已完成(data, '第二机位') ? '承接保护' : '常规';
+      const 阶段 = data.系统._第二机位?.阶段;
+      return (阶段 && 阶段 !== '未开始' && 阶段 !== '待门缝') || 已完成(data, '第二机位') ? '承接保护' : '常规';
     }
-    return data.系统._不再留门.道具已使用 ? '承接保护' : '常规';
+    return data.系统._不再留门?.道具已使用 ? '承接保护' : '常规';
   }
 
   if (门牌号 === '301') {
     const 不必停 = data.系统._安若妍不必停;
     if (
       已完成(data, '角色路线:301:结局剧情') ||
-      不必停.阶段 === '已完成' ||
+      不必停?.阶段 === '已完成' ||
       已完成(data, '不必停') ||
-      (不必停.江辰已接受互不干涉 && 不必停.提前通知已约定)
+      (不必停?.江辰已接受互不干涉 && 不必停.提前通知已约定)
     )
       return '关系转变';
-    return 不必停.阶段 !== '未开始' && 不必停.阶段 !== '已购买' ? '承接保护' : '常规';
+    return 不必停?.阶段 && 不必停.阶段 !== '未开始' && 不必停.阶段 !== '已购买' ? '承接保护' : '常规';
   }
 
   if (门牌号 === '201') {
     const 分居 = data.系统._许曼君分居;
     if (
-      分居.丈夫已知玩家关系 ||
-      分居.阶段 === '已完成' ||
+      分居?.丈夫已知玩家关系 ||
+      分居?.阶段 === '已完成' ||
       已完成(data, '分居') ||
-      ['路线外住', '预约回楼', '待离婚交接', '正式退居'].includes(户.夫._居住模式)
+      已完成(data, 许曼君离婚场景ID) ||
+      ['路线外住', '预约回楼', '待离婚交接', '正式退居'].includes(户.夫?._居住模式 ?? '')
     )
       return '关系转变';
-    return (分居.阶段 !== '未开始' && 分居.阶段 !== '待初谈') ||
-      (分居.阶段 === '待初谈' && 分居.当前场景 === '第一幕初谈' && 分居.当前拍 > 0)
+    return (分居?.阶段 && 分居.阶段 !== '未开始' && 分居.阶段 !== '待初谈') ||
+      (分居?.阶段 === '待初谈' && 分居.当前场景 === '第一幕初谈' && (分居.当前拍 ?? 0) > 0)
       ? '承接保护'
       : '常规';
   }
 
   if (门牌号 === '302') {
-    const 继承 = data.系统._双重继承.阶段;
+    const 继承 = data.系统._双重继承?.阶段;
     if (继承 === '已完成' || 已完成(data, '双重继承')) return '关系转变';
-    const 回国 = data.系统._回国.阶段;
-    return (回国 !== '未开始' && 回国 !== '待使用经营归档册') ||
+    const 回国 = data.系统._回国?.阶段;
+    return (回国 && 回国 !== '未开始' && 回国 !== '待使用经营归档册') ||
       已完成(data, '回国') ||
-      (继承 !== '未开始' && 继承 !== '待使用双重继承')
+      (继承 && 继承 !== '未开始' && 继承 !== '待使用双重继承')
       ? '承接保护'
       : '常规';
   }
@@ -91,7 +120,7 @@ export function 读取丈夫线路风险阶段(data: SchemaType, 门牌号: 门�
  * 这不是只针对丈夫查岗：母亲撞见、换装起疑、旧绿帽开线、通用孕情对质等
  * 与专属线路事实相驳的随机打断，都必须读取同一个按户真值。
  */
-export function 角色线路无关打断已停用(data: SchemaType, 门牌号: 门牌): boolean {
+export function 角色线路无关打断已停用(data: 角色线路事实输入, 门牌号: 门牌): boolean {
   return 读取丈夫线路风险阶段(data, 门牌号) !== '常规';
 }
 
@@ -99,18 +128,18 @@ export function 角色线路无关打断已停用(data: SchemaType, 门牌号: �
  * 当前前台只要有一名已经由承接／结局线路接管的角色，整轮就不再生产任何无关强剧情。
  * 只检查本轮真实演员，不会因为301已经完成，就把玩家在另一户的普通世界事件永久冻住。
  */
-export function 前台角色线路无关强剧情已冻结(data: SchemaType, 演员门牌: readonly string[]): boolean {
+export function 前台角色线路无关强剧情已冻结(data: 角色线路事实输入, 演员门牌: readonly string[]): boolean {
   const 唯一演员 = [...new Set(演员门牌.filter((value): value is 门牌 => 门牌列表.includes(value as 门牌)))];
   return 唯一演员.some(门牌号 => 角色线路无关打断已停用(data, 门牌号));
 }
 
 /** 旧名称保留给丈夫查岗／登门消费者；语义已经并入全角色线路隔离。 */
-export function 普通丈夫风险已停用(data: SchemaType, 门牌号: 门牌): boolean {
+export function 普通丈夫风险已停用(data: 角色线路事实输入, 门牌号: 门牌): boolean {
   return 角色线路无关打断已停用(data, 门牌号);
 }
 
 /** 正文与脚本使用同一事实，避免保留数值时旧疑心文案再次制造查岗剧情。 */
-export function 丈夫线路叙事约束(data: SchemaType, 门牌号: 门牌): string {
+export function 丈夫线路叙事约束(data: 角色线路事实输入, 门牌号: 门牌): string {
   const 阶段 = 读取丈夫线路风险阶段(data, 门牌号);
   if (阶段 === '常规') return '';
   const 进展 = 阶段 === '承接保护' ? '承接与结局由专属剧情推进' : '按已经成立的关系格局继续';

@@ -1,8 +1,14 @@
 /* eslint-disable import-x/no-nodejs-modules -- Node-only regression test */
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import test from 'node:test';
 import ts from 'typescript';
+
+process.env.TS_NODE_COMPILER_OPTIONS = JSON.stringify({ module: 'CommonJS', moduleResolution: 'node' });
+const load = createRequire(import.meta.url);
+load('ts-node/register/transpile-only');
+const 真实阶段语义 = load('../../src/人妻公寓/脚本/游戏逻辑/结局后生活社交语义.ts');
 
 const 读 = path => readFileSync(path, 'utf8');
 const schema = 读('src/人妻公寓/schema.ts');
@@ -48,6 +54,7 @@ function 载入手机生成行为(data, 当前场景 = '垃圾房') {
     '../../../不再留门契约': { 不再留门手机只读原因: () => '' },
     './运行时上下文': { 当前手机数据: () => data },
     '../../../stageConfig': { 户静态表: {} },
+    '../结局后生活社交语义': 真实阶段语义,
     './配置': { 读配置: () => ({ ai来源: '正文', base: '', key: '', model: '' }) },
     './数据层': {
       验收短文本: value => value,

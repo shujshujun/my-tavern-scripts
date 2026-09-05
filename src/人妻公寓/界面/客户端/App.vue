@@ -3248,7 +3248,7 @@ function 刷新在场() {
 const 头像列表 = computed(() =>
   可见门牌.value.map(m => {
     const 妻 = data.value.户[m]?.妻;
-    const 冷落状态 = 妻 && 余波有冻结效力(m, 妻, data.value.系统._母亲入列) ? 妻._冷落余波.状态 : '无';
+    const 冷落状态 = 妻 && 余波有冻结效力(m, 妻, data.value.系统._母亲入列, data.value) ? 妻._冷落余波.状态 : '无';
     const 怀孕公开 = 怀孕已公开(data.value, m);
     const 冷落说明 = 冷落状态 === '待诉苦' ? '冷落状态：等待回应' : 冷落状态 === '安抚中' ? '冷落状态：安抚中' : '';
     return {
