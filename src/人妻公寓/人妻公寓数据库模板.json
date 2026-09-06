@@ -68,7 +68,8 @@
       "batchSize": 3,
       "skipFloors": 0,
       "groupId": 62001,
-      "sendLatestRows": 60
+      "sendLatestRows": 60,
+      "sendRowsSqlTemplate": "-- 最多60条，按最后更新楼层选择；未显示的旧主题仍保存在数据库。\n{[sql \"SELECT row_id, character_name, topic, memory_text, future_impact, last_time, last_floor, confidence FROM rq_character_memory ORDER BY COALESCE(last_floor, -1) DESC, row_id DESC LIMIT 60\"]}"
     },
     "exportConfig": {
       "enabled": false,
@@ -109,7 +110,8 @@
       "batchSize": 3,
       "skipFloors": 0,
       "groupId": 62001,
-      "sendLatestRows": 60
+      "sendLatestRows": 60,
+      "sendRowsSqlTemplate": "-- 最多60条，包含最近新增的20条，其余优先未结事项及最近更新；未显示的事项仍保存在数据库。\n{[sql \"SELECT row_id, title, related_characters, detail, status, last_progress, last_time, last_floor FROM rq_promises ORDER BY CASE WHEN row_id IN (SELECT row_id FROM rq_promises ORDER BY row_id DESC LIMIT 20) THEN 0 ELSE 1 END, CASE WHEN status IN ('待处理', '推进中') THEN 0 ELSE 1 END, COALESCE(last_floor, -1) DESC, row_id DESC LIMIT 60\"]}"
     },
     "exportConfig": {
       "enabled": false,
