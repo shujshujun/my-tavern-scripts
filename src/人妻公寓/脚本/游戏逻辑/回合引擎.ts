@@ -277,9 +277,40 @@ export const 回合进行中 = () => 进行中 || 时间线切换协调中();
  */
 async function 内部删除聊天消息(消息楼层: number[]): Promise<void> {
   const 租约 = 登记内部删楼租约(消息楼层);
+  const 删除前聊天ID = 当前聊天ID();
+  const 删除前消息表 = SillyTavern.chat;
+  const 原消息 = 消息楼层
+    .filter(id => Number.isInteger(id) && id >= 0 && id < 删除前消息表.length)
+    .map(id => ({ 楼层: id, 消息: 删除前消息表[id] }));
+  let 已收到删除通知 = false;
+  const 删除监听 = eventOn(tavern_events.MESSAGE_DELETED, id => {
+    if (消息楼层.includes(Number(id))) 已收到删除通知 = true;
+  });
   try {
     await deleteChatMessages(消息楼层, { refresh: 'none' });
+    // 部分酒馆助手只 splice 并保存，refresh:none 不发 MESSAGE_DELETED。
+    // 数据库依赖此事件回放消息级检查点；实际删除已完成才补发，不靠放宽栅栏掩盖旧表。
+    if (
+      !已收到删除通知 &&
+      当前聊天ID() === 删除前聊天ID &&
+      SillyTavern.chat === 删除前消息表
+    ) {
+      const 已删除 = 原消息.filter(项 => !SillyTavern.chat.includes(项.消息));
+      if (已删除.length) {
+        const 通知楼层 = Math.min(...已删除.map(项 => 项.楼层));
+        // 合成通知与可能迟到的原生通知各保留一次精确租约，避免重复通知被误认成玩家删楼。
+        const 通知租约 = 登记内部删楼租约([通知楼层]);
+        try {
+          await eventEmit(tavern_events.MESSAGE_DELETED, 通知楼层);
+        } catch (error) {
+          console.warn('[人妻公寓] 删楼后的宿主通知失败，数据库继续等待时间线复验:', error);
+        } finally {
+          通知租约.完成();
+        }
+      }
+    }
   } finally {
+    删除监听.stop();
     租约.完成();
   }
 }

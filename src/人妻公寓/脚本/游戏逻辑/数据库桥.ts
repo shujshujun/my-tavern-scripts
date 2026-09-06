@@ -1,6 +1,7 @@
 import 数据库模板文本 from '../../人妻公寓数据库模板.json?raw';
 import { 提取数据库脚本版本 } from './数据库版本';
 import { 数据库异步写栅栏, 数据库时间线栅栏, type 数据库时间线持久状态 } from './数据库时间线栅栏';
+import { 接管数据库时间线接线 } from './数据库时间线接线所有权';
 import { 全局数据库AI租约 } from './数据库AI租约';
 import { 胶囊预算选择 } from './胶囊预算';
 import { 折叠检测文本, 规范可读文本 } from './记忆文本规范';
@@ -1045,7 +1046,6 @@ interface 时间线宿主状态 {
   待重建: Record<string, unknown>;
   当前聊天标识: string;
   进入当前聊天时间: number;
-  清理接线?: () => void;
 }
 
 function 取时间线宿主状态(): 时间线宿主状态 {
@@ -1066,12 +1066,6 @@ function 取时间线宿主状态(): 时间线宿主状态 {
 }
 
 const 时间线宿主 = 取时间线宿主状态();
-try {
-  时间线宿主.清理接线?.();
-} catch {
-  /* 热重载时旧 iframe 可能已经销毁。 */
-}
-时间线宿主.清理接线 = undefined;
 
 const 时间线栅栏 = new 数据库时间线栅栏();
 const 数据库异步写 = new 数据库异步写栅栏();
@@ -1425,13 +1419,15 @@ function 清理数据库时间线接线(): void {
   }
   for (const timer of 时间线重试计时器.values()) clearTimeout(timer);
   时间线重试计时器.clear();
-  if (时间线宿主.清理接线 === 清理数据库时间线接线) 时间线宿主.清理接线 = undefined;
+  释放时间线接线所有权();
   window.removeEventListener('pagehide', 清理数据库时间线接线);
 }
 
+// 持久恢复记录跨窗口共享，监听生命周期只归属当前窗口。客户端的首次准备组件也会
+// 导入此桥，不能因此卸载仍承担回合提交与取消恢复的游戏脚本实例。
+const 释放时间线接线所有权 = 接管数据库时间线接线(window, 清理数据库时间线接线);
 更新时间线驻留与恢复();
 接入宿主时间线事件();
-时间线宿主.清理接线 = 清理数据库时间线接线;
 window.addEventListener('pagehide', 清理数据库时间线接线, { once: true });
 
 function 更新时间线驻留与恢复(): void {
