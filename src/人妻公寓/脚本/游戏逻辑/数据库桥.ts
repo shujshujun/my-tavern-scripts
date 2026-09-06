@@ -1214,19 +1214,19 @@ async function 执行数据库时间线恢复(聊天标识: string, 令牌: stri
   while (!时间线接线已清理 && Date.now() <= 截止时间) {
     if (!仍是同一聊天(聊天标识)) return false;
     const persisted = 读取持久时间线状态(聊天标识);
-    if (!persisted) return true;
-    if (persisted.令牌 !== 令牌) return false;
-    const state = 时间线栅栏.读取状态(聊天标识);
-    if (!state?.待重建) {
-      清除持久时间线状态(聊天标识, 令牌);
-      return true;
-    }
+    if (persisted && persisted.令牌 !== 令牌) return false;
 
-    // 玩家可能在脚本 SQL 已发出、数据库插件尚未持久化时删楼。必须等旧 mutation 以及
-    // before-image 补偿一起结束后再采样；否则会先把栅栏打开，迟到写随后落到存活楼。
+    // 共享恢复记录可能先被另一窗口清除；它不代表本实例旧 SQL 和补偿已经结算。
+    // 在空记录与已恢复分支之前检查本地写，等待仍受原截止时间约束。
     if (数据库异步写.有已作废写入(聊天标识) || 数据库未补偿迟到写.has(聊天标识)) {
       await new Promise<void>(resolve => setTimeout(resolve, 160));
       continue;
+    }
+    if (!persisted) return 数据库时间线允许新写(聊天标识);
+    const state = 时间线栅栏.读取状态(聊天标识);
+    if (!state?.待重建) {
+      清除持久时间线状态(聊天标识, 令牌);
+      return 数据库时间线允许新写(聊天标识);
     }
 
     const now = Date.now();
@@ -1267,7 +1267,7 @@ async function 执行数据库时间线恢复(聊天标识: string, 令牌: stri
       清除持久时间线状态(聊天标识, 令牌);
       时间线重试间隔.delete(聊天标识);
       console.info('[人妻公寓·数据库] 消息时间线快照已稳定，长期记忆恢复读取。');
-      return true;
+      return 数据库时间线允许新写(聊天标识);
     }
     await new Promise<void>(resolve => setTimeout(resolve, 140));
   }
@@ -1275,9 +1275,9 @@ async function 执行数据库时间线恢复(聊天标识: string, 令牌: stri
 }
 
 function 启动数据库时间线恢复(聊天标识: string, 最长等待毫秒: number): Promise<boolean> {
-  if (时间线接线已清理) return Promise.resolve(false);
+  if (时间线接线已清理 || !仍是同一聊天(聊天标识)) return Promise.resolve(false);
   const persisted = 读取持久时间线状态(聊天标识);
-  if (!persisted) return Promise.resolve(true);
+  if (!persisted) return Promise.resolve(数据库时间线允许新写(聊天标识));
   const existing = 时间线恢复任务.get(聊天标识);
   if (existing?.令牌 === persisted.令牌) return existing.promise;
   取消时间线重试(聊天标识);
@@ -1359,14 +1359,17 @@ export function 标记数据库时间线将变更(目标楼层: number | null, �
  * 栅栏保持关闭并以退避方式后台重试；绝不因超时直接放行未知分支。
  */
 export async function 等待数据库时间线就绪(最长等待毫秒 = 3500): Promise<boolean> {
+  if (时间线接线已清理) return false;
   const 聊天标识 = 更新当前聊天驻留();
   const persisted = 读取持久时间线状态(聊天标识);
-  if (!persisted) {
-    return 数据库异步写.可开始新写(聊天标识) && !数据库未补偿迟到写.has(聊天标识);
-  }
+  if (!persisted) return 数据库时间线允许新写(聊天标识);
+  const 等待租约 = 数据库异步写.捕获(聊天标识);
   确保数据库时间线回调();
-  const 已就绪 = await 启动数据库时间线恢复(聊天标识, 最长等待毫秒);
+  const 恢复完成 = await 启动数据库时间线恢复(聊天标识, 最长等待毫秒);
   if (!仍是同一聊天(聊天标识)) return false;
+  // await 期间可能卸载、开始下一次回档，或另一窗口先完成共享恢复；最终按本实例现状复核。
+  const 已就绪 = 恢复完成 && !时间线接线已清理 &&
+    数据库异步写.可提交(等待租约) && 数据库时间线允许新写(聊天标识);
   if (!已就绪) {
     const state = 时间线栅栏.读取状态(聊天标识);
     console.warn(
