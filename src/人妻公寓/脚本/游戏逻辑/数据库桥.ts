@@ -894,46 +894,50 @@ async function 执行SQLite写入(
 ): Promise<SQLite写入状态> {
   const api = 取数据库API();
   const 写租约 = 数据库异步写.捕获(预期聊天标识);
+  // 独立于栅栏本身的身份校验，供未结算任务检查取消；不能反向递归查询栅栏。
+  const 请求仍有效 = () => 仍是同一聊天(预期聊天标识) && 取数据库API() === api && 额外提交校验();
   const 提交仍有效 = () =>
-    仍是同一聊天(预期聊天标识) &&
-    取数据库API() === api &&
-    额外提交校验() &&
-    数据库异步写.可提交(写租约) &&
-    数据库时间线允许新写(预期聊天标识);
+    请求仍有效() && 数据库异步写.可提交(写租约) && 数据库时间线允许新写(预期聊天标识);
   if (!预期聊天标识 || !提交仍有效()) return '已取消';
   if (typeof api?.executeSqlMutation !== 'function' || !(await 探测数据库SQLite模式())) return '未调用';
   // SQLite 能力探测包含异步等待；真正提交 mutation 前必须重新核对聊天与 API 实例。
   if (!提交仍有效()) return '已取消';
-  let 原mutation: Promise<SQL写入结果 | null>;
-  try {
-    原mutation = Promise.resolve(api.executeSqlMutation(sql, params));
-  } catch {
-    return '需核对';
-  }
-  const mutation = 数据库异步写.登记(
-    写租约,
-    原mutation.then(
-      async result => {
-        if (!提交仍有效() && 仍是同一聊天(预期聊天标识)) {
-          const 已补偿 = (await 失效补偿?.执行(api)) === true;
-          if (!已补偿) {
-            数据库未补偿迟到写.add(预期聊天标识);
-            console.error(
-              `[人妻公寓·数据库] 旧时间线 SQL 已迟到结算，但${失效补偿?.描述 ?? '缺少可靠旧行'}补偿失败；数据库读取保持关闭。`,
-            );
+  // 首次与唯一一次后台重试共用同一租约、旧行及补偿，直到补偿回读完成才解除追踪。
+  const 发起受追踪写入 = (): Promise<SQL写入结果 | null> => {
+    let 原mutation: Promise<SQL写入结果 | null>;
+    try {
+      原mutation = Promise.resolve(api.executeSqlMutation!(sql, params));
+    } catch (error) {
+      // 插件可能在同步提交后抛错，同样需要走失效补偿和回读。
+      原mutation = Promise.reject(error);
+    }
+    return 数据库异步写.登记(
+      写租约,
+      原mutation.then(
+        async result => {
+          if (!提交仍有效() && 仍是同一聊天(预期聊天标识)) {
+            const 已补偿 = (await 失效补偿?.执行(api)) === true;
+            if (!已补偿) {
+              数据库未补偿迟到写.add(预期聊天标识);
+              console.error(
+                `[人妻公寓·数据库] 旧时间线 SQL 已迟到结算，但${失效补偿?.描述 ?? '缺少可靠旧行'}补偿失败；数据库读取保持关闭。`,
+              );
+            }
           }
-        }
-        return result;
-      },
-      async error => {
-        if (!提交仍有效() && 仍是同一聊天(预期聊天标识)) {
-          const 已补偿 = (await 失效补偿?.执行(api)) === true;
-          if (!已补偿) 数据库未补偿迟到写.add(预期聊天标识);
-        }
-        throw error;
-      },
-    ),
-  );
+          return result;
+        },
+        async error => {
+          if (!提交仍有效() && 仍是同一聊天(预期聊天标识)) {
+            const 已补偿 = (await 失效补偿?.执行(api)) === true;
+            if (!已补偿) 数据库未补偿迟到写.add(预期聊天标识);
+          }
+          throw error;
+        },
+      ),
+      请求仍有效,
+    );
+  };
+  const mutation = 发起受追踪写入();
   let timer: ReturnType<typeof setTimeout> | undefined;
   const settled = await Promise.race([
     mutation.then(
@@ -955,7 +959,7 @@ async function 执行SQLite写入(
         return;
       }
       try {
-        const 重试结果 = await Promise.resolve(api.executeSqlMutation?.(sql, params) ?? null);
+        const 重试结果 = await 发起受追踪写入();
         if (!SQL写入已确认(重试结果)) {
           console.warn(`[人妻公寓·数据库] SQLite后台写入${原因}，补写一次仍未确认，本条记录可能缺失。`);
         }

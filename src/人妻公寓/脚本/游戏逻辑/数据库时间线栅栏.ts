@@ -11,6 +11,7 @@ export interface 数据库异步写租约 {
 interface 数据库异步写任务 {
   租约: 数据库异步写租约;
   任务: Promise<unknown>;
+  请求仍有效: () => boolean;
 }
 
 /**
@@ -46,8 +47,9 @@ export class 数据库异步写栅栏 {
     return !!聊天标识 && !this.有已作废写入(聊天标识);
   }
 
-  登记<T>(租约: 数据库异步写租约, 任务: Promise<T>): Promise<T> {
-    const entry: 数据库异步写任务 = { 租约: { ...租约 }, 任务: Promise.resolve() };
+  /** 请求校验只检查外部身份／取消，不能调用本栅栏，避免有效性检查递归。 */
+  登记<T>(租约: 数据库异步写租约, 任务: Promise<T>, 请求仍有效: () => boolean = () => true): Promise<T> {
+    const entry: 数据库异步写任务 = { 租约: { ...租约 }, 任务: Promise.resolve(), 请求仍有效 };
     const tracked = Promise.resolve(任务).finally(() => {
       this.任务.delete(entry);
     });
@@ -59,7 +61,16 @@ export class 数据库异步写栅栏 {
   有已作废写入(聊天标识: string): boolean {
     if (!聊天标识) return false;
     const current = this.当前世代(聊天标识);
-    return [...this.任务].some(entry => entry.租约.聊天标识 === 聊天标识 && entry.租约.世代 < current);
+    return [...this.任务].some(entry => {
+      if (entry.租约.聊天标识 !== 聊天标识) return false;
+      if (entry.租约.世代 < current) return true;
+      try {
+        return !entry.请求仍有效();
+      } catch {
+        // 无法确认仍有效的未结算写不能放行新分支；不让外部校验异常击穿恢复门。
+        return true;
+      }
+    });
   }
 
   private 当前世代(聊天标识: string): number {
