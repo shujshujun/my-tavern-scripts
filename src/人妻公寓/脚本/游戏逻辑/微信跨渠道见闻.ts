@@ -85,6 +85,7 @@ export function 读取角色跨渠道见闻(
   截止楼: number,
   截止时: number,
   有效任务: ReadonlySet<string> = new Set(),
+  玩家姓名 = '玩家',
 ): 角色社交见闻[] {
   const 群消息 = 角色可知群消息(库.消息, m, 截止楼, 截止时, 有效任务);
   const 行: 角色社交见闻[] = 群消息.map(项 => ({
@@ -92,7 +93,7 @@ export function 读取角色跨渠道见闻(
     楼: 项.楼,
     时: 项.时,
     序: 项.序,
-    文: 见闻文本(微信消息提示行(项, 群消息, '玩家'), 260),
+    文: 见闻文本(微信消息提示行(项, 群消息, 玩家姓名), 260),
   }));
   const 妻名 = 户静态表[m].妻名;
   for (const 项 of 库.圈) {
@@ -126,12 +127,12 @@ export function 编译角色跨渠道见闻(
   截止楼: number,
   截止时: number,
   有效任务: ReadonlySet<string> = new Set(),
-  选项: { 仅本楼?: boolean; 预算?: number } = {},
+  选项: { 仅本楼?: boolean; 预算?: number; 玩家姓名?: string } = {},
 ): string {
   const 候选: { 标题: string; 行: string[] }[] = [];
   for (const 人 of 人物) {
     if (!门牌列表.includes(人.门牌 as 门牌)) continue;
-    const 见闻 = 读取角色跨渠道见闻(库, 人.门牌 as 门牌, 截止楼, 截止时, 有效任务)
+    const 见闻 = 读取角色跨渠道见闻(库, 人.门牌 as 门牌, 截止楼, 截止时, 有效任务, 选项.玩家姓名)
       .filter(项 => !选项.仅本楼 || 项.楼 === 截止楼)
       .slice(-8);
     if (见闻.length) {

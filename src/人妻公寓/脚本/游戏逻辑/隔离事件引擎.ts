@@ -176,6 +176,21 @@ export function 净化隔离事件正文(原文: string): string {
   return 转为正文舞台纯文本(严格清除协议残留(全清));
 }
 
+/** 每次请求只读取一次主角身份；不对整段独立提示展开聊天历史宏。 */
+function 当前隔离玩家名(): string {
+  try {
+    if (typeof substitudeMacros === 'function') {
+      const 姓名 = substitudeMacros('{{user}}');
+      if (姓名 && 姓名 !== '{{user}}') return 姓名;
+    }
+  } catch { /* 宏接口不可用时使用同一Persona的直接显示名。 */ }
+  return (typeof SillyTavern !== 'undefined' && (SillyTavern as unknown as { name1?: string }).name1) || '管理员';
+}
+
+function 展开隔离玩家宏(文本: string, 玩家姓名: string): string {
+  return 文本.replace(/\{\{user\}\}/gi, () => 玩家姓名);
+}
+
 function 系统提示(类型: 隔离事件类型, 导演事件: string): string {
   return [
     隔离事件请求标记,
@@ -231,7 +246,7 @@ export async function 生成隔离事件草稿(参数: 隔离事件参数): Prom
     生成中 = true;
     已取消 = false;
     eventEmit('人妻公寓:生成开始');
-    const system = 系统提示(参数.类型, 参数.导演事件);
+    const system = 展开隔离玩家宏(系统提示(参数.类型, 参数.导演事件), 当前隔离玩家名());
     const history = 最近线程(参数.线程);
     // 预设破限段护航(2026-07-27):特殊场景正戏最敏感,裸发必被 Gemini 安全截断
     // 独立事件没有真实临时玩家楼,传入本拍行动让预设里的 {{lastUserMessage}} 展开为
@@ -316,13 +331,14 @@ export async function 生成录像带V4隔离草稿(参数: 录像带V4隔离事
     生成中 = true;
     已取消 = false;
     eventEmit('人妻公寓:生成开始');
+    const 玩家姓名 = 当前隔离玩家名();
     const 提示包 = 构造录像带V4提示词包({
       场次标识: 参数.场次标识,
-      系统契约: [隔离事件请求标记, 参数.系统契约].join('\n'),
-      入口胶囊: 参数.入口胶囊,
+      系统契约: 展开隔离玩家宏([隔离事件请求标记, 参数.系统契约].join('\n'), 玩家姓名),
+      入口胶囊: 展开隔离玩家宏(参数.入口胶囊, 玩家姓名),
       历史: 参数.历史,
       房间摘要: 参数.房间摘要,
-      当前卡: 参数.当前卡,
+      当前卡: 展开隔离玩家宏(参数.当前卡, 玩家姓名),
       玩家输入: 参数.行动,
     });
     const 用户输入 = 提示包.orderedPrompts.at(-1);
