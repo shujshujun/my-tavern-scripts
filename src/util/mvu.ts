@@ -172,18 +172,20 @@ export function defineMvuDataStore<T extends z.ZodType>(
       }
 
       /** 从 MVU 拉取最新数据到 store（绕过 500ms 轮询延迟）
-       *  用于按钮操作前确保读到脚本侧已清除/修改的值，避免 store 旧值覆盖 MVU */
-      function pull() {
+       *  用于按钮操作前确保读到脚本侧已清除/修改的值，避免 store 旧值覆盖 MVU。
+       *  返回是否成功读取；调用方可据此拒绝使用未能刷新的缓存。 */
+      function pull(): boolean {
         const variables = getVariables(currentOption);
-        if (!variables || !_.has(variables, 'stat_data')) return;
+        if (!variables || !_.has(variables, 'stat_data')) return false;
         const stat_data = _.get(variables, 'stat_data', {});
         const result = schema.safeParse(stat_data);
-        if (result.error) return;
+        if (result.error) return false;
         if (!_.isEqual(data.value, result.data)) {
           ignoreUpdates(() => {
             data.value = result.data;
           });
         }
+        return true;
       }
 
       return { data, flush, pull };

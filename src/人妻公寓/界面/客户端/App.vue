@@ -1604,7 +1604,7 @@ import type {
 } from './types';
 import { 卷轴条稳定键, 合并卷轴页, 更早楼层范围, 末页楼层范围, type 楼层范围 } from './卷轴分页';
 
-const store = useDataStore();
+const store = useDataStore() as ReturnType<typeof useDataStore> & { pull: () => boolean };
 // defineMvuDataStore 的 Pinia 泛型在 SFC 里推断失败(已知误报,见 ShopPanel 先例),显式标回
 const data = computed(() => (store as unknown as { data: SchemaType }).data);
 const 胜任红线 = computed(() => 难度表[data.value.系统._难度]?.胜任度红线 ?? 难度表.标准.胜任度红线);
@@ -2239,7 +2239,7 @@ async function 离开房间(): Promise<void> {
  * "站在楼道"组快照,送礼/要钱永久被拒,只有走出去再走回来才能自修。
  * 回合完成/隔离完成/回合失败 三个收口都过一遍;与真值一致时是无害幂等。
  */
-function 同步场景自变量() {
+function 同步场景自变量(): boolean {
   try {
     const 本次时间线世代 = 当前时间线切换世代();
     const 时间线变化 = 本次时间线世代 !== 场景同步时间线世代;
@@ -2276,8 +2276,10 @@ function 同步场景自变量() {
       最近CG信号 = null;
       清空CG信号交接(成人CG信号交接);
     }
+    return true;
   } catch (e) {
     console.error('[人妻公寓客户端] 场景同步失败:', e);
+    return false;
   }
 }
 
@@ -5746,8 +5748,18 @@ onMounted(() => {
     清空安若妍不必停CG队列();
     当前家庭计划CG.value = { ...载荷, 来源: '家庭计划' };
   });
-  eventOn('人妻公寓:不再留门CG', (载荷: { 文件: string; 实例: string }) => {
-    if (!载荷?.文件 || !不再留门CG允许(data.value, 载荷.文件, 载荷.实例, 当前房间.value) || !不再留门图片(载荷.文件)) return;
+  eventOn('人妻公寓:不再留门CG', (载荷: { 文件: string; 实例: string; 聊天ID: string }) => {
+    const 通知身份 = 捕获客户端时间线身份();
+    if (!载荷?.文件 || 载荷.聊天ID !== 通知身份.聊天ID) return;
+    try {
+      // 提交后的通知可能早于 Store 轮询；先只读同步，再按当前时间线与场景验收。
+      if (!store.pull() || !同步场景自变量()) return;
+    } catch (e) {
+      console.warn('[人妻公寓客户端] 《不再留门》画面通知同步失败:', e);
+      return;
+    }
+    if (!客户端时间线仍有效(通知身份)) return;
+    if (!不再留门CG允许(data.value, 载荷.文件, 载荷.实例, 当前房间.value) || !不再留门图片(载荷.文件)) return;
     清空当前成人CG(); 当前生产CG.value = null; 清空借种CG序列(); 清空安若妍不必停CG队列();
     当前家庭计划CG.value = { ...载荷, 标题: 不再留门CG标题(载荷.文件), 来源: '不再留门' };
   });

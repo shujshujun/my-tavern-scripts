@@ -5113,6 +5113,7 @@ function 挂载监听() {
     if (_时间推进中) { eventEmit('人妻公寓:提示', '时间正在推进，请等地图刷新后继续。'); return; }
     if (隔离事件进行中()) { eventEmit('人妻公寓:提示', '当前独立现场尚未结束，请先完成当前事件。'); return; }
     void 安全操作(async (raw, data) => {
+      const 通知聊天ID = 当前聊天ID();
       const 地点 = 读场景().房间id ?? '';
       const 阻断 = 不再留门动作阻断(data, 动作, 地点);
       if (阻断) { eventEmit('人妻公寓:提示', 阻断); return; }
@@ -5137,7 +5138,7 @@ function 挂载监听() {
         const 结果 = 准备();
         const 已落地 = await 落地(结果, raw, data);
         if (已落地 && 结果.成功 && 结果.CG) {
-          try { eventEmit('人妻公寓:不再留门CG', { 文件: 结果.CG, 实例: r.实例 }); }
+          try { eventEmit('人妻公寓:不再留门CG', { 文件: 结果.CG, 实例: r.实例, 聊天ID: 通知聊天ID }); }
           catch (e) { console.warn('[人妻公寓] 《不再留门》物件已提交，画面通知失败:', e); }
         }
       } finally { 解除地点校验(); }
@@ -7256,7 +7257,7 @@ function 挂载监听() {
         eventEmit('人妻公寓:提示', 原生许曼君离婚后日常提交.提示);
       }
       if (原生不再留门提交?.CG) {
-        try { eventEmit('人妻公寓:不再留门CG', { 文件: 原生不再留门提交.CG, 实例: newData.系统._不再留门.实例 }); }
+        try { eventEmit('人妻公寓:不再留门CG', { 文件: 原生不再留门提交.CG, 实例: newData.系统._不再留门.实例, 聊天ID: 原生聊天ID }); }
         catch (e) { console.warn('[人妻公寓] 《不再留门》已提交，画面通知失败:', e); }
       }
       if (原生回国提交?.提示) eventEmit('人妻公寓:提示', 原生回国提交.提示);
