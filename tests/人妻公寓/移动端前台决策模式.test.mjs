@@ -29,7 +29,7 @@ test('301 H7只保留继续／暂缓，手机强制展开并阻止普通输入�
   assert.match(App源码, /async function 进入[\s\S]{0,220}if \(安若妍H7决策中\.value && 房间id !== '301'\)/);
   assert.match(App源码, /async function 离开房间[\s\S]{0,180}if \(安若妍H7决策中\.value\)/);
   assert.match(App源码, /:forced-open="安若妍H7决策中 && !场景操作锁"/);
-  assert.match(App源码, /v-if="性爱进行中"[\s\S]{0,80}class="intimacy-stage-dock"[\s\S]{0,80}v-show="!安若妍H7决策中"/);
+  assert.match(App源码, /v-if="性爱进行中"\s+v-show="!安若妍H7决策中 && !当前事件CG"\s+class="intimacy-stage-dock"/);
   assert.match(App源码, /不必停预约夜暂缓[\s\S]{0,180}显示性爱结果卡\.value = false/);
 });
 

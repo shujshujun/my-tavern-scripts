@@ -409,7 +409,7 @@
               'story-visual-only': 正文隐藏,
               'story-special-interaction': 录像带交互幕 || 录像带V4中 || 静音会议交互幕,
               'story-mute-meeting': 静音会议显示组合图,
-              'story-intimacy-open': 性爱进行中 && 亲密抽屉展开,
+              'story-intimacy-open': 性爱进行中 && 亲密抽屉展开 && !当前事件CG,
               'story-mother-video': 母亲视频终幕已接通,
               'story-divorce-flash': 离婚结果白闪,
             },
@@ -606,8 +606,8 @@
           />
           <div
             v-if="性爱进行中"
+            v-show="!安若妍H7决策中 && !当前事件CG"
             class="intimacy-stage-dock"
-            v-show="!安若妍H7决策中"
             :class="{ open: 亲密抽屉展开, critical: data.玩家资源.体力.当前值 <= 1 }"
             @click.self="亲密抽屉展开 = false"
           >
