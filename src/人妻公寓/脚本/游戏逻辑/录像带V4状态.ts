@@ -427,6 +427,9 @@ export function 准备录像带V4监控(data: SchemaType, 场次标识: string):
   if (旧录像带正在运行(data) || (data.系统._特殊场景.id && data.系统._特殊场景.id !== '录像带V4')) {
     return 结果(false, false, '当前另有特殊场景正在运行。');
   }
+  if (data.系统._性爱场景.状态 !== '空闲') {
+    return 结果(false, false, '请先结束当前普通亲密场景，再启动录像带监控。');
+  }
   if (!data.系统._录像带V4.微信.监控就绪) return 结果(false, false, '两条微信还没有完成戴锁、知情同意和联合出发确认。');
   if (!新场景标识合法(场次标识)) return 结果(false, false, '录像带监控场次标识无效。');
   const 录像带索引 = data.背包.indexOf('录像带');
