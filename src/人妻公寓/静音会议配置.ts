@@ -6,6 +6,30 @@
 
 export type 静音会议候选门牌 = '101' | '102' | '201' | '202' | '301';
 
+interface 静音会议结局数据 {
+  系统: {
+    _已完成特殊场景: readonly string[];
+    _录像带V4?: { 阶段: string };
+    _许曼君离婚?: { 阶段: string };
+  };
+}
+
+/** 会议准入只消费各线现有正式完成凭据；不把承接、法律办理或关系后效当成结局。 */
+export function 静音会议角色结局已完成(data: 静音会议结局数据, 门牌: 静音会议候选门牌): boolean {
+  const 完成 = data.系统._已完成特殊场景;
+  switch (门牌) {
+    case '101':
+      return 完成.includes('借种');
+    case '102':
+    case '202':
+      return data.系统._录像带V4?.阶段 === '已完成' || 完成.includes('录像带结局') || 完成.includes('录像带');
+    case '201':
+      return data.系统._许曼君离婚?.阶段 === '已完成' || 完成.includes('角色路线:201:结局剧情');
+    case '301':
+      return 完成.includes('角色路线:301:结局剧情');
+  }
+}
+
 export type 静音会议画面状态 = 'CLEAN' | 'DETAIL' | 'PEAK';
 
 export type 静音会议组合键 = `SM-${2 | 3}-${string}`;

@@ -92,8 +92,8 @@ test('App 不再内联五段模板，但对应组件拥有原文案与关键 DOM
   assert.match(事件提示词源码, />完 整 提 示 词</, '提示词弹窗明确展示完整请求');
   assert.match(事件提示词源码, /<pre class="event-prompt-view" tabindex="0">/, '事件提示词只读 pre 保持');
 
-  assert.match(反馈提示源码, /FOUND \/ 拾获/, '拾获卡 kicker 文案保持');
-  assert.ok((反馈提示源码.match(/点击收下/g) ?? []).length >= 2, '拾获卡 title/提示均保持');
+  assert.match(反馈提示源码, /展开拾获提示/, '拾获提示具有可恢复的紧凑入口');
+  assert.match(反馈提示源码, /class="loot-confirm" @click="emit\('dismissLoot'\)">收下/, '确认收下具有独立按钮');
   assert.match(反馈提示源码, /@click="emit\('dismissLoot'\)"/, '拾获卡点击 emit dismissLoot');
 });
 
@@ -215,7 +215,7 @@ test('事件/反馈业务状态与 timer 留 App，组件只展示/emit；unmoun
   assert.match(事件提示词源码, /defineEmits<\{ close: \[\] \}>/, '事件提示词仅 emit close');
   assert.match(反馈提示源码, /defineProps<\{ toast: string; loot: string; sending: boolean \}>/, '反馈仅展示三 prop');
   assert.match(反馈提示源码, /defineEmits<\{ dismissLoot: \[\] \}>/, '反馈仅 emit dismissLoot');
-  assert.match(反馈提示源码, /<div v-if="toast" class="toast">/, 'toast 是根节点，无定位包装层');
+  assert.match(反馈提示源码, /<div v-if="toast && !提示关闭" class="toast" role="status">/, 'toast 是根节点，无定位包装层');
   assert.doesNotMatch(反馈提示源码, /feedback-layer|toast-layer|\.wrap/, '反馈无额外包装层 class');
 });
 
@@ -355,5 +355,5 @@ test('组件 props/emits/import 边界与地址/门牌 domain import 正确；�
   assert.match(App源码, /from '\.\/assets';/, 'App 仍导入 A1 assets');
   assert.match(App源码, /import type \{[\s\S]*\} from '\.\/types';/, 'App 仍以 type-only 导入 A1 types');
   assert.doesNotMatch(监控源码, /defineEmits<\{[\s\S]*dismissLoot/, '监控不持有反馈事件');
-  assert.doesNotMatch(反馈提示源码, /from ['"]vue['"]/, '反馈无需引 vue 运行时');
+  assert.match(反馈提示源码, /import \{ ref, watch \} from 'vue'/, '反馈只持临时展示态，业务状态仍留App');
 });

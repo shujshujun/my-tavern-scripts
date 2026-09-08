@@ -2,25 +2,25 @@
 /**
  * 房内操作抽屉。
  *
- * 手机端继续只有这一层总抽屉；桌面端保持原来的直接瓷砖。少数动作可以在同一面板内展开
+ * 电脑与手机共用这一层总抽屉；收起与展开只改变临时展示。少数动作可以在同一面板内展开
  * 一个轻量选择区，例如302结局后的“和她亲密”只展开“由我开始／让她开始”，不会再套
  * 第二层抽屉，也不会在组件里保存业务状态。
  */
-import { computed, onScopeDispose, reactive, ref, watch, watchEffect } from 'vue';
+import { computed, onMounted, onScopeDispose, reactive, ref, shallowRef, watch, watchEffect } from 'vue';
 import Ic from './Icon.vue';
 import { 创建抽屉状态机, type 抽屉状态, type 抽屉状态机 } from '../composables/抽屉状态机';
 import type { 卡动作, 卡动作选项 } from '../types';
 
 const props = defineProps<{
-  /** 保留父组件当前可选参数签名；本组件不据此改变桌面展示。 */
+  /** 兼容既有父组件签名；各房间共用同一抽屉。 */
   desktopCohabitationFold?: boolean;
   mobile: boolean;
-  /** 保留父组件既有签名；桌面现在始终直接展示瓷砖。 */
+  /** 兼容既有父组件签名；双端始终支持可逆收起。 */
   desktopCollapsible: boolean;
   roomId: string | null;
   actionCount: number;
   suppressed: boolean;
-  /** 线路硬选择在手机端必须直接展开，且在选择前不能被把手收起。 */
+  /** 新的线路硬选择先展开；允许临时收起，业务锁由父组件保留。 */
   forcedOpen?: boolean;
   actions: (卡动作 & { 分组?: '302共居' })[];
   garbageVisible: boolean;
@@ -31,44 +31,102 @@ const emit = defineEmits<{ openGarbage: [] }>();
 
 const 状态 = reactive<抽屉状态>({ 展开: false, 新增提示: false });
 const 机器: 抽屉状态机 = 创建抽屉状态机({ 状态 });
-const 当前选择动作 = ref<卡动作 | null>(null);
-const 当前长按选项 = ref<卡动作选项 | null>(null);
+// 保留父组件传来的原对象／代理身份，不在选择后额外包一层深代理。
+const 当前选择动作 = shallowRef<卡动作 | null>(null);
+const 当前长按选项 = shallowRef<卡动作选项 | null>(null);
 let 长按计时: ReturnType<typeof setTimeout> | undefined;
+interface 长按令牌 {
+  动作: 卡动作;
+  选项: 卡动作选项;
+  房间: string | null;
+  输入: string;
+  毫秒: number;
+  成功回调: 卡动作选项['做'];
+  短按回调: 卡动作选项['短按'];
+}
+let 当前长按令牌: 长按令牌 | null = null;
 
 // 单一响应式入口：进入房间与 actionCount 可能同一 tick 更新，全量输入交给状态机自行比对。
 watchEffect(() => {
   机器.更新({
     mobile: props.mobile,
+    collapsible: true,
     roomId: props.roomId,
     actionCount: props.actionCount,
-    suppressed: props.suppressed,
+    suppressed: props.suppressed && !props.forcedOpen,
   });
 });
 
 watch(
-  () => [props.roomId, props.suppressed, props.actions.map(动作 => `${动作.kicker}:${动作.文案}`).join('\u0000')] as const,
-  () => {
-    当前选择动作.value = null;
-  },
+  () => [
+    props.roomId, props.suppressed, props.mobile, props.videoTapeActive, props.actions,
+    props.actions.map(动作 => `${动作.kicker}:${动作.文案}`).join('\u0000'),
+  ] as const,
+  () => 关闭选择(),
+  { flush: 'sync' },
 );
 
 onScopeDispose(() => {
-  clearTimeout(长按计时);
+  关闭选择();
   机器.销毁();
 });
 
 // 普通动作仍按旧语义只受「录像带中」门控；垃圾入口原 v-if 没有录像带门控，两类门互不合并。
 const 普通动作可见 = computed(() => !props.videoTapeActive && props.actions.length > 0);
 const 有可见动作 = computed(() => props.garbageVisible || 普通动作可见.value);
-const 实际展开 = computed(() => Boolean(props.forcedOpen || 状态.展开));
-// 晨跑/健身是地点主操作。手机端只要主训练仍可执行，就保持面板可见。
-const 有主训练动作 = computed(() => props.mobile && props.actions.some(动作 => 动作.kicker === 'TRAIN'));
+const 实际展开 = computed(() => 状态.展开);
+const 抽屉根 = ref<HTMLElement | null>(null);
+const 把手 = ref<HTMLButtonElement | null>(null);
+watch(() => props.forcedOpen, value => { if (value) 机器.手动展开(); }, { immediate: true, flush: 'sync' });
+function 临时收起(): void { 关闭选择(); 机器.手动收起(); }
+function 外部按下(event: PointerEvent): void {
+  if (event.target instanceof Node && !抽屉根.value?.contains(event.target)) 临时收起();
+}
+function 抽屉按键(event: KeyboardEvent): void {
+  if (event.key === 'Escape' && 实际展开.value) { event.preventDefault(); event.stopPropagation(); 临时收起(); 把手.value?.focus(); }
+}
+onMounted(() => document.addEventListener('pointerdown', 外部按下));
+onScopeDispose(() => document.removeEventListener('pointerdown', 外部按下));
+
+function 选择仍可用(动作: 卡动作): boolean {
+  return 当前选择动作.value === 动作 && props.actions.includes(动作) && !动作.禁用 &&
+    普通动作可见.value && (!props.suppressed || Boolean(props.forcedOpen)) &&
+    实际展开.value;
+}
+
+function 长按仍有效(令牌: 长按令牌): boolean {
+  return 当前长按令牌 === 令牌 && 当前长按选项.value === 令牌.选项 &&
+    props.roomId === 令牌.房间 && 选择仍可用(令牌.动作) &&
+    Boolean(令牌.动作.选项?.includes(令牌.选项)) && 令牌.选项.长按毫秒 === 令牌.毫秒 &&
+    令牌.选项.做 === 令牌.成功回调 && 令牌.选项.短按 === 令牌.短按回调;
+}
+
+function 清长按计时(): void {
+  clearTimeout(长按计时);
+  长按计时 = undefined;
+  当前长按令牌 = null;
+  当前长按选项.value = null;
+}
+
+function 关闭选择(): void {
+  清长按计时();
+  当前选择动作.value = null;
+}
+
+// 同对象的禁用／选项变化也取消；清计时之外作废令牌，已排队旧回调不能认领重启后的同一选项。
+watchEffect(() => {
+  const 动作 = 当前选择动作.value;
+  const 选项 = 当前长按选项.value;
+  if (动作 && !选择仍可用(动作)) 关闭选择();
+  if (选项 && 当前长按令牌 && !长按仍有效(当前长按令牌)) 清长按计时();
+}, { flush: 'sync' });
 
 function 触发动作(动作: 卡动作): void {
   if (动作.禁用) return;
+  清长按计时();
   if (动作.选项?.length) {
     当前选择动作.value = 当前选择动作.value === 动作 ? null : 动作;
-    if (props.mobile) 机器.交互取消自动计时();
+    机器.交互取消自动计时();
     return;
   }
   当前选择动作.value = null;
@@ -78,44 +136,53 @@ function 触发动作(动作: 卡动作): void {
 
 function 触发动作选项(选项: 卡动作选项): void {
   if (选项.长按毫秒) return;
-  当前选择动作.value = null;
+  const 动作 = 当前选择动作.value;
+  if (!动作 || !选择仍可用(动作) || !动作.选项?.includes(选项)) return;
+  关闭选择();
   机器.手动收起();
   void 选项.做();
 }
 
-function 启动长按倒计时(选项: 卡动作选项): void {
+function 启动长按倒计时(选项: 卡动作选项, 输入: string): void {
   if (!选项.长按毫秒 || 当前长按选项.value) return;
+  const 动作 = 当前选择动作.value;
+  if (!动作 || !选择仍可用(动作) || !动作.选项?.includes(选项)) return;
+  const 令牌: 长按令牌 = {
+    动作, 选项, 房间: props.roomId, 输入, 毫秒: 选项.长按毫秒,
+    成功回调: 选项.做, 短按回调: 选项.短按,
+  };
+  当前长按令牌 = 令牌;
   当前长按选项.value = 选项;
+  机器.交互取消自动计时();
   clearTimeout(长按计时);
   长按计时 = setTimeout(() => {
-    if (当前长按选项.value !== 选项) return;
-    当前长按选项.value = null;
-    长按计时 = undefined;
-    当前选择动作.value = null;
+    if (当前长按令牌 !== 令牌) return;
+    const 可执行 = 长按仍有效(令牌);
+    关闭选择();
+    if (!可执行) return;
     机器.手动收起();
     void 选项.做();
-  }, 选项.长按毫秒);
+  }, 令牌.毫秒);
 }
 
 function 记录未完成长按(选项: 卡动作选项): void {
-  if (!选项.长按毫秒 || 当前长按选项.value !== 选项) return;
-  clearTimeout(长按计时);
-  长按计时 = undefined;
-  当前长按选项.value = null;
-  // 过早松手只记一次失败，不执行成功动作；关闭当前选择后由新状态重新渲染失败次数。
-  当前选择动作.value = null;
-  void 选项.短按?.();
+  const 令牌 = 当前长按令牌;
+  if (!令牌 || 令牌.选项 !== 选项) return;
+  const 可执行 = 长按仍有效(令牌);
+  关闭选择();
+  // 只有仍有效的本次输入提前释放才记一次短按；取消／失效不消费任何回调。
+  if (可执行) void 选项.短按?.();
 }
 
 function 开始长按选项(选项: 卡动作选项, event: PointerEvent): void {
   if (!选项.长按毫秒 || 当前长按选项.value) return;
   event.preventDefault();
   (event.currentTarget as HTMLElement | null)?.setPointerCapture?.(event.pointerId);
-  启动长按倒计时(选项);
+  启动长按倒计时(选项, `pointer:${event.pointerId}`);
 }
 
 function 结束长按选项(选项: 卡动作选项, event: PointerEvent): void {
-  if (!选项.长按毫秒 || 当前长按选项.value !== 选项) return;
+  if (当前长按选项.value !== 选项 || 当前长按令牌?.输入 !== `pointer:${event.pointerId}`) return;
   event.preventDefault();
   记录未完成长按(选项);
 }
@@ -123,32 +190,30 @@ function 结束长按选项(选项: 卡动作选项, event: PointerEvent): void 
 function 开始键盘长按(选项: 卡动作选项, event: KeyboardEvent): void {
   if (!选项.长按毫秒 || event.repeat || 当前长按选项.value) return;
   event.preventDefault();
-  启动长按倒计时(选项);
+  启动长按倒计时(选项, `key:${event.key}`);
 }
 
 function 结束键盘长按(选项: 卡动作选项, event: KeyboardEvent): void {
-  if (!选项.长按毫秒 || 当前长按选项.value !== 选项) return;
+  if (当前长按选项.value !== 选项 || 当前长按令牌?.输入 !== `key:${event.key}`) return;
   event.preventDefault();
   记录未完成长按(选项);
 }
 
-function 取消长按选项(选项: 卡动作选项): void {
+function 取消长按选项(选项: 卡动作选项, event?: PointerEvent): void {
   if (当前长按选项.value !== 选项) return;
-  clearTimeout(长按计时);
-  长按计时 = undefined;
-  当前长按选项.value = null;
+  if (event && 当前长按令牌?.输入 !== `pointer:${event.pointerId}`) return;
+  清长按计时();
 }
 
 function 触发垃圾(): void {
-  当前选择动作.value = null;
+  关闭选择();
   机器.手动收起();
   emit('openGarbage');
 }
 
 function 切换(): void {
-  if (props.forcedOpen) return;
   if (状态.展开) {
-    当前选择动作.value = null;
+    关闭选择();
     机器.手动收起();
   } else {
     机器.手动展开();
@@ -156,15 +221,15 @@ function 切换(): void {
 }
 
 function 面板交互(): void {
-  if (props.mobile) 机器.交互取消自动计时();
+  机器.交互取消自动计时();
 }
 </script>
 
 <template>
-  <div v-if="有可见动作 && (!suppressed || forcedOpen)" class="in-room-acts" :class="{ 'drawer-open': mobile && 实际展开 }">
-    <!-- 手机：流内只留一个总把手，所有房间动作与内部选择都在同一面板。 -->
+  <div v-if="有可见动作 && (!suppressed || forcedOpen)" ref="抽屉根" class="in-room-acts" :class="{ 'drawer-open': 实际展开 }" @keydown="抽屉按键">
+    <!-- 双端：流内保留总把手，所有房间动作与内部选择都在同一面板。 -->
     <button
-      v-if="mobile"
+      ref="把手"
       type="button"
       class="drawer-handle"
       :aria-expanded="实际展开"
@@ -174,20 +239,21 @@ function 面板交互(): void {
       @click="切换"
     >
       <Ic n="arrow" class="handle-arrow" />
-      <span class="handle-label">房内操作 · {{ actionCount }}项</span>
+      <span class="handle-label">{{ forcedOpen ? '待决定' : '房内操作' }} · {{ actionCount }}项</span>
+      <small>{{ 实际展开 ? '收起' : '展开' }}</small>
       <transition name="new-hint">
         <span v-if="状态.新增提示" class="new-hint">新增操作</span>
       </transition>
     </button>
 
-    <transition :name="mobile ? 'drawer' : ''" :css="mobile">
+    <transition name="drawer">
       <div
-        v-if="mobile ? 实际展开 || 有主训练动作 : true"
+        v-if="实际展开"
         id="in-room-acts-panel"
         class="drawer-content"
-        :class="{ 'drawer-panel': mobile }"
-        :role="mobile ? 'region' : undefined"
-        :aria-label="mobile ? '当前房间可执行操作' : undefined"
+        :class="{ 'drawer-panel': true }"
+        role="region"
+        aria-label="当前房间可执行操作"
         @pointerdown="面板交互"
         @focusin="面板交互"
       >
@@ -220,7 +286,7 @@ function 面板交互(): void {
           <section v-if="当前选择动作?.选项?.length" class="action-choice" aria-label="选择开场方式">
             <header>
               <span><small>PRIVATE SCENE</small><b>{{ 当前选择动作.文案 }}</b></span>
-              <button type="button" aria-label="关闭选择" @click="当前选择动作 = null">✕</button>
+              <button type="button" aria-label="关闭选择" @click="关闭选择">✕</button>
             </header>
             <div class="action-choice-grid">
               <button
@@ -232,7 +298,8 @@ function 面板交互(): void {
                 :title="选项.提示 || undefined"
                 @pointerdown="开始长按选项(选项, $event)"
                 @pointerup="结束长按选项(选项, $event)"
-                @pointercancel="取消长按选项(选项)"
+                @pointercancel="取消长按选项(选项, $event)"
+                @lostpointercapture="取消长按选项(选项, $event)"
                 @keydown.enter="开始键盘长按(选项, $event)"
                 @keyup.enter="结束键盘长按(选项, $event)"
                 @keydown.space="开始键盘长按(选项, $event)"

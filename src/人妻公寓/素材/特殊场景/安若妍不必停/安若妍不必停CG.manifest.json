@@ -1,10 +1,10 @@
 {
   "schemaVersion": "rqgy-anruoyan-301-no-stop-product-manifest-v2",
-  "updatedAt": "2026-09-04",
+  "updatedAt": "2026-09-08",
   "route": "安若妍301承接线:不必停",
   "status": "product-webp-ready-awaiting-external-publish",
   "runtimeSlots": 14,
-  "acceptedFiles": 18,
+  "acceptedFiles": 20,
   "format": "webp",
   "dimensions": {
     "width": 1536,
@@ -18,6 +18,10 @@
       "ARY-NBS-10",
       "ARY-NBS-13"
     ],
+    "pregnantOverrides": {
+      "ARY-NBS-11": "ARY-NBS-11-P",
+      "ARY-NBS-12": "ARY-NBS-12-P"
+    },
     "normalSuffix": "-N",
     "pregnantSuffix": "-P",
     "sharedSlots": [
@@ -28,8 +32,6 @@
       "ARY-NBS-05",
       "ARY-NBS-07",
       "ARY-NBS-08",
-      "ARY-NBS-11",
-      "ARY-NBS-12",
       "ARY-NBS-14"
     ]
   },
@@ -49,22 +51,22 @@
       93,
       95
     ],
-    "selectionReason": "Q93在不缩放前提下保持最低41.1734dB PSNR，同时节省约89.85%产品字节；最低指标与成人合成代表图均完成原尺寸目视复核。",
+    "selectionReason": "Q93在不缩放前提下保持最低41.1734dB PSNR，同时节省约89.84%产品字节；最低指标与成人合成代表图均完成原尺寸目视复核。",
     "minimumPsnrDb": 41.1734,
-    "averagePsnrDb": 42.3994,
+    "averagePsnrDb": 42.3154,
     "maximumMeanAbsoluteError": 1.5023,
-    "sourceBytes": 35384050,
-    "productBytes": 3591384,
-    "savedBytes": 31792666,
-    "savedPercent": 89.85,
+    "sourceBytes": 39108497,
+    "productBytes": 3971814,
+    "savedBytes": 35136683,
+    "savedPercent": 89.8441,
     "visualReview": "source_and_q93_worst_case_plus_adult_composite_original_view_passed"
   },
   "sourceEvidence": {
     "sourceManifest": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-no-stop/manifest-v1.json",
-    "sourceManifestSha256": "E4A606B8E7F9A36D4B4666937855579876742F5AC550319B3CD81E0099D057AD",
+    "sourceManifestSha256": "EDF29BECB6FB658248F7FDC23F6AE5932BE4DAF960928614C87265FD6251745B",
     "currentTask": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-no-stop/CURRENT_TASK.md",
-    "currentTaskSha256": "D49AD4A90B0B9F9228AB060048D09C4338D82C03E99672BCD386A5A0171BFAFE",
-    "acceptedOriginalsPreserved": 18,
+    "currentTaskSha256": "97F2F7297767DBFA5BA6DE75EBF9E0A688B99A46541114E454F5C9F41FD0FB0D",
+    "acceptedOriginalsPreserved": 20,
     "supersededOriginalsPreserved": 1,
     "technicalFailuresPreserved": 1,
     "nonProductionExperimentsRecorded": 1
@@ -387,6 +389,44 @@
       "height": 1024,
       "psnrDb": 42.4237,
       "meanAbsoluteError": 1.3422
+    },
+    {
+      "id": "ARY-NBS-11-P",
+      "semantic": "江辰从外面关门（孕态）",
+      "variant": "pregnant",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-no-stop/composites/ARY-NBS-11-P/draw1/ARY-NBS-11-P_江辰带上门_孕态.png",
+      "sourceSha256": "EF076882BC010200DFBA667AD5FFAC68313E97F65D5ED4613CC0C20042D6B3E3",
+      "sourceBytes": 1812214,
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-no-stop/reviews/ARY-NBS-11-P_draw1_composite.md",
+      "sourceBackend": "layered_composite_v2",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-NBS-11-P.webp",
+      "productSha256": "8BDC8B83DD05397FFBF06C1EA9E690F487B1CD39019714A1BE4F26CC6038B30E",
+      "productBytes": 183810,
+      "width": 1536,
+      "height": 1024,
+      "psnrDb": 41.8012,
+      "meanAbsoluteError": 1.3487,
+      "dHash": "06A18103A3809050"
+    },
+    {
+      "id": "ARY-NBS-12-P",
+      "semantic": "一墙之隔取卷宗（孕态）",
+      "variant": "pregnant",
+      "sourcePath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-no-stop/composites/ARY-NBS-12-P/draw1/ARY-NBS-12-P_书房取卷宗箱_孕态.png",
+      "sourceSha256": "6A6670ADC367475011BB871C57171270725B9EA89BEA947F3F688126A5F4BA63",
+      "sourceBytes": 1912233,
+      "sourceReviewPath": "output/imagegen/rqgy-reset/adult-completion/anruoyan-301-no-stop/reviews/ARY-NBS-12-P_draw1_composite.md",
+      "sourceBackend": "layered_composite_v2",
+      "sourceVerdict": "accepted_target_achieved",
+      "productFile": "ARY-NBS-12-P.webp",
+      "productSha256": "FE5CF92C1D6FC2F7DF644BE236C2D391BFBFA689AD82E0F2BF1ED40F1782108F",
+      "productBytes": 196620,
+      "width": 1536,
+      "height": 1024,
+      "psnrDb": 41.3167,
+      "meanAbsoluteError": 1.4073,
+      "dHash": "B0B1B3A160739390"
     },
     {
       "id": "ARY-NBS-14",

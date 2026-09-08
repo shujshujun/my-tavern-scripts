@@ -1,10 +1,11 @@
 <script setup lang="ts">
 // 回合输入(App A8b 从 App.vue 等价外移):游戏输入框、撤回/重演与失败行动重试、推进时间三块连续区域。
 // 纯展示 + 纯 emit:可输入/资源/重掷/时段等全部来自 App props,文本经 update:text 回 App,原 handler 一律留在 App。
-// 本地只持 textarea DOM ref 与浏览器输入法组合态；经 defineExpose 公开聚焦供 App/useMuteMeeting 调用。
+// 本地仅持输入法与展示态；经 defineExpose 公开聚焦供 App/useMuteMeeting 调用。
 // 不得 import App/store/eventEmit/composable,不得调用酒馆 API。
 import { ref } from 'vue';
 import Ic from './Icon.vue';
+import AuxPanel from './辅助面板.vue';
 
 defineProps<{
   open: boolean;
@@ -93,6 +94,13 @@ defineExpose({ 聚焦 });
       {{ resourceHint }}
     </small>
   </div>
+  <AuxPanel
+    v-if="decisionMode === 'none' && ((!videoActive && !formalMeeting) || failedAction || (sending && retryAction) || variableRegenerationState !== '不可用' || canReroll)"
+    label="回合辅助"
+    :hint="failedAction ? '生成失败 · 可重试' : sending && retryAction ? '生成中 · 停止与重试' : variableRegenerationState === '进行中' ? '变量生成中' : '时间与重演'"
+    :default-open="Boolean(failedAction)"
+    :reset-key="(currentRoom ?? '') + ':' + (failedAction ? 'failed' : sending ? 'sending' : 'idle')"
+  >
   <div v-if="decisionMode === 'none' && sending && retryAction" class="generation-recovery-row" aria-live="polite">
     <span>{{ retrying ? '正在停止这一轮…' : '正文卡住或没有写完整？' }}</span>
     <button
@@ -163,6 +171,7 @@ defineExpose({ 聚焦 });
       <small v-else>{{ currentPeriodLabel }} → 推进到{{ nextPeriodLabel }}</small>
     </span>
   </button>
+  </AuxPanel>
 </template>
 
 <style scoped>

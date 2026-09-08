@@ -33,15 +33,15 @@ export const 公寓外部背景图 = `${版本素材基址}/背景/公寓外部.
 export const 晨跑公园背景图 = `${版本素材基址}/背景/晨跑公园.webp`;
 export const 健身房背景图 = `${版本素材基址}/背景/健身房.webp`;
 /**
- * 302结局后四张开场CG与五张基础背景已在本地完成，但用户将在正式发布前上传到独立素材仓。
- * 当前不把生图工作目录打进客户端，也不猜测尚未确定的仓库／标签；验收环境可显式注入基址。
+ * 302结局后四张开场CG与五张基础背景随独立素材仓cg5提供。
+ * 运行时使用已核验的不可变地址，验收环境仍可显式注入基址。
  */
 export const 共居302素材发布配置 = Object.freeze({
   路线: '302结局后亲密开场与共居9图包',
-  仓库: '',
-  不可变标签: '',
-  产品目录: '',
-  状态: '待独立素材仓' as '待独立素材仓' | '已发布',
+  仓库: 'shujun8520-design/qgy-assets',
+  不可变标签: 'cg5',
+  产品目录: 'rq091/302-cohab',
+  状态: '已发布' as '待独立素材仓' | '已发布',
 });
 
 const 共居302背景文件表: Readonly<Record<string, string>> = Object.freeze({
@@ -106,10 +106,10 @@ export const 家庭计划图片 = (文件: string): string => `${家庭计划素
  */
 export const 剧情事件素材发布配置 = Object.freeze({
   路线: '第二机位',
-  仓库: 'shujshujun/my-tavern-scripts',
-  不可变标签: 'rq0.91',
-  产品目录: 'src/人妻公寓/素材/特殊场景',
-  状态: '待不可变标签' as '待不可变标签' | '已发布',
+  仓库: 'shujun8520-design/qgy-assets',
+  不可变标签: 'cg5',
+  产品目录: 'rq091/story',
+  状态: '已发布' as '待不可变标签' | '已发布',
 });
 export const 剧情事件待发布素材基址 =
   `https://testingcf.jsdelivr.net/gh/${剧情事件素材发布配置.仓库}` +
@@ -118,24 +118,24 @@ export const 剧情事件待发布素材基址 =
 /** 《回国》9图与《双重继承》11图的独立发布闭环；201未封板不会再连坐这个开关。 */
 export const 母亲线剧情素材发布配置 = Object.freeze({
   路线: '母亲线:回国+双重继承',
-  仓库: 'shujshujun/my-tavern-scripts',
-  不可变标签: 'rq0.91',
-  产品目录: 'src/人妻公寓/素材/特殊场景',
+  仓库: 'shujun8520-design/qgy-assets',
+  不可变标签: 'cg5',
+  产品目录: 'rq091/story',
   manifest: '母亲线剧情CG.manifest.json',
-  状态: '待不可变标签' as '待不可变标签' | '已发布',
+  状态: '已发布' as '待不可变标签' | '已发布',
 });
 export const 母亲线剧情待发布素材基址 =
   `https://testingcf.jsdelivr.net/gh/${母亲线剧情素材发布配置.仓库}` +
   `@${母亲线剧情素材发布配置.不可变标签}/${母亲线剧情素材发布配置.产品目录}`;
 
-/** 201方案仍待用户确认；即使同一仓库以后出现rq0.91，也不得由母亲线发布状态误解锁。 */
+/** 201分居产品使用独立配置；其发布状态与母亲线分别维护。 */
 export const 许曼君201素材发布配置 = Object.freeze({
   路线: '许曼君201分居/留宿',
-  仓库: 'shujshujun/my-tavern-scripts',
-  不可变标签: '',
-  产品目录: 'src/人妻公寓/素材/特殊场景/许曼君分居',
+  仓库: 'shujun8520-design/qgy-assets',
+  不可变标签: 'cg5',
+  产品目录: 'rq091/story/许曼君分居',
   manifest: '许曼君分居CG.manifest.json',
-  状态: '待设计/未发布' as '待设计/未发布' | '待不可变标签' | '已发布',
+  状态: '已发布' as '待设计/未发布' | '待不可变标签' | '已发布',
 });
 
 function 规范剧情素材基址(覆盖键: string, 配置: { 状态: string }, 待发布基址: string): string {
@@ -191,28 +191,28 @@ export const 双重继承图片 = (文件: string): string =>
     文件,
   );
 export const 许曼君分居图片 = (文件: string): string => {
-  const 覆盖 = 规范剧情素材基址('__RQGY_XMJ_201_ASSET_BASE__', 许曼君201素材发布配置, '');
+  const 覆盖 = 规范剧情素材基址('__RQGY_XMJ_201_ASSET_BASE__', 许曼君201素材发布配置, 'https://testingcf.jsdelivr.net/gh/shujun8520-design/qgy-assets@cg5/rq091/story');
   return 拼剧情事件图片(覆盖, '许曼君分居', 文件);
 };
 
 /**
- * 安若妍301《不必停》18张封板图（14个运行镜头，06/09/10/13含普通与孕态差分）。
+ * 安若妍301《不必停》20张封板图（14个运行镜头，含普通与孕态差分）。
  * 生图工作目录不是产品URL；发布前只接受显式预览基址，避免客户端请求不存在的标签。
  */
 export const 安若妍不必停素材发布配置 = Object.freeze({
   路线: '安若妍301承接线:不必停',
-  仓库: 'shujshujun/my-tavern-scripts',
-  不可变标签: '',
-  产品目录: 'src/人妻公寓/素材/特殊场景/安若妍不必停',
+  仓库: 'shujun8520-design/qgy-assets',
+  不可变标签: 'cg5',
+  产品目录: 'rq091/story/安若妍不必停',
   manifest: '安若妍不必停CG.manifest.json',
-  状态: '待不可变标签' as '待不可变标签' | '已发布',
+  状态: '已发布' as '待不可变标签' | '已发布',
 });
 const 安若妍不必停待发布素材基址 = 安若妍不必停素材发布配置.不可变标签
   ? `https://testingcf.jsdelivr.net/gh/${安若妍不必停素材发布配置.仓库}` +
     `@${安若妍不必停素材发布配置.不可变标签}/${安若妍不必停素材发布配置.产品目录}`
   : '';
 const 安若妍不必停CG白名单 =
-  /^(?:ARY-NBS-(?:0[1-5]|0[78]|1[124])|ARY-NBS-(?:06|09|10|13)-(?:N|P))$/u;
+  /^(?:ARY-NBS-(?:0[1-5]|0[78]|1[124])|ARY-NBS-(?:06|09|10|13)-(?:N|P)|ARY-NBS-(?:11|12)-P)$/u;
 export function 安若妍不必停图片(文件: string): string {
   if (!安若妍不必停CG白名单.test(文件)) return '';
   const 基址 = 规范剧情素材基址(
@@ -226,11 +226,11 @@ export function 安若妍不必停图片(文件: string): string {
 /** 《离婚》15张封板产品独立发布；发布前只接受显式全局覆盖，不请求虚构标签。 */
 export const 许曼君离婚素材发布配置 = Object.freeze({
   路线: '许曼君201正式结局:离婚',
-  仓库: 'shujshujun/my-tavern-scripts',
-  不可变标签: '',
-  产品目录: 'src/人妻公寓/素材/特殊场景/许曼君离婚',
+  仓库: 'shujun8520-design/qgy-assets',
+  不可变标签: 'cg5',
+  产品目录: 'rq091/story/许曼君离婚',
   manifest: '许曼君离婚CG.manifest.json',
-  状态: '待不可变标签' as '待不可变标签' | '已发布',
+  状态: '已发布' as '待不可变标签' | '已发布',
 });
 const 许曼君离婚待发布素材基址 = 许曼君离婚素材发布配置.不可变标签
   ? `https://testingcf.jsdelivr.net/gh/${许曼君离婚素材发布配置.仓库}` +

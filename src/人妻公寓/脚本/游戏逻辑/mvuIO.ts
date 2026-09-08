@@ -6,6 +6,8 @@ import { 当前时间线切换世代 } from './时间线切换协调';
 import { 同步场景剧情事务 } from './场景剧情事务';
 import { 规范AI表现文本 } from './AI表现文本安全';
 import { 清理线路失效待演打断 } from './线路待演打断';
+import { 确认时间事务允许写入, 时间事务阻止普通写入, 当前时间事务写入版本, 时间事务当前聊天ID, type 时间事务写入校验 } from './时间事务写入门';
+import { 同步通关进度 } from './通关结算';
 
 /**
  * 脚本侧 MVU 读写共享模块
@@ -89,13 +91,17 @@ function 确认MVU提交仍有效(): void {
 }
 
 export function 排队MVU操作<T>(任务: () => Promise<T> | T): Promise<T> {
+  try { 确认时间事务允许写入(); } catch (error) { return Promise.reject(error); }
   const 入队时间线世代 = 当前时间线切换世代();
+  const 入队时间写入版本 = 当前时间事务写入版本();
   // 必须在任何 Promise.then 之前同步标忙；否则同一调用栈紧接着发起的正文会先读旧整表。
   待处理MVU操作数 += 1;
   const 本次 = MVU操作队列.catch(() => undefined).then(async () => {
     const 取消提交校验 = 登记MVU提交校验(() => 入队时间线世代 === 当前时间线切换世代());
     try {
       确认MVU提交仍有效();
+      确认时间事务允许写入();
+      if (当前时间事务写入版本() !== 入队时间写入版本) throw new Error('排队期间时间已经更新，请重新操作。');
       return await 任务();
     } finally {
       取消提交校验();
@@ -111,6 +117,26 @@ export function 排队MVU操作<T>(任务: () => Promise<T> | T): Promise<T> {
   return 已收口;
 }
 
+const 时间解析候选 = new WeakMap<object, { 聊天ID: string; 时间版本: number; 开始时被阻断: boolean }>();
+
+/** MVU解析开始、结束与最终写楼使用同一候选对象；记录仅随对象存活，不写入存档。 */
+export function 登记时间事务变量候选(候选: object): void {
+  时间解析候选.set(候选, {
+    聊天ID: 时间事务当前聊天ID(), 时间版本: 当前时间事务写入版本(), 开始时被阻断: 时间事务阻止普通写入(),
+  });
+  确认时间事务变量候选(候选);
+}
+
+/** 未知目标楼的解析候选只能拒绝，不能拿当前末楼数据覆盖它。 */
+export function 确认时间事务变量候选(候选: object): void {
+  if (!时间解析候选.has(候选)) 登记时间事务变量候选(候选);
+  const 来源 = 时间解析候选.get(候选)!;
+  if (来源.聊天ID !== 时间事务当前聊天ID()) throw new Error('变量解析期间聊天已经切换，旧候选不再提交。');
+  if (来源.开始时被阻断 || 时间事务阻止普通写入() || 当前时间事务写入版本() !== 来源.时间版本) {
+    throw new Error('时间操作尚未收口或解析期间时间已经变化，请完成恢复后重新处理变量。');
+  }
+}
+
 /** 读最新楼 stat_data(经 schema 消毒;毒快照场景请先用 读最近有效stat 判存在性) */
 export function 读取(): { raw: object; data: SchemaType } {
   const raw = Mvu.getMvuData({ type: 'message', message_id: -1 }) as object;
@@ -121,6 +147,8 @@ export function 读取(): { raw: object; data: SchemaType } {
 }
 
 export interface 脚本写入选项 {
+  /** 仅由当前时间事务或恢复函数逐次传入精确记录校验，普通业务不得继承。 */
+  时间事务校验?: 时间事务写入校验;
   /** 重开、回档恢复等非玩法写回必须关闭，避免把状态替换误记成成长。 */
   记录成长?: boolean;
   /** 测试或特殊调用可显式提供绝对时段。 */
@@ -165,6 +193,7 @@ function 当前消息楼层(): number {
  */
 export async function 脚本写入(raw: object, data?: SchemaType, 选项: 脚本写入选项 = {}): Promise<void> {
   确认MVU提交仍有效();
+  确认时间事务允许写入(选项.时间事务校验);
   if (data) {
     清理线路失效待演打断(data);
     const 旧raw = _.get(raw, 'stat_data');
@@ -196,9 +225,11 @@ export async function 脚本写入(raw: object, data?: SchemaType, 选项: 脚�
         });
       }
     }
+    同步通关进度(data);
     _.set(raw, 'stat_data', data);
   }
   确认MVU提交仍有效();
+  确认时间事务允许写入(选项.时间事务校验);
   待完成写入数 += 1;
   脚本写入中 = true;
   try {

@@ -2,6 +2,11 @@ import type { 门牌 } from '../../../../../stageConfig';
 import type { 微信撤回定位, 微信消息定位 } from '../../../微信消息撤回';
 import type { 手机多人邀约安排 } from '../../邀约计划';
 
+/** 接受凭据只证明该标识已进入消息库，不冒充宿主服务端的持久保存收据。 */
+export type 手机消息发送结果 =
+  | { 已接受: false }
+  | { 已接受: true; 批次键: string; 消息标识: string };
+
 /**
  * 渲染层业务端口（拆分方案 P7B2）：本轮仍留内核的 P8 业务（玩家微信撤回绑定、赴约条读取、
  * 邀约、发送消息）经此最小显式端口提供给渲染页面；页面不得反向 import 内核。
@@ -24,7 +29,7 @@ export interface 手机渲染业务端口 {
     来源: '旧即时' | '计划';
   } | null;
   约多人出来(成员: readonly 门牌[], 安排: 手机多人邀约安排): Promise<void>;
-  发消息(会话: string, 文: string, 引用?: 微信消息定位): Promise<void>;
+  发消息(会话: string, 文: string, 引用?: 微信消息定位): Promise<手机消息发送结果>;
 }
 
 let 已注册业务端口: 手机渲染业务端口 | null = null;

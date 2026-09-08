@@ -216,9 +216,9 @@ test('PLAY-020: 场景被撤销为楼道时不沿用302缓存', t => {
   assert.equal(h.display.value, null);
 });
 
-test('PLAY-020: 未配置素材基址时不显示', t => {
+test('PLAY-020: 显式空素材覆盖时不显示', t => {
   const h = setup(t, afterArchive);
-  delete globalThis.__RQGY_NMD_ASSET_BASE__;
+  globalThis.__RQGY_NMD_ASSET_BASE__ = '';
   h.notify();
   assert.equal(h.display.value, null);
 });

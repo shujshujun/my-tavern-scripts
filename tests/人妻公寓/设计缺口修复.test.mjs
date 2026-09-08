@@ -124,7 +124,7 @@ test('新档不再上架旧录像带，历史实现仍为未完成旧存档续�
   }
 });
 
-test('肉偿账本保持原价、原结算与阶段线路接线所需完成标记', () => {
+test('肉偿账本保持原价，正文成功后保留原结算与阶段线路完成标记', () => {
   const data = 建数据('201');
   data.户['201'].妻.当前阶段 = 4;
   data.户['201']._欠租笔数 = 1;
@@ -134,9 +134,16 @@ test('肉偿账本保持原价、原结算与阶段线路接线所需完成标�
 
   assert.equal(result.成功, true);
   assert.equal(data.现金, 原现金 - 800);
+  assert.equal(data.户['201']._欠租笔数, 1);
+  assert.equal(data.系统._已完成特殊场景.includes('肉偿账本'), false);
+  assert.match(data.系统._待发送事件, /特殊场景·肉偿账本/);
+  const 事件 = data.系统._待发送事件;
+  const { 消费队首场景剧情 } = require('../../src/人妻公寓/脚本/游戏逻辑/场景剧情事务.ts');
+  const { 提交商店剧情结算 } = require('../../src/人妻公寓/脚本/游戏逻辑/商店剧情结算.ts');
+  assert.equal(消费队首场景剧情(data, 事件), true);
+  提交商店剧情结算(data, 事件);
   assert.equal(data.户['201']._欠租笔数, 0);
   assert.equal(data.系统._已完成特殊场景.includes('肉偿账本'), true);
-  assert.match(data.系统._待发送事件, /特殊场景·肉偿账本/);
 });
 
 test('母亲破墙礼物只追加自己的正戏，不覆盖已经排队的事件', async () => {

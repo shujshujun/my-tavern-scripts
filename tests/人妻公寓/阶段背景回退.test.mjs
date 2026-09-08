@@ -58,7 +58,9 @@ function resolve(overrides = {}, bases = {}) {
     母亲共居背景状态: () => '',
     ...overrides,
   };
-  const text = [...parts, app.slice(start, end), 'module.exports = { 背景图 };'].join('\n');
+  // URL可用性是受控依赖输入；背景选择与图片构造仍使用实际实现。
+  const availability = parts.map(part => part.replace(/状态: '已发布'/g, "状态: '待不可变标签'"));
+  const text = [...availability, app.slice(start, end), 'module.exports = { 背景图 };'].join('\n');
   const js = ts.transpileModule(text, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;

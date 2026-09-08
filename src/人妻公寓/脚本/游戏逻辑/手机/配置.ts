@@ -1,8 +1,8 @@
 import { 户静态表, type 门牌 } from '../../../stageConfig';
 
 /**
- * 手机配置（拆分方案 P2 / T5+T6）：localStorage 手机配置 + 世界书人设素材缓存。
- * 只持有持久化读写的实现与进程级缓存，不参与 AI 路由决策；AI 路由仍由内核负责。
+ * 手机配置（拆分方案 P2 / T5+T6）：localStorage 手机配置 + 当前世界书人设读取。
+ * 只负责配置读写与人设派生，不参与 AI 路由决策；AI 路由仍由内核负责。
  */
 
 // ============================================
@@ -86,20 +86,25 @@ export function 存配置(c: 手机配置): void {
 
 // ── 世界书人设注入(2026-07-19 用户拍板:微信里她得"是她自己") ──
 // 只给该妻自己的条目(数据隔离);外貌/穿衣段与微信无关,剥掉省token;
-// 朋友圈刻意不接(公开流永远贤妻=设计);世界书游戏内静态,进程级缓存一次就够
-const _人设缓存 = new Map<string, string>();
+// 朋友圈沿用原公开渠道；人设按需从公开世界书接口读取，随绑定、内容和启用状态更新。
+// 本模块不跨请求缓存派生结果，世界书加载由宿主接口管理。
+
+function 人设读取聊天身份(): string | number | null | undefined {
+  return typeof SillyTavern === 'undefined' ? undefined : SillyTavern.getCurrentChatId?.();
+}
 
 /** 从角色卡主世界书抽该妻人设YAML(剥外貌段+截长);拿不到返回空串,微信照旧不降级 */
 async function 妻人设(m: 门牌): Promise<string> {
   const 妻名 = 户静态表[m]?.妻名;
   if (!妻名) return '';
-  const 缓存 = _人设缓存.get(妻名);
-  if (缓存 !== undefined) return 缓存;
   let 出 = '';
   try {
+    const 聊天身份 = 人设读取聊天身份();
     const { primary } = getCharWorldbookNames('current');
     if (primary) {
-      const 条目 = (await getWorldbook(primary)).find(e => e.enabled && e.name.includes(妻名));
+      const 世界书 = await getWorldbook(primary);
+      if (getCharWorldbookNames('current').primary !== primary || 人设读取聊天身份() !== 聊天身份) return '';
+      const 条目 = 世界书.find(e => e.enabled && e.name.includes(妻名));
       if (条目?.content) {
         出 = 条目.content
           // 剥外貌大段(顶格两空格缩进的段头到下一同级段头;YAML结构=角色卡格式约定)
@@ -111,7 +116,6 @@ async function 妻人设(m: 门牌): Promise<string> {
   } catch (e) {
     console.warn('[人妻公寓·手机] 读取世界书人设失败(微信照常,仅少人设):', e);
   }
-  _人设缓存.set(妻名, 出);
   return 出;
 }
 

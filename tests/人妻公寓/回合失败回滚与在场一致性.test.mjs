@@ -34,7 +34,7 @@ test('失败回滚必须动态复核时间线并在变量回调内部关门，�
   );
   assert.match(
     恢复函数,
-    /vars => \{\s*if \(!提交校验\(\)\) throw new Error\('__RQGY_TIMELINE_CHANGED__'\)/,
+    /vars => \{\s*if \(!提交校验\(\) \|\| 当前聊天ID\(\) !== 手机聊天ID\) throw new Error\('__RQGY_TIMELINE_CHANGED__'\)/,
     '切聊或 swipe 若发生在 await 期间，回调必须在写入新分支前失败关闭',
   );
 });

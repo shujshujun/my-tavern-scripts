@@ -27,6 +27,10 @@ import {
   删除会话草稿,
   删除会话引用草稿,
   取会话引用草稿,
+  开始会话草稿发送,
+  完成会话草稿发送,
+  会话草稿正在发送,
+  标记会话文字修订,
   标记会话输入聚焦,
   会话输入聚焦中,
   会话正在输入,
@@ -265,10 +269,11 @@ export function 渲染chat(上下文: 渲染上下文): void {
       }
       const 状态 = 手机聊天批次.状态(批次键);
       ta.disabled = 回国群首拍收口中 || 外部输入中 || 状态.灯 === '红';
-      发钮.disabled = 回国群首拍收口中 || 外部输入中;
+      const 发送中 = 会话草稿正在发送(批次键);
+      发钮.disabled = 回国群首拍收口中 || 外部输入中 || (发送中 && 状态.灯 !== '红');
       发钮.classList.toggle('stop', 状态.灯 === '红');
       发钮.classList.toggle('waiting', 状态.灯 === '黄');
-      发钮.textContent = 状态.灯 === '红' ? '停止' : 状态.灯 === '黄' && 状态.待回复数 ? '立即回复' : '发送';
+      发钮.textContent = 状态.灯 === '红' ? '停止' : 发送中 ? '发送中' : 状态.灯 === '黄' && 状态.待回复数 ? '立即回复' : '发送';
     };
     发钮.addEventListener('pointerdown', ev => {
       if (!发钮.disabled) ev.preventDefault();
@@ -285,6 +290,7 @@ export function 渲染chat(上下文: 渲染上下文): void {
     });
     ta.addEventListener('compositionstart', () => {
       输入法组合中 = true;
+      标记会话文字修订(批次键);
     });
     ta.addEventListener('compositionend', () => {
       输入法组合中 = false;
@@ -317,8 +323,14 @@ export function 渲染chat(上下文: 渲染上下文): void {
       if (!ta.value.trim()) return;
       发钮.click();
     });
-    发钮.addEventListener('click', () => {
-      if (输入法组合中) return;
+    发钮.addEventListener('click', async () => {
+      if (
+        输入法组合中 || 发钮.disabled ||
+        !手机聊天渲染世代仍当前(本次渲染世代) ||
+        当前会话批次键(会话) !== 批次键 ||
+        上下文.读取当前页().名 !== 'chat' || 上下文.读取当前页().会话 !== 会话 ||
+        !root.classList.contains('open')
+      ) return;
       const 状态 = 手机聊天批次.状态(批次键);
       if (状态.灯 === '红') {
         取消手机聊天批次(会话);
@@ -332,13 +344,39 @@ export function 渲染chat(上下文: 渲染上下文): void {
         }
         return;
       }
-      ta.value = '';
-      删除会话草稿(批次键);
-      const 引用 = 取会话引用草稿(批次键);
-      删除会话引用草稿(批次键);
-      屏.querySelector('.rqp-quote-draft')?.remove();
+      const 票 = 开始会话草稿发送(批次键, ta.value);
+      if (!票) return;
       手机聊天批次.继续输入(批次键);
-      void 取渲染业务端口()?.发消息(会话, 文, 引用);
+      更新批次状态展示();
+      let 已接受 = false;
+      try {
+        const 结果 = await 取渲染业务端口()?.发消息(会话, 文, 票.引用);
+        已接受 = Boolean(结果?.已接受 && 结果.批次键 === 批次键 && 结果.消息标识);
+        if (!结果) eventEmit('人妻公寓:提示', '发送入口尚未就绪，草稿已保留，请稍后再试。');
+      } catch (错误) {
+        console.error('[人妻公寓·手机] 发送结果确认失败:', 错误);
+        if (当前会话批次键(会话) === 批次键)
+          eventEmit('人妻公寓:提示', '这条消息未能确认发送，草稿已保留。');
+      } finally {
+        const 修订 = 完成会话草稿发送(票);
+        const 时间线仍当前 = 当前会话批次键(会话) === 批次键;
+        const 页面仍当前 = 时间线仍当前 && root.classList.contains('open') &&
+          上下文.读取当前页().名 === 'chat' && 上下文.读取当前页().会话 === 会话;
+        // 消息/保存可以触发重绘，不能再清旧textarea，也不能以旧失败结果回填新草稿。
+        if (已接受 && 时间线仍当前) {
+          if (修订.文字仍当前) {
+            删除会话草稿(批次键);
+            const 当前输入 = 页面仍当前 ? 屏.querySelector('textarea') as HTMLTextAreaElement | null : null;
+            if (当前输入?.value === 票.原文) 当前输入.value = '';
+          }
+          if (修订.引用仍当前) {
+            删除会话引用草稿(批次键);
+            if (页面仍当前) 屏.querySelector('.rqp-quote-draft')?.remove();
+          }
+        }
+        // 新页面自有状态计时器；不为旧请求整屏重绘而打断玩家的新输入或输入法。
+        if (页面仍当前 && 手机聊天渲染世代仍当前(本次渲染世代)) 更新批次状态展示();
+      }
     });
     行.appendChild(ta);
     行.appendChild(发钮);

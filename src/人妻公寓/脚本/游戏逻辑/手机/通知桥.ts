@@ -516,7 +516,7 @@ export async function 写回国母亲入群消息(): Promise<boolean> {
     });
     if (!回国母亲邀请事务仍属于当前时间线(事务, false)) return false;
     if (!(await 写入回国母亲邀请主状态(事务))) return false;
-    return 完成回国母亲邀请事务(事务, false);
+    return await 完成回国母亲邀请事务(事务, false);
   } catch (error) {
     console.warn('[人妻公寓·回国] 母亲入群事务未完成，将由刷新恢复继续:', error);
     return false;

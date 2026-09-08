@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { 通关纪念Schema } from './通关纪念存档';
 
 export const 当前MVU数据版本 = 9;
 const 可迁移MVU数据版本 = [7, 8] as const;
@@ -1261,6 +1262,13 @@ const 当前Schema = z.object({
        * 后续票只等待到达设计地点，绝不能插入当前不相关互动或与队首混演。
        */
       _待发送事件: z.string().prefault(''),
+      /** 购买型单幕剧情的结算凭据；旧档无凭据时不补发历史奖励。 */
+      _商店剧情结算: z.object({
+        票号: z.string().prefault(''),
+        商品ID: z.string().prefault(''),
+        参与妻: z.array(z.enum(['101', '102', '201', '202', '301', '302'])).prefault([]),
+        状态: z.enum(['无', '待演', '已结算']).prefault('无'),
+      }).prefault({}),
       _场景剧情序号: nonNegInt(0),
       /**
        * 当前已经在设计地点触发的唯一场景剧情。生成失败、超时或取消时随 MVU 留在原分支，
@@ -1296,6 +1304,7 @@ const 当前Schema = z.object({
       _上次撞见档: z.coerce.number().int().catch(-1).prefault(-1),
       _难度: z.string().prefault('标准'), // 开局三档(轻松/标准/严苛),效果查 stageConfig.难度表
       _序章完成: bool(), // 单向语义随楼层快照走(回档到0=重开序章)
+      _通关纪念: 通关纪念Schema,
       /** 一次性特殊正戏完成表：供商店防重复与阶段路线判定共用，不为每场戏增设独立布尔值。 */
       _已完成特殊场景: z.array(z.string()).catch([]).prefault([]),
       /** 特殊场景通用前置记录；使用 `场景id:门牌` 短键，避免每场每人扩散布尔字段。 */

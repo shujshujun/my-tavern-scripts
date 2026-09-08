@@ -1,4 +1,5 @@
 import { 同步全部角色阶段世界书, 作废全部角色阶段世界书缓存 } from './结局世界书同步';
+import { 时间事务阻止普通写入, 时间事务未完成提示, 确认时间事务允许写入 } from './时间事务写入门';
 import {
   安若妍换掉事件要求H1开场, 安若妍换掉真实亲密已绑定, 安若妍换掉剧情演员错误,
   提交安若妍换掉剧情事件, 同步安若妍换掉时间节点, 解析安若妍换掉剧情事件,
@@ -17,6 +18,7 @@ import {
   校验场景剧情位置,
 } from './场景剧情事务';
 import type { SchemaType } from '../../schema';
+import { 提交商店剧情结算 } from './商店剧情结算';
 import { Schema, 验证可继续MVU存档结构 } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
 import { 户静态表, 难度表, 首批门牌, 查特殊场景 } from '../../stageConfig';
@@ -168,6 +170,8 @@ import {
 import {
   解析许曼君离婚后日常事件,
   提交许曼君离婚后日常事件,
+  冻结许曼君日常提交锚,
+  type 许曼君日常提交锚,
   许曼君离婚后日常演员错误,
   许曼君离婚后日常正文越界原因,
 } from './许曼君离婚后日常系统';
@@ -187,7 +191,7 @@ import { 手机记录在当前时间线, 规范手机已读时锚 } from './手�
 import { 裁剪手机节拍水位 } from './手机/节拍引擎';
 import { 手机邀约计划成员, 手机邀约计划需裁剪, 移除手机邀约计划成员, type 手机邀约计划 } from './手机/邀约计划';
 import { 手机锚消息签名, 作废当前手机时间线租约世代 } from './手机时间线租约';
-import { 写入微信清空镜像, 推进微信持久修订, 选择微信刷新恢复值 } from './手机/刷新恢复镜像';
+import { 写入微信清空镜像, 写入微信刷新镜像, 推进微信持久修订, 选择微信刷新恢复值 } from './手机/刷新恢复镜像';
 import { 推进特殊场景, 静音会议正式运行中 } from './特殊场景系统';
 import { 构造CG亲密上下文 } from './CG亲密上下文';
 import { 行动资源门槛, 亲密场景许可阶段, 现场楼身体增长依赖, 结算成功现场楼 } from './玩家资源系统';
@@ -435,16 +439,30 @@ async function 恢复回合变量快照(
   chat快照: Record<string, unknown>,
   提交校验: () => boolean = () => true,
 ): Promise<void> {
+  const 手机聊天ID = 当前聊天ID();
+  let 微信快照: Record<string, unknown> | null = null;
+  let 手机绝对时段 = -1;
   await updateVariablesWith(
     vars => {
-      if (!提交校验()) throw new Error('__RQGY_TIMELINE_CHANGED__');
+      if (!提交校验() || 当前聊天ID() !== 手机聊天ID) throw new Error('__RQGY_TIMELINE_CHANGED__');
+      const 原计划 = vars._手机邀约计划;
       for (const 键 of 回合变量键) {
         _.set(vars, 键, Object.prototype.hasOwnProperty.call(chat快照, 键) ? chat快照[键] : null);
+      }
+      const 原微信 = vars._微信;
+      if (!_.isEqual(原计划, vars._手机邀约计划) && 原微信 && typeof 原微信 === 'object' && !Array.isArray(原微信)) {
+        const 微信 = { ...(原微信 as Record<string, unknown>) };
+        手机绝对时段 = Number(读取最近有效()?.data.系统._绝对时段 ?? 0);
+        推进微信持久修订(微信, 手机聊天ID, 手机绝对时段, vars);
+        _.set(vars, '_微信', 微信);
+        微信快照 = _.cloneDeep(微信);
       }
       return vars;
     },
     { type: 'chat' },
   );
+  if (!提交校验() || 当前聊天ID() !== 手机聊天ID) throw new Error('__RQGY_TIMELINE_CHANGED__');
+  if (微信快照) 写入微信刷新镜像(手机聊天ID, 微信快照, 手机绝对时段);
 }
 
 /** 手机记录不塞进每回合快照（会令存档平方膨胀），按楼层戳裁掉被删除时间线。
@@ -505,7 +523,7 @@ export function 裁手机时间线(vars: Record<string, unknown>, 楼层: number
   // 从已裁剪的存活朋友圈重建；若该类图已全部被回档裁掉，对应游标也一并消失。
   const 妻名按门牌 = Object.fromEntries(Object.entries(户静态表).map(([门牌, 配置]) => [门牌, 配置.妻名]));
   库.节拍 = 裁剪手机节拍水位(库.节拍 ?? {}, 目标钟, 库.圈, 妻名按门牌);
-  推进微信持久修订(库 as Record<string, unknown>, 手机聊天ID, 目标钟);
+  推进微信持久修订(库 as Record<string, unknown>, 手机聊天ID, 目标钟, vars);
   _.set(vars, '_微信', 库);
   const 事件日志 = _.get(vars, '_隔离事件.日志');
   if (Array.isArray(事件日志)) {
@@ -959,13 +977,18 @@ const 内置解析格式说明 = [
   '</JSONPatch>',
   '</UpdateVariable>',
   '路径从根写起，层级以【当前可写变量现值】JSON 为准，如 /户/302/妻/当前情绪；只允许 replace 已存在的字段；确认本轮无任何变化时输出空数组 []。',
-  '【可写字段规则】',
+  '【可写字段规则】以下字段规则仅适用于【当前可写变量现值】中本轮实际存在的叶子路径；字段说明不授予额外写权，视图外人物和字段不得更新。',
+  '没有明确正文依据时保持不变，不得为了更新而改值；若当前可写变量现值的 户 为空，JSON Patch 必须是 []。',
   '好感值：{{user}}的言行让她受用/帮到她时 +1~3；冒犯、令她失望时 -1~3；单轮不超过 ±3。',
   '堕落值：仅限本轮有实质暧昧/亲密/性内容时才更新；她被越界体验真实触动时 +1~3，明显反感退缩时 -1~3，纯日常闲聊不动；单轮超出 ±3 系统会整项回滚到回合前数值，不要写超。',
   '身体开发（小嘴/胸部/小屄/屁穴）：仅性场景且对应部位被认真对待时 +1~3，只增不减。',
   '当前心理想法：妻本人在场时更新，一两句第一人称内心独白，只写意图/判断/矛盾，不得照抄台词。',
   '当前情绪：妻本人在场时随剧情更新，如 平静/雀跃/局促/心虚/悸动。',
-  '其余字段（当前阶段/婚姻值/裂缝/疑心值/现金/系统等）由脚本管理，严禁写入。',
+  '外装/内衣/妆容：仅妻本人在场且她确实自行换装/补妆时更新，一句话描述。',
+  '{{user}}送的衣物穿戴由系统写入，变量模型不动这些脚本穿戴结果。',
+  '夫.当前心理想法：仅丈夫本人在场对戏时更新，一两句第一人称内心独白，只概括意图/判断/矛盾，不得照抄台词、称呼或口头禅。',
+  '夫.当前情绪：仅丈夫本人在场对戏时随剧情更新。',
+  '视图外路径及脚本管理字段（当前阶段/婚姻值/裂缝/疑心值/现金/系统等）严禁写入，不得自行创建字段。',
 ].join('\n');
 
 /** 内置外置变量解析的可区分结果：成功拿到变量块 / 没有任何可用解析模型 / 请求失败。 */
@@ -1200,6 +1223,7 @@ async function 持久写入变量重生成消息(
   data: Mvu.MvuData,
   extra: Record<string, unknown>,
 ): Promise<{ 核心已提交: true; 持久化警告?: unknown }> {
+  确认时间事务允许写入();
   const 负载 = [{ message_id: 楼层, message: 正文, data: _.cloneDeep(data) as Record<string, unknown>, extra }];
   const 立即保存 = 读取立即持久保存宿主聊天();
   let 写入错误: unknown;
@@ -1226,6 +1250,10 @@ async function 持久写入变量重生成消息(
  * Schema、守护、聊天身份全部复核通过后才替换末楼变量，并在同一消息上持久标记本回合已用。
  */
 export async function 重新生成最近回合变量(): Promise<boolean> {
+  if (时间事务阻止普通写入()) {
+    eventEmit('人妻公寓:变量重生成结束', { 成功: false, 状态: '不可用', 提示: 时间事务未完成提示 });
+    return false;
+  }
   const 初始状态 = 读取变量重生成状态();
   if (初始状态.状态 !== '可用') {
     if (初始状态.状态 !== '进行中') {
@@ -1470,10 +1498,13 @@ async function 结算连续反感(
   事务仍有效: () => boolean = () => true,
 ): Promise<门牌[]> {
   const 离场: 门牌[] = [];
+  const 手机聊天ID = 当前聊天ID();
+  const 手机绝对时段 = Number(新Stat.系统._绝对时段);
+  let 微信快照: Record<string, unknown> | null = null;
   if (!事务仍有效()) throw new Error('__RQGY_TIMELINE_CHANGED__');
   await updateVariablesWith(
     vars => {
-      if (!事务仍有效()) throw new Error('__RQGY_TIMELINE_CHANGED__');
+      if (!事务仍有效() || 当前聊天ID() !== 手机聊天ID) throw new Error('__RQGY_TIMELINE_CHANGED__');
       const 记录 = (_.get(vars, '_反感连续') ?? {}) as Partial<Record<门牌, 反感连续项>>;
       // “连续”只属于同一次现场对话。玩家换房、去做楼务或穿插新手引导后，旧房间妻子的
       // 负好感链必须断开；否则下一次重访的第一句也会接上几楼前的旧计数，造成未推进时间
@@ -1537,13 +1568,23 @@ async function 结算连续反感(
         const 邀约计划 = (_.get(vars, '_手机邀约计划') ?? null) as 手机邀约计划 | null;
         if (手机邀约计划成员(邀约计划).some(m => 离场.includes(m))) {
           _.set(vars, '_手机邀约计划', 移除手机邀约计划成员(邀约计划, 离场));
+          // 成员移除虽不产生微信气泡，仍必须与取消后的计划共同取得新修订。
+          // 不在await后重读计划，否则会把另一笔提交拼进旧镜像。
+          const 原微信 = vars._微信;
+          const 微信 = 原微信 && typeof 原微信 === 'object' && !Array.isArray(原微信)
+            ? { ...(原微信 as Record<string, unknown>) }
+            : {};
+          推进微信持久修订(微信, 手机聊天ID, 手机绝对时段, vars);
+          _.set(vars, '_微信', 微信);
+          微信快照 = _.cloneDeep(微信);
         }
       }
       return vars;
     },
     { type: 'chat' },
   );
-  if (!事务仍有效()) throw new Error('__RQGY_TIMELINE_CHANGED__');
+  if (!事务仍有效() || 当前聊天ID() !== 手机聊天ID) throw new Error('__RQGY_TIMELINE_CHANGED__');
+  if (微信快照) 写入微信刷新镜像(手机聊天ID, 微信快照, 手机绝对时段);
   return 离场;
 }
 
@@ -1573,7 +1614,9 @@ export async function 组快照注入(
   变量范围: AI可写变量范围;
   快照刷新票: 快照刷新票;
 }> {
-  const { 焦点, 在场, 妻在场, 夫在场, 私聊可召回妻 } = 检测焦点(对话尾, data, 楼层, 本楼事件);
+  // 检测结果还包含跨场承接等语义，不能只重组演员数组而丢掉附加标志。
+  const 人物 = 检测焦点(对话尾, data, 楼层, 本楼事件);
+  const { 焦点, 在场, 妻在场, 夫在场, 私聊可召回妻 } = 人物;
   const 本线演员错误 =
     不再留门剧情演员错误(本楼事件, 妻在场, 夫在场) ||
     安若妍不必停剧情演员错误(本楼事件, 妻在场, 夫在场) ||
@@ -1582,7 +1625,6 @@ export async function 组快照注入(
     许曼君离婚剧情演员错误(本楼事件, 妻在场, 夫在场) ||
     许曼君离婚后日常演员错误(本楼事件, 妻在场, 夫在场);
   if (本线演员错误) throw new Error(本线演员错误);
-  const 人物 = { 焦点, 在场, 妻在场, 夫在场, 私聊可召回妻 };
   const 快照刷新票 = 规划快照刷新(data, 本楼事件, 人物);
   const 公寓快照 = 组公寓快照(对话尾, data, 楼层, 本楼事件, 人物, 快照刷新票);
   const 尺度模式: 尺度模式 = 公寓快照.includes('【尺度判定·详】') ? '详' : '简';
@@ -2010,6 +2052,7 @@ function 回合结算(
   玩家行动: string,
   变量派生票据?: 变量重生成派生票据,
   场景剧情票?: { id: string; 请求世代: number },
+  日常提交锚?: 许曼君日常提交锚 | null,
 ): 回合结算结果 {
   const 本楼事件 = 本轮事件.内容;
   let 入住预约已提交 = false;
@@ -2095,7 +2138,7 @@ function 回合结算(
     if (许曼君分居票) {
       const 演员错误 = 许曼君分居剧情演员错误(本楼事件, 妻在场, 夫在场);
       if (演员错误) throw new Error(演员错误);
-      const 提交结果 = 提交许曼君分居剧情事件(newStat, 本楼事件, 回合场景, 楼层, 玩家行动);
+      const 提交结果 = 提交许曼君分居剧情事件(newStat, 本楼事件, 回合场景, 楼层, 玩家行动, 正文);
       if (!提交结果?.成功) throw new Error(提交结果?.提示 || '《分居》剧情票未能提交。');
       许曼君分居提交结果 = 提交结果;
       if (提交结果.提示) 排队提交后提示(提交结果.提示);
@@ -2130,6 +2173,7 @@ function 回合结算(
         楼层,
         妻在场,
         夫在场,
+        日常提交锚 ?? null,
       );
       if (!提交结果?.成功) throw new Error(提交结果?.提示 || '201新日常剧情票未能提交。');
       if (提交结果.提示) 排队提交后提示(提交结果.提示);
@@ -2166,6 +2210,7 @@ function 回合结算(
       ? 提交场景剧情成功(newStat, 本楼事件, 活动事务ID, 场景剧情票?.请求世代)
       : 消费队首场景剧情(newStat, 本楼事件);
     if (!已消费) throw new Error('场景剧情队首在提交前已经变化，本轮没有消费任何待演事件。');
+    if (本楼事件.includes('【商店剧情结算:')) 提交商店剧情结算(newStat, 本楼事件);
     排入第二机位后续剧情(newStat, 第二机位提交结果);
     排入不再留门后续剧情(newStat, 不再留门提交结果);
     排入安若妍不必停后续剧情(newStat, 安若妍不必停提交结果);
@@ -2329,6 +2374,11 @@ export async function 执行回合(
   } = {},
 ): Promise<boolean> {
   const 释放预占租约 = () => 选项.预占前台生成租约?.释放();
+  if (时间事务阻止普通写入()) {
+    释放预占租约();
+    eventEmit('人妻公寓:回合失败', 时间事务未完成提示);
+    return false;
+  }
   if (回合进行中()) {
     释放预占租约();
     eventEmit('人妻公寓:回合失败', '上一轮或消息时间线还在收口，请稍等片刻再行动。');
@@ -2530,6 +2580,11 @@ export async function 执行回合(
       );
     }
     const 本楼事件 = 本轮事件冻结.内容;
+    // 业务票记录来源楼，生成目标来自本回合真实落位；禁止用结果楼反写旧票。
+    const 日常提交锚 = 冻结许曼君日常提交锚(data, 本楼事件, 回合前末楼, 生成楼层);
+    if (解析许曼君离婚后日常事件(本楼事件) && !日常提交锚) {
+      throw new Error('201日常来源楼或场景事务已经失效，本次没有开始生成。');
+    }
     const 不再留门回应阻断 = 不再留门回应错误(本楼事件, 行动);
     if (不再留门回应阻断) throw new Error(不再留门回应阻断);
     const 演出data = 构造入住登场演出态(data, 本楼事件, 生成楼层);
@@ -2753,6 +2808,7 @@ export async function 执行回合(
       const 重写节拍错误 =
         不再留门正文越拍原因(本楼事件, 重写正文) ||
         第二机位正文越拍原因(本楼事件, 重写正文) ||
+        安若妍不必停正文越拍原因(本楼事件, 重写正文) ||
         许曼君分居正文越拍原因(本楼事件, 重写正文) ||
         许曼君离婚正文越拍原因(本楼事件, 重写正文) ||
         许曼君离婚后日常正文越界原因(本楼事件, 重写正文) ||
@@ -2765,6 +2821,7 @@ export async function 执行回合(
       } else if (
         不再留门票 ||
         第二机位票 ||
+        安若妍不必停票 ||
         许曼君分居票 ||
         许曼君离婚票 ||
         许曼君离婚后日常票 ||
@@ -2775,6 +2832,11 @@ export async function 执行回合(
         if (第二机位票) {
           throw new Error(
             `第二机位当前剧情回合两次未能停在正确节点：${重写节拍错误 || 重写稽查.原因}。本拍保留，可直接重试。`,
+          );
+        }
+        if (安若妍不必停票) {
+          throw new Error(
+            `《不必停》当前剧情回合两次未能停在正确节点：${重写节拍错误 || 重写稽查.原因}。本拍保留，可直接重试。`,
           );
         }
         if (许曼君分居票) {
@@ -3130,6 +3192,7 @@ export async function 执行回合(
       行动,
       变量重生成派生票据 ?? undefined,
       当前场景剧情事务ID ? { id: 当前场景剧情事务ID, 请求世代: 选项.场景剧情请求世代 ?? 0 } : undefined,
+      日常提交锚,
     );
     const 回合结算后待发送基线 = newStat.系统._待发送事件;
     const 特殊场景id = 本楼事件.match(/【特殊场景·([^·】]+)/)?.[1];
@@ -3326,6 +3389,7 @@ export async function 执行回合(
         _.set(新, 'stat_data', newStat);
         确认本轮事务有效();
         确认回合场景未变化('生成期间场景已经变化，本轮正文不会在错误地点提交。');
+        确认时间事务允许写入();
         await Promise.resolve(Mvu.replaceMvuData(新 as Mvu.MvuData, { type: 'message', message_id: 临时助手楼层! }));
         确认本轮事务有效();
         捕获保护快照(newStat);
@@ -3583,6 +3647,7 @@ export async function 执行回合(
  * 然后按行动楼的现文本重新执行一回合(玩家可能已用羽笔改写过输入,2026-08-04)。
  */
 export async function 重掷回合(): Promise<void> {
+  if (时间事务阻止普通写入()) { eventEmit('人妻公寓:回合失败', 时间事务未完成提示); return; }
   if (回合进行中()) {
     // 静默返回会闩死客户端的乐观 发送中 锁(2026-07-26 审计 C6):必须回一个事件解锁
     eventEmit('人妻公寓:回合失败', '上一轮还没结束,稍等片刻再重来');
@@ -3741,6 +3806,7 @@ export async function 重掷回合(): Promise<void> {
  * 否则回档后任意一次 UI 抬升(镜像直写)会把整份旧局镜像重新盖上当前楼戳,旧阶段全数复活。
  */
 export async function 回档至(楼层: number): Promise<void> {
+  if (时间事务阻止普通写入()) { eventEmit('人妻公寓:回合失败', 时间事务未完成提示); return; }
   if (回合进行中()) {
     eventEmit('人妻公寓:回合失败', '上一轮还没结束,稍等片刻再回档');
     return;
@@ -4055,6 +4121,7 @@ export async function 开始新游戏(难度: string): Promise<boolean> {
  * 残留旧局镜像会把旧阶段"取大"进新局,防护9 反向路径)。
  */
 export async function 重开一局(): Promise<void> {
+  if (时间事务阻止普通写入()) { eventEmit('人妻公寓:回合失败', 时间事务未完成提示); return; }
   if (回合进行中()) {
     // 静默返回=客户端 发送中 永久闩死只能刷新页面(2026-07-26 审计 C6 最易触发路径)
     eventEmit('人妻公寓:回合失败', '上一轮还没结束,稍等片刻再重开');

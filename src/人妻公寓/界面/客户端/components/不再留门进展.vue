@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AuxPanel from './辅助面板.vue';
 import { computed, ref, watch } from 'vue';
 import type { SchemaType } from '../../../schema';
 import {
@@ -45,6 +46,7 @@ const photoDate = computed(() => {
 </script>
 
 <template>
+  <AuxPanel v-if="visible && progress" label="线路进展" :hint="progress.状态" :reset-key="(room ?? '') + ':' + r.实例">
   <aside v-if="visible && progress" class="nmd-progress" aria-label="不再留门进展">
     <div class="nmd-line">
       <strong>不再留门</strong><span>{{ progress.状态 }}</span>
@@ -99,6 +101,7 @@ const photoDate = computed(() => {
       <p>周小满亲自封好的同一记录盒已存入202专用格，由你代为保管。</p>
     </details>
   </aside>
+  </AuxPanel>
 </template>
 
 <style scoped>

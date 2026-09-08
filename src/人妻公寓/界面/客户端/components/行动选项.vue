@@ -2,7 +2,7 @@
 // 行动选项(App A8b 从 App.vue 等价外移):gal 式居中选项条,点了直接发送。
 // 纯展示 + 纯 emit:显示门控/选项列表全部来自 App,组件只把原字符串 select 回去。
 // 不得 import App/store/eventEmit/composable,不得调用酒馆 API。
-import { ref, watch } from 'vue';
+import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { 素材基址 } from '../assets';
 import Ic from './Icon.vue';
 
@@ -17,6 +17,16 @@ const emit = defineEmits<{
 }>();
 
 const 展开 = ref(false);
+const 根 = ref<HTMLElement | null>(null);
+const 把手 = ref<HTMLButtonElement | null>(null);
+function 按键(event: KeyboardEvent): void {
+  if (event.key !== 'Escape' || !展开.value) return;
+  event.preventDefault(); event.stopPropagation(); 展开.value = false;
+  void nextTick(() => 把手.value?.focus());
+}
+function 外部按下(event: PointerEvent): void { if (event.target instanceof Node && !根.value?.contains(event.target)) 展开.value = false; }
+onMounted(() => document.addEventListener('pointerdown', 外部按下));
+onUnmounted(() => document.removeEventListener('pointerdown', 外部按下));
 
 watch(
   [() => props.open, () => props.mobile, () => props.options],
@@ -34,9 +44,10 @@ function 选择(文本: string): void {
 
 <template>
   <template v-if="open">
-    <div v-if="mobile" class="option-drawer" :class="{ open: 展开 }">
+    <div ref="根" class="option-drawer" :class="{ open: 展开 }" @keydown="按键">
       <button
         type="button"
+        ref="把手"
         class="option-drawer-handle"
         :aria-expanded="展开"
         aria-controls="mobile-action-options"
@@ -63,15 +74,7 @@ function 选择(文本: string): void {
         </div>
       </transition>
     </div>
-    <div
-      v-else
-      class="option-row desktop-option-row"
-      :style="{ '--opt-img': `url(${素材基址}/界面/选项条.webp)` }"
-    >
-      <button v-for="(项, i) in options" :key="i" class="option-chip gal" @click="选择(项)">
-        {{ 项 }}
-      </button>
-    </div>
+
   </template>
 </template>
 

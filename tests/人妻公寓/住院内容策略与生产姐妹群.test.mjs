@@ -280,7 +280,7 @@ test('住院微信按出生时间重建四个幂等节点，性别作为硬事�
   const 住院键 = 列出住院微信节点(data).map(x => 产后微信键(x, x.类型));
   assert.equal(new Set(住院键).size, 4);
   assert.match(孕产AI通知源码, /孩子事实:[\s\S]*性别: 孩子\.性别/);
-  assert.match(孕产AI通知源码, /验收生产硬事实\(行, 孩子\?\.性别\)/);
+  assert.match(孕产AI通知源码, /验收生产硬事实\(行, 孩子\?\.性别, 凭据\.胎次\)/);
   assert.doesNotMatch(孕产AI通知源码, /母女平安|母子平安/);
   assert.doesNotMatch(孕产AI通知源码, /生成生产群获知/, '必达通知不得抢先写一条重复的生产群播报');
 });

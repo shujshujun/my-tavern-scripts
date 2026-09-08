@@ -3,7 +3,7 @@ import { 当前时段, 取绝对时段, 妻位置推算, 读取世界时间 } fr
 import { 阶段性癖已完成 } from './阶段性癖状态';
 import { 读取医院内容策略 } from './生产系统';
 import { 应使用怀孕CG } from './怀孕系统';
-import { 拼接待发送事件队列, 读取待发送事件队列, 有普通场景剧情阻塞, 清空场景剧情事务 } from './场景剧情事务';
+import { 拼接待发送事件队列, 读取待发送事件队列, 有地点动作剧情冲突, 清空场景剧情事务 } from './场景剧情事务';
 
 export const 安若妍换掉商品ID = '角色路线:301:结局剧情';
 export const 安若妍拍立得ID = '301拍立得套装';
@@ -158,10 +158,10 @@ function 前置成立(data: SchemaType): boolean {
 function 身体可用(data: SchemaType): boolean {
   return Boolean(data.户['301'] && 读取医院内容策略(data, '301').允许成人特殊场景);
 }
-function 外部阻断(data: SchemaType): string {
+function 外部阻断(data: SchemaType, 地点 = '301'): string {
   if (!身体可用(data)) return '安若妍正在医院、待产或产后恢复。';
   if (data.系统._父亲通话.标识 || data.系统._父亲通话.状态 || data.系统._待接来电.期 >= 0) return '请先处理当前来电。';
-  if (data.系统._特殊场景.id || 有普通场景剧情阻塞(data)) return '请先完成当前剧情。';
+  if (data.系统._特殊场景.id || 有地点动作剧情冲突(data, 地点)) return '请先完成当前剧情。';
   return '';
 }
 function 最近安全夜(data: SchemaType, 起点: number): number {
@@ -329,10 +329,10 @@ function 动作阻断(data: SchemaType, id: 安若妍换掉动作ID): string {
   if (!动作阶段匹配(路线.阶段, 配置.阶段) || 已完成(data)) return '线路状态已经变化。';
   // 改约只撤销尚未开始的本夜安排，身体恢复或来电不能反向封死这个硬操作。
   if (id === '暂缓预约夜') {
-    return data.系统._性爱场景.状态 !== '空闲' || data.系统._特殊场景.id || 有普通场景剧情阻塞(data)
+    return data.系统._性爱场景.状态 !== '空闲' || data.系统._特殊场景.id || 有地点动作剧情冲突(data, 配置.地点)
       ? '请先完成当前场次或剧情，再调整预约。' : '';
   }
-  const 外部 = 外部阻断(data);
+  const 外部 = 外部阻断(data, 配置.地点);
   if (外部) return 外部;
   if (配置.地点 === '301' && 妻位置推算('301', 当前, data.户['301']) !== '301') return '安若妍当前不在301。';
   if (id === '使用换掉' && (!前置成立(data) || !data.背包.includes(安若妍换掉商品ID)))

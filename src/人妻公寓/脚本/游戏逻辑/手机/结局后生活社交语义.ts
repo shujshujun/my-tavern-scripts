@@ -1,10 +1,7 @@
 import type { SchemaType } from '../../../schema';
 import type { 门牌 } from '../../../stageConfig';
-import {
-  构建角色结局后生活社交语义,
-  角色对母亲共居动态评论池,
-  角色结局后姐妹群长期方向,
-} from '../结局后生活社交语义';
+import { 构建角色结局后生活社交语义, 角色结局后姐妹群长期方向, 读取周小满承接生活事实 } from '../结局后生活社交语义';
+import { 公开动态评论者方向 } from './结局后日常反馈';
 import { 母亲共居主动私聊主题, 母亲共居玩家私聊纪律 } from '../302共居系统';
 
 export interface 结局后生活社交画像 {
@@ -39,7 +36,7 @@ export function 构建结局后生活社交画像(data: SchemaType, 门牌文本
   }
   const 语义 = 构建角色结局后生活社交语义(data, 门牌号);
   const 生活差分 =
-    门牌号 === '202' && 语义.已开启
+    门牌号 === '202' && 语义.已开启 && 读取周小满承接生活事实(data).停止默认等待
       ? `周小满不再把临时决定和无限等待当成默认，她会把自己的时间放回生活里。${语义.普通正文纪律}`
       : 语义.普通正文纪律;
   const 禁止 =
@@ -89,7 +86,9 @@ export function 角色结局后公开朋友圈补充(data: SchemaType, 门牌文
 export function 母亲共居公开评论文案(data: SchemaType, 评论者文本: string, 事件类型: string): string {
   const 评论者 = 有效门牌(评论者文本);
   if (!评论者 || 评论者 === '302') return '';
-  return 角色对母亲共居动态评论池(data, 评论者, 事件类型)[0] ?? '';
+  const 方向 = 公开动态评论者方向(data, 评论者);
+  if (!方向) return '';
+  return 事件类型 === '公开交接' ? `当前是正式交接公开动态。${方向}` : 方向;
 }
 
 export function 结局后姐妹群长期话题(data: SchemaType): string {

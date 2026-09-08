@@ -2133,11 +2133,39 @@ function 安装数据库手动填表保护(): void {
       if (!运行态.观察器.has(doc) && doc.documentElement) {
         const Observer = doc.defaultView?.MutationObserver;
         if (Observer) {
-          const observer = new Observer(() => 安排扫描());
+          const observer = new Observer(records => {
+            // 取消失败时保护层会把 disabled 从 true 临时改为 false 再恢复为 true。
+            // 同一批记录须比较该属性首次变更前与最终值，不能把每条中间记录都当外部变化。
+            // 节点增删仍要扫描；真实就绪、勾选和重绘变化也不能因一次取消失败而永久忽略。
+            if (records.some(record => record.type === 'childList')) {
+              安排扫描();
+              return;
+            }
+            const 首次属性值 = new Map<Element, Map<string, string | null>>();
+            for (const record of records) {
+              if (record.type !== 'attributes' || !record.attributeName) continue;
+              const target = record.target as Element;
+              let 属性们 = 首次属性值.get(target);
+              if (!属性们) {
+                属性们 = new Map();
+                首次属性值.set(target, 属性们);
+              }
+              if (!属性们.has(record.attributeName)) 属性们.set(record.attributeName, record.oldValue);
+            }
+            for (const [target, 属性们] of 首次属性值) {
+              for (const [名称, 原值] of 属性们) {
+                if (target.getAttribute(名称) !== 原值) {
+                  安排扫描();
+                  return;
+                }
+              }
+            }
+          });
           observer.observe(doc.documentElement, {
             childList: true,
             subtree: true,
             attributes: true,
+            attributeOldValue: true,
             attributeFilter: ['disabled', 'aria-checked'],
           });
           运行态.观察器.set(doc, observer);

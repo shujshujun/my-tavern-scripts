@@ -1433,7 +1433,7 @@ test('荣耀洞与监控不再调用执行隔离事件，改用 生成隔离事�
   assert.match(监控段, /await 顺序提交隔离事件\(\{/);
   const 荣耀段 = 截段(Index源, 'async function 运行荣耀洞隔离拍', '\n  }\n');
   assert.doesNotMatch(荣耀段, /执行隔离事件\(/);
-  assert.match(荣耀段, /await 生成隔离事件草稿\(\{/);
+  assert.match(荣耀段, /await 生成隔离事件草稿\(\s*\{/);
   assert.match(荣耀段, /await 顺序提交隔离事件\(\{/);
 });
 
@@ -1622,7 +1622,7 @@ test('启动恢复必须在挂载监听之前，且时间与隔离事务并存�
   const 恢复位置 = Index源.indexOf('await 恢复中断隔离提交(');
   const 挂载位置 = Index源.indexOf('挂载监听();');
   assert.ok(恢复位置 >= 0 && 挂载位置 > 恢复位置, '隔离恢复必须先于玩法监听挂载');
-  const 启动段 = 截段(Index源, 'const 启动聊天变量 = getVariables', '脚本心跳:每 5s 写 sessionStorage');
+  const 启动段 = 截段(Index源, 'const 启动时间变量 = getVariables', '脚本心跳:每 5s 写 sessionStorage');
   assert.match(启动段, /时间推进事务键[\s\S]*隔离事件事务键/, '必须检查时间事务与隔离事务并存');
   assert.match(启动段, /await 恢复中断时间推进\(\)/);
   assert.match(启动段, /await 恢复中断隔离提交\(/);

@@ -15,7 +15,7 @@ test('302不再为一块核心瓷砖增加电脑端第二层折叠', () => {
 test('手机继续只有原房内操作总抽屉，内部选择留在同一面板', () => {
   const component = read('src/人妻公寓/界面/客户端/components/房内操作抽屉.vue');
   assert.equal((component.match(/class="drawer-handle"/g) ?? []).length, 1);
-  assert.match(component, /房内操作 · \{\{ actionCount \}\}项/);
+  assert.match(component, /forcedOpen \? '待决定' : '房内操作'/);
   assert.match(component, /id="in-room-acts-panel"/);
   assert.match(component, /当前选择动作\?\.选项\?\.length/);
   assert.match(component, /class="action-choice"/);

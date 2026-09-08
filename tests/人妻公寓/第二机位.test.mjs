@@ -1119,7 +1119,7 @@ test('第二机位九张正式WebP进入源素材，运行时路由不再依赖o
     false,
   );
   const 资源路由 = readFileSync(new URL('../../src/人妻公寓/界面/客户端/assets.ts', import.meta.url), 'utf8');
-  assert.match(资源路由, /素材\/特殊场景/);
+  assert.match(资源路由, /rq091\/story/);
   assert.doesNotMatch(资源路由, /output\/imagegen\/second-camera/);
   assert.match(资源路由, /第二机位图片/);
 });

@@ -220,7 +220,7 @@ test('孕态最终照片冻结，体态改变不改写背景照片版本', () =>
   data.系统._已完成特殊场景.push(route.安若妍换掉商品ID);
   const assets = require('../../src/人妻公寓/脚本/游戏逻辑/安若妍换掉资源.ts');
   assert.equal(assets.安若妍换掉背景文件(data), 'ARY-RPL-BG-BASE-POST-P');
-  assert.equal(assets.安若妍换掉图片('ARY-RPL-10-P'), '');
+  assert.equal(decodeURI(assets.安若妍换掉图片('ARY-RPL-10-P')), 'https://testingcf.jsdelivr.net/gh/shujun8520-design/qgy-assets@cg5/rq091/story/安若妍换掉/ARY-RPL-10-P.webp');
   globalThis.__RQGY_ARY_REPLACE_ASSET_BASE__ = 'https://example.com/approved';
   assert.equal(assets.安若妍换掉图片('ARY-RPL-10-P'), 'https://example.com/approved/ARY-RPL-10-P.webp');
   assert.equal(assets.安若妍换掉图片('../ARY-RPL-10-N'), '');

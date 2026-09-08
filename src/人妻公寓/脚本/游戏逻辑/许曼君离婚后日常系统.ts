@@ -3,6 +3,7 @@ import { 门牌列表 } from '../../stageConfig';
 import { 当前时段, 妻位置推算 } from './楼层时钟';
 import { 处于医院硬锁 } from './生产系统';
 import { 许曼君离婚已完成 } from './许曼君离婚系统';
+import { 读取队首场景剧情, 有地点动作剧情冲突 } from './场景剧情事务';
 
 export const 许曼君离婚后日常主题列表 = ['给自己改衣服', '重排201', '给自己留一笔生活钱'] as const;
 export type 许曼君离婚后日常主题 = (typeof 许曼君离婚后日常主题列表)[number];
@@ -51,6 +52,7 @@ export interface 许曼君离婚后日常票 {
   事件ID: string;
   期望次数: number;
   请求时段: number;
+  /** 发起动作时的来源楼，绝不是之后新增的助手结果楼；旧票保留原字段和事件ID。 */
   请求楼层: number;
   关系: 许曼君离婚后日常关系;
   主题: 许曼君离婚后日常主题;
@@ -97,7 +99,7 @@ function 硬阻断原因(data: SchemaType, location: string, 检查剧情事务:
   if (data.系统._性爱场景.状态 !== '空闲') return '当前亲密场景尚未结束。';
   if (data.系统._父亲通话.标识 || data.系统._父亲通话.状态) return '先结束当前电话。';
   if (data.系统._待接来电.期 >= 0) return '先处理当前来电。';
-  if (检查剧情事务 && (data.系统._场景剧情事务.id || String(data.系统._待发送事件 ?? '').trim())) {
+  if (检查剧情事务 && 有地点动作剧情冲突(data, location)) {
     return '先完成当前剧情。';
   }
   if (处于医院硬锁(data, '201')) return '许曼君正在医院待产或恢复。';
@@ -322,6 +324,64 @@ export function 解析许曼君离婚后日常事件(event: string): 许曼君�
   };
 }
 
+/** 单次生成的内存凭据；沿既有场景事务/原生租约传递，不增加存档或第二套调度。 */
+export interface 许曼君日常提交锚 {
+  readonly 事件: string;
+  readonly 来源楼层: number;
+  readonly 生成前末楼: number;
+  readonly 结果楼层: number;
+  readonly 场景事务ID: string;
+  readonly 请求世代: number;
+  readonly 触发楼层: number;
+}
+
+/**
+ * 从生成前的可信数据冻结来源与结果身份。调用通道提供实际预期结果楼；这里不猜+1/+2。
+ * 重试保留旧业务来源楼，结果楼跟随本次生成；旧等待票可由既有场景恢复入口重新激活。
+ */
+export function 冻结许曼君日常提交锚(
+  data: SchemaType,
+  event: string,
+  生成前末楼: number,
+  结果楼层: number,
+): 许曼君日常提交锚 | null {
+  const ticket = 解析许曼君离婚后日常事件(event);
+  if (!ticket || ![ticket.请求楼层, 生成前末楼, 结果楼层].every(value => Number.isSafeInteger(value) && value >= 0) ||
+      ticket.请求楼层 > 生成前末楼 || 结果楼层 <= 生成前末楼 ||
+      ticket.请求时段 !== data.系统._绝对时段) return null;
+  const txn = data.系统._场景剧情事务;
+  if (txn.id) {
+    const head = 读取队首场景剧情(data.系统._待发送事件);
+    if (txn.状态 !== '生成中' || txn.目标场景 !== '201' || txn.内容 !== event ||
+        !Number.isSafeInteger(txn.请求世代) || txn.请求世代 < 1 ||
+        !Number.isSafeInteger(txn.触发楼层) || txn.触发楼层 < ticket.请求楼层 || txn.触发楼层 > 生成前末楼 ||
+        !head || head.id !== txn.id || head.内容 !== event) return null;
+  } else if (ticket.请求楼层 !== 生成前末楼) {
+    // 无活动事务的兼容票只能属于本次来源楼；不能靠未来任意一条正文认领旧日常。
+    return null;
+  }
+  return Object.freeze({
+    事件: event, 来源楼层: ticket.请求楼层, 生成前末楼, 结果楼层,
+    场景事务ID: txn.id, 请求世代: txn.id ? txn.请求世代 : 0, 触发楼层: txn.id ? txn.触发楼层 : ticket.请求楼层,
+  });
+}
+
+function 日常提交楼层有效(
+  data: SchemaType,
+  event: string,
+  ticket: 许曼君离婚后日常票,
+  floor: number,
+  anchor: 许曼君日常提交锚 | null | undefined,
+): boolean {
+  if (!Number.isSafeInteger(floor) || floor < 0) return false;
+  // 保留无场景事务的旧纯函数同楼调用；两个生产通道均显式传凭据，null不可退化放行。
+  if (anchor === undefined) return !data.系统._场景剧情事务.id && floor === ticket.请求楼层;
+  if (!anchor || anchor.事件 !== event || anchor.来源楼层 !== ticket.请求楼层 || anchor.结果楼层 !== floor) return false;
+  const current = 冻结许曼君日常提交锚(data, event, anchor.生成前末楼, anchor.结果楼层);
+  return !!current && current.场景事务ID === anchor.场景事务ID && current.请求世代 === anchor.请求世代 &&
+    current.触发楼层 === anchor.触发楼层;
+}
+
 export function 许曼君离婚后日常演员错误(event: string, wives: readonly string[], husbands: readonly string[]): string {
   if (!解析许曼君离婚后日常事件(event)) return '';
   const uniqueWives = [...new Set(wives)];
@@ -331,16 +391,103 @@ export function 许曼君离婚后日常演员错误(event: string, wives: reado
   return '';
 }
 
+function 日常谓语被否定(before: string, after: string): boolean {
+  return /(?:尚未|还未|仍未|未曾|没有|还没|仍没|并未|未能|没能|不能|不曾|并非|不是|不算|未|没)(?:(?!已经|终于|随后|却|就|还是|仍然).)*$/u.test(before) ||
+    /^(?:了)?(?:还谈不上|谈不上|尚未发生|并未发生|是不可能的|没有发生|了吗|了么|没有)/u.test(after);
+}
+
+/** 并列后续动作另有自己的时态与宾语，不能反向修饰已经命中的完成谓语。 */
+function 日常谓语直接后缀(after: string): string {
+  const next = after.search(/(?:并(?:且)?|而且|接着|随后|然后)(?=(?:她|自己)?(?:决定|打算|准备|计划|开始|试穿|检查|核对|列出|单列))/u);
+  return next < 0 ? after : after.slice(0, next);
+}
+
+/** 后置时间只解释当前谓语，不能因全文含有未来或历史词而抹掉另一项已发生事实。 */
+function 日常谓语后置非本次事实(after: string): boolean {
+  const tail = 日常谓语直接后缀(after);
+  // 包含当前谓语的宾语，例如“写进明账以后”；不跨过“并决定以后试穿”等另一个动作。
+  const 时间从句 = /^(?:了)?[^，,。！？!?；;\n—]*?(?:以后|之后|之前|以前)(?=再|才|[。！？!?；;\n]|$)|^(?:了)?(?:后才|后再)/u.test(tail);
+  // 单独的“摆妥后，又挪回”仍是先完成后撤销；追溯说明只归属当前谓语。
+  const 历史追注 = /^(?:了)?[^，,。！？!?；;\n]*?(?:——|--|（|\()(?:这|那)是(?:昨天|昨日|上次|从前|过去)/u.test(tail);
+  return 时间从句 || 历史追注;
+}
+
+/** 裸“单列”只有宾语是预算本身才算结果；预算修饰的待办/说明等名词不是这笔钱。 */
+function 日常单列预算对象有效(before: string, after: string): boolean {
+  const object = 日常谓语直接后缀(after).replace(/^了/u, '').replace(/[。！？!?；;\n]+$/u, '').trim();
+  if (object) {
+    return /^(?:(?:一|这|那)笔|(?:她|自己|许曼君)的)*(?:生活钱|生活预算|自己的钱|自己.{0,12}(?:生活|开销).{0,8}钱)(?=$|用于|作为|以供|供)/u.test(object);
+  }
+  // “把自己的生活预算单列”与预算作主语时，沿紧邻谓语的前置名词核对，不借全文关键词猜宾语。
+  return /(?:生活钱|生活预算|自己的钱|自己.{0,12}(?:生活|开销).{0,8}钱)(?:现在|已经|已|正式|固定|在明账(?:里|中))*$/u.test(before);
+}
+
+/** 只识别本项日常的结果事实，不把动作词出现、计划、旧引文或别的事情完成当作收针。 */
+function 日常结果事实(theme: 许曼君离婚后日常主题, text: string): { 曾完成: boolean; 最终完成: boolean } {
+  const item = theme === '给自己改衣服'
+    ? /衣服|衣裳|衣摆|袖口|衣身|布边|针线|裙|上衣|裁改|缝合|收针/u
+    : theme === '重排201'
+      ? /201|房间|物件|家具|柜子|桌面|抽屉|动线|重排/u
+      : /生活钱|生活预算|自己的钱|自己.{0,12}(?:生活|开销).{0,8}钱|明账|额度/u;
+  const predicate = theme === '给自己改衣服'
+    ? /改好|改完|缝好|缝完|缝妥|改妥|(?:修改|裁改|缝制|缝合|收针)(?:已经|已|终于)?(?:完成|完毕|妥当|好了)/gu
+    : theme === '重排201'
+      ? /归位|落定|排好|摆妥|(?:重新布置|重新摆放|重新安排|重新整理|安置)(?:好|妥当)|重排(?:已经|已)?(?:完成|结束|完毕)|现在住着顺手/gu
+      : /固定留(?:下|出)|(?:正式|固定|单独)(?:记入|写入|写进)|单列(?:入账)?|留给(?=自己)|已经固定|已经留出/gu;
+  // 只屏蔽有明确引用来源的片段；人物直接说出的当前结果仍可作为事实，不要求固定口令。
+  const narrative = text.replace(
+    /((?:便签|纸条|旧计划|旧记录|旧稿|例句|引用|复述)[^。！？；\n“「『‘"']{0,20})[“「『‘"'][^”」』’"'\n]*[”」』’"']/gu,
+    '$1 ',
+  );
+  let 曾完成 = false, 最终完成 = false, 同项上文 = false;
+  for (const sentence of narrative.match(/[^。！？!?；;\n]+[。！？!?；;\n]?/gu) ?? []) {
+    let 非本次事实 = false;
+    for (const raw of sentence.split(/[，,]|(?=但是|不过|然而|可是|但)/u)) {
+      const clause = raw.replace(/[“”「」『』‘’"']/gu, '').trim();
+      if (!clause || /[？?]/u.test(clause)) continue;
+      if (/^(?:但是|不过|然而|可是|但|现在|此刻|如今)/u.test(clause)) 非本次事实 = false;
+      const scope = clause.replace(/(?:按照|按|照着|沿着)(?:昨天|上次|之前|刚才).{0,18}(?:尺寸|标记|动线|范围|数字|位置)/gu, '');
+      const modes = /准备(?!好|过)|打算|计划|希望|想要|想(?=把|将|先|再)|正在|如果|假如|要是|明天|改天|以后|将会|就会|也许|可能|似乎|好像|大概|是否|能否|要不要|会不会|问[：:]?|昨天|昨日|上次|从前|曾经|回忆|谎称|假装|想象/gu;
+      const mode = [...scope.matchAll(modes)][0];
+      const localItem = item.test(clause);
+      const otherTask = /报表|报告|另一户|其他户|另一件|别的事|其他事情/u.test(clause);
+      if (localItem && !otherTask) 同项上文 = true;
+      else if (otherTask) 同项上文 = false;
+      const related = localItem || 同项上文;
+      for (const match of clause.matchAll(predicate)) {
+        const at = match.index;
+        const before = clause.slice(0, at), after = clause.slice(at + match[0].length);
+        const nonActual = 非本次事实 || (mode !== undefined && mode.index <= at);
+        if (!related || otherTask || nonActual || 日常谓语后置非本次事实(after)) continue;
+        // 核对本次“单列”的预算宾语；列核对事项不算定额，真正预算仍沿用下方入账门。
+        if (theme === '给自己留一笔生活钱' && match[0] === '单列' &&
+          !日常单列预算对象有效(before, after)) continue;
+        // 否定只作用于当前谓语：不能让“尚未熨平，但已缝好”或另一项未完盖掉真正结果。
+        if (日常谓语被否定(before, after)) { 最终完成 = false; continue; }
+        if (theme === '重排201' && !/房间|201|动线|全部|所有|常用物件|重排/u.test(clause)) continue;
+        曾完成 = true;
+        // 留钱必须确实入账；D1即使只提前固定额度，也已经越过“只定范围”的边界。
+        if (theme !== '给自己留一笔生活钱' || /明账|入账|记入|写入|写进/u.test(clause)) 最终完成 = true;
+      }
+      if (mode) 非本次事实 = true;
+      if (非本次事实 || !related || otherTask) continue;
+      const unfinished = [...clause.matchAll(/完成|挪动|写入|写进|记入|留下/gu)].some(match =>
+        日常谓语被否定(clause.slice(0, match.index), clause.slice(match.index + match[0].length)),
+      ) || /仍.{0,6}(?:保持原样|停在检查)|还谈不上/u.test(clause);
+      const undone = theme === '给自己留一笔生活钱'
+        ? /(?:又|重新|全部).{0,8}挪回.{0,8}(?:别人|他人|旧账)|生活钱没有留下/u.test(clause)
+        : /(?:又|重新).{0,8}(?:拆开|拆掉|挪回原位|恢复原样)/u.test(clause);
+      const cancelled = [...clause.matchAll(/不做了|改天再说|以后再弄|拒绝继续|算了|不了了之/gu)].some(match =>
+        !日常谓语被否定(clause.slice(0, match.index), clause.slice(match.index + match[0].length)),
+      );
+      if (unfinished || undone || cancelled) 最终完成 = false;
+    }
+  }
+  return { 曾完成, 最终完成 };
+}
+
 function D1范围错误(theme: 许曼君离婚后日常主题, text: string): string {
-  const completion =
-    theme === '给自己改衣服'
-      ? /改好|缝好|重新缝好|试穿.{0,8}(?:合身|完成)|已经完成/u
-      : theme === '重排201'
-        ? /全部归位|重排完成|已经落定|现在住着顺手|全部安排好/u
-        : /正式写进|正式写入|已经固定|不会再挪|已经留出/u;
-  const 明确尚未完成 =
-    theme === '给自己留一笔生活钱' && /还没有.{0,12}正式写(?:进|入)|尚未.{0,12}正式写(?:进|入)/u.test(text);
-  if (!明确尚未完成 && completion.test(text)) return 'D1提前完成了本应留给D2的收针结果。';
+  if (日常结果事实(theme, text).曾完成) return 'D1提前完成了本应留给D2的收针结果。';
   const scoped =
     theme === '给自己改衣服'
       ? /检查|接缝|尺寸|粉笔|标出|量肩|衣摆|布边/u.test(text)
@@ -351,19 +498,7 @@ function D1范围错误(theme: 许曼君离婚后日常主题, text: string): st
 }
 
 function D2完成错误(theme: 许曼君离婚后日常主题, text: string): string {
-  if (theme === '给自己改衣服') {
-    const hasItem = /衣服|衣裳|衣摆|袖口|衣身|布边|针线|缝|裁|裙|上衣/u.test(text);
-    const hasDone = /改好|缝好|剪|收窄|收腰|重新缝|试穿|完成/u.test(text);
-    return hasItem && hasDone ? '' : 'D2没有完成“给自己改衣服”。';
-  }
-  if (theme === '重排201') {
-    const hasRoom = /201|房间|柜子|桌面|抽屉|动线|空位|物件/u.test(text);
-    const hasDone = /重排|重新安排|挪|清空|归位|重新摆|落定|顺手/u.test(text);
-    return hasRoom && hasDone ? '' : 'D2没有完成“重排201”。';
-  }
-  const hasMoney = /生活钱|生活预算|自己的钱|预算|账本|明账|额度/u.test(text);
-  const hasDone = /留下|留给|固定|记入|写进|不会再挪|单独/u.test(text);
-  return hasMoney && hasDone ? '' : 'D2没有完成“给自己留一笔生活钱”。';
+  return 日常结果事实(theme, text).最终完成 ? '' : `D2没有完成“${theme}”。`;
 }
 
 export function 许曼君离婚后日常正文越界原因(event: string, text: string): string {
@@ -381,9 +516,6 @@ export function 许曼君离婚后日常正文越界原因(event: string, text: 
     return '“退出关系”分支不能恢复恋爱、留宿或身体亲密。';
   }
   if (ticket.拍 === 'D1') return D1范围错误(ticket.主题, body);
-  if (/不做了|改天再说|以后再弄|拒绝|算了|没有完成|转身离开|不了了之/u.test(body)) {
-    return '许曼君拒绝或中止了当前日常，D2没有完成项目。';
-  }
   return D2完成错误(ticket.主题, body);
 }
 
@@ -399,17 +531,30 @@ function 事件摘要(ticket: 许曼君离婚后日常票): string {
   return `许曼君在明账里固定留下一笔自己的生活钱；${relation}。`;
 }
 
-function 反馈文案(ticket: 许曼君离婚后日常票): string {
+function 反馈文案(
+  ticket: Pick<许曼君离婚后日常票, '主题' | '关系'>,
+  回指: '之前' | '昨天' = '之前',
+): string {
   const boundary =
     ticket.关系 === '退出关系'
-      ? '房里的事按昨天说的边界来，别多想。'
+      ? `房里的事按${回指}说的边界来，别多想。`
       : ticket.关系 === '暂不承诺'
-        ? '昨天那件事我记你的好，不过咱们没说过的话，姐也不会替你补上。'
-        : '昨天你在旁边，这件事办得确实顺。';
-  if (ticket.主题 === '给自己改衣服') return `昨天改的那件衣服我又试了一遍，袖口和衣摆都留着我自己喜欢的样子。${boundary}`;
-  if (ticket.主题 === '重排201') return `201昨天挪过以后顺手多了，空出来的位置我也没再替谁留着。${boundary}`;
-  return `昨天留在明账里的那笔生活钱还在，我没再顺手挪回别人的账。${boundary}`;
+        ? `${回指}那件事我记你的好，不过咱们没说过的话，姐也不会替你补上。`
+        : `${回指}你在旁边，这件事办得确实顺。`;
+  if (ticket.主题 === '给自己改衣服') return `${回指}改的那件衣服我又试了一遍，袖口和衣摆都留着我自己喜欢的样子。${boundary}`;
+  if (ticket.主题 === '重排201') return `201${回指}挪过以后顺手多了，空出来的位置我也没再替谁留着。${boundary}`;
+  return `${回指}留在明账里的那笔生活钱还在，我没再顺手挪回别人的账。${boundary}`;
 }
+
+/** 只兼容九种已知旧模板的未发送票；不猜日期、不改存档或手机里已经送达的历史。 */
+const 旧反馈文案映射 = new Map(
+  许曼君离婚后日常主题列表.flatMap(主题 =>
+    (['继续关系', '暂不承诺', '退出关系'] as const).map(关系 => {
+      const ticket = { 主题, 关系 };
+      return [反馈文案(ticket, '昨天'), 反馈文案(ticket)] as const;
+    }),
+  ),
+);
 
 function 清空当前检查点(data: SchemaType): void {
   const account = 状态(data);
@@ -430,6 +575,7 @@ export function 提交许曼君离婚后日常事件(
   floor: number,
   wives: readonly string[],
   husbands: readonly string[],
+  提交锚?: 许曼君日常提交锚 | null,
 ): 许曼君离婚后日常结果 {
   const ticket = 解析许曼君离婚后日常事件(event);
   if (!ticket) return { 成功: false, 变动: false, 提示: '201离婚后日常票已经失效。' };
@@ -442,7 +588,7 @@ export function 提交许曼君离婚后日常事件(
   const relation = 当前关系(data);
   const account = 状态(data);
   if (data.系统._绝对时段 !== ticket.请求时段) return { 成功: false, 变动: false, 提示: '世界时间已经变化，本次迟到正文不提交。' };
-  if (floor !== ticket.请求楼层 || !Number.isInteger(floor) || floor < 0) return { 成功: false, 变动: false, 提示: '正文楼层或时间线租约已经变化。' };
+  if (!日常提交楼层有效(data, event, ticket, floor, 提交锚)) return { 成功: false, 变动: false, 提示: '正文楼层或时间线租约已经变化。' };
   if (relation !== ticket.关系) return { 成功: false, 变动: false, 提示: '关系选择已经变化，本次正文不提交。' };
   if (!选项属于关系(ticket.选择, ticket.关系)) return { 成功: false, 变动: false, 提示: '结构化选择已经不属于当前关系。' };
 
@@ -537,7 +683,9 @@ export function 许曼君离婚后日常待发送反馈(
   data: SchemaType,
 ): SchemaType['系统']['_许曼君离婚后日常']['待反馈事件'] {
   if (!许曼君离婚已完成(data) || !data.户['201']) return [];
-  return 状态(data).待反馈事件.filter(item => item.可发送时段 >= 0 && data.系统._绝对时段 >= item.可发送时段);
+  return 状态(data).待反馈事件
+    .filter(item => item.可发送时段 >= 0 && data.系统._绝对时段 >= item.可发送时段)
+    .map(item => ({ ...item, 文案: 旧反馈文案映射.get(item.文案) ?? item.文案 }));
 }
 
 export function 提交许曼君离婚后日常反馈已送达(data: SchemaType, messageKey: string): boolean {

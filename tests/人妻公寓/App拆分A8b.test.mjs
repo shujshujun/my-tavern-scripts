@@ -95,8 +95,8 @@ test('App 不再内联 option-row/quill/reroll/global-time 模板；两组件拥
   // 行动选项：根门、移动抽屉/桌面两列、循环/纸条 class/点击转发
   const 行动选项模板 = 提取模板(行动选项源码);
   assert.match(行动选项模板, /<template v-if="open">/, '行动选项根门');
-  assert.match(行动选项模板, /v-if="mobile" class="option-drawer"/, '手机使用覆盖式抽屉');
-  assert.match(行动选项模板, /v-else\s+class="option-row desktop-option-row"/, '桌面保持两列');
+  assert.match(行动选项模板, /ref="根" class="option-drawer"/, '双端使用覆盖式抽屉');
+  assert.match(行动选项源码, /grid-template-columns: 1fr 1fr/, '双端展开后保持两列');
   assert.match(
     行动选项模板,
     /v-for="\(项, i\) in options" :key="i" class="option-chip gal"/,
@@ -262,7 +262,7 @@ test('ActionOptions 完整组合门控，组件只映射 open；RoundInput 输�
   assert.match(输入模板, /:disabled="sending \|\| variableRegenerationState !== '可用'"/, '变量按钮仅可用态允许点击');
   assert.match(输入模板, /v-if="decisionMode === 'none' && !videoActive && !formalMeeting"[\s\S]*?class="global-time-advance"/, '推进时间门完整');
   const 失败位置 = 输入模板.indexOf('failedAction && !sending');
-  const 重掷位置 = 输入模板.indexOf("variableRegenerationState !== '不可用'");
+  const 重掷位置 = 输入模板.indexOf("variableRegenerationState !== '不可用'", 失败位置);
   const 时间位置 = 输入模板.indexOf('class="global-time-advance"');
   assert.ok(失败位置 >= 0 && 重掷位置 > 失败位置, '失败行动提示位于快捷入口之前');
   assert.ok(时间位置 > 重掷位置, '推进时间按钮在快捷入口之后');

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AuxPanel from './辅助面板.vue';
 // 特殊场景「录像带」操作瓷砖(App A7a 从 App.vue 等价外移)。
 // 只按 props 展示三块瓷砖并 emit 动作；阶段/计数/补偿资格全部来自 App 传入。
 import Ic from './Icon.vue';
@@ -20,6 +21,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
+  <AuxPanel v-if="open && !sending" label="录像操作" :hint="stage" :default-open="true" :reset-key="stage">
   <div v-if="open && !sending" class="scene-acts special-scene-acts">
     <button
       class="tile"
@@ -51,6 +53,7 @@ const emit = defineEmits<{
       <strong>让监控系统自动重连</strong>
     </button>
   </div>
+  </AuxPanel>
 </template>
 
 <style scoped>

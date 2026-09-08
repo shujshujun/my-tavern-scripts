@@ -151,19 +151,19 @@ test('运行时不再携带本地候选路径，客户端与小手机共用同�
       客户端资源.母亲视频通话CG产品相对路径(id),
       `cg1/mother-video-call/${encodeURIComponent(id)}.webp`,
     );
-    assert.equal(客户端资源.母亲视频通话CG图片(id), '', '远端标签未发布前不得请求待发布URL');
-    assert.equal(小手机视频资源.母亲视频通话CG图片(id), '');
+    assert.equal(客户端资源.母亲视频通话CG图片(id), `https://testingcf.jsdelivr.net/gh/shujun8520-design/qgy-assets@cg5/cg1/mother-video-call/${encodeURIComponent(id)}.webp`);
+    assert.equal(小手机视频资源.母亲视频通话CG图片(id), 客户端资源.母亲视频通话CG图片(id));
   }
   assert.equal(共同视频资源.母亲视频通话CG产品相对路径('不存在'), '');
   assert.equal(共同视频资源.母亲视频通话CG图片('不存在'), '');
 });
 
-test('视频默认生产配置完整但明确待发布；可选覆盖只接受共同解析器且不回退main或output', () => {
+test('视频默认生产配置锁定已发布cg5；可选覆盖只接受共同解析器且不回退main或output', () => {
   const 配置 = 共同视频资源.母亲视频通话素材发布配置;
   assert.equal(配置.仓库, 'shujun8520-design/qgy-assets');
   assert.equal(配置.不可变标签, 'cg5');
   assert.equal(配置.产品目录, 'cg1/mother-video-call');
-  assert.equal(配置.状态, '待不可变标签');
+  assert.equal(配置.状态, '已发布');
   assert.ok(共同视频资源.母亲视频通话待发布素材基址.length > 0, '待发布生产配置不得是空占位');
   assert.match(共同视频资源.母亲视频通话待发布素材基址, /qgy-assets@cg5\/cg1\/mother-video-call$/);
   assert.doesNotMatch(共同视频资源.母亲视频通话待发布素材基址, /@main(?:\/|$)|output\/imagegen/);
@@ -214,27 +214,27 @@ test('回国9张与双重继承11张代码映射、manifest和本地产品WebP�
   }
 });
 
-test('母亲静态线拥有独立发布开关，未封板201与第二机位不能连坐其基址', () => {
+test('母亲静态线拥有独立发布开关，201与第二机位各自保留独立基址', () => {
   const 母亲配置 = 客户端资源.母亲线剧情素材发布配置;
-  assert.equal(母亲配置.不可变标签, 'rq0.91');
-  assert.equal(母亲配置.状态, '待不可变标签');
+  assert.equal(母亲配置.不可变标签, 'cg5');
+  assert.equal(母亲配置.状态, '已发布');
   assert.equal(母亲配置.manifest, '母亲线剧情CG.manifest.json');
   assert.notStrictEqual(母亲配置, 客户端资源.剧情事件素材发布配置);
   assert.notStrictEqual(母亲配置, 客户端资源.许曼君201素材发布配置);
-  assert.equal(客户端资源.许曼君201素材发布配置.状态, '待设计/未发布');
+  assert.equal(客户端资源.许曼君201素材发布配置.状态, '已发布');
   assert.ok(客户端资源.母亲线剧情待发布素材基址.length > 0);
-  assert.match(客户端资源.母亲线剧情待发布素材基址, /@rq0\.91\/src\/人妻公寓\/素材\/特殊场景$/);
+  assert.match(客户端资源.母亲线剧情待发布素材基址, /@cg5\/rq091\/story$/);
   assert.doesNotMatch(客户端资源.母亲线剧情待发布素材基址, /@main(?:\/|$)|output\/imagegen/);
-  assert.equal(客户端资源.母亲线剧情素材基址, '');
-  assert.equal(客户端资源.回国图片('回国_01_管理员室整理经营归档'), '');
-  assert.equal(客户端资源.双重继承图片('双重继承_01_公寓外部检查'), '');
+  assert.equal(客户端资源.母亲线剧情素材基址, 'https://testingcf.jsdelivr.net/gh/shujun8520-design/qgy-assets@cg5/rq091/story');
+  assert.match(decodeURI(客户端资源.回国图片('回国_01_管理员室整理经营归档')), /@cg5\/rq091\/story\/回国\//);
+  assert.match(decodeURI(客户端资源.双重继承图片('双重继承_01_公寓外部检查')), /@cg5\/rq091\/story\/双重继承\//);
 
   globalThis.__RQGY_MOTHER_LINE_STORY_ASSET_BASE__ = 'https://cdn.example/assets@mother/src/人妻公寓/素材/特殊场景/';
   try {
     assert.match(decodeURI(客户端资源.回国图片('回国_01_管理员室整理经营归档')), /assets@mother\/.*\/回国\//u);
     assert.match(decodeURI(客户端资源.双重继承图片('双重继承_01_公寓外部检查')), /assets@mother\/.*\/双重继承\//u);
-    assert.equal(客户端资源.第二机位图片('第二机位_01'), '');
-    assert.equal(客户端资源.许曼君分居图片('分居_A1_工资卡'), '');
+    assert.match(decodeURI(客户端资源.第二机位图片('第二机位_01_门缝那一眼')), /@cg5\/rq091\/story\/第二机位\//u);
+    assert.match(decodeURI(客户端资源.许曼君分居图片('分居_A1_工资卡入封套')), /@cg5\/rq091\/story\/许曼君分居\//u);
   } finally {
     delete globalThis.__RQGY_MOTHER_LINE_STORY_ASSET_BASE__;
   }

@@ -411,17 +411,13 @@ function 清理历史正文(文本: string): string {
 /**
  * 自由阶段只替换发送给正文模型的历史，不隐藏或删除玩家可见楼层，也不改每楼stat_data。
  * 有准确完成楼层时从结局最终收束开始；旧完成ID缺楼戳时只保留最近12条。
+ * 活动场景保留从自身起点开始的完整历史，已结束章节仍按完成楼封存。
  */
 export function 构造302自由阶段聊天历史(data: SchemaType, 当前地点: string): 共居历史提示[] | null {
   if (
     当前地点 !== '302' ||
     !双重继承完成事实(data) ||
     Boolean(data.系统._坏结局) ||
-    Boolean(data.系统._场景剧情事务.id) ||
-    Boolean(String(data.系统._待发送事件 ?? '').trim()) ||
-    data.系统._待接来电.期 >= 0 ||
-    data.系统._性爱场景.状态 !== '空闲' ||
-    Boolean(data.系统._特殊场景.id) ||
     data.系统._荣耀洞拍 >= 0 ||
     typeof getChatMessages !== 'function' ||
     typeof getLastMessageId !== 'function'
@@ -432,13 +428,25 @@ export function 构造302自由阶段聊天历史(data: SchemaType, 当前地点
   const 完成楼 = data.系统._双重继承.完成楼层;
   const 有精确完成楼 = 完成楼 >= 0 && 完成楼 <= 最后楼;
   const 起楼 = 有精确完成楼 ? 完成楼 + 1 : Math.max(0, 最后楼 - 11);
+  const 活动起点 = [
+    data.系统._场景剧情事务.id ? data.系统._场景剧情事务.触发楼层 : null,
+    data.系统._特殊场景.id ? data.系统._特殊场景.启动楼层 : null,
+    data.系统._性爱场景.状态 !== '空闲' ? data.系统._性爱场景.开始楼层 : null,
+  ].filter((楼): 楼 is number => 楼 !== null);
+  // 缺少完成边界、或现有活动横跨该边界时，不能推断其必要开头已经结束。
+  if (活动起点.length && (!有精确完成楼 || 活动起点.some(楼 => 楼 >= 0 && 楼 <= 完成楼))) return null;
+  const 活动保留起楼 = 活动起点.length
+    ? Math.min(...活动起点.map(楼 => Number.isInteger(楼) && 楼 >= 起楼 && 楼 <= 最后楼 ? 楼 : 起楼))
+    : Number.POSITIVE_INFINITY;
   const 历史 =
     起楼 <= 最后楼
       ? getChatMessages(`${起楼}-${最后楼}`, { hide_state: 'unhidden', include_swipes: false })
           .filter(消息 => 消息.role === 'user' || 消息.role === 'assistant')
-          .map(消息 => ({ role: 消息.role as 'assistant' | 'user', content: 清理历史正文(消息.message) }))
+          .map(消息 => ({ message_id: 消息.message_id, role: 消息.role as 'assistant' | 'user', content: 清理历史正文(消息.message) }))
           .filter(消息 => !!消息.content)
-          .slice(-共居自由历史上限)
+          .filter((消息, 序, 全部) => 序 >= 全部.length - 共居自由历史上限 ||
+            (活动起点.length > 0 && (!Number.isInteger(消息.message_id) || 消息.message_id >= 活动保留起楼)))
+          .map(({ role, content }) => ({ role, content }))
       : [];
   return [
     {

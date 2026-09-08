@@ -323,7 +323,7 @@ test('真实产品接线是一块父瓷砖、同层二选一和成功后登记�
   assert.match(types, /选项\?: readonly 卡动作选项\[\]/);
   assert.match(component, /当前选择动作/);
   assert.match(component, /action-choice-grid/);
-  assert.match(component, /房内操作 · \{\{ actionCount \}\}项/);
+  assert.match(component, /forcedOpen \? '待决定' : '房内操作'/);
   assert.doesNotMatch(component, /划分桌面302共居动作|room-actions-desktop-cohab-toggle/);
   assert.match(index, /提交302共居动作\(newData, 动作, 地点, 预期绝对时段\)/);
   assert.match(index, /if \(成功 && 开场CG\)[\s\S]*人妻公寓:302亲密开场CG/);

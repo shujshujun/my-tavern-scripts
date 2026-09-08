@@ -64,6 +64,17 @@ const 会话待回复 = new Map<string, 会话待回复上下文>();
 const 会话草稿 = new Map<string, string>();
 /** 引用不是普通文字草稿：只在当前聊天/当前时间线短暂存活，离页即清。 */
 const 会话引用草稿 = new Map<string, 微信消息定位>();
+// 文本/引用分别记录修订身份：值改回原样也不是旧请求持有的那份草稿。
+const 会话文字修订 = new Map<string, symbol>();
+const 会话引用修订 = new Map<string, symbol>();
+export interface 会话草稿发送票 {
+  键: string;
+  原文: string;
+  引用?: 微信消息定位;
+  文字修订?: symbol;
+  引用修订?: symbol;
+}
+const 会话草稿发送票表 = new Map<string, 会话草稿发送票>();
 const 会话输入聚焦 = new Set<string>();
 let 手机聊天渲染世代 = 0;
 let 手机聊天状态刷新计时: ReturnType<typeof setInterval> | null = null;
@@ -114,11 +125,44 @@ export function 取会话草稿(键: string): string | undefined {
 }
 
 export function 写会话草稿(键: string, 文: string): void {
+  if (会话草稿.get(键) !== 文) 标记会话文字修订(键);
   会话草稿.set(键, 文);
+}
+
+/** 组合输入刚开始也取得新身份，旧发送结果不能打断尚未触发input的输入法会话。 */
+export function 标记会话文字修订(键: string): void {
+  会话文字修订.set(键, Symbol());
 }
 
 export function 删除会话草稿(键: string): void {
   会话草稿.delete(键);
+  会话文字修订.delete(键);
+}
+
+/** 跨重绘只保留一份进行中的发送；仍可编辑，但不能把同一待确认草稿重复提交。 */
+export function 开始会话草稿发送(键: string, 原文: string): 会话草稿发送票 | null {
+  if (会话草稿发送票表.has(键)) return null;
+  写会话草稿(键, 原文);
+  const 票: 会话草稿发送票 = {
+    键, 原文, 引用: 取会话引用草稿(键),
+    文字修订: 会话文字修订.get(键), 引用修订: 会话引用修订.get(键),
+  };
+  会话草稿发送票表.set(键, 票);
+  return 票;
+}
+
+export function 会话草稿正在发送(键: string): boolean {
+  return 会话草稿发送票表.has(键);
+}
+
+/** 只释放自己的票；UI在同一同步段按两个修订分别清理，失败不回填旧值。 */
+export function 完成会话草稿发送(票: 会话草稿发送票): { 文字仍当前: boolean; 引用仍当前: boolean } {
+  if (会话草稿发送票表.get(票.键) !== 票) return { 文字仍当前: false, 引用仍当前: false };
+  会话草稿发送票表.delete(票.键);
+  return {
+    文字仍当前: 会话文字修订.get(票.键) === 票.文字修订 && 会话草稿.get(票.键) === 票.原文,
+    引用仍当前: 会话引用修订.get(票.键) === 票.引用修订,
+  };
 }
 
 export function 取会话引用草稿(键: string): 微信消息定位 | undefined {
@@ -128,17 +172,20 @@ export function 取会话引用草稿(键: string): 微信消息定位 | undefin
 
 export function 写会话引用草稿(键: string, 引用: 微信消息定位): void {
   会话引用草稿.clear();
+  会话引用修订.clear();
   会话引用草稿.set(键, { ...引用 });
+  会话引用修订.set(键, Symbol());
 }
 
 export function 删除会话引用草稿(键: string): void {
   会话引用草稿.delete(键);
+  会话引用修订.delete(键);
 }
 
 /** 切档、回档、swipe 或 ABA 世代变化时，即使没有待回复批次也必须清引用。 */
 export function 清理失效会话引用草稿(): void {
   const 前缀 = `${当前聊天ID()}\u0000${读取当前手机时间线租约世代()}\u0000`;
-  for (const 键 of 会话引用草稿.keys()) if (!键.startsWith(前缀)) 会话引用草稿.delete(键);
+  for (const 键 of 会话引用草稿.keys()) if (!键.startsWith(前缀)) 删除会话引用草稿(键);
 }
 
 export function 标记会话输入聚焦(键: string): void {
@@ -232,7 +279,7 @@ export function 清理失效手机聊天批次(): void {
     if (上下文.活动生成ID) stopGenerationById(上下文.活动生成ID);
     手机聊天批次.丢弃(键);
     释放会话待回复(键);
-    会话草稿.delete(键);
+    删除会话草稿(键);
     会话输入聚焦.delete(键);
     console.info('[人妻公寓·手机] 时间线已变化，旧手机聊天批次已作废。');
   }

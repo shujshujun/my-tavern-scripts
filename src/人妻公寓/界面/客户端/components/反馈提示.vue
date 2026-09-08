@@ -1,23 +1,41 @@
 <script setup lang="ts">
 // 反馈浮层：toast + 拾获卡。业务状态(提示文本/拾获卡/提示timer/弹提示)与事件总线写入全留 App；
 // 组件只展示并 emit 收下。多根直接输出两个 absolute 节点，不加会改变定位参照或 z-index 的包装层。
-defineProps<{ toast: string; loot: string; sending: boolean }>();
+import { ref, watch } from 'vue';
+const props = defineProps<{ toast: string; loot: string; sending: boolean }>();
+const 拾获收起 = ref(false);
+const 提示关闭 = ref(false);
+watch(() => props.loot, () => { 拾获收起.value = false; });
+watch(() => props.toast, () => { 提示关闭.value = false; });
 const emit = defineEmits<{ dismissLoot: [] }>();
 </script>
 
 <template>
-  <div v-if="toast" class="toast">{{ toast }}</div>
+  <div v-if="toast && !提示关闭" class="toast" role="status">
+    <span>{{ toast }}</span><button type="button" aria-label="关闭提示" @click="提示关闭 = true">关闭</button>
+  </div>
 
   <!-- 拾获卡(2026-07-17 用户反馈:翻出东西不能一闪而过)——带【】的重要提示
        (线索/收获类)升级成点击才收下的 gal 卡,普通提示仍走 toast -->
-  <div v-if="loot && !sending" class="loot-card" title="点击收下" @click="emit('dismissLoot')">
-    <div class="ui-kicker">FOUND / 拾获</div>
+  <div v-if="loot && !sending" class="loot-card" :class="{ collapsed: 拾获收起 }">
+    <button class="loot-toggle" type="button" :aria-expanded="!拾获收起" @click="拾获收起 = !拾获收起">{{ 拾获收起 ? '展开拾获提示' : '收起提示' }}</button>
+    <div v-show="!拾获收起" class="loot-body">
     <p>{{ loot }}</p>
-    <span class="loot-hint">点击收下</span>
+    <button type="button" class="loot-confirm" @click="emit('dismissLoot')">收下</button>
+    </div>
   </div>
 </template>
 
 <style scoped>
+.toast > span { max-height: min(25dvh, 160px); overflow: auto; }
+.toast button, .loot-card button { min-height: 44px; padding: 6px 10px; border: 1px solid currentColor; border-radius: 8px; color: inherit; background: transparent; font: inherit; cursor: pointer; }
+.toast button { flex: none; }
+.loot-body { max-height: min(38dvh, 260px); overflow-y: auto; overscroll-behavior: contain; }
+.loot-toggle { display: block; margin-left: auto; }
+.loot-confirm { display: block; margin-top: 8px; margin-left: auto; }
+.loot-card.collapsed { padding: 4px 7px; }
+.loot-card button:focus-visible, .toast button:focus-visible { outline: 2px solid var(--pink); outline-offset: 2px; }
+
 /* 反馈浮层样式：完整移动自 App.vue（.toast / .loot-card 全组 / dark toast+loot / 两个 keyframes）。
    需复制 .ui-kicker 基础声明（避免为反馈引入 .mask/.sheet 大量无关 CSS）；card-pop-in 在 App 仍被
    其他卡使用不能删，这里复制同名 keyframes 的现有 from 声明，确保 scoped 动画名重写后仍存在。 */
@@ -31,6 +49,9 @@ const emit = defineEmits<{ dismissLoot: [] }>();
 }
 
 .toast {
+  display: flex;
+  align-items: start;
+  gap: 8px;
   position: absolute;
   box-sizing: border-box;
   left: 50%;

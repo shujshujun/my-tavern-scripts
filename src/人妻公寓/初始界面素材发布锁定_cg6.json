@@ -1,0 +1,127 @@
+{
+  "assetTag": "cg6",
+  "gameVersion": "0.91",
+  "count": 8,
+  "files": [
+    {
+      "path": "rq091/ui/初始外装_周小满.webp",
+      "source": "src/人妻公寓/素材/道具/初始外装_周小满.webp",
+      "sourceBytes": 1330646,
+      "sourceSha256": "9c2b34b21668208ad07040b2995d83dcd423ab2ceecdb6a8daddcaf2bbbd50c4",
+      "bytes": 1330646,
+      "sha256": "9c2b34b21668208ad07040b2995d83dcd423ab2ceecdb6a8daddcaf2bbbd50c4",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "format": "WebP",
+      "pixelIdentical": true,
+      "conversion": "existing compressed WebP bytes reused"
+    },
+    {
+      "path": "rq091/ui/初始外装_夏乔.webp",
+      "source": "src/人妻公寓/素材/道具/初始外装_夏乔.webp",
+      "sourceBytes": 1435274,
+      "sourceSha256": "9a8dcd45beb52c66816a77b26ab5d8472b1bbb3e3a5faead17221c270cdb8822",
+      "bytes": 1435274,
+      "sha256": "9a8dcd45beb52c66816a77b26ab5d8472b1bbb3e3a5faead17221c270cdb8822",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "format": "WebP",
+      "pixelIdentical": true,
+      "conversion": "existing compressed WebP bytes reused"
+    },
+    {
+      "path": "rq091/ui/初始外装_安若妍.webp",
+      "source": "src/人妻公寓/素材/道具/初始外装_安若妍.webp",
+      "sourceBytes": 1454280,
+      "sourceSha256": "98d534672f2a7d19a487f6ce00b83f5e7896b4adc67c02006ccc0818e9a8c9fe",
+      "bytes": 1454280,
+      "sha256": "98d534672f2a7d19a487f6ce00b83f5e7896b4adc67c02006ccc0818e9a8c9fe",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "format": "WebP",
+      "pixelIdentical": true,
+      "conversion": "existing compressed WebP bytes reused"
+    },
+    {
+      "path": "rq091/ui/初始外装_母亲.webp",
+      "source": "src/人妻公寓/素材/道具/初始外装_母亲.webp",
+      "sourceBytes": 1535174,
+      "sourceSha256": "5af68da2976992a06fd4b78e64ed9494ee35f986fb85ed52d168519606c450f6",
+      "bytes": 1535174,
+      "sha256": "5af68da2976992a06fd4b78e64ed9494ee35f986fb85ed52d168519606c450f6",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "format": "WebP",
+      "pixelIdentical": true,
+      "conversion": "existing compressed WebP bytes reused"
+    },
+    {
+      "path": "rq091/ui/初始外装_沈静仪.webp",
+      "source": "src/人妻公寓/素材/道具/初始外装_沈静仪.webp",
+      "sourceBytes": 1342066,
+      "sourceSha256": "f63916eb65cfcaba6937113668be1a810d392694b4682f7389710dac8ba05809",
+      "bytes": 1342066,
+      "sha256": "f63916eb65cfcaba6937113668be1a810d392694b4682f7389710dac8ba05809",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "format": "WebP",
+      "pixelIdentical": true,
+      "conversion": "existing compressed WebP bytes reused"
+    },
+    {
+      "path": "rq091/ui/初始外装_许曼君.webp",
+      "source": "src/人妻公寓/素材/道具/初始外装_许曼君.webp",
+      "sourceBytes": 1192592,
+      "sourceSha256": "6b9110a0a39703118b0b77aba5af17fa9200d96fa0d2bbaf3963f858d82eccc3",
+      "bytes": 1192592,
+      "sha256": "6b9110a0a39703118b0b77aba5af17fa9200d96fa0d2bbaf3963f858d82eccc3",
+      "dimensions": [
+        1254,
+        1254
+      ],
+      "format": "WebP",
+      "pixelIdentical": true,
+      "conversion": "existing compressed WebP bytes reused"
+    },
+    {
+      "path": "rq091/ui/衣柜_默认内衣状态.webp",
+      "source": "src/人妻公寓/素材/道具/衣柜_默认内衣状态.png",
+      "sourceBytes": 94916,
+      "sourceSha256": "f571f35a0b1f034b8ee310fdc985b0c34fe75278e484559a075f5016fa3e7d48",
+      "bytes": 52928,
+      "sha256": "d22922a4aa2950d24d51cf876055872d8539ba64a05ad0c4ab5fd15e4d81d4e7",
+      "dimensions": [
+        256,
+        256
+      ],
+      "format": "WebP",
+      "pixelIdentical": true,
+      "conversion": "PNG to lossless WebP"
+    },
+    {
+      "path": "rq091/ui/衣柜_初始妆容.webp",
+      "source": "src/人妻公寓/素材/道具/衣柜_初始妆容.png",
+      "sourceBytes": 92324,
+      "sourceSha256": "8a5ffab053db7b4be5e3d13dfa6cab5d08085bbc5be65fbf52981205ac554361",
+      "bytes": 51478,
+      "sha256": "748df38ab882794562f50b9edc9bb2dcc1ee33439c7c30a681a41f4713adde60",
+      "dimensions": [
+        256,
+        256
+      ],
+      "format": "WebP",
+      "pixelIdentical": true,
+      "conversion": "PNG to lossless WebP"
+    }
+  ]
+}

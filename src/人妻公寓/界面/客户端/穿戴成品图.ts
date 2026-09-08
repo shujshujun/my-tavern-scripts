@@ -3,10 +3,10 @@ export { 穿戴成品键, type 成品穿戴状态 } from '../../衣柜造型配�
 
 /** 只读本地验收注入或明确发布的不可变素材，不请求不存在的待发布 URL。 */
 export const 衣柜素材发布配置 = Object.freeze({
-  仓库: 'shujshujun/my-tavern-scripts',
-  标签: 'rq0.91',
-  目录: 'src/人妻公寓/素材/衣柜/成品',
-  状态: '待发布' as '待发布' | '已发布',
+  仓库: 'shujun8520-design/qgy-assets',
+  标签: 'cg5',
+  目录: 'rq091/wardrobe',
+  状态: '已发布' as '待发布' | '已发布',
 });
 export const 衣柜素材基址 = String(
   (globalThis as Record<string, unknown>).__RQGY_WARDROBE_ASSET_BASE__ ??

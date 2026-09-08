@@ -1,6 +1,6 @@
 import type { 门牌 } from '../../../stageConfig';
 import { 户静态表, 门牌列表 } from '../../../stageConfig';
-import { 同一换装余波事件, type 换装余波 } from '../雌竞系统';
+import { 同一换装余波事件, 余波过期楼, type 换装余波 } from '../雌竞系统';
 import { 建私聊图库地址索引, 重建已发私聊图, type 私聊图片消息记录, type 已发私聊图缓存 } from '../私聊图片轮换';
 import { 私聊图库清单 } from '../私聊图库清单';
 import {
@@ -18,6 +18,7 @@ import { 验收单条群消息 } from '../手机群聊格式';
 import { 规范手机单气泡 } from '../手机文本格式';
 import { 创建手机时间线租约, 手机时间线租约仍有效 } from '../手机时间线租约';
 import { 时间线切换协调中 } from '../时间线切换协调';
+import { 确认时间事务允许写入, 时间事务阻止普通写入, type 时间事务写入校验 } from '../时间事务写入门';
 import { 合并微信撤回状态, type 微信消息记录 } from '../微信消息撤回';
 import { 构造微信联系保护表, type 微信联系保护表 } from '../微信每日联系';
 import { 压缩微信会话消息 } from '../微信消息压缩';
@@ -38,7 +39,7 @@ import { 合并手机记录投影 } from './原始库投影';
 import {
   写入微信刷新镜像,
   写入微信清空镜像,
-  读取微信持久修订,
+  微信清空提交字段,
   推进微信持久修订,
   选择微信刷新恢复值,
   type 微信刷新恢复选择,
@@ -56,6 +57,14 @@ import {
 
 /** 玩家可见的手机内容只保留宽松安全门；不再要求模型把自然表达压进20～60字。 */
 export const 手机可见单条硬上限 = 150;
+
+function 手机时间写入允许(vars: Record<string, unknown>, 校验?: 时间事务写入校验): boolean {
+  if (校验) {
+    确认时间事务允许写入(校验, vars);
+    return true;
+  }
+  return !时间事务阻止普通写入(vars);
+}
 
 /** 玩家名(酒馆 persona 名;手机生成不知道玩家叫啥时会自创"王师傅"式称呼——一律显式传入) */
 export function 玩家名(): string {
@@ -153,6 +162,8 @@ export interface 微信库 {
 export interface 微信增量写入统计 {
   实际插入消息数: number;
   实际插入消息键: string[];
+  /** 按需返回去重后的朋友圈数量；不把候选动态数量当成实际插入。 */
+  实际插入朋友圈数?: number;
 }
 
 export interface 手机余波身份 {
@@ -355,15 +366,35 @@ function 读取微信原始候选(
   vars: Record<string, unknown>,
   聊天ID = 当前聊天ID(),
   当前绝对时段 = 当前手机绝对时段(),
+  写回关联 = false,
 ): { 库: 已归一微信原始库; 选择: 微信刷新恢复选择 } {
   const 当前键存在 = Object.prototype.hasOwnProperty.call(vars, '_微信');
   const 当前值 = _.get(vars, '_微信');
-  const 选择 = 选择微信刷新恢复值(当前值, 当前键存在, 聊天ID, 当前绝对时段);
+  const 选择 = 选择微信刷新恢复值(当前值, 当前键存在, 聊天ID, 当前绝对时段, vars);
+  if (写回关联 && 选择.使用镜像) {
+    _.set(vars, '_微信', _.cloneDeep(选择.值));
+    if (选择.清空提交) _.set(vars, 微信清空提交字段, _.cloneDeep(选择.清空提交));
+    const 计划 = 选择.关联变量?.手机邀约计划;
+    if (计划) {
+      if (计划.存在) _.set(vars, 手机邀约计划键, _.cloneDeep(计划.值));
+      else _.unset(vars, 手机邀约计划键);
+    }
+    const 消费 = 选择.关联变量?.换装消费;
+    const 当前余波 = (_.get(vars, '_换装余波') ?? null) as 换装余波 | null;
+    const 当前楼 = 末楼();
+    if (消费 && 当前余波 && 同一换装余波事件(消费, 当前余波) &&
+        当前余波.起楼 <= 当前楼 && 当前楼 - 当前余波.起楼 < 余波过期楼) {
+      // 事件本身必须已经存在且仍在当前时间线；只恢复手机消费位，不复活事件或回退疑记。
+      _.set(vars, '_换装余波', {
+        ...当前余波, 圈晒: 消费.圈晒, 探针: 消费.探针, 群议: 消费.群议,
+      });
+    }
+  }
   return { 库: 归一微信原始库(选择.值), 选择 };
 }
 
 function 写入当前聊天微信刷新镜像(预期聊天ID: string, 微信: unknown, 当前绝对时段 = 当前手机绝对时段()): boolean {
-  if (!预期聊天ID || 当前聊天ID() !== 预期聊天ID) return false;
+  if (!预期聊天ID || 当前聊天ID() !== 预期聊天ID || 当前手机绝对时段() < 当前绝对时段) return false;
   return 写入微信刷新镜像(预期聊天ID, 微信, 当前绝对时段);
 }
 
@@ -374,12 +405,17 @@ function 写入当前聊天微信刷新镜像(预期聊天ID: string, 微信: un
 export async function 确认当前微信为刷新真值(
   预期聊天ID = 当前聊天ID(),
   当前绝对时段 = 当前手机绝对时段(),
+  时间事务校验?: 时间事务写入校验,
 ): Promise<boolean> {
   if (!预期聊天ID || 当前聊天ID() !== 预期聊天ID) return false;
+  if (!手机时间写入允许(getVariables({ type: 'chat' }), 时间事务校验)) return false;
   let 快照: 已归一微信原始库 | null = null;
   let 清空 = false;
+  let 清空快照: Record<string, unknown> = {};
+  let 清空变量: Record<string, unknown> = {};
   await updateVariablesWith(
     vars => {
+      if (!手机时间写入允许(vars, 时间事务校验)) return vars;
       if (当前聊天ID() !== 预期聊天ID) return vars;
       const 键存在 = Object.prototype.hasOwnProperty.call(vars, '_微信');
       const 当前值 = _.get(vars, '_微信');
@@ -387,10 +423,16 @@ export async function 确认当前微信为刷新真值(
       // 是调用方已经确认的空库真值，必须写高修订清空墓碑，不能让旧恢复镜像再次获胜。
       if (!键存在 || !是普通对象(当前值)) {
         清空 = true;
+        清空变量 = Object.prototype.hasOwnProperty.call(vars, 手机邀约计划键)
+          ? { [手机邀约计划键]: _.cloneDeep(vars[手机邀约计划键]) }
+          : {};
+        清空快照 = {};
+        推进微信持久修订(清空快照, 预期聊天ID, 当前绝对时段, vars);
+        _.set(vars, 微信清空提交字段, _.cloneDeep(清空快照));
         return vars;
       }
       const 库 = 归一微信原始库(当前值);
-      推进微信持久修订(库 as Record<string, unknown>, 预期聊天ID, 当前绝对时段);
+      推进微信持久修订(库 as Record<string, unknown>, 预期聊天ID, 当前绝对时段, vars);
       _.set(vars, '_微信', 库);
       快照 = _.cloneDeep(库);
       return vars;
@@ -398,8 +440,13 @@ export async function 确认当前微信为刷新真值(
     { type: 'chat' },
   );
   if (当前聊天ID() !== 预期聊天ID) return false;
-  if (快照) return 写入微信刷新镜像(预期聊天ID, 快照, 当前绝对时段);
-  if (清空) return 写入微信清空镜像(预期聊天ID, 当前绝对时段) > 0;
+  if (快照) return 写入当前聊天微信刷新镜像(预期聊天ID, 快照, 当前绝对时段);
+  if (清空 && 当前手机绝对时段() >= 当前绝对时段) {
+    const 最新变量 = getVariables({ type: 'chat' });
+    // 清空回调返回迟到时，新消息/新计划已提交便不得再发布旧墓碑。
+    if (是普通对象(最新变量._微信) || !_.isEqual(_.pick(最新变量, 手机邀约计划键), 清空变量)) return false;
+    return 写入微信清空镜像(预期聊天ID, 当前绝对时段, 清空变量, 清空快照) > 0;
+  }
   return false;
 }
 
@@ -413,18 +460,20 @@ export async function 修改微信消息容器(
   预期聊天ID = 当前聊天ID(),
   允许写入: () => boolean = () => true,
 ): Promise<boolean> {
+  if (时间事务阻止普通写入()) return false;
   let 已写 = false;
   let 微信快照: 已归一微信原始库 | null = null;
   let 微信快照绝对时段 = -1;
   await updateVariablesWith(
     vars => {
+      if (时间事务阻止普通写入(vars)) return vars;
       if ((预期聊天ID && 当前聊天ID() !== 预期聊天ID) || !允许写入()) return vars;
       const 当前绝对时段 = 当前手机绝对时段();
-      const { 库 } = 读取微信原始候选(vars, 预期聊天ID, 当前绝对时段);
+      const { 库 } = 读取微信原始候选(vars, 预期聊天ID, 当前绝对时段, true);
       const 新消息 = 修改([...库.消息]);
       if (!新消息) return vars;
       库.消息 = 规范微信消息容器(新消息);
-      推进微信持久修订(库 as Record<string, unknown>, 预期聊天ID, 当前绝对时段);
+      推进微信持久修订(库 as Record<string, unknown>, 预期聊天ID, 当前绝对时段, vars);
       _.set(vars, '_微信', 库);
       微信快照 = _.cloneDeep(库);
       微信快照绝对时段 = 当前绝对时段;
@@ -517,26 +566,41 @@ function 读取手机宿主保存接口(): { 上下文: 手机宿主保存接口
  * 父窗口内存、localStorage 与 sessionStorage。SillyTavern 的 saveChatConditional 会吞掉内部超时和请求异常，
  * 因而“await 没抛错”并不能证明服务器已经落盘；恢复镜像承担这段不可观测失败窗口。
  */
-async function 记录当前微信刷新恢复副本(预期聊天ID: string): Promise<boolean> {
+async function 记录当前微信刷新恢复副本(
+  预期聊天ID: string,
+  时间事务校验?: 时间事务写入校验,
+  允许保存: () => boolean = () => true,
+): Promise<boolean> {
   const 需要校验聊天 = !!预期聊天ID;
   let 快照: 已归一微信原始库 | null = null;
   let 应写清空墓碑 = false;
+  let 清空快照: Record<string, unknown> = {};
+  let 清空变量: Record<string, unknown> = {};
   let 快照绝对时段 = -1;
   await updateVariablesWith(
     vars => {
+      if (!允许保存()) return vars;
+      if (!手机时间写入允许(vars, 时间事务校验)) return vars;
       if (需要校验聊天 && 当前聊天ID() !== 预期聊天ID) return vars;
       const 当前绝对时段 = 当前手机绝对时段();
-      const { 库, 选择 } = 读取微信原始候选(vars, 预期聊天ID, 当前绝对时段);
+      const { 库, 选择 } = 读取微信原始候选(vars, 预期聊天ID, 当前绝对时段, true);
       if (选择.值 === null) {
         if (Object.prototype.hasOwnProperty.call(vars, '_微信') || 选择.使用镜像) {
           _.set(vars, '_微信', null);
           应写清空墓碑 = true;
           快照绝对时段 = 当前绝对时段;
+          清空变量 = Object.prototype.hasOwnProperty.call(vars, 手机邀约计划键)
+            ? { [手机邀约计划键]: _.cloneDeep(vars[手机邀约计划键]) }
+            : {};
+          清空快照 = {};
+          推进微信持久修订(清空快照, 预期聊天ID, 当前绝对时段, vars);
+          _.set(vars, 微信清空提交字段, _.cloneDeep(清空快照));
         }
         return vars;
       }
       if (!是普通对象(选择.值)) return vars;
-      if (读取微信持久修订(库) <= 0) 推进微信持久修订(库 as Record<string, unknown>, 预期聊天ID, 当前绝对时段);
+      // 普通保存也可能紧随独立的取消/成员移除；在本回调冻结当前计划并争取新修订。
+      推进微信持久修订(库 as Record<string, unknown>, 预期聊天ID, 当前绝对时段, vars);
       _.set(vars, '_微信', 库);
       快照 = _.cloneDeep(库);
       快照绝对时段 = 当前绝对时段;
@@ -544,13 +608,13 @@ async function 记录当前微信刷新恢复副本(预期聊天ID: string): Pro
     },
     { type: 'chat' },
   );
+  if (!允许保存()) return false;
   if (快照) return 写入当前聊天微信刷新镜像(预期聊天ID, 快照, 快照绝对时段);
   if (应写清空墓碑) {
-    // 已经从更高修订的清空镜像恢复时不重复制造新墓碑；只有当前变量主动写成 null
-    // 且尚无对应镜像时才创建一次新的清空修订。
-    const 现有镜像 = 选择微信刷新恢复值(null, false, 预期聊天ID, 快照绝对时段);
-    if (!现有镜像.使用镜像 || 现有镜像.值 !== null) 写入微信清空镜像(预期聊天ID, 快照绝对时段);
-    return true;
+    if (当前聊天ID() !== 预期聊天ID || 当前手机绝对时段() < 快照绝对时段) return false;
+    const 最新变量 = getVariables({ type: 'chat' });
+    if (是普通对象(最新变量._微信) || !_.isEqual(_.pick(最新变量, 手机邀约计划键), 清空变量)) return false;
+    return 写入微信清空镜像(预期聊天ID, 快照绝对时段, 清空变量, 清空快照) > 0;
   }
   return false;
 }
@@ -559,7 +623,7 @@ async function 记录当前微信刷新恢复副本(预期聊天ID: string): Pro
  * SillyTavern 的保存接口没有成功回执，并且会吞掉内部超时；每批可见手机事务完成后，
  * 在静默期再串行补存一次。连续气泡会重置同聊天计时器，只补存最终合并态，不制造保存风暴。
  */
-function 安排手机聊天变量延迟补存(预期聊天ID: string): void {
+function 安排手机聊天变量延迟补存(预期聊天ID: string, 允许保存: () => boolean = () => true): void {
   const 键 = 预期聊天ID || '__current__';
   const 已有 = 手机聊天变量延迟补存计时器.get(键);
   if (已有 !== undefined) clearTimeout(已有);
@@ -568,6 +632,7 @@ function 安排手机聊天变量延迟补存(预期聊天ID: string): void {
     const 补存 = 手机聊天变量持久化队列
       .catch(() => undefined)
       .then(async () => {
+        if (!允许保存()) return;
         if (预期聊天ID && 当前聊天ID() !== 预期聊天ID) return;
         const 接口 = 读取手机宿主保存接口();
         if (!接口) return;
@@ -590,22 +655,32 @@ function 安排手机聊天变量延迟补存(预期聊天ID: string): void {
  * 酒馆助手的 chat 变量更新只会安排防抖保存；这里把手机提交串行接到宿主立即保存接口，
  * 并先写同聊天的内存 + localStorage + sessionStorage 恢复镜像。排队期间切聊则失败关闭，绝不把旧聊天的延迟提交误保存到新聊天。
  * 旧宿主没有保存接口时，浏览器恢复镜像仍可兜住跨刷新与跨重启的未落盘窗口。
+ * 可选允许保存传入调用方租约；在排队、镜像写入和延迟补存时仍按同一时间线校验。
  */
-export async function 立即持久保存手机聊天变量(预期聊天ID = 当前聊天ID()): Promise<boolean> {
+export async function 立即持久保存手机聊天变量(
+  预期聊天ID = 当前聊天ID(),
+  时间事务校验?: 时间事务写入校验,
+  允许保存: () => boolean = () => true,
+): Promise<boolean> {
+  if (!允许保存() || !手机时间写入允许(getVariables({ type: 'chat' }), 时间事务校验)) return false;
   const 需要校验聊天 = !!预期聊天ID;
   const 本次保存 = 手机聊天变量持久化队列
     .catch(() => undefined)
     .then(async (): Promise<boolean> => {
+      if (!允许保存()) return false;
       if (需要校验聊天 && 当前聊天ID() !== 预期聊天ID) return false;
+      if (!手机时间写入允许(getVariables({ type: 'chat' }), 时间事务校验)) return false;
       let 镜像已准备 = false;
       try {
-        镜像已准备 = await 记录当前微信刷新恢复副本(预期聊天ID);
+        镜像已准备 = await 记录当前微信刷新恢复副本(预期聊天ID, 时间事务校验, 允许保存);
       } catch (error) {
         // 恢复副本与宿主保存是两条独立持久通道；镜像失败不能再把原本可用的宿主保存一并跳过。
         console.error('[人妻公寓·手机] 记录微信刷新恢复副本失败，仍继续请求宿主保存:', error);
       }
+      if (!允许保存()) return false;
       if (需要校验聊天 && 当前聊天ID() !== 预期聊天ID) return false;
-      安排手机聊天变量延迟补存(预期聊天ID);
+      if (!手机时间写入允许(getVariables({ type: 'chat' }), 时间事务校验)) return false;
+      安排手机聊天变量延迟补存(预期聊天ID, 允许保存);
       const 接口 = 读取手机宿主保存接口();
       if (!接口) {
         if (!已警告缺少手机硬保存接口) {
@@ -617,7 +692,7 @@ export async function 立即持久保存手机聊天变量(预期聊天ID = 当�
         return 镜像已准备;
       }
       await Promise.resolve(接口.保存.call(接口.上下文));
-      return !需要校验聊天 || 当前聊天ID() === 预期聊天ID;
+      return 允许保存() && (!需要校验聊天 || 当前聊天ID() === 预期聊天ID);
     });
   手机聊天变量持久化队列 = 本次保存.then(
     () => undefined,
@@ -649,6 +724,7 @@ export async function 等待微信刷新宿主就绪(超时毫秒 = 10000): Prom
  */
 export async function 恢复微信刷新恢复副本(预期聊天ID = 当前聊天ID()): Promise<boolean> {
   if (!预期聊天ID || 当前聊天ID() !== 预期聊天ID) return false;
+  if (时间事务阻止普通写入()) return false;
   const 恢复绝对时段 = 当前手机绝对时段();
   const 初始变量 = getVariables({ type: 'chat' });
   const 初始选择 = 选择微信刷新恢复值(
@@ -656,6 +732,7 @@ export async function 恢复微信刷新恢复副本(预期聊天ID = 当前聊�
     Object.prototype.hasOwnProperty.call(初始变量, '_微信'),
     预期聊天ID,
     恢复绝对时段,
+    初始变量,
   );
   if (!初始选择.使用镜像) return false;
 
@@ -664,15 +741,10 @@ export async function 恢复微信刷新恢复副本(预期聊天ID = 当前聊�
   let 恢复身份 = 初始选择.聊天身份;
   await updateVariablesWith(
     vars => {
+      if (时间事务阻止普通写入(vars)) return vars;
       if (当前聊天ID() !== 预期聊天ID) return vars;
-      const 最新选择 = 选择微信刷新恢复值(
-        _.get(vars, '_微信'),
-        Object.prototype.hasOwnProperty.call(vars, '_微信'),
-        预期聊天ID,
-        恢复绝对时段,
-      );
+      const { 选择: 最新选择 } = 读取微信原始候选(vars, 预期聊天ID, 当前手机绝对时段(), true);
       if (!最新选择.使用镜像) return vars;
-      _.set(vars, '_微信', _.cloneDeep(最新选择.值));
       恢复修订 = 最新选择.镜像修订;
       恢复身份 = 最新选择.聊天身份;
       已恢复 = true;
@@ -724,7 +796,7 @@ export async function 隔离当前手机分支(
       // 不能只依赖调用前的瞬时检查。
       if ((写入聊天ID && 当前聊天ID() !== 写入聊天ID) || !允许写入()) return vars;
       const 当前绝对时段 = 当前手机绝对时段();
-      const { 库: v } = 读取微信原始候选(vars, 写入聊天ID, 当前绝对时段);
+      const { 库: v } = 读取微信原始候选(vars, 写入聊天ID, 当前绝对时段, true);
       const 聊天 = SillyTavern.chat ?? [];
       v.消息 = 类型 === '删楼' ? 裁删楼后记录(v.消息, 变更楼, 聊天) : 裁同楼切分支记录(v.消息, 变更楼, 聊天);
       // 朋友圈没有玩家手动输入例外；明确 swipe 时无锚同楼动态按隐私优先一律裁掉。
@@ -749,7 +821,7 @@ export async function 隔离当前手机分支(
       const 圈锚 = 手机分支变更后已读时锚(v.圈读到, v.圈读时, v.圈, 当前绝对时段, 变更楼, 当前楼);
       v.圈读到 = 圈锚.楼;
       v.圈读时 = 圈锚;
-      推进微信持久修订(v as Record<string, unknown>, 写入聊天ID, 当前绝对时段);
+      推进微信持久修订(v as Record<string, unknown>, 写入聊天ID, 当前绝对时段, vars);
       _.set(vars, '_微信', v);
       微信快照 = _.cloneDeep(v);
       微信快照绝对时段 = 当前绝对时段;
@@ -862,6 +934,8 @@ export async function 写库增量(
     新圈: 朋友圈条[];
     新消息: 微信消息[];
     节拍改: Record<string, number>;
+    /** 调用方显式修复当前分支同键、同会话的不可见超长私聊；其余入口保持原去重。 */
+    替换不可见超长私聊?: { 会话: 门牌; 键: string };
     已发私聊图改?: Partial<Record<门牌, string[]>>;
     读到改?: Record<string, 手机已读时锚>;
     圈读到改?: 手机已读时锚;
@@ -880,23 +954,28 @@ export async function 写库增量(
   if (写入统计) {
     写入统计.实际插入消息数 = 0;
     写入统计.实际插入消息键 = [];
+    if ('实际插入朋友圈数' in 写入统计) 写入统计.实际插入朋友圈数 = 0;
   }
   const 写入聊天ID = 当前聊天ID();
   // 宿主 swipe/删楼 监听同步取得协调锁、下一任务拍才裁枝。窗口内若允许新分支消息落库，
   // 随后的“同楼旧分支全裁”会把它一并删除。唯一写入口先冻结，并在变量回调内再验一次。
-  if (时间线切换协调中()) return false;
+  if (时间线切换协调中() || 时间事务阻止普通写入()) return false;
   let 已写 = false;
   let 实际插入消息数 = 0;
+  let 实际插入朋友圈数 = 0;
   const 实际插入消息键: string[] = [];
   let 微信快照: 已归一微信原始库 | null = null;
   let 微信快照绝对时段 = -1;
   await updateVariablesWith(
     vars => {
+      if (时间事务阻止普通写入(vars)) return vars;
       // AI 生成结束到变量回调真正执行之间仍可能发生回档/切聊；在离提交最近的位置
       // 再验一次时间线租约，不能只依赖调用写库前的那次检查。
       if (时间线切换协调中() || (写入聊天ID && 当前聊天ID() !== 写入聊天ID) || !允许写入()) return vars;
       const 当前楼 = 末楼();
       const 当前绝对时段 = 当前手机绝对时段();
+      // 必须早于计划CAS恢复整组提交；否则第二成员会在旧空计划上覆盖第一成员。
+      const { 库: v } = 读取微信原始候选(vars, 写入聊天ID, 当前绝对时段, true);
       let 合并后邀约计划: 手机邀约计划 | null = null;
       if (增.赴约提交) {
         const 当前赴约 = (_.get(vars, '_赴约') ?? null) as Partial<手机赴约提交> | null;
@@ -928,7 +1007,6 @@ export async function 写库增量(
         if (!余波身份相同(当前余波, 增.余波消费.预期)) return vars;
         if (Object.keys(增.余波消费.标记).some(键 => !!当前余波?.[键 as keyof 换装余波])) return vars;
       }
-      const { 库: v } = 读取微信原始候选(vars, 写入聊天ID, 当前绝对时段);
       const 原消息投影 = 筛当前手机时间线(v.消息, 当前楼, 当前绝对时段);
       const 原圈投影 = 筛当前手机时间线(v.圈, 当前楼, 当前绝对时段);
       const 新鲜: 微信库 = {
@@ -972,6 +1050,7 @@ export async function 写库增量(
           : 门牌列表.filter(m => 户静态表[m].妻名 === 条.谁);
       }
       新鲜.圈.unshift(...新圈);
+      实际插入朋友圈数 = 新圈.length;
       // 脚本事件键是分支内幂等真值。只认当前楼仍存活的键：未裁的未来消息
       // 不能阻止回档后同一事件重演。
       const 活消息键 = new Set(新鲜.消息.filter(消息 => 消息.楼 <= 当前楼 && 消息.键).map(消息 => 消息.键 as string));
@@ -985,8 +1064,26 @@ export async function 写库增量(
         新鲜.消息,
       );
       for (const 消息 of 新消息) {
-        if (消息.键 && 活消息键.has(消息.键)) continue;
         if (消息.标识 && 活玩家标识.has(消息.标识)) continue;
+        if (消息.键 && 活消息键.has(消息.键)) {
+          const 范围 = 增.替换不可见超长私聊;
+          if (!范围 || 范围.键 !== 消息.键 || 范围.会话 !== 消息.会话 ||
+              !门牌列表.includes(消息.会话 as 门牌)) continue;
+          const 同会话文本 = (旧: 微信消息) =>
+            旧.会话 === 消息.会话 && 旧.发 === '对方' && (旧.类 === undefined || 旧.类 === '文本');
+          if (!同会话文本(消息) || 验收短文本(消息.文, 手机可见单条硬上限) === null) continue;
+          const 同键消息 = 新鲜.消息.filter(旧 => 旧.键 === 消息.键);
+          if (
+            !同键消息.length ||
+            同键消息.some(旧 => !同会话文本(旧) ||
+              验收短文本(旧.文, 手机可见单条硬上限) !== null ||
+              验收短文本(旧.文, Number.MAX_SAFE_INTEGER) === null)
+          ) continue;
+          // 仅长度不合格的旧文本才可原子替换。可见消息、墓碑及其他格式错误仍占键；
+          // 只移除本投影中的精确对象，其他分支／未来记录由原始库投影合并继续保留。
+          const 被替换 = new Set(同键消息);
+          新鲜.消息 = 新鲜.消息.filter(旧 => !被替换.has(旧));
+        }
         // 去重通过才代表这条真的会插入当前库，此刻才分配单调序（不信任调用方快照里的序）。
         消息.序 = ++最大序;
         消息.接收门牌 = 当前社交接收门牌(接收状态, 消息.会话);
@@ -1021,15 +1118,15 @@ export async function 写库增量(
       v.圈读时 = 新鲜.圈读时;
       v.节拍 = 新鲜.节拍;
       v.已发私聊图 = 新鲜.已发私聊图;
-      推进微信持久修订(v as Record<string, unknown>, 写入聊天ID, 当前绝对时段);
-      _.set(vars, '_微信', v);
-      微信快照 = _.cloneDeep(v);
-      微信快照绝对时段 = 当前绝对时段;
       if (增.余波消费 && 当前余波) {
         _.set(vars, '_换装余波', { ...当前余波, ...增.余波消费.标记 });
       }
       if (增.赴约提交) _.set(vars, '_赴约', { ...增.赴约提交 });
       if (合并后邀约计划) _.set(vars, 手机邀约计划键, 合并后邀约计划);
+      推进微信持久修订(v as Record<string, unknown>, 写入聊天ID, 当前绝对时段, vars);
+      _.set(vars, '_微信', v);
+      微信快照 = _.cloneDeep(v);
+      微信快照绝对时段 = 当前绝对时段;
       已写 = true;
       return vars;
     },
@@ -1039,6 +1136,7 @@ export async function 写库增量(
   if (写入统计) {
     写入统计.实际插入消息数 = 已写 ? 实际插入消息数 : 0;
     写入统计.实际插入消息键 = 已写 ? 实际插入消息键 : [];
+    if ('实际插入朋友圈数' in 写入统计) 写入统计.实际插入朋友圈数 = 已写 ? 实际插入朋友圈数 : 0;
   }
   return 已写;
 }
@@ -1054,6 +1152,7 @@ export async function 压缩微信会话记录(
   普通气泡上限: number,
   允许写入: () => boolean = () => true,
 ): Promise<boolean> {
+  if (时间事务阻止普通写入()) return false;
   const 写入聊天ID = 当前聊天ID();
   let 已写 = false;
   let 有变化 = false;
@@ -1061,10 +1160,11 @@ export async function 压缩微信会话记录(
   let 微信快照绝对时段 = -1;
   await updateVariablesWith(
     vars => {
+      if (时间事务阻止普通写入(vars)) return vars;
       if ((写入聊天ID && 当前聊天ID() !== 写入聊天ID) || !允许写入()) return vars;
       const 当前楼 = 末楼();
       const 当前绝对时段 = 当前手机绝对时段();
-      const { 库: v } = 读取微信原始候选(vars, 写入聊天ID, 当前绝对时段);
+      const { 库: v } = 读取微信原始候选(vars, 写入聊天ID, 当前绝对时段, true);
       const 原消息 = 筛当前手机时间线(v.消息, 当前楼, 当前绝对时段);
       const 水位库: 微信库 = {
         消息: 原消息,
@@ -1119,7 +1219,7 @@ export async function 压缩微信会话记录(
         v.读到 = 水位库.读到;
         v.读时 = 水位库.读时;
         v.已发私聊图 = 按消息重建已发私聊图(新消息, 当前楼);
-        推进微信持久修订(v as Record<string, unknown>, 写入聊天ID, 当前绝对时段);
+        推进微信持久修订(v as Record<string, unknown>, 写入聊天ID, 当前绝对时段, vars);
         _.set(vars, '_微信', v);
         微信快照 = _.cloneDeep(v);
         微信快照绝对时段 = 当前绝对时段;

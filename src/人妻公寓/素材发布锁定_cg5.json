@@ -1,0 +1,5324 @@
+{
+  "schemaVersion": 1,
+  "assetTag": "cg5",
+  "gameVersion": "0.91",
+  "format": "WebP",
+  "count": 350,
+  "bytes": 99244738,
+  "groups": {
+    "安若妍不必停": {
+      "count": 20,
+      "bytes": 3971814
+    },
+    "安若妍换掉": {
+      "count": 31,
+      "bytes": 39923840
+    },
+    "不再留门": {
+      "count": 8,
+      "bytes": 2000490
+    },
+    "第二机位": {
+      "count": 9,
+      "bytes": 1494942
+    },
+    "回国": {
+      "count": 9,
+      "bytes": 1982914
+    },
+    "双重继承": {
+      "count": 11,
+      "bytes": 2938868
+    },
+    "许曼君分居": {
+      "count": 12,
+      "bytes": 3082816
+    },
+    "许曼君离婚": {
+      "count": 15,
+      "bytes": 2313280
+    },
+    "录像带V4": {
+      "count": 38,
+      "bytes": 6975484
+    },
+    "衣柜成品": {
+      "count": 133,
+      "bytes": 16107986
+    },
+    "通关庆典": {
+      "count": 1,
+      "bytes": 336310
+    },
+    "母亲视频": {
+      "count": 54,
+      "bytes": 16149636
+    },
+    "302共居": {
+      "count": 9,
+      "bytes": 1966358
+    }
+  },
+  "files": [
+    {
+      "path": "rq091/story/安若妍不必停/ARY-NBS-01.webp",
+      "group": "安若妍不必停",
+      "bytes": 235986,
+      "sha256": "daa5d3cc6e7225d71dfbf2f14b7e9271276649350d5cc67b7ea84e257443eb5b",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍不必停/ARY-NBS-02.webp",
+      "group": "安若妍不必停",
+      "bytes": 211348,
+      "sha256": "4e7a060e41503326e0efcbc83880240487e1edc2dc2ef83198181332be141d56",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍不必停/ARY-NBS-03.webp",
+      "group": "安若妍不必停",
+      "bytes": 259808,
+      "sha256": "918a384241c135c55467b560ab8578fab981bbc88be4dcea2c28142ca1f4cf12",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍不必停/ARY-NBS-04.webp",
+      "group": "安若妍不必停",
+      "bytes": 253462,
+      "sha256": "79115f2d58be476bb912e938306f3c949d25604d4add87a25ec2a176ef5b67cd",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍不必停/ARY-NBS-05.webp",
+      "group": "安若妍不必停",
+      "bytes": 192108,
+      "sha256": "623b7aeaf5ff058d06682656778362c4a040975057c633953261e895f6208160",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍不必停/ARY-NBS-06-N.webp",
+      "group": "安若妍不必停",
+      "bytes": 212146,
+      "sha256": "8da5f9ca672ae9ba26fbcea3970f7a4994c3bd2310df15483c374705e12236ea",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍不必停/ARY-NBS-06-P.webp",
+      "group": "安若妍不必停",
+      "bytes": 230980,
+      "sha256": "bd2564e589e503b7f6f577d840b73baa776e5af13ae5012a5046635b68ecf12e",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍不必停/ARY-NBS-07.webp",
+      "group": "安若妍不必停",
+      "bytes": 186976,
+      "sha256": "84a1b7aca6bd6d420789b939c8952189f5bf628586116a70daac55c56cc30c62",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍不必停/ARY-NBS-08.webp",
+      "group": "安若妍不必停",
+      "bytes": 193738,
+      "sha256": "1449901673a328c2a013355013705e4d1183b63202e5aad80c2da2e78e1a1886",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍不必停/ARY-NBS-09-N.webp",
+      "group": "安若妍不必停",
+      "bytes": 163434,
+      "sha256": "a71eb7c26143ffe528cedc799e6296b5932bfcc6d946cd6596274c0581b11912",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍不必停/ARY-NBS-09-P.webp",
+      "group": "安若妍不必停",
+      "bytes": 144198,
+      "sha256": "cb54087c082dd53c75dfbdabcb953aa51f9a7d1c39d5c3a1338efbd523ba5abd",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍不必停/ARY-NBS-10-N.webp",
+      "group": "安若妍不必停",
+      "bytes": 140292,
+      "sha256": "8ecea88375fe74c88f8677967066115015142f5fe60ac4c25092df8192de6f8e",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍不必停/ARY-NBS-10-P.webp",
+      "group": "安若妍不必停",
+      "bytes": 152280,
+      "sha256": "9b0592c1a3e97e67e035b83144c6256ffc52f1e6506a8499cbaf901aedd85ae5",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍不必停/ARY-NBS-11-P.webp",
+      "group": "安若妍不必停",
+      "bytes": 183810,
+      "sha256": "8bdc8b83dd05397ffbf06c1ea9e690f487b1cd39019714a1be4f26cc6038b30e",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍不必停/ARY-NBS-11.webp",
+      "group": "安若妍不必停",
+      "bytes": 174078,
+      "sha256": "7fe3f547e8c53e39e6cc71b55817c31c310617e8339c32166b4b5c349532d91a",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍不必停/ARY-NBS-12-P.webp",
+      "group": "安若妍不必停",
+      "bytes": 196620,
+      "sha256": "fe5cf92c1d6fc2f7df644be236c2d391bfbfa689ad82e0f2bf1ed40f1782108f",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍不必停/ARY-NBS-12.webp",
+      "group": "安若妍不必停",
+      "bytes": 200308,
+      "sha256": "e864c6d3c8971eca1a64ae6adb04980212b0245003fb499a1a1481f3ee2e9750",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍不必停/ARY-NBS-13-N.webp",
+      "group": "安若妍不必停",
+      "bytes": 192062,
+      "sha256": "e87035037cffd1be27beb025acaad304e118ae188728b96625494cf163fe4b7e",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍不必停/ARY-NBS-13-P.webp",
+      "group": "安若妍不必停",
+      "bytes": 201322,
+      "sha256": "f5f0c7b758cc76f9bb2e16959380e1099253b67d45823367061d16d282a1ef20",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍不必停/ARY-NBS-14.webp",
+      "group": "安若妍不必停",
+      "bytes": 246858,
+      "sha256": "91698561f796508d483373aa4a6e53fb4468c9ef49c77c4b54f487069fabb226",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-01.webp",
+      "group": "安若妍换掉",
+      "bytes": 1442082,
+      "sha256": "8eb94ee2db440371e4eb0a2fa2b5fb1d32235028563a8243b64fad835441978c",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-02.webp",
+      "group": "安若妍换掉",
+      "bytes": 1470600,
+      "sha256": "e7849a3afe9f02d4e1ca25738a63bba8f6ad1fd1aa5263cbf41fcc20508b0b3d",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-03.webp",
+      "group": "安若妍换掉",
+      "bytes": 1501450,
+      "sha256": "9c8f6d1236753d5d2f61dfec8a4ac4022df9dce6fec34d12204e8affd1f23c17",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-04.webp",
+      "group": "安若妍换掉",
+      "bytes": 1391584,
+      "sha256": "617c7a09a6c48d3c51b8ce4c55136b4a0c3a0f03edccee2e9a846ca97b5d4502",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-05.webp",
+      "group": "安若妍换掉",
+      "bytes": 1392180,
+      "sha256": "835f4a0efc41b6d8643475174ed7b8d52d79feb400915d6ba875c1870389c367",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-06-N.webp",
+      "group": "安若妍换掉",
+      "bytes": 1481376,
+      "sha256": "78cb38dbbb9bc425b1db046b0041998322c16fa33ee11b7a6a6c48f68307139f",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-06-P.webp",
+      "group": "安若妍换掉",
+      "bytes": 1471068,
+      "sha256": "6ab86e96e7a9236ad7cbf8237307f65efece6b0df9879079bbd94685341c4511",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-07-N.webp",
+      "group": "安若妍换掉",
+      "bytes": 1169362,
+      "sha256": "b3f6168009471231fcec61f19733c0852678379c08b4316200d9fdfc538a5f84",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-07-P.webp",
+      "group": "安若妍换掉",
+      "bytes": 1071138,
+      "sha256": "1d5c2a10dfaadb3170f07a8fed114016745e1c6d84640432b40bfddd061aa659",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-08-N.webp",
+      "group": "安若妍换掉",
+      "bytes": 818274,
+      "sha256": "25db7fd0e4cfefc03a00adccb5a41a40e5616d029342014a750c61e0c3d41bb9",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-08-P.webp",
+      "group": "安若妍换掉",
+      "bytes": 770506,
+      "sha256": "518fe79410ce00a634fd6a73b22686b7add20c9e8f900fbe78f4c80ee21e5c73",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-09-N.webp",
+      "group": "安若妍换掉",
+      "bytes": 1177038,
+      "sha256": "37d256ddda578db8a5c7ada9c603602c630317ecb9779d01adc2c9079ee16a8e",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-09-P.webp",
+      "group": "安若妍换掉",
+      "bytes": 1197204,
+      "sha256": "c911f431d2ac08f75eb377d04f81998b5cd993364df68475596ba4ecd86a0ee0",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-10-N.webp",
+      "group": "安若妍换掉",
+      "bytes": 841956,
+      "sha256": "3466a48969ccd1791426637d4d90d641ba1f44ba14248674a1d0f37b46fb183f",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-10-P.webp",
+      "group": "安若妍换掉",
+      "bytes": 829518,
+      "sha256": "0d42ae11cc082749e4a33e8751e2627a50e5e96b200df108a94091ad286282af",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-11-N.webp",
+      "group": "安若妍换掉",
+      "bytes": 1401264,
+      "sha256": "de316b3826df9ef230d263cbeb0ceed12b01c39b127aa045987a7afd16cdec13",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-11-P.webp",
+      "group": "安若妍换掉",
+      "bytes": 1378786,
+      "sha256": "ef913cbc5240e9b3738f5f8a15297cc5112ec6b800a5af5d90e97d316a54ce23",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-12.webp",
+      "group": "安若妍换掉",
+      "bytes": 1445536,
+      "sha256": "d3bb2ca2ba8b7aa2d3ac3b7159ef9749bb1ecfbda66442d9f08d3eca1bf3e348",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-13.webp",
+      "group": "安若妍换掉",
+      "bytes": 1442836,
+      "sha256": "26b00f5accc4e706c5463afca793d3396eef58ecf01cd794bc97205a56dd002f",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-BG-BABY1-POST-N.webp",
+      "group": "安若妍换掉",
+      "bytes": 1289872,
+      "sha256": "119b6b1b61c2629bb374b2a3e631dee92a36818a9efbd4fa927e27d4e3b8ebe5",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-BG-BABY1-POST-P.webp",
+      "group": "安若妍换掉",
+      "bytes": 1289752,
+      "sha256": "75ffe54946f56e0bf16d665fa02fff33eca0a94412ef2ab790d9aa1977159c8e",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-BG-BABY1-PRE.webp",
+      "group": "安若妍换掉",
+      "bytes": 1289442,
+      "sha256": "11f3d15d89a3b0068b488cae3ef34d4c3084e7da78e9311f21cb373e925183b8",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-BG-BABY2-POST-N.webp",
+      "group": "安若妍换掉",
+      "bytes": 1381550,
+      "sha256": "69c8ebe321b8015288b8231e063b3bbcb2e5b1f6ce608b6756c846b3f7894a41",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-BG-BABY2-POST-P.webp",
+      "group": "安若妍换掉",
+      "bytes": 1381646,
+      "sha256": "a35055b0c7eb1b5232c6fbbc6c2eacb255f981fb05f1b4a85502a557034e7efc",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-BG-BABY2-PRE.webp",
+      "group": "安若妍换掉",
+      "bytes": 1381594,
+      "sha256": "8e9a43a2034dbd83f72183a0c8dc45ce90903ef97143f45258d35c3b76894b9c",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-BG-BABY3-POST-N.webp",
+      "group": "安若妍换掉",
+      "bytes": 1439270,
+      "sha256": "3fb9e71d16ac8a12e1a07a4aa60251963677219d6536ec699a8be7ae177d7f18",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-BG-BABY3-POST-P.webp",
+      "group": "安若妍换掉",
+      "bytes": 1439572,
+      "sha256": "c6223e4ed5c0080a9cbec5f53a416a804f29c3012a28d3d2706a15fb354dbe34",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-BG-BABY3-PRE.webp",
+      "group": "安若妍换掉",
+      "bytes": 1440752,
+      "sha256": "d7545edabe826f0f79341ffce76690849a1ed51d2773da2acb0716c66e67a755",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-BG-BASE-POST-N.webp",
+      "group": "安若妍换掉",
+      "bytes": 1299010,
+      "sha256": "21513d562740368f0417817de70b3ead0208ab113c799973dc4f30deb18337b1",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-BG-BASE-POST-P.webp",
+      "group": "安若妍换掉",
+      "bytes": 1299010,
+      "sha256": "fe36bd1a58d9edef29f76a66880a2f2e483f03a5fcbee0101ba055e04091c7ab",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/安若妍换掉/ARY-RPL-BG-BASE-PRE.webp",
+      "group": "安若妍换掉",
+      "bytes": 1298612,
+      "sha256": "2da0fe5f344ff16221bf9a59ae3de94e03e9b8262dcb1b86e1ceb63e47b7cf0e",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/不再留门/ZXM-NMD-01.webp",
+      "group": "不再留门",
+      "bytes": 469744,
+      "sha256": "472c1bd403504affd9f0f778f2177f1d1e910acec6c70ea288b4aa8a3c3385db",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/不再留门/ZXM-NMD-02.webp",
+      "group": "不再留门",
+      "bytes": 449606,
+      "sha256": "15181ce1989b90dcef3e897dcfa2557eac16c69d7bbc73fa8abc065af343b907",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/不再留门/ZXM-NMD-03.webp",
+      "group": "不再留门",
+      "bytes": 174632,
+      "sha256": "0422b8b1c44598a49d8147bb2ad4b6980a6f0eb4563c9bc61d975b9a2d85d9f9",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/不再留门/ZXM-NMD-04.webp",
+      "group": "不再留门",
+      "bytes": 160500,
+      "sha256": "15fec3f45c6a5a40568fcbd4b6bb2efb2d94ea869b383e946e7933e4ea469bad",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/不再留门/ZXM-NMD-05.webp",
+      "group": "不再留门",
+      "bytes": 115312,
+      "sha256": "8f612afa008dddd22f2dcdcfff42e56e15b2cf75c29ad4d3a7d7b9a6d377d301",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/不再留门/ZXM-NMD-06.webp",
+      "group": "不再留门",
+      "bytes": 226446,
+      "sha256": "c718aa62dd4194776702c64c168e2bc3fc789852946ff0b9c389b30f0737a1e3",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/不再留门/ZXM-NMD-07.webp",
+      "group": "不再留门",
+      "bytes": 225472,
+      "sha256": "d779a4900094879c8bad3539f47707c60a91a535d58b8b9fe7af9c4981ea58d9",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/不再留门/ZXM-NMD-08.webp",
+      "group": "不再留门",
+      "bytes": 178778,
+      "sha256": "4ef40bb8ef71fc8e2595e2182452816591ff9893f18acb6a21cdd3c29343e5db",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/第二机位/第二机位_01_门缝那一眼.webp",
+      "group": "第二机位",
+      "bytes": 112510,
+      "sha256": "164c3e1e4edc9c399b2e4626d210f9e7072aa2bbd69416d1f07065134c2077f6",
+      "originalBytes": 1907647,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": 0.9410215831335672,
+      "provenance": "story-cg-manifest_回国_第二机位_双重继承_2026-08-29.md"
+    },
+    {
+      "path": "rq091/story/第二机位/第二机位_02_CAM102异常记录.webp",
+      "group": "第二机位",
+      "bytes": 179304,
+      "sha256": "f8df0bcd60461b6ff9d0c99cd89830300283e8ceab2f74e016d2ae9f1f945b8e",
+      "originalBytes": 2248242,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": 0.9202470196713699,
+      "provenance": "story-cg-manifest_回国_第二机位_双重继承_2026-08-29.md"
+    },
+    {
+      "path": "rq091/story/第二机位/第二机位_03_顾国栋给出行程.webp",
+      "group": "第二机位",
+      "bytes": 186262,
+      "sha256": "949e4adf9df074cb503198d5ff4f56494c4b550c945640bb3e5216b6182a803d",
+      "originalBytes": 2248444,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": 0.9171596001501483,
+      "provenance": "story-cg-manifest_回国_第二机位_双重继承_2026-08-29.md"
+    },
+    {
+      "path": "rq091/story/第二机位/第二机位_04_安装第二机位.webp",
+      "group": "第二机位",
+      "bytes": 209330,
+      "sha256": "31203f6858039736f1b0d2ce146852b5b661ed433685a062146c25ec6d0342d1",
+      "originalBytes": 2220492,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": 0.905728099898581,
+      "provenance": "story-cg-manifest_回国_第二机位_双重继承_2026-08-29.md"
+    },
+    {
+      "path": "rq091/story/第二机位/第二机位_05_沈静仪开启录制.webp",
+      "group": "第二机位",
+      "bytes": 148848,
+      "sha256": "56ef6211066f865dfda1bfd75f64156fab1343680f1d10e34daba69c751b8080",
+      "originalBytes": 1920584,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": 0.9224985733506058,
+      "provenance": "story-cg-manifest_回国_第二机位_双重继承_2026-08-29.md"
+    },
+    {
+      "path": "rq091/story/第二机位/第二机位_06_沈静仪封存母带.webp",
+      "group": "第二机位",
+      "bytes": 149546,
+      "sha256": "e4f8341a6ff775094e7986e2537b342826efff8605e39fc7a009b0ab1ad374f6",
+      "originalBytes": 1900487,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": 0.921311747988805,
+      "provenance": "story-cg-manifest_回国_第二机位_双重继承_2026-08-29.md"
+    },
+    {
+      "path": "rq091/story/第二机位/第二机位_07_302资料柜归档.webp",
+      "group": "第二机位",
+      "bytes": 175832,
+      "sha256": "b0e71e52bf78d2cfd13b4baadaa7cd8db1f1b959dd8ff29a1bed84bb8aadbd9f",
+      "originalBytes": 1978756,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": 0.9111401304658078,
+      "provenance": "story-cg-manifest_回国_第二机位_双重继承_2026-08-29.md"
+    },
+    {
+      "path": "rq091/story/第二机位/第二机位_102_已安装.webp",
+      "group": "第二机位",
+      "bytes": 123044,
+      "sha256": "615e9d5c7e90f802a2a93511b0d523dbb147e90ca88e63058b8d442b34ad4b84",
+      "originalBytes": 1830284,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": 0.932773274530073,
+      "provenance": "story-cg-manifest_回国_第二机位_双重继承_2026-08-29.md"
+    },
+    {
+      "path": "rq091/story/第二机位/第二机位_302_资料柜母带.webp",
+      "group": "第二机位",
+      "bytes": 210266,
+      "sha256": "687505f9127d77aeae39c5d18a0c88ca6f83a940f33a2321246a28af7cf73a5c",
+      "originalBytes": 1939878,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": 0.8916086475541245,
+      "provenance": "story-cg-manifest_回国_第二机位_双重继承_2026-08-29.md"
+    },
+    {
+      "path": "rq091/story/回国/回国_01_管理员室整理经营归档.webp",
+      "group": "回国",
+      "bytes": 281870,
+      "sha256": "ab45f5fb9ba26aee6d633dc4111ce482ee094fa124e8f67df5528ce65dbf31f2",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/回国/回国_02_302共同阅读回国消息.webp",
+      "group": "回国",
+      "bytes": 211284,
+      "sha256": "8bc0499372e410866d0f564e05345d7c9b5b60fe93e288fabbb69b32e7e5325d",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/回国/回国_03_302清点私人物件箱.webp",
+      "group": "回国",
+      "bytes": 209352,
+      "sha256": "2f22859e50d4e6e305ebf67286cb3b09cfad61f6bd79ca5629cdf3d54da09f75",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/回国/回国_04_管理员室锁存私人物件箱.webp",
+      "group": "回国",
+      "bytes": 180110,
+      "sha256": "7900e472b505fb638cbc600efd6ab28e539b432d58386c421f16328e278387be",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/回国/回国_05_母亲核对平常管理记录.webp",
+      "group": "回国",
+      "bytes": 232070,
+      "sha256": "eb0f594ce2fb47ead1f84a287aef12f28daa4a0cb120bde70706acaa0a4b27aa",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/回国/回国_06_母亲加入姐妹茶话会.webp",
+      "group": "回国",
+      "bytes": 204312,
+      "sha256": "31476c66f9201b53754b89fd53252739867833131ad8d02519cbc978ade11f09",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/回国/回国_07_大堂接待旧维修人员.webp",
+      "group": "回国",
+      "bytes": 246414,
+      "sha256": "a866dcc4d641aeffb0c4640961ffbbb3e5d857db0f3e80386d2e6f63edf72c61",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/回国/回国_08_管理员室深夜夜谈.webp",
+      "group": "回国",
+      "bytes": 197134,
+      "sha256": "1dccb7c6a3f70b3523fe340a00b5b56a0c089efb5dc1e819bac24d65ba29ce8e",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/回国/回国_09_302父亲会话协同回复.webp",
+      "group": "回国",
+      "bytes": 220368,
+      "sha256": "1e29dce76d70beae3d1b1bc94a27089f0965ca05e8b025fd7b5f7b8923e8c98b",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/双重继承/双重继承_01_公寓外部检查.webp",
+      "group": "双重继承",
+      "bytes": 459148,
+      "sha256": "3b03a5bf195707349f29e68457c36411b15740866b62e1684a7804f931c304be",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/双重继承/双重继承_02_大堂检查.webp",
+      "group": "双重继承",
+      "bytes": 198880,
+      "sha256": "05a6ba90894dab8216c335010ba3af60c2bc00932bd3a9a9d7a3d490dd6f10f4",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/双重继承/双重继承_03_信箱区检查.webp",
+      "group": "双重继承",
+      "bytes": 170948,
+      "sha256": "c10ae6a7fca3e5e54b236de7c17feb5610c216a813e50944996a943e068c2c2f",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/双重继承/双重继承_04_楼梯间检查.webp",
+      "group": "双重继承",
+      "bytes": 184862,
+      "sha256": "05c21326dd8ab9e4908ca8c87c0aff3dbf0c2327c2994c46732461a26262cbe1",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/双重继承/双重继承_05_垃圾房检查.webp",
+      "group": "双重继承",
+      "bytes": 232718,
+      "sha256": "14b242eb10249f016d5ebaeaafec4a43cb2ec68a3cca66a3cbf57ec34fd87c69",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/双重继承/双重继承_06_公共洗手间检查.webp",
+      "group": "双重继承",
+      "bytes": 190800,
+      "sha256": "cfd2345f2ed9d0cb2b0000d36a5cb95d41217c0822e866bf1b2f6a28a21ff0b0",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/双重继承/双重继承_07_健身房检查.webp",
+      "group": "双重继承",
+      "bytes": 396188,
+      "sha256": "a93dcbf38c5c63675cd94709bcdd221e45e204eec2152640d43fe7989326046a",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/双重继承/双重继承_08_天台检查.webp",
+      "group": "双重继承",
+      "bytes": 340766,
+      "sha256": "807ed8d4fa3bdd36ec453a0a2fb2f86c4326029a5cb745d03ae7b1baaa95e4cd",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/双重继承/双重继承_09_管理员室完全交权.webp",
+      "group": "双重继承",
+      "bytes": 260194,
+      "sha256": "660e9b3e0a490f46d585e9e32e9accb28959998bd5a70cfcd662f7011ed865f3",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/双重继承/双重继承_10_父亲交出公寓楼总钥匙.webp",
+      "group": "双重继承",
+      "bytes": 225680,
+      "sha256": "bdd31eb0d0505ae337b99b648e6b6ebb930bf839a13e07bd1c4d8c690caef6a3",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/双重继承/双重继承_11_302三人早餐.webp",
+      "group": "双重继承",
+      "bytes": 278684,
+      "sha256": "bd71409ad49540ce36ef9a9d940362edf8d5c219e5e389e77816b3deb1dcceb1",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君分居/201_分居_取物后.webp",
+      "group": "许曼君分居",
+      "bytes": 199720,
+      "sha256": "246e7d7857e7914fb7787d87ee1324a2f879943731ff6630ffea14c5fa4a565a",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君分居/201_分居_独住.webp",
+      "group": "许曼君分居",
+      "bytes": 218734,
+      "sha256": "d743fb65f1b771baefcf4a613298d7264f510590a578bac5fc179adcf3c491ad",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君分居/201_留宿_夜.webp",
+      "group": "许曼君分居",
+      "bytes": 132576,
+      "sha256": "460a2dba3cf84aede537ba60d5b16c1a4a8c62c1074e67d0625e252574ddd3f2",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君分居/201_留宿_晨.webp",
+      "group": "许曼君分居",
+      "bytes": 228080,
+      "sha256": "e3a9c501a1003940905331688b5b4b49e10decd27cf0805473fb6e62b3f667e6",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君分居/分居_201钥匙封存袋.webp",
+      "group": "许曼君分居",
+      "bytes": 342922,
+      "sha256": "7fdb06d8fe89229ed18744502e2d53771aff4bc75c03e11fd02eadc0d3ccdd45",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君分居/分居_A1_工资卡入封套.webp",
+      "group": "许曼君分居",
+      "bytes": 203066,
+      "sha256": "404a18b348c7191e0f703d9639e8d7a6390683dd34d37658f00f478b6da6c2e9",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君分居/分居_A1_署名会面通知.webp",
+      "group": "许曼君分居",
+      "bytes": 241772,
+      "sha256": "468bbeed55514602f65c4c18b1882dfa31c43a6362c59bc39ca18b0362509bb2",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君分居/分居_A3_201三人同桌.webp",
+      "group": "许曼君分居",
+      "bytes": 247546,
+      "sha256": "4c684d4acfbd4e11c12eb93b7220855cc8e81e0fa89b8bbd250a879d388c1bb9",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君分居/分居_A3_工资卡归还.webp",
+      "group": "许曼君分居",
+      "bytes": 247910,
+      "sha256": "9554b85d81a544510bb8fd0c6caebc7110ff67600de5d9f17bc5ef3c5f4c461a",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君分居/分居_A5_取物与修复.webp",
+      "group": "许曼君分居",
+      "bytes": 275356,
+      "sha256": "a1bd0e7166d43a2c94965f0f114703ab6aab6608ad9ca2af163cb90680b43c00",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君分居/分居_A6_钥匙柜前最终会面.webp",
+      "group": "许曼君分居",
+      "bytes": 280554,
+      "sha256": "c140687cbd78b1e48f9d2593a100e500772c3001a9ea33aabb565fd912ae2c30",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君分居/分居_赵国强带行李离楼.webp",
+      "group": "许曼君分居",
+      "bytes": 464580,
+      "sha256": "215f6a1d1c6196dddddfcf15f7fbf08b5846c818c6ee656661eeb8999f6a4f9b",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君离婚/XMJ-DIV-01.webp",
+      "group": "许曼君离婚",
+      "bytes": 149318,
+      "sha256": "c94841c2339d4d14f6c6958f80e77176e402c67b3bd871eed0ed39f9c615ce81",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君离婚/XMJ-DIV-02.webp",
+      "group": "许曼君离婚",
+      "bytes": 171570,
+      "sha256": "056cbb37b70ee92610a055f043e24be927f2095105d8f54c334f58b7b0efcbc2",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君离婚/XMJ-DIV-03.webp",
+      "group": "许曼君离婚",
+      "bytes": 117744,
+      "sha256": "c49a3421902c79f9278fa3ec368776f14e106ff0a62926f4831eb9aa00cfdc6c",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君离婚/XMJ-DIV-04.webp",
+      "group": "许曼君离婚",
+      "bytes": 156490,
+      "sha256": "3b12744a258d7bbd8562113ad47b0064ff26e62e5935ff90d7d20d2393943d47",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君离婚/XMJ-DIV-05.webp",
+      "group": "许曼君离婚",
+      "bytes": 144918,
+      "sha256": "d37fe66a8b22e68220fb109bdacfc8be9904b591ed504a2471cff692137a5f57",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君离婚/XMJ-DIV-06.webp",
+      "group": "许曼君离婚",
+      "bytes": 144134,
+      "sha256": "082badc5cb9f0a8c720d5a5bffe22fd61600b048e189235c421daae3c7e5e735",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君离婚/XMJ-DIV-07.webp",
+      "group": "许曼君离婚",
+      "bytes": 179514,
+      "sha256": "0b7466c418ac05e447a0dac4fdac205e89855462a7d79c6be7c61d094a29a473",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君离婚/XMJ-DIV-08.webp",
+      "group": "许曼君离婚",
+      "bytes": 170974,
+      "sha256": "0cb15219a8f44d50cc7fcdd41135552e57ee2730ef7fd9f70533e7863376eabd",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君离婚/XMJ-DIV-09.webp",
+      "group": "许曼君离婚",
+      "bytes": 115468,
+      "sha256": "7f5b9e6bf997486e0b19fd782ed5495fbd97432b9070bfdd94cf90e83677e48f",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君离婚/XMJ-DIV-10.webp",
+      "group": "许曼君离婚",
+      "bytes": 180596,
+      "sha256": "321d864b9f95fc02d258fa76b32de2b8a99c7293c73b69096c7d17e1f084e079",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君离婚/XMJ-DIV-11.webp",
+      "group": "许曼君离婚",
+      "bytes": 147742,
+      "sha256": "7fb70bb9a15753b39a27bcdc250008523481943e2dcf54caf798a639cb38de58",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君离婚/XMJ-DIV-12.webp",
+      "group": "许曼君离婚",
+      "bytes": 114076,
+      "sha256": "6bfbac01ba2a5fda79e0b39d67ed77067e4618c6a9d337b19705d18f75ed2ea8",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君离婚/XMJ-DIV-13.webp",
+      "group": "许曼君离婚",
+      "bytes": 170972,
+      "sha256": "5539aee167c97006b948c48e77444ef50a4d1001253748c7fd0d246c65319752",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君离婚/XMJ-DIV-14.webp",
+      "group": "许曼君离婚",
+      "bytes": 163862,
+      "sha256": "983c18e9fe0ff5ba2d741208a3f5bf61b9823e3fb8a4178fb5506507d0c2d767",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/许曼君离婚/XMJ-DIV-15.webp",
+      "group": "许曼君离婚",
+      "bytes": 185902,
+      "sha256": "f468571503003a35530c188db54f9afba52d256385692f3ee0f9ad3d5d6ceb1c",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-102-B01.webp",
+      "group": "录像带V4",
+      "bytes": 171766,
+      "sha256": "930204e4247d8df3813124d2bf3143a8f5c47e90c63013a0108fbd7af4533b22",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-102-B02.webp",
+      "group": "录像带V4",
+      "bytes": 188156,
+      "sha256": "443bebafb49e7b4523260f99e49b91786b2d6c67c521543e6d29d5598607b9ad",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-102-B03.webp",
+      "group": "录像带V4",
+      "bytes": 216456,
+      "sha256": "1b48de4fc523d0a8de04aea53b277a1df56899587b515b6c425a8e7501c42b22",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-102-B04.webp",
+      "group": "录像带V4",
+      "bytes": 218310,
+      "sha256": "a07e41897649a3bc7e58cb36e7df0d4f7fe04d64220229b1533aba65667761d7",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-102-B05.webp",
+      "group": "录像带V4",
+      "bytes": 185502,
+      "sha256": "e7fd520bce15de856f0c446eca69361353804ab10bf370badb8c57a946f96b32",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-102-B06.webp",
+      "group": "录像带V4",
+      "bytes": 175332,
+      "sha256": "287c3b668c981a185e15717550f7f8929b3fafdcc5d2abf64180200f41a69302",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-102-B07.webp",
+      "group": "录像带V4",
+      "bytes": 150146,
+      "sha256": "b4f8b4b1a14fab5da414be0c2bff41d919822bbfb625cb8324ab000513b948cf",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-102-B08.webp",
+      "group": "录像带V4",
+      "bytes": 186356,
+      "sha256": "f8868f991705c9eaca8efef5ff6ae0f209705c41751b61e1b78530b0788dab09",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-102-B09.webp",
+      "group": "录像带V4",
+      "bytes": 174590,
+      "sha256": "e9a2e0873e7ab6208098c2d6ea1643575fe1d5016d48f1a3cc4375a9eb3d391a",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-102-B10.webp",
+      "group": "录像带V4",
+      "bytes": 167452,
+      "sha256": "0721a867e6b9b3ee026510cacfac4c81fb80d5d17ff6603344367b6848154a73",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-102-B11.webp",
+      "group": "录像带V4",
+      "bytes": 148742,
+      "sha256": "2ea7e13ab72326133879bf2da1f6be1a835918587727eec356c43ce13507e47d",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-102-B12.webp",
+      "group": "录像带V4",
+      "bytes": 167784,
+      "sha256": "f7f6bcf9b3728fab65ef239d7b564362863b5b73e244a2a083fe3eb08aca34b3",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-102-B13.webp",
+      "group": "录像带V4",
+      "bytes": 180740,
+      "sha256": "73cdda7b51b4ce020fba4ad9469b23162e4fae6aea6f3b5c64a67c5b3cb377c9",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-102-B14.webp",
+      "group": "录像带V4",
+      "bytes": 164664,
+      "sha256": "b1ae0c82a3ceb810fd04b95bd0199d41951a0fab31a2c263bc9b97039b1ba684",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-102-B15.webp",
+      "group": "录像带V4",
+      "bytes": 173550,
+      "sha256": "63ab8112ff3aceb6674b29165819d3b6ed6891409c295231c449e041ea1fd2d0",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-102-B16.webp",
+      "group": "录像带V4",
+      "bytes": 160924,
+      "sha256": "dfd19bf8c67137b9e7f4e6e60f43f0497c9174a580775b6b8557818196b4375f",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-102-B17.webp",
+      "group": "录像带V4",
+      "bytes": 174768,
+      "sha256": "48e561c661d74b0d39be56ad9efada73eacaaf0d23f944fe54a783194eee44ac",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-102-B18.webp",
+      "group": "录像带V4",
+      "bytes": 216216,
+      "sha256": "22f0952295fcda8dcc04f68482485f03490e9e5683f8a7c1606d4bc887194163",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-102-B19.webp",
+      "group": "录像带V4",
+      "bytes": 230212,
+      "sha256": "4ba4ffcf78b9348c1497395aad1ff416f41fdf1c169b4386df1dbdfc375b8914",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-202-B01.webp",
+      "group": "录像带V4",
+      "bytes": 161062,
+      "sha256": "9f6e01af2240b16c62fdeeac164790d106daff68b07c13806a6ddafb7f7eeea4",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-202-B02.webp",
+      "group": "录像带V4",
+      "bytes": 248356,
+      "sha256": "7fc783bdbde172be797da6aa9da246be2ac25b8032a76d7af7d1d75d1319d895",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-202-B03.webp",
+      "group": "录像带V4",
+      "bytes": 196952,
+      "sha256": "aae220e5a28c8e4b2634cd18318d8090daec17042688a4f3c034efd949c51a9a",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-202-B04.webp",
+      "group": "录像带V4",
+      "bytes": 208452,
+      "sha256": "9ac6c35137a18e1191fbf235979a9b827e9ab460c1d3ea6f45e382e8f273ab28",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-202-B05.webp",
+      "group": "录像带V4",
+      "bytes": 198794,
+      "sha256": "9fbdbe6d5cb73f6750c949e344b88b53a363eff45e07af6dbce4ddd500e188f3",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-202-B06.webp",
+      "group": "录像带V4",
+      "bytes": 180646,
+      "sha256": "c5983fbc1cb9f74df1958232afaa1a59ce77f3c19b5763c7144070b75be7bc1c",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-202-B07.webp",
+      "group": "录像带V4",
+      "bytes": 192032,
+      "sha256": "73d29129df92e9d7a211c91c8b57d9d7d2299a3b840f43cb47fc8824d5124e69",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-202-B08.webp",
+      "group": "录像带V4",
+      "bytes": 176220,
+      "sha256": "3ccdd6dcb2ec97946016b9f013709cbc1b897bfc86b7da7cb7568633a53d4115",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-202-B09.webp",
+      "group": "录像带V4",
+      "bytes": 187224,
+      "sha256": "b0373b22b13fd7b18c36743d2b880629e889590026c86a8ae32ccf29886e3c27",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-202-B10.webp",
+      "group": "录像带V4",
+      "bytes": 184250,
+      "sha256": "792aa365a2859bf94240e2a809cf1d3cf0d1adcd89eba75e09b5f39fd7198582",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-202-B11.webp",
+      "group": "录像带V4",
+      "bytes": 167344,
+      "sha256": "f4550c7baf7d8bf9792f9cc4e94dce1b89c3e9ed9f807eb11793bf8be2c98c0e",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-202-B12.webp",
+      "group": "录像带V4",
+      "bytes": 172790,
+      "sha256": "6085e71dc9a547b8f2b40d455a39c0c74793595dad3b1516dd73ce3f942bc56b",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-202-B13.webp",
+      "group": "录像带V4",
+      "bytes": 187376,
+      "sha256": "96ba986c75b6ece7d828fb08ee53fd03f78a53ab105f1549737de36634896680",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-202-B14.webp",
+      "group": "录像带V4",
+      "bytes": 167256,
+      "sha256": "e9cf99f76b369b1e03a23ebe9c5b26031add1b02d9c53744eda37ae5cfa2b9b1",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-202-B15.webp",
+      "group": "录像带V4",
+      "bytes": 180024,
+      "sha256": "94d70fd4275961c0bb492ae0275b6d1f386b1d992d36cf86ca7ed24057824b55",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-202-B16.webp",
+      "group": "录像带V4",
+      "bytes": 143338,
+      "sha256": "0d26f220cf2629841f63c4acf6f67316cefa1e0a9731412a82a68e27e0268067",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-202-B17.webp",
+      "group": "录像带V4",
+      "bytes": 181214,
+      "sha256": "d6395f8e4927d3345278a8852252dedc6c849af74f782e577e98972916bd0576",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-202-B18.webp",
+      "group": "录像带V4",
+      "bytes": 197084,
+      "sha256": "5a36cbfee52e73fd490b8bde7308ed93ce39b838a6a9fb4ee1338c82a2cdd80e",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/story/录像带V4/VTR-V4-202-B19.webp",
+      "group": "录像带V4",
+      "bytes": 193404,
+      "sha256": "885d7d270fd864c926bed6e6f22fafd466e654916b5d8b0b3fb03a3726ffd9a3",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/周小满/一字肩.webp",
+      "group": "衣柜成品",
+      "bytes": 183676,
+      "sha256": "ed66ea51390e9a1fa0578f4196ab3f6098563f32906cc54e54b09c0444ff8338",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        325,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/周小满/一字肩_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 18076,
+      "sha256": "ea2a5689d2dd59c5abc2d277d89399b7717b3fed15b9e88f6324f41de5211c05",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/周小满/收腰连衣裙.webp",
+      "group": "衣柜成品",
+      "bytes": 176588,
+      "sha256": "6b617fa96bf63bce5f880e64dbfe040fdbe46a717b755334cd344ba588b448df",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        345,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/周小满/收腰连衣裙_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 18762,
+      "sha256": "904869ecaf78098835d9de37a6b022285872b630c5938551bc1c842b23ec9431",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/周小满/真丝吊带睡裙.webp",
+      "group": "衣柜成品",
+      "bytes": 179774,
+      "sha256": "852cf4b71f2818c3d3bd772126b5d54479ace9787cdd4f3312474a662471ae6b",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        335,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/周小满/真丝吊带睡裙_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 18618,
+      "sha256": "17a09ae3cabbb54faa5362b2ea0a266e44a0b68d3bf90e40b04f0d5eaf2bd178",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/周小满/连体网衣.webp",
+      "group": "衣柜成品",
+      "bytes": 226398,
+      "sha256": "5ef16abdabaabb040800affdf09c0c66e3b6ec9d5aee0b9fbb27ba4b040f253c",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        326,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/周小满/连体网衣_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 17954,
+      "sha256": "1e74bf4468a527b111624a0cf8a5d6bcd067a29f5178297523782d41d7fc47c9",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/周小满/露背装.webp",
+      "group": "衣柜成品",
+      "bytes": 172160,
+      "sha256": "0f0cbaad51e52b67c1e98035bae6d8b80d8527d775c59d0703bdc4b368b853b0",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        343,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/周小满/露背装_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 17030,
+      "sha256": "6d94b3b07ca5e1ede403f71cb65d36c4b0ee42a8f6a787a08f9419f218d5b154",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/夏乔/女仆装.webp",
+      "group": "衣柜成品",
+      "bytes": 240468,
+      "sha256": "5221dea527d1a060f6b7cfa7c868bc514b40c69012d163094810d292b2b69998",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        538,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/夏乔/女仆装_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 23858,
+      "sha256": "bb4e47a5009cdb959d19fa88b88ac9729caa78f08f719e0897c598e078a8235b",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/夏乔/碎花连衣裙.webp",
+      "group": "衣柜成品",
+      "bytes": 305604,
+      "sha256": "8ff4c92f3bcddb76a6e4713ece5145c89ab1f830b6a514d11fbf296be98e7c7d",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        544,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/夏乔/碎花连衣裙_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 29864,
+      "sha256": "466628bc65a1ca5b0bce47c71b6accf1c8102834593f3a41c11abcdc7435326a",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/夏乔/连体网衣.webp",
+      "group": "衣柜成品",
+      "bytes": 275588,
+      "sha256": "1f166730667978e8e2030abd4e5fd86bf5cd5436f0549e49de1883415f4dd9e4",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        556,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/夏乔/连体网衣_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 22478,
+      "sha256": "0b9748a9c850e79027a12c38c99497598e43e4644d99d765bcda9b25e2df47dc",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/安若妍/女仆装.webp",
+      "group": "衣柜成品",
+      "bytes": 219636,
+      "sha256": "ade90b1067afbbc56be964ea07ce4f08d5493d75788f871108e36c36852e81c8",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        365,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/安若妍/女仆装_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 20910,
+      "sha256": "b99e113f7a8ec8c9a287ada03765410a6988cf56dfde9b1cefa17c08f7fb8d86",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/安若妍/收腰连衣裙.webp",
+      "group": "衣柜成品",
+      "bytes": 204760,
+      "sha256": "de5cbc3886f1bf72fb45c56b0652b5667973bc37559b2189a9396ca03dee1ba7",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        368,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/安若妍/收腰连衣裙_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 19126,
+      "sha256": "c373978c250a6909cccf63ad10d68d172968fb297ca9385a1192949dbac3421c",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/安若妍/牛仔背带裙.webp",
+      "group": "衣柜成品",
+      "bytes": 244494,
+      "sha256": "8818efae3ecbee3369c2f5ebf4e2aa4c1c4d9707dfe1097561f3b8aba44d57d2",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        367,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/安若妍/牛仔背带裙_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 21976,
+      "sha256": "acb29169ccbc935a3b051b56854e6c767ea8539b43ede330e7e283ebf7f1d4e0",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/安若妍/连体网衣.webp",
+      "group": "衣柜成品",
+      "bytes": 246528,
+      "sha256": "329cb0eac4c64eff53f5b962b221ad8e67c3fa16cea614d44723d62d8e72ab34",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        365,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/安若妍/连体网衣_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 20106,
+      "sha256": "7f1982e2135225e2a002d486d813164cc6dd088102321cccc986fd811fc5c288",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/母亲/女仆装.webp",
+      "group": "衣柜成品",
+      "bytes": 217176,
+      "sha256": "3e213858e75305e416b751bfa1eea09bbf3e1b48dd58d4fa13ce217617239112",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        439,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/母亲/女仆装_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 21084,
+      "sha256": "d1f1218cf27ab42edf784b09adf7c5b3cebf58bf9386613728e0003d80cad5e7",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/母亲/牛仔背带裙.webp",
+      "group": "衣柜成品",
+      "bytes": 243030,
+      "sha256": "cda465bad88324d82509d335cc0e751901fa561a633473438c96d0ec16e6021a",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        438,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/母亲/牛仔背带裙_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 22836,
+      "sha256": "6828ef25d751beeb86b227c96dbe081cf0c243e6648d7b146bea185cc57f44f5",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/母亲/真丝吊带睡裙.webp",
+      "group": "衣柜成品",
+      "bytes": 196664,
+      "sha256": "cd692ba9c04e2a7af1b23ffeab8e6fb5a099370006011c5dad55063f31245f59",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        445,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/母亲/真丝吊带睡裙_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 21056,
+      "sha256": "dc4b7faf217b392c32cd2c4b071c3c70bca796eeb56193f45a76740e083fe7ce",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/母亲/碎花连衣裙.webp",
+      "group": "衣柜成品",
+      "bytes": 302992,
+      "sha256": "da3b8074ded389ee5284d44b8a8b6124ce78c7cabc96663048e281eb6574b699",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        440,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/母亲/碎花连衣裙_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 27894,
+      "sha256": "b4706ad608b9bee370d40f4bda7039ed1daa9e3b0f66ab0d44ce6ad1a50bd991",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/沈静仪/女仆装.webp",
+      "group": "衣柜成品",
+      "bytes": 166964,
+      "sha256": "9f8613d106c6127733c6db87bf98348aa524ee71fb5f20589eeb3cf5b5c8c5f7",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        307,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/沈静仪/女仆装_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 16294,
+      "sha256": "93df9289854617ec53e88c6a03d3de690141b298891c617febfeb175cb487c26",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/沈静仪/收腰连衣裙.webp",
+      "group": "衣柜成品",
+      "bytes": 152400,
+      "sha256": "f263a8fc23ab447b45d2805fa4627a4c0ff206279f0af970329dfc06bf519fd3",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        290,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/沈静仪/收腰连衣裙_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 15176,
+      "sha256": "516e6af158522f3fd2a2ed9969f84beb2bde47ac2101299f898beb8488a897f7",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/沈静仪/连体网衣.webp",
+      "group": "衣柜成品",
+      "bytes": 201684,
+      "sha256": "8d83629b0f444eeb954f37ed153580ff6b4b41c1c8d27fc45a708bd420bb1c2f",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        288,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/沈静仪/连体网衣_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 15944,
+      "sha256": "c244870148e6c86a098f0d28521fea6d438f0cf6c5c8b1cdc4ff8fc7c7084d8f",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/许曼君/低胸晚礼裙.webp",
+      "group": "衣柜成品",
+      "bytes": 221280,
+      "sha256": "a1f4aeeb12fc7909382224e7e85e33f1af61ae140ce0fd9ab6c2e44ea18054d9",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        402,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/许曼君/低胸晚礼裙_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 22114,
+      "sha256": "f1baa21276d00413dd01d47bd3b0ca77d4de6b4380ebc1b0ba1f8eb52e1a9bd8",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/许曼君/收腰连衣裙.webp",
+      "group": "衣柜成品",
+      "bytes": 194836,
+      "sha256": "05fade3edac20adcfb63cd4402a3037c84e099a94602affcd21e51808ec327fb",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        354,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/许曼君/收腰连衣裙_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 19790,
+      "sha256": "272c68e2874d51bdcb707fa28dcde9a283ae178ad0ca383a44cd1d10661dc311",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/许曼君/牛仔背带裙.webp",
+      "group": "衣柜成品",
+      "bytes": 221742,
+      "sha256": "65c2fa1cea3e7edf30146626c962fc3c77b9c45cbc8a20af2346941e6f7b0132",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        352,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/许曼君/牛仔背带裙_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 21548,
+      "sha256": "fbe4cee3c2029f95678b29bb61228d682a6dc8b6d19d56c9b82a67eea9761680",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/许曼君/碎花连衣裙.webp",
+      "group": "衣柜成品",
+      "bytes": 310918,
+      "sha256": "373c2f69763d48be5f5b8b947e476ad9d6503fae7b385c4602efcbd391399c4e",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        372,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/许曼君/碎花连衣裙_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 29574,
+      "sha256": "6b26ef374111dd67497cab7634658d1ce0d9380e43d54e16790025d626d77ec5",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/许曼君/连体网衣.webp",
+      "group": "衣柜成品",
+      "bytes": 227110,
+      "sha256": "ade6027969124a360d08525c2f29fddb629571ce7d9ef22c041b1aa12450ea79",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        334,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_服装/许曼君/连体网衣_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 17972,
+      "sha256": "9290769f8cf6583f992d1b2f4c3b598e40480afaddcf1cafdd45d30d5c6b64ad",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/_道具/换戒.webp",
+      "group": "衣柜成品",
+      "bytes": 52212,
+      "sha256": "831e833f3a9e3753f5e1ad26fcea8ec39b04f90db522a94cc0e7de8927857041",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null,
+      "provenance": "wardrobe-visual-reset/visual-matrix.json"
+    },
+    {
+      "path": "rq091/wardrobe/周小满/choker颈环.webp",
+      "group": "衣柜成品",
+      "bytes": 168528,
+      "sha256": "730e0f12f76591087a006bd53add26d434cb306811c7348955793728b6df62c9",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        515,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/周小满/choker颈环_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 41308,
+      "sha256": "6c2007e90a2f1adf8950004e4f064d777e25758bb59c307cdf7c702512be8c71",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/周小满/婚纱.webp",
+      "group": "衣柜成品",
+      "bytes": 239902,
+      "sha256": "a641e02aa9b5b6d010cf2a0794b3bef1da1ef7ead214cdfb354bf6b765061327",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        504,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/周小满/婚纱_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 20768,
+      "sha256": "9053ab6bd828acf5572f5986f1083c2e6a96d754182a7d70fbb16a179468317e",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/周小满/媚妆套盒.webp",
+      "group": "衣柜成品",
+      "bytes": 187078,
+      "sha256": "c8cc128261e2f3881dfd31c793f4d62c5de1760f4e031d3244d73d994f09cd7b",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        332,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/周小满/媚妆套盒_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 43296,
+      "sha256": "57cbba1d7c309d192ea29adbed59a92fe1f36890a72e6335555fce97a5186f09",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/周小满/换戒.webp",
+      "group": "衣柜成品",
+      "bytes": 185286,
+      "sha256": "d8db23be0238c91985d1e8a163c6bf9c3a438e833e7c17d14e27245d7271252e",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        326,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/周小满/换戒_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 42830,
+      "sha256": "6f4a5d738f92d540d610628ccef1ebef7ae2959ea08b221a6b4764fdf55c90d3",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/周小满/烈色口红.webp",
+      "group": "衣柜成品",
+      "bytes": 175638,
+      "sha256": "5de6854849d5f1912c7594748379ad8996e7e3edd5f6d7a526d9702d9d69dc6c",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        496,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/周小满/烈色口红_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 41928,
+      "sha256": "ae79d87b2441cd6782ce033588962e19215cc652a77f65d19fbaf3a37f811f4b",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/周小满/猫耳发箍.webp",
+      "group": "衣柜成品",
+      "bytes": 185912,
+      "sha256": "1a51542774d1ce8cba52f5278e600ce5f25f7375bc187ede230088a1703bfdcc",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        510,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/周小满/猫耳发箍_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 43672,
+      "sha256": "b7d88a972b9177edb3c39c2a3af37b00c64436d3d54e98c152cd91591c161575",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/周小满/项圈牵绳.webp",
+      "group": "衣柜成品",
+      "bytes": 182498,
+      "sha256": "4e2e5bb01af879c9793ce6e55b57d20f9bdf53390508707570af0cfd34650342",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        324,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/周小满/项圈牵绳_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 42954,
+      "sha256": "061be69f315af35e567a353a690f085eebda326d15e76d488cc8140f15e4e1e6",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/夏乔/choker颈环.webp",
+      "group": "衣柜成品",
+      "bytes": 206344,
+      "sha256": "e62c3591b8a1c6af4256f5d425f7f723886d760ac04ea8f4bc4306c9b0a5aded",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        581,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/夏乔/choker颈环_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 46646,
+      "sha256": "0afed07e447b9266573bd842cbcee15bffbc3d0fb42faaef4081dde934a847b9",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/夏乔/婚纱.webp",
+      "group": "衣柜成品",
+      "bytes": 267258,
+      "sha256": "61ebcb7ecf6bdc04585d329d57049b565e65552de2fb5c20963f162694016edf",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        613,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/夏乔/婚纱_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 25690,
+      "sha256": "d0a32925eb08ced0844467d24fa194099c1406be7bd244fdeeaed7ad6c4c302a",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/夏乔/媚妆套盒.webp",
+      "group": "衣柜成品",
+      "bytes": 216656,
+      "sha256": "2613bd80c53011c87f5c0c0222783152a881b4f215ff91cc4af7c567ec055899",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        540,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/夏乔/媚妆套盒_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 47232,
+      "sha256": "ce1a56f8e13a3667c5d2cae1d430dd445e02a05688e13fe72efd1e70bd59dd68",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/夏乔/换戒.webp",
+      "group": "衣柜成品",
+      "bytes": 209464,
+      "sha256": "9b5ae4e3c0aef03dc13c977308ca98021bd2f6c72566d2b22d082de408f17573",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        464,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/夏乔/换戒_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 46932,
+      "sha256": "aff861204b38c103e8b6e662599d7c6ca5d7d31073f43dfefc63d9d0a93800d5",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/夏乔/烈色口红.webp",
+      "group": "衣柜成品",
+      "bytes": 204242,
+      "sha256": "242e2f0898e0901f1a96e2242b817c0ecb3827f01f81922fe5b5781c6910a3c1",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        575,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/夏乔/烈色口红_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 46206,
+      "sha256": "d4583a11a4d35e51924fd26198cbc7004d0c58ceea38f483bdef13f14bc2f199",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/夏乔/猫耳发箍.webp",
+      "group": "衣柜成品",
+      "bytes": 209724,
+      "sha256": "3b4d2f5a25afa3a692d2a06631916c922ba135827cd71ccc35a95c6899d9ebde",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        576,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/夏乔/猫耳发箍_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 47568,
+      "sha256": "3c5724135618920dc9fba66781e858ae7eefdabb5f6c592f272d889894f16326",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/夏乔/项圈牵绳.webp",
+      "group": "衣柜成品",
+      "bytes": 215888,
+      "sha256": "d1e264f3427d1a8005abd998d0019868f289d54c8eb67d140632097549d69aa6",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        466,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/夏乔/项圈牵绳_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 47350,
+      "sha256": "1cc18c1b0faef78157361019a4b7c3c318ce155a6b7856f4f38e6de7954528c9",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/安若妍/choker颈环.webp",
+      "group": "衣柜成品",
+      "bytes": 197506,
+      "sha256": "b971d9e5ada44318661243b99cf09fed0812190d757d14223f0184dd89441827",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        549,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/安若妍/choker颈环_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 58236,
+      "sha256": "2a86ed06df799d54a1fc0bbefa9073f03b084767bb3a74c17f23bad5394755b2",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/安若妍/婚纱.webp",
+      "group": "衣柜成品",
+      "bytes": 283178,
+      "sha256": "f3c31d0012046e7e1dda5ae415d04b4a3afcae629629911344fad29507354b69",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        541,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/安若妍/婚纱_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 24468,
+      "sha256": "eb349d31943197a1e6490a07595d777bc2f7549b1083ac95de77ca29d1bf43f4",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/安若妍/媚妆套盒.webp",
+      "group": "衣柜成品",
+      "bytes": 203682,
+      "sha256": "af30ae72c5d0004d1cd2c852d86ee691989b3f0178157f815500001680d428db",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        364,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/安若妍/媚妆套盒_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 59624,
+      "sha256": "02aac56528ce3de481e02018f830f39b51a6230b6abef2bb389092630ce5f251",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/安若妍/换戒.webp",
+      "group": "衣柜成品",
+      "bytes": 199280,
+      "sha256": "b7322149cb0aa19a4a81455056ac52064c0d22a6d6067cd30d79e232700c8fb5",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        358,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/安若妍/换戒_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 60230,
+      "sha256": "66563965b2f11b0e540f5516dc2a5a07e2e289c03272a148cf7d2f9301dc6553",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/安若妍/烈色口红.webp",
+      "group": "衣柜成品",
+      "bytes": 189362,
+      "sha256": "6e5376e892003326426f9fe57116a69f792ac0b8a2ff3b9851a55dde7a1a19b3",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        520,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/安若妍/烈色口红_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 58110,
+      "sha256": "9920426a4ba12737d6adca4aa41e41f7873996c955b3f3fcb13184672b1b4bfe",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/安若妍/猫耳发箍.webp",
+      "group": "衣柜成品",
+      "bytes": 197336,
+      "sha256": "7d0d2ec6184705814c550e36ca7ed3f96af20e1758428e21016927105b3f3721",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        546,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/安若妍/猫耳发箍_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 61502,
+      "sha256": "e5cc91a49497a7a2c8c9bc890e434d64b84cf4105790721120d06191d51c6493",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/安若妍/项圈牵绳.webp",
+      "group": "衣柜成品",
+      "bytes": 203850,
+      "sha256": "342d00698223a1f6d8b579da317bbfa9bba1a3cce78641c8331df8fbf100eb42",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        371,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/安若妍/项圈牵绳_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 60786,
+      "sha256": "5355e9a86b8301411f1580f192c3bc0da9566945ca15e86b5a5a122e6e610959",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/母亲/choker颈环.webp",
+      "group": "衣柜成品",
+      "bytes": 198320,
+      "sha256": "ae142fb1408a18e4b0e8839448bd88026365c0b6ad62c6557407cd1fe97d82b5",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        472,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/母亲/choker颈环_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 47112,
+      "sha256": "3fd902abacbffcc34d71d86969d3214c56ed3225dd779f86f7b451aa2fe16f0c",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/母亲/婚纱.webp",
+      "group": "衣柜成品",
+      "bytes": 347682,
+      "sha256": "ef1b7acd6fceb5362740ce20f0372bc81e61453bbdc4069d6094a21fdac73544",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        766,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/母亲/婚纱_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 31374,
+      "sha256": "d1cfb6fe8b26ebca62efb01564ba6d83cc8e542c8fb1cc8bf4ab4697ca7d1de7",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/母亲/媚妆套盒.webp",
+      "group": "衣柜成品",
+      "bytes": 209520,
+      "sha256": "3ae705b1719d8ecd8795c3630226fe8305d7199fbf58d71beeb0edf588e8ed67",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        455,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/母亲/媚妆套盒_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 45196,
+      "sha256": "cc93ab2ee5df65e1e0174a35babf91082b7d0732fd5c439f427ecdf5830b1057",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/母亲/换戒.webp",
+      "group": "衣柜成品",
+      "bytes": 203622,
+      "sha256": "be9e2837a55929b2d76d07d7f222893aec1887f169814d8201bf4f62911bb4e1",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        408,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/母亲/换戒_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 49888,
+      "sha256": "36fa6f07dafca9660356fcf7bfbf3957ac43aedccac0ad1f7652f3f1e2e6e65b",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/母亲/烈色口红.webp",
+      "group": "衣柜成品",
+      "bytes": 202936,
+      "sha256": "eaa554ef14abbfcbaf54c12a78733bb15197b37400ab678b638575309a4dc637",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        474,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/母亲/烈色口红_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 47360,
+      "sha256": "ca32a7550b1f8465b09b26bae1572a49fbc5bdbfb4678bca14754cc9b2469b5a",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/母亲/猫耳发箍.webp",
+      "group": "衣柜成品",
+      "bytes": 202072,
+      "sha256": "23165ff2478d0ca8a3796d7c5b1ed80c7e0953cae48636b038e88e713bad52f3",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        475,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/母亲/猫耳发箍_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 46082,
+      "sha256": "d305526583a623bfa0ec8d28895a4946f0125f7de06649a1df1f90d1a6699a85",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/母亲/项圈牵绳.webp",
+      "group": "衣柜成品",
+      "bytes": 210886,
+      "sha256": "ad46569c208eae0cb92d54a651cba3699e2954829de55ab2673b657c7895e9c5",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        436,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/母亲/项圈牵绳_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 48028,
+      "sha256": "994fad37df73b8a6402b710a6a5857416befbdf8a5e718ae706f5d7c3a452c81",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/沈静仪/choker颈环.webp",
+      "group": "衣柜成品",
+      "bytes": 127450,
+      "sha256": "20b84749ecf97ad888a4237ff880a8c94179b09257e5a60cc6c56df352788f4d",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        509,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/沈静仪/choker颈环_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 32664,
+      "sha256": "7221e224aaf4ba782c11f541be47c33be48bb23d43cf81acc1cf36616775d3ef",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/沈静仪/婚纱.webp",
+      "group": "衣柜成品",
+      "bytes": 252128,
+      "sha256": "0aa7b60c4683fa28bf78cde172a1b0ed7c5c34e258f52f7427bb7d4d1fe6f2c4",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        611,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/沈静仪/婚纱_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 26732,
+      "sha256": "18fb65da1354f14fc8d160cf47920da99fd003054c4f26c0f8351f9ff3dc6935",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/沈静仪/媚妆套盒.webp",
+      "group": "衣柜成品",
+      "bytes": 152858,
+      "sha256": "6755a79184195fad650747a457addd66a9bdf1886d13b4d05c7a17e39f4adb71",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        294,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/沈静仪/媚妆套盒_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 34530,
+      "sha256": "147ca0525ec13d9645d708d0ce51712a74d71c548d8daa6db19b77365862c7f3",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/沈静仪/换戒.webp",
+      "group": "衣柜成品",
+      "bytes": 144396,
+      "sha256": "62eedce715d37cbcf9babdf567e9730e353dff7edde050a76ed3dbf28a9935fa",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        284,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/沈静仪/换戒_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 34340,
+      "sha256": "8f801f80dc9f850086f776e8f5f19cd011b78466dbaaebae358237612be2b4cf",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/沈静仪/烈色口红.webp",
+      "group": "衣柜成品",
+      "bytes": 122322,
+      "sha256": "335147587f0505fef3a576bcf0baf75f6fce0054d2f89b30926aa099dc8ab0cb",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        494,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/沈静仪/烈色口红_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 32614,
+      "sha256": "6a4ca61b55bdb481b71f68dfa53bff3a5ac69fe23e407cb21e61d185ab1d5e40",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/沈静仪/猫耳发箍.webp",
+      "group": "衣柜成品",
+      "bytes": 146160,
+      "sha256": "695c7040a35c25b889d50a82809b0ec7511acfacf33a13d251da6f5a25576981",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        530,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/沈静仪/猫耳发箍_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 35104,
+      "sha256": "fda9665f92f048b43c129c7712f3db4e49ef33c3e3c6c1718a074991f237cd65",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/沈静仪/项圈牵绳.webp",
+      "group": "衣柜成品",
+      "bytes": 162670,
+      "sha256": "67a274b79de0f300c07e26e5f1416d28e82d5979e3e78deb7ec0362a6d8bb60c",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        300,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/沈静仪/项圈牵绳_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 38424,
+      "sha256": "cd1420c89e5969d47304e16404cb9abed262bc226327049b03afd4322d6f2ecf",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/许曼君/choker颈环.webp",
+      "group": "衣柜成品",
+      "bytes": 162932,
+      "sha256": "5f0fe26b1d9aef5510ca1b08b974b0f3da9f0fe1881a07c17042d4807057ed9b",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        512,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/许曼君/choker颈环_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 48058,
+      "sha256": "e77c751f2611e4e2a1b84962170cdd47f99dd833cbc8eacb0ac0e02d89477c28",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/许曼君/婚纱.webp",
+      "group": "衣柜成品",
+      "bytes": 287662,
+      "sha256": "aaf5b409da444bc88bc163bcd77b9c525d62f5552d80fcf4f78982e225c4bd87",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        629,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/许曼君/婚纱_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 25116,
+      "sha256": "0c12742b7f7d98a0f7496ee7a10dee3c3d795037eef3f34bc514fcef821028ca",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/许曼君/媚妆套盒.webp",
+      "group": "衣柜成品",
+      "bytes": 184232,
+      "sha256": "35505a1b352e9773fcd4a88c7fb8d01bcf9b96827c60db62744f32999bea957b",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        339,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/许曼君/媚妆套盒_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 49908,
+      "sha256": "c09c7f96e7583e44a9a4551d6bb9e8cfa7538ba1f67faabe0efbed584690888e",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/许曼君/换戒.webp",
+      "group": "衣柜成品",
+      "bytes": 185072,
+      "sha256": "cff83e73b751a04f145bd9222c9bfe912c2249264c62cdd838f31b6ad2bb41a1",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        346,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/许曼君/换戒_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 49124,
+      "sha256": "3dda8965d71bc3ce7e277a88f5b153507e3c58b736de30a86be411e5ca6e850f",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/许曼君/烈色口红.webp",
+      "group": "衣柜成品",
+      "bytes": 174842,
+      "sha256": "8c031e4c7c18e4ed805a6b632a4954d2a353da4a6658e7b62a9a42557797fec6",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        492,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/许曼君/烈色口红_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 50074,
+      "sha256": "ab59dafed4efdf5be0bb70f85d1fc782971faf6a9fba185feeb610167fdc685e",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/许曼君/猫耳发箍.webp",
+      "group": "衣柜成品",
+      "bytes": 176622,
+      "sha256": "ffe208b7fe66a091acf45491aefa7cca48718d9c193d0c43b4f422e67e6f7c46",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        474,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/许曼君/猫耳发箍_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 48576,
+      "sha256": "4fe20b738eae64d06ae121147683cfe040e3f1cc77ec7f59beeb276e6e3ef6d9",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/许曼君/项圈牵绳.webp",
+      "group": "衣柜成品",
+      "bytes": 199492,
+      "sha256": "07fd81b1c155f6fa3782337c964be1c4ed027a27166ee691d2db64da8cf53eb5",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        386,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/wardrobe/许曼君/项圈牵绳_预览.webp",
+      "group": "衣柜成品",
+      "bytes": 53136,
+      "sha256": "f31ef999baf626e58c9be48b46f0694b90eda00e81e79c97e80da327c2a89c72",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossless",
+      "dimensions": [
+        256,
+        256
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "rq091/settlement/全员通关庆典.webp",
+      "group": "通关庆典",
+      "bytes": 336310,
+      "sha256": "d5070b84daa79c5dc52c26d62a82ea59930a70faef97fbc93e48bf4e854695b9",
+      "originalBytes": null,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1672,
+        941
+      ],
+      "decoded": true,
+      "originalReduction": null
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-001-draw1.webp",
+      "group": "母亲视频",
+      "bytes": 233538,
+      "sha256": "c4af6c447237759f59a7f3158d9cc9819d441cdc7f7c6f61def844a7660f58a0",
+      "originalBytes": 3247042,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9280766925712695
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-012-draw1@001-1.webp",
+      "group": "母亲视频",
+      "bytes": 273452,
+      "sha256": "e034fe9d11c11db2b8d3f37ecaf58708f91d0bac840d76880e7c80d6fc126160",
+      "originalBytes": 3430368,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9202849373594904
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-002-draw1.webp",
+      "group": "母亲视频",
+      "bytes": 286750,
+      "sha256": "db72b12abb41bf1fc9ddf4b2ff778a9bba93748e02844818f5540eee87f20b7a",
+      "originalBytes": 3571411,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9197096049712564
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-003-draw1.webp",
+      "group": "母亲视频",
+      "bytes": 327330,
+      "sha256": "41fa79ceb4e96bf3e3935995012471a204f657c216fff4fb79472e18404d6c58",
+      "originalBytes": 3842457,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9148123193050697
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-004-draw1.webp",
+      "group": "母亲视频",
+      "bytes": 301480,
+      "sha256": "ddee6413a2b9e1baafd0d4ac3ab976f35ba907c058919801e7e5d70710b564bf",
+      "originalBytes": 3677776,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9180265464780889
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-005-reused.webp",
+      "group": "母亲视频",
+      "bytes": 292380,
+      "sha256": "208782e830a1fdc95a48405fe56bd8e13ca740f7acf0bc1c0bd06d074454faf8",
+      "originalBytes": 3625815,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9193615780176319
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-006-draw1.webp",
+      "group": "母亲视频",
+      "bytes": 351768,
+      "sha256": "8f16e0c1060326525f4c5de3a0a50eff86ba43940ed9e206554bd3e957ebc792",
+      "originalBytes": 4012036,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9123218236326892
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-007-draw1.webp",
+      "group": "母亲视频",
+      "bytes": 275922,
+      "sha256": "e68c495dba8590b618a9a982525ce92ce298bef691c083f26c1e9772c676f3ea",
+      "originalBytes": 3500111,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9211676429690373
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-008-draw1.webp",
+      "group": "母亲视频",
+      "bytes": 305518,
+      "sha256": "297b8345ce25520e366fd221b925c70751857f5c53d474c90225b6c90ccf889b",
+      "originalBytes": 3728892,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9180673508377287
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-009-draw1.webp",
+      "group": "母亲视频",
+      "bytes": 294558,
+      "sha256": "e3cf3850e7869453b07231439fd71ee19e7204ff945dbffc39b397874986a172",
+      "originalBytes": 3635056,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9189674106808808
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-010-draw1.webp",
+      "group": "母亲视频",
+      "bytes": 300002,
+      "sha256": "61c861261b2587ccd935e77aa7c05b1fa81ca4688161bd641dd884802aebeb92",
+      "originalBytes": 3678469,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9184437873473992
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-010-draw2.webp",
+      "group": "母亲视频",
+      "bytes": 307944,
+      "sha256": "da8b2d9699ec40d07739183168e58dd6de02e5aa6eefa3a27efb169c19b33e55",
+      "originalBytes": 3726830,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9173710633433776
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-011-draw1.webp",
+      "group": "母亲视频",
+      "bytes": 305726,
+      "sha256": "47496fe6169159af9165609ca1d3b6b086f668542ad94aff88c21f1287498f14",
+      "originalBytes": 3719271,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9177994827480976
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-012-draw2.webp",
+      "group": "母亲视频",
+      "bytes": 293782,
+      "sha256": "d1b07c25aa5918452bc9463eeede5bff7038b85d28684ee81c908753a99da29e",
+      "originalBytes": 3543138,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9170842343707752
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-012-draw3.webp",
+      "group": "母亲视频",
+      "bytes": 324262,
+      "sha256": "206733b6bcce962a977aca9a454092a1741f9441a11e50d081585ad0dbcee6a8",
+      "originalBytes": 3762247,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.913811613113121
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-012-draw5.webp",
+      "group": "母亲视频",
+      "bytes": 287086,
+      "sha256": "198d3a740f87203d38482fa15d94262f199265241d888ba0b812efbda6fc8fce",
+      "originalBytes": 3627956,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9208683898040659
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-012-draw6.webp",
+      "group": "母亲视频",
+      "bytes": 275328,
+      "sha256": "50c22bbcd182e6170afb5723654b6ed9c07de4c4207119f3fd7870224d30c58d",
+      "originalBytes": 3537181,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9221617440555063
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-012-draw8.webp",
+      "group": "母亲视频",
+      "bytes": 305362,
+      "sha256": "e95e61a0d58f028250250f18e37c71fa55e6c5d599569af810c97fff31f36d81",
+      "originalBytes": 3741516,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9183854886628843
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-012-draw9.webp",
+      "group": "母亲视频",
+      "bytes": 300824,
+      "sha256": "4b4addfde15662192301585e46ff61323567be17d216627e97b7b17c81f9216c",
+      "originalBytes": 3778107,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9203770565523952
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-013-draw2.webp",
+      "group": "母亲视频",
+      "bytes": 302474,
+      "sha256": "6d99595f547458b65b2e61985c94425ee5328b6cfe47bfca33a0551697ad65f2",
+      "originalBytes": 3840792,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9212469719786961
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-013-draw3.webp",
+      "group": "母亲视频",
+      "bytes": 336812,
+      "sha256": "07c77e75435d8bb0c8e0f591f6c94289dc4662a7986e8f33c51ba24ed651b4f5",
+      "originalBytes": 3931592,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9143319042260744
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-014-draw2.webp",
+      "group": "母亲视频",
+      "bytes": 295558,
+      "sha256": "841fedfdd77ed5e973e080bba4859ddfbe7dda78f459350b10e3aad2866b0b11",
+      "originalBytes": 3741287,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9210009817477248
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-014-draw3.webp",
+      "group": "母亲视频",
+      "bytes": 297818,
+      "sha256": "8fc4efa30591841213ffcbbaad9dee86e6b59911f032d2a0d062e3a855635dd5",
+      "originalBytes": 3654379,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9185038005089237
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-014-draw4.webp",
+      "group": "母亲视频",
+      "bytes": 299104,
+      "sha256": "c04338710b9dc6ad128e2f3539174ea015d1bdc601bd298d3e28953df486b035",
+      "originalBytes": 3712778,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9194392985521892
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-015-draw2.webp",
+      "group": "母亲视频",
+      "bytes": 314954,
+      "sha256": "80f3b8ae559dfde213ab5be78a37305a5cbba7a73dfb562c3e7cd37af1ee64b9",
+      "originalBytes": 3837522,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9179277669287629
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-015-draw3.webp",
+      "group": "母亲视频",
+      "bytes": 338934,
+      "sha256": "2ad2797bd64b939982e4ef02034ebf5ecd9f28b3cbe3cef52ef0b04963e31c49",
+      "originalBytes": 3952374,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9142454636125023
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-016-draw6.webp",
+      "group": "母亲视频",
+      "bytes": 318298,
+      "sha256": "7f2279f5171c551321ad985b7501a664e1109b73ced8652aa054c681dc69409d",
+      "originalBytes": 3884239,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9180539611491466
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-016-draw8.webp",
+      "group": "母亲视频",
+      "bytes": 285516,
+      "sha256": "54dbf09aef2f65b63b1f15c7d05087c51eb910c8fb8af33d1e33f16c1e63ee86",
+      "originalBytes": 3638328,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9215254919292598
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-016-draw9.webp",
+      "group": "母亲视频",
+      "bytes": 310468,
+      "sha256": "4dd02f4383f8651dafe3fb80572d6e587fd4b8329945b5d025edc1ac5cb7b1ef",
+      "originalBytes": 3834802,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9190393663088733
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-017-draw2.webp",
+      "group": "母亲视频",
+      "bytes": 305950,
+      "sha256": "f2e2d1b60d332e1b2d94a5e1defe3918cfb4465191ffa9b9f6ecf96cc6b129dc",
+      "originalBytes": 3860174,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9207419147427033
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-017-draw3.webp",
+      "group": "母亲视频",
+      "bytes": 290380,
+      "sha256": "1494bb3faf142d2b13831e982e6b32fbb0fe2808a44f8948e63ec3514e516db9",
+      "originalBytes": 3692879,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9213675833949609
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-018-draw2.webp",
+      "group": "母亲视频",
+      "bytes": 296092,
+      "sha256": "54f7207bf5447c2dbd1abf94481d9033e7cf1323c46ccd0ca01eb994d6b84183",
+      "originalBytes": 3730091,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9206207033554945
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-018-draw3.webp",
+      "group": "母亲视频",
+      "bytes": 285682,
+      "sha256": "a9dcdcb7b1dffde7e06e17068a5dff569ea14a4d1f07deff6ecd2823b026c5c0",
+      "originalBytes": 3614943,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.920971921272341
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-019-draw3.webp",
+      "group": "母亲视频",
+      "bytes": 294716,
+      "sha256": "fa0796ae8158f366c38daa55407c992cda2f7fa02df274a2a8d09e2cafe8b200",
+      "originalBytes": 3739233,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9211827666262038
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-019-draw4.webp",
+      "group": "母亲视频",
+      "bytes": 325424,
+      "sha256": "4dec935f63f5c96e468515d86dc167c4f7f017c9825aa4c4ba3aced3128d9bc8",
+      "originalBytes": 3815239,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9147041640117435
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-020-draw1.webp",
+      "group": "母亲视频",
+      "bytes": 303634,
+      "sha256": "419116d667e4c4bfb0e3c7e346ac563e73c961616ab8f0a20361e38ea7b19918",
+      "originalBytes": 3710777,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9181750883979285
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-020-draw3.webp",
+      "group": "母亲视频",
+      "bytes": 306544,
+      "sha256": "c7edf3fdac2dc29bb6c062e8c08f090d201966650836e5e0f44c2e4296e217f5",
+      "originalBytes": 3783247,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9189733052058192
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-021-draw1.webp",
+      "group": "母亲视频",
+      "bytes": 288646,
+      "sha256": "7998f048f6117c4d40a331ab4a8ae1cc1b10af74b604889a106760d8c072b79f",
+      "originalBytes": 3603446,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9198972317054286
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-021-draw2.webp",
+      "group": "母亲视频",
+      "bytes": 303590,
+      "sha256": "53dcc06b8cec3f401c818ce5976b52dbc3f10872194a4ed1f1acef70edb573c6",
+      "originalBytes": 3797597,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.920057341524127
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-021-draw5.webp",
+      "group": "母亲视频",
+      "bytes": 312230,
+      "sha256": "554056a6724e27b6bd408da7cc2c4251077be50e992812863f335ded8091dee2",
+      "originalBytes": 3924532,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9204414691993847
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-021-draw6.webp",
+      "group": "母亲视频",
+      "bytes": 311294,
+      "sha256": "85f5de538b6eaa7cefa47b3baafa4bdd535c7f1e60c2461d49ac25538c610d25",
+      "originalBytes": 3803817,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9181627297001933
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-022-draw2.webp",
+      "group": "母亲视频",
+      "bytes": 315296,
+      "sha256": "40ea7e870f22728ab26fb30f35465457d88dd72a2f2cf910024b17cdfb8b4f3f",
+      "originalBytes": 3833485,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9177521237203223
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-023-draw2.webp",
+      "group": "母亲视频",
+      "bytes": 272470,
+      "sha256": "a8e7679c8cb0da8715c340fada822843b55cd727562b1e0359842ad16d16394e",
+      "originalBytes": 3517041,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9225286256259168
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-024-draw4.webp",
+      "group": "母亲视频",
+      "bytes": 303862,
+      "sha256": "d9ec28328d6baacb48eef3c29a8f7ebd33807ba1b78133bd13099b65403b55c0",
+      "originalBytes": 3755105,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9190802920291177
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-025-draw1.webp",
+      "group": "母亲视频",
+      "bytes": 301606,
+      "sha256": "11fbcf28f3b30ea471910f7af10c44dc2ba30505d4dc068267a1e8609e1ce698",
+      "originalBytes": 3747259,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9195129026309631
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-025-draw2.webp",
+      "group": "母亲视频",
+      "bytes": 293338,
+      "sha256": "922b3d9a393c172434cfc7181b37bdf0f03a14ba111cfefb6bd09d29fd6a4350",
+      "originalBytes": 3667683,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9200208960261833
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-026-draw1.webp",
+      "group": "母亲视频",
+      "bytes": 342968,
+      "sha256": "4535dc2b3b8abbe7241ccb29e38a4a391098c06b2e0b8eb878bd976ad1ba721a",
+      "originalBytes": 3893181,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9119054572597575
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-027-draw1.webp",
+      "group": "母亲视频",
+      "bytes": 299678,
+      "sha256": "224e49b50e0927a51ce049a9f711efa7b735992e302847f96cd90e838eea786a",
+      "originalBytes": 3786135,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9208485698476151
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-027-draw2.webp",
+      "group": "母亲视频",
+      "bytes": 272470,
+      "sha256": "a8e7679c8cb0da8715c340fada822843b55cd727562b1e0359842ad16d16394e",
+      "originalBytes": 3517041,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9225286256259168
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-027-draw3.webp",
+      "group": "母亲视频",
+      "bytes": 290674,
+      "sha256": "8f95357650fa4bcbfca6bc296e7d41d0f9bb6c2b40b806d3260af3f0368c869b",
+      "originalBytes": 3656949,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9205146147786036
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-028-draw1.webp",
+      "group": "母亲视频",
+      "bytes": 301836,
+      "sha256": "7b94a9254f3c161417f8b79dcc07efdc58736073d62558034634cae8d85644ec",
+      "originalBytes": 3790447,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9203692862609608
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-029-draw1.webp",
+      "group": "母亲视频",
+      "bytes": 325782,
+      "sha256": "cd8f1790e90ea93a3ac5420ff8ae34829c186ec20e07c5153c937d7735377caa",
+      "originalBytes": 3856647,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9155271405446234
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-030-draw2.webp",
+      "group": "母亲视频",
+      "bytes": 241786,
+      "sha256": "84632c36dba104ec4f62b0f656767d68d4b061b8773eac9ba5e063a103015059",
+      "originalBytes": 3384795,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.928567018091199
+    },
+    {
+      "path": "cg1/mother-video-call/MVC-CG-030-draw1.webp",
+      "group": "母亲视频",
+      "bytes": 220740,
+      "sha256": "831a1122b721056ed40d722f79be73d10299ca647015f77edc0fa7faac4d56b7",
+      "originalBytes": 3278639,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        2304
+      ],
+      "decoded": true,
+      "originalReduction": 0.9326732830299401
+    },
+    {
+      "path": "rq091/302-cohab/302_亲密开场_由我开始_夜晚.webp",
+      "group": "302共居",
+      "bytes": 232816,
+      "sha256": "0cd1ea5d6d4c4b50a73818f0ef0df3f1cfb9bf0d871921bd52af9cd670e55fa9",
+      "originalBytes": 2152734,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1024,
+        1536
+      ],
+      "decoded": true,
+      "originalReduction": 0.8918510136412581
+    },
+    {
+      "path": "rq091/302-cohab/302_亲密开场_由我开始_晨间.webp",
+      "group": "302共居",
+      "bytes": 246250,
+      "sha256": "c469d86c8b55e6c5c00ed3a3db89d6dcf803ef561c6c4c937b0d5da6b7c48746",
+      "originalBytes": 2069287,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1024,
+        1536
+      ],
+      "decoded": true,
+      "originalReduction": 0.8809976576472959
+    },
+    {
+      "path": "rq091/302-cohab/302_亲密开场_让她开始_夜晚.webp",
+      "group": "302共居",
+      "bytes": 157996,
+      "sha256": "cdce14bd83f11f0b6c64355e3a69d4700f9499fa95d27aed969dd26cb87dde48",
+      "originalBytes": 1942910,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1024,
+        1536
+      ],
+      "decoded": true,
+      "originalReduction": 0.918680741773937
+    },
+    {
+      "path": "rq091/302-cohab/302_亲密开场_让她开始_晨间.webp",
+      "group": "302共居",
+      "bytes": 241254,
+      "sha256": "1425bd7de988d7a71fc562db49b6b1669a2125ee9e73387af75565754a459e54",
+      "originalBytes": 2074219,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1024,
+        1536
+      ],
+      "decoded": true,
+      "originalReduction": 0.8836892343576064
+    },
+    {
+      "path": "rq091/302-cohab/302_共居_早晨.webp",
+      "group": "302共居",
+      "bytes": 229906,
+      "sha256": "ec5c28bdcc867f468f1f29919ea5dfbf928cf1397397c109b194c85b47074757",
+      "originalBytes": 2009914,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": 0.8856140113457591
+    },
+    {
+      "path": "rq091/302-cohab/302_共居_白天.webp",
+      "group": "302共居",
+      "bytes": 245362,
+      "sha256": "a9e37f45a1ee1a55557d3f4763abe4196e00dc4acfcda200af31c8f141252beb",
+      "originalBytes": 2176603,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": 0.8872729661771117
+    },
+    {
+      "path": "rq091/302-cohab/302_共居_傍晚归家.webp",
+      "group": "302共居",
+      "bytes": 235998,
+      "sha256": "5013585c09737a0df4635a6a07cca0260e2ed51250427f91a90bfa27164702ee",
+      "originalBytes": 2086093,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": 0.8868708154430316
+    },
+    {
+      "path": "rq091/302-cohab/302_共居_夜晚.webp",
+      "group": "302共居",
+      "bytes": 203562,
+      "sha256": "9c19ea448e149cd96400b787c3e96f6da13e6febcc5f7336651efbf28f823545",
+      "originalBytes": 1979835,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": 0.8971823409526551
+    },
+    {
+      "path": "rq091/302-cohab/302_共居_深夜.webp",
+      "group": "302共居",
+      "bytes": 173214,
+      "sha256": "617a7cbacb5d6ad1b7b1c19eac5e77978f4f4305b663f47e2a9813993da6a1e9",
+      "originalBytes": 2065150,
+      "format": "WEBP",
+      "compression": "lossy",
+      "dimensions": [
+        1536,
+        1024
+      ],
+      "decoded": true,
+      "originalReduction": 0.9161252209282619
+    }
+  ]
+}

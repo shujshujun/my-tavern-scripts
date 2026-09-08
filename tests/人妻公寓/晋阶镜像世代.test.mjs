@@ -98,7 +98,9 @@ test('时间撤销也在恢复旧聊天镜像前作废写世代，失败补偿�
   const body = index.slice(start, end);
 
   assert.match(body, /作废当前手机时间线租约世代\(\)[\s\S]{0,160}await 作废晋阶镜像时间线\(\)/);
-  assert.match(body, /镜像世代已作废 = true/);
-  assert.match(body, /聊天已恢复 \|\| 镜像世代已作废/);
-  assert.match(body, /恢复时间聊天备份\(推进后聊天备份/);
+  const 准备位 = body.indexOf('vars[时间推进事务键] = _.cloneDeep(撤销事务)');
+  const 作废位 = body.indexOf('await 作废晋阶镜像时间线()');
+  assert.ok(准备位 >= 0 && 作废位 > 准备位, '镜像失效前必须保留可重载的反向事务');
+  assert.match(body, /准备补偿: 撤销写口\.准备补偿/);
+  assert.match(body, /恢复推进前聊天:[\s\S]*撤销写口\.校验\(getVariables[\s\S]*恢复时间聊天备份\(\s*推进后聊天备份, 读取时间事务恢复键\(当前撤销事务\)/);
 });

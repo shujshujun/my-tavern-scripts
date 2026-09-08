@@ -277,7 +277,7 @@ test('手机实装使用独立 generation_id 与定向停止，并把一次私�
 
 test('系统在首次异步写库前预留消息，并按预留ID顺序组装一次请求', () => {
   const 发送段 = 交互源码.slice(交互源码.indexOf('async function 发消息('), 交互源码.indexOf('/** 黄灯到时'));
-  assert.ok(发送段.indexOf('开始写入(键, 玩家消息标识)') < 发送段.indexOf('await 写库增量'));
+  assert.ok(发送段.indexOf('开始写入(键, 玩家消息标识)') < 发送段.indexOf('写库增量('));
   assert.match(发送段, /finally\s*\{[\s\S]*完成写入\(键, 玩家消息标识, 已成功落库\)/);
 
   const 批次段 = 交互源码.slice(交互源码.indexOf('async function 执行待回复批次('), 交互源码.indexOf('async function 执行批次聊天回复('));

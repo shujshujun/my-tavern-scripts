@@ -13,11 +13,11 @@ export const 不再留门CG清单 = Object.freeze([
   ['ZXM-NMD-07', '她封存记录'],
   ['ZXM-NMD-08', '302母带归档'],
 ] as const);
-/** WebP产品尚未发布；验收服务器或后续发布配置提供基址。没有基址时保持可读回执。 */
+/** WebP产品随cg5提供；验收环境可以显式覆盖基址。 */
 export const 不再留门素材配置 = Object.freeze({
   产品目录: 'src/人妻公寓/素材/特殊场景/不再留门',
   扩展名: 'webp',
-  已发布基址: '',
+  已发布基址: 'https://testingcf.jsdelivr.net/gh/shujun8520-design/qgy-assets@cg5/rq091/story/不再留门',
 });
 export function 不再留门图片(文件: string): string {
   if (!不再留门CG清单.some(([id]) => id === 文件)) return '';

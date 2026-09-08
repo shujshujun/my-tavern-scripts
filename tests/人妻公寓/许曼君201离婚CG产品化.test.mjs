@@ -98,9 +98,9 @@ test('DIV-04/05是唯一长期背景；运行时仅拼产品ID，不读取生成
   assert.doesNotMatch(route, /output\/imagegen|local-insets|presentation-with-inset|canvas|drawImage/u);
   const assets = readFileSync(join(ROOT, 'src/人妻公寓/界面/客户端/assets.ts'), 'utf8');
   const section = assets.slice(assets.indexOf('export const 许曼君离婚素材发布配置'), assets.indexOf('/**', assets.indexOf('export function 许曼君离婚图片')));
-  assert.match(section, /产品目录: 'src\/人妻公寓\/素材\/特殊场景\/许曼君离婚'/u);
+  assert.match(section, /产品目录: 'rq091\/story\/许曼君离婚'/u);
   assert.match(section, /__RQGY_XMJ_DIVORCE_ASSET_BASE__/u);
-  assert.match(section, /不可变标签: ''/u);
+  assert.match(section, /不可变标签: 'cg5'/u);
   assert.doesNotMatch(section, /output\/imagegen|local-insets|presentation-with-inset|canvas|drawImage/u);
 });
 

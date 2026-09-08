@@ -335,7 +335,7 @@ test('App 导入并常驻接线抽屉组件；垃圾选择弹窗留在组件外�
   // 反向语义:键盘门必须带 移动端.value——桌面输入框 focus 时 键盘打开 不隐藏房内动作(桌面原样),
   // 与旧 keyboard-open CSS 只在 max-width:540px 媒体内生效等价;桌面/手机都抑制的仍是发送中与静音会议。
   assert.match(App源码, /房内操作抑制[\s\S]{0,80}\(移动端\.value && 键盘打开\.value\)/, '键盘门被 移动端.value 门控');
-  const 移动端媒体段 = App源码.slice(App源码.lastIndexOf('@media (max-width: 540px)'));
+  const 移动端媒体段 = App源码.slice(App源码.lastIndexOf('@media (max-width: 540px) {'));
   assert.match(
     移动端媒体段,
     /\.keyboard-open \.in-room-acts,/,
@@ -353,15 +353,12 @@ test('组件自身：消费 普通房间动作、触发动作收起并直调原�
     /const 普通动作可见 = computed\(\(\) => !props\.videoTapeActive && props\.actions\.length > 0\)/,
     '普通动作录像带门控在组件(旧 v-if 等价)',
   );
-  assert.match(
-    抽屉源码,
-    /const 有主训练动作 = computed\(\(\) => props\.mobile && props\.actions\.some\(动作 => 动作\.kicker === 'TRAIN'\)\)/,
-    '手机公园/健身房的主训练瓷砖不得随抽屉自动收起而消失',
-  );
+  assert.match(模板段, /v-if="实际展开"/, '训练与其他动作都服从真实收起状态');
+  assert.match(抽屉源码, /collapsible: true/, '桌面接入同一展示状态机');
   assert.match(抽屉源码, /forcedOpen\?: boolean/);
-  assert.match(抽屉源码, /const 实际展开 = computed\(\(\) => Boolean\(props\.forcedOpen \|\| 状态\.展开\)\)/);
+  assert.match(抽屉源码, /const 实际展开 = computed\(\(\) => 状态\.展开\)/);
   assert.match(抽屉源码, /有可见动作 && \(!suppressed \|\| forcedOpen\)/);
-  assert.match(抽屉源码, /function 切换\(\): void \{\s*if \(props\.forcedOpen\) return;/);
+  assert.doesNotMatch(抽屉源码, /function 切换\(\): void \{\s*if \(props\.forcedOpen\) return;/);
   assert.match(
     抽屉源码,
     /function 触发动作\(动作: 卡动作\): void \{[\s\S]*?if \(动作\.选项\?\.length\)[\s\S]*?机器\.手动收起\(\);[\s\S]{0,80}动作\.做\(\);/,
@@ -393,14 +390,14 @@ test('组件自身：消费 普通房间动作、触发动作收起并直调原�
 
 // ═══ 结构契约：手机面板 / 桌面 / ARIA / 样式 ═══
 
-test('手机把手至少44px且只在手机渲染；面板向上覆盖并限高滚动', () => {
+test('双端把手至少44px；面板向上覆盖并限高滚动', () => {
   const 模板段 = 提取模板(抽屉源码);
-  assert.match(模板段, /v-if="mobile"[\s\S]*?class="drawer-handle"/, '把手只在手机断点渲染');
+  assert.match(模板段, /ref="把手"[\s\S]*?class="drawer-handle"/, '双端都渲染同一把手');
   assert.match(模板段, /type="button"[\s\S]*?class="drawer-handle"/, '把手是 button 且 type=button');
   assert.match(模板段, /:aria-expanded="实际展开"/, '把手 aria-expanded 同时反映普通展开与线路强制展开');
   assert.match(模板段, /aria-controls="in-room-acts-panel"/, '把手 aria-controls');
-  assert.match(模板段, /:role="mobile \? 'region' : undefined"/, '手机面板 role=region');
-  assert.match(模板段, /:aria-label="mobile \? '当前房间可执行操作' : undefined"/, '手机面板有明确 aria-label');
+  assert.match(模板段, /role="region"/, '手机面板 role=region');
+  assert.match(模板段, /aria-label="当前房间可执行操作"/, '手机面板有明确 aria-label');
   assert.match(
     抽屉源码,
     /\.drawer-handle \{\s*display: flex;\s*align-items: center;\s*gap: 6px;\s*width: 100%;\s*min-height: 44px;/m,
@@ -418,12 +415,12 @@ test('手机把手至少44px且只在手机渲染；面板向上覆盖并限高�
   assert.match(抽屉源码, /focus-visible/, '把手有清晰 focus-visible');
 });
 
-test('桌面恒显两列，302只增加同层二选一；窄屏两列不横溢', () => {
+test('双端展开后两列，302只增加同层二选一；窄屏两列不横溢', () => {
   const 模板段 = 提取模板(抽屉源码);
   assert.match(
     模板段,
-    /v-if="mobile \? 实际展开 \|\| 有主训练动作 : true"/,
-    '桌面内容恒显；手机主训练瓷砖即使抽屉自动收起也保持可见',
+    /v-if="实际展开"/,
+    '双端与训练面板都可真正收起',
   );
   assert.doesNotMatch(抽屉源码, /桌面302折叠|desktop-cohab-drawer|room-actions-desktop-cohab/);
   assert.doesNotMatch(抽屉源码, /\.drawer-content \{\s*position: absolute;/, '桌面内容不得绝对定位');

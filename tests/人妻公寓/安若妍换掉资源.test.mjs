@@ -172,17 +172,17 @@ test('读档与回档保持冻结照片，缺照片的完成旧档使用既有�
   assert.equal(assets.安若妍换掉背景文件(Schema.parse({})), '');
 });
 
-test('发布配置与产品清单一致，未配置基址及非法文件名维持降级', () => {
+test('发布配置使用cg5，手机与界面同源且非法文件名维持降级', () => {
   const config = assets.安若妍换掉素材发布配置;
-  assert.equal(config.产品目录, manifest.publish.runtimeDirectory);
+  assert.equal(config.产品目录, 'rq091/story/安若妍换掉');
   assert.equal(config.manifest, '安若妍换掉CG.manifest.json');
   assert.equal(config.文件数, manifest.acceptedFiles);
-  assert.equal(config.仓库, manifest.publish.repository);
-  assert.equal(config.不可变标签, '');
-  assert.equal(config.状态, '待不可变标签');
+  assert.equal(config.仓库, 'shujun8520-design/qgy-assets');
+  assert.equal(config.不可变标签, 'cg5');
+  assert.equal(config.状态, '已发布');
   delete globalThis.__RQGY_ARY_REPLACE_ASSET_BASE__;
-  assert.equal(assets.安若妍换掉图片('ARY-RPL-10-N'), '');
-  assert.equal(phone.私聊图片地址('@ending/安若妍换掉/ARY-RPL-10-N'), assets.安若妍换掉CG占位图);
+  assert.equal(decodeURI(assets.安若妍换掉图片('ARY-RPL-10-N')), 'https://testingcf.jsdelivr.net/gh/shujun8520-design/qgy-assets@cg5/rq091/story/安若妍换掉/ARY-RPL-10-N.webp');
+  assert.equal(phone.私聊图片地址('@ending/安若妍换掉/ARY-RPL-10-N'), assets.安若妍换掉图片('ARY-RPL-10-N'));
   try {
     globalThis.__RQGY_ARY_REPLACE_ASSET_BASE__ = 'https://example.test/assets/';
     for (const id of [

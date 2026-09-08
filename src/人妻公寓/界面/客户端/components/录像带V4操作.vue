@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AuxPanel from './辅助面板.vue';
 import type { 录像带V4客户端快照 } from '../../../脚本/游戏逻辑/录像带V4运行时';
 import type { 录像带V4房间 } from '../../../脚本/游戏逻辑/录像带V4状态';
 
@@ -25,6 +26,7 @@ function 房间禁用(房间: 录像带V4房间): boolean {
 </script>
 
 <template>
+  <AuxPanel v-if="open" label="监控操作" :hint="sending ? '本幕生成中' : '切房与下一幕'" :default-open="true">
   <section v-if="open" class="vtr-v4-controls" aria-label="录像带监控操作">
     <button
       type="button"
@@ -72,6 +74,7 @@ function 房间禁用(房间: 录像带V4房间): boolean {
       <strong>安全退出本场</strong>
     </button>
   </section>
+  </AuxPanel>
 </template>
 
 <style scoped>

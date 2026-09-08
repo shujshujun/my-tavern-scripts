@@ -1,0 +1,18 @@
+{
+  "id": "settlement-celebration",
+  "approved": "2026-09-07",
+  "generator": "built-in image_gen",
+  "pipeline": ["background", "left trio", "right trio", "six-character composition"],
+  "sourceSha256": "3196af9527c21005434590da2c2441bf51edfac5256115b3bc7c2f69441ae078",
+  "file": "全员通关庆典.webp",
+  "width": 1672,
+  "height": 941,
+  "bytes": 336310,
+  "sha256": "d5070b84daa79c5dc52c26d62a82ea59930a70faef97fbc93e48bf4e854695b9",
+  "encoding": {
+    "effort": 6,
+    "format": "webp",
+    "quality": 88
+  },
+  "prompts": "制作提示词.md"
+}

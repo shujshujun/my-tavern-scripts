@@ -206,6 +206,29 @@ test('H6-H8暂停不扣体力不涨有效楼，恰好7点体力仍可免费完�
   assert.equal(data.系统._安若妍不必停.普通收尾已完成, true);
 });
 
+test('公开孕态在H8和隔墙H9分别选择11-P与12-P，且普通态分支不受影响', () => {
+  const data = startThroughH1(fresh());
+  data.户['301'].妻._怀孕.状态 = '已告知';
+  for (let i = 0; i < 4; i += 1) settleIntimacy(data, 120 + i);
+
+  const h6 = 读取待发送事件队列(data.系统._待发送事件)
+    .find(item => route.解析安若妍不必停剧情事件(item)?.场景 === 'H6前门打开');
+  assert.ok(h6);
+  const h6Commit = commit(data, h6, 130);
+  settleFixed(data, h6, 130);
+  commit(data, h6Commit.后续事件, 131);
+  settleFixed(data, h6Commit.后续事件, 131);
+
+  const h8 = route.执行安若妍不必停地点动作(data, '继续刚才的动作', '301', 132);
+  assert.equal(h8.成功, true);
+  const h8Commit = commit(data, h8.事件, 133);
+  settleFixed(data, h8.事件, 133);
+  assert.deepEqual(h8Commit.CG序列, ['ARY-NBS-10-P', 'ARY-NBS-11-P']);
+
+  const h9 = settleIntimacy(data, 134);
+  assert.equal(h9.线路CG, 'ARY-NBS-12-P');
+});
+
 test('H7选择暂缓只重排预约夜，卷宗和管理员室登记不重做且跳过受孕', () => {
   const data = startThroughH1(fresh());
   for (let i = 0; i < 4; i += 1) settleIntimacy(data, 60 + i);

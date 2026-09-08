@@ -236,7 +236,7 @@ test('配置.ts 损坏旧存储不会把非法枚举和非标量值泄漏给生�
 });
 
 test('配置.ts 世界书人设:剥外貌段并按 3000 字截断', async () => {
-  const 片段 = 截源(配置源码, 'const _人设缓存 =', 'export async function 人设段');
+  const 片段 = 截源(配置源码, '// ── 世界书人设注入', 'export async function 人设段');
   const { 妻人设 } = 执行TS片段(片段, ['妻人设']);
   const 原window = globalThis.window;
   const 原getCharWorldbookNames = globalThis.getCharWorldbookNames;

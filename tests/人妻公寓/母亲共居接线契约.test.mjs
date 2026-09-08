@@ -92,7 +92,7 @@ test('302结局后冷落预警自身直接排除母亲，其他门牌继续走�
   assert.match(cold, /计算妻冷落消息档/);
 });
 
-test('302九图包只保留独立素材仓映射，未发布时安全回退且优先级低于具体房间后果', () => {
+test('302九图包只保留独立素材仓映射，发布后地址可用且优先级低于具体房间后果', () => {
   const assets = read('src/人妻公寓/界面/客户端/assets.ts');
   const app = read('src/人妻公寓/界面/客户端/App.vue');
   const index = read('src/人妻公寓/脚本/游戏逻辑/index.ts');
@@ -104,7 +104,7 @@ test('302九图包只保留独立素材仓映射，未发布时安全回退且�
     '302_亲密开场_让她开始_晨间',
   ]) assert.match(assets, new RegExp(name));
   assert.match(assets, /__RQGY_302_COHAB_ASSET_BASE__/);
-  assert.match(assets, /状态: '待独立素材仓'/);
+  assert.match(assets, /状态: '已发布'/);
   assert.doesNotMatch(assets, /^import .*output\/imagegen|^import .*\.(?:png|webp)\?url/m);
   assert.match(app, /房间生产背景键[\s\S]*第二机位房间背景文件[\s\S]*共居302背景图/);
   assert.match(app, /人妻公寓:302亲密开场CG/);

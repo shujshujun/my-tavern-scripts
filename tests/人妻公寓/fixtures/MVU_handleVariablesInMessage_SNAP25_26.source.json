@@ -1,0 +1,7 @@
+{
+  "source": "D:/SillyTavern/MagVarUpdate-inspect/src/function/update_variables.ts",
+  "revision": "b42817925d0391c15fa242a8238d2bbe28eb6319",
+  "sourceSha256": "b257abc9138cb9e16671d39dfe555477ccc1e7c33eba260c37a4c392e869564b",
+  "functionSha256": "976e0203878be512442c4e3b192057b3c55fcf2cd254af53f76a35dab3e5a786",
+  "scope": "Complete unmodified public handleVariablesInMessage function. Parser and host I/O supplied by the isolated test."
+}

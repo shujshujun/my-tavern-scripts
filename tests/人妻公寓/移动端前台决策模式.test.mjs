@@ -34,7 +34,7 @@ test('301 H7只保留继续／暂缓，手机强制展开并阻止普通输入�
 });
 
 test('监控硬决策保留正文、收起无关操作，并且选择提交前不乐观清掉持久挂起', () => {
-  assert.match(App源码, /<div class="page" :class="\{ 'foreground-decision': 前台硬决策中 \}">/);
+  assert.match(App源码, /<div class="page" :class="\{ 'foreground-decision': 前台硬决策中 \}"(?:\s+:inert="[^"]+")?>/);
   assert.match(App源码, /:suppressed="房内操作抑制 \|\| 前台硬决策中"/);
   assert.match(
     App源码,
@@ -71,7 +71,7 @@ test('监控硬决策保留正文、收起无关操作，并且选择提交前�
   assert.match(App源码, /\.peep-options \{[\s\S]*?overflow-y:\s*auto/);
 });
 
-test('普通行动建议在手机上变为覆盖式可收起抽屉，桌面仍直接显示两列', () => {
+test('普通行动建议双端共用覆盖式可收起抽屉，展开后保留两列', () => {
   assert.match(行动选项源码, /mobile:\s*boolean/);
   assert.match(行动选项源码, /class="option-drawer-handle"/);
   assert.match(行动选项源码, /min-height:\s*44px/);
@@ -79,7 +79,7 @@ test('普通行动建议在手机上变为覆盖式可收起抽屉，桌面仍�
   assert.match(行动选项源码, /position:\s*absolute/);
   assert.match(行动选项源码, /max-height:\s*min\(40dvh, 280px\)/);
   assert.match(行动选项源码, /overflow-y:\s*auto/);
-  assert.match(行动选项源码, /v-else[\s\S]{0,180}class="option-row desktop-option-row"/);
+  assert.match(行动选项源码, /ref="根" class="option-drawer"/);
   assert.match(
     行动选项源码,
     /watch\([\s\S]*?props\.open[\s\S]*?props\.mobile[\s\S]*?props\.options[\s\S]*?展开\.value = false/,

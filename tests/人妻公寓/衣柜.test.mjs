@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import test from 'node:test';
+import { 装配真实时间事务门 } from './helpers/时间事务门装配.mjs';
 import lodash from 'lodash';
 
 globalThis._ = lodash;
@@ -482,7 +483,7 @@ function 事务环境() {
     ts.transpileModule([...functions.values(), source.slice(start, end)].join('\n'), {
       compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
     }).outputText,
-    scope,
+    装配真实时间事务门(scope),
   );
   state.submit = (id, 操作 = '穿戴') => state.action({ 门牌: '101', 道具id: id, 操作 });
   return state;

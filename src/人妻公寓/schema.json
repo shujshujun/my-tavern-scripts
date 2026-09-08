@@ -634,6 +634,44 @@
           "default": "",
           "type": "string"
         },
+        "_商店剧情结算": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "票号": {
+              "default": "",
+              "type": "string"
+            },
+            "商品ID": {
+              "default": "",
+              "type": "string"
+            },
+            "参与妻": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "101",
+                  "102",
+                  "201",
+                  "202",
+                  "301",
+                  "302"
+                ]
+              }
+            },
+            "状态": {
+              "default": "无",
+              "type": "string",
+              "enum": [
+                "无",
+                "待演",
+                "已结算"
+              ]
+            }
+          }
+        },
         "_场景剧情序号": {
           "default": 0,
           "type": "number"
@@ -730,6 +768,171 @@
         "_序章完成": {
           "default": false,
           "type": "boolean"
+        },
+        "_通关纪念": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "全员完成时段": {
+              "default": -1,
+              "type": "integer",
+              "minimum": -1,
+              "maximum": 9007199254740991
+            },
+            "CG记录": {
+              "default": [],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "首次成绩": {
+              "default": null,
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "规则版本": {
+                      "type": "number",
+                      "const": 1
+                    },
+                    "评级": {
+                      "type": "string",
+                      "enum": [
+                        "C",
+                        "B",
+                        "A",
+                        "S",
+                        "SS",
+                        "SSS"
+                      ]
+                    },
+                    "绝对时段": {
+                      "$ref": "#/$defs/__schema0"
+                    },
+                    "天数": {
+                      "$ref": "#/$defs/__schema0"
+                    },
+                    "角色": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "门牌": {
+                            "type": "string"
+                          },
+                          "姓名": {
+                            "type": "string"
+                          },
+                          "阶段": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 5
+                          },
+                          "完成": {
+                            "type": "boolean"
+                          },
+                          "结局": {
+                            "type": "string"
+                          },
+                          "归宿": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "门牌",
+                          "姓名",
+                          "阶段",
+                          "完成",
+                          "结局",
+                          "归宿"
+                        ]
+                      }
+                    },
+                    "结局线路数": {
+                      "$ref": "#/$defs/__schema0"
+                    },
+                    "特殊剧情": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "服饰数": {
+                      "$ref": "#/$defs/__schema0"
+                    },
+                    "CG数": {
+                      "$ref": "#/$defs/__schema0"
+                    },
+                    "探索分": {
+                      "maximum": 100,
+                      "$ref": "#/$defs/__schema0"
+                    },
+                    "探索项": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "名称": {
+                            "type": "string"
+                          },
+                          "数量": {
+                            "$ref": "#/$defs/__schema0"
+                          },
+                          "目标": {
+                            "$ref": "#/$defs/__schema0"
+                          },
+                          "分数": {
+                            "$ref": "#/$defs/__schema0"
+                          },
+                          "上限": {
+                            "$ref": "#/$defs/__schema0"
+                          },
+                          "说明": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "名称",
+                          "数量",
+                          "目标",
+                          "分数",
+                          "上限",
+                          "说明"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "规则版本",
+                    "评级",
+                    "绝对时段",
+                    "天数",
+                    "角色",
+                    "结局线路数",
+                    "特殊剧情",
+                    "服饰数",
+                    "CG数",
+                    "探索分",
+                    "探索项"
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "已庆祝评级": {
+              "default": "",
+              "type": "string",
+              "enum": [
+                "",
+                "S",
+                "SS",
+                "SSS"
+              ]
+            }
+          }
         },
         "_已完成特殊场景": {
           "default": [],
@@ -886,11 +1089,11 @@
               "properties": {
                 "102": {
                   "default": {},
-                  "$ref": "#/$defs/__schema0"
+                  "$ref": "#/$defs/__schema1"
                 },
                 "202": {
                   "default": {},
-                  "$ref": "#/$defs/__schema0"
+                  "$ref": "#/$defs/__schema1"
                 }
               }
             }
@@ -948,11 +1151,11 @@
               "properties": {
                 "102": {
                   "default": {},
-                  "$ref": "#/$defs/__schema1"
+                  "$ref": "#/$defs/__schema2"
                 },
                 "202": {
                   "default": {},
-                  "$ref": "#/$defs/__schema1"
+                  "$ref": "#/$defs/__schema2"
                 }
               }
             },
@@ -970,11 +1173,11 @@
               "properties": {
                 "102": {
                   "default": {},
-                  "$ref": "#/$defs/__schema2"
+                  "$ref": "#/$defs/__schema3"
                 },
                 "202": {
                   "default": {},
-                  "$ref": "#/$defs/__schema2"
+                  "$ref": "#/$defs/__schema3"
                 },
                 "两户确认完成": {
                   "default": false,
@@ -1064,10 +1267,10 @@
                   "type": "object",
                   "properties": {
                     "102": {
-                      "$ref": "#/$defs/__schema3"
+                      "$ref": "#/$defs/__schema4"
                     },
                     "202": {
-                      "$ref": "#/$defs/__schema3"
+                      "$ref": "#/$defs/__schema4"
                     }
                   }
                 }
@@ -3893,6 +4096,11 @@
   },
   "$defs": {
     "__schema0": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 9007199254740991
+    },
+    "__schema1": {
       "type": "object",
       "properties": {
         "状态": {
@@ -3947,7 +4155,7 @@
         }
       }
     },
-    "__schema1": {
+    "__schema2": {
       "type": "object",
       "properties": {
         "已接收": {
@@ -3960,7 +4168,7 @@
         }
       }
     },
-    "__schema2": {
+    "__schema3": {
       "type": "object",
       "properties": {
         "戴锁已确认": {
@@ -3973,7 +4181,7 @@
         }
       }
     },
-    "__schema3": {
+    "__schema4": {
       "default": "idle",
       "type": "string",
       "enum": [

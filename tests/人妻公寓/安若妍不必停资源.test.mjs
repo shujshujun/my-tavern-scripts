@@ -41,20 +41,20 @@ function webpSize(bytes) {
   return [bytes.readUInt16LE(marker + 3) & 0x3fff, bytes.readUInt16LE(marker + 5) & 0x3fff];
 }
 
-test('18张封板源图与WebP产品逐张SHA闭合，生图与拒绝证据继续留在产品目录之外', () => {
+test('20张封板源图与WebP产品逐张SHA闭合，生图与拒绝证据继续留在产品目录之外', () => {
   assert.equal(manifest.schemaVersion, 'rqgy-anruoyan-301-no-stop-product-manifest-v2');
   assert.equal(manifest.status, 'product-webp-ready-awaiting-external-publish');
   assert.equal(manifest.runtimeSlots, 14);
-  assert.equal(manifest.acceptedFiles, 18);
-  assert.equal(manifest.items.length, 18);
+  assert.equal(manifest.acceptedFiles, 20);
+  assert.equal(manifest.items.length, 20);
   assert.equal(manifest.format, 'webp');
   assert.equal(manifest.encoder.quality, 93);
   assert.equal(manifest.encoder.method, 6);
   assert.equal(manifest.encoder.resize, false);
   assert.equal(manifest.publish.immutableTag, '');
   assert.equal(manifest.publish.runtimeDirectory, 'src/人妻公寓/素材/特殊场景/安若妍不必停');
-  assert.equal(new Set(manifest.items.map(item => item.id)).size, 18);
-  assert.equal(manifest.sourceEvidence.acceptedOriginalsPreserved, 18);
+  assert.equal(new Set(manifest.items.map(item => item.id)).size, 20);
+  assert.equal(manifest.sourceEvidence.acceptedOriginalsPreserved, 20);
   assert.equal(manifest.sourceEvidence.supersededOriginalsPreserved, 1);
   assert.equal(manifest.sourceEvidence.technicalFailuresPreserved, 1);
   assert.equal(manifest.sourceEvidence.nonProductionExperimentsRecorded, 1);
@@ -91,25 +91,30 @@ test('18张封板源图与WebP产品逐张SHA闭合，生图与拒绝证据继�
   assert.ok(manifest.qualityEvidence.savedPercent > 80);
 });
 
-test('06/09/10/13严格拥有N/P两张，其他运行镜头只保留共享图', () => {
+test('06/09/10/13严格拥有N/P两张，11/12保留普通共享图并增加孕态覆写', () => {
   const byId = new Map(manifest.items.map(item => [item.id, item]));
   for (const slot of ['06', '09', '10', '13']) {
     assert.equal(byId.get(`ARY-NBS-${slot}-N`)?.variant, 'normal');
     assert.equal(byId.get(`ARY-NBS-${slot}-P`)?.variant, 'pregnant');
     assert.equal(byId.has(`ARY-NBS-${slot}`), false);
   }
-  for (const slot of ['01', '02', '03', '04', '05', '07', '08', '11', '12', '14']) {
+  for (const slot of ['11', '12']) {
+    assert.equal(byId.get(`ARY-NBS-${slot}`)?.variant, 'shared');
+    assert.equal(byId.has(`ARY-NBS-${slot}-N`), false);
+    assert.equal(byId.get(`ARY-NBS-${slot}-P`)?.variant, 'pregnant');
+  }
+  for (const slot of ['01', '02', '03', '04', '05', '07', '08', '14']) {
     assert.equal(byId.get(`ARY-NBS-${slot}`)?.variant, 'shared');
     assert.equal(byId.has(`ARY-NBS-${slot}-N`), false);
     assert.equal(byId.has(`ARY-NBS-${slot}-P`), false);
   }
 });
 
-test('全部CG保持统一3:2横图规格，代码发布前不会请求虚构不可变标签', () => {
+test('全部CG保持统一3:2横图规格，运行时使用已核验的不可变素材标签', () => {
   assert.deepEqual(manifest.dimensions, { width: 1536, height: 1024, aspectRatio: '3:2' });
   const assetsSource = readFileSync(new URL('../../src/人妻公寓/界面/客户端/assets.ts', import.meta.url), 'utf8');
-  assert.match(assetsSource, /不可变标签:\s*''/u);
-  assert.match(assetsSource, /状态:\s*'待不可变标签'/u);
+  assert.match(assetsSource, /不可变标签:\s*'cg5'/u);
+  assert.match(assetsSource, /状态:\s*'已发布'/u);
   assert.match(assetsSource, /__RQGY_ARY_301_NO_STOP_ASSET_BASE__/u);
   assert.match(assetsSource, /\$\{文件\}\.webp/u);
   assert.doesNotMatch(assetsSource, /@rq0\.90\.4\/src\/人妻公寓\/素材\/特殊场景\/安若妍不必停/u);

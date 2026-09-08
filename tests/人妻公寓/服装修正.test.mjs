@@ -57,11 +57,11 @@ test('没有修正记录的角色衣物保留原资源，不借用其他角色�
   assert.equal(角色立绘候选('夏乔', '牛仔背带裙', false)[0], `${素材基址}/立绘/夏乔_牛仔背带裙.webp`);
 });
 
-test('未发布时不构造失效远端链接，本地验收仅使用明确注入的资源地址', () => {
-  assert.equal(pendingResources.衣柜素材发布配置.状态, '待发布');
-  assert.equal(pendingResources.衣柜素材基址, '');
-  assert.equal(pendingResources.衣柜造型图片(fixed[0]), '');
-  assert.equal(pendingResources.衣柜商品修正图('换戒'), '');
+test('已发布时使用cg5素材，本地验收仍可使用明确注入的资源地址', () => {
+  assert.equal(pendingResources.衣柜素材发布配置.状态, '已发布');
+  assert.equal(pendingResources.衣柜素材基址, 'https://testingcf.jsdelivr.net/gh/shujun8520-design/qgy-assets@cg5/rq091/wardrobe');
+  assert.match(pendingResources.衣柜造型图片(fixed[0]), /@cg5\/rq091\/wardrobe\//);
+  assert.match(pendingResources.衣柜商品修正图('换戒'), /@cg5\/rq091\/wardrobe\/_道具\//);
   assert.equal(resources.衣柜素材基址, 'http://wardrobe.test/approved');
 });
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import AuxPanel from './辅助面板.vue';
 // 静音会议会后三块面板(App A7b3 从 App.vue 等价外移)。
 // 纯展示/纯 emit：散会名单、会后自由段、最终收尾重试按 props 门控渲染；切换/继续/结束/头像失败只转发。
 import type { 静音会议候选门牌 } from '../../../静音会议配置';
@@ -26,6 +27,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
+  <AuxPanel v-if="(waitingDismiss || freeWaiting || finishRetry) && !sending" :label="waitingDismiss ? '散会名单' : finishRetry ? '收尾待重试' : '会后操作'" :hint="waitingDismiss ? selectionHint : '待处理'" :default-open="true" :reset-key="waitingDismiss ? 'selection' : finishRetry ? 'retry' : 'free'">
   <section v-if="waitingDismiss && !sending" class="mute-after-panel mute-dismiss-panel">
     <div class="mute-after-heading">
       <span>第 12 拍 · 宣布散会</span>
@@ -79,6 +81,7 @@ const emit = defineEmits<{
       <button class="btn rite" type="button" @click="emit('requestEnd')">重新生成最终收尾</button>
     </div>
   </section>
+  </AuxPanel>
 </template>
 
 <style scoped>

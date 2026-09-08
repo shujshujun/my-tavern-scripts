@@ -29,6 +29,7 @@ import Wardrobe from './衣柜.vue';
 import { 当前可见立绘SKU, 外装已脱下, type 衣柜动作 } from '../../../脚本/游戏逻辑/衣柜系统';
 import { 衣柜默认状态图, 衣柜物品缩略图 } from '../衣柜素材';
 import { 是完整外装道具 } from '../../../衣柜造型配置';
+import { 读取配偶档案展示 } from '../composables/配偶档案展示';
 
 const props = defineProps<{
   door: 门牌 | null;
@@ -89,6 +90,7 @@ const 选中档案 = computed(() => {
     夫称谓: 阶段体验?.配偶称谓 ?? '丈夫',
     阶段体验,
     夫状态: 丈夫在楼(props.data.户[m], m, props.absolutePeriod),
+    配偶展示: 读取配偶档案展示(props.data, m, props.absolutePeriod),
     阶段标题: 阶段标题(妻.当前阶段, m),
     气质描述: 户静态表[m].初始?.气质描述 ?? '',
     立绘图,
@@ -447,7 +449,7 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
             <span class="kink-chip on">{{ 选中档案.阶段性癖 }}</span>
           </div>
         </div>
-        <!-- 丈夫状态栏(解锁后:双轴可见——疑心是风险表,信任是钥匙) -->
+        <!-- 配偶状态栏：保留原读数；旧随机风险停用后不再展示实时风险盘。 -->
         <div class="dsec husband dossier-card">
           <div class="dsec-title">她的{{ 选中档案.夫称谓 }}</div>
           <div class="hb-row">
@@ -461,11 +463,13 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
             <span v-else class="avatar-glyph hb">{{ 选中档案.夫名[0] }}</span>
             <span class="hb-main">
               <b>{{ 选中档案.夫名 }}</b>
-              <small>此刻{{ 选中档案.夫状态 }}</small>
+              <small v-if="选中档案.配偶展示.居住说明">{{ 选中档案.配偶展示.居住说明 }}</small>
+              <small v-else>此刻{{ 选中档案.夫状态 }}</small>
             </span>
           </div>
           <p v-if="选中档案.阶段体验" class="dline">{{ 选中档案.阶段体验.配偶说明 }}</p>
-          <div class="husband-risk" :aria-label="选中档案.夫称谓 + '疑心与信任读数'">
+          <p v-if="选中档案.配偶展示.风险说明" class="dline">{{ 选中档案.配偶展示.风险说明 }}</p>
+          <div v-if="!选中档案.配偶展示.旧风险已停用" class="husband-risk" :aria-label="选中档案.夫称谓 + '疑心与信任读数'">
             <span class="trust"><Ic n="lock" /> 信任</span>
             <i
               class="risk-needle"
@@ -497,7 +501,11 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
       </template>
       <template v-else>
         <p class="dline"><b>情绪</b> {{ 选中档案.妻.当前情绪 }}</p>
-        <p class="dline"><b>{{ 选中档案.夫称谓 }}</b> {{ 选中档案.夫名 }} —— 此刻{{ 选中档案.夫状态 }}</p>
+        <p class="dline">
+          <b>{{ 选中档案.夫称谓 }}</b> {{ 选中档案.夫名 }} ——
+          <span v-if="选中档案.配偶展示.居住说明">{{ 选中档案.配偶展示.居住说明 }}</span>
+          <span v-else>此刻{{ 选中档案.夫状态 }}</span>
+        </p>
         <p v-if="!选中档案.阶段体验" class="dsealed">
           她的日子隔着一扇门——裂缝线索 {{ 选中档案.妻.裂缝.碎片进度 }}/4。看清她的裂缝,才看得见她。
           <template v-if="选中档案.妻.裂缝.碎片进度 >= 4">线索齐了:背包里那封拼起来的东西,读一读。</template>
@@ -582,7 +590,7 @@ const 选中裂缝 = computed(() => (props.door ? (查裂缝(props.door) ?? null
           <div v-if="选中关系轨迹.预约" class="relation-appointment">
             <Ic n="clock" aria-hidden="true" />
             <span
-              ><small>本次行动</small><b>{{ 选中关系轨迹.预约 }}</b></span
+              ><small>保证到场</small><b>{{ 选中关系轨迹.预约 }}</b></span
             >
           </div>
           <ol class="relation-route">

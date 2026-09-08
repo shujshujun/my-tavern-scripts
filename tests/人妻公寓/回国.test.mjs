@@ -414,16 +414,23 @@ test('母亲以非雌竞特殊成员永久加入姐妹群，茶话会任务完�
   assert.equal(姐妹群成员(data).includes('302'), true);
   assert.equal(雌竞资格('302', data.户['302']), false, '母亲不得因入群获得雌竞资格');
   assert.equal(data.系统._回国.群名反应已完成, false);
-  assert.equal(提交回国茶话会批次(data, { 任务: '坦白' }).成功, false, '母亲坦白不得越过群名反应首拍');
-  assert.equal(提交回国茶话会批次(data, { 任务: '改名反应', 玩家已发言: false }).成功, true);
+  // 此处验证状态机，用具有明确内容及同批次键的代表性已存消息；真实写库链另有专项覆盖。
+  const submit = (payload, lines) => {
+    const target = payload.目标 || payload.回应成员?.join(',') || '-';
+    return 提交回国茶话会批次(data, payload, lines.map((文, i) => ({ 会话: '姐妹群', 发: '对方', 文, 键: `回国茶话会:${payload.任务}:${target}:aRouteTest:${i + 1}` })));
+  };
+  const confession = ['母亲:我和管理员已经不只是普通母子，我们是伴侣。'];
+  assert.equal(submit({ 任务: '坦白' }, confession).成功, false, '母亲坦白不得越过群名反应首拍');
+  assert.equal(submit({ 任务: '改名反应', 玩家已发言: false }, ['夏乔:这个新群名真有趣。', '沈静仪:我也看见了。', '母亲:看来大家都看见我取的新名字了。']).成功, true);
   assert.equal(data.系统._回国.群名反应已完成, true);
-  assert.equal(提交回国茶话会批次(data, { 任务: '坦白', 玩家已发言: true }).成功, true);
+  assert.equal(submit({ 任务: '坦白', 玩家已发言: true }, confession).成功, true);
   for (const 门牌 of ['101', '102']) {
-    assert.equal(提交回国茶话会批次(data, { 任务: '点评', 目标: 门牌, 玩家已发言: true }).成功, true);
+    const name = require('../../src/人妻公寓/stageConfig.ts').户静态表[门牌].妻名;
+    assert.equal(submit({ 任务: '点评', 目标: 门牌, 玩家已发言: true }, [`母亲:${name}，你最近看管理员的眼神藏不住心思了。`, `${name}:我就是在意他。`]).成功, true);
   }
-  assert.equal(提交回国茶话会批次(data, { 任务: '转正事', 玩家已发言: true }).成功, true);
-  assert.equal(提交回国茶话会批次(data, { 任务: '回应回国', 回应成员: ['101', '102'], 玩家已发言: true }).成功, true);
-  const 收束 = 提交回国茶话会批次(data, { 任务: '收束', 玩家已发言: true, 摘要: '正事已说明，群聊继续。' });
+  assert.equal(submit({ 任务: '转正事', 玩家已发言: true }, ['母亲:你爸一周后回国，公共区域大家按普通住户和管理员的关系相处。']).成功, true);
+  assert.equal(submit({ 任务: '回应回国', 回应成员: ['101', '102'], 玩家已发言: true }, ['夏乔:到时照常打招呼。', '沈静仪:我知道了。']).成功, true);
+  const 收束 = submit({ 任务: '收束', 玩家已发言: true, 摘要: '正事已说明，群聊继续。' }, ['母亲:正事说清楚了，大家照常过日子。']);
   assert.equal(收束.成功, true);
   assert.equal(data.系统._回国.阶段, '待旧委托');
   assert.equal(data.系统._回国.茶话会状态, '已完成');
@@ -531,7 +538,7 @@ test('《回国》正式WebP只从源素材稳定路由，不接入联系表或r
     文件.some(名 => 名.includes('联系表') || 名.includes('rejected')),
     false,
   );
-  assert.match(资源源码, /素材\/特殊场景/);
+  assert.match(资源源码, /rq091\/story/);
   assert.doesNotMatch(资源源码, /output\/imagegen\/return-home/);
   assert.match(客户端源码, /eventOn\('人妻公寓:回国CG'/);
 });

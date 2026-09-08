@@ -156,6 +156,8 @@ interface 手机小生成结果 {
 export interface 手机小生成控制 {
   生成ID?: string;
   仍有效?: () => boolean;
+  /** 业务已结束时只能按生成ID尽力停止，不能回退全局停止而误杀其他请求。 */
+  仅停止本请求?: boolean;
   /** 玩家手动聊天批次严格只调用一次提供方；格式异常也不得暗中重试或跨来源回退。 */
   单次请求?: boolean;
   /** 批次私聊以具体妻名开头，长度验收时同样忽略“说话人:”这一协议外壳。 */
@@ -206,12 +208,13 @@ function 新手机生成ID(控制?: 手机小生成控制): string {
   return `rqgy-phone-${Date.now()}-${++手机生成请求序号}`;
 }
 
-function 停止手机底层请求(生成ID: string): void {
+function 停止手机底层请求(生成ID: string, 控制?: 手机小生成控制): void {
   try {
     if (typeof stopGenerationById === 'function' && stopGenerationById(生成ID)) return;
   } catch {
-    /* 旧宿主回退全局停止。 */
+    /* 旧宿主可保留原回退，但精确业务取消不能误停其他请求。 */
   }
+  if (控制?.仅停止本请求) return;
   try {
     stopAllGeneration();
   } catch {
@@ -221,13 +224,13 @@ function 停止手机底层请求(生成ID: string): void {
 
 async function 等待受控生成(
   任务: PromiseLike<unknown>,
-  生成ID: string,
+  生成ID: string | undefined,
   控制?: 手机小生成控制,
 ): Promise<unknown> {
   return 创建受控生成等待(任务, {
     超时毫秒: 手机生成等待上限毫秒,
     超时说明: '手机生成超过四分钟未返回',
-    请求停止: () => 停止手机底层请求(生成ID),
+    请求停止: 生成ID ? () => 停止手机底层请求(生成ID, 控制) : undefined,
     仍有效: () => 手机小生成仍有效(控制),
     失效说明: '手机生成上下文已经失效',
   }).结果;
@@ -360,7 +363,7 @@ export async function 小生成(系统提示: string, 用户提示: string, 控�
       const db = 数据库状态();
       if (db.可调用AI) {
         try {
-          const 原 = await 通过数据库生成(
+          const 数据库任务 = 通过数据库生成(
             [
               ...手机系统消息(本次系统提示),
               { role: 'user', content: 用户提示 },
@@ -369,6 +372,11 @@ export async function 小生成(系统提示: string, 用户提示: string, 控�
             '',
             手机请求token上限,
           );
+          // 数据库callAI没有本请求的宿主生成ID；只取消本地等待，不清其真实迟到租约。
+          // 原数据库租约继续保护底层结算，不能用stopAllGeneration假装已取消数据库。
+          const 原 = 控制?.仅停止本请求
+            ? await 等待受控生成(数据库任务, undefined, 控制)
+            : await 数据库任务;
           if (!手机小生成仍有效(控制)) return 空手机小生成结果();
           const 结果 = 解析手机小生成原文(原);
           // 成功返回但封套缺失或未闭合属于内容不完整，不是 API 错误；交给小生成按同一路由重试一次。

@@ -195,7 +195,7 @@ test('真实 swipe 协调期间唯一手机写入口双重冻结，事件后新�
   const 止 = 手机数据层源.indexOf('\nexport ', 起 + 1);
   assert.ok(起 >= 0 && 止 > 起);
   const 写入段 = 手机数据层源.slice(起, 止);
-  const 外门 = 写入段.indexOf('if (时间线切换协调中()) return false;');
+  const 外门 = 写入段.indexOf('if (时间线切换协调中() || 时间事务阻止普通写入()) return false;');
   const 更新 = 写入段.indexOf('updateVariablesWith');
   assert.ok(外门 >= 0 && 外门 < 更新, '进入变量队列前必须冻结新手机写入');
   assert.match(

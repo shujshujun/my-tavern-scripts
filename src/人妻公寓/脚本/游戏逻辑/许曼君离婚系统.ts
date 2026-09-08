@@ -1,4 +1,5 @@
 import type { SchemaType } from '../../schema';
+import { 有地点动作剧情冲突 } from './场景剧情事务';
 import { 许曼君离婚场景ID, 许曼君离婚新锁芯ID, 许曼君离婚新钥匙ID } from '../../stageConfig';
 import { 当前时段, 每天时段数, 妻位置推算 } from './楼层时钟';
 import { 处于医院硬锁 } from './生产系统';
@@ -229,14 +230,8 @@ function 自有剧情票(text: string): boolean {
   return String(text ?? '').includes('【许曼君离婚提交:');
 }
 
-function 普通强剧情冲突(data: SchemaType): boolean {
-  const active = data.系统._场景剧情事务;
-  if (active.id && !自有剧情票(active.内容)) return true;
-  const pending = String(data.系统._待发送事件 ?? '')
-    .split('|')
-    .map(item => item.trim())
-    .filter(Boolean);
-  return pending.some(item => !自有剧情票(item));
+function 普通强剧情冲突(data: SchemaType, location: string): boolean {
+  return 有地点动作剧情冲突(data, location, 自有剧情票);
 }
 
 function 父亲或其他硬隔离(data: SchemaType): boolean {
@@ -254,12 +249,12 @@ function 医院阻断(data: SchemaType): string {
   return 处于医院硬锁(data, '201') ? '许曼君正在医院待产或恢复，《离婚》保留当前检查点并顺延。' : '';
 }
 
-function 入口阻断(data: SchemaType, 允许绑定亲密 = false): string {
+function 入口阻断(data: SchemaType, location: string, 允许绑定亲密 = false): string {
   if (data.系统._坏结局) return '当前坏结局已经锁定。';
   if (!允许绑定亲密 && data.系统._性爱场景.状态 !== '空闲') return '先把当前亲密场景正常收束。';
   if (允许绑定亲密 && !许曼君离婚接管普通收尾(data)) return '当前普通亲密场次不是《最后一笔》绑定场次。';
   if (data.系统._特殊场景.id || data.系统._荣耀洞拍 >= 0) return '当前特殊场景尚未结束。';
-  if (普通强剧情冲突(data)) return '还有一段强剧情没有完成。';
+  if (普通强剧情冲突(data, location)) return '还有一段强剧情没有完成。';
   if (data.系统._父亲通话.标识 || data.系统._父亲通话.状态 || data.系统._待接来电.期 >= 0) return '先处理当前父亲电话。';
   return 医院阻断(data);
 }
@@ -316,7 +311,7 @@ function 结局后亲密可用(data: SchemaType, location: string): boolean {
       (node.妻.当前阶段 ?? 0) >= 3 &&
       妻在201(data) &&
       !父亲或其他硬隔离(data) &&
-      !普通强剧情冲突(data) &&
+      !普通强剧情冲突(data, location) &&
       !处于医院硬锁(data, '201'),
   );
 }
@@ -341,7 +336,7 @@ export function 许曼君离婚地点动作(data: SchemaType, location: string):
   }
 
   const allowBound = state.阶段 === '最后一笔中' && ['H7', 'H8'].includes(state.H阶段);
-  if (入口阻断(data, allowBound)) return [];
+  if (入口阻断(data, location, allowBound)) return [];
 
   if (state.阶段 === '已购买' && location === '201' && 是安全夜晚(data) && 妻在201(data)) {
     return [{ id: '使用红色封存盒', kicker: 'START', icon: 'story', 文案: '使用《离婚》·红色封存盒' }];
@@ -506,7 +501,8 @@ function actionOf(code: string): 离婚剧情动作 | null {
   return null;
 }
 
-function actorMarker(action: 离婚剧情动作): string {
+function actorMarker(action: 离婚剧情动作, payload = '-'): string {
+  if (action === '办理见证' && payload === '当着赵国强牵住她') return '【事件在场妻:201】【事件在场夫:201】';
   return action === '办理等待' || action === '办理见证'
     ? '【事件在场妻:201】【事件关联夫:201】'
     : '【事件在场妻:201】';
@@ -516,7 +512,7 @@ function storyEvent(data: SchemaType, action: 离婚剧情动作, payload = '-')
   const state = 路线(data);
   const encoded = actionPayload(action, payload);
   const marker =
-    `${actorMarker(action)}【许曼君离婚提交:${codeOf(action)}:${state.阶段}:${data.系统._绝对时段}:1:${encoded}】` +
+    `${actorMarker(action, payload)}【许曼君离婚提交:${codeOf(action)}:${state.阶段}:${data.系统._绝对时段}:1:${encoded}】` +
     `【场景剧情连续锁场】【许曼君·离婚·${action}】`;
   if (action === '预约办理') {
     return `${marker}地点固定在201，只有玩家与许曼君。红色封存盒仍在玩家手里，本回合只把正式离婚办理约到第二天下午。不得生成、展示或暗示已经拿到离婚证；不得演赵国强到场、钥匙归档、换锁或婚纱终幕。许曼君明确这是她自己的决定，并亲口确认第二天下午由夫妻本人办理，玩家只陪到现场。`;
@@ -570,17 +566,57 @@ export function 解析许曼君离婚剧情事件(event: string): 许曼君离�
   return { 动作: action, 预期阶段: match[2] as 离婚阶段, 请求时段: time, 拍: beat, 载荷: match[5] };
 }
 
-function positiveSentence(text: string, pattern: RegExp): boolean {
-  return String(text ?? '')
-    .split(/[。！？；;\n]/u)
-    .map(part => part.trim())
-    .filter(Boolean)
-    .some(sentence => {
-      const match = sentence.match(pattern);
-      if (!match || match.index === undefined) return false;
-      const prefix = sentence.slice(Math.max(0, match.index - 14), match.index);
-      return !/(?:没有|并未|尚未|还没|未曾|不曾|不能|不会|不打算|准备|打算|如果|假如)/u.test(prefix);
-    });
+/** 当前事实与引文、条件、疑问分别处理；只供本路线已有事实模板使用。 */
+function 离婚事实候选句(text: string): string[] {
+  const original = String(text ?? '').normalize('NFKC');
+  const body = original.replace(/“[^”]*”|‘[^’]*’|「[^」]*」|『[^』]*』|"[^"]*"/gu, (quote: string, index: number) => {
+    const before = original.slice(0, index).split(/[。！？!?；;\n，,]/u).at(-1) ?? '';
+    const after = original.slice(index + quote.length).split(/[。！？!?；;\n，,]/u)[0];
+    const reported = /引用|复述|转述|回忆|想象|假设|举例|说过|问(?:她|他|你|道|:|：)|(?:昨天|以前|之前|曾经|当时).*(?:说|写|提)|(?:没|没有|并未|不是|不会).*(?:说|表示|确认)/u.test(before);
+    const described = /^(?:这句话|这件事|这句|的说法)?(?:只)?(?:是|为).*(?:假设|例子|引文|原话)|不是.*(?:事实|实际发生)/u.test(after);
+    // 留下分隔符，不能把引用前的主体与引用后的动作拼成一件从未发生的事。
+    return reported || described ? '；' : quote.slice(1, -1);
+  });
+  return (body.match(/[^。！？!?；;\n]+[。！？!?；;]?/gu) ?? [])
+    .map(sentence => sentence.trim()).filter(Boolean);
+}
+
+function 离婚事实匹配有效(sentence: string, match: RegExpExecArray, currentOnly: boolean): boolean {
+  const start = match.index;
+  const end = start + match[0].length;
+  const before = sentence.slice(0, start);
+  // 否定作用域从本分句开始；不能用上一件事的“没有”否定本件事。
+  const prefix = before.split(/[,，]|(?:但是|但现在|而是|却)/u).at(-1) ?? '';
+  const suffix = sentence.slice(end).split(/[,，:：]/u)[0];
+  const scope = (prefix + match[0]).replace(/(?:没有|并未|未曾|不再)(?:犹豫|迟疑|沉默)/gu, '');
+  // 条件可以跨逗号支配后面的动作，不能只看匹配片段之前若干字。
+  const governing = sentence.slice(0, end).split(/(?:但现在|但是现在|而现在|然而现在)/u).at(-1) ?? '';
+  if (/如果|假如|要是|倘若|万一|除非|也许|或许|假设|想象|幻想|梦见/u.test(governing)) return false;
+  if (/[?？]|是否|有没有|能不能|会不会|要不要|(?:了|的)?吗/u.test(scope + suffix)) return false;
+  if (/没有|并未|尚未|还没|未曾|不曾|未能|没能|不能|不会|不再|不打算|不想|不愿|并非|不是|拒绝|准备|打算|计划|希望|期待|想要|将要|即将|询问|追问|引用|复述|转述|回忆/u.test(scope)) return false;
+  if (/没(?!事)|未(?!来|婚|知)|不(?:拿|捧|持|带|牵|握|抱|离开|走远|确认|穿|身着|打开|掀开|揭开|摆|放|合|关|封|归档|继续|肯)/u.test(scope)) return false;
+  if (/(?:昨天|以前|之前|曾经|当时).*(?:说|提|表示|确认)/u.test(scope)) return false;
+  if (currentOnly) {
+    // 出口见证必须是这一拍；归档等已成立硬事实不套用此时态门。
+    const past = Math.max(...['昨天', '以前', '之前', '曾经', '当时', '过去'].map(word => governing.lastIndexOf(word)));
+    const current = Math.max(...['现在', '此刻', '这时', '如今', '眼下', '这次', '今天'].map(word => governing.lastIndexOf(word)));
+    if (past >= 0 && current < past) return false;
+  }
+  if (/^(?:这件事|这一幕|这句话|的说法)?(?:并未发生|没有发生|尚未发生|是假设|只是假设|不是事实)/u.test(suffix.trim())) return false;
+  return true;
+}
+
+function positiveSentence(text: string, pattern: RegExp, currentOnly = false): boolean {
+  for (const sentence of 离婚事实候选句(text)) {
+    const matcher = new RegExp(pattern.source, pattern.flags.replace(/[gy]/gu, '') + 'g');
+    let match: RegExpExecArray | null;
+    while ((match = matcher.exec(sentence))) {
+      if (离婚事实匹配有效(sentence, match, currentOnly)) return true;
+      // 首个否定匹配可能吞到后续肯定句；逐起点继续，不能只查看一次 sentence.match。
+      matcher.lastIndex = match.index + ((sentence.codePointAt(match.index) ?? 0) > 0xffff ? 2 : 1);
+    }
+  }
+  return false;
 }
 
 export function 许曼君离婚正文越拍原因(event: string, text: string): string {
@@ -596,14 +632,14 @@ export function 许曼君离婚正文越拍原因(event: string, text: string): 
     return '';
   }
   if (ticket.动作 === '办理见证') {
-    if (!positiveSentence(body, /许曼君.{0,18}(?:拿着|捧着|持着|带着).{0,10}(?:她本人|自己的)?离婚证|(?:她本人|自己的)?离婚证.{0,12}(?:在|落在).{0,8}许曼君/u)) {
+    if (!positiveSentence(body, /许曼君.{0,18}(?:拿着|捧着|持着|带着).{0,10}(?:她本人|自己的)?离婚证|(?:她本人|自己的)?离婚证.{0,12}(?:在|落在).{0,8}许曼君/u, true)) {
       return '办理第2回合没有写出许曼君持本人离婚证出来';
     }
     const choice = ticket.载荷 as 许曼君离婚公开选择;
-    if (choice === '当着赵国强牵住她' && !positiveSentence(body, /(?:玩家|你|我).{0,10}(?:牵住|握住).{0,8}(?:许曼君|她).{0,8}(?:手|手指)|(?:许曼君|她).{0,8}(?:手|手指).{0,8}(?:被|让).{0,6}(?:玩家|你|我).{0,6}(?:牵住|握住)/u)) {
+    if (choice === '当着赵国强牵住她' && !positiveSentence(body, /(?:玩家|你|我).{0,10}(?:牵住|握住).{0,8}(?:许曼君|她).{0,8}(?:手|手指)|(?:许曼君|她).{0,8}(?:手|手指).{0,8}(?:被|让).{0,6}(?:玩家|你|我).{0,6}(?:牵住|握住)/u, true)) {
       return '办理第2回合没有完成公开牵手见证';
     }
-    if (choice === '等赵国强离开再抱她' && !positiveSentence(body, /赵国强.{0,16}(?:离开|走远|消失).{0,30}(?:玩家|你|我).{0,10}(?:抱住|拥住).{0,8}(?:许曼君|她)/u)) {
+    if (choice === '等赵国强离开再抱她' && !positiveSentence(body, /赵国强.{0,16}(?:离开|走远|消失).{0,30}(?:玩家|你|我).{0,10}(?:抱住|拥住).{0,8}(?:许曼君|她)/u, true)) {
       return '办理第2回合没有按选择在赵国强离开后拥抱';
     }
     return '';
@@ -675,13 +711,25 @@ export function 许曼君离婚正文越拍原因(event: string, text: string): 
   return '';
 }
 
+export function 许曼君离婚事件需赵国强在场(event: string): boolean {
+  const ticket = 解析许曼君离婚剧情事件(event);
+  return ticket?.动作 === '办理见证' && ticket.载荷 === '当着赵国强牵住她';
+}
+
 export function 许曼君离婚剧情演员错误(event: string, wives: readonly string[], husbands: readonly string[]): string {
   const ticket = 解析许曼君离婚剧情事件(event);
   if (!ticket) return '';
   const wifeOK = wives.length === 1 && wives[0] === '201';
   if (!wifeOK) return '当前拍的妻子演员必须且只能是许曼君';
   const legal = ticket.动作 === '办理等待' || ticket.动作 === '办理见证';
-  if (legal) return husbands.length === 1 && husbands[0] === '201' ? '' : '办理现场必须关联且只能关联赵国强';
+  if (legal) {
+    const related = new Set([...event.matchAll(/【事件(?:在场夫|关联夫):([\d,]+)】/gu)].flatMap(match => match[1].split(',')));
+    if (related.size !== 1 || !related.has('201')) return '办理现场必须关联且只能关联赵国强';
+    if (许曼君离婚事件需赵国强在场(event)) {
+      return husbands.length === 1 && husbands[0] === '201' ? '' : '当面见证必须由赵国强在场';
+    }
+    return husbands.length ? '等待或离开后见证只关联赵国强，不把他作为当前在场演员' : '';
+  }
   return husbands.length ? '当前201私人回合不允许赵国强在场' : '';
 }
 

@@ -17,7 +17,7 @@ export function 是时间撤销地点(地点: string | null | undefined): 地点
  */
 export const 时间撤销点键 = '_时间撤销点';
 export const 时间撤销点版本 = 2 as const;
-/** 跨聊天重载时用于恢复双存储半事务；正常提交会在同一次 chat 写入中删除。 */
+/** 推进与撤销共用的预写恢复记录；两路存储均确认成功后才单独清理。 */
 export const 时间推进事务键 = '_时间推进事务';
 export const 时间推进事务版本 = 1 as const;
 
@@ -82,6 +82,12 @@ export interface 时间推进事务记录 {
   事务ID: string;
   聊天ID: string;
   创建时间: number;
+  /** 缺失表示旧版正向推进；撤销的“推进前”字段保存的是撤销开始前状态。 */
+  方向?: '推进' | '撤销';
+  锚楼?: number;
+  锚消息签名?: string;
+  /** 只用于撤销：尚未写聊天时，补偿不能覆盖同期新收到的手机消息。 */
+  聊天已写?: boolean;
   推进前数据: SchemaType;
   推进前数据指纹: string;
   推进前聊天: 精确聊天快照;
@@ -286,9 +292,18 @@ export function 创建时间推进事务记录(参数: {
   聊天ID: string;
   推进前数据: SchemaType;
   推进前聊天: 精确聊天快照;
+  方向?: '推进' | '撤销';
+  锚楼?: number;
+  锚消息签名?: string;
 }): 时间推进事务记录 {
   if (!参数.聊天ID) throw new Error('时间推进事务缺少聊天身份');
-  if (!聊天快照包含键(参数.推进前聊天, 时间推进事务恢复聊天键)) {
+  const 有分支锚 = 参数.锚楼 !== undefined || 参数.锚消息签名 !== undefined;
+  if (
+    (有分支锚 || 参数.方向 === '撤销') &&
+    (!Number.isInteger(参数.锚楼) || Number(参数.锚楼) < 0 || !参数.锚消息签名)
+  ) throw new Error('时间事务缺少有效的原聊天分支锚');
+  const 恢复键 = 参数.方向 === '撤销' ? 时间撤销写入聊天键 : 时间推进事务恢复聊天键;
+  if (!聊天快照包含键(参数.推进前聊天, 恢复键)) {
     throw new Error('时间推进事务的聊天快照不完整');
   }
   const 推进前数据 = Schema.parse(_.cloneDeep(参数.推进前数据)) as SchemaType;
@@ -297,9 +312,12 @@ export function 创建时间推进事务记录(参数: {
   const 创建时间 = Date.now();
   return {
     版本: 时间推进事务版本,
-    事务ID: `${创建时间}-${时间状态指纹([参数.聊天ID, 推进前数据.系统._绝对时段]).slice(-12)}`,
+    事务ID: `${创建时间}-${时间状态指纹([参数.聊天ID, 推进前数据.系统._绝对时段]).slice(-12)}-${Math.random().toString(36).slice(2, 12)}`,
     聊天ID: 参数.聊天ID,
     创建时间,
+    ...(参数.方向 ? { 方向: 参数.方向 } : {}),
+    ...(有分支锚 ? { 锚楼: 参数.锚楼, 锚消息签名: 参数.锚消息签名 } : {}),
+    ...(参数.方向 === '撤销' ? { 聊天已写: false } : {}),
     推进前数据,
     推进前数据指纹: 时间状态指纹(推进前数据),
     推进前聊天,
@@ -320,7 +338,11 @@ export function 读取时间推进事务记录(raw: unknown): 时间推进事务
     !Number.isFinite(raw.创建时间) ||
     typeof raw.推进前数据指纹 !== 'string' ||
     typeof raw.推进前聊天指纹 !== 'string' ||
-    !聊天快照包含键(raw.推进前聊天, 时间推进事务恢复聊天键)
+    (raw.方向 !== undefined && raw.方向 !== '推进' && raw.方向 !== '撤销') ||
+    ((raw.方向 === '撤销' || raw.聊天已写 !== undefined) && typeof raw.聊天已写 !== 'boolean') ||
+    ((raw.锚楼 !== undefined || raw.锚消息签名 !== undefined || raw.方向 === '撤销') &&
+      (!Number.isInteger(raw.锚楼) || Number(raw.锚楼) < 0 || typeof raw.锚消息签名 !== 'string' || !raw.锚消息签名)) ||
+    !聊天快照包含键(raw.推进前聊天, raw.方向 === '撤销' ? 时间撤销写入聊天键 : 时间推进事务恢复聊天键)
   ) {
     return null;
   }
@@ -336,6 +358,9 @@ export function 读取时间推进事务记录(raw: unknown): 时间推进事务
     事务ID: raw.事务ID,
     聊天ID: raw.聊天ID,
     创建时间: raw.创建时间,
+    ...(raw.方向 ? { 方向: raw.方向 as '推进' | '撤销' } : {}),
+    ...(raw.锚楼 !== undefined ? { 锚楼: raw.锚楼 as number, 锚消息签名: raw.锚消息签名 as string } : {}),
+    ...(raw.聊天已写 !== undefined ? { 聊天已写: raw.聊天已写 as boolean } : {}),
     推进前数据,
     推进前数据指纹: raw.推进前数据指纹,
     推进前聊天,
@@ -343,9 +368,81 @@ export function 读取时间推进事务记录(raw: unknown): 时间推进事务
   };
 }
 
+/** 撤销尚未写入聊天时，只补偿本次可能清空的镜像等键，不覆盖并发手机输入。 */
+export function 读取时间事务恢复键(记录: 时间推进事务记录): readonly string[] {
+  if (记录.方向 !== '撤销') return 时间推进事务恢复聊天键;
+  return 记录.聊天已写 ? 时间撤销写入聊天键 : 时间撤销写入聊天键.filter(key => key !== '_微信');
+}
+
+/**
+ * 恢复记录的删除也可能“应用后抛错”。只在本写口亲自完成删除、原时间线仍有效且
+ * 删除后的相关状态未变化时重新登记原记录；必须先登记成功，之后才允许回退 MVU。
+ * 此处不操作 MVU，不把宿主异常当作成功，也不以缺少记录为由放开一般身份门。
+ */
+export function 创建时间事务写口(
+  记录: 时间推进事务记录,
+  适配: {
+    校验归属: () => boolean;
+    更新聊天: (更新: (vars: Record<string, unknown>) => Record<string, unknown>) => unknown | Promise<unknown>;
+  },
+) {
+  let 本口清理后指纹: string | null = null;
+  const 指纹 = (vars: Record<string, unknown>) => 时间状态指纹([
+    时间聊天状态指纹(vars),
+    捕获精确聊天快照(vars, 记录.方向 === '撤销' ? 时间撤销写入聊天键 : 时间推进事务恢复聊天键),
+  ]);
+  const 校验归属 = () => {
+    if (!适配.校验归属()) throw new Error('时间事务的聊天或分支锚已经变化');
+  };
+  const 校验 = (vars: Record<string, unknown>) => {
+    校验归属();
+    const 当前 = 读取时间推进事务记录(vars[时间推进事务键]);
+    if (
+      !当前 || 当前.事务ID !== 记录.事务ID || 当前.聊天ID !== 记录.聊天ID ||
+      当前.推进前数据指纹 !== 记录.推进前数据指纹 || 当前.推进前聊天指纹 !== 记录.推进前聊天指纹 ||
+      当前.方向 !== 记录.方向 || 当前.锚楼 !== 记录.锚楼 || 当前.锚消息签名 !== 记录.锚消息签名
+    ) throw new Error('时间推进恢复记录已经变化');
+    return 当前;
+  };
+  return {
+    校验,
+    async 准备补偿(): Promise<void> {
+      校验归属();
+      await 适配.更新聊天(vars => {
+        校验归属();
+        if (Object.prototype.hasOwnProperty.call(vars, 时间推进事务键)) {
+          校验(vars);
+        } else {
+          if (本口清理后指纹 === null || 指纹(vars) !== 本口清理后指纹) {
+            throw new Error('时间事务缺少可证明归属的补偿记录');
+          }
+          vars[时间推进事务键] = _.cloneDeep(记录);
+        }
+        return vars;
+      });
+      校验归属();
+    },
+    async 清理(): Promise<void> {
+      校验归属();
+      await 适配.更新聊天(vars => {
+        校验(vars);
+        delete vars[时间推进事务键];
+        本口清理后指纹 = 指纹(vars);
+        return vars;
+      });
+    },
+  };
+}
+
 export interface 时间推进双存储提交参数 {
   写推进状态: () => void | Promise<unknown>;
   写撤销点: () => void | Promise<unknown>;
+  /** 两路提交均成功后才能清理半事务恢复记录。 */
+  提交完成?: () => void | Promise<unknown>;
+  /** 任何补偿前先确认或恢复本次预写记录；失败后不得继续碰 MVU/chat。 */
+  准备补偿?: () => void | Promise<unknown>;
+  /** 两路补偿均确认成功后才能删除恢复记录。 */
+  补偿完成?: () => void | Promise<unknown>;
   恢复推进前状态: () => void | Promise<unknown>;
   恢复推进前聊天: () => void | Promise<unknown>;
 }
@@ -358,7 +455,15 @@ export async function 执行时间推进双存储提交(参数: 时间推进双�
   try {
     await 参数.写推进状态();
     await 参数.写撤销点();
+    if (参数.提交完成) await 参数.提交完成();
   } catch (error) {
+    if (参数.准备补偿) {
+      try {
+        await 参数.准备补偿();
+      } catch (准备错误) {
+        throw new Error(`${error instanceof Error ? error.message : String(error)}；补偿准备失败:${准备错误 instanceof Error ? 准备错误.message : String(准备错误)}`, { cause: error });
+      }
+    }
     const 补偿错误: string[] = [];
     try {
       await 参数.恢复推进前状态();
@@ -369,6 +474,13 @@ export async function 执行时间推进双存储提交(参数: 时间推进双�
       await 参数.恢复推进前聊天();
     } catch (补偿) {
       补偿错误.push(`聊天回滚失败:${补偿 instanceof Error ? 补偿.message : String(补偿)}`);
+    }
+    if (!补偿错误.length && 参数.补偿完成) {
+      try {
+        await 参数.补偿完成();
+      } catch (补偿) {
+        补偿错误.push(`恢复记录清理失败:${补偿 instanceof Error ? 补偿.message : String(补偿)}`);
+      }
     }
     if (补偿错误.length) {
       throw new Error(`${error instanceof Error ? error.message : String(error)}；${补偿错误.join('；')}`, {

@@ -42,7 +42,7 @@ test('模板把 正文隐藏 ref 派生到 story-visual-only class；隐藏按�
     'story-special-interaction 同时覆盖旧录像带、V4与静音会议',
   );
   assert.match(故事标签, /'story-mute-meeting': 静音会议显示组合图,/, 'story-mute-meeting 保持');
-  assert.match(故事标签, /'story-intimacy-open': 性爱进行中 && 亲密抽屉展开,/, 'story-intimacy-open 保持');
+  assert.match(故事标签, /'story-intimacy-open': 性爱进行中 && 亲密抽屉展开 && !当前事件CG,/, 'story-intimacy-open 服从事件CG前台展示');
   assert.match(模板段, /class="story-hide-btn"/, '隐藏正文钮仍在');
   assert.match(模板段, /v-if="!录像带任一中 && !静音会议交互幕"/, '隐藏正文钮对两代录像带统一让位');
   assert.match(模板段, /@click\.stop="正文隐藏 = !正文隐藏"/, '隐藏按钮仍切换 正文隐藏');
@@ -108,7 +108,7 @@ test('760px 以上成人 CG 使用等权双列，窄窗只挂载第一槽且单�
 });
 
 test('反例：亲密底栏不卸载、不 v-if 掉、不被纯画面 class 施加样式', () => {
-  assert.match(App源, /v-if="性爱进行中"[\s\S]{0,40}class="intimacy-stage-dock"/, '亲密底栏仍按 性爱进行中 渲染，不得被 v-if 掉');
+  assert.match(App源, /v-if="性爱进行中"\s+v-show="!安若妍H7决策中 && !当前事件CG"\s+class="intimacy-stage-dock"/, '亲密底栏保持挂载，并在决策与事件CG期间临时隐藏');
   assert.match(App源, /class="intimacy-summary"/, '亲密底栏汇总仍保留');
   assert.doesNotMatch(App源, /story-visual-only[\s\S]{0,120}\.intimacy-stage-dock\s*\{/, '纯画面 class 不得对亲密底栏施加 CSS');
   assert.doesNotMatch(App源, /story-visual-only[\s\S]{0,120}\.intimacy-summary\s*\{/, '纯画面 class 不得对亲密底栏汇总施加 CSS');

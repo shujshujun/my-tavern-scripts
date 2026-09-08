@@ -1,16 +1,20 @@
 /* eslint-disable import-x/no-nodejs-modules -- Node-only regression test */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import test from 'node:test';
 
-// A 组：纯租约动态行为，直接动态单测纯进程内状态机。
-import {
+const require = createRequire(import.meta.url);
+process.env.TS_NODE_COMPILER_OPTIONS = JSON.stringify({ module: 'CommonJS', moduleResolution: 'node' });
+require('ts-node/register/transpile-only');
+// 通过项目的TS加载器读取真实生成租约及其时间写入依赖。
+const {
   取得前台生成租约,
   取得手机生成租约,
   前台生成租约持有中,
   手机生成租约持有中,
   清空生成租约,
-} from '../../src/人妻公寓/脚本/游戏逻辑/生成通道互斥.ts';
+} = require('../../src/人妻公寓/脚本/游戏逻辑/生成通道互斥.ts');
 
 function 读取源码(路径) {
   return readFileSync(路径, 'utf8').replace(/\r\n?/gu, '\n');
@@ -313,8 +317,8 @@ test('D1 新建会话待回复上下文前同步取得手机租约；前台占�
   // 前台占用时在任何玩家消息写库前同步拒绝并给可见提示。
   const 拒绝位 = 发送段.indexOf('if (!生成租约) {', 获租约);
   const 提示位 = 发送段.indexOf('eventEmit', 拒绝位);
-  const 返回位 = 发送段.indexOf('return;', 提示位);
-  const 首次写库 = 发送段.indexOf('await 写库增量');
+  const 返回位 = 发送段.indexOf('return { 已接受: false };', 提示位);
+  const 首次写库 = 发送段.indexOf('写库增量(');
   assert.ok(
     拒绝位 > 获租约 && 提示位 > 拒绝位 && 返回位 > 提示位 && 首次写库 > 返回位,
     '前台占用时必须在任何玩家消息写库前同步拒绝并给可见提示',

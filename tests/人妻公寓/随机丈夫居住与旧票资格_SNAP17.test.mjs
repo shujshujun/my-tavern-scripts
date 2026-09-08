@@ -43,7 +43,10 @@ function start(d, m, expected) {
   const suspicion = d.户[m].夫.疑心值;
   route.推进荣耀洞隔离拍(d);
   assert.equal(route.荣耀洞当前事件(d).includes('复合事件:'), expected);
-  assert.equal(d.户[m].夫.疑心值, suspicion + (expected ? 2 : 0));
+  assert.equal(d.户[m].夫.疑心值, suspicion, '到场拍尚未提交，资格本身不产生疑心');
+  const performed = structuredClone(d);
+  route.推进荣耀洞隔离拍(performed);
+  assert.equal(performed.户[m].夫.疑心值, suspicion + (expected ? 2 : 0));
 }
 function pending(d, m, beat = 0) {
   Object.assign(d.系统, { _荣耀洞门牌: m, _荣耀洞拍: beat, _荣耀洞起时段: d.系统._绝对时段,
@@ -198,6 +201,8 @@ for (const [label, expired, protectedRoute, expected] of [
     if (protectedRoute) d.系统._家庭计划.阶段 = '已完成';
     route.推进荣耀洞隔离拍(d);
     assert.equal(route.荣耀洞当前事件(d).includes('复合事件:'), expected);
+    assert.equal(d.户['101'].夫.疑心值, 17, '演员即将进入下一拍，尚未产生到场后果');
+    route.推进荣耀洞隔离拍(d);
     assert.equal(d.户['101'].夫.疑心值, expected ? 19 : 17);
     assert.equal(d.系统._荣耀洞夫, true, 'Preserve the original ticket; eligibility is read-only');
   });

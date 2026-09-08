@@ -216,15 +216,19 @@ function 当前预设名称(): string {
   }
 }
 
-function 最近线程(线程: string): { role: 'user' | 'assistant'; content: string }[] {
+function 最近线程(线程: string, 历史叙事可用: (正文: string) => boolean = () => true): { role: 'user' | 'assistant'; content: string }[] {
   return 读库()
     .日志.filter(条 => 条.线程 === 线程)
     .slice(-4)
+    .filter(条 => 条.谁 === '玩家' || 历史叙事可用(条.文本))
     .map(条 => ({ role: 条.谁 === '玩家' ? 'user' : 'assistant', content: 条.文本 }));
 }
 
 /** 只调用 AI 并返回草稿；本函数成功时仍不会改动聊天变量。 */
-export async function 生成隔离事件草稿(参数: 隔离事件参数): Promise<隔离事件草稿> {
+export async function 生成隔离事件草稿(
+  参数: 隔离事件参数,
+  选项: { /** 只筛选本次请求中的旧叙事；不修改持久日志，也不存入草稿参数。 */ 历史叙事可用?: (正文: string) => boolean } = {},
+): Promise<隔离事件草稿> {
   if (生成中) throw new Error('另一段独立事件正在生成，请等待完成后重试。');
   // 数据库 AI 迟到租约：底层 callAI 无法取消，超时后仍占用 TavernHelper 生成槽；忙时
   // 明确失败且零 AI 调用（不建临时楼、不发生成开始）。抛出可行动原因，由调用方统一广播，
@@ -247,7 +251,7 @@ export async function 生成隔离事件草稿(参数: 隔离事件参数): Prom
     已取消 = false;
     eventEmit('人妻公寓:生成开始');
     const system = 展开隔离玩家宏(系统提示(参数.类型, 参数.导演事件), 当前隔离玩家名());
-    const history = 最近线程(参数.线程);
+    const history = 最近线程(参数.线程, 选项.历史叙事可用);
     // 预设破限段护航(2026-07-27):特殊场景正戏最敏感,裸发必被 Gemini 安全截断
     // 独立事件没有真实临时玩家楼,传入本拍行动让预设里的 {{lastUserMessage}} 展开为
     // 本拍行动,而不是真实聊天的上一楼玩家指令。

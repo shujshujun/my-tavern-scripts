@@ -3,6 +3,7 @@ import type { 门牌 } from '../../stageConfig';
 import { 户静态表 } from '../../stageConfig';
 import {
   静音会议候选门牌顺序,
+  静音会议角色结局已完成,
   type 静音会议候选门牌,
 } from '../../静音会议配置';
 import { 取会场私聊摘要提示 } from './手机系统';
@@ -89,6 +90,7 @@ export function 静音会议合资格妻(data: SchemaType): 静音会议候选�
     const 妻 = data.户[门牌号]?.妻;
     return (
       !!妻 &&
+      !静音会议角色结局已完成(data, 门牌号) &&
       妻.当前阶段 >= 4 &&
       妻.特殊.some(项 => 项.includes('遥控跳蛋')) &&
       读取医院内容策略(data, 门牌号).允许成人特殊场景
@@ -299,7 +301,7 @@ export function 打开静音会议筹备(data: SchemaType, 当前地点: string)
   }
   if (!data.背包.includes('静音会议')) return { 成功: false, 提示: '背包里没有「静音会议」票。' };
   if (静音会议合资格妻(data).length < 2) {
-    return { 成功: false, 提示: '至少需要两位已入住、达到 L4 且装载遥控跳蛋的候选妻。' };
+    return { 成功: false, 提示: '至少需要两位未完成结局、已入住、达到 L4 且装载遥控跳蛋的候选妻。' };
   }
   data.系统._特殊场景 = {
     ...空特殊场景状态(),

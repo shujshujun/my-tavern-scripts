@@ -1,12 +1,34 @@
 /**
  * 微信刷新恢复镜像。
  *
- * `_微信` 的正式真值仍在 Tavern Helper chat variables；本模块只保存同一聊天的完整紧急副本，专门兜住宿主整聊保存超时/失败后刷新或重启造成的“聊天变量回到旧版本”。
+ * `_微信` 和独立预约计划的正式真值仍在 Tavern Helper chat variables；本模块只保存同一聊天、同一次提交的紧急副本，兜住宿主整聊保存超时/失败后的旧版本回退。
  * 副本按聊天 metadata.integrity（优先）或角色+聊天 ID 隔离，并带单调修订号；正常 `_微信`、显式重开墓碑、回档/删楼后的裁剪都会争取更高修订，旧时间线不能靠刷新或重启复活。
  * 父窗口内存用于当前页面，sessionStorage 覆盖同一标签页刷新，localStorage 覆盖关闭页面后的重启窗口；三者都不是正式聊天文件真值。
  */
 
+import type { 换装余波 } from '../雌竞系统';
+
+type 微信余波消费快照 = Pick<换装余波, '事件ID' | '门牌' | '起楼' | '物' | '私密' | '圈晒' | '探针' | '群议'>;
+
 export const 微信持久修订字段 = '__rqgy微信持久修订';
+/** `_微信` 必须保持null/缺键时，用单个提交凭据阻止并发写口读回更旧镜像。 */
+export const 微信清空提交字段 = '__rqgy微信清空提交';
+const 微信事务关联字段 = '__rqgy微信事务关联';
+
+type 预约变量快照 = { 存在: boolean; 值: unknown };
+interface 微信关联变量 {
+  手机邀约计划: 预约变量快照;
+  /** 只证明现有事件的手机消费，不负责创建事件或恢复其他世界状态。 */
+  换装消费?: 微信余波消费快照 | null;
+}
+interface 微信事务关联 extends 微信关联变量 {
+  版本: 1;
+  修订: number;
+  聊天身份: string;
+  锚楼: number;
+  锚绝对时段: number;
+  分支指纹: string;
+}
 
 const 刷新镜像版本 = 2 as const;
 const 会话存储键 = '人妻公寓_微信刷新恢复_v2';
@@ -35,6 +57,8 @@ export interface 微信刷新镜像包 {
   分支指纹: string;
   清空: boolean;
   微信: Record<string, unknown> | null;
+  /** 只恢复同修订提交的关联变量；旧镜像缺省时不猜测、不覆盖独立计划。 */
+  关联变量?: 微信关联变量;
 }
 
 export interface 微信刷新恢复选择 {
@@ -43,6 +67,8 @@ export interface 微信刷新恢复选择 {
   当前修订: number;
   镜像修订: number;
   聊天身份: string;
+  关联变量?: 微信关联变量;
+  清空提交?: Record<string, unknown>;
 }
 
 type 手机恢复宿主窗口 = Window & {
@@ -69,6 +95,56 @@ function JSON克隆<T>(值: T): T | null {
   } catch {
     return null;
   }
+}
+
+function 解析微信余波消费(值: unknown): 微信余波消费快照 | null {
+  if (!是普通对象(值) || typeof 值.门牌 !== 'string' || 安全非负整数(值.起楼) === null ||
+      typeof 值.物 !== 'string' || typeof 值.私密 !== 'boolean' ||
+      ['圈晒', '探针', '群议'].some(键 => typeof 值[键] !== 'boolean')) return null;
+  return {
+    ...(typeof 值.事件ID === 'string' && 值.事件ID.trim() ? { 事件ID: 值.事件ID } : {}),
+    门牌: 值.门牌 as 换装余波['门牌'], 起楼: 值.起楼 as number, 物: 值.物, 私密: 值.私密,
+    圈晒: 值.圈晒 as boolean, 探针: 值.探针 as boolean, 群议: 值.群议 as boolean,
+  };
+}
+
+function 捕获微信关联变量(vars: Record<string, unknown>): 微信关联变量 {
+  const 值 = vars._手机邀约计划;
+  const 余波 = vars._换装余波;
+  const 换装消费 = 是普通对象(余波) ? 解析微信余波消费({
+    ...余波, 私密: !!余波.私密, 圈晒: !!余波.圈晒, 探针: !!余波.探针, 群议: !!余波.群议,
+  }) : null;
+  return {
+    换装消费,
+    手机邀约计划: {
+      存在: Object.prototype.hasOwnProperty.call(vars, '_手机邀约计划') && 值 !== undefined,
+      值: JSON克隆(值),
+    },
+  };
+}
+
+function 解析微信关联变量(值: unknown): 微信关联变量 | null {
+  if (!是普通对象(值) || !是普通对象(值.手机邀约计划)) return null;
+  const 计划 = 值.手机邀约计划;
+  if (typeof 计划.存在 !== 'boolean' || !Object.prototype.hasOwnProperty.call(计划, '值')) return null;
+  const 含余波 = Object.prototype.hasOwnProperty.call(值, '换装消费');
+  const 换装消费 = 解析微信余波消费(值.换装消费);
+  if (含余波 && 值.换装消费 !== null && !换装消费) return null;
+  return {
+    手机邀约计划: { 存在: 计划.存在, 值: JSON克隆(计划.值) },
+    ...(含余波 ? { 换装消费 } : {}),
+  };
+}
+
+function 读取微信事务关联(微信: unknown): 微信事务关联 | null {
+  if (!是普通对象(微信)) return null;
+  const 值 = 微信[微信事务关联字段];
+  if (!是普通对象(值) || 值.版本 !== 1 || 值.修订 !== 读取微信持久修订(微信)) return null;
+  const 关联 = 解析微信关联变量(值);
+  const 锚楼 = 安全非负整数(值.锚楼);
+  const 锚绝对时段 = 安全非负整数(值.锚绝对时段);
+  if (!关联 || 锚楼 === null || 锚绝对时段 === null || typeof 值.聊天身份 !== 'string' || typeof 值.分支指纹 !== 'string') return null;
+  return { ...关联, 版本: 1, 修订: 读取微信持久修订(微信), 聊天身份: 值.聊天身份, 锚楼, 锚绝对时段, 分支指纹: 值.分支指纹 };
 }
 
 function 安全非负整数(值: unknown): number | null {
@@ -146,7 +222,10 @@ function 创建当前刷新时间线锚(当前绝对时段: number): Pick<微信
   };
 }
 
-function 镜像属于当前时间线(镜像: 微信刷新镜像包, 当前绝对时段: number): boolean {
+function 镜像属于当前时间线(
+  镜像: Pick<微信刷新镜像包, '锚楼' | '锚绝对时段' | '分支指纹'>,
+  当前绝对时段: number,
+): boolean {
   const 时段 = 安全非负整数(当前绝对时段);
   const 消息们 = 当前聊天消息();
   if (时段 === null || 时段 < 镜像.锚绝对时段 || 消息们.length <= 镜像.锚楼) return false;
@@ -252,6 +331,18 @@ function 解析镜像包(值: unknown, 聊天身份: string): 微信刷新镜像
     return null;
   const 微信 = 清空 ? null : JSON克隆(值.微信 as Record<string, unknown>);
   if (!清空 && !微信) return null;
+  const 关联变量 = 解析微信关联变量(值.关联变量);
+  if (Object.prototype.hasOwnProperty.call(值, '关联变量') && !关联变量) return null;
+  if (微信 && Object.prototype.hasOwnProperty.call(微信, 微信事务关联字段)) {
+    const 提交 = 读取微信事务关联(微信);
+    if (!提交 || !关联变量 || 提交.修订 !== 修订 || 提交.聊天身份 !== 聊天身份 ||
+        提交.锚楼 !== 锚楼 || 提交.锚绝对时段 !== 锚绝对时段 || 提交.分支指纹 !== 分支指纹 ||
+        JSON.stringify(提交.手机邀约计划) !== JSON.stringify(关联变量.手机邀约计划) ||
+        JSON.stringify(提交.换装消费) !== JSON.stringify(关联变量.换装消费)) return null;
+  } else if (!清空 && 关联变量) {
+    // 新载荷不能把无同修订签名的计划接到旧微信上；真正旧镜像没有关联字段，继续兼容。
+    return null;
+  }
   return {
     版本: 刷新镜像版本,
     聊天身份,
@@ -262,6 +353,7 @@ function 解析镜像包(值: unknown, 聊天身份: string): 微信刷新镜像
     分支指纹,
     清空,
     微信,
+    ...(关联变量 ? { 关联变量 } : {}),
   };
 }
 
@@ -349,14 +441,32 @@ export function 读取微信刷新镜像(聊天ID: string, 当前绝对时段: n
 }
 
 /** 当前 `_微信` 真值发生变化时，在变量回调内取得高于现有恢复副本的单调修订。 */
-export function 推进微信持久修订(微信: Record<string, unknown>, 聊天ID: string, 当前绝对时段: number): number {
+export function 推进微信持久修订(
+  微信: Record<string, unknown>,
+  聊天ID: string,
+  当前绝对时段: number,
+  关联变量?: Record<string, unknown>,
+): number {
   // 修订号只负责同聊天的先后，不负责授权恢复；即使旧镜像属于已经裁掉的未来时间线，
   // 新分支也要越过它再覆盖同一存储槽，避免 sessionStorage 中的较大旧号重新获胜。
-  void 当前绝对时段;
   const 镜像修订 = 读取微信刷新镜像候选(聊天ID)?.修订 ?? 0;
   const 当前修订 = 读取微信持久修订(微信);
-  const 下一修订 = Math.max(镜像修订, 当前修订) + 1;
+  const 清空修订 = 读取微信持久修订(关联变量?.[微信清空提交字段]);
+  const 下一修订 = Math.max(镜像修订, 当前修订, 清空修订) + 1;
   微信[微信持久修订字段] = 下一修订;
+  // 与微信和计划的最终CAS一起冻结；await之后禁止再读取另一个时刻的计划或分支身份。
+  const 锚 = 创建当前刷新时间线锚(当前绝对时段);
+  if (关联变量 && 锚) {
+    微信[微信事务关联字段] = {
+      ...捕获微信关联变量(关联变量),
+      版本: 1,
+      修订: 下一修订,
+      聊天身份: 当前微信持久身份(聊天ID),
+      ...锚,
+    } satisfies 微信事务关联;
+  } else {
+    delete 微信[微信事务关联字段];
+  }
   return 下一修订;
 }
 
@@ -386,8 +496,14 @@ function 写入镜像包(包: 微信刷新镜像包): boolean {
 export function 写入微信刷新镜像(聊天ID: string, 微信: unknown, 当前绝对时段: number): boolean {
   if (!是普通对象(微信)) return false;
   const 聊天身份 = 当前微信持久身份(聊天ID);
-  const 时间线锚 = 创建当前刷新时间线锚(当前绝对时段);
+  const 事务关联 = 读取微信事务关联(微信);
+  if (Object.prototype.hasOwnProperty.call(微信, 微信事务关联字段) && !事务关联) return false;
+  const 时间线锚 = 事务关联 ?? 创建当前刷新时间线锚(当前绝对时段);
   if (!聊天身份 || !时间线锚) return false;
+  if (
+    事务关联 &&
+    (事务关联.聊天身份 !== 聊天身份 || !镜像属于当前时间线(事务关联, 当前绝对时段))
+  ) return false;
   const 修订 = 读取微信持久修订(微信);
   if (修订 <= 0) return false;
   const 副本 = JSON克隆(微信);
@@ -397,9 +513,12 @@ export function 写入微信刷新镜像(聊天ID: string, 微信: unknown, 当�
     聊天身份,
     修订,
     写入时间: Date.now(),
-    ...时间线锚,
+    锚楼: 时间线锚.锚楼,
+    锚绝对时段: 时间线锚.锚绝对时段,
+    分支指纹: 时间线锚.分支指纹,
     清空: false,
     微信: 副本,
+    ...(事务关联 ? { 关联变量: 解析微信关联变量(事务关联)! } : {}),
   };
   return 写入镜像包(包);
 }
@@ -408,19 +527,35 @@ export function 写入微信刷新镜像(聊天ID: string, 微信: unknown, 当�
  * 重开一局的空库墓碑。即便宿主随后保存失败、刷新又载回旧 `_微信`，更高修订的墓碑
  * 也会阻止旧聊天复活；新局第一次真实手机写入会再取得更高修订并覆盖墓碑。
  */
-export function 写入微信清空镜像(聊天ID: string, 当前绝对时段: number): number {
+export function 写入微信清空镜像(
+  聊天ID: string,
+  当前绝对时段: number,
+  关联变量: Record<string, unknown> = { _手机邀约计划: null },
+  冻结快照?: Record<string, unknown>,
+): number {
   const 聊天身份 = 当前微信持久身份(聊天ID);
-  const 时间线锚 = 创建当前刷新时间线锚(当前绝对时段);
+  const 事务关联 = 读取微信事务关联(冻结快照);
+  if (冻结快照 && !事务关联) return 0;
+  const 时间线锚 = 事务关联 ?? 创建当前刷新时间线锚(当前绝对时段);
   if (!聊天身份 || !时间线锚) return 0;
-  const 下一修订 = (读取微信刷新镜像候选(聊天ID)?.修订 ?? 0) + 1;
+  if (
+    事务关联 &&
+    (事务关联.聊天身份 !== 聊天身份 || !镜像属于当前时间线(事务关联, 当前绝对时段))
+  ) return 0;
+  const 下一修订 = 事务关联?.修订 ?? (读取微信刷新镜像候选(聊天ID)?.修订 ?? 0) + 1;
   写入镜像包({
     版本: 刷新镜像版本,
     聊天身份,
     修订: 下一修订,
     写入时间: Date.now(),
-    ...时间线锚,
+    锚楼: 时间线锚.锚楼,
+    锚绝对时段: 时间线锚.锚绝对时段,
+    分支指纹: 时间线锚.分支指纹,
     清空: true,
     微信: null,
+    关联变量: 事务关联
+      ? 解析微信关联变量(事务关联)!
+      : 捕获微信关联变量(关联变量),
   });
   return 下一修订;
 }
@@ -434,9 +569,13 @@ export function 选择微信刷新恢复值(
   当前键存在: boolean,
   聊天ID: string,
   当前绝对时段: number,
+  当前变量?: Record<string, unknown>,
 ): 微信刷新恢复选择 {
   const 聊天身份 = 当前微信持久身份(聊天ID);
-  const 当前修订 = 读取微信持久修订(当前值);
+  const 清空候选 = 是普通对象(当前值) ? null : 读取微信事务关联(当前变量?.[微信清空提交字段]);
+  const 清空提交 = 清空候选 && 清空候选.聊天身份 === 聊天身份 && 镜像属于当前时间线(清空候选, 当前绝对时段)
+    ? 清空候选 : null;
+  const 当前修订 = Math.max(读取微信持久修订(当前值), 清空提交?.修订 ?? 0);
   const 镜像 = 读取微信刷新镜像(聊天ID, 当前绝对时段);
   if (!聊天身份 || !镜像) {
     return { 值: 当前值, 使用镜像: false, 当前修订, 镜像修订: 0, 聊天身份 };
@@ -444,8 +583,13 @@ export function 选择微信刷新恢复值(
 
   // `_微信:null` 也可能只是宿主上一次成功保存的旧基线。真正的重开/清空由更高修订的
   // 清空墓碑表达；因此只要同聊天、同时间线镜像更高，就允许完整副本覆盖旧 null。
-  const 当前可用 = 是普通对象(当前值) || (当前键存在 && 当前值 === null);
-  const 应使用镜像 = !当前可用 || 镜像.修订 > 当前修订;
+  const 当前可用 = 是普通对象(当前值) || (当前键存在 && 当前值 === null) || !!清空提交;
+  // 计划可能由独立的权威事务取消/移除。当前计划已偏离当前微信的提交检查点时，
+  // 不让迟到镜像抹掉这个明确的新决定；后续正常保存会重新冻结二者并提升修订。
+  const 当前关联 = 清空提交 ?? 读取微信事务关联(当前值);
+  const 独立计划已变 = 当前变量 && 当前关联 &&
+    JSON.stringify(当前关联.手机邀约计划) !== JSON.stringify(捕获微信关联变量(当前变量).手机邀约计划);
+  const 应使用镜像 = !独立计划已变 && (!当前可用 || 镜像.修订 > 当前修订);
   if (!应使用镜像) {
     return { 值: 当前值, 使用镜像: false, 当前修订, 镜像修订: 镜像.修订, 聊天身份 };
   }
@@ -455,5 +599,15 @@ export function 选择微信刷新恢复值(
     当前修订,
     镜像修订: 镜像.修订,
     聊天身份,
+    ...(镜像.关联变量 ? { 关联变量: JSON克隆(镜像.关联变量)! } : {}),
+    ...(镜像.清空 && 镜像.关联变量 ? {
+      清空提交: {
+        [微信持久修订字段]: 镜像.修订,
+        [微信事务关联字段]: {
+          ...JSON克隆(镜像.关联变量)!, 版本: 1, 修订: 镜像.修订, 聊天身份,
+          锚楼: 镜像.锚楼, 锚绝对时段: 镜像.锚绝对时段, 分支指纹: 镜像.分支指纹,
+        },
+      },
+    } : {}),
   };
 }

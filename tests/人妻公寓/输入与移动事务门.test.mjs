@@ -157,9 +157,10 @@ test('场景移动冻结共享世代与聊天身份，旧移动返回不得切�
   assert.match(写场景, /const 写入身份 = 捕获客户端时间线身份\(\)/, '写场景自身冻结身份');
   assert.match(
     写场景,
-    /await insertOrAssignVariables[\s\S]*?if \(!客户端时间线仍有效\(写入身份\)\) return false;[\s\S]*?清空当前成人CG\(\)/,
+    /await updateVariablesWith[\s\S]*?if \(!已写场景 \|\| !客户端时间线仍有效\(写入身份\)\) return false;[\s\S]*?清空当前成人CG\(\)/,
     '旧写入返回必须在任何 CG 清理前失败关闭',
   );
+  assert.match(写场景, /时间事务阻止普通写入\(vars\)[\s\S]*?Object\.assign\(vars/, '实际变量回调也要保护时间恢复');
   assert.match(写场景, /return true;/, '当前时间线写入成功才返回 true');
 
   assert.match(进入, /const 移动身份 = 捕获客户端时间线身份\(\)/, '进入操作冻结身份');

@@ -403,7 +403,7 @@ test('设置页运行中重新打开内置解析时，先落盘，再失败关�
 test('启动自愈确实代关时停止后续挂载，等待父页刷新后才启用业务监听', () => {
   const pending起点 = 入口源码.indexOf('if (内置变量解析等待宿主刷新())');
   const 自愈起点 = 入口源码.indexOf('if (自动代关MVU自动请求())');
-  const 终点 = 入口源码.indexOf('// 必须先于监听与 UI 操作恢复', 自愈起点);
+  const 终点 = 入口源码.indexOf('await 恢复中断时间推进();', 自愈起点);
   assert.ok(pending起点 >= 0 && 自愈起点 > pending起点 && 终点 > 自愈起点, '必须先检查遗留父页闸门，再进入启动自愈');
   const pending段 = 入口源码.slice(pending起点, 自愈起点);
   assert.match(pending段, /return;/, '只重载 iframe 时必须停止挂载，不能清掉父页闸门后继续');

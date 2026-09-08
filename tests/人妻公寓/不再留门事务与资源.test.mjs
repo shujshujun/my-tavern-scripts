@@ -5,6 +5,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 import test from 'node:test';
+import { 装配真实时间事务门 } from './helpers/时间事务门装配.mjs';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 import lodash from 'lodash';
@@ -438,7 +439,8 @@ function actualFunction(file, name, env) {
   const js = ts.transpileModule(`const run = ${declaration};`, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
-  return Function(...Object.keys(env), `${js}\nreturn run;`)(...Object.values(env));
+  const runtimeEnv = 装配真实时间事务门(env);
+  return Function(...Object.keys(runtimeEnv), `${js}\nreturn run;`)(...Object.values(runtimeEnv));
 }
 
 test('已打开的手机在录制中也不能发送消息或绕过AI只读门，待机仍放行', async () => {

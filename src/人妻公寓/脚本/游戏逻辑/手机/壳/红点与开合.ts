@@ -86,12 +86,17 @@ export function 开合防抖(): boolean {
   return true;
 }
 
+/** 同一份已读取数据上的待接判据；独立视频不借用普通语音期数。 */
+export function 有待接来电(data: SchemaType | null | undefined): boolean {
+  return (data?.系统._待接来电.期 ?? -1) >= 0 || 母亲视频通话待接听(data);
+}
+
 export function 有来电(): boolean {
   try {
     const rawStat = 读最近有效stat();
     if (!rawStat) return false;
     const data = Schema.parse(rawStat) as SchemaType;
-    return data.系统._待接来电.期 >= 0 || 母亲视频通话待接听(data);
+    return 有待接来电(data);
   } catch {
     return false;
   }

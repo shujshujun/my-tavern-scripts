@@ -1,6 +1,7 @@
 import type { SchemaType, 户节点Type } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
 import { 户静态表 } from '../../stageConfig';
+import { 角色当前仅保留事务往来 } from './结局后生活社交语义';
 
 /**
  * 雌竞系统(2026-07-19 用户提案拍板):
@@ -11,8 +12,9 @@ import { 户静态表 } from '../../stageConfig';
  */
 
 /** 资格门:阶段≥3(越界,2026-07-19 用户改拍从2提到3)——真下过水才有资格吃醋,与姐妹群同线 */
-export function 雌竞资格(门牌号: 门牌, 节点: 户节点Type | undefined): boolean {
-  return !!节点 && !!户静态表[门牌号]?.雌竞 && 节点.妻.当前阶段 >= 3;
+export function 雌竞资格(门牌号: 门牌, 节点: 户节点Type | undefined, data?: SchemaType): boolean {
+  return !!节点 && !!户静态表[门牌号]?.雌竞 && 节点.妻.当前阶段 >= 3 &&
+    (!data || !角色当前仅保留事务往来(data, 门牌号));
 }
 
 /** 姐妹群资格:阶段≥3(越界)——都下过水的人才有资格进"心照不宣"的小群 */
@@ -44,7 +46,9 @@ export function 雌竞火气值(节点: 户节点Type, 楼层: number): number {
 
 /** 撞场演出块(snapshotSystem 调用;竞者≥2 时注入,概率与冷却由调用方管) */
 export function 雌竞演出块(竞者: 门牌[], data: SchemaType, 楼层: number, 起因?: string): string {
-  const 段 = 竞者.map(m => {
+  const 当前竞者 = 竞者.filter(m => 雌竞资格(m, data.户[m], data));
+  if (当前竞者.length < 2) return '';
+  const 段 = 当前竞者.map(m => {
     const 配 = 户静态表[m];
     return `${配.妻名}:${配.雌竞}(此刻:${雌竞火气(data.户[m], 楼层)})`;
   });
