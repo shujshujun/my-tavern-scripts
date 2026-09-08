@@ -1,9 +1,6 @@
 name: Publish rq0.91.3 release assets
 
 on:
-  push:
-    branches:
-      - release/rq0913
   workflow_dispatch:
 
 permissions:
