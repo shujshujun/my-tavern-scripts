@@ -71,7 +71,7 @@ function world({ storageDenied = false, future = false } = {}) {
     CREATE TABLE rq_social_history(row_id INTEGER PRIMARY KEY,event_type TEXT,character_name TEXT,event_text TEXT,result TEXT,game_time TEXT,last_floor INTEGER,event_key TEXT UNIQUE,display_result TEXT);
     CREATE TABLE rq_character_memory(row_id INTEGER PRIMARY KEY,character_name TEXT,topic TEXT,memory_text TEXT,future_impact TEXT,last_time TEXT,last_floor INTEGER,confidence TEXT);
     CREATE TABLE rq_promises(row_id INTEGER PRIMARY KEY,title TEXT,related_characters TEXT,detail TEXT,status TEXT,last_progress TEXT,last_time TEXT,last_floor INTEGER);`);
-  let chat = 'dual-test', auto = true;
+  let chat = 'dual-test', auto = true, floor = 10;
   const snapshot = () => ({
     a: { name: 'RQ_剧情事件', content: [['楼层'], [future ? 11 : 4]] },
     b: { name: 'RQ_人物长期记忆', content: [['最后楼层']] },
@@ -113,7 +113,7 @@ function world({ storageDenied = false, future = false } = {}) {
       '同步社交轨迹', '读取数据库记忆胶囊',
     ], {
       ...deps, ...time, _: lodash, window, console: { info() {}, warn() {}, error() {} },
-      宿主窗口: () => host, 当前聊天标识: () => chat, 仍是同一聊天: id => id === chat, 当前末楼: () => 10,
+      宿主窗口: () => host, 当前聊天标识: () => chat, 仍是同一聊天: id => id === chat, 当前末楼: () => floor,
       取数据库API: () => api, 数据库状态: () => ({ 已装游戏模板: true, 社交结果说明可用: true }),
       探测数据库SQLite模式: async () => true,
       执行SQLite查询: (sql, params = []) => ({ rows: db.prepare(sql).all(...params) }),
@@ -130,7 +130,7 @@ function world({ storageDenied = false, future = false } = {}) {
   }, valid);
   return {
     time, calls, callbacks, instance, social, snapshot,
-    auto: value => { auto = value; }, setChat: value => { chat = value; },
+    auto: value => { auto = value; }, setChat: value => { chat = value; }, setFloor: value => { floor = value; },
     row: () => db.prepare('SELECT * FROM rq_social_history WHERE event_key=?').get('dual-event'),
     notify: () => { for (const fn of [...callbacks]) fn(snapshot()); },
     async close() {
@@ -140,6 +140,45 @@ function world({ storageDenied = false, future = false } = {}) {
     },
   };
 }
+
+test('跨窗口内部删楼已由操作级栅栏覆盖时，不得重标成玩家删除消息', async () => {
+  const w = world(), game = w.instance(), client = w.instance();
+  try {
+    game.标记数据库时间线将变更(0, '重开一局');
+    const before = game.读取持久时间线状态('dual-test');
+    const clientOldLease = client.数据库异步写.捕获('dual-test');
+    assert.ok(before);
+
+    // 客户端 iframe 也会收到同一个 MESSAGE_DELETED，但它没有游戏脚本的内部删楼租约。
+    client.emit('deleted');
+    const after = client.读取持久时间线状态('dual-test');
+    assert.ok(after);
+    assert.equal(after.原因, '重开一局');
+    assert.equal(after.令牌, before.令牌, '已覆盖事件不得重新起一代共享恢复事务');
+    assert.equal(after.目标楼层, 0);
+    assert.equal(client.数据库异步写.可提交(clientOldLease), false, '客户端实例自己的迟到 SQL 仍必须立即作废');
+  } finally { await w.close(); }
+});
+
+test('真实原生删除没有既有覆盖时仍建立删除栅栏，更低末楼会收窄既有栅栏', async () => {
+  const w = world(), game = w.instance(), client = w.instance();
+  try {
+    w.setFloor(8);
+    client.emit('deleted');
+    const native = client.读取持久时间线状态('dual-test');
+    assert.equal(native?.原因, '删除消息');
+    assert.equal(native?.目标楼层, 8);
+
+    game.标记数据库时间线将变更(6, '重掷回合');
+    const before = game.读取持久时间线状态('dual-test');
+    w.setFloor(4);
+    client.emit('deleted');
+    const narrowed = client.读取持久时间线状态('dual-test');
+    assert.equal(narrowed?.原因, '删除消息');
+    assert.equal(narrowed?.目标楼层, 4);
+    assert.notEqual(narrowed?.令牌, before?.令牌);
+  } finally { await w.close(); }
+});
 
 for (const stage of ['first', 'retry']) {
   for (const reason of ['删除消息', '切换消息分支']) {

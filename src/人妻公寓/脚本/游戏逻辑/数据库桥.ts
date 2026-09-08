@@ -1338,18 +1338,40 @@ function 确保数据库时间线回调(): void {
   }
 }
 
+interface 数据库时间线标记选项 {
+  /**
+   * 卡内删楼已经在调用 deleteChatMessages 前创建共享栅栏；其他 iframe 收到同一删除事件时，
+   * 仍须作废自己的迟到 SQL，但不得用泛化的“删除消息”覆盖更严格的原操作原因和令牌。
+   */
+  已有共享栅栏覆盖时不重标?: boolean;
+}
+
 /** 删除/滑动消息前先关闭一般数据库记忆读取；数据库仍只是可丢弃派生记忆。 */
-export function 标记数据库时间线将变更(目标楼层: number | null, 原因: string): void {
+export function 标记数据库时间线将变更(
+  目标楼层: number | null,
+  原因: string,
+  选项: 数据库时间线标记选项 = {},
+): void {
   if (!数据库状态().已装游戏模板) return;
   const 聊天标识 = 更新当前聊天驻留();
   if (!聊天标识) return;
+  const 已有状态 = 选项.已有共享栅栏覆盖时不重标 ? 读取持久时间线状态(聊天标识) : null;
   // 必须在任何删楼 await 之前同步推进；已经起跑的脚本 SQL 从这一拍开始只允许结算后补偿。
+  // 即使共享栅栏已经由另一个 iframe 建立，本实例自己的异步写世代仍必须单独作废。
   数据库异步写.作废(聊天标识);
   const 冻结楼层 = Number.isInteger(目标楼层) && Number(目标楼层) >= 0 ? Number(目标楼层) : 当前末楼();
   if (冻结楼层 === null) return;
   确保数据库时间线回调();
   取消时间线重试(聊天标识);
   时间线重试间隔.set(聊天标识, 1000);
+  if (
+    选项.已有共享栅栏覆盖时不重标 &&
+    已有状态 &&
+    已有状态.目标楼层 !== null &&
+    已有状态.目标楼层 <= 冻结楼层
+  ) {
+    return;
+  }
   const state = 时间线栅栏.标记(聊天标识, 冻结楼层, 原因);
   if (state) 持久化时间线状态(state);
 }
@@ -1382,7 +1404,7 @@ export async function 等待数据库时间线就绪(最长等待毫秒 = 3500):
 function 接入宿主时间线事件(): void {
   try {
     const 删除监听 = eventOn(tavern_events.MESSAGE_DELETED, () => {
-      标记数据库时间线将变更(当前末楼(), '删除消息');
+      标记数据库时间线将变更(当前末楼(), '删除消息', { 已有共享栅栏覆盖时不重标: true });
       void 等待数据库时间线就绪();
     });
     const 滑动监听 = eventOn(tavern_events.MESSAGE_SWIPED, () => {
