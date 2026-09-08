@@ -1,0 +1,75 @@
+name: Publish rq0.91.3 release assets
+
+on:
+  push:
+    branches:
+      - release/rq0913
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      TAG: rq0.91.3
+      VERSION: 0.91.3
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out immutable release tag
+        uses: actions/checkout@v4
+        with:
+          ref: rq0.91.3
+          fetch-depth: 0
+
+      - name: Verify tag and prepare release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "ce9aad7a8d88046be74f94ab9b35acb737de9cac"
+          test "$(git rev-parse "${TAG}^{}")" = "$(git rev-parse HEAD)"
+          mkdir -p release-assets
+          cp 'dist/人妻公寓/人妻公寓.png' "release-assets/rqgy-${VERSION}.png"
+          cp 'dist/人妻公寓/人妻公寓.json' "release-assets/rqgy-${VERSION}.json"
+          node <<'NODE'
+          const crypto = require('node:crypto');
+          const fs = require('node:fs');
+          const path = require('node:path');
+          const version = process.env.VERSION;
+          const tag = process.env.TAG;
+          const dir = 'release-assets';
+          const names = [`rqgy-${version}.png`, `rqgy-${version}.json`];
+          const files = names.map(name => {
+            const data = fs.readFileSync(path.join(dir, name));
+            return {
+              name,
+              bytes: data.length,
+              sha256: crypto.createHash('sha256').update(data).digest('hex'),
+            };
+          });
+          fs.writeFileSync(
+            path.join(dir, `rqgy-${version}-checksums.json`),
+            `${JSON.stringify({ version, tag, files }, null, 2)}\n`,
+          );
+          NODE
+          test "$(sha256sum "release-assets/rqgy-${VERSION}.png" | cut -d' ' -f1)" = '4a5947394038806ec398f9cbb620cd798fd008e540c1c401c8c6af3ac24b7154'
+          test "$(sha256sum "release-assets/rqgy-${VERSION}.json" | cut -d' ' -f1)" = 'e8fa57e38c98e9c7e2ea28bf630c3281817c4105421ecff244658d23a08279aa'
+          test "$(sha256sum "release-assets/rqgy-${VERSION}-checksums.json" | cut -d' ' -f1)" = '5bd1b45dc9e37231dae17f212afe99a2fc5925f7d50fa2692ebd3c75575ed644'
+
+      - name: Create GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists; refusing to overwrite it." >&2
+            exit 1
+          fi
+          gh release create "$TAG" \
+            "release-assets/rqgy-${VERSION}.png" \
+            "release-assets/rqgy-${VERSION}.json" \
+            "release-assets/rqgy-${VERSION}-checksums.json" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title '人妻公寓 v0.91.3' \
+            --notes-file 'src/人妻公寓/发布说明_v0.91.3_2026-09-09.md' \
+            --verify-tag
