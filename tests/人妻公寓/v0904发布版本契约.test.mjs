@@ -19,18 +19,18 @@ function 载入TypeScript(路径) {
   return module.exports;
 }
 
-test('v0.90.4 历史发布记录保留，当前版本、标签和兼容范围前进到0.91.2', () => {
+test('v0.90.4 历史发布记录保留，当前版本、标签和兼容范围前进到0.91.3', () => {
   const 依赖版本源 = 读('src/人妻公寓/脚本/游戏逻辑/依赖版本.ts');
   const 首次准备源 = 读('src/人妻公寓/界面/客户端/components/首次准备.vue');
   const 组卡源 = 读('src/人妻公寓/组卡.mjs');
   const 发布说明 = 读('src/人妻公寓/发布说明_v0.90.4_2026-08-28.md');
-  assert.match(依赖版本源, /当前游戏版本 = '0\.91\.2'/);
+  assert.match(依赖版本源, /当前游戏版本 = '0\.91\.3'/);
   assert.match(依赖版本源, /游戏版本构建标记 = `RQGY_GAME_VERSION:\$\{当前游戏版本\}`/);
   assert.match(首次准备源, /游戏版本构建标记/);
   assert.match(首次准备源, /:data-game-build="游戏版本构建标记"/);
-  assert.match(组卡源, /const 版本 = '0\.91\.2'/);
-  assert.match(组卡源, /const TAG = 'rq0\.91\.2'/);
-  assert.match(组卡源, /支持继承 v0\.80～v0\.91 存档/);
+  assert.match(组卡源, /const 版本 = '0\.91\.3'/);
+  assert.match(组卡源, /const TAG = 'rq0\.91\.3'/);
+  assert.match(组卡源, /支持继承 v0\.80～v0\.91\.2 存档/);
   assert.match(组卡源, /校验发布版本一致\(\{ 版本, 标签: TAG \}\)/);
   assert.match(组卡源, /校验客户端构建版本\(readFileSync\(客户端构建路径, 'utf8'\), 版本\)/);
   assert.match(发布说明, /发布分支：`release\/rq0904`/);
