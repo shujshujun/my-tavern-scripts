@@ -1,8 +1,20 @@
 import type { SchemaType } from '../../schema';
 import { 荣耀洞丈夫在场率, 荣耀洞冷却时段, 荣耀洞表, 户静态表, type 门牌 } from '../../stageConfig';
 import { 登记脚本正增长候选 } from './冷落系统';
-import { seededRandom, 取绝对时段, 疑心冻结中 } from './楼层时钟';
+import { seededRandom, 取绝对时段, 疑心冻结中, 丈夫在楼 } from './楼层时钟';
 import { 处于医院硬锁 } from './生产系统';
+import { 普通丈夫风险已停用 } from './丈夫线路风险策略';
+
+/** 新抽签与旧未演票共用当前关系及在楼事实，不改已记入的历史疑心。 */
+function 荣耀洞丈夫可出现(data: SchemaType, m: string): boolean {
+  const 门牌号 = m as 门牌;
+  const 节点 = data.户[门牌号];
+  return Boolean(
+    m !== '302' && 节点 && 户静态表[门牌号]?.夫名 &&
+    !普通丈夫风险已停用(data, 门牌号) &&
+    丈夫在楼(节点, 门牌号, 取绝对时段(data)) !== '外出',
+  );
+}
 
 /** 所有负值和未来时段都不得制造假冷却。 */
 export function 规范荣耀洞上次时段(记录: number, 当前绝对时段: number): number {
@@ -70,6 +82,7 @@ const 点破许可 = (妻名: string) =>
   `(一句压低的称呼/一件塞过洞口的小物/离开前在隔板上的唇印),亮不亮、何时亮,按${妻名}的性格演`;
 
 function 夫段(data: SchemaType, m: 门牌): string {
+  if (!荣耀洞丈夫可出现(data, m)) return '';
   const 节点 = data.户[m];
   const 夫名 = 户静态表[m].夫名;
   if (!节点 || !夫名) return '';
@@ -155,7 +168,7 @@ export function 使用荣耀洞(
     const 配 = 荣耀洞表[命中]!;
     系._荣耀洞点破 = data.户[命中]!.妻.当前阶段 >= 配.点破;
     系._荣耀洞夫 =
-      !!户静态表[命中].夫名 && 命中 !== '302' && seededRandom(绝对时段, 命中, '荣耀洞夫') < 荣耀洞丈夫在场率;
+      荣耀洞丈夫可出现(data, 命中) && seededRandom(绝对时段, 命中, '荣耀洞夫') < 荣耀洞丈夫在场率;
   }
   return {
     提示: '你闩上末隔间的门，在洞前坐定——隔板另一边的动静立刻响了起来。',
@@ -209,7 +222,7 @@ export function 推进荣耀洞隔离拍(data: SchemaType): void {
     return;
   }
   系._荣耀洞拍 += 1;
-  if (系._荣耀洞夫 && 系._荣耀洞拍 === 1 && data.户[m as 门牌]) {
+  if (系._荣耀洞夫 && 系._荣耀洞拍 === 1 && 荣耀洞丈夫可出现(data, m)) {
     const 夫 = data.户[m as 门牌]!.夫;
     if (!疑心冻结中(夫, 系._荣耀洞起时段)) 夫.疑心值 = _.clamp(夫.疑心值 + 夫在场疑心, 0, 100);
   }
