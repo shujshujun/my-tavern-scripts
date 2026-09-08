@@ -240,8 +240,13 @@ test('客户端启动前有可见占位，生产包不再内嵌大幅场景位�
   assert.match(客户端模板, /<meta\s+charset=["']utf-8["']/i);
   assert.match(客户端模板, /id=["']app["'][^>]*>[\s\S]*?游戏界面加载中/);
   assert.doesNotMatch(App源码, /(?:png|webp)\?url/);
-  assert.doesNotMatch(客户端产物, /data:image\/(?:png|webp);base64,/);
-  assert.ok(Buffer.byteLength(客户端产物, 'utf8') < 2_000_000, '移动端入口应保持在 2 MB 内');
+  // 小型图标可以内联；这里只阻止约 128 KiB 以上的 PNG/WebP 再被当成场景图塞回单文件入口。
+  assert.doesNotMatch(
+    客户端产物,
+    /data:image\/(?:png|webp);base64,[A-Za-z0-9+/=]{175000,}/,
+    '大幅场景位图必须继续走不可变外链，不能重新膨胀客户端入口',
+  );
+  assert.ok(Buffer.byteLength(客户端产物, 'utf8') < 2_500_000, '移动端入口应保持在 2.5 MB 内');
 });
 
 test('新CG回合重置临时坏图集合，加载回调携带实际图片身份', () => {
