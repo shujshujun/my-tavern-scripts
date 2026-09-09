@@ -7,6 +7,8 @@
  *
  * 用法：node src/秦璐重置版/组卡.mjs
  * 可选：QIN_CARD_TEMPLATE=D:/path/to/秦璐.png node src/秦璐重置版/组卡.mjs
+ * 可选：QIN_OUTPUT_DIR=D:/path/to/output node src/秦璐重置版/组卡.mjs
+ * 可选：QIN_CARD_ONLY=1（目标目录只写 PNG 与 JSON）
  */
 
 import { createHash } from 'node:crypto';
@@ -17,16 +19,19 @@ import { parse as parseYaml } from 'yaml';
 
 const 根 = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const 项目 = path.join(根, 'src/秦璐重置版');
-const 产物 = path.join(根, 'dist/秦璐重置版');
+const 构建产物 = path.join(根, 'dist/秦璐重置版');
+const 发布产物 = process.env.QIN_OUTPUT_DIR ? path.resolve(process.env.QIN_OUTPUT_DIR) : 构建产物;
 const 配置 = JSON.parse(readFileSync(path.join(项目, '发布配置.json'), 'utf8'));
 const 本地自包含 = process.env.QIN_SELF_CONTAINED === '1';
+const 仅输出角色卡 = process.env.QIN_CARD_ONLY === '1';
 const 发布文件基名 = `${配置.name}_v${配置.version}_${配置.edition}`;
 const 文件基名 = 本地自包含 ? `${发布文件基名}_本地自包含测试` : 发布文件基名;
-const JSON输出 = path.join(产物, `${文件基名}.json`);
-const PNG输出 = path.join(产物, `${文件基名}.png`);
-const 校验输出 = path.join(产物, `${文件基名}.sha256`);
-const 清单输出 = path.join(产物, `${文件基名}.manifest.json`);
+const JSON输出 = path.join(发布产物, `${文件基名}.json`);
+const PNG输出 = path.join(发布产物, `${文件基名}.png`);
+const 校验输出 = path.join(发布产物, `${文件基名}.sha256`);
+const 清单输出 = path.join(发布产物, `${文件基名}.manifest.json`);
 
+console.error('[qin-repack] 配置与输出路径已解析');
 if (配置.baselineTag !== '0.40') throw new Error(`发布基线必须是 Git 0.40，实际为 ${配置.baselineTag}`);
 if (配置.tag === 'qin1.0') throw new Error('正式发布必须使用当前版本独立标签');
 
@@ -45,19 +50,28 @@ const 必需产物 = [
   '脚本/游戏逻辑/index.js',
 ];
 for (const relative of 必需产物) {
-  const file = path.join(产物, relative);
+  const file = path.join(构建产物, relative);
   if (!existsSync(file)) throw new Error(`缺少正式构建产物：${file}`);
 }
+console.error('[qin-repack] 模板与正式构建产物已确认');
 
 // 直接钉住“必须仍是 0.40 完整状态栏”，防止再次把缩水界面误组进角色卡。
-const 状态栏HTML = readFileSync(path.join(产物, '界面/状态栏/index.html'), 'utf8');
-const 行动选项HTML = readFileSync(path.join(产物, '界面/行动选项/index.html'), 'utf8');
+const 状态栏HTML = readFileSync(path.join(构建产物, '界面/状态栏/index.html'), 'utf8');
+const 行动选项HTML = readFileSync(path.join(构建产物, '界面/行动选项/index.html'), 'utf8');
 for (const marker of ['路线共鸣', '影像档案', '静滞怀表', '立即使用（永久）', '苏文视角']) {
   if (!状态栏HTML.includes(marker)) throw new Error(`状态栏缺少 0.40 完整架构/修复标记：${marker}`);
 }
 if (Buffer.byteLength(状态栏HTML) < 120_000) {
   throw new Error(`状态栏体积异常（${Buffer.byteLength(状态栏HTML)} bytes），疑似又组入缩水版本`);
 }
+const piniaImport = 状态栏HTML.match(/import\{([^}]*)\}from['"][^'"]*pinia\/\+esm['"]/);
+if (!piniaImport?.[1].includes('defineStore')) {
+  throw new Error('状态栏构建产物没有从 Pinia 导入 defineStore；该产物会在 TT 中加载成功后空白');
+}
+if (/\bdefineStore\s*\(/.test(状态栏HTML)) {
+  throw new Error('状态栏构建产物仍含未解析的 defineStore(...) 调用，拒绝组卡');
+}
+console.error('[qin-repack] 状态栏完整性已确认');
 
 const CRC32表 = Array.from({ length: 256 }, (_, n) => {
   let c = n;
@@ -88,21 +102,25 @@ function 读取PNG卡(pngPath) {
   let offset = 8;
   let 卡 = null;
   let chara块数 = 0;
+  let ccv3块数 = 0;
   while (offset < png.length) {
     const length = png.readUInt32BE(offset);
     const type = png.toString('ascii', offset + 4, offset + 8);
     const end = offset + 12 + length;
     if (end > png.length) throw new Error(`模板 PNG 块损坏：${type}`);
     const data = png.subarray(offset + 8, offset + 8 + length);
-    if (type === 'tEXt' && data.subarray(0, 6).toString('latin1') === 'chara\0') {
+    const keyword = type === 'tEXt' ? data.subarray(0, 6).toString('latin1') : '';
+    if (keyword === 'chara\0') {
       chara块数 += 1;
       const decoded = Buffer.from(data.subarray(6).toString('latin1'), 'base64').toString('utf8');
       卡 = JSON.parse(decoded);
+    } else if (keyword === 'ccv3\0') {
+      ccv3块数 += 1;
     }
     offset = end;
   }
   if (!卡) throw new Error(`模板 PNG 不含 chara 数据：${pngPath}`);
-  return { png, 卡, chara块数 };
+  return { png, 卡, chara块数, ccv3块数 };
 }
 
 function 写PNG角色卡(模板PNG, json, 输出) {
@@ -117,10 +135,16 @@ function 写PNG角色卡(模板PNG, json, 输出) {
     if (end > 模板PNG.length) throw new Error(`头像 PNG 块损坏：${type}`);
     const 原块 = 模板PNG.subarray(offset, end);
     const data = 模板PNG.subarray(offset + 8, offset + 8 + length);
-    const 是旧卡数据 = type === 'tEXt' && data.subarray(0, 6).toString('latin1') === 'chara\0';
+    const nul = type === 'tEXt' ? data.indexOf(0) : -1;
+    const keyword = nul >= 0 ? data.subarray(0, nul).toString('latin1').toLowerCase() : '';
+    const 是旧卡数据 = keyword === 'chara' || keyword === 'ccv3';
     if (type === 'IEND' && !已写入) {
       const 编码 = Buffer.from(Buffer.from(json, 'utf8').toString('base64'), 'latin1');
-      块们.push(png块('tEXt', Buffer.concat([Buffer.from('chara\0', 'latin1'), 编码])));
+      for (const metadataKeyword of ['chara', 'ccv3']) {
+        块们.push(
+          png块('tEXt', Buffer.concat([Buffer.from(`${metadataKeyword}\0`, 'latin1'), 编码])),
+        );
+      }
       已写入 = true;
     }
     if (!是旧卡数据) 块们.push(原块);
@@ -133,13 +157,15 @@ function 写PNG角色卡(模板PNG, json, 输出) {
 function 读取内嵌卡(pngPath) {
   const png = readFileSync(pngPath);
   let offset = 8;
-  const cards = [];
+  const cards = { chara: [], ccv3: [] };
   while (offset < png.length) {
     const length = png.readUInt32BE(offset);
     const type = png.toString('ascii', offset + 4, offset + 8);
     const data = png.subarray(offset + 8, offset + 8 + length);
-    if (type === 'tEXt' && data.subarray(0, 6).toString('latin1') === 'chara\0') {
-      cards.push(Buffer.from(data.subarray(6).toString('latin1'), 'base64').toString('utf8'));
+    const nul = type === 'tEXt' ? data.indexOf(0) : -1;
+    const keyword = nul >= 0 ? data.subarray(0, nul).toString('latin1').toLowerCase() : '';
+    if (keyword === 'chara' || keyword === 'ccv3') {
+      cards[keyword].push(Buffer.from(data.subarray(nul + 1).toString('latin1'), 'base64').toString('utf8'));
     }
     offset += 12 + length;
   }
@@ -271,7 +297,14 @@ function 读取世界书() {
   });
 }
 
-const { png: 模板PNG, 卡: 模板卡, chara块数: 模板chara块数 } = 读取PNG卡(模板路径);
+const {
+  png: 模板PNG,
+  卡: 模板卡,
+  chara块数: 模板chara块数,
+  ccv3块数: 模板ccv3块数,
+} = 读取PNG卡(模板路径);
+console.error('[qin-repack] 模板 PNG 元数据已读取');
+if (!existsSync(发布产物)) throw new Error(`输出目录不存在：${发布产物}`);
 const 卡 = structuredClone(模板卡);
 const data = structuredClone(卡.data ?? 卡);
 const BASE = `https://testingcf.jsdelivr.net/gh/${配置.repository}@${配置.tag}`;
@@ -316,9 +349,9 @@ const 原脚本 = Array.isArray(data.extensions?.tavern_helper?.scripts)
   ? data.extensions.tavern_helper.scripts
   : [];
 const 找脚本 = names => 原脚本.find(item => names.includes(item.name));
-const mvuContent = 去源码映射(readFileSync(path.join(产物, '脚本/MVU/index.js'), 'utf8'));
-const schemaContent = 去源码映射(readFileSync(path.join(产物, '脚本/变量结构/index.js'), 'utf8'));
-const builtLogicContent = 去源码映射(readFileSync(path.join(产物, '脚本/游戏逻辑/index.js'), 'utf8'));
+const mvuContent = 去源码映射(readFileSync(path.join(构建产物, '脚本/MVU/index.js'), 'utf8'));
+const schemaContent = 去源码映射(readFileSync(path.join(构建产物, '脚本/变量结构/index.js'), 'utf8'));
+const builtLogicContent = 去源码映射(readFileSync(path.join(构建产物, '脚本/游戏逻辑/index.js'), 'utf8'));
 const logicContent = 本地自包含
   ? builtLogicContent
   : `import '${BASE}/dist/秦璐重置版/脚本/游戏逻辑/index.js';`;
@@ -372,13 +405,22 @@ data.character_book = {
 卡.create_date = 配置.releaseDate;
 
 const 卡JSON = JSON.stringify(卡, null, 2);
+console.error('[qin-repack] 新角色卡 JSON 已生成');
 writeFileSync(JSON输出, 卡JSON, 'utf8');
+console.error('[qin-repack] 独立 JSON 已写入');
 写PNG角色卡(模板PNG, 卡JSON, PNG输出);
+console.error('[qin-repack] PNG 元数据已重写');
 
 const 回读JSON = readFileSync(JSON输出, 'utf8');
 const PNG内嵌卡 = 读取内嵌卡(PNG输出);
-if (PNG内嵌卡.length !== 1) throw new Error(`发布 PNG 的 chara 块数量不是1，而是 ${PNG内嵌卡.length}`);
-if (PNG内嵌卡[0] !== 回读JSON) throw new Error('发布 PNG 内嵌 JSON 与独立 JSON 不一致');
+for (const keyword of ['chara', 'ccv3']) {
+  if (PNG内嵌卡[keyword].length !== 1) {
+    throw new Error(`发布 PNG 的 ${keyword} 块数量不是1，而是 ${PNG内嵌卡[keyword].length}`);
+  }
+  if (PNG内嵌卡[keyword][0] !== 回读JSON) {
+    throw new Error(`发布 PNG 的 ${keyword} 数据与独立 JSON 不一致`);
+  }
+}
 const parsed = JSON.parse(回读JSON);
 if (parsed.spec !== 'chara_card_v3' || parsed.spec_version !== '3.0') throw new Error('发布卡不是 chara_card_v3');
 if (parsed.data.character_version !== 配置.version) throw new Error('角色卡版本与发布配置不一致');
@@ -390,9 +432,32 @@ if (本地自包含) {
     throw new Error('本地测试卡没有内嵌完整状态栏页面');
   }
 } else {
-  if (!logicContent.includes(`@${配置.tag}/`)) throw new Error('游戏逻辑资源未固定到正式标签');
-  if (!状态栏正则.replaceString.includes(`@${配置.tag}/dist/秦璐重置版/`)) {
-    throw new Error('状态栏未固定到正式标签');
+  const 发布资源 = [
+    ['状态栏正则', 状态栏正则.replaceString],
+    ['行动选项正则', 行动选项正则.replaceString],
+    ['游戏逻辑脚本', logicContent],
+  ];
+  for (const [name, content] of 发布资源) {
+    if (!content.includes(`@${配置.tag}/`)) throw new Error(`${name}未固定到正式标签 ${配置.tag}`);
+    if (content.includes('@0.40/')) throw new Error(`${name}仍残留旧 0.40 资源地址`);
+  }
+}
+const helperScripts = parsed.data.extensions.tavern_helper.scripts;
+if (helperScripts.map(item => item.name).join('|') !== 'MVU|变量结构|游戏逻辑') {
+  throw new Error(`发布卡脚本清单异常：${helperScripts.map(item => item.name).join('、')}`);
+}
+const variableSchemaScript = helperScripts.find(item => item.name === '变量结构');
+if (!variableSchemaScript?.content.includes('registerMvuSchema') || !variableSchemaScript.content.includes('位置数值冻结')) {
+  throw new Error('发布卡变量结构脚本不是 qin1.1 完整版本');
+}
+for (const regex of parsed.data.extensions.regex_scripts) {
+  if (String(regex.replaceString ?? '').includes('my-tavern-scripts@0.40/')) {
+    throw new Error(`正则“${regex.scriptName}”仍残留旧 0.40 资源地址`);
+  }
+}
+for (const script of helperScripts) {
+  if (String(script.content ?? '').includes('my-tavern-scripts@0.40/')) {
+    throw new Error(`脚本“${script.name}”仍残留旧 0.40 资源地址`);
   }
 }
 if (parsed.data.character_book.entries.length !== 9) throw new Error('0.40 实际角色卡世界书应有 9 项（已排除被删除文件留下的失效索引）');
@@ -400,11 +465,13 @@ if (parsed.data.character_book.entries.length !== 9) throw new Error('0.40 实�
 const jsonBytes = readFileSync(JSON输出);
 const pngBytes = readFileSync(PNG输出);
 const checksums = { json: sha256(jsonBytes), png: sha256(pngBytes) };
-writeFileSync(
-  校验输出,
-  `${checksums.json}  ${path.basename(JSON输出)}\n${checksums.png}  ${path.basename(PNG输出)}\n`,
-  'utf8',
-);
+if (!仅输出角色卡) {
+  writeFileSync(
+    校验输出,
+    `${checksums.json}  ${path.basename(JSON输出)}\n${checksums.png}  ${path.basename(PNG输出)}\n`,
+    'utf8',
+  );
+}
 
 const manifest = {
   name: 配置.name,
@@ -417,6 +484,7 @@ const manifest = {
   releaseDate: 配置.releaseDate,
   template: path.basename(模板路径),
   templateCharaChunks: 模板chara块数,
+  templateCcv3Chunks: 模板ccv3块数,
   card: {
     spec: parsed.spec,
     specVersion: parsed.spec_version,
@@ -427,6 +495,7 @@ const manifest = {
     enabledWorldbookEntries: parsed.data.character_book.entries.filter(entry => entry.enabled).length,
     regexScripts: parsed.data.extensions.regex_scripts.map(item => item.scriptName),
     helperScripts: parsed.data.extensions.tavern_helper.scripts.map(item => item.name),
+    metadataChunks: { chara: PNG内嵌卡.chara.length, ccv3: PNG内嵌卡.ccv3.length },
     statusBarBytes: Buffer.byteLength(状态栏HTML),
     requiredStatusMarkers: ['路线共鸣', '影像档案', '静滞怀表', '立即使用（永久）', '苏文视角'],
   },
@@ -436,12 +505,14 @@ const manifest = {
     checksums: { name: path.basename(校验输出) },
   },
 };
-writeFileSync(清单输出, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
+if (!仅输出角色卡) writeFileSync(清单输出, JSON.stringify(manifest, null, 2) + '\n', 'utf8');
 
 console.log(`✓ ${JSON输出}`);
-console.log(`✓ ${PNG输出}（唯一 chara 块，内嵌 JSON 与独立 JSON 逐字节一致）`);
-console.log(`✓ ${校验输出}`);
-console.log(`✓ ${清单输出}`);
+console.log(`✓ ${PNG输出}（chara/ccv3 各唯一一块，均与独立 JSON 逐字节一致）`);
+if (!仅输出角色卡) {
+  console.log(`✓ ${校验输出}`);
+  console.log(`✓ ${清单输出}`);
+}
 console.log(
   `  基线：Git ${配置.baselineTag} 完整重置版 | 版本：${配置.version} | ` +
     (本地自包含 ? '本地自包含测试卡' : `标签：${配置.tag}`),

@@ -9,6 +9,7 @@
   "releaseDate": "2026-09-10",
   "template": "秦璐.png",
   "templateCharaChunks": 1,
+  "templateCcv3Chunks": 0,
   "card": {
     "spec": "chara_card_v3",
     "specVersion": "3.0",
@@ -28,7 +29,11 @@
       "变量结构",
       "游戏逻辑"
     ],
-    "statusBarBytes": 160543,
+    "metadataChunks": {
+      "chara": 1,
+      "ccv3": 1
+    },
+    "statusBarBytes": 161430,
     "requiredStatusMarkers": [
       "路线共鸣",
       "影像档案",
@@ -45,8 +50,8 @@
     },
     "png": {
       "name": "秦璐_v1.1_完结版.png",
-      "bytes": 746093,
-      "sha256": "067E9DF3986A9977A5F17C02A56820F508E0DC15B205896766F044C7655BEA40"
+      "bytes": 772445,
+      "sha256": "858C552C54A20C2115FC3B3E0A45D19805229E67D4C64FD4510BE754377B332B"
     },
     "checksums": {
       "name": "秦璐_v1.1_完结版.sha256"

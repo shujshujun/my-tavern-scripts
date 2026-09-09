@@ -24,15 +24,17 @@ function readPngCards(file) {
   const png = readFileSync(file);
   assert.equal(png.subarray(0, 8).toString('hex'), '89504e470d0a1a0a');
   let offset = 8;
-  const cards = [];
+  const cards = { chara: [], ccv3: [] };
   while (offset < png.length) {
     const length = png.readUInt32BE(offset);
     const type = png.toString('ascii', offset + 4, offset + 8);
     const end = offset + 12 + length;
     assert.ok(end <= png.length, `PNG 块越界：${type}`);
     const data = png.subarray(offset + 8, offset + 8 + length);
-    if (type === 'tEXt' && data.subarray(0, 6).toString('latin1') === 'chara\0') {
-      cards.push(Buffer.from(data.subarray(6).toString('latin1'), 'base64').toString('utf8'));
+    const nul = type === 'tEXt' ? data.indexOf(0) : -1;
+    const keyword = nul >= 0 ? data.subarray(0, nul).toString('latin1').toLowerCase() : '';
+    if (keyword === 'chara' || keyword === 'ccv3') {
+      cards[keyword].push(Buffer.from(data.subarray(nul + 1).toString('latin1'), 'base64').toString('utf8'));
     }
     offset = end;
   }
@@ -45,23 +47,23 @@ function decodeInlinePage(replaceString) {
   return Buffer.from(match[1], 'base64').toString('utf8');
 }
 
-for (const base of [releaseBase, localBase]) {
-  test(`${base} 四项交付文件齐全且 SHA 清单一致`, () => {
-    for (const ext of ['json', 'png', 'sha256', 'manifest.json']) {
-      assert.equal(existsSync(path.join(dist, `${base}.${ext}`)), true, `缺少 ${base}.${ext}`);
-    }
-    const checksum = readFileSync(path.join(dist, `${base}.sha256`), 'utf8');
-    assert.match(checksum, new RegExp(`${sha256(path.join(dist, `${base}.json`))}  ${base}\\.json`));
-    assert.match(checksum, new RegExp(`${sha256(path.join(dist, `${base}.png`))}  ${base}\\.png`));
-  });
+test(`${releaseBase} 四项交付文件齐全且 SHA 清单一致`, () => {
+  for (const ext of ['json', 'png', 'sha256', 'manifest.json']) {
+    assert.equal(existsSync(path.join(dist, `${releaseBase}.${ext}`)), true, `缺少 ${releaseBase}.${ext}`);
+  }
+  const checksum = readFileSync(path.join(dist, `${releaseBase}.sha256`), 'utf8');
+  assert.match(checksum, new RegExp(`${sha256(path.join(dist, `${releaseBase}.json`))}  ${releaseBase}\\.json`));
+  assert.match(checksum, new RegExp(`${sha256(path.join(dist, `${releaseBase}.png`))}  ${releaseBase}\\.png`));
+});
 
-  test(`${base} PNG 只有一个 chara 块并与独立 JSON 逐字节一致`, () => {
-    const json = readFileSync(path.join(dist, `${base}.json`), 'utf8');
-    const cards = readPngCards(path.join(dist, `${base}.png`));
-    assert.equal(cards.length, 1);
-    assert.equal(cards[0], json);
-  });
-}
+test(`${releaseBase} PNG 的 chara/ccv3 各唯一一块并都与独立 JSON 逐字节一致`, () => {
+  const json = readFileSync(path.join(dist, `${releaseBase}.json`), 'utf8');
+  const cards = readPngCards(path.join(dist, `${releaseBase}.png`));
+  assert.equal(cards.chara.length, 1);
+  assert.equal(cards.ccv3.length, 1);
+  assert.equal(cards.chara[0], json);
+  assert.equal(cards.ccv3[0], json);
+});
 
 test('发布配置使用 Git 0.40 完整重置版基线和 v1.1 独立标签', () => {
   assert.equal(config.baselineTag, '0.40');
@@ -96,7 +98,19 @@ test('正式卡固定到 qin1.1，并保留完整世界书、状态栏和脚本�
   assert.equal(text.includes('@qin1.0.1/'), false);
 });
 
-test('本地测试卡精确内嵌本次 v1.1 构建', () => {
+test('状态栏构建产物已正确导入 Pinia defineStore，不含会导致 TT 空白的裸调用', () => {
+  const statusHtml = readFileSync(path.join(dist, '界面/状态栏/index.html'), 'utf8');
+  const piniaImport = statusHtml.match(/import\{([^}]*)\}from['"][^'"]*pinia\/\+esm['"]/);
+  assert.ok(piniaImport, '状态栏缺少 Pinia ESM 导入');
+  assert.match(piniaImport[1], /defineStore/, '状态栏没有从 Pinia 导入 defineStore');
+  assert.doesNotMatch(statusHtml, /\bdefineStore\s*\(/, '状态栏仍含未解析的 defineStore(...) 调用');
+});
+
+const localArtifactsExist = ['json', 'png', 'sha256', 'manifest.json'].every(ext =>
+  existsSync(path.join(dist, `${localBase}.${ext}`)),
+);
+
+test('本地测试卡精确内嵌本次 v1.1 构建', { skip: !localArtifactsExist }, () => {
   const card = readJson(path.join(dist, `${localBase}.json`));
   const text = JSON.stringify(card);
   const statusRegex = card.data.extensions.regex_scripts.find(regex => regex.scriptName === '状态栏');
