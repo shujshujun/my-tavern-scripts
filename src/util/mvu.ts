@@ -1,3 +1,5 @@
+import { defineStore } from 'pinia';
+
 /**
  * 支持动态获取 message_id 的变量选项类型
  * Bug #32 修复：支持传入函数来动态获取 message_id，解决 ES module 缓存导致的问题

@@ -100,6 +100,11 @@ test('正式卡保持 v1.1，并固定到唯一热修资源标签 qin1.1.1', () 
   assert.equal(text.includes('@qin1.0.1/'), false);
 });
 
+test('MVU 数据仓库源码显式导入 Pinia defineStore，不依赖构建器隐式补全', () => {
+  const mvuSource = readFileSync(path.join(root, 'src/util/mvu.ts'), 'utf8');
+  assert.match(mvuSource, /^import \{ defineStore \} from 'pinia';/m);
+});
+
 test('状态栏构建产物已正确导入 Pinia defineStore，不含会导致 TT 空白的裸调用', () => {
   const statusHtml = readFileSync(path.join(dist, '界面/状态栏/index.html'), 'utf8');
   const piniaImport = statusHtml.match(/import\{([^}]*)\}from['"][^'"]*pinia\/\+esm['"]/);
