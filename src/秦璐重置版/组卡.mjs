@@ -22,6 +22,7 @@ const 项目 = path.join(根, 'src/秦璐重置版');
 const 构建产物 = path.join(根, 'dist/秦璐重置版');
 const 发布产物 = process.env.QIN_OUTPUT_DIR ? path.resolve(process.env.QIN_OUTPUT_DIR) : 构建产物;
 const 配置 = JSON.parse(readFileSync(path.join(项目, '发布配置.json'), 'utf8'));
+const 资源标签 = 配置.resourceTag ?? 配置.tag;
 const 本地自包含 = process.env.QIN_SELF_CONTAINED === '1';
 const 仅输出角色卡 = process.env.QIN_CARD_ONLY === '1';
 const 发布文件基名 = `${配置.name}_v${配置.version}_${配置.edition}`;
@@ -307,7 +308,7 @@ console.error('[qin-repack] 模板 PNG 元数据已读取');
 if (!existsSync(发布产物)) throw new Error(`输出目录不存在：${发布产物}`);
 const 卡 = structuredClone(模板卡);
 const data = structuredClone(卡.data ?? 卡);
-const BASE = `https://testingcf.jsdelivr.net/gh/${配置.repository}@${配置.tag}`;
+const BASE = `https://testingcf.jsdelivr.net/gh/${配置.repository}@${资源标签}`;
 
 const 原正则 = Array.isArray(data.extensions?.regex_scripts) ? data.extensions.regex_scripts : [];
 const 状态栏正则 = 原正则.find(item => item.scriptName === '状态栏') ?? {
@@ -376,7 +377,7 @@ data.creator_notes = [
   '新增永久特权“静滞怀表”：售价1000，购买后需再次点击启用，永久冻结苏文状态、位置、作息游标与两项疑心值。',
   本地自包含
     ? '这是本地自包含测试卡：状态栏、行动选项和游戏逻辑均已内嵌，可在修正标签发布前直接测试。'
-    : `资源固定到正式标签 ${配置.tag}；需要启用最新版酒馆助手与 MVU。`,
+    : `资源固定到热修标签 ${资源标签}；发布版本仍为 ${配置.tag}。需要启用最新版酒馆助手与 MVU。`,
 ].join('\n');
 data.tags = [...new Set([...(Array.isArray(data.tags) ? data.tags : []), '秦璐', '重置版', '完结版'])];
 data.extensions.world = 配置.name;
@@ -438,7 +439,7 @@ if (本地自包含) {
     ['游戏逻辑脚本', logicContent],
   ];
   for (const [name, content] of 发布资源) {
-    if (!content.includes(`@${配置.tag}/`)) throw new Error(`${name}未固定到正式标签 ${配置.tag}`);
+    if (!content.includes(`@${资源标签}/`)) throw new Error(`${name}未固定到资源标签 ${资源标签}`);
     if (content.includes('@0.40/')) throw new Error(`${name}仍残留旧 0.40 资源地址`);
   }
 }
@@ -480,6 +481,7 @@ const manifest = {
   baselineTag: 配置.baselineTag,
   deliveryMode: 本地自包含 ? 'self-contained-local-test' : 'tagged-release',
   tag: 本地自包含 ? null : 配置.tag,
+  resourceTag: 本地自包含 ? null : 资源标签,
   releaseBranch: 配置.releaseBranch,
   releaseDate: 配置.releaseDate,
   template: path.basename(模板路径),
@@ -515,7 +517,7 @@ if (!仅输出角色卡) {
 }
 console.log(
   `  基线：Git ${配置.baselineTag} 完整重置版 | 版本：${配置.version} | ` +
-    (本地自包含 ? '本地自包含测试卡' : `标签：${配置.tag}`),
+    (本地自包含 ? '本地自包含测试卡' : `发布标签：${配置.tag} | 资源标签：${资源标签}`),
 );
 console.log(
   `  世界书：${manifest.card.worldbookEntries}项（启用${manifest.card.enabledWorldbookEntries}） | 正则：${manifest.card.regexScripts.length} | 脚本：${manifest.card.helperScripts.length}`,

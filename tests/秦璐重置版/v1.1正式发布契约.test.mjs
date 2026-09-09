@@ -70,10 +70,11 @@ test('发布配置使用 Git 0.40 完整重置版基线和 v1.1 独立标签', (
   assert.equal(config.version, '1.1');
   assert.equal(config.edition, '完结版');
   assert.equal(config.tag, 'qin1.1');
+  assert.equal(config.resourceTag, 'qin1.1.1');
   assert.equal(config.releaseBranch, 'release/qin1.1');
 });
 
-test('正式卡固定到 qin1.1，并保留完整世界书、状态栏和脚本结构', () => {
+test('正式卡保持 v1.1，并固定到唯一热修资源标签 qin1.1.1', () => {
   const card = readJson(path.join(dist, `${releaseBase}.json`));
   const text = JSON.stringify(card);
   assert.equal(card.spec, 'chara_card_v3');
@@ -93,7 +94,8 @@ test('正式卡固定到 qin1.1，并保留完整世界书、状态栏和脚本�
     '去除变量更新',
     '1.对AI隐藏状态栏',
   ]);
-  assert.equal(text.includes('@qin1.1/'), true);
+  assert.equal(text.includes('@qin1.1.1/'), true);
+  assert.equal(text.includes('@qin1.1/'), false);
   assert.equal(text.includes('@qin1.0/'), false);
   assert.equal(text.includes('@qin1.0.1/'), false);
 });
@@ -122,7 +124,7 @@ test('本地测试卡精确内嵌本次 v1.1 构建', { skip: !localArtifactsExi
     .replace(/\n?\/\/# sourceMappingURL=.*$/m, '')
     .trim();
 
-  assert.equal(text.includes('@qin1.1/'), false);
+  assert.equal(text.includes('@qin1.1.1/'), false);
   assert.equal(decodeInlinePage(statusRegex.replaceString), statusHtml);
   assert.equal(decodeInlinePage(actionRegex.replaceString), actionHtml);
   assert.equal(logicScript.content, logic);

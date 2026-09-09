@@ -5,6 +5,7 @@
   "baselineTag": "0.40",
   "deliveryMode": "tagged-release",
   "tag": "qin1.1",
+  "resourceTag": "qin1.1.1",
   "releaseBranch": "release/qin1.1",
   "releaseDate": "2026-09-10",
   "template": "秦璐.png",
@@ -45,13 +46,13 @@
   "files": {
     "json": {
       "name": "秦璐_v1.1_完结版.json",
-      "bytes": 65345,
-      "sha256": "E01B7BFBFA3FDE1D73C77519035ACA28676FAACDC32DB61A542C8B5526A618B5"
+      "bytes": 65411,
+      "sha256": "2130A849C8DD1CB20C29805860F7943B96E4EB0E32F5DCEA131270B831986943"
     },
     "png": {
       "name": "秦璐_v1.1_完结版.png",
-      "bytes": 772445,
-      "sha256": "858C552C54A20C2115FC3B3E0A45D19805229E67D4C64FD4510BE754377B332B"
+      "bytes": 772621,
+      "sha256": "0C119B7B32C078FBB82F056D2B5EC685BAA46CF2E87319007598581C87F83CC3"
     },
     "checksums": {
       "name": "秦璐_v1.1_完结版.sha256"
