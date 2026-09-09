@@ -128,7 +128,7 @@ test('useUIPrefs 单例状态/存储键/合并写/容错/CSS 变量与类/跟随
   assert.doesNotMatch(偏好源码, /s\.二次变量结算|s\.内置变量解析/, '恢复设置只读纯 UI 字段');
 });
 
-test('设置组件拥有全部可见设置文案、UI prefs 共享、MVU 外置默认/通道/API 表单/1500ms 轮询与卸载、重开 emit', () => {
+test('设置组件拥有全部可见设置文案、UI prefs 共享、游戏独立变量 API/官方 MVU 路径/1500ms 轮询与卸载、重开 emit', () => {
   assert.match(设置源码, /看着舒服最要紧/, '标题文案保持');
   assert.match(设置源码, /跟随时段/, '跟随时段文案保持');
   assert.match(设置源码, /正文字色/, '字色组保持');
@@ -137,14 +137,15 @@ test('设置组件拥有全部可见设置文案、UI prefs 共享、MVU 外置�
   assert.match(设置源码, /减少动效/, '减动效组保持');
   assert.match(设置源码, /useUIPrefs\(\)/, '组件直接共享 useUIPrefs 单例');
   assert.match(设置源码, /主题模式 = m/, 'UI refs 在组件内直接可写');
-  assert.match(设置源码, /变量解析：外置模型（默认）/, '只读外置状态说明保持');
+  assert.match(设置源码, /变量解析：独立模型（默认）/, '游戏独立变量解析说明保持');
   assert.match(设置源码, /正文负责故事，独立模型负责变量/, '新手解释保持');
-  assert.match(设置源码, /恢复外置解析/, '恢复外置解析按钮保持');
+  assert.match(设置源码, /恢复 MVU 官方外置解析/, '玩家关闭内置解析后仍可恢复官方 MVU 路径');
   assert.match(设置源码, /内置变量解析/, '内置解析开关保持');
   assert.match(设置源码, /解析模型通道/, '通道组保持');
   assert.match(设置源码, /自定义模型/, '自定义通道保持');
   assert.match(设置源码, /mvu-api-form/, '自定义 API 表单保持');
-  assert.match(设置源码, /点击「保存并启用」后写入 MVU 变量框架的「额外模型解析配置」/, 'API 表单提示保持');
+  assert.match(设置源码, /点击「保存并启用」后写入《人妻公寓》的独立持久配置/, 'API 表单说明游戏权威配置');
+  assert.match(设置源码, /MVU 面板、读取模型和完整父页刷新都不是激活前置/, '不得再把 MVU 面板或拉取模型当作激活步骤');
   assert.match(设置源码, /setInterval\(刷新MVU解析状态, 1500\)/, '1500ms 轮询在组件');
   assert.match(设置源码, /clearInterval\(MVU解析刷新timer\)/, '关闭/卸载清轮询');
   assert.match(设置源码, /return 写入变量解析偏好\(\{[\s\S]*?内置变量解析: 内置变量解析\.value,[\s\S]*?严格变量审计: 严格变量审计\.value,/, '解析开关通过共享父页持久层合并写并报告结果');

@@ -8,7 +8,7 @@ import {
   写入MVU设置,
   写入变量解析偏好,
   写入变量解析通道,
-  读取MVU外置模型配置,
+  读取游戏变量解析设置,
   读取MVU解析状态,
   读取变量解析偏好,
   读取变量解析通道,
@@ -46,7 +46,7 @@ const {
   重置界面偏好,
 } = useUIPrefs();
 
-// ── MVU 解析设置(只在本组件使用;内置变量解析仍持久到 人妻公寓_界面偏好) ──
+// ── 变量解析设置：游戏 API 配置独立持久；MVU 仅保留官方外置路径与兼容镜像 ──
 
 /** MVU 外置模式下，由游戏直接请求解析模型（默认开）。 */
 const 内置变量解析 = ref(true);
@@ -58,13 +58,14 @@ let MVU解析刷新timer: ReturnType<typeof setInterval> | undefined;
 const 解析通道 = ref<变量解析通道类型>('自动');
 
 /**
- * 自定义解析模型表单：与 MVU 额外模型解析配置同源（写穿持久层，玩家不必开 MVU 面板）。
- * 只在设置页打开或切到自定义通道时从 MVU 载入一次，输入过程中绝不被轮询刷新覆盖。
+ * 自定义解析模型表单：从《人妻公寓》权威配置载入；旧 MVU 配置仅在未迁移时兼容读取。
+ * 只在设置页打开或切到自定义通道时载入一次，输入过程中绝不被轮询刷新覆盖。
  */
 const 解析API表单 = reactive({ api地址: '', 密钥: '', 模型名称: '', 温度: '', top_p: '', 最大回复token数: '' });
 /** 模型读取结果与读取中状态：只写本组件草稿内存，绝不直接写 MVU 配置。 */
 const 模型列表 = ref<string[]>([]);
 const 读取模型中 = ref(false);
+const 保存设置中 = ref(false);
 /** 每次读取冻结一个单调世代；关闭、切通道或改连接信息都会让旧结果失去写权。 */
 let 模型读取世代 = 0;
 
@@ -87,7 +88,7 @@ const 自定义反馈类型 = ref<'ok' | 'err'>('ok');
 
 function 载入解析API表单() {
   作废模型读取();
-  const 配置 = 读取MVU外置模型配置();
+  const 配置 = 读取游戏变量解析设置().自定义API;
   解析API表单.api地址 = 配置?.api地址 ?? '';
   解析API表单.密钥 = 配置?.密钥 ?? '';
   解析API表单.模型名称 = 配置?.模型名称 ?? '';
@@ -99,14 +100,18 @@ function 载入解析API表单() {
   自定义反馈类型.value = 'ok';
 }
 
-/** 恢复 v0.80 唯一变量路线：把 MVU 写回额外模型解析。 */
-function 选择解析路线() {
-  写入MVU设置({ 更新方式: '额外模型解析' });
+/** 玩家关闭游戏内置解析后，才需要把 MVU 恢复为官方额外模型路径。 */
+async function 选择解析路线() {
+  if (保存设置中.value) return;
+  if (!(await 写入MVU设置({ 更新方式: '额外模型解析' }))) {
+    自定义反馈.value = '恢复 MVU 官方外置解析失败：宿主设置没有保存。';
+    自定义反馈类型.value = 'err';
+  }
   刷新MVU解析状态();
 }
 
-function 选择解析通道(通道: 变量解析通道类型) {
-  if (通道 === 解析通道.value) return;
+async function 选择解析通道(通道: 变量解析通道类型) {
+  if (保存设置中.value || 通道 === 解析通道.value) return;
   作废模型读取();
   自定义反馈.value = '';
   自定义反馈类型.value = 'ok';
@@ -117,7 +122,7 @@ function 选择解析通道(通道: 变量解析通道类型) {
     return;
   }
   // 回自动只写通道偏好（不动 MVU 配置）；持久化失败时保持当前真实通道，不显示假切换。
-  if (!写入变量解析通道('自动')) {
+  if (!(await 写入变量解析通道('自动'))) {
     自定义反馈.value = '切换失败：浏览器未能保存解析通道，请检查隐私模式或存储权限。';
     自定义反馈类型.value = 'err';
     return;
@@ -167,10 +172,12 @@ async function 读取模型() {
   }
 }
 
-/** 显式提交自定义解析配置：先 trim 地址/Key/模型并校验，再把 MVU 配置与游戏通道原子提交；
- * 只有两边都持久化成功才刷新真实状态并显示成功。失败回滚旧配置、保留草稿与现有通道。
- * 数值留空=不覆盖、沿用 MVU 现值；非空但不是有限数字必须指出字段，不得静默当空。 */
-function 保存并启用() {
+/** 显式提交自定义解析配置：先 trim 地址/Key/模型并校验，再原子保存游戏权威配置；
+ * MVU 当前方案只是同一宿主持久事务里的兼容镜像，镜像结构不兼容不得阻断游戏内置解析。
+ * 只有宿主 Promise 真正完成才显示成功；失败回滚旧配置、保留草稿与现有通道。
+ * 数值留空=不覆盖、沿用游戏权威现值；非空但不是有限数字必须指出字段，不得静默当空。 */
+async function 保存并启用() {
+  if (保存设置中.value) return;
   const 地址 = 规范OpenAI兼容API地址(解析API表单.api地址);
   const 密钥 = 解析API表单.密钥.trim();
   const 模型 = 解析API表单.模型名称.trim();
@@ -207,22 +214,29 @@ function 保存并启用() {
     自定义反馈类型.value = 'err';
     return;
   }
-  const 成功 = 保存自定义变量解析设置({
-    api地址: 地址,
-    密钥,
-    模型名称: 模型,
-    温度,
-    top_p,
-    最大回复token数,
-  });
-  if (成功) {
-    解析通道.value = '自定义';
-    刷新MVU解析状态();
-    自定义反馈.value = '已保存并启用：本轮起变量走此自定义模型。';
-    自定义反馈类型.value = 'ok';
-  } else {
-    自定义反馈.value = '保存失败：模型配置或解析通道未能完整持久化，已回滚旧设置；草稿仍保留。';
-    自定义反馈类型.value = 'err';
+  保存设置中.value = true;
+  自定义反馈.value = '正在保存并确认宿主设置…';
+  自定义反馈类型.value = 'ok';
+  try {
+    const 成功 = await 保存自定义变量解析设置({
+      api地址: 地址,
+      密钥,
+      模型名称: 模型,
+      温度,
+      top_p,
+      最大回复token数,
+    });
+    if (成功) {
+      解析通道.value = '自定义';
+      刷新MVU解析状态();
+      自定义反馈.value = '已保存并启用：无需打开 MVU 面板，本轮起变量直接走此自定义模型。';
+      自定义反馈类型.value = 'ok';
+    } else {
+      自定义反馈.value = '保存失败：宿主设置未确认，游戏权威配置与兼容镜像均已回滚；草稿仍保留。';
+      自定义反馈类型.value = 'err';
+    }
+  } finally {
+    保存设置中.value = false;
   }
 }
 
@@ -239,7 +253,8 @@ function 持久化解析字段(): boolean {
   });
 }
 
-function 切换内置变量解析() {
+async function 切换内置变量解析() {
+  if (保存设置中.value) return;
   const 原值 = 内置变量解析.value;
   内置变量解析.value = !原值;
   改设置();
@@ -254,7 +269,7 @@ function 切换内置变量解析() {
   }
 
   try {
-    const 需要刷新宿主 = 内置变量解析.value && 自动代关MVU自动请求();
+    const 需要刷新宿主 = 内置变量解析.value && (await 自动代关MVU自动请求());
     if (需要刷新宿主) {
       const 已安排 = 安排宿主刷新以应用MVU设置();
       自定义反馈.value = 已安排
@@ -447,13 +462,15 @@ onUnmounted(() => {
       <div class="set-group">
         <div class="set-label">变量解析</div>
         <p class="set-hint">
-          变量解析：外置模型（默认）。正文负责故事，独立模型负责变量，互不干扰。已直接接入 MVU
-          变量框架，无需打开 MVU 面板。
+          变量解析：独立模型（默认）。正文负责故事，独立模型负责变量，互不干扰。游戏 API 配置独立保存，
+          重开、切换聊天或刷新游戏画面后都会直接恢复；读取模型只填下拉框，无需打开 MVU 面板。
         </p>
-        <button v-if="!MVU解析.外置模式" class="btn mini" @click="选择解析路线()">恢复外置解析</button>
+        <button v-if="!内置变量解析 && !MVU解析.外置模式" class="btn mini" @click="选择解析路线()">
+          恢复 MVU 官方外置解析
+        </button>
       </div>
 
-      <div v-if="MVU解析.外置模式" class="set-group row">
+      <div class="set-group row">
         <div>
           <div class="set-label">内置变量解析</div>
           <p class="set-hint">
@@ -462,10 +479,10 @@ onUnmounted(() => {
             面板重新勾选“启用自动请求”。
           </p>
         </div>
-        <button class="toggle" :class="{ on: 内置变量解析 }" @click="切换内置变量解析"><i /></button>
+        <button class="toggle" :class="{ on: 内置变量解析 }" :disabled="保存设置中" @click="切换内置变量解析"><i /></button>
       </div>
 
-      <div v-if="MVU解析.外置模式 && MVU解析.内置解析" class="set-group row">
+      <div v-if="内置变量解析" class="set-group row">
         <div>
           <div class="set-label">严格变量审计</div>
           <p class="set-hint">
@@ -484,11 +501,11 @@ onUnmounted(() => {
         </button>
       </div>
 
-      <div v-if="MVU解析.外置模式 && MVU解析.内置解析" class="set-group">
+      <div v-if="内置变量解析" class="set-group">
         <div class="set-label">解析模型通道</div>
         <div class="seg">
-          <button :class="{ on: 解析通道 === '自动' }" @click="选择解析通道('自动')">自动</button>
-          <button :class="{ on: 解析通道 === '自定义' }" @click="选择解析通道('自定义')">自定义模型</button>
+          <button :class="{ on: 解析通道 === '自动' }" :disabled="保存设置中" @click="选择解析通道('自动')">自动</button>
+          <button :class="{ on: 解析通道 === '自定义' }" :disabled="保存设置中" @click="选择解析通道('自定义')">自定义模型</button>
         </div>
         <p class="set-hint">
           自动（推荐）：装了数据库插件就由数据库独立模型代发请求，沿用数据库当前配置（与微信相同，不读取数据库的密钥与模型）；没有数据库时使用下方已填写的自定义
@@ -508,7 +525,7 @@ onUnmounted(() => {
             <input v-model="解析API表单.模型名称" placeholder="如 gemini-2.5-flash" />
           </label>
           <div class="mvu-api-row">
-            <button class="btn mini" :disabled="读取模型中" @click="读取模型">读取模型</button>
+            <button class="btn mini" :disabled="读取模型中 || 保存设置中" @click="读取模型">读取模型</button>
             <select v-if="模型列表.length" v-model="解析API表单.模型名称" class="mvu-api-select">
               <option v-for="m in 模型列表" :key="m" :value="m">{{ m }}</option>
             </select>
@@ -520,11 +537,16 @@ onUnmounted(() => {
               >最大回复token<input v-model="解析API表单.最大回复token数" inputmode="numeric" placeholder="8192"
             /></label>
           </div>
-          <button class="btn" :disabled="读取模型中" @click="保存并启用">保存并启用</button>
+          <button class="btn" :disabled="读取模型中 || 保存设置中" @click="保存并启用">
+            {{ 保存设置中 ? '保存中…' : '保存并启用' }}
+          </button>
           <p v-if="自定义反馈" class="set-hint mvu-api-feedback" :class="自定义反馈类型 === 'err' ? 'err' : 'ok'">
             {{ 自定义反馈 }}
           </p>
-          <p class="set-hint">点击「保存并启用」后写入 MVU 变量框架的「额外模型解析配置」，游戏与 MVU 共用同一份配置。</p>
+          <p class="set-hint">
+            点击「保存并启用」后写入《人妻公寓》的独立持久配置，并兼容镜像到 MVU。游戏运行只读取自己的权威配置，
+            MVU 面板、读取模型和完整父页刷新都不是激活前置。
+          </p>
         </div>
       </div>
 

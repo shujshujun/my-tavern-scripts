@@ -59,10 +59,12 @@ function fixture({ queryFailure = false, displayColumn = true } = {}) {
       const call = { sql, params: [...params], settled: false, finish(mode = 'apply') {
         assert.equal(call.settled, false); call.settled = true;
         if (mode === 'reject') { reject(new Error('Controlled pre-commit failure')); return; }
+        if (mode === 'active-fill') { reject(new Error('AI 填表正在进行中 (active-fill)')); return; }
         if (mode === 'unconfirmed') { resolve({ changes: 0, errors: [], saved: false }); return; }
         try {
           call.changes = Number(db.prepare(sql).run(...params).changes);
-          if (mode === 'apply-throw') reject(new Error('Controlled post-commit failure'));
+          if (mode === 'apply-active-fill') reject(new Error('AI 填表正在进行中 (active-fill)'));
+          else if (mode === 'apply-throw') reject(new Error('Controlled post-commit failure'));
           else resolve({ changes: call.changes, errors: [], saved: true });
         } catch (error) { reject(error); }
       } };
@@ -71,7 +73,13 @@ function fixture({ queryFailure = false, displayColumn = true } = {}) {
       return promise;
     },
   };
-  const bridge = compile(['同步数据库回合', '同步社交轨迹', '覆盖数据库剧情事件摘要', '修复数据库固定开局摘要'], {
+  const bridge = compile([
+    '数据库填表占用错误',
+    '同步数据库回合',
+    '同步社交轨迹',
+    '覆盖数据库剧情事件摘要',
+    '修复数据库固定开局摘要',
+  ], {
     _: lodash, console: { warn: (...args) => logs.push(args), error: (...args) => logs.push(args) },
     取数据库API: () => api,
     数据库状态: () => ({ 已装游戏模板: true, 社交结果说明可用: displayColumn }),
@@ -80,6 +88,7 @@ function fixture({ queryFailure = false, displayColumn = true } = {}) {
     执行SQLite查询: (sql, params = []) => queryFailure ? null : { rows: db.prepare(sql).all(...params) },
     数据库异步写: writes, 数据库未补偿迟到写: unresolved,
     数据库时间线允许新写: id => writes.可开始新写(id) && !unresolved.has(id),
+    确保数据库时间线回调: () => undefined,
     setTimeout: (fn, ms) => { const id = ++timerId; timers.set(id, { fn, ms }); return id; },
     clearTimeout: id => timers.delete(id),
   });
@@ -243,4 +252,50 @@ test('A different chat can write while old-chat retry is unresolved; no compensa
     assert.equal(f.calls.length, count); assert.equal(f.unresolved.size, 0);
     assert.equal(f.db.prepare('SELECT result FROM rq_social_history WHERE event_key=?').get('other-event').result, '新设备记录。');
   } finally { await f.close(); }
+});
+
+test('RQ skeleton surfaces active-fill as a retryable state instead of a permanent write failure', async () => {
+  const f = fixture();
+  try {
+    assert.equal(f.bridge.数据库填表占用错误(new Error('AI 填表正在进行中 (active-fill)')), true);
+    assert.equal(f.bridge.数据库填表占用错误(new Error('unrelated provider failure')), false);
+    f.setAuto(false);
+    const pending = f.bridge.同步数据库回合(event('待补事件摘要。', 12));
+    await until(() => f.calls.length === 1);
+    f.calls[0].finish('active-fill');
+    assert.equal(await pending, '填表占用');
+    assert.equal(f.db.prepare('SELECT * FROM rq_events WHERE floor_no=?').get(12), undefined);
+    assert.equal(f.calls.length, 1, 'bridge must not tear down the fill mutex or spin an immediate competing retry');
+  } finally { await f.close(); }
+});
+
+test('RQ skeleton active-fill rejection is accepted when exact read-back proves the row committed', async () => {
+  const f = fixture();
+  try {
+    f.setAuto(false);
+    const pending = f.bridge.同步数据库回合(event('已经提交的事件摘要。', 13));
+    await until(() => f.calls.length === 1);
+    f.calls[0].finish('apply-active-fill');
+    assert.equal(await pending, '已确认');
+    assert.equal(f.db.prepare('SELECT result_summary FROM rq_events WHERE floor_no=?').get(13).result_summary, '已经提交的事件摘要。');
+    assert.equal(f.calls.length, 1, 'read-back confirmation must not duplicate the idempotent write');
+  } finally { await f.close(); }
+});
+
+test('RQ skeleton owner waits for persisted update, reads back first, and grants only one queued UPSERT', () => {
+  const engine = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/回合引擎.ts', import.meta.url), 'utf8');
+  const index = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
+  const bridge = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/数据库桥.ts', import.meta.url), 'utf8');
+  assert.match(engine, /const RQ剧情骨架待补队列 = new Map/);
+  assert.match(engine, /核对数据库回合已写入\(task\.事件\)/);
+  assert.match(engine, /RQ_剧情事件骨架待补/);
+  assert.match(engine, /RQ_剧情事件骨架补写成功/);
+  assert.match(engine, /写入结果 === '填表占用'/);
+  assert.match(engine, /队列补写已发起 = true[\s\S]*?同步数据库回合\(task\.事件/, 'single retry permit is consumed before awaiting SQL');
+  assert.match(engine, /RQ剧情骨架填表回读次数 = RQ剧情骨架重试延迟\.length - 1/, 'active-fill polls by exact read-back before fallback');
+  assert.match(engine, /export function 唤醒RQ剧情骨架待补队列/);
+  assert.match(index, /eventOn\('人妻公寓:数据库表格已更新', 唤醒RQ剧情骨架待补队列\)/);
+  assert.match(bridge, /eventEmit\('人妻公寓:数据库表格已更新'\)/, 'public table-update callback wakes the owner without exposing fill mutex internals');
+  assert.match(engine, /骨架写入状态 !== '已记录'/, 'optional database fill must wait for the hard skeleton');
+  assert.match(engine, /同一 active-fill 期间继续扫更多楼只会撞同一互斥锁/);
 });

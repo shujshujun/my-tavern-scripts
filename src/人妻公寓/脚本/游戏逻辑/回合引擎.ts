@@ -24,10 +24,10 @@ import type { 门牌 } from '../../stageConfig';
 import { 户静态表, 难度表, 首批门牌, 查特殊场景 } from '../../stageConfig';
 import {
   严格变量审计开启,
-  选择变量解析通道,
-  读取MVU外置模型配置,
+  解析游戏变量请求路由,
+  输出变量配置握手诊断,
   读取MVU解析状态,
-  读取变量解析通道,
+  选择变量解析执行路径,
   规范OpenAI兼容API地址,
 } from '../../MVU解析模式';
 // (难度表兼供撞见概率系数查表)
@@ -87,6 +87,7 @@ import {
   读取数据库记忆胶囊,
   读取微信进展胶囊,
   读取数据库剧情事件已记录楼层,
+  核对数据库回合已写入,
   检测数据库脚本写入能力,
   修复数据库固定开局摘要,
   同步数据库回合,
@@ -100,8 +101,14 @@ import {
   数据库状态,
   触发数据库增量更新,
   通过数据库生成,
+  type 数据库回合事件,
 } from './数据库桥';
-import { 取消当前数据库剧情规划, 构造数据库剧情规划输入, 经数据库剧情规划生成 } from './数据库剧情规划桥';
+import {
+  取消当前数据库剧情规划,
+  构造数据库剧情规划输入,
+  经数据库剧情规划生成,
+  type 数据库剧情规划消息锚,
+} from './数据库剧情规划桥';
 import { 全局数据库AI租约 } from './数据库AI租约';
 import { 上报阶段线路事件, 提交母亲两幕事件, 提交阶段线路剧情, 提交阶段线路演出事件 } from './阶段线路系统';
 import { 提交阶段性癖开幕, 解析阶段性癖开幕事件 } from './性癖系统';
@@ -708,13 +715,8 @@ function 成长对应攻略风闻(成长: ReturnType<typeof 记录全楼有效�
   return null;
 }
 
-function 变量重生成通道输入(配置 = 读取MVU外置模型配置()) {
-  const 自定义可用 = 配置?.模型来源 === '自定义' && !!配置.api地址.trim() && !!配置.模型名称.trim();
-  return [读取变量解析通道(), 数据库状态().可调用AI, 自定义可用] as const;
-}
-
-function 当前变量重生成解析通道(): ReturnType<typeof 选择变量解析通道> {
-  return 选择变量解析通道(...变量重生成通道输入());
+function 当前变量重生成解析通道(): ReturnType<typeof 解析游戏变量请求路由>['selectedRoute'] {
+  return 解析游戏变量请求路由(数据库状态().可调用AI).selectedRoute;
 }
 
 function 读上次回合(): 上次回合记录 | undefined {
@@ -792,6 +794,8 @@ type 正文生成参数 = Parameters<typeof generate>[0] & { automatic_trigger?:
 interface 正文生成等待选项 {
   启用数据库规划: boolean;
   规划输入?: string;
+  消息锚?: 数据库剧情规划消息锚;
+  消息目标?: unknown;
   规划开始?: () => void;
   正文开始?: (已规划: boolean) => void;
   继续前确认?: () => void;
@@ -840,6 +844,8 @@ async function 等待正文生成(参数: 正文生成参数, 选项?: 正文生
       生成任务 = 经数据库剧情规划生成(参数, {
         启用: 选项.启用数据库规划,
         规划输入: 选项.规划输入,
+        消息锚: 选项.消息锚,
+        消息目标: 选项.消息目标,
         规划开始: 选项.规划开始,
         正文开始: 已规划 => {
           标记正文开始();
@@ -997,11 +1003,11 @@ type 内置外置变量解析结果 =
 
 /**
  * 引擎自己调用解析模型生成变量块(替代"跨脚本桥按 MVU 官方按钮+轮询楼层"路线)。
- * 通道选择与设置页同一张路由矩阵(选择变量解析通道);正文模型只负责故事,
- * 外置变量解析绝不占用正文 API。
+ * 每次请求都从《人妻公寓》独立持久设置重新决议通道；重开、iframe reload 与切聊不会依赖
+ * MVU 面板的临时 Pinia 方案。正文模型只负责故事，外置变量解析绝不占用正文 API。
  * - 自动(默认) → 数据库插件 callAI 代发优先(沿用数据库当前配置,不读其密钥与模型),
- *   没有数据库时使用已填写的自定义 API;
- * - 自定义 → generateRaw + custom_api(与 MVU 额外模型解析配置同源,游戏设置页写穿)。
+ *   没有数据库时使用游戏已保存的自定义 API;
+ * - 自定义 → generateRaw + custom_api(游戏权威配置；MVU 只作兼容镜像)。
  * 数据库/自定义都不可用时返回"未配置":不发起任何模型请求、保留正文与旧变量;
  * 请求失败返回"失败",由调用方同轮重试一次、再失败只提示本轮结果,绝不抛错作废回合。
  */
@@ -1018,14 +1024,21 @@ async function 内置外置变量解析(参数: {
   const 用户内容 = `【本轮玩家行动】\n${参数.行动}\n\n【本轮已完成正文】\n${参数.正文}`;
   const 现值视图 = `【当前可写变量现值】以下 JSON 是本轮允许更新字段的当前值，JSONPatch 路径层级以它为准：\n${JSON.stringify(参数.可写视图)}`;
   const 变量结算令 = 当前变量结算令();
-  const 配置 = 读取MVU外置模型配置();
-  // 通道选择与设置页同一张路由矩阵：自动优先数据库、其次自定义，都没有就返回 null——
-  // 绝不回落正文 API（正文模型只负责故事，外置变量解析必须用独立模型）。
-  const 通道 = 选择变量解析通道(...变量重生成通道输入(配置));
+  // 运行点重新读取游戏权威配置；不能复用设置页草稿、MVU 面板缓存或上一轮路由。
+  const 路由 = 解析游戏变量请求路由(数据库状态().可调用AI);
+  const 配置 = 路由.配置;
+  const 通道 = 路由.selectedRoute;
   if (!通道) {
-    console.info('[人妻公寓] 没有可用的外置变量模型，本轮不发起解析请求');
+    console.info(
+      `[人妻公寓·变量请求] selectedRoute=null configSource=${路由.配置来源} channel=${路由.通道}，本轮不发起解析请求`,
+    );
     return { 结果: '未配置' };
   }
+  console.info(
+    `[人妻公寓·变量请求] 变量请求已发起 selectedRoute=${通道} configSource=${路由.配置来源} model=${
+      通道 === '自定义' ? 配置?.模型名称 || '未配置' : '数据库代发'
+    }`,
+  );
 
   本回合生成id = `${参数.生成id前缀 ?? 'rqgy-mvuvars'}-${参数.回合前末楼}-${_.random(1e9)}`;
   const 生成id = 本回合生成id;
@@ -1043,7 +1056,7 @@ async function 内置外置变量解析(参数: {
   let 原文: string | null;
   try {
     if (通道 === '自定义' && 配置) {
-      console.info('[人妻公寓] 内置变量解析走自定义API通道(与 MVU 额外模型配置同源)');
+      console.info('[人妻公寓] 内置变量解析走游戏权威自定义 API 通道');
       原文 = String(
         await Promise.race([
           generateRaw({
@@ -1298,10 +1311,13 @@ export async function 重新生成最近回合变量(): Promise<boolean> {
     触发取消: () => 触发中止(new Error('__RQGY_MVUVARS_CANCELLED__')),
   };
   变量重生成事务 = 事务;
-  eventEmit('人妻公寓:变量重生成开始');
-  广播变量重生成状态();
+  let 结束载荷:
+    | { 成功: boolean; 取消?: boolean; 状态: 变量重生成可用状态; 提示: string }
+    | undefined;
 
   try {
+    eventEmit('人妻公寓:变量重生成开始');
+    广播变量重生成状态();
     if (!身份仍有效()) throw new Error('__RQGY_VARIABLE_REGEN_STALE__');
     const 当前正文 = getChatMessages(上下文.助手楼层).at(-1)?.message ?? '';
     const 基础正文 = 提取正文舞台文本(当前正文);
@@ -1408,13 +1424,13 @@ export async function 重新生成最近回合变量(): Promise<boolean> {
       }
     });
 
-    eventEmit('人妻公寓:变量重生成结束', {
+    结束载荷 = {
       成功: true,
       状态: '已完成',
       提示: 核心持久化有警告
         ? '变量已经成套更新，但宿主保存返回异常；本回合已锁定，请先不要重复操作。'
         : '本回合变量已重新生成，正文没有改变。',
-    });
+    };
     return true;
   } catch (e) {
     const 代码 = e instanceof Error ? e.message : String(e);
@@ -1445,18 +1461,21 @@ export async function 重新生成最近回合变量(): Promise<boolean> {
           : 当前变量重生成解析通道()
             ? '可用'
             : '未配置';
-    eventEmit('人妻公寓:变量重生成结束', {
+    结束载荷 = {
       成功: false,
       取消: 已取消请求,
       状态: 失败后状态,
       提示,
-    });
+    };
     return false;
   } finally {
     if (变量重生成事务 === 事务) 变量重生成事务 = null;
     if (本回合生成id.startsWith('rqgy-mvuvars-regen-')) 本回合生成id = '';
+    // 客户端收到“结束”后会立刻解锁所有操作；必须先清事务并释放共享前台槽，
+    // 否则变量已经成功落盘，下一次点击仍会被误判成“内容正在生成”。
     前台租约.释放();
     广播变量重生成状态();
+    if (结束载荷) eventEmit('人妻公寓:变量重生成结束', 结束载荷);
   }
 }
 
@@ -1785,6 +1804,217 @@ async function 广播生成完成事件(目标助手楼层: number, 提交校验
   }
 }
 
+type RQ剧情骨架写入状态 = '已记录' | '待补' | '未写入';
+type RQ剧情骨架待补原因 = 'active-fill' | '待确认';
+
+interface RQ剧情骨架待补任务 {
+  key: string;
+  聊天ID: string;
+  事件: 数据库回合事件;
+  提交校验: () => boolean;
+  原因: RQ剧情骨架待补原因;
+  尝试序号: number;
+  仅回读剩余: number;
+  /** 原始失败之后，队列每次被当前成功回合认领只允许再发起一次幂等 UPSERT。 */
+  队列补写已发起: boolean;
+  运行中: boolean;
+  待处理唤醒: '数据库刷新' | '新回合' | null;
+  timer?: ReturnType<typeof setTimeout>;
+}
+
+const RQ剧情骨架待补队列 = new Map<string, RQ剧情骨架待补任务>();
+const RQ剧情骨架重试延迟 = [500, 1500, 3500, 7000] as const;
+/** active-fill 没有完成信号时只做三次精确回读，最后才允许一次保守补写。 */
+const RQ剧情骨架填表回读次数 = RQ剧情骨架重试延迟.length - 1;
+
+function RQ剧情骨架待补键(聊天ID: string, 楼层: number): string {
+  return `${聊天ID}|${楼层}`;
+}
+
+function 完成RQ剧情骨架待补(task: RQ剧情骨架待补任务): void {
+  if (RQ剧情骨架待补队列.get(task.key) !== task) return;
+  if (task.timer) clearTimeout(task.timer);
+  RQ剧情骨架待补队列.delete(task.key);
+  数据库记录失败提示签名 = '';
+  console.info(`[人妻公寓·数据库] RQ_剧情事件骨架 ${task.事件.楼层} 补写成功并通过精确回读。`);
+  eventEmit('人妻公寓:运行阶段', '数据库剧情骨架补写成功');
+  eventEmit('人妻公寓:提示', `✓ RQ_剧情事件骨架补写成功：楼层 ${task.事件.楼层} 已回读确认。`);
+}
+
+type RQ剧情骨架唤醒来源 = '数据库刷新' | '新回合';
+
+function 应用RQ剧情骨架唤醒(task: RQ剧情骨架待补任务, 来源: RQ剧情骨架唤醒来源): void {
+  task.尝试序号 = 0;
+  if (来源 === '新回合') task.队列补写已发起 = false;
+  // 数据库公开 table-update 回调代表一次表格持久化已经结束：active-fill 可立即精确回读，
+  // 缺行时再发唯一一次补写。没有回调的旧版则先保守回读三轮，最后才尝试一次。
+  task.仅回读剩余 =
+    来源 === '数据库刷新' ? (task.原因 === 'active-fill' ? 0 : 1) : task.原因 === 'active-fill' ? RQ剧情骨架填表回读次数 : 2;
+}
+
+function 重新调度RQ剧情骨架待补(task: RQ剧情骨架待补任务, 来源: RQ剧情骨架唤醒来源): void {
+  if (RQ剧情骨架待补队列.get(task.key) !== task) return;
+  if (task.运行中) {
+    task.待处理唤醒 = 来源;
+    return;
+  }
+  if (task.timer) clearTimeout(task.timer);
+  task.timer = undefined;
+  应用RQ剧情骨架唤醒(task, 来源);
+  调度RQ剧情骨架待补(task);
+}
+
+/** 数据库公开 table-update 回调的无载荷唤醒入口；先回读，绝不因信号本身盲写。 */
+export function 唤醒RQ剧情骨架待补队列(): void {
+  const 聊天ID = 当前聊天ID();
+  for (const task of RQ剧情骨架待补队列.values()) {
+    if (task.聊天ID !== 聊天ID || !task.提交校验()) {
+      if (task.timer) clearTimeout(task.timer);
+      RQ剧情骨架待补队列.delete(task.key);
+      continue;
+    }
+    重新调度RQ剧情骨架待补(task, '数据库刷新');
+  }
+}
+
+function 调度RQ剧情骨架待补(task: RQ剧情骨架待补任务): void {
+  if (task.timer || task.运行中 || RQ剧情骨架待补队列.get(task.key) !== task) return;
+  if (task.尝试序号 >= RQ剧情骨架重试延迟.length) {
+    console.warn(
+      `[人妻公寓·数据库] RQ_剧情事件骨架 ${task.事件.楼层} 本轮只读核对/单次补写已结束，继续保留待补；数据库下次持久化或下个成功回合会再次唤醒。`,
+    );
+    eventEmit('人妻公寓:运行阶段', '数据库剧情骨架仍待补');
+    return;
+  }
+  const 延迟 = RQ剧情骨架重试延迟[task.尝试序号];
+  task.timer = setTimeout(() => {
+    task.timer = undefined;
+    task.运行中 = true;
+    void (async () => {
+      if (
+        RQ剧情骨架待补队列.get(task.key) !== task ||
+        当前聊天ID() !== task.聊天ID ||
+        !task.提交校验()
+      ) {
+        RQ剧情骨架待补队列.delete(task.key);
+        return;
+      }
+      const 时间线可用 = await 等待数据库时间线就绪();
+      if (
+        !时间线可用 ||
+        RQ剧情骨架待补队列.get(task.key) !== task ||
+        当前聊天ID() !== task.聊天ID ||
+        !task.提交校验()
+      ) {
+        task.尝试序号 += 1;
+        return;
+      }
+      const 回读 = 核对数据库回合已写入(task.事件);
+      if (回读 === true) {
+        完成RQ剧情骨架待补(task);
+        return;
+      }
+      // 原 mutation 或 active-fill 尚可能在结算；先只做精确回读，不拆锁、不并发 UPSERT。
+      if (task.仅回读剩余 > 0) {
+        task.仅回读剩余 -= 1;
+        task.尝试序号 += 1;
+        return;
+      }
+      if (task.队列补写已发起) {
+        task.尝试序号 = RQ剧情骨架重试延迟.length;
+        return;
+      }
+
+      // 原始写入之外，当前成功回合只授予一次幂等补写；在 await 前即消费写权，
+      // 即使数据库回调与 Promise 同时抵达也不会并发发出第二条 SQL。
+      task.队列补写已发起 = true;
+      const 写入 = await 同步数据库回合(task.事件, task.提交校验);
+      if (
+        RQ剧情骨架待补队列.get(task.key) !== task ||
+        当前聊天ID() !== task.聊天ID ||
+        !task.提交校验()
+      ) {
+        RQ剧情骨架待补队列.delete(task.key);
+        return;
+      }
+      if (写入 === '已确认' || 核对数据库回合已写入(task.事件) === true) {
+        完成RQ剧情骨架待补(task);
+        return;
+      }
+      if (写入 === '待确认' || 写入 === '填表占用') {
+        task.原因 = 写入 === '填表占用' ? 'active-fill' : '待确认';
+        task.仅回读剩余 = RQ剧情骨架重试延迟.length;
+        task.尝试序号 = 0;
+        console.warn(
+          `[人妻公寓·数据库] RQ_剧情事件骨架 ${task.事件.楼层} 单次补写${写入 === '填表占用' ? '仍遇 active-fill' : '已提交待确认'}；后续只回读，等待数据库持久化信号。`,
+        );
+        return;
+      }
+      task.尝试序号 = RQ剧情骨架重试延迟.length;
+      console.warn(`[人妻公寓·数据库] RQ_剧情事件骨架 ${task.事件.楼层} 单次补写未确认，保留待下个成功回合。`);
+    })()
+      .catch(error => {
+        console.warn(`[人妻公寓·数据库] RQ_剧情事件骨架 ${task.事件.楼层} 待补重试异常:`, error);
+        task.尝试序号 = RQ剧情骨架重试延迟.length;
+      })
+      .finally(() => {
+        task.运行中 = false;
+        if (RQ剧情骨架待补队列.get(task.key) !== task) return;
+        const 待处理唤醒 = task.待处理唤醒;
+        task.待处理唤醒 = null;
+        if (待处理唤醒) 应用RQ剧情骨架唤醒(task, 待处理唤醒);
+        调度RQ剧情骨架待补(task);
+      });
+  }, 延迟);
+}
+
+function 排队RQ剧情骨架待补(
+  事件: 数据库回合事件,
+  提交校验: () => boolean,
+  原因: RQ剧情骨架待补原因,
+): void {
+  const 聊天ID = 当前聊天ID();
+  if (!聊天ID || !提交校验()) return;
+  const key = RQ剧情骨架待补键(聊天ID, 事件.楼层);
+  let task = RQ剧情骨架待补队列.get(key);
+  if (!task) {
+    task = {
+      key,
+      聊天ID,
+      事件: _.cloneDeep(事件),
+      提交校验,
+      原因,
+      尝试序号: 0,
+      仅回读剩余: 原因 === 'active-fill' ? RQ剧情骨架填表回读次数 : 2,
+      队列补写已发起: false,
+      运行中: false,
+      待处理唤醒: null,
+    };
+    RQ剧情骨架待补队列.set(key, task);
+    const 说明 =
+      原因 === 'active-fill'
+        ? '数据库正在执行 AI 填表，脚本没有拆互斥锁'
+        : 'SQLite 已受理写入，正在等待回读确认';
+    console.warn(`[人妻公寓·数据库] RQ_剧情事件骨架 ${事件.楼层} 待补：${说明}。`);
+    eventEmit(
+      '人妻公寓:提示',
+      `⚠ RQ_剧情事件骨架待补：楼层 ${事件.楼层}，${说明}；已排队自动回读/重试，本轮正文与游戏结算不受影响。`,
+    );
+  } else {
+    task.事件 = _.cloneDeep(事件);
+    task.提交校验 = 提交校验;
+    task.原因 = 原因;
+    // 新成功回合重新认领这条 pending 后，授予本回合唯一一次补写权；旧计时器先取消，
+    // 仍在运行的旧回调则只记录“新回合唤醒”，待其 finally 串行接续。
+    task.队列补写已发起 = false;
+    eventEmit('人妻公寓:运行阶段', '数据库剧情骨架待补');
+    重新调度RQ剧情骨架待补(task, '新回合');
+    return;
+  }
+  eventEmit('人妻公寓:运行阶段', '数据库剧情骨架待补');
+  调度RQ剧情骨架待补(task);
+}
+
 let 数据库记录失败提示签名 = '';
 let 数据库所有权模板提示签名 = '';
 
@@ -1797,35 +2027,32 @@ async function 记录数据库回合骨架(
   妻在场: readonly 门牌[],
   夫在场: readonly 门牌[],
   提交校验: () => boolean = () => true,
-): Promise<boolean> {
+): Promise<RQ剧情骨架写入状态> {
   if (!提交校验()) throw new Error('__RQGY_TIMELINE_CHANGED__');
   const 参与者 = [...妻在场.map(m => 户静态表[m]?.妻名), ...夫在场.map(m => 户静态表[m]?.夫名)].filter(
     (name): name is string => !!name,
   );
   const 数据库已启用 = 数据库状态().已装游戏模板;
-  if (!数据库已启用) return false;
+  if (!数据库已启用) return '未写入';
+  const 事件: 数据库回合事件 = {
+    楼层,
+    时间: 格式化游戏内时间(data),
+    地点: 地点 || '公寓公共区域',
+    参与者,
+    玩家行动: 行动,
+    结果摘要,
+  };
   eventEmit('人妻公寓:运行阶段', '数据库正在记录剧情硬骨架');
-  const 写入结果 = await 同步数据库回合(
-    {
-      楼层,
-      时间: 格式化游戏内时间(data),
-      地点: 地点 || '公寓公共区域',
-      参与者,
-      玩家行动: 行动,
-      结果摘要,
-    },
-    提交校验,
-  );
+  const 写入结果 = await 同步数据库回合(事件, 提交校验);
   if (!提交校验()) throw new Error('__RQGY_TIMELINE_CHANGED__');
   if (写入结果 === '已确认') {
     数据库记录失败提示签名 = '';
     eventEmit('人妻公寓:运行阶段', '数据库剧情骨架已记录');
-    return true;
+    return '已记录';
   }
-  if (写入结果 === '待确认') {
-    console.warn(`[人妻公寓·数据库] RQ_剧情事件骨架 ${楼层} 已提交，仍在后台等待 SQLite 确认。`);
-    eventEmit('人妻公寓:运行阶段', '数据库剧情骨架后台确认中');
-    return true;
+  if (写入结果 === '待确认' || 写入结果 === '填表占用') {
+    排队RQ剧情骨架待补(事件, 提交校验, 写入结果 === '填表占用' ? 'active-fill' : '待确认');
+    return '待补';
   }
 
   const 能力 = await 检测数据库脚本写入能力();
@@ -1840,7 +2067,7 @@ async function 记录数据库回合骨架(
     数据库记录失败提示签名 = 提示签名;
     eventEmit('人妻公寓:提示', `⚠ RQ_剧情事件骨架未写入：${原因} 本轮正文与游戏结算不受影响。`);
   }
-  return false;
+  return '未写入';
 }
 
 /**
@@ -1899,17 +2126,13 @@ async function 补齐缺失数据库事件骨架(截止楼层: number, 提交校
     const 结果摘要 =
       (typeof 元数据?.结果摘要 === 'string' && 元数据.结果摘要.trim()) ||
       (typeof extra._rqgy开局令牌 === 'string' ? 数据库固定开局摘要 : 脚本保守回合摘要(玩家行动));
-    const 写入 = await 同步数据库回合(
-      {
-        楼层,
-        时间,
-        地点,
-        参与者,
-        玩家行动,
-        结果摘要,
-      },
-      提交校验,
-    );
+    const 事件: 数据库回合事件 = { 楼层, 时间, 地点, 参与者, 玩家行动, 结果摘要 };
+    const 写入 = await 同步数据库回合(事件, 提交校验);
+    if (写入 === '填表占用' || 写入 === '待确认') {
+      排队RQ剧情骨架待补(事件, 提交校验, 写入 === '填表占用' ? 'active-fill' : '待确认');
+      // 同一 active-fill 期间继续扫更多楼只会撞同一互斥锁；保留队列，下一成功回合再唤醒。
+      break;
+    }
     if (写入 === '失败') break;
     已记录.add(楼层);
     已补写 += 1;
@@ -1941,7 +2164,7 @@ function 安排数据库回合后处理(参数: {
           console.warn(`[人妻公寓·数据库] 当前消息时间线仍在恢复，RQ_剧情事件骨架 ${参数.楼层} 留待后续成功回合补写。`);
           return;
         }
-        await 记录数据库回合骨架(
+        const 骨架写入状态 = await 记录数据库回合骨架(
           参数.楼层,
           data快照,
           参数.地点,
@@ -1951,7 +2174,7 @@ function 安排数据库回合后处理(参数: {
           夫快照,
           参数.提交校验,
         );
-        if (!参数.提交校验()) return;
+        if (!参数.提交校验() || 骨架写入状态 !== '已记录') return;
         const 开局摘要修复 = await 修复数据库固定开局摘要(参数.提交校验);
         if (!参数.提交校验()) return;
         await 补齐缺失数据库事件骨架(参数.楼层, 参数.提交校验);
@@ -2601,10 +2824,22 @@ export async function 执行回合(
     // let 声明：稽查事后补亲密妻时可扩展（见稽查块后）
     let 变量范围 = 初始变量范围;
     const 本轮有可写演员 = 变量范围.妻.length > 0 || 变量范围.夫.length > 0;
-    // 每回合重新读取一次：玩家可能刚在 MVU 面板切换更新方式。v0.80 的正文模型始终
-    // 退出变量处理；即使外部面板被改到非外置模式，也不能重新启用已退役的正文变量路线。
+    // 每回合重新读取一次。游戏内置解析的 API 与通道来自自己的持久权威设置；MVU 状态只
+    // 决定玩家明确关闭内置解析后，是否走官方额外模型路径。正文模型始终不处理变量。
     const MVU解析 = 读取MVU解析状态();
     const 使用MVU外置解析 = MVU解析.外置模式;
+    const 变量执行路径 = 选择变量解析执行路径(MVU解析, 本轮有可写演员, 本轮静音会议);
+    const 变量配置握手 = 输出变量配置握手诊断({
+      聊天ID: 当前聊天ID(),
+      有可写演员: 本轮有可写演员,
+      数据库可调用AI: 数据库状态().可调用AI,
+      跳过原因: 本轮静音会议 ? 'silent-meeting' : undefined,
+    });
+    if (!本轮静音会议 && 本轮有可写演员 && MVU解析.内置解析) {
+      console.info(
+        `[人妻公寓] 变量解析门通过 selectedRoute=${变量配置握手.selectedRoute ?? 'null'} configSource=${变量配置握手.configSource}`,
+      );
+    }
     const 自由阶段历史 = 构造302自由阶段聊天历史(data, 回合起始场景);
     const 正文模型覆盖 = {
       chat_history: {
@@ -2675,6 +2910,16 @@ export async function 执行回合(
     if (临时用户楼层 !== 回合前末楼 + 1) {
       throw new Error(`临时行动楼层错位：预期 ${回合前末楼 + 1}，实际 ${临时用户楼层}`);
     }
+    const 临时用户消息ID原值 = (临时用户消息引用 as { message_id?: unknown } | undefined)?.message_id;
+    const 数据库Plot消息锚: 数据库剧情规划消息锚 = {
+      chatId: 当前聊天ID(),
+      messageIndex: 临时用户楼层,
+      messageId:
+        typeof 临时用户消息ID原值 === 'string' || typeof 临时用户消息ID原值 === 'number'
+          ? 临时用户消息ID原值
+          : 临时用户楼层,
+      turnToken: 本回合消息令牌,
+    };
 
     本回合生成id = `rqgy-${回合前末楼}-${_.random(1e9)}`;
     正文流式生成id = 本回合生成id;
@@ -2697,6 +2942,8 @@ export async function 执行回合(
           // 回档重建或迟到 SQL 补偿尚未落定时，官方数据库规划同样必须停用；只停本卡
           // 记忆胶囊仍会让插件自己的召回钩子读到旧分支运行态。
           启用数据库规划: 本轮数据库已安装 && 本轮数据库时间线可用,
+          消息锚: 数据库Plot消息锚,
+          消息目标: 临时用户消息引用,
           规划输入: 构造数据库剧情规划输入(行动, {
             日期: `第${当前天数(演出data)}天`,
             时段: 当前时段(演出data),
@@ -3017,8 +3264,8 @@ export async function 执行回合(
     // 内置解析时改走 MVU 当前官方外置桥。两条现行路线都不要补发 MESSAGE_RECEIVED，否则双请求。
     let 内置解析变量块已就绪 = false;
     let 官方外置变量块需本地应用 = false;
-    if (!本轮静音会议 && 使用MVU外置解析 && MVU解析.内置解析 && 本轮有可写演员) {
-      console.info('[人妻公寓] 内置变量解析启动(复用 MVU 外置模型接口参数)');
+    if (变量执行路径 === '游戏内置') {
+      console.info('[人妻公寓] 内置变量解析启动(每轮读取游戏权威 API 配置)');
       eventEmit('人妻公寓:运行阶段', '正在结算本轮变量');
       try {
         const 可写视图 = 构造AI可写变量视图(_.get(解析基准, 'stat_data'), 变量范围);
@@ -3062,7 +3309,7 @@ export async function 执行回合(
         // 事务失效会在降级入口重新抛出交给外层回滚；其余异常降级=回到可信基准保留旧值。
         await 降级AI变量解析('内置变量', e);
       }
-    } else if (!本轮静音会议 && 使用MVU外置解析 && MVU解析.自动请求 && 本轮有可写演员) {
+    } else if (变量执行路径 === 'MVU官方自动') {
       console.info('[人妻公寓] 调用 MVU 官方外置模型解析');
       eventEmit('人妻公寓:运行阶段', 'MVU外置模型正在解析变量');
       try {
@@ -3124,7 +3371,7 @@ export async function 执行回合(
       } catch (e) {
         await 降级AI变量解析('MVU外置模型', e);
       }
-    } else if (!本轮静音会议 && 使用MVU外置解析 && !MVU解析.自动请求 && 本轮有可写演员) {
+    } else if (变量执行路径 === 'MVU官方待手动') {
       console.info('[人妻公寓] MVU 外置模式已选择，但自动请求已关闭；本轮等待玩家手动重试外置解析');
     }
 
@@ -3392,6 +3639,9 @@ export async function 执行回合(
         确认时间事务允许写入();
         await Promise.resolve(Mvu.replaceMvuData(新 as Mvu.MvuData, { type: 'message', message_id: 临时助手楼层! }));
         确认本轮事务有效();
+        if (内置解析变量块已就绪 && !变量解析已降级) {
+          console.info('[人妻公寓·变量请求] 变量块已解析、通过写权守护并应用到本轮助手楼');
+        }
         捕获保护快照(newStat);
       });
     // 最终可信整表已写入 assistant 楼:当前分支中同令牌的 user/assistant 两楼持久转正

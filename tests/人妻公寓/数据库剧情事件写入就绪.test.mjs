@@ -201,7 +201,7 @@ test('数据库桥公开 mutation 能力并用同一判定函数探测脚本直�
   assert.match(源码, /判定数据库脚本写入能力\(静态能力, SQLite已启用\)/);
 });
 
-test('剧情逐楼写入携带脚本摘要，并区分已确认、后台待确认与失败', () => {
+test('剧情逐楼写入携带脚本摘要，并区分已确认、排队待补与永久失败', () => {
   const 引擎 = 读('src/人妻公寓/脚本/游戏逻辑/回合引擎.ts');
   const 桥 = 读('src/人妻公寓/脚本/游戏逻辑/数据库桥.ts');
   const 起 = 引擎.indexOf('async function 记录数据库回合骨架');
@@ -215,13 +215,18 @@ test('剧情逐楼写入携带脚本摘要，并区分已确认、后台待确�
   assert.match(同步函数, /Promise<数据库回合写入结果>/);
   assert.match(同步函数, /SQL写入状态 === '已确认'[^\n]*return '已确认'/);
   assert.match(同步函数, /SQL写入状态 === '已提交待定'[^\n]*return '待确认'/);
+  assert.match(同步函数, /SQL写入状态 === '填表占用'[^\n]*return '填表占用'/);
+  assert.match(同步函数, /核对数据库回合已写入\(event\)/, '待确认与 active-fill 都必须先精确回读');
   assert.doesNotMatch(同步函数, /SQL写入状态 === '已确认' \|\| SQL写入状态 === '已提交待定'[^\n]*return true/);
 
   assert.match(函数, /const 写入结果 = await 同步数据库回合\(/);
   assert.match(函数, /结果摘要,/);
   assert.match(函数, /写入结果 === '已确认'/);
-  assert.match(函数, /写入结果 === '待确认'/);
-  assert.match(函数, /数据库剧情骨架后台确认中/);
+  assert.match(函数, /写入结果 === '待确认' \|\| 写入结果 === '填表占用'/);
+  assert.match(函数, /排队RQ剧情骨架待补\(/);
+  assert.match(函数, /return '待补'/);
+  assert.match(引擎, /RQ_剧情事件骨架待补/);
+  assert.match(引擎, /RQ_剧情事件骨架补写成功/);
   assert.match(函数, /检测数据库脚本写入能力\(\)/);
   assert.match(函数, /数据库剧情骨架未写入/);
   assert.match(函数, /本轮正文与游戏结算不受影响/);

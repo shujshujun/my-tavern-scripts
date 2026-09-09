@@ -9,6 +9,7 @@ require('ts-node/register/transpile-only');
 
 const {
   取消当前数据库剧情规划,
+  数据库Plot兼容输入哈希,
   构造数据库剧情规划输入,
   经数据库剧情规划生成,
 } = require('../../src/人妻公寓/脚本/游戏逻辑/数据库剧情规划桥.ts');
@@ -59,6 +60,7 @@ test('成功路径只运行官方规划，不发出伪非流式正文；规划�
     return scope.original_TavernHelper_generate_ACU(参数);
   });
   const 正文调用 = [];
+  const 诊断 = [];
   const 卡片注入 = [{ role: 'system', content: '公寓快照与行动锚', position: 'in_chat', depth: 0, should_scan: true }];
   const 规划检索输入 = 构造数据库剧情规划输入('敲响 101 的房门', {
     日期: '第3天',
@@ -67,6 +69,18 @@ test('成功路径只运行官方规划，不发出伪非流式正文；规划�
     当前角色: ['林婉清'],
     焦点角色: ['林婉清'],
   });
+  const 消息锚 = {
+    chatId: 'chat-rqgy-a',
+    messageIndex: 17,
+    messageId: 17,
+    turnToken: 'rqgy-turn-token-a',
+  };
+  const 目标用户消息 = {
+    is_user: true,
+    message_id: 17,
+    mes: '敲响 101 的房门',
+    extra: { _rqgy回合令牌: 消息锚.turnToken },
+  };
 
   const 结果 = await 经数据库剧情规划生成(
     {
@@ -79,10 +93,13 @@ test('成功路径只运行官方规划，不发出伪非流式正文；规划�
       启用: true,
       根窗口,
       规划输入: 规划检索输入,
+      消息锚,
+      消息目标: 目标用户消息,
       调用正文: async 参数 => {
         正文调用.push(参数);
         return '流式正文';
       },
+      诊断: 记录 => 诊断.push(记录),
     },
   );
 
@@ -90,14 +107,31 @@ test('成功路径只运行官方规划，不发出伪非流式正文；规划�
   assert.equal(规划入参.length, 1);
   assert.equal(规划入参[0].should_stream, false, '官方钩子必须看到非流式规划请求');
   assert.equal(规划入参[0].user_input, 规划检索输入, '官方规划必须收到带日期、时段与人物范围的检索锚');
+  assert.deepEqual(规划入参[0]._qrf_plot_message_anchor, 消息锚, '数据库必须收到真实用户楼层/消息 ID/回合令牌');
   assert.equal('injects' in 规划入参[0], false, '规划只看真实玩家行动，不能误把整份公寓快照当 userMessage');
   assert.deepEqual(原始调用, [], '规划阶段必须截住数据库即将发出的伪正文请求');
   assert.equal(正文调用.length, 1);
   assert.equal(正文调用[0].should_stream, true, '最终正文必须保留原流式传输');
   assert.equal(正文调用[0].automatic_trigger, true, '数据库前置已经完成，正文阶段必须阻止同一动作被重复处理');
   assert.equal(正文调用[0].generation_id, 'rqgy-turn-1');
+  assert.equal('_qrf_plot_message_anchor' in 正文调用[0], false, '私有 Plot 锚不得泄漏到最终正文模型请求');
   assert.equal(正文调用[0].user_input.includes('AM0007'), true, '最终正文请求必须携带数据库召回编码');
   assert.strictEqual(正文调用[0].injects, 卡片注入, '卡片快照、行动锚与系统注入必须原样保留');
+  assert.deepEqual(诊断, [
+    {
+      intercepted: true,
+      processed: true,
+      adopted: true,
+      formalInputSource: 'planned.user_input',
+      outcome: 'completed',
+    },
+  ]);
+  assert.equal(JSON.stringify(诊断).includes('敲响 101 的房门'), false, '控制流诊断不得夹带玩家行动或规划正文');
+  assert.equal(
+    目标用户消息._qrf_plot_pending_hash,
+    数据库Plot兼容输入哈希(规划检索输入),
+    '当前 spv9.2.3 必须在已由消息 ID/回合令牌锁定的目标楼安装兼容标记，不能扫描长文本猜楼',
+  );
   assert.strictEqual(运行时.original_TavernHelper_generate_ACU, 原始生成, '临时截获结束后必须恢复数据库原始生成器');
 });
 
@@ -106,20 +140,28 @@ test('剧情推进关闭或规划失败时安全降级为原流式正文，不�
     运行时.original_TavernHelper_generate_ACU(参数),
   );
   const 正文调用 = [];
+  const 诊断 = [];
   const 原参数 = {
     user_input: '去公共厨房看看',
     should_stream: true,
     injects: [{ role: 'system', content: '快照', position: 'in_chat', depth: 0, should_scan: true }],
     generation_id: 'rqgy-turn-2',
   };
+  const 规划输入 = '<rqgy_recall_context>本轮未采用</rqgy_recall_context>';
+  const 消息锚 = { chatId: 'chat-rqgy-b', messageIndex: 9, messageId: 9, turnToken: 'rqgy-turn-token-b' };
+  const 目标用户消息 = { is_user: true, message_id: 9, extra: { _rqgy回合令牌: 消息锚.turnToken } };
 
   const 结果 = await 经数据库剧情规划生成(原参数, {
     启用: true,
     根窗口,
+    规划输入,
+    消息锚,
+    消息目标: 目标用户消息,
     调用正文: async 参数 => {
       正文调用.push(参数);
       return '无召回正文';
     },
+    诊断: 记录 => 诊断.push(记录),
   });
 
   assert.equal(结果, '无召回正文');
@@ -127,6 +169,16 @@ test('剧情推进关闭或规划失败时安全降级为原流式正文，不�
   assert.equal(正文调用.length, 1);
   assert.equal(正文调用[0].user_input, 原参数.user_input);
   assert.equal(正文调用[0].should_stream, true);
+  assert.deepEqual(诊断, [
+    {
+      intercepted: true,
+      processed: false,
+      adopted: false,
+      formalInputSource: 'original.user_input',
+      outcome: 'completed',
+    },
+  ]);
+  assert.equal('_qrf_plot_pending_hash' in 目标用户消息, false, '未被正文采用的规划必须撤销兼容标记');
   assert.strictEqual(运行时.original_TavernHelper_generate_ACU, 原始生成);
 });
 
@@ -222,6 +274,7 @@ test('规划超时会中止官方请求并降级正文，迟到规划不得额�
   });
   let 中止请求数 = 0;
   const 正文调用 = [];
+  const 诊断 = [];
 
   const 结果 = await 经数据库剧情规划生成(
     { user_input: '超时后继续', should_stream: true, generation_id: 'rqgy-turn-timeout' },
@@ -236,6 +289,7 @@ test('规划超时会中止官方请求并降级正文，迟到规划不得额�
         正文调用.push(参数);
         return '超时降级正文';
       },
+      诊断: 记录 => 诊断.push(记录),
     },
   );
 
@@ -244,6 +298,15 @@ test('规划超时会中止官方请求并降级正文，迟到规划不得额�
   assert.equal(正文调用.length, 1);
   assert.equal(正文调用[0].user_input, '超时后继续');
   assert.equal(正文调用[0].automatic_trigger, true, '超时降级正文不得再次进入同一个数据库规划钩子');
+  assert.deepEqual(诊断, [
+    {
+      intercepted: false,
+      processed: false,
+      adopted: false,
+      formalInputSource: 'original.user_input',
+      outcome: 'timeout',
+    },
+  ]);
   assert.equal(取消当前数据库剧情规划(), false);
 
   释放规划();
@@ -314,6 +377,7 @@ test('规划开始回调异常时也恢复锁与原始生成器，不留下永�
 
 test('数据库运行时不存在时不做私有探测写入，直接走原正文', async () => {
   const 调用 = [];
+  const 诊断 = [];
   const 根窗口 = { frames: [] };
   根窗口.parent = 根窗口;
   根窗口.top = 根窗口;
@@ -327,12 +391,22 @@ test('数据库运行时不存在时不做私有探测写入，直接走原正�
         调用.push(参数);
         return '直接正文';
       },
+      诊断: 记录 => 诊断.push(记录),
     },
   );
 
   assert.equal(结果, '直接正文');
   assert.equal(调用.length, 1);
   assert.equal(调用[0].user_input, '普通行动');
+  assert.deepEqual(诊断, [
+    {
+      intercepted: false,
+      processed: false,
+      adopted: false,
+      formalInputSource: 'original.user_input',
+      outcome: 'runtime-unavailable',
+    },
+  ]);
 });
 
 test('主回合接线：首稿仅在数据库时间线就绪时启用规划桥，取消优先中止规划，稽查重写明确绕过重复规划', () => {
@@ -341,6 +415,14 @@ test('主回合接线：首稿仅在数据库时间线就绪时启用规划桥�
   assert.match(engine, /取消当前数据库剧情规划/);
   assert.match(engine, /本轮数据库时间线可用\s*=\s*await 等待数据库时间线就绪\(\)/);
   assert.match(engine, /启用数据库规划:\s*本轮数据库已安装\s*&&\s*本轮数据库时间线可用/);
+  assert.match(engine, /const 数据库Plot消息锚:\s*数据库剧情规划消息锚\s*=\s*\{/);
+  assert.match(engine, /chatId:\s*当前聊天ID\(\)/);
+  assert.match(engine, /messageIndex:\s*临时用户楼层/);
+  assert.match(engine, /messageId:[\s\S]*?临时用户消息ID原值[\s\S]*?:\s*临时用户楼层/);
+  assert.match(engine, /turnToken:\s*本回合消息令牌/);
+  assert.match(engine, /消息锚:\s*数据库Plot消息锚/);
+  assert.match(engine, /消息目标:\s*临时用户消息引用/, 'spv9.2.3 兼容层只能标记已按本轮令牌捕获的唯一消息对象');
+  assert.match(engine, /\[回合令牌键\]:\s*本回合消息令牌/, '显式锚令牌必须通过统一常量实际写入真实用户楼 extra');
   assert.match(engine, /数据库正在进行时间召回/);
   assert.match(engine, /automatic_trigger:\s*true/, '稽查重写不是新用户行动，不能再次触发时间召回');
 });
