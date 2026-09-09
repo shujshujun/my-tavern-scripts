@@ -21,8 +21,9 @@ const {
 } = require('../../src/人妻公寓/脚本/游戏逻辑/生产系统.ts');
 
 const 仓库根 = fileURLToPath(new URL('../../', import.meta.url));
-const 生产素材目录 = path.join(仓库根, 'output/imagegen/production-system/final');
-const 家庭计划素材目录 = path.join(仓库根, 'output/imagegen/family-plan');
+const 素材证据根 = process.env.RQGY_TEST_ARTIFACT_ROOT ? path.resolve(process.env.RQGY_TEST_ARTIFACT_ROOT) : 仓库根;
+const 生产素材目录 = path.join(素材证据根, 'output/imagegen/production-system/final');
+const 家庭计划素材目录 = path.join(素材证据根, 'output/imagegen/family-plan');
 
 function 递归文件(目录, 扩展名) {
   const 结果 = [];

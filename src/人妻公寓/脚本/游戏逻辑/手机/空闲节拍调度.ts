@@ -19,6 +19,15 @@ export interface 空闲手机节拍调度器 {
 
 const 默认等待 = (毫秒: number) => new Promise<void>(resolve => setTimeout(resolve, 毫秒));
 
+/** 旧宿主与隔离 VM 可能没有原生 queueMicrotask；Promise 微任务保持同一调度语义。 */
+const 默认排队微任务 = (任务: () => void): void => {
+  if (typeof globalThis.queueMicrotask === 'function') {
+    globalThis.queueMicrotask(任务);
+    return;
+  }
+  void Promise.resolve().then(任务);
+};
+
 /**
  * `回合完成` 只是“核心结果已提交”，并不保证调用栈里的前台租约、时间写入租约与
  * MVU 串行队列已经全部释放。手机节拍会在落下微信内容后广播送达回执，而这些回执又会
@@ -35,7 +44,7 @@ export function 创建空闲手机节拍调度器(
   const 轮询毫秒 = Math.max(1, 选项.轮询毫秒 ?? 40);
   const 等待 = 依赖.等待 ?? 默认等待;
   const 当前时间 = 依赖.当前时间 ?? Date.now;
-  const 排队微任务 = 依赖.排队微任务 ?? queueMicrotask;
+  const 排队微任务 = 依赖.排队微任务 ?? 默认排队微任务;
   const 警告 = 依赖.警告 ?? (() => undefined);
 
   let 已请求序号 = 0;

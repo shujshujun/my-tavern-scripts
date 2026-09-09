@@ -29,7 +29,7 @@ test('严格变量审计旧偏好默认关闭，只有布尔 true 才开启', ()
   }
 });
 
-test('设置页提供默认关闭开关，合并持久化且只在v0.80内置外置解析路线显示', () => {
+test('设置页提供默认关闭开关，合并持久化且只在游戏内置解析路线显示', () => {
   assert.match(设置源码, /const 严格变量审计 = ref\(false\)/, '默认关闭');
   assert.match(
     设置源码,
@@ -45,13 +45,13 @@ test('设置页提供默认关闭开关，合并持久化且只在v0.80内置外
   assert.match(设置源码, /不会增加模型请求/, '向玩家说明不新增请求');
   assert.match(
     设置源码,
-    /<div v-if="MVU解析\.外置模式 && MVU解析\.内置解析" class="set-group row">\s*<div>\s*<div class="set-label">严格变量审计<\/div>/,
-    '严格审计行受当前内置外置解析条件控制',
+    /<div v-if="内置变量解析" class="set-group row">\s*<div>\s*<div class="set-label">严格变量审计<\/div>/,
+    '严格审计行只在游戏内置变量解析开启时显示',
   );
   assert.match(
     设置源码,
-    /<div v-if="MVU解析\.外置模式" class="set-group row">\s*<div>\s*<div class="set-label">内置变量解析<\/div>/,
-    '内置解析开关关闭后仍可见并可重新开启',
+    /<div class="set-group row">\s*<div>\s*<div class="set-label">内置变量解析<\/div>[\s\S]{0,520}:class="\{ on: 内置变量解析 \}"/,
+    '内置解析开关不受当前路线隐藏，关闭后仍可重新开启',
   );
   assert.match(设置源码, /function 切换严格变量审计\(\)/, '有独立切换函数');
 });

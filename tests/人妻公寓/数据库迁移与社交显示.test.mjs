@@ -8,13 +8,16 @@ import test from 'node:test';
 const require = createRequire(import.meta.url);
 const ts = require('typescript');
 const _ = require('lodash');
+const hostWindow = { document: {}, addEventListener() {}, removeEventListener() {} };
+hostWindow.parent = hostWindow;
+globalThis.window = hostWindow;
 process.env.TS_NODE_COMPILER_OPTIONS = JSON.stringify({ module: 'CommonJS', moduleResolution: 'node' });
 require('ts-node/register/transpile-only');
 const { 按列名迁移游戏表 } = require('../../src/人妻公寓/脚本/游戏逻辑/数据库表格迁移.ts');
 const 文本规范 = require('../../src/人妻公寓/脚本/游戏逻辑/记忆文本规范.ts');
 const 来源 = require('../../src/人妻公寓/脚本/游戏逻辑/微信摘要来源.ts');
 const { 胶囊预算选择 } = require('../../src/人妻公寓/脚本/游戏逻辑/胶囊预算.ts');
-const { 数据库异步写栅栏 } = require('../../src/人妻公寓/脚本/游戏逻辑/数据库时间线栅栏.ts');
+const { 数据库异步写栅栏, 数据库时间线栅栏 } = require('../../src/人妻公寓/脚本/游戏逻辑/数据库时间线栅栏.ts');
 const source = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/数据库桥.ts', import.meta.url), 'utf8');
 const templateText = readFileSync(new URL('../../src/人妻公寓/人妻公寓数据库模板.json', import.meta.url), 'utf8');
 const template = JSON.parse(templateText);
@@ -29,7 +32,7 @@ for (const node of ast.statements) {
 }
 
 function load(names, overrides = {}) {
-  const env = { _, ...文本规范, ...来源, 按列名迁移游戏表, 胶囊预算选择, 数据库模板文本: templateText, ...overrides };
+  const env = { _, ...文本规范, ...来源, 按列名迁移游戏表, 胶囊预算选择, 数据库时间线栅栏, 数据库模板文本: templateText, ...overrides };
   const selected = new Set();
   function add(name) {
     if (Object.hasOwn(env, name)) return;
@@ -427,6 +430,8 @@ test('同聊天取消后的迟到SQL真实补偿同时恢复原协议与结果�
         当前聊天标识: () => 'owned-test',
         仍是同一聊天: () => true,
         数据库时间线允许新写: () => true,
+        确保数据库时间线回调: () => undefined,
+        数据库未补偿迟到写: new Set(),
         数据库异步写: new 数据库异步写栅栏(),
       });
       const entry = {

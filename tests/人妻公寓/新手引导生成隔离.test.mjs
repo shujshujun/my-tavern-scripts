@@ -24,7 +24,9 @@ test('序章完成只同步确定性楼务微信，不启动会抢正文生成�
     入口源码.indexOf("eventOn('人妻公寓:布设摄像头'"),
   );
   assert.match(完成监听, /跳过手机节拍[\s\S]{0,220}同步管理任务微信/);
-  assert.match(完成监听, /else \{[\s\S]{0,260}queueMicrotask\(\(\) => void 手机节拍\(\)\)/);
+  assert.match(完成监听, /else \{[\s\S]{0,360}空闲后手机节拍\.请求\(\)/);
+  assert.doesNotMatch(完成监听, /void 手机节拍\(\)/, '回合完成监听不得直接启动手机AI节拍');
+  assert.doesNotMatch(完成监听, /queueMicrotask\(\(\) => void 手机节拍\(\)\)/, '旧单微任务调度已被真实空闲门替代');
 });
 
 test('手机自动节拍和每个手机 AI 请求都公开在途状态，主正文启动前执行双向生成互斥门', () => {

@@ -8,6 +8,11 @@ import test from 'node:test';
 import * as ts from 'typescript';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
+const artifactRoot = process.env.RQGY_WARDROBE_ARTIFACT_ROOT
+  ? path.resolve(process.env.RQGY_WARDROBE_ARTIFACT_ROOT)
+  : process.env.RQGY_TEST_ARTIFACT_ROOT
+    ? path.resolve(process.env.RQGY_TEST_ARTIFACT_ROOT)
+    : root;
 const sourceFile = path.join(root, 'src/人妻公寓/界面/客户端/衣柜素材.ts');
 const source = fs.readFileSync(process.env.RQGY_WARDROBE_SOURCE ?? sourceFile, 'utf8');
 const module = { exports: {} };
@@ -55,7 +60,7 @@ test('PLAY044普通商品、成品造型及默认内衣妆容仍沿原路径', (
 });
 
 test('PLAY044六张原PNG与无损WebP来源SHA明确，原生尺寸保留', () => {
-  const dir = path.join(root, 'output/imagegen/wardrobe-initial-20260908');
+  const dir = path.join(artifactRoot, 'output/imagegen/wardrobe-initial-20260908');
   const manifest = JSON.parse(fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8').replace(/^\uFEFF/, ''));
   assert.equal(manifest.items.length, 6);
   for (const item of manifest.items) {

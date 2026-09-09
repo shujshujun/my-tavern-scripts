@@ -49,7 +49,7 @@ function descendants(root, predicate) {
 }
 const turn = ast.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === '执行回合');
 const builtInBranches = descendants(turn, node => ts.isIfStatement(node) &&
-  node.expression.getText(ast) === '!本轮静音会议 && 使用MVU外置解析 && MVU解析.内置解析 && 本轮有可写演员');
+  node.expression.getText(ast) === "变量执行路径 === '游戏内置'");
 assert.equal(builtInBranches.length, 1);
 const fallback = descendants(turn, node => ts.isVariableStatement(node) &&
   node.declarationList.declarations.some(item => item.name.getText(ast) === '降级AI变量解析'));
@@ -65,6 +65,7 @@ const mainSlice = `async function 主回合解析片段(参数) {
   const 使用MVU外置解析 = true;
   const MVU解析 = { 内置解析: true };
   const 本轮有可写演员 = 变量范围.妻.length > 0 || 变量范围.夫.length > 0;
+  const 变量执行路径 = 本轮静音会议 || !本轮有可写演员 ? '跳过' : '游戏内置';
   let 变量解析已降级 = false, 变量解析降级阶段 = '', 变量块 = '', 可重处理楼层正文 = 基础正文;
   let 内置解析变量块已就绪 = false;
   ${fallback[0].getText(ast)}
@@ -74,7 +75,7 @@ const mainSlice = `async function 主回合解析片段(参数) {
 const declarations = [
   '本回合生成id', '变量结算基础令', '严格变量审计令', '变量结算格式收口令', '当前变量结算令',
   '清除变量禁区', '宽松提取完整变量块', '取变量块', '内置变量解析超时毫秒', '内置解析格式说明',
-  '变量重生成通道输入', '当前变量重生成解析通道', '内置外置变量解析',
+  '当前变量重生成解析通道', '内置外置变量解析',
   '变量重生成事务', '变量重生成不确定提交令牌', '变量重生成成功标记键', '读上次回合',
   '读取变量重生成上下文', '变量重生成身份有效', '读取变量重生成状态', '广播变量重生成状态',
   '取消变量重生成', '持久写入变量重生成消息', '重新生成最近回合变量',
@@ -130,7 +131,20 @@ function environment({ route = '自定义', strict = false, shape = 'couple', re
   }
   const deps = {
     _, Schema, 验证可继续MVU存档结构, 构造AI可写变量视图, 回滚保护字段,
-    选择变量解析通道, 规范OpenAI兼容API地址, 规范变量协议候选, 提取末尾裸JSON补丁, 提取正文舞台文本,
+    选择变量解析通道, 规范OpenAI兼容API地址,
+    解析游戏变量请求路由: () => {
+      const 配置 = config();
+      const 数据库可用 = e.route === '数据库' && e.configured;
+      const 自定义可用 = e.route === '自定义' && Boolean(配置);
+      return {
+        selectedRoute: 数据库可用 ? '数据库' : 自定义可用 ? '自定义' : null,
+        配置,
+        配置来源: '游戏持久设置',
+        通道: e.route === '数据库' ? '自动' : '自定义',
+        自定义API可用: Boolean(配置),
+      };
+    },
+    规范变量协议候选, 提取末尾裸JSON补丁, 提取正文舞台文本,
     手机锚消息签名, 临时楼标记键, 回合令牌键, 回合角色键, ...core, ...gates,
     console: { info() {}, warn() {}, error() {} },
     严格变量审计开启: () => e.strict,

@@ -170,6 +170,26 @@ test('节拍执行期间到达的新请求会在首拍结束后补跑一次', as
   assert.equal(节拍数, 2);
 });
 
+test('旧宿主没有 queueMicrotask 时退回 Promise 微任务，挂载与节拍仍可运行', async () => {
+  const 原描述 = Object.getOwnPropertyDescriptor(globalThis, 'queueMicrotask');
+  Object.defineProperty(globalThis, 'queueMicrotask', { configurable: true, writable: true, value: undefined });
+  try {
+    let 节拍数 = 0;
+    const 调度器 = 创建空闲手机节拍调度器({
+      运行期忙碌: () => false,
+      执行节拍: () => {
+        节拍数 += 1;
+      },
+    });
+    调度器.请求();
+    await setImmediate();
+    assert.equal(节拍数, 1);
+  } finally {
+    if (原描述) Object.defineProperty(globalThis, 'queueMicrotask', 原描述);
+    else delete globalThis.queueMicrotask;
+  }
+});
+
 test('真实恢复门持续存在时安静超时，不启动节拍也不制造玩家失败提示', async () => {
   let 当前 = 0;
   let 节拍数 = 0;
