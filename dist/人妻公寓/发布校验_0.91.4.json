@@ -1,0 +1,42 @@
+{
+  "version": "0.91.4",
+  "tag": "rq0.91.4",
+  "build": "build-1788952664113-28c0b0",
+  "sourceCommit": "28c0b0bcc82ccbc7ee1c528c82959c4d4ebdcf9d",
+  "tests": 6508,
+  "targetedTests": 347,
+  "typeCheck": true,
+  "lintErrors": 0,
+  "productionBuild": true,
+  "buildWarnings": 39,
+  "isolatedProductionBuild": true,
+  "pngJsonIdentical": true,
+  "distUnrelatedPreserved": true,
+  "files": [
+    {
+      "path": "dist/人妻公寓/人妻公寓.json",
+      "bytes": 93839,
+      "sha256": "5bc9108e5b882162f32fbbbf73f4fa2beaf94c3c7371c5d476c9d5b72c39c0ba"
+    },
+    {
+      "path": "dist/人妻公寓/人妻公寓.png",
+      "bytes": 2383219,
+      "sha256": "136fa5e68b301daae2944a6f45534c14925a5e0b9a89416cb546fc5db135d0d3"
+    },
+    {
+      "path": "dist/人妻公寓/界面/客户端/index.html",
+      "bytes": 2363024,
+      "sha256": "7fdd7d7d7826579c838a55416134cf0472393ad884a22d488cc8a8dc67a353da"
+    },
+    {
+      "path": "dist/人妻公寓/脚本/游戏逻辑/index.js",
+      "bytes": 2968417,
+      "sha256": "32dd9e427de5fe03ff65a7defda2464eea39ae6592d05881096ddfdf79c5dcdf"
+    }
+  ],
+  "assetTags": [
+    "cg5",
+    "cg6"
+  ],
+  "assetFiles": 358
+}
