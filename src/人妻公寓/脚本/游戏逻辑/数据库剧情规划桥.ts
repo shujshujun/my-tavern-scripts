@@ -10,6 +10,7 @@ type 生成参数 = Parameters<typeof generate>[0];
 type 生成结果 = Awaited<ReturnType<typeof generate>>;
 type 扩展生成参数 = 生成参数 & {
   _qrf_processed_by_hook?: boolean;
+  _qrf_plot_message_anchor?: 数据库剧情规划消息锚;
   automatic_trigger?: boolean;
   [键: string]: unknown;
 };
@@ -24,10 +25,101 @@ interface 数据库运行时 {
   原始生成: 生成函数;
 }
 
+export interface 数据库剧情规划消息锚 {
+  /** 当前聊天的宿主稳定 ID；只用于防止 pending 跨聊天误写。 */
+  chatId: string;
+  /** 游戏在调用数据库规划前已经落位的真实用户楼层。 */
+  messageIndex: number;
+  /** 宿主消息 ID；部分版本与 messageIndex 相同，仍单独携带以适配稳定 ID。 */
+  messageId?: string | number;
+  /** 游戏写入消息 extra 的本回合唯一令牌。 */
+  turnToken: string;
+}
+
+type 数据库Plot目标消息 = {
+  is_user?: unknown;
+  role?: unknown;
+  message_id?: unknown;
+  messageId?: unknown;
+  id?: unknown;
+  extra?: Record<string, unknown>;
+  _qrf_plot_pending_hash?: unknown;
+};
+
+/**
+ * spv9.2.3 首次认领 Plot 目标时仍识别 `_qrf_plot_pending_hash`。这里严格复刻其 FNV-1a
+ * 兼容算法，但绝不靠哈希扫描聊天：调用方先用本轮消息引用、消息 ID 与回合令牌锁定唯一楼，
+ * 再把兼容标记写到该对象。数据库支持 `_qrf_plot_message_anchor` 后会直接走显式锚，本标记无害。
+ */
+export function 数据库Plot兼容输入哈希(text: string): string {
+  if (!text) return '';
+  const normalized = String(text).trim().replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  let hash = 2166136261;
+  for (let i = 0; i < normalized.length; i += 1) {
+    hash ^= normalized.charCodeAt(i);
+    hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+  }
+  return hash.toString(36);
+}
+
+function 读取Plot目标消息ID(message: 数据库Plot目标消息): string | number | undefined {
+  const value = message.message_id ?? message.messageId ?? message.id;
+  return typeof value === 'string' || typeof value === 'number' ? value : undefined;
+}
+
+/**
+ * 给当前数据库版本安装一次兼容锚。返回清理函数；只有规划未被数据库采用时才调用，
+ * 成功或延迟保存必须保留标记，让数据库在宿主保存成功后自行消费。
+ */
+function 安装数据库Plot兼容消息锚(
+  rawMessage: unknown,
+  anchor: 数据库剧情规划消息锚 | undefined,
+  planningInput: unknown,
+): () => void {
+  if (!是对象(rawMessage) || !anchor?.turnToken) return () => undefined;
+  const message = rawMessage as 数据库Plot目标消息;
+  if (!(message.is_user === true || message.role === 'user')) return () => undefined;
+  if (message.extra?._rqgy回合令牌 !== anchor.turnToken) return () => undefined;
+  const actualMessageId = 读取Plot目标消息ID(message);
+  if (
+    anchor.messageId !== undefined &&
+    actualMessageId !== undefined &&
+    String(anchor.messageId) !== String(actualMessageId)
+  ) {
+    return () => undefined;
+  }
+  const pendingHash = 数据库Plot兼容输入哈希(String(planningInput ?? ''));
+  if (!pendingHash) return () => undefined;
+  const hadPrevious = Object.prototype.hasOwnProperty.call(message, '_qrf_plot_pending_hash');
+  const previous = message._qrf_plot_pending_hash;
+  message._qrf_plot_pending_hash = pendingHash;
+  return () => {
+    if (message._qrf_plot_pending_hash !== pendingHash) return;
+    if (hadPrevious) message._qrf_plot_pending_hash = previous;
+    else delete message._qrf_plot_pending_hash;
+  };
+}
+
+export type 数据库剧情规划正式输入来源 = 'planned.user_input' | 'original.user_input';
+
+export interface 数据库剧情规划诊断 {
+  intercepted: boolean;
+  processed: boolean;
+  adopted: boolean;
+  formalInputSource: 数据库剧情规划正式输入来源;
+  outcome: 'disabled' | 'runtime-unavailable' | 'busy' | 'install-failed' | 'completed' | 'failed' | 'timeout';
+}
+
 export interface 数据库剧情规划桥选项 {
   启用: boolean;
   根窗口?: unknown;
   规划输入?: string;
+  /**
+   * 显式绑定数据库 Plot 到已经落位的真实用户楼；数据库不得再用包装后的规划长文本哈希猜楼。
+   */
+  消息锚?: 数据库剧情规划消息锚;
+  /** 已由游戏按回合令牌捕获的唯一玩家消息引用；仅用于安装 spv9.2.3 兼容标记，不转发模型。 */
+  消息目标?: unknown;
   /** 官方规划无响应时释放正文链；迟到请求仍会被身份拦截器吞掉。 */
   规划超时毫秒?: number;
   调用正文?: (参数: 生成参数) => Promise<生成结果>;
@@ -35,6 +127,8 @@ export interface 数据库剧情规划桥选项 {
   正文开始?: (已规划: boolean) => void;
   继续前确认?: () => void;
   请求中止规划?: () => void;
+  /** 只报告控制流，不输出规划输入、正文或任何数据库内容。 */
+  诊断?: (诊断: 数据库剧情规划诊断) => void;
 }
 
 export interface 数据库剧情规划上下文 {
@@ -307,22 +401,51 @@ export function 取消当前数据库剧情规划(): boolean {
   return true;
 }
 
+function 输出数据库剧情规划诊断(选项: 数据库剧情规划桥选项, 诊断: 数据库剧情规划诊断): void {
+  console.info(
+    `[人妻公寓·数据库Plot] intercepted=${诊断.intercepted} processed=${诊断.processed} adopted=${诊断.adopted} formalInputSource=${诊断.formalInputSource} outcome=${诊断.outcome}`,
+  );
+  try {
+    选项.诊断?.(诊断);
+  } catch (error) {
+    console.warn('[人妻公寓·数据库Plot] 诊断回调失败（不影响正文）:', error);
+  }
+}
+
 export async function 经数据库剧情规划生成(参数: 生成参数, 选项: 数据库剧情规划桥选项): Promise<生成结果> {
   const 调用正文 = 选项.调用正文 ?? 默认正文调用;
   const 根窗口 = 选项.根窗口 ?? 默认根窗口();
-  const 直接生成 = async () => {
+  const 直接生成 = async (outcome: 数据库剧情规划诊断['outcome']) => {
     选项.继续前确认?.();
+    输出数据库剧情规划诊断(选项, {
+      intercepted: false,
+      processed: false,
+      adopted: false,
+      formalInputSource: 'original.user_input',
+      outcome,
+    });
     选项.正文开始?.(false);
     return 调用正文(参数);
   };
 
-  if (!选项.启用) return 直接生成();
+  if (!选项.启用) return 直接生成('disabled');
   const 运行时 = 查找数据库运行时(根窗口);
-  if (!运行时 || 当前活跃规划 || 安全读取(运行时.作用域, 运行时锁键)) return 直接生成();
+  if (!运行时) return 直接生成('runtime-unavailable');
+  if (当前活跃规划 || 安全读取(运行时.作用域, 运行时锁键)) return 直接生成('busy');
 
   const 规划参数: 扩展生成参数 = {
     user_input: 选项.规划输入 ?? 参数.user_input,
     should_stream: false,
+    ...(选项.消息锚
+      ? {
+          _qrf_plot_message_anchor: {
+            chatId: 选项.消息锚.chatId,
+            messageIndex: 选项.消息锚.messageIndex,
+            ...(选项.消息锚.messageId !== undefined ? { messageId: 选项.消息锚.messageId } : {}),
+            turnToken: 选项.消息锚.turnToken,
+          },
+        }
+      : {}),
   };
   let 原锁描述: PropertyDescriptor | undefined;
   const 锁 = Object.freeze({ 参数: 规划参数 });
@@ -344,7 +467,7 @@ export async function 经数据库剧情规划生成(参数: 生成参数, 选�
     释放规划请求保护();
     恢复属性(运行时.作用域, 运行时锁键, 锁, 原锁描述);
     console.warn('[人妻公寓] 数据库剧情规划桥无法安装，已降级为原流式正文:', 错误);
-    return 直接生成();
+    return 直接生成('install-failed');
   }
 
   let 释放取消门: () => void = () => undefined;
@@ -382,8 +505,10 @@ export async function 经数据库剧情规划生成(参数: 生成参数, 选�
   let 超时定时器: ReturnType<typeof setTimeout> | undefined;
   let 已完成迟到清理 = false;
   let 底层已启动 = false;
+  let 清理兼容消息锚: () => void = () => undefined;
   let 已规划结果 = false;
   let 跳过重复规划 = false;
+  let 规划诊断结果: 数据库剧情规划诊断['outcome'] = 'completed';
   const 完成迟到清理 = () => {
     if (已完成迟到清理) return;
     已完成迟到清理 = true;
@@ -396,6 +521,9 @@ export async function 经数据库剧情规划生成(参数: 生成参数, 选�
     当前活跃规划 = 活跃规划;
     解绑中止监听 = 监听官方中止按钮(根窗口, 活跃规划.触发取消);
     选项.规划开始?.();
+    // 当前 spv9.2.3 尚不识别显式 anchor 字段；在已经由消息引用+ID+回合令牌锁定的
+    // 唯一玩家楼上安装兼容标记。这里只标记目标对象，绝不扫描聊天或按长文本猜楼。
+    清理兼容消息锚 = 安装数据库Plot兼容消息锚(选项.消息目标, 选项.消息锚, 规划参数.user_input);
 
     底层已启动 = true;
     const 底层规划 = Promise.resolve().then(() => Reflect.apply(运行时.包装生成, 运行时.助手, [规划参数]));
@@ -416,14 +544,21 @@ export async function 经数据库剧情规划生成(参数: 生成参数, 选�
     });
     const 结果 = await Promise.race([底层结果, 取消门.then(() => ({ 类型: '取消' as const })), 超时门]);
 
-    if (结果.类型 === '取消' || 活跃规划.已取消) throw new Error('__RQGY_CANCELLED__');
+    if (结果.类型 === '取消' || 活跃规划.已取消) {
+      清理兼容消息锚();
+      throw new Error('__RQGY_CANCELLED__');
+    }
     // 到达完成门的这一刻冻结采用结果；超时后的迟到包装器不能再改写已经放行的正文。
     已规划结果 = 已截获目标请求 && 规划参数._qrf_processed_by_hook === true;
+    // 未被正式正文采用的规划不拥有历史 Plot；恢复兼容标记，防迟到任务挂载到未采用回合。
+    if (!已规划结果) 清理兼容消息锚();
     跳过重复规划 = 已截获目标请求 || 结果.类型 === '超时';
     if (结果.类型 === '超时') {
+      规划诊断结果 = 'timeout';
       请求中止一次();
       console.warn(`[人妻公寓] 数据库剧情规划超过 ${超时毫秒}ms，已降级为原流式正文。`);
     } else if (结果.类型 === '失败') {
+      规划诊断结果 = 'failed';
       console.warn('[人妻公寓] 数据库剧情规划失败，已降级为原流式正文:', 结果.错误);
     }
   } finally {
@@ -434,6 +569,17 @@ export async function 经数据库剧情规划生成(参数: 生成参数, 选�
   }
 
   选项.继续前确认?.();
+  const 已处理 = 规划参数._qrf_processed_by_hook === true;
+  const 正式输入来源: 数据库剧情规划正式输入来源 = 已规划结果
+    ? 'planned.user_input'
+    : 'original.user_input';
+  输出数据库剧情规划诊断(选项, {
+    intercepted: 已截获目标请求,
+    processed: 已处理,
+    adopted: 已规划结果,
+    formalInputSource: 正式输入来源,
+    outcome: 规划诊断结果,
+  });
   选项.正文开始?.(已规划结果);
   const 正文参数: 扩展生成参数 = {
     ...参数,

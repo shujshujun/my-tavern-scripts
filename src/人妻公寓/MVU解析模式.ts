@@ -5,9 +5,23 @@ export type MVU解析状态 = {
   外置模式: boolean;
   /** MVU 是否允许正常回复自动发起额外模型请求。 */
   自动请求: boolean;
-  /** 游戏开关：外置模式下由游戏自己请求解析模型（默认开）。 */
+  /** 游戏开关：由游戏自己请求解析模型（默认开；不依赖 MVU 当前更新方式）。 */
   内置解析: boolean;
 };
+
+export type 变量解析执行路径 = '游戏内置' | 'MVU官方自动' | 'MVU官方待手动' | '跳过';
+
+/** 单轮只能选择一条变量解析执行路径，作为防双发的可测试总闸。 */
+export function 选择变量解析执行路径(
+  状态: MVU解析状态,
+  有可写演员: boolean,
+  静音会议: boolean,
+): 变量解析执行路径 {
+  if (静音会议 || !有可写演员) return '跳过';
+  if (状态.内置解析) return '游戏内置';
+  if (!状态.外置模式) return '跳过';
+  return 状态.自动请求 ? 'MVU官方自动' : 'MVU官方待手动';
+}
 
 export type MVU外置模型配置 = {
   模型来源: '与插头相同' | '自定义';
@@ -31,6 +45,9 @@ type MVU设置 = {
     温度?: unknown;
     top_p?: unknown;
     最大回复token数?: unknown;
+    /** 兼容 MVU 新版多方案结构；游戏只迁移当前方案，不依赖该运行时结构。 */
+    api方案列表?: unknown;
+    当前api方案?: unknown;
   };
 };
 
@@ -46,62 +63,80 @@ type 宿主窗口类型 = Window & {
   [内置解析等待宿主刷新字段]?: boolean;
 };
 
-type ST接口 = {
+type ST上下文 = {
   extensionSettings?: Record<string, unknown>;
-  saveSettingsDebounced?: () => void;
-  getContext?: () => { extensionSettings?: Record<string, unknown>; saveSettingsDebounced?: () => void };
+  saveSettingsDebounced?: () => void | Promise<void>;
+};
+
+type ST接口 = ST上下文 & {
+  getContext?: () => ST上下文;
+};
+
+export type 宿主设置来源 = 'parent-context' | 'iframe-flat' | 'window-flat' | 'parent-flat' | 'none';
+
+type ST定位 = {
+  接口?: ST接口;
+  保存所有者?: ST接口;
+  来源: 宿主设置来源;
+  父页上下文设置?: Record<string, unknown>;
 };
 
 function 宿主窗口(): 宿主窗口类型 {
   return (window.parent ?? window) as 宿主窗口类型;
 }
 
-/**
- * 取真正带 extensionSettings 的 ST 接口。
- *
- * 酒馆助手在 iframe 里注入的 `SillyTavern` 全局已经拍平了 `extensionSettings` 与
- * `saveSettingsDebounced`；而顶层酒馆页面的 `window.SillyTavern` 只暴露 `getContext()`，
- * 直接读 `window.parent.SillyTavern.extensionSettings` 会拿到 undefined ——
- * 于是路线按钮读不出状态、写入静默失败（rq0.71 症状）。
- * 依次尝试：iframe 注入全局 → 本窗口 → 父窗口，父窗口再回退 getContext()。
- */
-function 取ST(): ST接口 | undefined {
-  const 候选: (ST接口 | undefined)[] = [];
+function 安全读取ST(读取: () => ST接口 | undefined): ST接口 | undefined {
   try {
-    候选.push((globalThis as unknown as { SillyTavern?: ST接口 }).SillyTavern);
+    return 读取();
   } catch {
-    /* 忽略跨域或未注入 */
+    return undefined;
   }
-  try {
-    候选.push((window as unknown as { SillyTavern?: ST接口 }).SillyTavern);
-  } catch {
-    /* 忽略 */
-  }
-  try {
-    候选.push(宿主窗口().SillyTavern);
-  } catch {
-    /* 忽略跨域 */
-  }
-  for (const st of 候选) {
-    if (st?.extensionSettings) return st;
-  }
-  // 全部拍平字段缺失时，用顶层的 getContext() 兜底（酒馆主页面形态）。
-  for (const st of 候选) {
-    try {
-      const ctx = st?.getContext?.();
-      if (ctx?.extensionSettings) {
-        return { extensionSettings: ctx.extensionSettings, saveSettingsDebounced: ctx.saveSettingsDebounced };
-      }
-    } catch {
-      /* 忽略 */
-    }
-  }
-  return 候选.find(Boolean);
 }
 
 /**
- * 宿主集成功能共用的稳定设置入口。优先使用酒馆助手注入到 iframe 本身的拍平接口，
- * 再回退父窗口 `getContext()`；禁止直接假定 `window.parent.SillyTavern` 已拍平设置字段。
+ * `extensionSettings` 的权威来源必须是父页 `getContext()`：iframe 拍平对象可能是创建时快照，
+ * 游戏重开只重载 0 楼 iframe 后仍会保留旧引用。只有父页上下文不可用时才退回拍平接口。
+ */
+function 取ST定位(): ST定位 {
+  const iframe拍平 = 安全读取ST(() => (globalThis as unknown as { SillyTavern?: ST接口 }).SillyTavern);
+  const 本窗拍平 = 安全读取ST(() => (window as unknown as { SillyTavern?: ST接口 }).SillyTavern);
+  const 父页拍平 = 安全读取ST(() => 宿主窗口().SillyTavern);
+  const 父页上下文 = 安全读取ST(() => 父页拍平?.getContext?.());
+  const 父页上下文设置 = 父页上下文?.extensionSettings;
+  const 候选: Array<{ 接口?: ST接口; 来源: 宿主设置来源 }> = [
+    { 接口: 父页上下文, 来源: 'parent-context' },
+    { 接口: iframe拍平, 来源: 'iframe-flat' },
+    { 接口: 本窗拍平, 来源: 'window-flat' },
+    { 接口: 父页拍平, 来源: 'parent-flat' },
+  ];
+  const 命中 = 候选.find(项 => 项.接口?.extensionSettings) ?? 候选.find(项 => 项.接口);
+  if (!命中?.接口) return { 来源: 'none', 父页上下文设置 };
+
+  const 设置 = 命中.接口.extensionSettings;
+  const 保存候选 = [父页上下文, 父页拍平, iframe拍平, 本窗拍平].filter(
+    (项): 项 is ST接口 => Boolean(项),
+  );
+  const 保存所有者 =
+    保存候选.find(项 => 项.extensionSettings === 设置 && typeof 项.saveSettingsDebounced === 'function') ??
+    保存候选.find(项 => typeof 项.saveSettingsDebounced === 'function');
+  return { 接口: 命中.接口, 保存所有者, 来源: 命中.来源, 父页上下文设置 };
+}
+
+function 取ST(): ST接口 | undefined {
+  return 取ST定位().接口;
+}
+
+/** 真正等待宿主设置保存；同步抛错与 Promise reject 都交给事务回滚。 */
+async function 等待宿主设置保存(定位 = 取ST定位()): Promise<void> {
+  const 保存所有者 = 定位.保存所有者;
+  const 保存 = 保存所有者?.saveSettingsDebounced;
+  if (typeof 保存 !== 'function') throw new Error('拿不到 saveSettingsDebounced');
+  await Promise.resolve(保存.call(保存所有者));
+}
+
+/**
+ * 宿主集成功能共用的稳定设置入口。优先使用父页 `getContext()` 的实时对象，避免重开后
+ * 继续读取 iframe 创建时的拍平快照；父页上下文不可用时才回退各窗口拍平接口。
  */
 export function 读取宿主SillyTavern接口(): ST接口 | undefined {
   return 取ST();
@@ -288,29 +323,104 @@ function 取数值(原值: unknown): number | undefined {
   return typeof 数 === 'number' && Number.isFinite(数) ? 数 : undefined;
 }
 
-/**
- * 内置变量解析复用 MVU 面板玩家已填好的接口参数（只读，不写）。
- * 面板缺失或结构对不上时返回 null；调用方按独立解析路由选择数据库或自定义，
- * 两者都不可用就提示配置，绝不回落正文 API。
- */
-export function 读取MVU外置模型配置(): MVU外置模型配置 | null {
+function 展开MVU方案记录(原值: unknown): Record<string, unknown> | null {
+  if (!是记录(原值)) return null;
+  for (const 键 of ['配置', 'config', 'api配置', '参数']) {
+    const 内层 = 原值[键];
+    if (是记录(内层)) return { ...原值, ...内层 };
+  }
+  return 原值;
+}
+
+function 规范模型配置记录(原值: unknown, 默认来源?: MVU外置模型配置['模型来源']): MVU外置模型配置 | null {
+  const 配置 = 展开MVU方案记录(原值);
+  if (!配置) return null;
+  const 模型来源 =
+    配置.模型来源 === '自定义' || 配置.模型来源 === '与插头相同'
+      ? 配置.模型来源
+      : 默认来源 ?? null;
+  if (!模型来源) return null;
+  const api地址 = typeof 配置.api地址 === 'string' ? 配置.api地址 : '';
+  const 密钥 = typeof 配置.密钥 === 'string' ? 配置.密钥 : '';
+  const 模型名称 = typeof 配置.模型名称 === 'string' ? 配置.模型名称 : '';
+  if (!api地址 && !密钥 && !模型名称 && 配置.模型来源 === undefined && !默认来源) return null;
+  return {
+    模型来源,
+    api地址,
+    密钥,
+    模型名称,
+    温度: 取数值(配置.温度),
+    top_p: 取数值(配置.top_p),
+    最大回复token数: 取数值(配置.最大回复token数),
+  };
+}
+
+function 读取MVU当前方案记录(配置: MVU设置['额外模型解析配置']): Record<string, unknown> | null {
+  if (!配置) return null;
+  const 当前 = 配置.当前api方案;
+  if (是记录(当前)) return 展开MVU方案记录(当前);
+  const 列表 = 配置.api方案列表;
+  if (Array.isArray(列表)) {
+    if (typeof 当前 === 'number' && Number.isInteger(当前)) return 展开MVU方案记录(列表[当前]);
+    if (typeof 当前 === 'string') {
+      const 命中 = 列表.find(项 => {
+        if (!是记录(项)) return false;
+        return ['名称', '方案名', 'name', 'id', 'key', 'uuid'].some(键 => String(项[键] ?? '') === 当前);
+      });
+      return 展开MVU方案记录(命中);
+    }
+  }
+  if (是记录(列表) && (typeof 当前 === 'string' || typeof 当前 === 'number')) {
+    return 展开MVU方案记录(列表[String(当前)]);
+  }
+  return null;
+}
+
+function 模型配置相同(a: MVU外置模型配置 | null, b: MVU外置模型配置 | null): boolean {
+  if (!a || !b) return a === b;
+  return (
+    a.模型来源 === b.模型来源 &&
+    a.api地址 === b.api地址 &&
+    a.密钥 === b.密钥 &&
+    a.模型名称 === b.模型名称 &&
+    a.温度 === b.温度 &&
+    a.top_p === b.top_p &&
+    a.最大回复token数 === b.最大回复token数
+  );
+}
+
+type MVU外置配置详情 = {
+  配置: MVU外置模型配置 | null;
+  平铺配置: MVU外置模型配置 | null;
+  当前方案配置: MVU外置模型配置 | null;
+  activeProfilePresent: boolean;
+  activeProfileMatchesFlat: boolean;
+};
+
+function 读取MVU外置配置详情(): MVU外置配置详情 {
   try {
-    const 配置 = 读MVU设置()?.额外模型解析配置;
-    if (!配置) return null;
-    const 模型来源 = 配置.模型来源 === '自定义' ? '自定义' : 配置.模型来源 === '与插头相同' ? '与插头相同' : null;
-    if (!模型来源) return null;
+    const 外置 = 读MVU设置()?.额外模型解析配置;
+    const 平铺配置 = 规范模型配置记录(外置);
+    const 当前方案记录 = 读取MVU当前方案记录(外置);
+    const 当前方案配置 = 规范模型配置记录(当前方案记录, 平铺配置?.模型来源);
     return {
-      模型来源,
-      api地址: typeof 配置.api地址 === 'string' ? 配置.api地址 : '',
-      密钥: typeof 配置.密钥 === 'string' ? 配置.密钥 : '',
-      模型名称: typeof 配置.模型名称 === 'string' ? 配置.模型名称 : '',
-      温度: 取数值(配置.温度),
-      top_p: 取数值(配置.top_p),
-      最大回复token数: 取数值(配置.最大回复token数),
+      配置: 当前方案配置 ?? 平铺配置,
+      平铺配置,
+      当前方案配置,
+      activeProfilePresent: Boolean(当前方案记录),
+      activeProfileMatchesFlat: Boolean(当前方案配置 && 平铺配置 && 模型配置相同(当前方案配置, 平铺配置)),
     };
   } catch {
-    return null;
+    return { 配置: null, 平铺配置: null, 当前方案配置: null, activeProfilePresent: false, activeProfileMatchesFlat: false };
   }
+}
+
+/**
+ * MVU 配置只用于旧用户兼容迁移，或玩家关闭游戏内置解析后走 MVU 官方外置路径。
+ * 游戏内置变量请求不得把 MVU 面板/Pinia 当前方案当作运行前置；配置缺失时绝不回落正文 API。
+ */
+export function 读取MVU外置模型配置(): MVU外置模型配置 | null {
+  return 读取MVU外置配置详情().配置;
 }
 
 /**
@@ -343,7 +453,7 @@ export function 规范OpenAI兼容API地址(原地址: string): string {
  * 只能改持久层（extensionSettings + saveSettingsDebounced），等页面刷新后完全生效。
  * 返回 true 表示本次确实代关了（调用方据此弹 toast）。
  */
-export function 自动代关MVU自动请求(): boolean {
+export async function 自动代关MVU自动请求(): Promise<boolean> {
   if (!内置变量解析开启()) return false;
   const 设置 = 读MVU设置();
   if (设置?.更新方式 !== '额外模型解析') return false;
@@ -356,18 +466,17 @@ export function 自动代关MVU自动请求(): boolean {
   const 缺键采用默认开启 = 新键原值 === undefined && 旧键原值 === undefined;
   if (新键原值 !== true && 旧键原值 !== true && !缺键采用默认开启) return false;
 
-  const st = 取ST();
-  const 根 = st?.extensionSettings;
-  const 保存 = st?.saveSettingsDebounced;
-  if (!根 || typeof 保存 !== 'function') {
+  const 定位 = 取ST定位();
+  const 根 = 定位.接口?.extensionSettings;
+  if (!根 || !定位.保存所有者?.saveSettingsDebounced) {
     throw new Error('关闭 MVU 自动请求失败：拿不到 extensionSettings 或 saveSettingsDebounced');
   }
   const 快照 = 捕获MVU设置快照(根);
   try {
     if (新键原值 === true || 缺键采用默认开启) (设置.额外模型解析配置 ??= {}).启用自动请求 = false;
     if (旧键原值 === true) 设置.自动触发额外模型解析 = false;
-    // 只有宿主明确受理保存后才挂刷新闸门；保存同步失败必须回滚并交给调用方停止启动或回退开关。
-    保存.call(st);
+    // 只有宿主异步保存真正 resolve 后才挂刷新闸门；Promise reject 必须先原位回滚。
+    await 等待宿主设置保存(定位);
     挂起内置变量解析直至宿主刷新();
     return true;
   } catch (e) {
@@ -406,15 +515,175 @@ export function 选择变量解析通道(
   return 自定义API可用 ? '自定义' : null;
 }
 
-export function 读取变量解析通道(): 变量解析通道类型 {
-  return 规范变量解析通道(读界面偏好().变量解析通道);
+const 游戏变量解析设置键 = 'rqgy_builtin_variable_parser';
+
+export type 游戏变量解析配置来源 = '游戏权威配置' | 'MVU兼容配置' | '默认配置';
+
+export interface 游戏变量解析设置 {
+  版本: 1;
+  通道: 变量解析通道类型;
+  自定义API: MVU外置模型配置 | null;
+  来源: 游戏变量解析配置来源;
 }
 
-export function 写入变量解析通道(通道: 变量解析通道类型): boolean {
-  // 自动只改游戏偏好，不触碰玩家已经填写的 MVU 自定义配置。
-  if (通道 === '自动') return 写界面偏好({ 变量解析通道: 通道 });
-  // 明确选择自定义时，模型来源与游戏通道必须同成同败，不能留下半启用状态。
-  return 提交变量解析设置事务({ 模型来源: '自定义' }, '自定义');
+interface 游戏变量解析持久设置 {
+  版本: 1;
+  通道: 变量解析通道类型;
+  自定义API?: MVU外置模型配置;
+}
+
+function 读取游戏变量解析持久设置(): 游戏变量解析持久设置 | null {
+  const 原值 = 取ST()?.extensionSettings?.[游戏变量解析设置键];
+  if (!是记录(原值)) return null;
+  const 自定义API = 规范模型配置记录(原值.自定义API, '自定义');
+  return {
+    版本: 1,
+    通道: 规范变量解析通道(原值.通道),
+    ...(自定义API ? { 自定义API: { ...自定义API, 模型来源: '自定义' } } : {}),
+  };
+}
+
+/**
+ * 游戏内置变量解析的唯一权威读取入口。新配置独立于聊天楼层与 MVU Pinia；旧用户在首次
+ * 持久迁移前仍可直接读取 MVU 已保存的自定义配置，因此重开后无需打开面板或拉取模型。
+ */
+export function 读取游戏变量解析设置(): 游戏变量解析设置 {
+  const 持久 = 读取游戏变量解析持久设置();
+  if (持久) {
+    return {
+      版本: 1,
+      通道: 持久.通道,
+      自定义API: 持久.自定义API ?? null,
+      来源: '游戏权威配置',
+    };
+  }
+  const 兼容 = 读取MVU外置配置详情().配置;
+  const 自定义API = 兼容?.模型来源 === '自定义' ? { ...兼容, 模型来源: '自定义' as const } : null;
+  return {
+    版本: 1,
+    通道: 规范变量解析通道(读界面偏好().变量解析通道),
+    自定义API,
+    来源: 自定义API ? 'MVU兼容配置' : '默认配置',
+  };
+}
+
+export interface 游戏变量请求路由 {
+  selectedRoute: '数据库' | '自定义' | null;
+  配置: MVU外置模型配置 | null;
+  配置来源: 游戏变量解析配置来源;
+  通道: 变量解析通道类型;
+  自定义API可用: boolean;
+}
+
+/** 每次变量请求实时调用，不缓存设置页或上一轮的临时激活状态。 */
+export function 解析游戏变量请求路由(数据库可调用AI: boolean): 游戏变量请求路由 {
+  const 设置 = 读取游戏变量解析设置();
+  const 配置 = 设置.自定义API;
+  const 自定义API可用 =
+    配置?.模型来源 === '自定义' && !!规范OpenAI兼容API地址(配置.api地址) && !!配置.模型名称.trim();
+  return {
+    selectedRoute: 选择变量解析通道(设置.通道, 数据库可调用AI, 自定义API可用),
+    配置,
+    配置来源: 设置.来源,
+    通道: 设置.通道,
+    自定义API可用,
+  };
+}
+
+export interface 变量配置握手诊断 {
+  chatId: string;
+  stSource: 宿主设置来源;
+  sameExtensionSettingsAsParentContext: boolean;
+  mvuLoaded: boolean;
+  externalMode: boolean;
+  internalParser: boolean;
+  autoRequest: boolean;
+  hasWritableActors: boolean;
+  channel: 变量解析通道类型;
+  modelSource: string;
+  apiUrlPresent: boolean;
+  modelName: string;
+  activeProfilePresent: boolean;
+  activeProfileMatchesFlat: boolean;
+  selectedRoute: '数据库' | '自定义' | null;
+  configSource: 游戏变量解析配置来源;
+  skipReason: string;
+}
+
+/** 仅输出来源和完整性，不包含 Key、Key 长度或 Key 的任何派生值。 */
+export function 构造变量配置握手诊断(参数: {
+  聊天ID?: string;
+  有可写演员: boolean;
+  数据库可调用AI: boolean;
+  跳过原因?: string;
+}): 变量配置握手诊断 {
+  const 定位 = 取ST定位();
+  const MVU状态 = 读取MVU解析状态();
+  const 路由 = 解析游戏变量请求路由(参数.数据库可调用AI);
+  const MVU详情 = 读取MVU外置配置详情();
+  const 配置 = 路由.配置;
+  const skipReason =
+    参数.跳过原因 ??
+    (!参数.有可写演员
+      ? 'no-writable-actors'
+      : !MVU状态.内置解析
+        ? 'internal-parser-disabled'
+        : !路由.selectedRoute
+          ? 'no-available-route'
+          : '');
+  return {
+    chatId: 参数.聊天ID ?? '',
+    stSource: 定位.来源,
+    sameExtensionSettingsAsParentContext: Boolean(
+      定位.父页上下文设置 && 定位.接口?.extensionSettings === 定位.父页上下文设置,
+    ),
+    mvuLoaded: MVU状态.已加载,
+    externalMode: MVU状态.外置模式,
+    internalParser: MVU状态.内置解析,
+    autoRequest: MVU状态.自动请求,
+    hasWritableActors: 参数.有可写演员,
+    channel: 路由.通道,
+    modelSource: 配置?.模型来源 ?? '未配置',
+    apiUrlPresent: Boolean(配置?.api地址.trim()),
+    modelName: 配置?.模型名称.trim() ?? '',
+    activeProfilePresent: MVU详情.activeProfilePresent,
+    activeProfileMatchesFlat: MVU详情.activeProfileMatchesFlat,
+    selectedRoute: 路由.selectedRoute,
+    configSource: 路由.配置来源,
+    skipReason,
+  };
+}
+
+export function 输出变量配置握手诊断(参数: {
+  聊天ID?: string;
+  有可写演员: boolean;
+  数据库可调用AI: boolean;
+  跳过原因?: string;
+}): 变量配置握手诊断 {
+  const 诊断 = 构造变量配置握手诊断(参数);
+  console.info(
+    '[人妻公寓·变量配置握手]\n' +
+      Object.entries(诊断)
+        .map(([键, 值]) => `${键}=${值 === null ? 'null' : String(值)}`)
+        .join('\n'),
+  );
+  return 诊断;
+}
+
+export function 读取变量解析通道(): 变量解析通道类型 {
+  return 读取游戏变量解析设置().通道;
+}
+
+export async function 写入变量解析通道(通道: 变量解析通道类型): Promise<boolean> {
+  // 只提交游戏权威设置；MVU 当前方案不是内置解析的激活前置。
+  return 提交变量解析设置事务({}, 通道, false);
+}
+
+/** 启动时把旧 MVU/界面偏好复制到游戏独立设置；迁移失败仍保留兼容读取，不阻断游戏。 */
+export async function 迁移游戏变量解析设置(): Promise<boolean> {
+  if (读取游戏变量解析持久设置()) return false;
+  const 旧设置 = 读取游戏变量解析设置();
+  return 提交变量解析设置事务({}, 旧设置.通道, false);
 }
 
 export type MVU设置补丁 = {
@@ -486,74 +755,143 @@ function 取或建MVU设置(根: Record<string, unknown>): MVU设置 {
   return 设置;
 }
 
+function 克隆并补丁MVU方案(原值: unknown, 补丁: MVU设置补丁): Record<string, unknown> | null {
+  if (!是记录(原值)) return null;
+  const 方案 = { ...原值 };
+  const 内层键 = ['配置', 'config', 'api配置', '参数'].find(键 => 是记录(方案[键]));
+  const 写入目标 = 内层键 ? { ...(方案[内层键] as Record<string, unknown>) } : 方案;
+  for (const 键 of MVU外置配置键) if (补丁[键] !== undefined) 写入目标[键] = 补丁[键];
+  if (内层键) 方案[内层键] = 写入目标;
+  return 方案;
+}
+
+/**
+ * 新版 MVU 可能同时保存扁平配置与“方案列表 + 当前方案”。这里只克隆并替换当前方案，
+ * 保留其他方案与未知字段；结构无法识别时跳过镜像，游戏权威配置仍可独立工作。
+ */
+function 镜像MVU当前方案(配置: Record<string, unknown>, 补丁: MVU设置补丁): boolean {
+  const 当前 = 配置.当前api方案;
+  if (是记录(当前)) {
+    const 新方案 = 克隆并补丁MVU方案(当前, 补丁);
+    if (!新方案) return false;
+    配置.当前api方案 = 新方案;
+    return true;
+  }
+
+  const 列表 = 配置.api方案列表;
+  if (Array.isArray(列表)) {
+    let 索引 = typeof 当前 === 'number' && Number.isInteger(当前) ? 当前 : -1;
+    if (索引 < 0 && typeof 当前 === 'string') {
+      索引 = 列表.findIndex(项 => {
+        if (!是记录(项)) return false;
+        return ['名称', '方案名', 'name', 'id', 'key', 'uuid'].some(键 => String(项[键] ?? '') === 当前);
+      });
+    }
+    if (索引 < 0 || 索引 >= 列表.length) return false;
+    const 新方案 = 克隆并补丁MVU方案(列表[索引], 补丁);
+    if (!新方案) return false;
+    const 新列表 = [...列表];
+    新列表[索引] = 新方案;
+    配置.api方案列表 = 新列表;
+    return true;
+  }
+
+  if (是记录(列表) && (typeof 当前 === 'string' || typeof 当前 === 'number')) {
+    const key = String(当前);
+    const 新方案 = 克隆并补丁MVU方案(列表[key], 补丁);
+    if (!新方案) return false;
+    配置.api方案列表 = { ...列表, [key]: 新方案 };
+    return true;
+  }
+  return false;
+}
+
 function 应用MVU设置补丁(设置: MVU设置, 补丁: MVU设置补丁): void {
   if (补丁.更新方式 !== undefined) 设置.更新方式 = 补丁.更新方式;
   if (!MVU外置配置键.some(键 => 补丁[键] !== undefined)) return;
   const 原配置 = 设置.额外模型解析配置;
   const 配置 = 是记录(原配置) ? 原配置 : ((设置.额外模型解析配置 = {}) as Record<string, unknown>);
   for (const 键 of MVU外置配置键) if (补丁[键] !== undefined) 配置[键] = 补丁[键];
+  镜像MVU当前方案(配置, 补丁);
 }
 
-function 解析偏好原文(原文: string | null): Record<string, unknown> {
-  if (!原文) return {};
-  try {
-    const 值 = JSON.parse(原文) as unknown;
-    return 是记录(值) ? 值 : {};
-  } catch {
-    return {};
-  }
+function 合并游戏自定义API(
+  原配置: MVU外置模型配置 | null,
+  补丁: MVU设置补丁,
+): MVU外置模型配置 | null {
+  const 有补丁 = ['api地址', '密钥', '模型名称', '温度', 'top_p', '最大回复token数', '模型来源'].some(
+    键 => 补丁[键 as keyof MVU设置补丁] !== undefined,
+  );
+  if (!原配置 && !有补丁) return null;
+  return {
+    模型来源: '自定义',
+    api地址: 补丁.api地址 !== undefined ? 补丁.api地址 : 原配置?.api地址 ?? '',
+    密钥: 补丁.密钥 !== undefined ? 补丁.密钥 : 原配置?.密钥 ?? '',
+    模型名称: 补丁.模型名称 !== undefined ? 补丁.模型名称 : 原配置?.模型名称 ?? '',
+    温度: 补丁.温度 !== undefined ? 补丁.温度 : 原配置?.温度,
+    top_p: 补丁.top_p !== undefined ? 补丁.top_p : 原配置?.top_p,
+    最大回复token数:
+      补丁.最大回复token数 !== undefined ? 补丁.最大回复token数 : 原配置?.最大回复token数,
+  };
 }
 
 /**
- * MVU 配置与游戏解析通道跨两个持久层；先冻结两边原值，再提交并只调用一次宿主保存。
- * localStorage、extensionSettings 或 saveSettingsDebounced 任一步同步失败，都原位恢复旧对象与旧偏好。
+ * 游戏权威配置与兼容 MVU 镜像共用一次宿主保存。真正 await Promise 后才报告成功；
+ * reject 时恢复游戏对象和 MVU 对象原引用。MVU 结构不兼容时只跳过镜像，不能阻断游戏配置。
  */
-function 提交变量解析设置事务(补丁: MVU设置补丁, 通道: 变量解析通道类型): boolean {
-  const st = 取ST();
-  const 根 = st?.extensionSettings;
-  const 保存 = st?.saveSettingsDebounced;
-  const 存储 = 偏好存储();
-  if (!根 || typeof 保存 !== 'function' || !存储) {
-    console.warn('[人妻公寓] 提交变量解析设置失败:缺少 extensionSettings、saveSettingsDebounced 或 localStorage');
+async function 提交变量解析设置事务(
+  补丁: MVU设置补丁,
+  通道: 变量解析通道类型,
+  镜像MVU = true,
+): Promise<boolean> {
+  const 定位 = 取ST定位();
+  const 根 = 定位.接口?.extensionSettings;
+  if (!根 || !定位.保存所有者?.saveSettingsDebounced) {
+    console.warn('[人妻公寓] 提交变量解析设置失败:缺少 extensionSettings 或 saveSettingsDebounced');
     return false;
   }
 
-  let 原偏好: string | null;
-  try {
-    原偏好 = 存储.getItem(界面偏好存储键);
-  } catch (e) {
-    console.warn('[人妻公寓] 提交变量解析设置失败:无法读取旧偏好:', e);
-    return false;
-  }
+  const 游戏原值存在 = Object.prototype.hasOwnProperty.call(根, 游戏变量解析设置键);
+  const 游戏原值 = 根[游戏变量解析设置键];
   const MVU快照 = 捕获MVU设置快照(根);
-  let 偏好已写 = false;
+  const 当前 = 读取游戏变量解析设置();
+  const 自定义API = 合并游戏自定义API(当前.自定义API, 补丁);
+  const 新设置: 游戏变量解析持久设置 = {
+    版本: 1,
+    通道,
+    ...(自定义API ? { 自定义API } : {}),
+  };
+
+  let 已镜像MVU = false;
   try {
-    应用MVU设置补丁(取或建MVU设置(根), 补丁);
-    存储.setItem(
-      界面偏好存储键,
-      JSON.stringify({ ...解析偏好原文(原偏好), 变量解析通道: 通道 }),
-    );
-    偏好已写 = true;
-    保存.call(st);
-    return true;
-  } catch (e) {
-    恢复MVU设置快照(根, MVU快照);
-    if (偏好已写) {
+    根[游戏变量解析设置键] = 新设置;
+    if (镜像MVU) {
       try {
-        if (原偏好 === null) 存储.removeItem(界面偏好存储键);
-        else 存储.setItem(界面偏好存储键, 原偏好);
-      } catch (回滚错误) {
-        console.error('[人妻公寓] 解析设置事务失败且偏好回滚受阻:', 回滚错误);
+        应用MVU设置补丁(取或建MVU设置(根), { ...补丁, 模型来源: '自定义' });
+        已镜像MVU = true;
+      } catch (镜像错误) {
+        恢复MVU设置快照(根, MVU快照);
+        console.warn('[人妻公寓] 游戏变量 API 已准备保存，但 MVU 兼容镜像失败；内置解析不受影响:', 镜像错误);
       }
     }
+    await 等待宿主设置保存(定位);
+    // 旧版本只读界面偏好中的通道；作为兼容镜像尽力写入，失败不影响已经持久化的权威设置。
+    if (!写界面偏好({ 变量解析通道: 通道 })) {
+      console.warn('[人妻公寓] 游戏变量 API 已保存，但旧界面偏好通道镜像失败。');
+    }
+    return true;
+  } catch (e) {
+    if (游戏原值存在) 根[游戏变量解析设置键] = 游戏原值;
+    else delete 根[游戏变量解析设置键];
+    if (已镜像MVU) 恢复MVU设置快照(根, MVU快照);
     console.warn('[人妻公寓] 提交变量解析设置失败，已回滚:', e);
     return false;
   }
 }
 
-/** 自定义 API 表单的唯一提交入口：模型配置与“自定义”通道同成同败。 */
-export function 保存自定义变量解析设置(补丁: Omit<MVU设置补丁, '模型来源'>): boolean {
-  return 提交变量解析设置事务({ ...补丁, 模型来源: '自定义' }, '自定义');
+/** 自定义 API 表单的唯一提交入口：游戏权威配置先落地，MVU 只作兼容镜像。 */
+export async function 保存自定义变量解析设置(补丁: Omit<MVU设置补丁, '模型来源'>): Promise<boolean> {
+  return 提交变量解析设置事务({ ...补丁, 模型来源: '自定义' }, '自定义', true);
 }
 
 /**
@@ -562,18 +900,17 @@ export function 保存自定义变量解析设置(补丁: Omit<MVU设置补丁, 
  * 游戏自己的内置解析每回合都读持久层、立即生效；MVU 插件自身行为要刷新页面才跟上。
  * mvu_settings 缺失时按需创建——MVU 的 zod schema 各字段均有默认值，残缺对象能被正常补全。
  */
-export function 写入MVU设置(补丁: MVU设置补丁): boolean {
-  const st = 取ST();
-  const 根 = st?.extensionSettings;
-  const 保存 = st?.saveSettingsDebounced;
-  if (!根 || typeof 保存 !== 'function') {
+export async function 写入MVU设置(补丁: MVU设置补丁): Promise<boolean> {
+  const 定位 = 取ST定位();
+  const 根 = 定位.接口?.extensionSettings;
+  if (!根 || !定位.保存所有者?.saveSettingsDebounced) {
     console.warn('[人妻公寓] 写入MVU设置失败:拿不到 extensionSettings 或 saveSettingsDebounced');
     return false;
   }
   const 快照 = 捕获MVU设置快照(根);
   try {
     应用MVU设置补丁(取或建MVU设置(根), 补丁);
-    保存.call(st);
+    await 等待宿主设置保存(定位);
     return true;
   } catch (e) {
     恢复MVU设置快照(根, 快照);
@@ -592,7 +929,7 @@ const MVU外置默认V080初始化键 = 'MVU外置默认V080已初始化';
  * 下一次启动必须可重试。成功初始化一次后完全尊重玩家在游戏设置页（或 MVU 面板）的
  * 选择，绝不每次启动强改回去。返回 true 表示本次确实把更新方式写成了外置。
  */
-export function 确保MVU默认外置解析(): boolean {
+export async function 确保MVU默认外置解析(): Promise<boolean> {
   try {
     if (读界面偏好()[MVU外置默认V080初始化键] === true) return false;
     const 设置 = 读MVU设置();
@@ -600,7 +937,7 @@ export function 确保MVU默认外置解析(): boolean {
       写界面偏好({ [MVU外置默认V080初始化键]: true });
       return false;
     }
-    const 成功 = 写入MVU设置({ 更新方式: '额外模型解析' });
+    const 成功 = await 写入MVU设置({ 更新方式: '额外模型解析' });
     if (成功) 写界面偏好({ [MVU外置默认V080初始化键]: true });
     return 成功;
   } catch {

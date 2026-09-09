@@ -883,7 +883,16 @@ function 构造SQLite唯一行失效补偿(参数: {
   };
 }
 
-type SQLite写入状态 = '未调用' | '已取消' | '已确认' | '已提交待定' | '需核对';
+export function 数据库填表占用错误(error: unknown): boolean {
+  const message = error instanceof Error ? `${error.name} ${error.message}` : String(error ?? '');
+  return (
+    /active[ _-]*fill/i.test(message) ||
+    /AI\s*填表.*(?:进行中|尚未完成)/i.test(message) ||
+    /填表.*(?:进行中|正在进行|占用|互斥|锁定)/i.test(message)
+  );
+}
+
+type SQLite写入状态 = '未调用' | '已取消' | '已确认' | '已提交待定' | '需核对' | '填表占用';
 
 async function 执行SQLite写入(
   sql: string,
@@ -893,6 +902,9 @@ async function 执行SQLite写入(
   失效补偿: SQLite失效补偿 | null = null,
 ): Promise<SQLite写入状态> {
   const api = 取数据库API();
+  // 脚本写入可能恰好撞上数据库的 active-fill。先确保公开 table-update 回调已接入；
+  // 填表持久化完成后，该回调会唤醒 RQ 骨架队列做精确回读，再决定是否单次补写。
+  确保数据库时间线回调();
   const 写租约 = 数据库异步写.捕获(预期聊天标识);
   // 独立于栅栏本身的身份校验，供未结算任务检查取消；不能反向递归查询栅栏。
   const 请求仍有效 = () => 仍是同一聊天(预期聊天标识) && 取数据库API() === api && 额外提交校验();
@@ -977,7 +989,13 @@ async function 执行SQLite写入(
     return '已提交待定';
   }
   if (!提交仍有效()) return '已取消';
-  return settled.kind === 'done' ? (SQL写入已确认(settled.result) ? '已确认' : '需核对') : '需核对';
+  return settled.kind === 'done'
+    ? SQL写入已确认(settled.result)
+      ? '已确认'
+      : '需核对'
+    : 数据库填表占用错误(settled.error)
+      ? '填表占用'
+      : '需核对';
 }
 
 function 核对SQLite记录(sql: string, params: unknown[], expected: Readonly<Record<string, unknown>>): boolean | null {
@@ -1309,6 +1327,13 @@ function 启动数据库时间线恢复(聊天标识: string, 最长等待毫秒
 const 数据库刷新完成回调 = (raw: unknown): void => {
   if (时间线接线已清理) return;
   确保数据库手动填表选择安全(raw);
+  // 公开 table-update 回调发生在数据库完成一次表格持久化后。这里只广播无载荷信号：
+  // RQ 骨架队列收到后先按 floor_no + event_code 精确回读，缺行才允许单次幂等补写。
+  try {
+    eventEmit('人妻公寓:数据库表格已更新');
+  } catch {
+    /* 游戏逻辑监听尚未挂载时无需处理；下一回合仍会按保守回读路径补齐。 */
+  }
   const 聊天标识 = 更新当前聊天驻留();
   const persisted = 读取持久时间线状态(聊天标识);
   if (!persisted) return;
@@ -1321,6 +1346,7 @@ const 数据库刷新完成回调 = (raw: unknown): void => {
 };
 
 function 确保数据库时间线回调(): void {
+  if (时间线接线已清理) return;
   const api = 取数据库API();
   if (api === 时间线回调API) return;
   try {
@@ -2133,11 +2159,39 @@ function 安装数据库手动填表保护(): void {
       if (!运行态.观察器.has(doc) && doc.documentElement) {
         const Observer = doc.defaultView?.MutationObserver;
         if (Observer) {
-          const observer = new Observer(() => 安排扫描());
+          const observer = new Observer(records => {
+            // 取消失败时保护层会把 disabled 从 true 临时改为 false 再恢复为 true。
+            // 同一批记录须比较该属性首次变更前与最终值，不能把每条中间记录都当外部变化。
+            // 节点增删仍要扫描；真实就绪、勾选和重绘变化也不能因一次取消失败而永久忽略。
+            if (records.some(record => record.type === 'childList')) {
+              安排扫描();
+              return;
+            }
+            const 首次属性值 = new Map<Element, Map<string, string | null>>();
+            for (const record of records) {
+              if (record.type !== 'attributes' || !record.attributeName) continue;
+              const target = record.target as Element;
+              let 属性们 = 首次属性值.get(target);
+              if (!属性们) {
+                属性们 = new Map();
+                首次属性值.set(target, 属性们);
+              }
+              if (!属性们.has(record.attributeName)) 属性们.set(record.attributeName, record.oldValue);
+            }
+            for (const [target, 属性们] of 首次属性值) {
+              for (const [名称, 原值] of 属性们) {
+                if (target.getAttribute(名称) !== 原值) {
+                  安排扫描();
+                  return;
+                }
+              }
+            }
+          });
           observer.observe(doc.documentElement, {
             childList: true,
             subtree: true,
             attributes: true,
+            attributeOldValue: true,
             attributeFilter: ['disabled', 'aria-checked'],
           });
           运行态.观察器.set(doc, observer);
@@ -2614,7 +2668,59 @@ export interface 数据库回合事件 {
   结果摘要: string;
 }
 
-export type 数据库回合写入结果 = '已确认' | '待确认' | '失败';
+export type 数据库回合写入结果 = '已确认' | '待确认' | '填表占用' | '失败';
+
+interface 规范数据库回合数据 {
+  楼层: number;
+  时间: string;
+  地点: string;
+  参与者: string;
+  玩家行动: string;
+  结果摘要: string;
+  事件编码: string;
+}
+
+const 数据库回合精确查询SQL = `SELECT floor_no, time_text, location, participants, player_action, result_summary, event_code
+       FROM rq_events
+      WHERE floor_no = ?
+      LIMIT 1`;
+
+function 规范数据库回合数据(event: 数据库回合事件): 规范数据库回合数据 {
+  return {
+    楼层: event.楼层,
+    时间: event.时间,
+    地点: event.地点,
+    参与者: event.参与者.join('、'),
+    玩家行动: 规范玩家行动(event.玩家行动),
+    结果摘要: 规范事件摘要(event.结果摘要, event.玩家行动),
+    事件编码: `RQ-${event.楼层}`,
+  };
+}
+
+/**
+ * 精确回读同楼骨架：硬字段必须完全一致；若本次提供了真实摘要，库中仍是脚本兜底则不算成功。
+ * `null` 表示当前 SQLite 无法查询，调用方可保留待补任务而不是误报成功。
+ */
+export function 核对数据库回合已写入(event: 数据库回合事件): boolean | null {
+  const data = 规范数据库回合数据(event);
+  const 核对 = 执行SQLite查询(数据库回合精确查询SQL, [data.楼层], 1);
+  if (!核对) return null;
+  const rows = SQL结果对象行(核对);
+  if (rows === null) return null;
+  const row = rows[0];
+  const 硬字段一致 =
+    !!row &&
+    Number(row.floor_no) === data.楼层 &&
+    String(row.time_text ?? '') === data.时间 &&
+    String(row.location ?? '') === data.地点 &&
+    String(row.participants ?? '') === data.参与者 &&
+    String(row.player_action ?? '') === data.玩家行动 &&
+    String(row.event_code ?? '') === data.事件编码;
+  if (!硬字段一致) return false;
+  const 库中摘要 = String(row?.result_summary ?? '').trim();
+  const 本次是兜底 = 数据库事件摘要为脚本兜底(data.结果摘要);
+  return Boolean(库中摘要 && (本次是兜底 || !数据库事件摘要为脚本兜底(库中摘要)));
+}
 
 export type 固定开局摘要修复结果 = '无需修复' | '已修复' | '待确认' | '失败';
 
@@ -2737,19 +2843,8 @@ export async function 同步数据库回合(
   try {
     // 最后边界：玩家行动 ≤40 字；结果摘要必须是真实短摘要，收到长正文时改为安全短句，
     // 禁止 slice(0,800) 或把正文截成 60 字冒充摘要。
-    const data: Record<string, unknown> = {
-      楼层: event.楼层,
-      时间: event.时间,
-      地点: event.地点,
-      参与者: event.参与者.join('、'),
-      玩家行动: 规范玩家行动(event.玩家行动),
-      结果摘要: 规范事件摘要(event.结果摘要, event.玩家行动),
-      事件编码: `RQ-${event.楼层}`,
-    };
-    const 查询SQL = `SELECT floor_no, time_text, location, participants, player_action, result_summary, event_code
-           FROM rq_events
-          WHERE floor_no = ?
-          LIMIT 1`;
+    const data = 规范数据库回合数据(event);
+    const 查询SQL = 数据库回合精确查询SQL;
     const upsertSQL = `INSERT INTO rq_events
         (floor_no, time_text, location, participants, player_action, result_summary, event_code)
        VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -2800,25 +2895,11 @@ export async function 同步数据库回合(
     if (!仍是同一聊天(聊天标识) || !额外提交校验()) return '失败';
     if (SQL写入状态 === '已确认') return '已确认';
     if (SQL写入状态 === '已提交待定') return '待确认';
-    if (SQL写入状态 === '需核对' && 额外提交校验()) {
-      const 核对 = 执行SQLite查询(查询SQL, [data.楼层], 1);
-      const rows = 核对 ? SQL结果对象行(核对) : null;
-      const row = rows?.[0];
-      const 硬字段一致 =
-        !!row &&
-        Number(row.floor_no) === data.楼层 &&
-        String(row.time_text ?? '') === String(data.时间) &&
-        String(row.location ?? '') === String(data.地点) &&
-        String(row.participants ?? '') === String(data.参与者) &&
-        String(row.player_action ?? '') === String(data.玩家行动) &&
-        String(row.event_code ?? '') === String(data.事件编码);
-      // 重放同楼记录时，结果摘要可能已经由该楼脚本完成；只要硬字段一致且摘要非空就算确认，
-      // 绝不能为了核对历史占位值把已完成摘要重新覆盖成旧“待整理”状态。
-      // 但本次带来真摘要、库里仍是兜底句时不算确认——那说明这次覆盖没有真正生效。
-      const 库中摘要 = String(row?.result_summary ?? '').trim();
-      const 本次是兜底 = 数据库事件摘要为脚本兜底(data.结果摘要);
-      if (硬字段一致 && 库中摘要 && (本次是兜底 || !数据库事件摘要为脚本兜底(库中摘要))) return '已确认';
+    // active-fill 拒绝也先做一次精确回读：插件可能在拒绝脚本写之前已经由同轮填表写好了该行。
+    if ((SQL写入状态 === '需核对' || SQL写入状态 === '填表占用') && 额外提交校验()) {
+      if (核对数据库回合已写入(event) === true) return '已确认';
     }
+    if (SQL写入状态 === '填表占用') return '填表占用';
     // 普通行 API 会把这次写入挂到更早的可追加消息；回档后该旧消息可能仍存活。
     // 因此脚本事件只允许 SQLite 的“最新 AI 消息 mutation”路径，非 SQLite 模式失败闭合。
     return '失败';

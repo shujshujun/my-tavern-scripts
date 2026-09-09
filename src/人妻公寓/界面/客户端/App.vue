@@ -1,8 +1,11 @@
 <template>
   <div class="apt" :class="{ 'keyboard-open': 键盘打开 }">
-    <div class="page" :class="{ 'foreground-decision': 前台硬决策中 }">
+    <div class="page" :class="{ 'foreground-decision': 前台硬决策中 }" :inert="通关纪念开 || undefined">
       <!-- 错误护栏:任何运行时异常显示在此,不再整屏空白(点击即散,不常驻) -->
-      <div v-if="错误信息" class="err" title="点击关闭" @click="错误信息 = ''">⚠︎ 界面异常:{{ 错误信息 }}(点击关闭)</div>
+      <AuxPanel v-if="错误信息" label="界面异常" direction="down" :default-open="true" :reset-key="错误信息">
+        <div class="err" role="alert">{{ 错误信息 }}</div>
+        <button class="btn" type="button" @click="错误信息 = ''">关闭此提示</button>
+      </AuxPanel>
 
       <!-- 酒馆外层的数据库公告在移动端真全屏不可见；在游戏层镜像真实运行阶段。 -->
       <transition name="loc-flash">
@@ -42,6 +45,9 @@
 
       <!-- 右上角:手机只留全屏+设置；桌面仍保留主题快捷钮 -->
       <span class="corner-btns" :class="{ 'above-setup': 首次说明开 }">
+        <button v-if="就绪 && data.系统._序章完成 && !data.系统._坏结局" class="btn mini settlement-entry" type="button" title="旅程进度与通关纪念" aria-label="查看旅程进度与通关纪念" :disabled="通关展示忙碌()" @click="查看通关纪念">
+          {{ 通关当前成绩?.评级 ?? 'C' }}
+        </button>
         <button v-if="!移动端" class="btn mini icon" :title="暗色 ? '切回日间模式' : '切换夜间模式'" @click="切换主题">
           <Ic :n="暗色 ? 'sun' : 'moon'" />
         </button>
@@ -388,13 +394,17 @@
         </div>
 
         <!-- 待办软引导(职务引导,开局流程③;不硬锁,可划掉) -->
-        <div v-if="显示待办" class="todo-bar">
+        <AuxPanel v-if="显示待办" label="开局待办" :hint="'未完成 ' + 待办列表.filter(项 => !项.完成).length + ' 项'" direction="down" :reset-key="当前聊天ID()">
+        <div class="todo-bar">
           <span v-for="项 in 待办列表" :key="项.键" class="todo-item" :class="{ done: 项.完成 }">
             {{ 项.完成 ? '✓' : '·' }} {{ 项.文字 }}
           </span>
-          <button class="btn mini" title="收起待办" @click="划掉待办">✕</button>
+          <button class="btn mini" type="button" title="本局不再提示这些待办" @click="划掉待办">不再提示</button>
         </div>
 
+        </AuxPanel>
+
+        <div class="play-area">
         <!-- 正文舞台:背景四层在 wrap 上,立绘钉右下,正文滚动层浮最上(垫板压立绘,gal 层次) -->
         <div
           class="story-wrap"
@@ -747,6 +757,7 @@
         </div>
 
         <!-- 场景条(在场者=头像徽章,一眼认人) -->
+        <div class="play-sidebar">
         <div class="scene-bar">
           <span class="scene-name">{{ 当前房间名 || '楼道里' }}</span>
           <span v-if="当前房间 && 房内的人(当前房间).length" class="scene-occ">
@@ -779,6 +790,8 @@
             <Ic n="exit" />离开
           </button>
         </div>
+        <div :key="当前聊天ID()" class="stage-tools">
+        <AuxPanel v-if="母亲视频终幕已接通 || 双重继承最终收束锁 || 静音会议正式中" label="当前场景已锁定" hint="查看说明">
         <section v-if="母亲视频终幕已接通" class="mother-video-lock-note" role="status" aria-live="polite">
           {{ 母亲视频终幕锁提示 }}
         </section>
@@ -786,6 +799,8 @@
           机场视频已经结束 · 只剩公寓楼总钥匙的最后现实动作
         </section>
         <MuteMeetingLockNote :open="静音会议正式中" />
+        </AuxPanel>
+        <AuxPanel v-if="场景剧情状态 || 录像带前置中" label="剧情待处理" :hint="场景剧情状态?.标题 ?? 录像带前置标题 ?? '当前剧情'" :default-open="true" :reset-key="场景剧情状态?.id ?? 录像带前置标题 ?? ''">
         <section
           v-if="场景剧情状态"
           class="scene-story-lock"
@@ -852,7 +867,10 @@
           </p>
         </section>
 
+        </AuxPanel>
+
         <transition name="scene-result">
+          <AuxPanel v-if="显示性爱结果卡 && !性爱进行中" label="场景结果" hint="查看记录" :default-open="true">
           <section v-if="显示性爱结果卡 && !性爱进行中" class="scene-result-card" role="status" aria-live="polite">
             <header>
               <span><small>SCENE RESULT</small><b>亲密结果</b></span>
@@ -894,10 +912,11 @@
               </article>
             </div>
           </section>
+          </AuxPanel>
         </transition>
 
         <!-- 房内动作(输入门控收紧后的补位:站在垃圾房/空户里,翻袋撬门不用开地图)。
-             手机端与结局后302桌面由 房内操作抽屉.vue 收起瓷砖；其他桌面房间保持原两列。 -->
+             电脑与手机由房内操作抽屉统一收起瓷砖，业务动作仍由原提供方执行。 -->
         <NoMoreDoorProgress v-if="!录像带任一中 && !静音会议正式中 && !安若妍H7决策中" :data="data" :room="当前房间" :sending="发送中" @action="请求不再留门动作" />
         <RoomActionsDrawer
         :desktop-cohabitation-fold="当前房间 === '302'"
@@ -956,7 +975,6 @@
               <small>{{ 界面事务提交中 ? '正在确认观察结果…' : '判断完成前，普通操作暂时收起' }}</small>
             </span>
             <button
-              v-if="移动端"
               type="button"
               class="peep-collapse"
               :aria-expanded="!偷窥决策收起"
@@ -1030,6 +1048,8 @@
           @avatar-error="头像失效[$event] = true"
         />
 
+        </div>
+
         <!-- 游戏内输入(玩家不碰酒馆输入框) -->
         <template v-if="!母亲视频终幕已接通 && !录像带V4中">
           <RoundInput
@@ -1069,6 +1089,9 @@
             @advance-time="推进固定时段"
           />
         </template>
+
+        </div>
+        </div>
 
         <!-- 功能区:gal 式底部 dock(大图标按钮,与数据 HUD 分离) -->
         <nav
@@ -1374,12 +1397,14 @@
            带【】的重要提示(线索/收获类)升级成点击才收下的 gal 卡,普通提示仍走 toast -->
       <FeedbackOverlay :toast="提示文本" :loot="拾获卡" :sending="发送中" @dismiss-loot="收下拾获卡" />
     </div>
+    <SettlementScreen v-if="通关纪念开 && 通关当前成绩" :current="通关当前成绩" :first="首次通关成绩" :celebration="通关庆祝成绩" :saving="通关保存中" :error="通关保存错误" :reduced-motion="减动效" @close="关闭通关纪念" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { 安若妍换掉图片, 安若妍换掉背景文件, 安若妍换掉CG覆盖普通场次, 安若妍换掉CG占位图 } from '../../脚本/游戏逻辑/安若妍换掉资源';
 import { 安若妍换掉等待硬操作 } from '../../脚本/游戏逻辑/安若妍换掉系统';
+import { 剧情商品货架可见 } from '../../脚本/游戏逻辑/商店剧情货架';
 import { 场景剧情楼道, 读取场景剧情状态, 读取队首场景剧情 } from '../../脚本/游戏逻辑/场景剧情事务';
 import { 是入住登场事件 } from '../../脚本/游戏逻辑/入住触发门';
 import type { SchemaType } from '../../schema';
@@ -1474,6 +1499,7 @@ import { MVU操作进行中 } from '../../脚本/游戏逻辑/mvuIO';
 import { 当前可见立绘SKU } from '../../脚本/游戏逻辑/衣柜系统';
 import { 衣柜商品修正图 } from './穿戴成品图';
 import { 当前时间线切换世代 } from '../../脚本/游戏逻辑/时间线切换协调';
+import { 时间事务阻止普通写入, 当前时间事务写入版本 } from '../../脚本/游戏逻辑/时间事务写入门';
 // 纯函数模块：客户端直连可安全用于目标时段的地图赴约位置派生。
 import { 手机邀约计划成员, 手机邀约计划状态, type 手机邀约计划 } from '../../脚本/游戏逻辑/手机/邀约计划';
 import { 手机锚消息签名 } from '../../脚本/游戏逻辑/手机时间线租约';
@@ -1519,6 +1545,9 @@ import { useRoomActions } from './composables/useRoomActions';
 import { useVideoTape } from './composables/useVideoTape';
 import { useVideoTapeV4 } from './composables/useVideoTapeV4';
 import { useMuteMeeting } from './composables/useMuteMeeting';
+import { useSettlement } from './composables/useSettlement';
+import SettlementScreen from './components/通关结算.vue';
+import AuxPanel from './components/辅助面板.vue';
 import {
   创建CG信号交接,
   接收CG信号,
@@ -1964,6 +1993,8 @@ let 场景同步时间线世代 = 当前时间线切换世代();
 async function 写场景(房间id: string | null, 破门 = false, 待提交状态?: 待提交场景状态): Promise<boolean> {
   const 写入身份 = 捕获客户端时间线身份();
   const 变量 = getVariables({ type: 'chat' });
+  if (时间事务阻止普通写入(变量)) return false;
+  const 时间写入版本 = 当前时间事务写入版本();
   const 旧场景 = (_.get(变量, '_场景') as 场景聊天状态 | null | undefined) ?? null;
   const 旧房间 = 旧场景?.房间id ?? null;
   const 新场景状态 = 待提交状态 ?? {
@@ -1988,8 +2019,12 @@ async function 写场景(房间id: string | null, 破门 = false, 待提交状�
     };
   }
   if (!客户端时间线仍有效(写入身份)) return false;
-  await insertOrAssignVariables(
-    {
+  let 已写场景 = false;
+  await updateVariablesWith(
+    vars => {
+      if (!客户端时间线仍有效(写入身份) || 时间事务阻止普通写入(vars) ||
+          当前时间事务写入版本() !== 时间写入版本) return vars;
+      Object.assign(vars, {
       _场景: 房间id
         ? {
             房间id,
@@ -2002,10 +2037,13 @@ async function 写场景(房间id: string | null, 破门 = false, 待提交状�
       _无耗时拜访: 无耗时拜访,
       _粘滞: null, // 玩家一走动就解除旧对话固定；重回同一房间也不能把已经离开的人“复活”
       _地图轨迹: 新轨迹,
+      });
+      已写场景 = true;
+      return vars;
     },
     { type: 'chat' },
   );
-  if (!客户端时间线仍有效(写入身份)) return false;
+  if (!已写场景 || !客户端时间线仍有效(写入身份)) return false;
   if (旧房间 !== 房间id) {
     清空当前成人CG();
     当前家庭计划CG.value = null;
@@ -3047,6 +3085,7 @@ function 成人CG已加载(事件: Event): void {
   if (!结果.已处理) return;
   当前成人CG槽位.value = 结果.槽位;
   const id = 事件id;
+  if (id) 记录本局CG(id);
   if (!id || 已解锁CG.value.has(id)) return;
   const next = new Set(已解锁CG.value);
   next.add(id);
@@ -4377,6 +4416,8 @@ function 录像带贞操锁可送门牌(门牌号: 门牌): boolean {
 
 const 货架 = computed(() => {
   const 全部 = Object.values(道具表).filter(d => {
+    const 剧情可见 = 剧情商品货架可见(data.value, d);
+    if (剧情可见 !== null) return 剧情可见;
     const 基础可见 = (d.价格 ?? 0) > 0 || d.特殊剧情占位 || (!!d.剧情占位 && 角色剧情占位已上架(data.value, d.id));
     if (!基础可见) return false;
     if (d.id === 第二机位任务ID) return 第二机位任务已上架(data.value);
@@ -4429,6 +4470,7 @@ const 货架 = computed(() => {
 });
 
 function 商品锁定原因(商品: 道具配置): string[] {
+  if (剧情商品货架可见(data.value, 商品) === false) return ['当前线路尚未开放，或这件物品已经领取、购买或完成'];
   if (商品.id === '不再留门') return [不再留门购买阻断(data.value)].filter(Boolean);
   if (商品.剧情占位) return 角色剧情占位锁定原因(商品.id);
   if (商品.特殊剧情占位) return [];
@@ -4465,6 +4507,7 @@ function 商品购买文案(商品: 道具配置): string {
   }
   if (商品锁定原因(商品).length) return '未解锁';
   if (data.value.现金 < (商品.价格 ?? 0)) return '钱不够';
+  if (商品.价格 === 0 && 剧情商品货架可见(data.value, 商品) === true) return '领取';
   const 允许 = 查特殊场景(商品.id)?.允许时段;
   return 允许 && !允许.includes(时段.value) ? `${允许.join('或')}开演` : '买下';
 }
@@ -4483,6 +4526,7 @@ function 商品不可购买(商品: 道具配置): boolean {
 }
 
 function 商品价格文案(商品: 道具配置): string {
+  if (商品.价格 === 0 && 剧情商品货架可见(data.value, 商品) === true) return '免费领取';
   const 路线占位 = 查角色剧情占位(商品.id);
   if (路线占位) return 角色剧情占位价格文案(路线占位);
   if (商品.特殊剧情占位) return '特殊剧情占位';
@@ -4498,6 +4542,9 @@ function 商品价格文案(商品: 道具配置): string {
 }
 
 function 买(道具id: string) {
+  const 商品 = 查道具(道具id);
+  // 已打开的旧商品卡可能滞后一拍；点击时重读资格，宿主仍保留最终购买审查。
+  if (商品 && 剧情商品货架可见(data.value, 商品) === false) return;
   if (查角色剧情占位(道具id)) return;
   if (查道具(道具id)?.特殊剧情占位) return;
   if (提交界面事务(() => eventEmit('人妻公寓:购买', 道具id)) && 查性癖(道具id)) 显示商店.value = false;
@@ -4958,6 +5005,7 @@ const {
   进真全屏,
   立绘显示,
   省流,
+  减动效,
   初始化,
   销毁,
 } = useUIPrefs({
@@ -5546,6 +5594,31 @@ function 客户端聊天切换(): void {
 
 // ── 挂载:事件接线 + 状态恢复 ──
 
+/** 结算等待玩家当前使用的界面收起；手机壳位于宿主文档，单独观察其实际开合。 */
+function 通关展示忙碌(): boolean {
+  let 手机开 = false;
+  try { 手机开 = Boolean(document.getElementById('rq-phone-root')?.classList.contains('open') || window.parent.document.getElementById('rq-phone-root')?.classList.contains('open')); } catch { /* 跨域宿主不读取其DOM。 */ }
+  return !就绪.value || Boolean(data.value.系统._坏结局) || 手机开 || 发送中.value || 界面事务提交中.value || 场景移动中
+    || 场景剧情锁定.value || Boolean(data.value.系统._特殊场景.id) || 性爱进行中.value
+    || Boolean(静音会议筹备步骤.value) || 静音会议筹备提交中.value
+    || 显示地图.value || 显示商店.value || 显示背包.value || 显示监控.value || 显示史册.value
+    || Boolean(选中门牌.value || CG图库门牌.value || 读信门牌.value || 事件提示词文本.value)
+    || 设置开.value || 首次说明开.value || 垃圾选择开.value || Boolean(偷窥待选.value)
+    || Boolean(显示资源详情.value) || 显示胜任详情.value || 显示风闻详情.value
+    || 显示性爱结果卡.value || Boolean(拾获卡.value);
+}
+
+const {
+  打开: 通关纪念开, 当前: 通关当前成绩, 首次: 首次通关成绩, 庆祝: 通关庆祝成绩,
+  保存中: 通关保存中, 错误: 通关保存错误, 查看: 查看通关纪念, 关闭: 关闭通关纪念,
+  记录CG: 记录本局CG,
+} = useSettlement({
+  data, 就绪, 展示忙碌: 通关展示忙碌,
+  写入忙碌: () => 发送中.value || 界面事务提交中.value || MVU操作进行中(),
+  聊天ID: 当前聊天ID,
+  场景: () => 当前房间.value,
+});
+
 onMounted(() => {
   恢复失败行动();
   读取CG解锁();
@@ -5992,7 +6065,8 @@ onMounted(() => {
   });
   eventOn('人妻公寓:已重开', () => {
     清除待恢复行动();
-    // 楼层与过程变量已清,整页重建最干净(幕房间/卷轴/弹窗全归零),回到标题屏
+    // 楼层与过程变量已清；这里只重建游戏 iframe 的 UI。变量 API 保存在父页 extensionSettings，
+    // 不属于聊天/新局数据，重开不得清空，也不需要重新打开 MVU 面板或读取模型来激活。
     window.location.reload();
   });
   eventOn('人妻公寓:监控回合', () => {
@@ -6129,6 +6203,23 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+
+.play-area { display: flex; flex: 1; flex-direction: column; min-height: 0; }
+.play-sidebar { display: contents; }
+.play-sidebar > :deep(.aux-disclosure) { margin-top: 4px; }
+/* 辅助入口横向共用高度；展开内容覆盖舞台并独立滚动，收起不会改动任何业务锁。 */
+.stage-tools { position: relative; display: flex; flex: none; flex-wrap: wrap; gap: 4px; margin-top: 4px; min-width: 0; }
+.stage-tools:empty { display: none; }
+.stage-tools > :deep(.aux-disclosure), .stage-tools > :deep(.in-room-acts), .stage-tools > :deep(.option-drawer) { position: static; flex: 1 1 160px; min-width: 0; margin: 0; }
+.stage-tools :deep(.drawer-handle), .stage-tools :deep(.option-drawer-handle) { min-height: 44px; margin-top: 0; padding: 7px 10px; }
+.stage-tools :deep(.drawer-panel), .stage-tools :deep(.option-drawer-panel) { z-index: 28; }
+.stage-tools :deep(.handle-label) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stage-tools > .peep-card { flex-basis: 100%; max-height: min(40dvh, 300px); overflow-y: auto; }
+.stage-tools .peep-head { position: sticky; top: 0; background: var(--paper-card); }
+.stage-tools .peep-collapse { flex: none; min-height: 44px; }
+.page > :deep(.aux-disclosure) { margin-top: 4px; }
+.page > :deep(.aux-disclosure) .todo-bar { flex-wrap: wrap; }
+
 .mobile-fullscreen-cta {
   display: none;
 }
@@ -9880,5 +9971,26 @@ button.battery:focus-visible {
     width: 100%;
     justify-content: flex-end;
   }
+}
+
+@media (min-width: 640px) and (max-height: 520px) {
+  .apt { height: min(var(--frame-h, 100dvh), 100dvh); padding: 4px; }
+  .page { padding: 4px 8px; }
+  .page > .ui-kicker { display: none; }
+  .masthead { margin: 0 0 3px; font-size: 1.1em; line-height: 1.2; }
+  .hud { margin: 0 0 4px; padding: 5px 8px; }
+  .avatar-row { gap: 8px; margin: 0 0 4px; }
+  .avatar { gap: 1px; }
+  .avatar-glyph, .avatar > img { width: 28px; height: 28px; }
+  .avatar-name { font-size: 0.6em; }
+  .play-area { display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 36%); gap: 7px; }
+  .play-area > .story-wrap { height: 100%; min-height: 0; margin: 0; }
+  .play-sidebar { display: block; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 3px 5px; scrollbar-width: thin; }
+  .play-sidebar .stage-tools { display: flex; flex-direction: column; }
+  .play-sidebar .stage-tools > :deep(*) { flex: none; }
+  .play-sidebar :deep(.aux-panel), .play-sidebar :deep(.drawer-panel), .play-sidebar :deep(.option-drawer-panel) { position: static; max-height: min(55dvh, 230px); margin-top: 4px; }
+  .play-sidebar > .scene-bar { margin-top: 0; }
+  .dock { flex: none; margin-top: 4px; padding: 0; }
+  .dock-btn { min-height: 36px; padding: 4px 8px; }
 }
 </style>
