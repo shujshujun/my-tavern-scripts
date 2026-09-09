@@ -25,11 +25,12 @@
       <div v-if="badEnd" class="bad-end-banner">☠ 坏结局已锁定 · {{ badEnd }} · 游戏系统全部停止</div>
 
       <!-- 苏文一行速览（常驻，不单独占页；打断余波期整条变琥珀色脉冲） -->
-      <div :class="['suwen-strip', { aftermath: aftermathLeft > 0 }]">
+      <div :class="['suwen-strip', { aftermath: !suwenStasisActive && aftermathLeft > 0 }]">
         <span class="sw-name">苏文</span>
         <span :class="['sw-chip', suwenStatusClass]">{{ suwenStatusDisplay }}</span>
         <span class="sw-loc">@ {{ suwenPos }}</span>
-        <span v-if="aftermathLeft > 0" class="sw-hint aftermath-hint">👁 余波·他还没走远（剩{{ aftermathLeft }}楼）</span>
+        <span v-if="suwenStasisActive" class="sw-hint stasis">⏸ 永久静滞·位置与数值已锁定</span>
+        <span v-else-if="aftermathLeft > 0" class="sw-hint aftermath-hint">👁 余波·他还没走远（剩{{ aftermathLeft }}楼）</span>
         <span v-else-if="suwenAccel" class="sw-hint accel">⚡念头加速中</span>
         <span v-else-if="suwenSafe" class="sw-hint safe">✓ {{ suwenSafe }}</span>
         <span class="sw-sus"
@@ -130,6 +131,7 @@ const suwenSafe = computed(() => {
 });
 const susQin = computed(() => Math.round(suwen.value?.对秦璐疑心值 ?? 0));
 const susMeng = computed(() => Math.round(suwen.value?.对苏梦疑心值 ?? 0));
+const suwenStasisActive = computed(() => suwen.value?.位置数值冻结?.是否生效 === true);
 const badEnd = computed(() => data.value?.系统?._坏结局 ?? '');
 const recording = computed(() => data.value?.系统?._录像?.录制中 ?? false);
 // 打断余波（v0.25）：打断后苏文滞留家中的剩余楼数（>0 时速览条特殊显示）
@@ -564,6 +566,11 @@ $font-serif: 'Noto Serif SC', 'Songti SC', 'STSong', serif;
   }
   &.safe {
     color: #79c48a;
+  }
+  &.stasis {
+    color: #8fc9e8;
+    font-weight: 700;
+    letter-spacing: 0.4px;
   }
   &.aftermath-hint {
     color: #e8a94f;

@@ -14,7 +14,7 @@
 import type { SchemaType } from '../../schema';
 import { getStageByCorruption } from '../../stageConfig';
 import { ROUTE_FULLSTAR, getEquipBoost, getCultivationSlots, getOutfitStars, hasEscalationKey, queueItemEvent } from './shopSystem';
-import { isSuwenInAccelerationRoom } from './suwenRoutine';
+import { isSuwenLocationAccelerationRoom } from './suwenRoutine';
 
 /** 念头类型（10大类 + 待判定），沿用旧版 */
 export type ThoughtCategoryValue =
@@ -331,7 +331,7 @@ export function tickThoughtProgress(
 ): void {
   const character = data[characterKey];
   const thoughts = character.念头列表;
-  const accelerating = isSuwenInAccelerationRoom(data.系统._苏文作息游标);
+  const accelerating = isSuwenLocationAccelerationRoom(data.苏文状态.当前位置);
 
   for (const [id, thought] of Object.entries(thoughts)) {
     // 强植排异（v0.24 三振）：强行压入的念头下一楼必被心智弹出 → 退回未达标

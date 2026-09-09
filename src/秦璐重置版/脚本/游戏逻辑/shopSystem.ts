@@ -16,6 +16,23 @@
 import type { SchemaType } from '../../schema';
 import { getStageByCorruption, getStageConfig, getStageTitle } from '../../stageConfig';
 import type { ThoughtCategoryValue } from './thoughtEngine';
+import {
+  SUWEN_STASIS_ITEM,
+  SUWEN_STASIS_PRICE,
+  activateSuwenStasisItem,
+  isSuwenStasisActive,
+  purchaseSuwenStasisItem,
+  restoreSuwenStasisSnapshot,
+} from './suwenStasis';
+
+export {
+  SUWEN_STASIS_ITEM,
+  SUWEN_STASIS_PRICE,
+  activateSuwenStasisItem,
+  isSuwenStasisActive,
+  purchaseSuwenStasisItem,
+  restoreSuwenStasisSnapshot,
+};
 
 export type CharKey = '秦璐状态' | '苏梦状态';
 /** 装备槽位。v0.35 起鞋子收编进仪容星标（6 星 = 5 槽 + 体改） */
@@ -1247,6 +1264,17 @@ export const SHOP_ITEMS: ShopItem[] = [
   },
   // ━━━━ 特权（全局永久，货币终极去处） ━━━━
   {
+    名称: SUWEN_STASIS_ITEM,
+    分类: '特权',
+    阶段门槛: 1,
+    类型倾向: [],
+    加速: 0,
+    风险: 0,
+    越级钥匙: false,
+    价格: SUWEN_STASIS_PRICE,
+    简介: '购买后放入背包；启用时永久冻结苏文当时的状态、位置、作息游标及对秦璐/苏梦两项疑心值，不可撤销',
+  },
+  {
     名称: '植入扩容',
     分类: '特权',
     阶段门槛: 1,
@@ -1977,6 +2005,12 @@ export function useConsumable(
   if (data.系统._坏结局) return '结局已锁定';
   const item = ITEM_MAP[name];
   if (!item || item.分类 !== '消耗品') return '未知消耗品';
+  if (
+    isSuwenStasisActive(data) &&
+    ['借口短信', '精心家宴', '贴心小礼物', '周末全家出游'].includes(name)
+  ) {
+    return '苏文的疑心值已被静滞怀表永久冻结，无需再使用降疑或疑心冻结道具';
+  }
   // 冷却（v0.25 对标云霜凝）：防降疑道具连刷 / 药效叠加
   const cdLeft = getConsumableCooldownLeft(data, name, currentFloor);
   if (cdLeft > 0) return `冷却中（还需 ${cdLeft} 楼）`;
@@ -2064,6 +2098,7 @@ export function buyPrivilege(data: SchemaType, name: string): string | null {
   const item = ITEM_MAP[name];
   if (!item || item.分类 !== '特权') return '未知特权';
   if (item.未上架) return '暂未上架';
+  if (name === SUWEN_STASIS_ITEM) return purchaseSuwenStasisItem(data);
   // 刻印香炉：可复购，走名额累计，不占 道具状态
   if (name === ENGRAVE_ITEM_NAME) {
     if (data.系统.货币 < item.价格) return '货币不足';

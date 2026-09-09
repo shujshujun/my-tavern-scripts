@@ -126,6 +126,10 @@ import {
   SHOP_ITEMS,
   CAMERA_NAME,
   ENGRAVE_ITEM_NAME,
+  SUWEN_STASIS_ITEM,
+  activateSuwenStasisItem,
+  isSuwenStasisActive,
+  purchaseSuwenStasisItem,
   buyCamera,
   buyEquipment,
   buyBodyMod,
@@ -253,6 +257,16 @@ function itemUi(item: ShopItem): { label: string; disabled: boolean; kind: 'buy'
   }
   if (item.分类 === '特权') {
     if (item.未上架) return { label: '未上架', disabled: true, kind: 'none' };
+    if (item.名称 === SUWEN_STASIS_ITEM) {
+      const state = data.value?.系统?.道具状态?.[SUWEN_STASIS_ITEM] ?? '未购买';
+      if ((data.value && isSuwenStasisActive(data.value as any)) || state === '使用中') {
+        return { label: '永久生效', disabled: true, kind: 'none' };
+      }
+      if (state === '已购买') {
+        return { label: '立即使用（永久）', disabled: false, kind: 'use' };
+      }
+      return { label: '购买', disabled: money.value < item.价格, kind: 'buy' };
+    }
     // 刻印香炉（v0.33）：可复购，购买累计刻印名额（角色页习惯旁 📌 消耗）
     if (item.名称 === ENGRAVE_ITEM_NAME) {
       const quota = data.value?.系统?._刻印名额 ?? 0;
@@ -311,7 +325,18 @@ async function shopAction(item: ShopItem) {
           : '，影像已生成——AI 下一轮归档摘要后即可给她们看';
       }
     } else if (item.分类 === '特权') {
-      err = buyPrivilege(d, item.名称);
+      if (item.名称 === SUWEN_STASIS_ITEM) {
+        const state = d.系统.道具状态?.[SUWEN_STASIS_ITEM] ?? '未购买';
+        if (state === '已购买' && !isSuwenStasisActive(d)) {
+          err = activateSuwenStasisItem(d, SillyTavern.chat?.length ?? 0);
+          if (!err) extra = '，苏文当前状态、位置、作息及两项疑心值已永久冻结';
+        } else {
+          err = purchaseSuwenStasisItem(d);
+          if (!err) extra = '，已放入背包；再次点击即可永久启用';
+        }
+      } else {
+        err = buyPrivilege(d, item.名称);
+      }
     } else if (item.分类 === '消耗品') {
       err = useConsumable(d, key, item.名称, SillyTavern.chat?.length ?? 0);
     } else if (item.分类 === '体改') {

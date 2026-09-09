@@ -54,12 +54,6 @@ entries:
     constant: true
     comment: 2026-07-03 已在酒馆手动转蓝灯常驻（关键词几乎不会被触发：AI 被禁止说这些词）；快照只列动态清单，语义说明以此条目为准
 
-  - keys: [选项, 行动, options]
-    content: !include 系统设定/行动选项.yaml
-    enabled: true
-    insertion_order: 51
-    case_sensitive: false
-
   - keys: ['[initvar]', 变量初始化勿开]
     content: !include initvar.yaml
     enabled: false

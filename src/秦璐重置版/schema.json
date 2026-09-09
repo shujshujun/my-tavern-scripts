@@ -99,6 +99,45 @@
         "对苏梦疑心值冻结": {
           "default": {},
           "$ref": "#/$defs/__schema22"
+        },
+        "位置数值冻结": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "是否生效": {
+              "default": false,
+              "type": "boolean"
+            },
+            "冻结状态": {
+              "default": "在家",
+              "type": "string",
+              "enum": [
+                "在家",
+                "外出",
+                "睡眠"
+              ]
+            },
+            "冻结位置": {
+              "default": "客厅",
+              "$ref": "#/$defs/__schema2"
+            },
+            "冻结对秦璐疑心值": {
+              "default": 0,
+              "type": "number"
+            },
+            "冻结对苏梦疑心值": {
+              "default": 0,
+              "type": "number"
+            },
+            "冻结作息游标": {
+              "default": -1,
+              "type": "number"
+            },
+            "启用楼层": {
+              "default": -1,
+              "type": "number"
+            }
+          }
         }
       }
     },
@@ -364,7 +403,7 @@
           "type": "boolean"
         },
         "_苏文作息游标": {
-          "default": 0,
+          "default": 11,
           "type": "number"
         },
         "_上次处理楼层": {

@@ -96,7 +96,8 @@
         </div>
         <span class="bv">{{ suspicion }}</span>
       </div>
-      <p v-if="isAccelerating" class="note warn">⚡ 苏文在附近 · 念头加速中</p>
+      <p v-if="suwenStasisActive" class="note freeze">⏸ 永久静滞 · 位置、状态、作息与两项疑心值已锁定</p>
+      <p v-else-if="isAccelerating" class="note warn">⚡ 苏文在附近 · 念头加速中</p>
       <p v-else-if="suwenSafeReason" class="note safe">✓ {{ suwenSafeReason }}</p>
       <p v-if="freezeUntil > 0" class="note freeze">❄ 对{{ name }}的疑心冻结中（至 {{ freezeUntil }} 楼）</p>
       <button v-if="povReady" class="pov-btn" @click="enterSuwenPov">👁 苏文视角</button>
@@ -231,7 +232,7 @@ import {
   promoteStage,
   直写晋阶镜像,
 } from '../../../脚本/游戏逻辑/shopSystem';
-import { isSuwenInAccelerationRoom } from '../../../脚本/游戏逻辑/suwenRoutine';
+import { isSuwenLocationAccelerationRoom } from '../../../脚本/游戏逻辑/suwenRoutine';
 import { CATEGORY_STAGE, HABIT_SELL_PRICE, countActiveThoughts, forceImplant, retryImplant } from '../../../脚本/游戏逻辑/thoughtEngine';
 import { useDataStore } from '../store';
 
@@ -381,14 +382,13 @@ const suwenSafeReason = computed(() => {
   const s = suwen.value?.当前状态 ?? '在家';
   return s === '外出' ? '苏文外出，可安心进行' : s === '睡眠' ? '苏文熟睡，相对安全' : '';
 });
-const isAccelerating = computed(() => {
-  const p = suwen.value?.当前位置;
-  return p === '餐厅' || p === '客厅' || p === '主卧';
-});
+const isAccelerating = computed(() => isSuwenLocationAccelerationRoom(suwen.value?.当前位置 ?? '外面'));
+const suwenStasisActive = computed(() => data.value?.苏文状态?.位置数值冻结?.是否生效 === true);
 const suspicion = computed(() =>
   Math.round(props.name === '秦璐' ? suwen.value?.对秦璐疑心值 ?? 0 : suwen.value?.对苏梦疑心值 ?? 0),
 );
 const freezeUntil = computed(() => {
+  if (suwenStasisActive.value) return 0;
   const f = props.name === '秦璐' ? suwen.value?.对秦璐疑心值冻结 : suwen.value?.对苏梦疑心值冻结;
   const floor = SillyTavern.chat?.length ?? 0;
   return f?.是否冻结 && floor < f.冻结结束楼层 ? f.冻结结束楼层 : 0;
@@ -431,7 +431,7 @@ const engraveQuota = computed(() => data.value?.系统?._刻印名额 ?? 0);
 function thoughtRateParts(t: any): { total: number; parts: string[] } {
   const parts: string[] = ['保底 1'];
   let total = 1;
-  if (data.value && isSuwenInAccelerationRoom(data.value.系统?._苏文作息游标 ?? 0)) {
+  if (data.value && isSuwenLocationAccelerationRoom(data.value.苏文状态?.当前位置 ?? '外面')) {
     total += 0.5;
     parts.push('加速房 +0.5');
   }

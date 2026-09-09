@@ -1,0 +1,55 @@
+{
+  "name": "秦璐",
+  "version": "1.1",
+  "edition": "完结版",
+  "baselineTag": "0.40",
+  "deliveryMode": "tagged-release",
+  "tag": "qin1.1",
+  "releaseBranch": "release/qin1.1",
+  "releaseDate": "2026-09-10",
+  "template": "秦璐.png",
+  "templateCharaChunks": 1,
+  "card": {
+    "spec": "chara_card_v3",
+    "specVersion": "3.0",
+    "characterVersion": "1.1",
+    "firstMesLength": 1369,
+    "alternateGreetings": 0,
+    "worldbookEntries": 9,
+    "enabledWorldbookEntries": 8,
+    "regexScripts": [
+      "状态栏",
+      "行动选项",
+      "去除变量更新",
+      "1.对AI隐藏状态栏"
+    ],
+    "helperScripts": [
+      "MVU",
+      "变量结构",
+      "游戏逻辑"
+    ],
+    "statusBarBytes": 160543,
+    "requiredStatusMarkers": [
+      "路线共鸣",
+      "影像档案",
+      "静滞怀表",
+      "立即使用（永久）",
+      "苏文视角"
+    ]
+  },
+  "files": {
+    "json": {
+      "name": "秦璐_v1.1_完结版.json",
+      "bytes": 65345,
+      "sha256": "E01B7BFBFA3FDE1D73C77519035ACA28676FAACDC32DB61A542C8B5526A618B5"
+    },
+    "png": {
+      "name": "秦璐_v1.1_完结版.png",
+      "bytes": 746093,
+      "sha256": "067E9DF3986A9977A5F17C02A56820F508E0DC15B205896766F044C7655BEA40"
+    },
+    "checksums": {
+      "name": "秦璐_v1.1_完结版.sha256"
+    }
+  }
+}

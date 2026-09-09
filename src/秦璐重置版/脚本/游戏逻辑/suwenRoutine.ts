@@ -1,252 +1,355 @@
 /**
- * 苏文位置引擎 — 楼层驱动的黑盒生活节律
+ * 苏文位置引擎 — Git 0.40 楼层作息的连续性补丁。
  *
- * 设计（见 设计文档/苏文系统.md §四）：
- * - 楼层 = 时间流逝：玩家每推进一楼，苏文位置随之变化
- * - 黑盒、不告知：楼层→位置的映射原理是脚本内部的事，不告诉玩家、不告诉 AI
- * - 模板循环游标：按作息模板一段段走，走完循环下一天
- * - 关键词跳转：检测玩家输入"第二天/几日后"等，重置游标到对应段
- * - 每段至少停留 2 楼
- *
- * 追踪：使用 系统._苏文作息游标 记录已推进的楼层基准（绝对楼层）。
+ * 保留 0.40 的完整黑盒作息模板，只修正三件事：
+ * 1. 提示词预演与回复后写回共用同一个计划；
+ * 2. 普通对白中的“明天”不再被误判为时间跳转，旧档游标失配先按已保存位置自愈；
+ * 3. 静滞怀表启用后，位置、状态、作息游标与两项疑心值永久固定。
  */
 
 import type { SchemaType } from '../../schema';
+import { isSuwenStasisActive, restoreSuwenStasisSnapshot } from './suwenStasis';
 
-/** 苏文在家时的活动状态 */
 export type SuwenStatusValue = '在家' | '外出' | '睡眠';
+export type SuwenLocationValue = SchemaType['苏文状态']['当前位置'];
+export type SuwenJumpMoment = '次日开场' | '次日早晨' | '次日晚间';
 
-/** 一个作息模板段 */
-interface RoutineSegment {
+export interface SuwenPosition {
   状态: SuwenStatusValue;
-  位置: string;
+  位置: SuwenLocationValue;
+}
+
+export interface SuwenRoutinePreview extends SuwenPosition {
+  目标游标: number;
+  是否推进: boolean;
+  跳转类型: SuwenJumpMoment | null;
+  转场说明: string;
+}
+
+interface RoutineSegment extends SuwenPosition {
   楼数: number;
 }
 
-/**
- * 工作日模板（有班）
- * 周一二四用此模板
- */
+/** 工作日模板（周一、周二、周四）。 */
 const WORKDAY_ROUTINE: RoutineSegment[] = [
-  { 状态: '在家', 位置: '主卧', 楼数: 2 }, // 起床洗漱
-  { 状态: '外出', 位置: '外面', 楼数: 7 }, // 上班（安全期）
-  { 状态: '在家', 位置: '餐厅', 楼数: 2 }, // 晚饭
-  { 状态: '在家', 位置: '客厅', 楼数: 3 }, // 看电视
+  { 状态: '在家', 位置: '主卧', 楼数: 2 },
+  { 状态: '外出', 位置: '外面', 楼数: 7 },
+  { 状态: '在家', 位置: '餐厅', 楼数: 2 },
+  { 状态: '在家', 位置: '客厅', 楼数: 3 },
   { 状态: '睡眠', 位置: '主卧', 楼数: 2 },
 ];
 
-/**
- * 在家日模板（周末 / 半天班在家段）
- * 周六日用此模板
- */
+/** 周末在家模板。 */
 const HOME_DAY_ROUTINE: RoutineSegment[] = [
-  { 状态: '睡眠', 位置: '主卧', 楼数: 2 }, // 赖床
-  { 状态: '在家', 位置: '餐厅', 楼数: 2 }, // 早午饭
+  { 状态: '睡眠', 位置: '主卧', 楼数: 2 },
+  { 状态: '在家', 位置: '餐厅', 楼数: 2 },
   { 状态: '在家', 位置: '客厅', 楼数: 3 },
-  { 状态: '在家', 位置: '厨房', 楼数: 2 }, // 走动
+  { 状态: '在家', 位置: '厨房', 楼数: 2 },
   { 状态: '在家', 位置: '客厅', 楼数: 3 },
   { 状态: '睡眠', 位置: '主卧', 楼数: 3 },
 ];
 
-/**
- * 周三：上午外出，下午在家（意外刺激窗口）
- * 上午段按工作日，下午段改在家
- */
+/** 周三：上午外出，下午在家。 */
 const WEDNESDAY_ROUTINE: RoutineSegment[] = [
   { 状态: '在家', 位置: '主卧', 楼数: 2 },
-  { 状态: '外出', 位置: '外面', 楼数: 5 }, // 上午上班
-  { 状态: '在家', 位置: '餐厅', 楼数: 2 }, // 下午回家晚饭
-  { 状态: '在家', 位置: '客厅', 楼数: 3 }, // 下午在家（意外）
-  { 状态: '在家', 位置: '客厅', 楼数: 2 }, // 晚上继续
+  { 状态: '外出', 位置: '外面', 楼数: 5 },
+  { 状态: '在家', 位置: '餐厅', 楼数: 2 },
+  { 状态: '在家', 位置: '客厅', 楼数: 3 },
+  { 状态: '在家', 位置: '客厅', 楼数: 2 },
   { 状态: '睡眠', 位置: '主卧', 楼数: 2 },
 ];
 
-/**
- * 周五：上午在家，下午外出
- */
+/** 周五：上午在家，下午外出。 */
 const FRIDAY_ROUTINE: RoutineSegment[] = [
   { 状态: '在家', 位置: '主卧', 楼数: 2 },
-  { 状态: '在家', 位置: '餐厅', 楼数: 2 }, // 上午在家
-  { 状态: '在家', 位置: '客厅', 楼数: 3 }, // 上午在家（意外）
-  { 状态: '外出', 位置: '外面', 楼数: 5 }, // 下午上班
-  { 状态: '在家', 位置: '餐厅', 楼数: 2 }, // 晚饭
+  { 状态: '在家', 位置: '餐厅', 楼数: 2 },
+  { 状态: '在家', 位置: '客厅', 楼数: 3 },
+  { 状态: '外出', 位置: '外面', 楼数: 5 },
+  { 状态: '在家', 位置: '餐厅', 楼数: 2 },
   { 状态: '睡眠', 位置: '主卧', 楼数: 2 },
 ];
 
-/** 一周七天的模板序列（索引 0=周一 … 6=周日） */
 const WEEK_ROUTINES: RoutineSegment[][] = [
-  WORKDAY_ROUTINE, // 周一
-  WORKDAY_ROUTINE, // 周二
-  WEDNESDAY_ROUTINE, // 周三
-  WORKDAY_ROUTINE, // 周四
-  FRIDAY_ROUTINE, // 周五
-  HOME_DAY_ROUTINE, // 周六
-  HOME_DAY_ROUTINE, // 周日
+  WORKDAY_ROUTINE,
+  WORKDAY_ROUTINE,
+  WEDNESDAY_ROUTINE,
+  WORKDAY_ROUTINE,
+  FRIDAY_ROUTINE,
+  HOME_DAY_ROUTINE,
+  HOME_DAY_ROUTINE,
 ];
 
-/** 一周的总楼数（用于游标取模定位星期） */
-const WEEK_TOTAL_FLOORS = WEEK_ROUTINES.reduce((sum, routine) => sum + routine.reduce((s, seg) => s + seg.楼数, 0), 0);
+const dayFloorCount = (routine: RoutineSegment[]) => routine.reduce((sum, segment) => sum + segment.楼数, 0);
+const WEEK_TOTAL_FLOORS = WEEK_ROUTINES.reduce((sum, routine) => sum + dayFloorCount(routine), 0);
 
-/** 关键词跳转目标段（重置游标） */
-interface JumpTarget {
-  关键词: string[];
-  偏移: number; // 相对当前一周开始的楼层偏移
+function positiveModulo(value: number, modulus: number): number {
+  return ((value % modulus) + modulus) % modulus;
 }
 
-/** 简单跳转词表（待细化） */
-const JUMP_KEYWORDS: JumpTarget[] = [
-  { 关键词: ['第二天', '第二日', '明天', '次日'], 偏移: -1 }, // 跳到下一天开头（特殊处理）
-  { 关键词: ['第二天早上', '次日清晨', '第二天早晨'], 偏移: -1 },
-  { 关键词: ['第二天晚上', '次日晚上'], 偏移: -1 },
-];
-
-/**
- * 计算游标在一周内的位置
- * @param cursor 绝对楼层游标
- * @returns { dayIndex: 星期几(0-6), segmentIndex: 当天第几段, segmentFloorOffset: 当前段内已走的楼数 }
- */
 function locateCursor(cursor: number): {
   dayIndex: number;
   segmentIndex: number;
   segmentFloorOffset: number;
 } {
-  const relFloor = ((cursor % WEEK_TOTAL_FLOORS) + WEEK_TOTAL_FLOORS) % WEEK_TOTAL_FLOORS;
-  let remaining = relFloor;
-  let dayIndex = 0;
-  for (let d = 0; d < WEEK_ROUTINES.length; d++) {
-    const routine = WEEK_ROUTINES[d];
-    const dayTotal = routine.reduce((s, seg) => s + seg.楼数, 0);
+  let remaining = positiveModulo(cursor, WEEK_TOTAL_FLOORS);
+  for (let dayIndex = 0; dayIndex < WEEK_ROUTINES.length; dayIndex++) {
+    const routine = WEEK_ROUTINES[dayIndex];
+    const dayTotal = dayFloorCount(routine);
     if (remaining < dayTotal) {
-      dayIndex = d;
-      let segOffset = remaining;
-      for (let s = 0; s < routine.length; s++) {
-        if (segOffset < routine[s].楼数) {
-          return { dayIndex: d, segmentIndex: s, segmentFloorOffset: segOffset };
+      let segmentRemaining = remaining;
+      for (let segmentIndex = 0; segmentIndex < routine.length; segmentIndex++) {
+        const segment = routine[segmentIndex];
+        if (segmentRemaining < segment.楼数) {
+          return { dayIndex, segmentIndex, segmentFloorOffset: segmentRemaining };
         }
-        segOffset -= routine[s].楼数;
+        segmentRemaining -= segment.楼数;
       }
-      return { dayIndex: d, segmentIndex: routine.length - 1, segmentFloorOffset: 0 };
     }
     remaining -= dayTotal;
   }
-  // 兜底
   return { dayIndex: 0, segmentIndex: 0, segmentFloorOffset: 0 };
 }
 
-/**
- * 根据游标获取苏文当前状态/位置
- */
-export function getSuwenPosition(cursor: number): { 状态: SuwenStatusValue; 位置: string } {
+export function getSuwenPosition(cursor: number): SuwenPosition {
   const { dayIndex, segmentIndex } = locateCursor(cursor);
   const segment = WEEK_ROUTINES[dayIndex][segmentIndex];
   return { 状态: segment.状态, 位置: segment.位置 };
 }
 
+function samePosition(lhs: SuwenPosition, rhs: SuwenPosition): boolean {
+  return lhs.状态 === rhs.状态 && lhs.位置 === rhs.位置;
+}
+
 /**
- * 检测玩家输入是否含跳转关键词，返回应跳转到的游标（null=无跳转）
- * "第二天"类：跳到下一天开头
+ * 旧档/异常写回自愈：若游标算出的地点与状态栏真值不符，先在一周模板内寻找最近的匹配点。
+ * 这样“状态栏仍在单位、游标却落在主卧”的档不会用错误游标继续推进。
  */
-export function detectJump(playerInput: string, currentCursor: number): number | null {
-  const text = playerInput;
-  for (const target of JUMP_KEYWORDS) {
-    for (const kw of target.关键词) {
-      if (text.includes(kw)) {
-        // 跳到下一天开头：找到当前天在周内的结束位置
-        const { dayIndex } = locateCursor(currentCursor);
-        // 计算下一天开始的绝对游标
-        const weekStart = Math.floor(currentCursor / WEEK_TOTAL_FLOORS) * WEEK_TOTAL_FLOORS;
-        let nextDayStart = weekStart;
-        for (let d = 0; d <= dayIndex; d++) {
-          nextDayStart += WEEK_ROUTINES[d].reduce((s, seg) => s + seg.楼数, 0);
-        }
-        return nextDayStart;
-      }
-    }
+export function alignSuwenCursor(
+  cursor: number,
+  status: SuwenStatusValue,
+  location: SuwenLocationValue,
+): number {
+  const expected: SuwenPosition = { 状态: status, 位置: location };
+  if (samePosition(getSuwenPosition(cursor), expected)) return cursor;
+
+  for (let distance = 1; distance <= WEEK_TOTAL_FLOORS; distance++) {
+    const backward = cursor - distance;
+    if (samePosition(getSuwenPosition(backward), expected)) return backward;
+    const forward = cursor + distance;
+    if (samePosition(getSuwenPosition(forward), expected)) return forward;
   }
-  return null;
+  return cursor;
 }
 
 /**
- * 判断苏文是否在加速房间（餐厅/客厅/主卧）
- * 见 设计文档/苏文系统.md §2.1：只看苏文位置，女角色位置不参与
+ * 只识别玩家明确要求推进时间的表达。
+ * “你明天还要工作吗”“明天记得回来”只是对白，不再触发整天跳转。
  */
-export function isSuwenInAccelerationRoom(cursor: number): boolean {
-  const { 位置 } = getSuwenPosition(cursor);
-  return 位置 === '餐厅' || 位置 === '客厅' || 位置 === '主卧';
+export function detectJumpMoment(playerInput: string): SuwenJumpMoment | null {
+  const text = playerInput.trim();
+  if (!text) return null;
+
+  const actionMatch = text.match(
+    /(?:睡到|等到|待到|跳到|快进到|推进到|来到|熬到|直到|时间(?:来)?到|转眼(?:来)?到(?:了)?)\s*(?:了)?\s*(?:明天|第二天|第二日|次日)(?:\s*(?:清晨|早上|早晨|上午|下午|傍晚|晚上|夜里))?/u,
+  );
+  const narrativeMatch = text.match(
+    /^(?:(?:时间来到|转眼到了?|到了?)\s*)?(?:第二天|第二日|次日)(?:\s*(?:清晨|早上|早晨|上午|下午|傍晚|晚上|夜里))?(?=$|[，,。.!！？\s])/u,
+  );
+  // “明天早上你还要工作吗”仍是对白；只有整句本身就是时间指令时才把“明天”认作跳转。
+  const tomorrowOnly = /^明天(?:\s*(?:清晨|早上|早晨|上午|下午|傍晚|晚上|夜里))?[。.!！]?$/u.test(text)
+    ? text
+    : '';
+  const matchedText = actionMatch?.[0] ?? narrativeMatch?.[0] ?? tomorrowOnly;
+  if (!matchedText) return null;
+
+  if (/(?:下午|傍晚|晚上|夜里)/u.test(matchedText)) return '次日晚间';
+  if (/(?:清晨|早上|早晨|上午)/u.test(matchedText)) return '次日早晨';
+  return '次日开场';
 }
 
-/**
- * 判断苏文是否在家（非外出、非睡眠算在家）
- */
-export function isSuwenHome(cursor: number): boolean {
-  const { 状态 } = getSuwenPosition(cursor);
-  return 状态 === '在家';
+function getNextDayStart(cursor: number): { cursor: number; dayIndex: number } {
+  const relFloor = positiveModulo(cursor, WEEK_TOTAL_FLOORS);
+  const weekStart = cursor - relFloor;
+  const { dayIndex } = locateCursor(cursor);
+  let nextDayCursor = weekStart;
+  for (let day = 0; day <= dayIndex; day++) nextDayCursor += dayFloorCount(WEEK_ROUTINES[day]);
+  return { cursor: nextDayCursor, dayIndex: (dayIndex + 1) % WEEK_ROUTINES.length };
 }
 
-/**
- * 预演本楼推进后的苏文状态（v0.29，纯计算不写变量）
- *
- * 供 PROMPT_READY 注入快照时调用：真正的推进在写阶段（AI 回复后）才发生，
- * 注入时从 message_id=-1 读到的是上一楼的状态——每个跨段楼/跳转楼，快照与
- * 本楼落地值必然错开一段（"第二天"跳转楼错开一整天），v0.28 的心理锚定
- * 反而会把 AI 摁在旧处境上。此函数与写阶段同输入（游标基准/玩家输入/余波窗口）
- * 同算法，预演结果 = 写阶段落地结果；写阶段仍是唯一写入方。
- *
- * @param isReroll 重roll/继续（chat 末条为 AI 消息）不预推——重roll 的推进
- *   基准与原次生成相同，落地结果一致，读到什么就是什么
- */
+function getEveningOffset(routine: RoutineSegment[]): number {
+  let cursor = 0;
+  let lastHomeOffset = 0;
+  for (const segment of routine) {
+    if (segment.状态 === '在家') lastHomeOffset = cursor;
+    cursor += segment.楼数;
+  }
+  return lastHomeOffset;
+}
+
+/** 保留 0.40 既有 API；无明确时间推进时返回 null。 */
+export function detectJump(playerInput: string, currentCursor: number): number | null {
+  const moment = detectJumpMoment(playerInput);
+  if (!moment) return null;
+
+  const nextDay = getNextDayStart(currentCursor);
+  if (moment === '次日晚间') {
+    return nextDay.cursor + getEveningOffset(WEEK_ROUTINES[nextDay.dayIndex]);
+  }
+  return nextDay.cursor;
+}
+
+function buildTransitionNote(
+  current: SuwenPosition,
+  target: SuwenPosition,
+  jumpMoment: SuwenJumpMoment | null,
+): string {
+  if (jumpMoment) {
+    return `玩家明确推进到${jumpMoment}；正文先交代时间已经跳转，再按苏文${target.状态}@${target.位置}演绎。`;
+  }
+  if (current.状态 === '外出' && target.状态 !== '外出') {
+    return `苏文正从单位返家；正文必须先写下班、回程与进门，再让他到达${target.位置}，不得无过渡直接出现在主卧。`;
+  }
+  if (current.状态 !== target.状态 || current.位置 !== target.位置) {
+    return `苏文本轮从${current.状态}@${current.位置}自然移动到${target.状态}@${target.位置}，正文保留合理转场。`;
+  }
+  return '';
+}
+
+function planSuwenRoutine(
+  data: SchemaType,
+  currentFloor: number,
+  playerInput: string,
+  isReroll: boolean,
+): SuwenRoutinePreview {
+  const sys = data.系统;
+  const current: SuwenPosition = {
+    状态: data.苏文状态.当前状态,
+    位置: data.苏文状态.当前位置,
+  };
+
+  if (isSuwenStasisActive(data)) {
+    const freeze = data.苏文状态.位置数值冻结;
+    return {
+      状态: freeze.冻结状态,
+      位置: freeze.冻结位置,
+      目标游标: freeze.冻结作息游标 >= 0 ? freeze.冻结作息游标 : sys._苏文作息游标,
+      是否推进: false,
+      跳转类型: null,
+      转场说明: `静滞怀表已永久生效：苏文保持${freeze.冻结状态}@${freeze.冻结位置}，状态、位置、作息与两项疑心值都不得变化。`,
+    };
+  }
+
+  // 打断余波期间 0.40 的设计是苏文滞留现场、游标暂停。
+  if (sys._打断余波至楼层 >= 0 && currentFloor <= sys._打断余波至楼层) {
+    return {
+      状态: '在家',
+      位置: current.位置,
+      目标游标: sys._苏文作息游标,
+      是否推进: false,
+      跳转类型: null,
+      转场说明: '',
+    };
+  }
+
+  if (isReroll || currentFloor === sys._上次处理楼层) {
+    return {
+      ...current,
+      目标游标: sys._苏文作息游标,
+      是否推进: false,
+      跳转类型: null,
+      转场说明: '',
+    };
+  }
+
+  const jumpMoment = detectJumpMoment(playerInput);
+  let baseCursor = sys._苏文作息游标;
+  let targetCursor: number;
+  if (jumpMoment) {
+    targetCursor = detectJump(playerInput, baseCursor) ?? baseCursor + 1;
+  } else {
+    baseCursor = alignSuwenCursor(baseCursor, current.状态, current.位置);
+    targetCursor = baseCursor + 1;
+  }
+
+  let target = getSuwenPosition(targetCursor);
+  // 终极防线：普通推进绝不允许“单位 → 主卧”直切。正常模板本来会先到餐厅；
+  // 只有严重损坏的旧档才可能来到这里，因此同时把游标校准到客厅匹配点。
+  if (!jumpMoment && current.状态 === '外出' && target.位置 === '主卧') {
+    target = { 状态: '在家', 位置: '客厅' };
+    targetCursor = alignSuwenCursor(targetCursor, target.状态, target.位置);
+  }
+
+  return {
+    ...target,
+    目标游标: targetCursor,
+    是否推进: true,
+    跳转类型: jumpMoment,
+    转场说明: buildTransitionNote(current, target, jumpMoment),
+  };
+}
+
+/** 在生成提示词前预演本轮最终位置；纯计算，不改变量。 */
+export function previewSuwenRoutine(
+  data: SchemaType,
+  currentFloor: number,
+  playerInput: string,
+  isReroll = false,
+): SuwenRoutinePreview {
+  return planSuwenRoutine(data, currentFloor, playerInput, isReroll);
+}
+
+/** 兼容 0.40 的旧调用签名。 */
 export function previewSuwenPosition(
   data: SchemaType,
   promptFloor: number,
   playerInput: string,
   isReroll: boolean,
-): { 状态: SuwenStatusValue; 位置: string } {
-  // 打断余波窗口：写阶段游标暂停、状态强制在家（位置维持打断落地值；条件对齐快照余波提示行）
-  if (data.系统._打断余波至楼层 >= 0 && promptFloor < data.系统._打断余波至楼层) {
-    return { 状态: '在家', 位置: data.苏文状态.当前位置 };
-  }
-  if (isReroll) {
-    return { 状态: data.苏文状态.当前状态, 位置: data.苏文状态.当前位置 };
-  }
-  const cursor = detectJump(playerInput, data.系统._苏文作息游标) ?? data.系统._苏文作息游标 + 1;
-  return getSuwenPosition(cursor);
+): SuwenPosition {
+  const plan = previewSuwenRoutine(data, promptFloor, playerInput, isReroll);
+  return { 状态: plan.状态, 位置: plan.位置 };
 }
 
-/**
- * 主推进函数：根据当前楼层更新苏文位置游标
- * 应在 VARIABLE_UPDATE_ENDED 调用（AI 回复后的写阶段）
- *
- * @param data MVU 数据（会被直接修改）
- * @param currentFloor 当前消息楼层 ID
- * @param playerInput 玩家本轮输入文本（用于检测跳转关键词）
- */
+export function isSuwenLocationAccelerationRoom(location: string): boolean {
+  return location === '餐厅' || location === '客厅' || location === '主卧';
+}
+
+export function isSuwenInAccelerationRoom(cursor: number): boolean {
+  return isSuwenLocationAccelerationRoom(getSuwenPosition(cursor).位置);
+}
+
+export function isSuwenHome(cursor: number): boolean {
+  return getSuwenPosition(cursor).状态 === '在家';
+}
+
+/** 回复后的唯一作息写入口；同一楼结果与 previewSuwenRoutine 完全一致。 */
 export function advanceSuwenRoutine(data: SchemaType, currentFloor: number, playerInput: string): void {
   const sys = data.系统;
-  const lastFloor = sys._上次处理楼层;
-
-  // 防同楼重复推进（ROLL 保护）
-  if (currentFloor === lastFloor) {
-    console.info(`[苏文作息] 楼层 ${currentFloor} 与上次相同，跳过游标推进`);
-  } else {
-    // 检测跳转
-    const jumpTarget = detectJump(playerInput, sys._苏文作息游标);
-    if (jumpTarget !== null) {
-      sys._苏文作息游标 = jumpTarget;
-      console.info(`[苏文作息] 检测到跳转关键词，游标跳至 ${jumpTarget}`);
-    } else {
-      // 正常推进一楼
-      sys._苏文作息游标 += 1;
-    }
+  if (restoreSuwenStasisSnapshot(data)) {
     sys._上次处理楼层 = currentFloor;
+    const freeze = data.苏文状态.位置数值冻结;
+    console.info(
+      `[苏文作息] 永久静滞：${freeze.冻结状态}@${freeze.冻结位置}，游标=${freeze.冻结作息游标}，两项疑心值保持不变`,
+    );
+    return;
   }
 
-  // 根据游标算出苏文状态/位置，写入变量
-  const { 状态, 位置 } = getSuwenPosition(sys._苏文作息游标);
-  data.苏文状态.当前状态 = 状态;
-  data.苏文状态.当前位置 = 位置 as any;
+  const oldCursor = sys._苏文作息游标;
+  const plan = planSuwenRoutine(data, currentFloor, playerInput, false);
+  sys._苏文作息游标 = plan.目标游标;
+  if (plan.是否推进) sys._上次处理楼层 = currentFloor;
+  data.苏文状态.当前状态 = plan.状态;
+  data.苏文状态.当前位置 = plan.位置;
+
+  if (plan.是否推进 && !plan.跳转类型) {
+    const alignedBase = plan.目标游标 - 1;
+    if (alignedBase !== oldCursor) console.info(`[苏文作息] 旧档游标自愈：${oldCursor} → ${alignedBase}`);
+  } else if (!plan.是否推进 && currentFloor === sys._上次处理楼层) {
+    console.info(`[苏文作息] 楼层 ${currentFloor} 已处理，跳过重复推进`);
+  }
 
   console.info(
-    `[苏文作息] 游标=${sys._苏文作息游标} → 苏文${状态}@${位置}` +
-      (isSuwenInAccelerationRoom(sys._苏文作息游标) ? ' [加速房]' : ''),
+    `[苏文作息] 游标=${sys._苏文作息游标} → 苏文${plan.状态}@${plan.位置}` +
+      (isSuwenLocationAccelerationRoom(plan.位置) ? ' [加速房]' : '') +
+      (plan.跳转类型 ? ` [${plan.跳转类型}]` : ''),
   );
 }

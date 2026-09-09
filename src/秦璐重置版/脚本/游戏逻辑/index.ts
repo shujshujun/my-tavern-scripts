@@ -24,7 +24,8 @@ import {
   getOutfitStars,
   getSuspicionFloor,
 } from './shopSystem';
-import { advanceSuwenRoutine, previewSuwenPosition } from './suwenRoutine';
+import { advanceSuwenRoutine, previewSuwenRoutine, type SuwenRoutinePreview } from './suwenRoutine';
+import { isSuwenStasisActive, restoreSuwenStasisSnapshot } from './suwenStasis';
 import { tickThoughtProgress, resolveThoughtType, isInVulnerableWindow, type ThoughtCategoryValue } from './thoughtEngine';
 import { reloadOnChatChange } from '@/util/script';
 import { registerMvuSchema } from 'https://testingcf.jsdelivr.net/gh/StageDog/tavern_resource/dist/util/mvu_zod.js';
@@ -149,6 +150,7 @@ function captureProtectionSnapshot(data: SchemaType): void {
       当前位置: data.苏文状态.当前位置,
       对秦璐疑心值: data.苏文状态.对秦璐疑心值,
       对苏梦疑心值: data.苏文状态.对苏梦疑心值,
+      位置数值冻结: { ...data.苏文状态.位置数值冻结 },
     } as any,
     系统: {
       货币: data.系统.货币,
@@ -280,11 +282,17 @@ function rollbackProtectedFields(data: SchemaType): void {
     data.苏文状态.当前位置 = snap.苏文状态.当前位置;
     data.苏文状态.对秦璐疑心值 = snap.苏文状态.对秦璐疑心值 as number;
     data.苏文状态.对苏梦疑心值 = snap.苏文状态.对苏梦疑心值 as number;
+    if (snap.苏文状态.位置数值冻结) {
+      data.苏文状态.位置数值冻结 = {
+        ...(snap.苏文状态.位置数值冻结 as typeof data.苏文状态.位置数值冻结),
+      };
+    }
   }
-  // 系统：游标/货币回滚（货币由脚本结算管理，AI 不应直改）
+  // 系统：游标/货币/道具回滚（均由脚本或界面管理，AI 不应直改）
   if (snap.系统) {
     data.系统._苏文作息游标 = snap.系统._苏文作息游标;
     if (snap.系统.货币 !== undefined) data.系统.货币 = snap.系统.货币;
+    if (snap.系统.道具状态) data.系统.道具状态 = { ...snap.系统.道具状态 };
     // 在场锁定（v0.25）：锁定标志本身防 AI 动；锁定期间 在场角色 转脚本管理，回滚 AI 的进出场改动
     if (snap.系统._在场锁定 !== undefined) data.系统._在场锁定 = snap.系统._在场锁定 as boolean;
     if (snap.系统._在场锁定 && snap.系统.在场角色) {
@@ -307,6 +315,9 @@ function rollbackProtectedFields(data: SchemaType): void {
       data.系统._打断冷却至楼层 = Math.max(data.系统._打断冷却至楼层, snap.系统._打断冷却至楼层);
     }
   }
+
+  // 永久静滞是最后一道脚本保护：即使本轮变量命令碰过苏文，也立即恢复启用时锚点。
+  if (isSuwenStasisActive(data)) restoreSuwenStasisSnapshot(data);
 
   // 念头"内容"保护：AI 只许改"类型"，不许改"内容"
   for (const charKey of ['秦璐状态', '苏梦状态'] as const) {
@@ -340,6 +351,10 @@ function rollbackProtectedFields(data: SchemaType): void {
 const SUSPICION_RISE_CAP_PER_FLOOR = 2;
 function settleSuspicion(data: SchemaType, currentFloor: number): void {
   if (data.系统._坏结局) return;
+  if (isSuwenStasisActive(data)) {
+    restoreSuwenStasisSnapshot(data);
+    return;
+  }
   // 每楼最多触发一次打断（两角色同楼都够档时只演一位；另一位档位不标记，等冷却后按存量补触发）
   let interruptFiredThisFloor = false;
   const present = getPresentCharacters(data);
@@ -459,6 +474,10 @@ function settleSuspicion(data: SchemaType, currentFloor: number): void {
  */
 function settleOutfitAttention(data: SchemaType, currentFloor: number): void {
   if (data.系统._坏结局) return;
+  if (isSuwenStasisActive(data)) {
+    restoreSuwenStasisSnapshot(data);
+    return;
+  }
   if (data.苏文状态.当前状态 !== '在家') return;
   // 打断余波期他已经在全神贯注地盯着，不再叠加注意事件
   if (data.系统._打断余波至楼层 >= 0 && currentFloor <= data.系统._打断余波至楼层) return;
@@ -614,7 +633,11 @@ const STAGE_RESTRAINTS: Record<number, string> = {
  *   情绪/位置/内心/依存度是 AI 自己写的或纯数值，正文已承载，不回注
  * - 按 系统.在场角色 过滤：不在场角色的状态/影响/相关度判定整块跳过（对标云霜凝）
  */
-function buildStatusSnapshot(data: SchemaType, promptFloor: number): string {
+function buildStatusSnapshot(
+  data: SchemaType,
+  promptFloor: number,
+  suwenPlan?: SuwenRoutinePreview,
+): string {
   // 坏结局已锁定：只注入终局指引，其余系统块全部停止（文本按结局类型分支）
   if (data.系统._坏结局) {
     const be = data.系统._坏结局;
@@ -711,8 +734,10 @@ function buildStatusSnapshot(data: SchemaType, promptFloor: number): string {
   //   上一楼的状态——跨段楼/跳转楼快照必错一段，v0.28 的锚定反而把 AI 摁在旧处境
   //   （症状：状态栏已"外出"，心理活动还是"回卧室躺一会"）。预演与写阶段同输入
   //   同算法，注入的即本楼落地值
-  const suwen = previewSuwenPosition(data, promptFloor, getLastUserMessage(), isRerollGeneration());
+  const suwen =
+    suwenPlan ?? previewSuwenRoutine(data, promptFloor, getLastUserMessage(), isRerollGeneration());
   lines.push(`【苏文】${suwen.状态} @ ${suwen.位置}`);
+  if (suwen.转场说明) lines.push(`  ▷ 苏文·位置连续性：${suwen.转场说明}`);
   // 心理活动锚定（v0.28）：当前心理想法由 AI 写，但必须符合脚本算出的处境——
   //   否则会出现"外出上班却在想着再睡一会"这类与位置矛盾的独白
   {
@@ -956,7 +981,8 @@ $(() => {
         // 3. 构建快照 + 注入（幂等 marker 防重复）
         //    v0.32：注入前统一替换 {{user}}——脚本注入的消息不经过酒馆宏替换，
         //    此前快照/道具事件里的 {{user}} 原样透传（越界应对行曾硬编码"苏斌"，玩家角色名各异）
-        const snapshot = (SNAPSHOT_MARKER + ']\n' + buildStatusSnapshot(data, messageId)).replace(
+        const suwenPlan = previewSuwenRoutine(data, messageId, getLastUserMessage(), isRerollGeneration());
+        const snapshot = (SNAPSHOT_MARKER + ']\n' + buildStatusSnapshot(data, messageId, suwenPlan)).replace(
           /\{\{user\}\}/g,
           getUserName(),
         );
@@ -1121,7 +1147,13 @@ $(() => {
         // 2. 推进苏文作息游标（楼层驱动黑盒节律）
         //    v0.25 打断余波：窗口内游标暂停——他因打断滞留家中（状态/位置维持打断落地时的强制值，
         //    回滚机制每轮从快照恢复），窗口过后从暂停处恢复流动；过期清理标志
-        if (newData.系统._打断余波至楼层 >= 0 && currentFloor <= newData.系统._打断余波至楼层) {
+        if (isSuwenStasisActive(newData)) {
+          // 永久静滞优先级高于作息与打断余波：恢复锚点，但余波到期标记仍正常清理。
+          advanceSuwenRoutine(newData, currentFloor, playerInput);
+          if (newData.系统._打断余波至楼层 >= 0 && currentFloor > newData.系统._打断余波至楼层) {
+            newData.系统._打断余波至楼层 = -1;
+          }
+        } else if (newData.系统._打断余波至楼层 >= 0 && currentFloor <= newData.系统._打断余波至楼层) {
           newData.苏文状态.当前状态 = '在家';
           console.info(
             `[苏文作息] 打断余波中（至楼${newData.系统._打断余波至楼层}），游标暂停，苏文滞留@${newData.苏文状态.当前位置}`,
@@ -1200,7 +1232,8 @@ $(() => {
 
         // （原 4.5 事件清空已前移至 1.4——本周期新产生的事件保留到下一轮注入）
 
-        // 5. 写回
+        // 5. 写回前再次恢复永久锚点，防止后续结算或第三方变量命令留下瞬时漂移。
+        if (isSuwenStasisActive(newData)) restoreSuwenStasisSnapshot(newData);
         _.set(新变量, 'stat_data', newData);
         _isInAiCycle = false;
       } catch (err) {

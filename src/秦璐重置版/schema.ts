@@ -222,6 +222,24 @@ const SuspicionFreeze = z.object({
   冻结结束楼层: z.coerce.number().default(-1).describe('当前楼层 >= 此值则解冻'),
 });
 
+/** 静滞怀表的永久锚点；不存在倒计时，启用后只允许脚本按该锚点恢复。 */
+const SuwenPermanentStasis = z.object({
+  是否生效: z.boolean().default(false),
+  冻结状态: SuwenStatus.default('在家'),
+  冻结位置: Location.default('客厅'),
+  冻结对秦璐疑心值: z.coerce
+    .number()
+    .transform(v => clamp(v, 0, 100))
+    .prefault(0),
+  冻结对苏梦疑心值: z.coerce
+    .number()
+    .transform(v => clamp(v, 0, 100))
+    .prefault(0),
+  /** -1 兼容早期候选档：脚本首次恢复时用当时游标补齐。 */
+  冻结作息游标: z.coerce.number().default(-1),
+  启用楼层: z.coerce.number().default(-1),
+});
+
 const SuwenState = z.object({
   /** 当前状态/位置：由脚本按楼层黑盒作息游标算出（见 苏文系统.md §四） */
   当前状态: SuwenStatus.default('在家'),
@@ -244,6 +262,8 @@ const SuwenState = z.object({
     .prefault(0),
   对秦璐疑心值冻结: SuspicionFreeze.prefault({}),
   对苏梦疑心值冻结: SuspicionFreeze.prefault({}),
+  /** 静滞怀表：永久冻结当前状态、位置、作息游标和两项疑心值。 */
+  位置数值冻结: SuwenPermanentStasis.prefault({}),
 });
 
 // ============================================
@@ -376,7 +396,7 @@ const SystemState = z.object({
   /** 在场角色锁定（v0.25）：true 时 在场角色 转脚本管理（回滚 AI 改动），玩家手动纠正 AI 判错用 */
   _在场锁定: z.boolean().default(false),
   /** 苏文作息游标：已推进的楼层基准（黑盒，决定苏文位置） */
-  _苏文作息游标: z.coerce.number().default(0),
+  _苏文作息游标: z.coerce.number().default(11),
   /** 上次处理楼层（防 ROLL 重复推进游标） */
   _上次处理楼层: z.coerce.number().default(-1),
 });
