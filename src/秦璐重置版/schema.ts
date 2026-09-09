@@ -198,6 +198,26 @@ const SuspicionFreeze = z.object({
   冻结结束楼层: z.coerce.number().default(-1).describe('当前楼层 >= 此值则解冻'),
 });
 
+/**
+ * 苏文位置/数值静滞快照。
+ *
+ * 「静滞怀表」使用后由脚本记录苏文当时的位置、状态与两项疑心值；
+ * 一经启用永久生效，每次结算都恢复这份快照并暂停作息游标，AI 不要修改。
+ */
+const SuwenPositionValueFreeze = z.object({
+  是否生效: z.boolean().default(false),
+  冻结状态: SuwenStatus.default('在家'),
+  冻结位置: Location.default('客厅'),
+  冻结对秦璐疑心值: z.coerce
+    .number()
+    .transform(v => clamp(v, 0, 100))
+    .prefault(0),
+  冻结对苏梦疑心值: z.coerce
+    .number()
+    .transform(v => clamp(v, 0, 100))
+    .prefault(0),
+});
+
 const SuwenState = z.object({
   /** 当前状态/位置：由脚本按楼层黑盒作息游标算出（见 苏文系统.md §四） */
   当前状态: SuwenStatus.default('在家'),
@@ -215,6 +235,7 @@ const SuwenState = z.object({
     .prefault(0),
   对秦璐疑心值冻结: SuspicionFreeze.prefault({}),
   对苏梦疑心值冻结: SuspicionFreeze.prefault({}),
+  位置数值冻结: SuwenPositionValueFreeze.prefault({}),
 });
 
 // ============================================
@@ -260,8 +281,11 @@ const SystemState = z.object({
   // ━━━━ 内部标志（脚本管理，AI 不要修改） ━━━━
   /** 待发送道具事件（| 分隔，脚本写、下一轮 AI 演绎，注入后清空） */
   _待发送道具事件: z.string().default(''),
-  /** 苏文作息游标：已推进的楼层基准（黑盒，决定苏文位置） */
-  _苏文作息游标: z.coerce.number().default(0),
+  /** 苏文作息游标：已推进的楼层基准；默认 11 与开场“在家@客厅”一致 */
+  _苏文作息游标: z.coerce
+    .number()
+    .default(11)
+    .describe('苏文作息游标：已推进的楼层基准；默认 11 与开场“在家@客厅”一致'),
   /** 上次处理楼层（防 ROLL 重复推进游标） */
   _上次处理楼层: z.coerce.number().default(-1),
 });

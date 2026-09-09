@@ -13,7 +13,7 @@
 
 import type { SchemaType } from '../../schema';
 import { getStageByCorruption } from '../../stageConfig';
-import { isSuwenInAccelerationRoom } from './suwenRoutine';
+import { isSuwenLocationAccelerationRoom } from './suwenRoutine';
 
 /** 念头类型（10大类 + 待判定），沿用旧版 */
 export type ThoughtCategoryValue =
@@ -185,7 +185,8 @@ export function tickThoughtProgress(
 ): void {
   const character = data[characterKey];
   const thoughts = character.念头列表;
-  const accelerating = isSuwenInAccelerationRoom(data.系统._苏文作息游标);
+  // 以本轮实际落地位置为准；静滞怀表暂停游标时也不会读到游标背后的未来位置。
+  const accelerating = isSuwenLocationAccelerationRoom(data.苏文状态.当前位置);
 
   for (const [id, thought] of Object.entries(thoughts)) {
     if (thought.状态 !== '培育中') continue;

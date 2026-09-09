@@ -137,7 +137,8 @@
               </div>
               <span class="val">{{ suspicion }}</span>
             </div>
-            <div v-if="isAccelerating" class="accel-hint">⚡ 苏文在附近 · 念头加速中</div>
+            <div v-if="stasisActive" class="stasis-hint">⏸ 永久静滞 · 位置、状态与疑心值已锁定</div>
+            <div v-else-if="isAccelerating" class="accel-hint">⚡ 苏文在附近 · 念头加速中</div>
             <div v-else-if="suwenSafeReason" class="safe-indicator">
               <span class="safe-icon">✓</span><span>{{ suwenSafeReason }}</span>
             </div>
@@ -147,6 +148,22 @@
           <div class="currency-card">
             <span class="label">💰 货币</span>
             <span class="val">{{ data?.系统?.货币 ?? 0 }}</span>
+          </div>
+
+          <!-- 苏文控制道具 -->
+          <div class="shop-card">
+            <div class="shop-header">
+              <span class="title">⌚ 静滞怀表</span>
+              <span class="price">{{ SUWEN_STASIS_PRICE }} 货币</span>
+            </div>
+            <div class="shop-desc">永久冻结苏文当前状态、位置及两项疑心值；启用后不可撤销。</div>
+            <div class="shop-status">
+              状态：<strong>{{ stasisItemDisplay }}</strong>
+              <span v-if="stasisActive"> · 锚点 {{ stasisAnchor }}</span>
+            </div>
+            <button class="shop-action" :disabled="stasisActive" @click="handleStasisItem">
+              {{ stasisActionText }}
+            </button>
           </div>
         </div>
 
@@ -160,8 +177,8 @@
               <span :class="['emotion-val', { 'vulnerable-glow': isVulnerable }]">{{ char?.当前情绪 ?? '平静' }}</span>
             </div>
             <div v-if="isVulnerable" class="vulnerable-hint"><span>⚡</span><span>心防松动 · 可植入越级念头</span></div>
-            <div class="thought-bubble" v-if="char?.当前心理想法">「 {{ char.当前心理想法 }} 」</div>
-            <div class="temperament" v-if="char?.气质描述">— {{ char.气质描述 }}</div>
+            <div v-if="char?.当前心理想法" class="thought-bubble">「 {{ char.当前心理想法 }} 」</div>
+            <div v-if="char?.气质描述" class="temperament">— {{ char.气质描述 }}</div>
           </div>
 
           <!-- 念头列表 -->
@@ -237,7 +254,14 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import type { SchemaType } from '../../schema';
+import { Schema, type SchemaType } from '../../schema';
+import {
+  SUWEN_STASIS_ITEM,
+  SUWEN_STASIS_PRICE,
+  activateSuwenStasisItem,
+  isSuwenStasisActive,
+  purchaseSuwenStasisItem,
+} from '../../脚本/游戏逻辑/itemSystem';
 
 const MAX_LEN = 20;
 const VULNERABLE_EMOTION = '心防松动';
@@ -255,7 +279,8 @@ function getMessageId(): number {
 async function refreshData() {
   try {
     const vars = Mvu.getMvuData({ type: 'message', message_id: -1 });
-    data.value = (_.get(vars, 'stat_data') as SchemaType) ?? null;
+    const raw = _.get(vars, 'stat_data');
+    data.value = raw ? (Schema.parse(raw) as SchemaType) : null;
   } catch (e) {
     console.warn('[秦璐重置版] 刷新数据失败', e);
   }
@@ -286,6 +311,23 @@ const suwenStatusClass = computed(() => {
 const suwenSafeReason = computed(() => {
   const s = suwen.value?.当前状态 ?? '在家';
   return s === '外出' ? '苏文外出，可安心进行' : s === '睡眠' ? '苏文熟睡，相对安全' : '';
+});
+
+const stasisActive = computed(() => (data.value ? isSuwenStasisActive(data.value) : false));
+const stasisAnchor = computed(() => {
+  const freeze = suwen.value?.位置数值冻结;
+  return freeze ? `${freeze.冻结状态}@${freeze.冻结位置}` : '未记录';
+});
+const stasisItemState = computed(() => data.value?.系统?.道具状态?.[SUWEN_STASIS_ITEM] ?? '未购买');
+const stasisItemDisplay = computed(() => {
+  if (stasisActive.value) return '永久生效';
+  return stasisItemState.value === '已购买' ? '背包中' : '未购买';
+});
+const stasisActionText = computed(() => {
+  if (stasisActive.value) return '永久冻结中';
+  return stasisItemState.value === '已购买'
+    ? '立即使用（永久）'
+    : `购买 · ${SUWEN_STASIS_PRICE} 货币`;
 });
 
 const isAccelerating = computed(() => {
@@ -367,6 +409,35 @@ async function discardThought(id: string) {
     await refreshData();
   } catch (e) {
     console.error('[秦璐重置版] 退回失败', e);
+  }
+}
+
+async function handleStasisItem() {
+  try {
+    const vars = Mvu.getMvuData({ type: 'message', message_id: -1 });
+    const raw = _.get(vars, 'stat_data');
+    if (!raw) {
+      showMsg('变量未初始化，请先让 AI 回复一轮', 'warn');
+      return;
+    }
+
+    const d = Schema.parse(raw) as SchemaType;
+    const result =
+      (d.系统.道具状态[SUWEN_STASIS_ITEM] ?? '未购买') === '已购买'
+        ? activateSuwenStasisItem(d, getMessageId())
+        : purchaseSuwenStasisItem(d);
+    if (!result.ok) {
+      showMsg(result.message, 'warn');
+      return;
+    }
+
+    _.set(vars, 'stat_data', d);
+    await Mvu.replaceMvuData(vars, { type: 'message', message_id: -1 });
+    showMsg(result.message, 'success');
+    await refreshData();
+  } catch (e) {
+    console.error('[秦璐重置版] 静滞怀表操作失败', e);
+    showMsg('静滞怀表操作失败：' + (e instanceof Error ? e.message : String(e)), 'error');
   }
 }
 
@@ -779,6 +850,15 @@ $c-border: #333;
   color: $c-gold;
   font-weight: 600;
 }
+.stasis-hint {
+  font-size: 12px;
+  color: $c-cyan;
+  margin-top: 8px;
+  padding: 5px 8px;
+  background: rgba(79, 195, 247, 0.1);
+  border-left: 2px solid $c-cyan;
+  border-radius: 3px;
+}
 .accel-hint {
   font-size: 12px;
   color: $c-orange;
@@ -815,6 +895,60 @@ $c-border: #333;
   color: $c-gold-bright;
   font-size: 18px;
   font-weight: 700;
+}
+
+// 商店道具
+.shop-card {
+  background: $c-panel;
+  border: 1px solid rgba(79, 195, 247, 0.35);
+  border-radius: 8px;
+  padding: 10px;
+}
+.shop-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.shop-header .title {
+  color: $c-cyan;
+  font-size: 13px;
+  font-weight: 700;
+}
+.shop-header .price {
+  color: $c-gold-bright;
+  font-size: 11px;
+}
+.shop-desc,
+.shop-status {
+  color: $c-text-dim;
+  font-size: 11px;
+  line-height: 1.5;
+  margin-top: 6px;
+}
+.shop-status strong {
+  color: $c-text;
+}
+.shop-action {
+  width: 100%;
+  margin-top: 8px;
+  padding: 7px 10px;
+  border: 1px solid rgba(79, 195, 247, 0.45);
+  border-radius: 6px;
+  background: rgba(79, 195, 247, 0.1);
+  color: $c-cyan;
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.shop-action:hover:not(:disabled) {
+  background: rgba(79, 195, 247, 0.2);
+  border-color: $c-cyan;
+}
+.shop-action:disabled {
+  opacity: 0.65;
+  cursor: default;
 }
 
 // 右栏

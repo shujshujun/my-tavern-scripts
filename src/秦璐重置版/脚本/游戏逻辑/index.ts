@@ -14,8 +14,13 @@
 import type { SchemaType } from '../../schema';
 import { Schema } from '../../schema';
 import { getStageByCorruption, getStageTitle } from '../../stageConfig';
-import { advanceSuwenRoutine, isInVulnerableWindow } from './suwenRoutine';
-import { tickThoughtProgress, resolveThoughtType, type ThoughtCategoryValue } from './thoughtEngine';
+import { advanceSuwenRoutine, previewSuwenRoutine, type SuwenRoutinePreview } from './suwenRoutine';
+import {
+  isInVulnerableWindow,
+  tickThoughtProgress,
+  resolveThoughtType,
+  type ThoughtCategoryValue,
+} from './thoughtEngine';
 import { reloadOnChatChange } from '@/util/script';
 
 // ────────────────────────────────────────────────────────
@@ -32,8 +37,9 @@ let _protSnapshot: Partial<SchemaType> | null = null;
 // 快照注入幂等标记（防 ROLL/删楼累积多份）
 const SNAPSHOT_MARKER = '[当前游戏状态快照';
 
-// 心防松动状态覆写：脚本后写覆盖角色 当前情绪
-let _pendingVulnerableFloor = -1;
+// 同一生成周期固定使用 PROMPT_READY 时的楼层与玩家输入，保证预览和回复后写回完全同拍。
+let _generationFloor = -1;
+let _generationPlayerInput = '';
 
 // ────────────────────────────────────────────────────────
 // 工具函数
@@ -49,15 +55,6 @@ function getLastUserMessage(): string {
   const chat = SillyTavern.chat ?? [];
   for (let i = chat.length - 1; i >= 0; i--) {
     if (chat[i].is_user) return chat[i].mes ?? '';
-  }
-  return '';
-}
-
-/** 获取最后一条 AI 回复文本 */
-function getLastAiMessage(): string {
-  const chat = SillyTavern.chat ?? [];
-  for (let i = chat.length - 1; i >= 0; i--) {
-    if (!chat[i].is_user) return chat[i].mes ?? '';
   }
   return '';
 }
@@ -89,11 +86,14 @@ function captureProtectionSnapshot(data: SchemaType): void {
       当前位置: data.苏文状态.当前位置,
       对秦璐疑心值: data.苏文状态.对秦璐疑心值,
       对苏梦疑心值: data.苏文状态.对苏梦疑心值,
+      位置数值冻结: { ...data.苏文状态.位置数值冻结 },
     } as any,
     系统: {
       货币: data.系统.货币,
       道具状态: { ...data.系统.道具状态 },
+      _待发送道具事件: data.系统._待发送道具事件,
       _苏文作息游标: data.系统._苏文作息游标,
+      _上次处理楼层: data.系统._上次处理楼层,
     } as any,
   };
 }
@@ -105,15 +105,21 @@ function rollbackProtectedFields(data: SchemaType): void {
   if (!_protSnapshot) return;
   const snap = _protSnapshot;
 
-  // 苏文状态：脚本管理字段强制回滚
+  // 苏文状态：位置、两项疑心值和静滞锚点均由脚本管理。
   if (snap.苏文状态) {
     data.苏文状态.当前状态 = snap.苏文状态.当前状态;
     data.苏文状态.当前位置 = snap.苏文状态.当前位置;
+    data.苏文状态.对秦璐疑心值 = snap.苏文状态.对秦璐疑心值;
+    data.苏文状态.对苏梦疑心值 = snap.苏文状态.对苏梦疑心值;
+    data.苏文状态.位置数值冻结 = { ...snap.苏文状态.位置数值冻结 };
   }
-  // 系统：游标/货币回滚（货币由变卖习惯管理，AI 不应直改）
+  // 系统：道具、游标和货币回滚，防 AI 绕过购买或篡改时效。
   if (snap.系统) {
+    data.系统.货币 = snap.系统.货币;
+    data.系统.道具状态 = { ...snap.系统.道具状态 };
+    data.系统._待发送道具事件 = snap.系统._待发送道具事件;
     data.系统._苏文作息游标 = snap.系统._苏文作息游标;
-    if (snap.系统.货币 !== undefined) data.系统.货币 = snap.系统.货币;
+    data.系统._上次处理楼层 = snap.系统._上次处理楼层;
   }
 
   // 念头"内容"保护：AI 只许改"类型"，不许改"内容"
@@ -138,7 +144,7 @@ function rollbackProtectedFields(data: SchemaType): void {
  * 构建注入给 AI 的状态快照（精简、按需知情）
  * 对接"世界书精简原则"：只注入当前相关的，不注入脚本算法/废弃系统
  */
-function buildStatusSnapshot(data: SchemaType): string {
+function buildStatusSnapshot(data: SchemaType, suwenPlan: SuwenRoutinePreview): string {
   const lines: string[] = [];
   lines.push('════════ 当前游戏状态 ════════');
 
@@ -155,8 +161,17 @@ function buildStatusSnapshot(data: SchemaType): string {
     lines.push(`【内心】${char.当前心理想法}`);
   }
 
-  // 苏文状态（仅位置/状态，不注入疑心值算法）
-  lines.push(`【苏文】${data.苏文状态.当前状态} @ ${data.苏文状态.当前位置}`);
+  // 注入的是“本轮回复后将落地”的同拍位置，不再注入上一轮旧位置。
+  lines.push(`【苏文·本轮有效位置】${suwenPlan.状态} @ ${suwenPlan.位置}`);
+  if (suwenPlan.转场说明) lines.push(`【苏文动线】${suwenPlan.转场说明}`);
+
+  const stasis = data.苏文状态.位置数值冻结;
+  if (stasis.是否生效) {
+    lines.push('⏸️【静滞怀表·永久】苏文的位置、状态和两项疑心值已永久冻结，任何后续剧情都不得改动。');
+  }
+  if (data.系统._待发送道具事件) {
+    lines.push(`【本轮道具事件】${data.系统._待发送道具事件}`);
+  }
 
   // 心防松动窗口提示（脚本检测后写）
   const floor = getCurrentFloor();
@@ -224,6 +239,9 @@ $(() => {
     _isInAiCycle = true;
     try {
       const messageId = getCurrentFloor();
+      const playerInput = getLastUserMessage();
+      _generationFloor = messageId;
+      _generationPlayerInput = playerInput;
       const vars = Mvu.getMvuData({ type: 'message', message_id: messageId });
       const data = Schema.parse(_.get(vars, 'stat_data') ?? {}) as SchemaType;
 
@@ -237,11 +255,14 @@ $(() => {
         }
       }
 
-      // 2. 捕获硬保护快照（含前端写入：念头植入、习惯变卖、道具购买等）
+      // 2. 预演本轮苏文位置；AI 正文与回复后写回共用这一楼层/输入。
+      const suwenPlan = previewSuwenRoutine(data, messageId, playerInput);
+
+      // 3. 捕获硬保护快照（含前端写入：念头植入、习惯变卖、道具购买等）
       captureProtectionSnapshot(data);
 
-      // 3. 构建快照 + 注入（幂等 marker 防重复）
-      const snapshot = SNAPSHOT_MARKER + ']\n' + buildStatusSnapshot(data);
+      // 4. 构建快照 + 注入（幂等 marker 防重复）
+      const snapshot = SNAPSHOT_MARKER + ']\n' + buildStatusSnapshot(data, suwenPlan);
       const chat = event_data.chat ?? [];
       // 清理旧快照
       for (let i = chat.length - 1; i >= 0; i--) {
@@ -259,20 +280,22 @@ $(() => {
   // ─────────────────────────────────────────────────────
   // 写阶段：派生计算 + 推进（对标云霜凝 VARIABLE_UPDATE_ENDED）
   // ─────────────────────────────────────────────────────
-  eventOn(Mvu.events.VARIABLE_UPDATE_ENDED, (新变量: object, 旧变量: object) => {
+  eventOn(Mvu.events.VARIABLE_UPDATE_ENDED, (新变量: object, _旧变量: object) => {
     try {
       // 守卫：仅在 AI 生成周期内处理
       if (!_isInAiCycle || !_protSnapshot) return;
 
       const newData = Schema.parse(_.get(新变量, 'stat_data') ?? {}) as SchemaType;
-      const oldData = Schema.parse(_.get(旧变量, 'stat_data') ?? {}) as SchemaType;
-      const currentFloor = getCurrentFloor();
-      const playerInput = getLastUserMessage();
+      const currentFloor = _generationFloor >= 0 ? _generationFloor : getCurrentFloor();
+      const playerInput = _generationFloor >= 0 ? _generationPlayerInput : getLastUserMessage();
 
       // 1. 回滚脚本管理字段（防 AI 乱改）
       rollbackProtectedFields(newData);
 
-      // 2. 推进苏文作息游标（楼层驱动黑盒节律）
+      // 道具事件已在本轮提示词消费；清空一次性演出消息，永久冻结本体仍保存在结构字段中。
+      newData.系统._待发送道具事件 = '';
+
+      // 2. 推进苏文作息游标（与 PROMPT_READY 的预演同楼、同输入）
       advanceSuwenRoutine(newData, currentFloor, playerInput);
 
       // 3. 解析 AI 写入的念头类型（待判定→具体类型）
@@ -310,6 +333,8 @@ $(() => {
   // ─────────────────────────────────────────────────────
   eventOn(tavern_events.MESSAGE_RECEIVED, async () => {
     _isInAiCycle = false;
+    _generationFloor = -1;
+    _generationPlayerInput = '';
     try {
       // 刷新保护快照（AI 回复后数据已落地）
       const messageId = getCurrentFloor();
