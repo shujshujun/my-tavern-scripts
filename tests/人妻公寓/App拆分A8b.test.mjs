@@ -303,7 +303,7 @@ test('textarea DOM ref 已从 App 迁出，defineExpose 公开聚焦；App 明�
   assert.match(App源码, /虚拟键盘\?\.boundingRect/, 'VisualViewport 兜底仍在 App');
 });
 
-test('CSS 所有权精确：独占规则迁入组件，App 保留共享 option-chip/btn/remaining keyboard selectors；dark/rq-lite/mobile/:deep 完整', () => {
+test('CSS 所有权精确：独占规则迁入组件，App 保留共享 option-chip/btn/remaining keyboard selectors；dark/mobile/:deep 完整且 rq-lite 退场', () => {
   // App 不再持有独占规则
   for (const selector of [
     '.option-row {',
@@ -318,7 +318,7 @@ test('CSS 所有权精确：独占规则迁入组件，App 保留共享 option-c
   ]) {
     assert.doesNotMatch(App源码, new RegExp(转义(selector)), `App 不应再持有 ${selector}`);
   }
-  // 行动选项组件持有全套 option-chip（含 rq-lite/rq-dark/mobile/keyboard-open）
+  // 行动选项组件持有全套 option-chip（含 rq-dark/mobile/keyboard-open，手动 rq-lite 已退场）
   for (const selector of [
     '.option-row {',
     '.option-chip {',
@@ -328,7 +328,7 @@ test('CSS 所有权精确：独占规则迁入组件，App 保留共享 option-c
   ]) {
     assert.match(行动选项源码, new RegExp(转义(selector)), `行动选项应持有 ${selector}`);
   }
-  assert.match(行动选项源码, /:global\(html\.rq-lite\) \.option-row/, '行动选项持有 rq-lite option-row');
+  assert.doesNotMatch(行动选项源码, /rq-lite/, '行动选项不再消费已删除的手动省流 class');
   assert.match(行动选项源码, /:global\(html\.rq-dark\) \.option-chip\.gal/, '行动选项持有 dark gal');
   assert.match(行动选项源码, /@media \(max-width: 540px\)[\s\S]*?\.option-chip \{/, '行动选项持有 mobile option-chip');
   assert.match(
@@ -384,7 +384,7 @@ test('CSS 所有权精确：独占规则迁入组件，App 保留共享 option-c
   assert.match(App源码, /^\.option-chip\.gal \{/m, 'App 保留 option-chip.gal(偷窥)');
   assert.match(App源码, /^\.btn \{/m, 'App 保留通用 .btn');
   assert.match(App源码, /^\.btn\.rite \{/m, 'App 保留通用 .btn.rite');
-  assert.match(App源码, /:global\(html\.rq-lite\) \.peep-card/, 'App 保留 rq-lite peep-card');
+  assert.doesNotMatch(App源码, /rq-lite|rq-still/, 'App 不再保留手动省流或减动效 class 链');
   assert.match(App源码, /:global\(html\.rq-dark\) \.option-chip\.gal/, 'App 保留 dark option-chip.gal(偷窥)');
   assert.match(App源码, /@media \(max-width: 540px\)[\s\S]*? {2}\.option-chip \{/, 'App 保留 mobile option-chip(偷窥)');
   assert.match(

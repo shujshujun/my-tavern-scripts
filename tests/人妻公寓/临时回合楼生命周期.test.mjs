@@ -544,7 +544,7 @@ test('E1 自定义输入框全链:组件 submit → App 发送/发出 → 玩家
   assert.match(主回合, /role: 'assistant'/);
 });
 
-test('E2 成功路径先解锁前台，再后台触发数据库；V2 优先，旧版 GENERATION_ENDED 使用 chat.length 且不发 MESSAGE_SENT', () => {
+test('E2 成功路径先释放事务与前台租约、登记异步数据库任务，最后广播完成；V2 优先且不发 MESSAGE_SENT', () => {
   const 广播函数 = engine.slice(engine.indexOf('async function 广播生成完成事件'), engine.indexOf('let 数据库记录失败提示签名'));
   assert.match(广播函数, /触发数据库增量更新\(\)/, '优先使用数据库公开的 V2 增量更新入口');
   assert.match(广播函数, /GENERATION_ENDED/, '旧版仍须补发正常生成完成事件唤醒数据库插件扫楼');
@@ -557,10 +557,22 @@ test('E2 成功路径先解锁前台，再后台触发数据库；V2 优先，�
   assert.doesNotMatch(广播函数, /\.emit\([^)]*MESSAGE_SENT/, '刻意不发 MESSAGE_SENT,避免惊醒 MVU 对玩家楼无条件跑一轮=双重记账');
 
   const 转正标志位置 = 主回合.indexOf('临时用户已转正 = true');
-  const 完成位置 = 主回合.indexOf("eventEmit('人妻公寓:回合完成')", 转正标志位置);
-  const 后台位置 = 主回合.indexOf('安排数据库回合后处理({', 完成位置);
-  assert.ok(完成位置 > 转正标志位置, '双楼转正与最终 stat 提交后才能解锁前台');
-  assert.ok(后台位置 > 完成位置, '数据库骨架与填表更新必须在回合完成事件之后异步安排');
+  const 待广播位置 = 主回合.indexOf('待广播回合完成 = true', 转正标志位置);
+  const finally位置 = 主回合.indexOf('} finally {', 待广播位置);
+  const 事务结束位置 = 主回合.indexOf('标记回合事务结束();', finally位置);
+  const 前台释放位置 = 主回合.indexOf('前台租约.释放();', 事务结束位置);
+  const 后台登记位置 = 主回合.indexOf('安排数据库回合后处理({ ...待安排数据库回合后处理 });', 前台释放位置);
+  const 完成位置 = 主回合.indexOf("eventEmit('人妻公寓:回合完成')", 后台登记位置);
+  assert.ok(待广播位置 > 转正标志位置, '双楼转正与最终 stat 提交后只能记录成功，不能在事务内解锁前台');
+  assert.ok(finally位置 > 待广播位置, '真正收尾必须统一进入 finally');
+  assert.ok(事务结束位置 > finally位置 && 前台释放位置 > 事务结束位置, '先结束回合事务，再释放共享前台租约');
+  assert.ok(后台登记位置 > 前台释放位置, '数据库后处理只能在前台租约释放后登记');
+  assert.ok(完成位置 > 后台登记位置, '回合完成必须是全部运行期门释放且异步任务已可靠登记后的最后开放信号');
+  assert.match(
+    engine.slice(engine.indexOf('function 安排数据库回合后处理'), engine.indexOf('function 安排数据库回合后处理') + 900),
+    /setTimeout\(\(\) =>/,
+    '数据库 SQL 与填表本体仍必须在下一任务拍异步执行',
+  );
   assert.doesNotMatch(主回合, /await 广播生成完成事件\(/, '数据库插件等待不得继续占住前台回合锁');
 });
 

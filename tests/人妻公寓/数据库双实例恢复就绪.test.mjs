@@ -67,16 +67,23 @@ function world({ storageDenied = false, future = false } = {}) {
     setItem: (key, value) => { if (storageDenied) throw Error('storage denied'); storage.set(key, value); },
   } };
   const db = new DatabaseSync(':memory:');
-  db.exec(`CREATE TABLE rq_events(floor_no INTEGER PRIMARY KEY,time_text TEXT,location TEXT,participants TEXT,player_action TEXT,result_summary TEXT,event_code TEXT UNIQUE);
+  db.exec(`CREATE TABLE rq_events(row_id INTEGER PRIMARY KEY,floor_no INTEGER NOT NULL UNIQUE,time_text TEXT,location TEXT,participants TEXT,player_action TEXT,result_summary TEXT,event_code TEXT NOT NULL UNIQUE);
     CREATE TABLE rq_social_history(row_id INTEGER PRIMARY KEY,event_type TEXT,character_name TEXT,event_text TEXT,result TEXT,game_time TEXT,last_floor INTEGER,event_key TEXT UNIQUE,display_result TEXT);
     CREATE TABLE rq_character_memory(row_id INTEGER PRIMARY KEY,character_name TEXT,topic TEXT,memory_text TEXT,future_impact TEXT,last_time TEXT,last_floor INTEGER,confidence TEXT);
-    CREATE TABLE rq_promises(row_id INTEGER PRIMARY KEY,title TEXT,related_characters TEXT,detail TEXT,status TEXT,last_progress TEXT,last_time TEXT,last_floor INTEGER);`);
+    CREATE TABLE rq_promises(row_id INTEGER PRIMARY KEY,title TEXT,related_characters TEXT,detail TEXT,status TEXT,last_progress TEXT,last_time TEXT,last_floor INTEGER);
+    CREATE TABLE chronicle(row_id INTEGER PRIMARY KEY,code_index TEXT NOT NULL UNIQUE,time_span TEXT NOT NULL,summary TEXT NOT NULL,chronicle_text TEXT NOT NULL,key_dialogue TEXT);`);
+  if (future) {
+    db.prepare(`INSERT INTO rq_character_memory
+      (character_name, topic, memory_text, future_impact, last_time, last_floor, confidence)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run('未来住户', '未来记忆', '未来分支数据', '不得提前放行', '第3天 晚上', 11, '高');
+  }
   let chat = 'dual-test', auto = true, floor = 10;
   const snapshot = () => ({
-    a: { name: 'RQ_剧情事件', content: [['楼层'], [future ? 11 : 4]] },
-    b: { name: 'RQ_人物长期记忆', content: [['最后楼层']] },
-    c: { name: 'RQ_承诺与伏笔', content: [['最后楼层']] },
-    d: { name: 'RQ_社交轨迹', content: [['最后楼层'], ...db.prepare('SELECT last_floor FROM rq_social_history').all().map(r => [r.last_floor])] },
+    a: { name: 'RQ_剧情事件', content: [['楼层'], ...db.prepare('SELECT floor_no FROM rq_events ORDER BY floor_no').all().map(r => [r.floor_no])] },
+    b: { name: 'RQ_人物长期记忆', content: [['最后楼层'], ...db.prepare('SELECT last_floor FROM rq_character_memory ORDER BY row_id').all().map(r => [r.last_floor])] },
+    c: { name: 'RQ_承诺与伏笔', content: [['最后楼层'], ...db.prepare('SELECT last_floor FROM rq_promises ORDER BY row_id').all().map(r => [r.last_floor])] },
+    d: { name: 'RQ_社交轨迹', content: [['最后楼层'], ...db.prepare('SELECT last_floor FROM rq_social_history ORDER BY row_id').all().map(r => [r.last_floor])] },
   });
   const api = {
     exportTableAsJson: snapshot,
@@ -110,7 +117,8 @@ function world({ storageDenied = false, future = false } = {}) {
       '等待数据库时间线就绪', '启动数据库时间线恢复', '执行数据库时间线恢复', '标记数据库时间线将变更',
       '接入宿主时间线事件', '清理数据库时间线接线', '数据库刷新完成回调', '读取持久时间线状态',
       '数据库时间线允许新写', '数据库异步写', '数据库未补偿迟到写', '时间线恢复任务', '时间线栅栏',
-      '同步社交轨迹', '读取数据库记忆胶囊',
+      '数据库脚本表裁剪状态', '解析数据库脚本表裁剪规则', '收口数据库脚本表裁剪',
+      '同步数据库回合', '同步社交轨迹', '读取数据库记忆胶囊',
     ], {
       ...deps, ...time, _: lodash, window, console: { info() {}, warn() {}, error() {} },
       宿主窗口: () => host, 当前聊天标识: () => chat, 仍是同一聊天: id => id === chat, 当前末楼: () => floor,
@@ -122,15 +130,56 @@ function world({ storageDenied = false, future = false } = {}) {
       eventOn: (name, fn) => { if (!bus.has(name)) bus.set(name, new Set()); bus.get(name).add(fn); return { stop: () => bus.get(name).delete(fn) }; },
     });
     bridge.接入宿主时间线事件();
-    bridge.emit = name => { for (const fn of [...(bus.get(name) ?? [])]) fn(); };
+    bridge.emit = (name, ...args) => { for (const fn of [...(bus.get(name) ?? [])]) fn(...args); };
     bridge.window = window; instances.push(bridge); return bridge;
   }
+  const event = (bridge, floor = 2, valid = () => true) => bridge.同步数据库回合({
+    楼层: floor, 时间: '第1天 下午', 地点: '公寓大厅', 参与者: ['测试住户'],
+    玩家行动: '继续测试', 结果摘要: '新时间线的剧情事件已经写入。',
+  }, valid);
   const social = (bridge, text, floor = 4, valid = () => true) => bridge.同步社交轨迹({
     类型: '赠礼', 人物: '测试住户', 事件: '交付设备', 结果: text, 时间: '第2天 早上', 楼层: floor, 事件键: 'dual-event',
   }, valid);
+  const seedScriptRows = (seedFloor, suffix = `branch-${seedFloor}`) => {
+    db.prepare(`INSERT INTO rq_events
+      (floor_no, time_text, location, participants, player_action, result_summary, event_code)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run(seedFloor, '分支时间', '分支场景', '分支住户', '分支行动', `${suffix}剧情`, `${suffix}-event`);
+    db.prepare(`INSERT INTO rq_social_history
+      (event_type, character_name, event_text, result, game_time, last_floor, event_key, display_result)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run('赠礼', '分支住户', '分支事件', `${suffix}社交`, '分支时间', seedFloor, `${suffix}-social`, `${suffix}社交`);
+  };
+  const seedResetRows = (seedFloor = 9) => {
+    db.prepare(`INSERT INTO rq_events
+      (floor_no, time_text, location, participants, player_action, result_summary, event_code)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run(seedFloor, '旧时间', '旧场景', '旧住户', '旧行动', '旧分支剧情事件', `RQ-${seedFloor}`);
+    db.prepare(`INSERT INTO rq_character_memory
+      (character_name, topic, memory_text, future_impact, last_time, last_floor, confidence)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run('旧住户', '旧局记忆', '上一局的长期记忆', '新局不得继承', '旧时间', seedFloor, '明确');
+    db.prepare(`INSERT INTO rq_promises
+      (title, related_characters, detail, status, last_progress, last_time, last_floor)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run('旧局承诺', '旧住户', '上一局尚未完成的事项', '待处理', '旧进展', '旧时间', seedFloor);
+    db.prepare(`INSERT INTO rq_social_history
+      (event_type, character_name, event_text, result, game_time, last_floor, event_key, display_result)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+      .run('赠礼', '旧住户', '旧事件', '旧分支社交轨迹', '旧时间', seedFloor, `old-${seedFloor}`, '旧分支社交轨迹');
+    db.prepare(`INSERT INTO chronicle
+      (code_index, time_span, summary, chronicle_text, key_dialogue)
+      VALUES (?, ?, ?, ?, ?)`)
+      .run('AM0001', '旧时间', '旧局纪要', '上一局的剧情纪要。', null);
+  };
   return {
-    time, calls, callbacks, instance, social, snapshot,
+    time, calls, callbacks, instance, event, social, snapshot, seedResetRows, seedScriptRows,
     auto: value => { auto = value; }, setChat: value => { chat = value; }, setFloor: value => { floor = value; },
+    eventRows: () => db.prepare('SELECT * FROM rq_events ORDER BY floor_no').all(),
+    memoryRows: () => db.prepare('SELECT * FROM rq_character_memory ORDER BY row_id').all(),
+    promiseRows: () => db.prepare('SELECT * FROM rq_promises ORDER BY row_id').all(),
+    socialRows: () => db.prepare('SELECT * FROM rq_social_history ORDER BY last_floor').all(),
+    chronicleRows: () => db.prepare('SELECT * FROM chronicle ORDER BY row_id').all(),
     row: () => db.prepare('SELECT * FROM rq_social_history WHERE event_key=?').get('dual-event'),
     notify: () => { for (const fn of [...callbacks]) fn(snapshot()); },
     async close() {
@@ -160,6 +209,43 @@ test('跨窗口内部删楼已由操作级栅栏覆盖时，不得重标成玩�
   } finally { await w.close(); }
 });
 
+test('同一宿主事件的多实例重复标记只在短窗口内合并，之后同楼真实操作仍会换新令牌', async () => {
+  const w = world(), game = w.instance(), client = w.instance();
+  try {
+    w.setFloor(8);
+    game.标记数据库时间线将变更(8, '删除消息');
+    const first = game.读取持久时间线状态('dual-test');
+    assert.ok(first);
+
+    client.标记数据库时间线将变更(8, '删除消息');
+    const duplicate = client.读取持久时间线状态('dual-test');
+    assert.equal(duplicate?.令牌, first.令牌, '同一事件被两个 iframe 同步观察时必须复用共享事务');
+
+    await w.time.advance(251);
+    client.标记数据库时间线将变更(8, '删除消息');
+    const later = client.读取持久时间线状态('dual-test');
+    assert.notEqual(later?.令牌, first.令牌, '短合并窗之后的同楼同类操作必须建立新事务，不能被旧恢复吞掉');
+  } finally { await w.close(); }
+});
+
+test('精确 swipe 栅栏不会被稍后回合引擎兜底扩大到当前末楼', async () => {
+  const w = world(), bridge = w.instance(), engineFallback = w.instance();
+  try {
+    w.setFloor(9);
+    bridge.emit('swiped', 4);
+    const exact = bridge.读取持久时间线状态('dual-test');
+    assert.equal(exact?.目标楼层, 4);
+    assert.equal(exact?.原因, '切换消息分支');
+
+    // 回合引擎在异步 MVU 队列后才进入，可能已经超过普通同源事件的250ms合并窗。
+    await w.time.advance(400);
+    engineFallback.标记数据库时间线将变更(9, '切换消息分支', { 已有共享栅栏覆盖时不重标: true });
+    const preserved = engineFallback.读取持久时间线状态('dual-test');
+    assert.equal(preserved?.令牌, exact?.令牌);
+    assert.equal(preserved?.目标楼层, 4, '已有更严格的精确楼号必须继续覆盖当前末楼兜底');
+  } finally { await w.close(); }
+});
+
 test('真实原生删除没有既有覆盖时仍建立删除栅栏，更低末楼会收窄既有栅栏', async () => {
   const w = world(), game = w.instance(), client = w.instance();
   try {
@@ -177,6 +263,173 @@ test('真实原生删除没有既有覆盖时仍建立删除栅栏，更低末�
     assert.equal(narrowed?.原因, '删除消息');
     assert.equal(narrowed?.目标楼层, 4);
     assert.notEqual(narrowed?.令牌, before?.令牌);
+  } finally { await w.close(); }
+});
+
+test('重开到0会清空上一局五张数据库记忆表，再恢复剧情与社交写入', async () => {
+  const w = world(), game = w.instance(), client = w.instance();
+  try {
+    w.seedResetRows(9);
+    for (const rows of [w.eventRows(), w.memoryRows(), w.promiseRows(), w.socialRows(), w.chronicleRows()]) {
+      assert.equal(rows.length, 1);
+    }
+
+    game.标记数据库时间线将变更(0, '重开一局');
+    w.setFloor(0);
+    client.emit('deleted');
+    const results = [watch(game.等待数据库时间线就绪(8000)), watch(client.等待数据库时间线就绪(8000))];
+    await w.time.advance(9000);
+
+    assert.ok(results.every(result => result.value === true), '上一局数据库记忆不得把新局永久锁在恢复态');
+    for (const rows of [w.eventRows(), w.memoryRows(), w.promiseRows(), w.socialRows(), w.chronicleRows()]) {
+      assert.deepEqual(rows, []);
+    }
+    assert.equal(await w.event(game, 2), '已确认');
+    assert.equal(await w.social(game, '新局社交轨迹。', 2), '已确认');
+    assert.equal(w.eventRows().at(-1)?.result_summary, '新时间线的剧情事件已经写入。');
+    assert.equal(w.socialRows().at(-1)?.result, '新局社交轨迹。');
+  } finally { await w.close(); }
+});
+
+test('普通回档只裁剪脚本独占两表，通用长期记忆／承诺／纪要交给checkpoint保留', async () => {
+  const w = world(), game = w.instance();
+  try {
+    w.seedResetRows(4);
+    w.seedScriptRows(8, 'future');
+    game.标记数据库时间线将变更(4, '回档至4楼');
+    w.setFloor(4);
+    const result = watch(game.等待数据库时间线就绪(3500));
+    await w.time.advance(3200);
+
+    assert.equal(result.value, true);
+    assert.deepEqual(w.eventRows().map(row => row.floor_no), [4], '剧情流水只保留存活锚楼及以前');
+    assert.deepEqual(w.socialRows().map(row => row.last_floor), [4], '社交流水只保留存活锚楼及以前');
+    assert.equal(w.memoryRows().length, 1, '人物长期记忆不能被游戏侧普通回档清空');
+    assert.equal(w.promiseRows().length, 1, '承诺与伏笔不能被游戏侧普通回档清空');
+    assert.equal(w.chronicleRows().length, 1, '纪要不能被游戏侧普通回档清空');
+    const deletes = w.calls.filter(call => /^DELETE FROM /u.test(call.sql));
+    assert.equal(deletes.length, 2);
+    assert.ok(deletes.every(call => /DELETE FROM (?:rq_events|rq_social_history)/u.test(call.sql)));
+    assert.ok(deletes.every(call => / > \?/u.test(call.sql)), '普通回档只能裁目标楼之后，不得删除目标楼');
+  } finally { await w.close(); }
+});
+
+test('普通回档裁剪DELETE超时后，底层Promise真实settle前跨窗口持续关门且不重复发SQL', async () => {
+  const w = world(), game = w.instance(), client = w.instance();
+  try {
+    w.seedScriptRows(8, 'future-timeout');
+    w.auto(false);
+    game.标记数据库时间线将变更(4, '回档至4楼');
+    client.标记数据库时间线将变更(4, '回档至4楼');
+    const results = [watch(game.等待数据库时间线就绪(8000)), watch(client.等待数据库时间线就绪(8000))];
+
+    // 第一张脚本表的裁剪已超过单次2.5秒等待，但底层DELETE仍未真正结算。
+    await w.time.advance(3600);
+    assert.equal(w.calls.length, 1, '多iframe与恢复重试不得复制仍在运行的破坏性裁剪SQL');
+    assert.ok(results.every(result => result.value !== true));
+    assert.equal(game.数据库时间线允许新写('dual-test'), false);
+    assert.equal(client.数据库时间线允许新写('dual-test'), false);
+    const callCount = w.calls.length;
+    assert.equal(await w.event(game, 2), '失败', '裁剪未settle期间新剧情写入必须失败关闭');
+    assert.equal(w.calls.length, callCount, '被栅栏拒绝的业务写不得进入数据库队列');
+
+    w.auto(true);
+    w.calls[0].finish();
+    await flush();
+    await w.time.advance(3600);
+    assert.ok(results.every(result => result.value === true));
+    assert.deepEqual(w.eventRows(), []);
+    assert.deepEqual(w.socialRows(), []);
+    assert.ok(w.calls.every(call => call.settled), '开放写门时不得残留任何脚本表裁剪DELETE');
+  } finally { await w.close(); }
+});
+
+test('同楼swipe使用事件携带的精确楼号，并删除目标楼及其后的旧剧情／社交分支行', async () => {
+  const w = world(), game = w.instance();
+  try {
+    w.seedScriptRows(2, 'prior');
+    w.seedResetRows(4);
+    w.setFloor(9);
+    game.emit('swiped', 4);
+    const pending = game.读取持久时间线状态('dual-test');
+    assert.equal(pending?.目标楼层, 4, '不得用仍为9的当前末楼替代实际被swipe的4楼');
+    assert.equal(pending?.原因, '切换消息分支');
+
+    const result = watch(game.等待数据库时间线就绪(3500));
+    await w.time.advance(1200);
+    w.notify();
+    await w.time.advance(500);
+
+    assert.equal(result.value, true);
+    assert.deepEqual(w.eventRows().map(row => row.floor_no), [2], '目标4楼的旧剧情行必须与未来行一起裁掉');
+    assert.deepEqual(w.socialRows().map(row => row.last_floor), [2], '目标4楼的旧社交行必须与未来行一起裁掉');
+    assert.equal(w.memoryRows().length, 1);
+    assert.equal(w.promiseRows().length, 1);
+    assert.equal(w.chronicleRows().length, 1);
+    const deletes = w.calls.filter(call => /^DELETE FROM /u.test(call.sql));
+    assert.equal(deletes.length, 2);
+    assert.ok(deletes.every(call => / >= \?/u.test(call.sql)), '同楼swipe必须包含目标楼自身');
+  } finally { await w.close(); }
+});
+
+test('重开五表清空后若checkpoint迟到回灌旧行，稳定复核会再次清理而不开放新写', async () => {
+  const w = world(), game = w.instance();
+  try {
+    w.seedResetRows(9);
+    game.标记数据库时间线将变更(0, '重开一局');
+    w.setFloor(0);
+    const result = watch(game.等待数据库时间线就绪(8000));
+
+    await w.time.advance(2700);
+    assert.ok(result.value !== true);
+    for (const rows of [w.eventRows(), w.memoryRows(), w.promiseRows(), w.socialRows(), w.chronicleRows()]) {
+      assert.deepEqual(rows, [], '第一轮五表清场应已落库但仍处于稳定复核期');
+    }
+
+    // 模拟数据库删楼守卫／checkpoint 在清场后迟到把上一局快照重新灌回运行表。
+    w.seedResetRows(9);
+    await w.time.advance(5500);
+    assert.equal(result.value, true, '迟到回灌必须被重新清理后才能完成原恢复令牌');
+    for (const rows of [w.eventRows(), w.memoryRows(), w.promiseRows(), w.socialRows(), w.chronicleRows()]) {
+      assert.deepEqual(rows, []);
+    }
+    const eventDeletes = w.calls.filter(call => /^DELETE FROM rq_events /u.test(call.sql));
+    assert.ok(eventDeletes.length >= 2, '同一令牌应检测并清理至少两次旧剧情回灌');
+  } finally { await w.close(); }
+});
+
+test('重开清场DELETE超时后跨窗口只保留一笔，真实结算前不开放新局写入', async () => {
+  const w = world(), game = w.instance(), client = w.instance();
+  try {
+    w.seedResetRows(9);
+    w.auto(false);
+    game.标记数据库时间线将变更(0, '重开一局');
+    w.setFloor(0);
+    client.emit('deleted');
+    const results = [watch(game.等待数据库时间线就绪(8000)), watch(client.等待数据库时间线就绪(8000))];
+
+    // 第一张表的 DELETE 已超过单次等待上限，但底层 promise 尚未真正结算。
+    await w.time.advance(6000);
+    assert.equal(w.calls.length, 1, '两个 iframe 与超时重试不得复制同一笔破坏性清场 SQL');
+    assert.ok(results.every(result => result.value !== true));
+    assert.equal(game.数据库时间线允许新写('dual-test'), false);
+    assert.equal(client.数据库时间线允许新写('dual-test'), false);
+
+    // 原 DELETE 真正 settle 后，其余空表清场可串行完成；之后的新局行不会被迟到请求抹掉。
+    w.auto(true);
+    w.calls[0].finish();
+    await flush();
+    await w.time.advance(4000);
+    assert.ok(
+      results.every(result => result.settled && result.value === false),
+      '原8秒有界等待已经到期时保持失败关闭，不把迟到清场伪报为本次同步完成',
+    );
+    assert.equal(game.读取持久时间线状态('dual-test'), null, '后台重试应在真实settle后完成共享恢复');
+    assert.equal(client.读取持久时间线状态('dual-test'), null);
+    assert.equal(await game.等待数据库时间线就绪(0), true);
+    assert.equal(await w.event(game, 2), '已确认');
+    assert.equal(w.eventRows().at(-1)?.result_summary, '新时间线的剧情事件已经写入。');
+    assert.ok(w.calls.every(call => call.settled), '数据库写门开放时不得残留任何清场 DELETE');
   } finally { await w.close(); }
 });
 
@@ -224,7 +477,7 @@ for (const failure of ['unfinished', 'compensation-failed']) {
       const result = watch(a.等待数据库时间线就绪(3500)); void b.等待数据库时间线就绪(3500);
       await w.time.advance(1100); w.notify(); await w.time.advance(500);
       if (failure === 'compensation-failed') { w.calls.at(-1).finish(); await flush(); w.calls.at(-1).finish('reject'); await flush(); }
-      await w.time.advance(2200);
+      await w.time.advance(3200);
       assert.equal(result.settled, true); assert.equal(result.value, false);
       assert.equal(await a.等待数据库时间线就绪(0), false);
       assert.equal(a.数据库时间线允许新写('dual-test'), false);
@@ -255,6 +508,8 @@ test('Future snapshot and swipe without a trusted callback do not open either in
       const results = [watch(a.等待数据库时间线就绪(3500)), watch(b.等待数据库时间线就绪(3500))];
       await w.time.advance(4000); assert.ok(results.every(r => r.value === false));
       assert.equal(a.数据库时间线允许新写('dual-test'), false);
+      assert.equal(w.calls.length, 0, '普通回档或 swipe 不得借重开清场逻辑删除任何数据库行');
+      if (future) assert.equal(w.memoryRows().length, 1, '普通回档中的未来长期记忆应等待插件恢复，而不是被脚本清空');
     } finally { await w.close(); }
   }
 });

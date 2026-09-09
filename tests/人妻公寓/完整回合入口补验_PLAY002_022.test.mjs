@@ -29,6 +29,17 @@ for (const theme of [0, 1, 2]) test(`PLAY002 完整入口D1→D2/主题${theme}�
   assert.equal(e.requests.length, 2);
 });
 
+test('普通完整回合只在回合门与共享前台租约释放后广播成功完成', async () => {
+  const e = dailyHost();
+  e.provider = () => dailyBodies[0][0];
+  assert.equal(await e.run(), true, e.warnings.join('\n'));
+  const completed = e.trace.findLast(item => item.op === 'event' && item.name === '人妻公寓:回合完成');
+  assert.ok(completed, '成功回合必须广播完成');
+  assert.equal(completed.roundBusy, false, '完成监听器进入时回合事务门必须已经关闭');
+  assert.equal(completed.foregroundBusy, false, '完成监听器进入时共享前台生成租约必须已经释放');
+  assertReleased(e);
+});
+
 test('PLAY022 H8完整入口：真实动作生产票、验收、提交和文件重载', async () => {
   const e = nbsHost(); storage(e, 'h8');
   e.provider = () => '你没有离开，而是继续刚才的动作。江辰从外面关好卧室门，转身去书房。';

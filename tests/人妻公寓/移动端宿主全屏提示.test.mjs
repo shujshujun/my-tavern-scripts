@@ -60,8 +60,8 @@ test('客户端全屏建议允许继续窗口模式，并持久记住任一选�
     '两种全屏选择都必须保留至少44px的移动端触控高度',
   );
   assert.match(界面偏好源, /移动端全屏引导存储键 = ['"]rqgy-mobile-fullscreen-guide-v1['"]/);
-  assert.match(界面偏好源, /localStorage\.getItem\(移动端全屏引导存储键\)/);
-  assert.match(界面偏好源, /localStorage\.setItem\(移动端全屏引导存储键,/);
+  assert.match(界面偏好源, /取共享存储\(\)\?\.getItem\(移动端全屏引导存储键\)/, '全屏选择从父页优先的共享存储读取');
+  assert.match(界面偏好源, /取共享存储\(\)\?\.setItem\(移动端全屏引导存储键,/, '全屏选择写入父页优先的共享存储');
   assert.match(界面偏好源, /function 继续窗口模式\(\)[\s\S]{0,180}记住移动端全屏选择\('窗口'\)/);
   assert.match(界面偏好源, /async function 打开移动端全屏\(\)[\s\S]{0,180}记住移动端全屏选择\('全屏'\)/);
 });

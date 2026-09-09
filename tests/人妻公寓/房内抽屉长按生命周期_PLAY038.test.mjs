@@ -274,7 +274,7 @@ function browserHarness() {
 }
 
 const vueSource = readFileSync(require.resolve('vue/dist/vue.global.prod.js'), 'utf8');
-const html = `<!doctype html><html class="rq-still"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+const html = `<!doctype html><html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
 body{margin:0;padding:20px;box-sizing:border-box;background:#f5f4f2;color:#252331;font:16px sans-serif;--ink:#252331;--ink-faint:#615e6a;--pink:#b75182}#app{max-width:720px;margin:360px auto 0}*{box-sizing:border-box}
 ${styles.join('\n')}</style><body><main id="app"></main><script>${vueSource.replaceAll('</script', '<\\/script')}</script><script>
 const sources = ${JSON.stringify(modules).replaceAll('</script', '<\\/script')}; const cache = {};

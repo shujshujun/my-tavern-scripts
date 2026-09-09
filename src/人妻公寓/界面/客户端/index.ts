@@ -3,6 +3,7 @@ import App from './App.vue';
 import './global.css';
 import { 注册画幅页面生命周期, 同步画幅 } from './viewport';
 import { 等待客户端启动依赖 } from './启动等待';
+import { 清理已删除界面偏好 } from './旧界面偏好迁移';
 
 type 客户端入口窗口 = Window & {
   __rqgyClientEntryCleanup?: () => void;
@@ -39,14 +40,22 @@ const 未处理拒绝处理 = (ev: PromiseRejectionEvent) => 显示致命错误(
 window.addEventListener('error', 窗口错误处理);
 window.addEventListener('unhandledrejection', 未处理拒绝处理);
 
+// 旧偏好与旧 iframe class 必须在任何 DOM ready、MVU/stat_data 等待和 Vue mount 之前同步退场。
+// 共享存储读写失败只记诊断，不能把客户端重新卡在静态占位页。
+const 旧偏好迁移 = 清理已删除界面偏好();
+if (旧偏好迁移.根类错误) console.warn('[人妻公寓客户端] 清理旧界面 class 失败，继续启动:', 旧偏好迁移.根类错误);
+if (旧偏好迁移.存储错误) console.warn('[人妻公寓客户端] 清理旧界面偏好存储失败，继续启动:', 旧偏好迁移.存储错误);
+
 同步画幅();
 const 注销画幅生命周期 = 注册画幅页面生命周期();
+let 注销文档就绪监听 = () => {};
 
 const 清理入口 = () => {
   if (入口已作废) return;
   入口已作废 = true;
   window.removeEventListener('error', 窗口错误处理);
   window.removeEventListener('unhandledrejection', 未处理拒绝处理);
+  注销文档就绪监听();
   注销画幅生命周期();
   已挂载应用?.unmount();
   已挂载应用 = undefined;
@@ -54,7 +63,7 @@ const 清理入口 = () => {
 };
 入口全局.__rqgyClientEntryCleanup = 清理入口;
 
-$(async () => {
+async function 挂载客户端(): Promise<void> {
   if (入口已作废) return;
   try {
     const 启动等待 = await 等待客户端启动依赖(
@@ -80,4 +89,18 @@ $(async () => {
   } catch (e) {
     显示致命错误(e, 'mount');
   }
-});
+}
+
+const 文档就绪后启动 = (): void => {
+  注销文档就绪监听();
+  void 挂载客户端();
+};
+
+// jQuery ready 曾是 try/catch 之外唯一没有超时或降级的前置门；改用浏览器原生就绪状态，
+// 已经 ready 的热重载 iframe 走微任务，仍在解析的首载 iframe 只等一次 DOMContentLoaded。
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', 文档就绪后启动, { once: true });
+  注销文档就绪监听 = () => document.removeEventListener('DOMContentLoaded', 文档就绪后启动);
+} else {
+  void Promise.resolve().then(文档就绪后启动);
+}

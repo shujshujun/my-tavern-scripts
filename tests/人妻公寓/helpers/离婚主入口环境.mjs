@@ -1,4 +1,4 @@
-/* eslint-disable import-x/no-nodejs-modules -- Isolated host ports; loads complete current production modules. */
+/* eslint-disable import-x/no-nodejs-modules, import-x/no-dynamic-require -- Isolated host ports; loads complete current production modules. */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -76,7 +76,16 @@ export function host(options = {}) {
     getWorldbookNames: () => [], getCharWorldbookNames: () => ({ primary: null, additional: [] }), getCharLorebook: () => null,
     eventOn: (name, fn) => { if (!e.listeners.has(name)) e.listeners.set(name, new Set()); e.listeners.get(name).add(fn); return { stop: () => e.listeners.get(name).delete(fn) }; },
     eventClearEvent: name => e.listeners.delete(name),
-    eventEmit: async (name, ...args) => { e.trace.push({ op: 'event', name, args: clone(args) }); for (const fn of [...(e.listeners.get(name) ?? [])]) await fn(...args); },
+    eventEmit: async (name, ...args) => {
+      e.trace.push({
+        op: 'event',
+        name,
+        args: clone(args),
+        roundBusy: Boolean(e.main?.回合进行中?.()),
+        foregroundBusy: Boolean(e.locks?.前台生成租约持有中?.()),
+      });
+      for (const fn of [...(e.listeners.get(name) ?? [])]) await fn(...args);
+    },
     tavern_events: { MESSAGE_DELETED: 'message_deleted', GENERATION_STARTED: 'generation_started', GENERATION_ENDED: 'generation_ended' },
     iframe_events: { STREAM_TOKEN_RECEIVED_FULLY: 'stream-full' },
     fetch: noCall('network'), generateRaw: noCall('unconfigured-variable-model'),

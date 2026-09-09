@@ -242,7 +242,7 @@ test('弹窗基础.css 精确含通用 selector；四弹窗以 scoped src 使用
   }
   assert.match(基础CSS, /:global\(html\.rq-dark\) \.sheet/, '基础 CSS 应含 dark sheet');
   assert.match(基础CSS, /:global\(html\.rq-dark\) \.sheet-close/, '基础 CSS 应含 dark sheet-close');
-  assert.match(基础CSS, /:global\(html\.rq-still\) \*/, '基础 CSS 应含 rq-still 减动效');
+  assert.doesNotMatch(基础CSS, /rq-still/, '已删除的手动减动效 class 不得留在弹窗基础 CSS');
   assert.match(基础CSS, /background:\s*var\(--surface-sheet\);/, 'sheet 明暗表面应由语义令牌统一');
   assert.match(基础CSS, /backdrop-filter: blur\(4px\) saturate\(0\.9\);/, 'mask 关键声明应保留');
 
@@ -303,7 +303,7 @@ test('五组专属 CSS 已从 App 移除并出现在正确组件；App 仍保留
   assert.match(反馈提示源码, /@keyframes card-pop-in/, '反馈需复制 card-pop-in 同名 keyframes');
   assert.match(反馈提示源码, /:global\(html\.rq-dark\) \.toast/, 'dark toast 应到 反馈提示.vue');
   assert.match(反馈提示源码, /:global\(html\.rq-dark\) \.loot-card/, 'dark 拾获卡应到 反馈提示.vue');
-  assert.match(反馈提示源码, /:global\(html\.rq-still\)/, '反馈需自带 rq-still 减动效');
+  assert.doesNotMatch(反馈提示源码, /rq-still/, '反馈组件不得继续消费已删除的手动减动效 class');
 
   // App 仍保留未拆卡片/未拆区块所需规则
   assert.match(档案卡源码, /\.dossier-card \.dsec-title \.cg-progress/, '档案卡开图库按钮 CSS 随档案卡迁入组件');

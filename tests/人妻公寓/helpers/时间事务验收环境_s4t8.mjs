@@ -1,8 +1,9 @@
-/* eslint-disable import-x/no-nodejs-modules -- Node-only isolated host adapters */
+/* eslint-disable import-x/no-nodejs-modules, import-x/no-dynamic-require -- Node-only isolated production-module loader */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+import { after } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const require = createRequire(import.meta.url);
@@ -11,6 +12,17 @@ require('ts-node/register/transpile-only');
 const jsonLoader = require.extensions['.json'];
 delete require.extensions['.json'];
 require.extensions['.json'] = jsonLoader;
+const Module = require('node:module');
+const originalLoad = Module._load;
+Module._load = function (request, parent, main) {
+  if (String(request).endsWith('?raw')) {
+    return fs.readFileSync(path.resolve(path.dirname(parent.filename), String(request).slice(0, -4)), 'utf8');
+  }
+  return originalLoad.call(this, request, parent, main);
+};
+after(() => {
+  Module._load = originalLoad;
+});
 const _ = require('lodash');
 const ts = require('typescript');
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -35,6 +47,8 @@ const nativeInterval = globalThis.setInterval;
 globalThis.setInterval = (...args) => { const timer = nativeInterval(...args); timer.unref(); return timer; };
 export const { Schema } = require(path.join(root, 'src/人妻公寓/schema.ts'));
 export const undoCore = require(path.join(base, '时间撤销系统.ts'));
+const timeGate = require(path.join(base, '时间事务写入门.ts'));
+const mvuIO = require(path.join(base, 'mvuIO.ts'));
 const { 手机锚消息签名 } = require(path.join(base, '手机时间线租约.ts'));
 const parsed = new Map();
 
@@ -85,6 +99,7 @@ export function createTimeEnvironment({ clock = 5, room = '管理员室', mode =
   let hook = async () => {};
   let counters = { core: 0, chat: 0, model: 0, mirror: 0, phoneSave: 0, phoneRefresh: 0 };
   const events = [];
+  const eventStates = [];
   const errors = [];
   const original = _.cloneDeep(stores.get('time-a'));
   const current = () => stores.get(chatId);
@@ -109,7 +124,13 @@ export function createTimeEnvironment({ clock = 5, room = '管理员室', mode =
     登记MVU提交校验: () => () => {},
     安全操作: run => {
       const startId = chatId, startGeneration = generation;
-      pending = Promise.resolve().then(() => run({ stat_data: _.cloneDeep(current().data) }, _.cloneDeep(current().data), () => startId === chatId && startGeneration === generation)).catch(error => errors.push(error.message));
+      pending = mvuIO.排队MVU操作(() =>
+        run(
+          { stat_data: _.cloneDeep(current().data) },
+          _.cloneDeep(current().data),
+          () => startId === chatId && startGeneration === generation,
+        )
+      ).catch(error => errors.push(error.message));
       return pending;
     },
     读取最近有效: () => ({ raw: { stat_data: _.cloneDeep(current().data) }, data: _.cloneDeep(current().data) }),
@@ -132,7 +153,14 @@ export function createTimeEnvironment({ clock = 5, room = '管理员室', mode =
       counters.model++; await hit('model', counters.model);
       return { 参数: parameters, 正文: '关灯休息，次日早晨在原处醒来。', 提示词: 'isolated neutral provider' };
     },
-    eventEmit: (...args) => events.push(args), setTimeout: () => 0,
+    eventEmit: (...args) => {
+      events.push(args);
+      eventStates.push({
+        event: args[0],
+        mvuBusy: mvuIO.MVU操作进行中(),
+        timeBlocked: timeGate.时间事务阻止普通写入(),
+      });
+    }, setTimeout: () => 0,
     console: { info() {}, warn() {}, error() {} },
   };
   adapters.写时间结束场景 = actual('写时间结束场景', adapters);
@@ -146,7 +174,7 @@ export function createTimeEnvironment({ clock = 5, room = '管理员室', mode =
   const advance = actual('处理时间推进', adapters);
   const reverse = actual('处理撤销时间推进', adapters);
   const env = {
-    stores, original, errors, events,
+    stores, original, errors, events, eventStates,
     get state() { return current(); }, get counters() { return counters; }, get chatId() { return chatId; },
     get a() { return stores.get('time-a'); },
     setHook(next) { hook = next; },

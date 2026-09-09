@@ -293,14 +293,14 @@ test('H3成功信号会先撤下DIV-07横向事件图，再让普通亲密CG舞�
   assert.match(app, /当前家庭计划CG\.value = \{ 文件, 标题: 许曼君离婚CG标题\(文件\), 来源: '许曼君离婚' \}/u);
 });
 
-test('H8三张结果图切换使用一次轻微白闪，并在静止/减弱动态模式下关闭且卸载清理计时', () => {
+test('H8三张结果图切换使用一次轻微白闪，并在系统减弱动态模式下关闭且卸载清理计时', () => {
   const app = read('src/人妻公寓/界面/客户端/App.vue');
   assert.match(app, /story-divorce-flash['"]:\s*离婚结果白闪/u);
   assert.match(app, /\^XMJ-DIV-1\[1-3\]\$/u);
   assert.match(app, /触发离婚结果白闪\(\)/u);
   assert.match(app, /@keyframes divorce-result-flash/u);
   assert.match(app, /prefers-reduced-motion: reduce[\s\S]*?story-divorce-flash/u);
-  assert.match(app, /html\.rq-still[\s\S]*?story-divorce-flash/u);
+  assert.doesNotMatch(app, /rq-still/u, '手动减动效 class 链已彻底删除');
   assert.match(app, /clearTimeout\(离婚结果白闪timer\)/u);
   assert.match(app, /cancelAnimationFrame\(离婚结果白闪帧\)/u);
   assert.match(app, /当前事件CG请求epoch\.value \+= 1/u);

@@ -38,8 +38,6 @@ const {
   正文字色,
   立绘显示,
   垫板浓度,
-  省流,
-  减动效,
   全屏中,
   切换全屏,
   改设置,
@@ -441,22 +439,6 @@ onUnmounted(() => {
           </p>
         </div>
         <button class="toggle" :class="{ on: 立绘显示 }" @click="((立绘显示 = !立绘显示), 改设置())"><i /></button>
-      </div>
-
-      <div class="set-group row">
-        <div>
-          <div class="set-label">省流模式</div>
-          <p class="set-hint">只关闭场景背景与地图立面大图；人物、头像和功能图标仍正常显示。</p>
-        </div>
-        <button class="toggle" :class="{ on: 省流 }" @click="((省流 = !省流), 改设置())"><i /></button>
-      </div>
-
-      <div class="set-group row">
-        <div>
-          <div class="set-label">减少动效</div>
-          <p class="set-hint">关掉转场、弹跳、呼吸等动画。</p>
-        </div>
-        <button class="toggle" :class="{ on: 减动效 }" @click="((减动效 = !减动效), 改设置())"><i /></button>
       </div>
 
       <div class="set-group">

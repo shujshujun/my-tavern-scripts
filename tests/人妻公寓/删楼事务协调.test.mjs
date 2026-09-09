@@ -25,7 +25,8 @@ test('原生 swipe/删楼都进入带世代的统一时间线协调，并只停�
   const handler = index.slice(start, end);
 
   assert.match(handler, /排队时间线切换协调/);
-  assert.match(handler, /协调原生时间线切换/);
+  assert.match(handler, /协调原生时间线切换\(类型, 切分支楼\)/,
+    '回合引擎兜底必须继续使用 TT 酒馆事件携带的精确 swipe 楼号');
   assert.match(handler, /消费内部删楼事件/);
   assert.match(handler, /清原生本轮冻结\(\)/);
   assert.match(handler, /释放静音会议原生生成锁/);
@@ -218,8 +219,14 @@ test('重开出厂 stat 一旦提交，镜像／世界书后处理失败仍按�
   const catch段 = 重开.slice(重开.indexOf('} catch (e) {'));
   assert.match(
     catch段,
-    /if \(重开核心已提交\)[\s\S]*eventEmit\('人妻公寓:已重开'\)[\s\S]*return;/,
-    '核心已提交后的派生失败不能伪报重开失败或把界面留在旧局',
+    /if \(重开核心已提交\)[\s\S]*新局核心状态已经保存[\s\S]*return;/,
+    '核心已提交后的派生失败不能伪报重开失败',
+  );
+  const finally段 = 重开.slice(重开.lastIndexOf('} finally {'));
+  assert.match(
+    finally段,
+    /标记回合事务结束\(\);[\s\S]*if \(重开核心已提交 && 重开仍有效\(\)\)[\s\S]*eventEmit\('人妻公寓:已重开'\)/,
+    '核心已提交后的正常与派生失败路径都必须在事务门释放后通知界面进入新局',
   );
 });
 

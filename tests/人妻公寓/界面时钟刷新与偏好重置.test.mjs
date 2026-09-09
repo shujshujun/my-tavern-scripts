@@ -130,7 +130,7 @@ test('偏好单例销毁后重挂载会接管最新 App 的时段、画幅与错
   }
 });
 
-test('损坏或旧版界面偏好按枚举、范围与布尔类型归一，不把非法值写进 CSS', () => {
+test('损坏或旧版界面偏好按枚举与范围归一；已删除设置不再暴露且下一次写回不会复活', () => {
   const 原window = globalThis.window;
   const 原document = globalThis.document;
   const 原localStorage = globalThis.localStorage;
@@ -171,6 +171,7 @@ test('损坏或旧版界面偏好按枚举、范围与布尔类型归一，不�
       省流: 'false',
       减动效: 1,
       立绘显示: 'false',
+      变量解析通道: '自定义',
     }));
 
     const 偏好 = useUIPrefs();
@@ -179,9 +180,14 @@ test('损坏或旧版界面偏好按枚举、范围与布尔类型归一，不�
     assert.equal(偏好.字号档.value, '中');
     assert.equal(偏好.正文字色.value, '');
     assert.equal(偏好.垫板浓度.value, 1, '垫板浓度必须夹在 0.2~1.0');
-    assert.equal(偏好.省流.value, false, '字符串 false 不能被强转为 true');
-    assert.equal(偏好.减动效.value, false);
+    assert.equal(Object.prototype.hasOwnProperty.call(偏好, '省流'), false, '已删除设置不再由 composable 暴露');
+    assert.equal(Object.prototype.hasOwnProperty.call(偏好, '减动效'), false, '已删除设置不再由 composable 暴露');
     assert.equal(偏好.立绘显示.value, true);
+    偏好.改设置();
+    const 保存后 = JSON.parse(localStorage.getItem(设置存储键));
+    assert.equal(Object.prototype.hasOwnProperty.call(保存后, '省流'), false, '外观写回会清除旧省流字段');
+    assert.equal(Object.prototype.hasOwnProperty.call(保存后, '减动效'), false, '外观写回会清除旧减动效字段');
+    assert.equal(保存后.变量解析通道, '自定义', '共享键里的变量解析通道逐值保留');
   } finally {
     if (原window === undefined) delete globalThis.window;
     else globalThis.window = 原window;
@@ -192,7 +198,7 @@ test('损坏或旧版界面偏好按枚举、范围与布尔类型归一，不�
   }
 });
 
-test('恢复默认外观只重置 UI 字段，保留变量解析通道、严格审计和版本初始化标记', () => {
+test('恢复默认外观只重置安全 UI 字段，保留变量解析设置并清除已删除旧字段', () => {
   const 原window = globalThis.window;
   const 原document = globalThis.document;
   const 原localStorage = globalThis.localStorage;
@@ -230,6 +236,8 @@ test('恢复默认外观只重置 UI 字段，保留变量解析通道、严格�
       严格变量审计: true,
       变量解析通道: '自定义',
       MVU外置默认V080已初始化: true,
+      省流: true,
+      减动效: true,
     }));
 
     useUIPrefs().重置界面偏好();
@@ -246,6 +254,8 @@ test('恢复默认外观只重置 UI 字段，保留变量解析通道、严格�
     assert.equal(保存后.主题模式, '日间');
     assert.equal(保存后.字号档, '中');
     assert.equal(保存后.立绘显示, true);
+    assert.equal(Object.prototype.hasOwnProperty.call(保存后, '省流'), false);
+    assert.equal(Object.prototype.hasOwnProperty.call(保存后, '减动效'), false);
   } finally {
     if (原window === undefined) delete globalThis.window;
     else globalThis.window = 原window;

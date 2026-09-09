@@ -40,7 +40,7 @@ const plan = (shape = 'group', patch = {}) => ({
 function fixture(initial = plan()) {
   let vars = { _手机邀约计划: initial, _场景: { 房间id: '大堂' }, _赴约: { m: '202', 起楼: 1, 至楼: 8 }, _上次回合: { 旧: true } };
   let generation = 1, chat = 'invitation-test', beforeUpdate = () => {}, saveFailure = '', waitDB = async () => true;
-  const saved = [], writes = [];
+  const saved = [], writes = [], databaseMarks = [];
   const environment = {
     _: lodash, ...plans, 门牌列表,
     当前聊天ID: () => chat, 当前时间线切换世代: () => generation,
@@ -49,7 +49,8 @@ function fixture(initial = plan()) {
     读取最近有效: () => ({ raw: {}, data: { 系统: { _绝对时段: 12 } } }),
     updateVariablesWith: async updater => { await beforeUpdate(); vars = updater(structuredClone(vars)); writes.push(structuredClone(vars)); },
     排队MVU操作: async work => work(), 等待数据库时间线就绪: () => waitDB(),
-    标记数据库时间线将变更: () => {}, 作废晋阶镜像时间线: async () => {},
+    标记数据库时间线将变更: (...args) => { databaseMarks.push(structuredClone(args)); },
+    作废晋阶镜像时间线: async () => {},
     立即持久保存手机聊天变量: async () => {
       if (saveFailure === 'before') throw new Error('save-before');
       saved.push(structuredClone(vars));
@@ -72,7 +73,7 @@ function fixture(initial = plan()) {
     ...compile('snapshotSystem', ['读赴约们', '读赴约'], environment),
   };
   return {
-    engine, readers, saved, writes,
+    engine, readers, saved, writes, databaseMarks,
     get vars() { return structuredClone(vars); },
     replace: value => { vars = structuredClone(value); },
     nextGeneration: () => { generation++; },
@@ -90,6 +91,20 @@ test('执行后的集合保留快照键但排除无条件清场，不能只检�
   for (const key of ['_场景', '_赴约', '_上次回合', '_上次隔离回合', '_时间撤销点']) {
     assert.ok(f.engine.时间线清场变量键.includes(key));
   }
+});
+
+test('TT 酒馆同楼 swipe 的精确楼号不会被回合引擎兜底改写成当前末楼', async () => {
+  const swipe = fixture();
+  await swipe.engine.协调原生时间线切换('切分支', 2);
+  assert.deepEqual(swipe.databaseMarks, [
+    [2, '切换消息分支', { 已有共享栅栏覆盖时不重标: true }],
+  ]);
+
+  const deleted = fixture();
+  await deleted.engine.协调原生时间线切换('删楼', 2);
+  assert.deepEqual(deleted.databaseMarks, [
+    [4, '删除消息', { 已有共享栅栏覆盖时不重标: true }],
+  ], '删楼事件载荷是被删消息，数据库边界仍应取删完后的存活末楼');
 });
 for (const type of ['删楼', '切分支']) {
   for (const shape of ['legacy-single', 'single-v2', 'group']) {

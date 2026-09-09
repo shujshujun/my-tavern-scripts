@@ -1186,7 +1186,6 @@
         :day="天数"
         :weekday="星期"
         :period="时段"
-        :lite="省流"
         :sending="发送中 || 场景剧情移动锁 || 前台硬决策中"
         :hospital-visible="医院已解锁(data)"
         :avatar-failed="头像失效"
@@ -1397,7 +1396,7 @@
            带【】的重要提示(线索/收获类)升级成点击才收下的 gal 卡,普通提示仍走 toast -->
       <FeedbackOverlay :toast="提示文本" :loot="拾获卡" :sending="发送中" @dismiss-loot="收下拾获卡" />
     </div>
-    <SettlementScreen v-if="通关纪念开 && 通关当前成绩" :current="通关当前成绩" :first="首次通关成绩" :celebration="通关庆祝成绩" :saving="通关保存中" :error="通关保存错误" :reduced-motion="减动效" @close="关闭通关纪念" />
+    <SettlementScreen v-if="通关纪念开 && 通关当前成绩" :current="通关当前成绩" :first="首次通关成绩" :celebration="通关庆祝成绩" :saving="通关保存中" :error="通关保存错误" @close="关闭通关纪念" />
   </div>
 </template>
 
@@ -5004,8 +5003,6 @@ const {
   继续窗口模式,
   进真全屏,
   立绘显示,
-  省流,
-  减动效,
   初始化,
   销毁,
 } = useUIPrefs({
@@ -6671,11 +6668,6 @@ onUnmounted(() => {
   }
 }
 
-:global(html.rq-still) .story-wrap.story-divorce-flash::after {
-  display: none;
-  animation: none;
-}
-
 /* 展开亲密管理时，正文舞台可能只剩一个 48px 底栏高；允许抽屉从舞台底边向上覆盖，
    而不是继承残余高度后被 overflow:hidden 裁成不可点击的窄缝。 */
 .story-wrap.story-intimacy-open {
@@ -7933,10 +7925,6 @@ onUnmounted(() => {
   border-color: rgba(255, 79, 154, 0.55);
   box-shadow: 0 6px 18px rgba(255, 79, 154, 0.22);
   transform: translateY(-1px);
-}
-
-:global(html.rq-lite) .peep-card {
-  --opt-img: none;
 }
 
 :global(html.rq-dark) .option-chip.gal {
@@ -9354,22 +9342,6 @@ button.battery:focus-visible {
     var(--glass);
 }
 
-/* ── 省流模式:关掉重量级场景位图(背景/立面),回纯 CSS 渐变;头像/图标小,保留 ── */
-:global(html.rq-lite) .story-wrap {
-  --scene-img: none !important;
-  background:
-    linear-gradient(160deg, rgba(var(--sc-a, 165, 175, 195), 0.16), rgba(var(--sc-b, 205, 215, 230), 0.08)),
-    var(--glass) !important;
-}
-
-/* ── 减少动效:关掉全局过渡与动画 ── */
-:global(html.rq-still) *,
-:global(html.rq-still) *::before,
-:global(html.rq-still) *::after {
-  animation-duration: 0.001s !important;
-  transition-duration: 0.001s !important;
-}
-
 :global(html.rq-dark) .sheet {
   background: var(--surface-sheet);
   border-color: var(--surface-sheet-border);
@@ -9832,10 +9804,6 @@ button.battery:focus-visible {
   filter: grayscale(0.75);
 }
 
-:global(html.rq-still) .dock-btn.meeting-live {
-  animation: none;
-}
-
 @keyframes mute-phone-breathe {
   50% {
     color: #147048;
@@ -9881,10 +9849,6 @@ button.battery:focus-visible {
 
 .second-camera-rec em {
   opacity: 0.72;
-}
-
-:global(html.rq-still) .second-camera-rec__dot {
-  animation: none;
 }
 
 @keyframes second-camera-rec-pulse {

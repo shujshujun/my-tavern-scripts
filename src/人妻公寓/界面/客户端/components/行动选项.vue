@@ -204,11 +204,6 @@ function 选择(文本: string): void {
   transform: translateY(-1px);
 }
 
-:global(html.rq-lite) .option-row,
-:global(html.rq-lite) .option-drawer-panel {
-  --opt-img: none;
-}
-
 :global(html.rq-dark) .option-drawer-panel,
 :global(html.rq-dark) .option-drawer-handle {
   background: #2c2e40;
@@ -253,12 +248,6 @@ function 选择(文本: string): void {
   .option-drawer-handle :deep(.ic) {
     transition: none;
   }
-}
-
-:global(html.rq-still) .option-drawer-enter-active,
-:global(html.rq-still) .option-drawer-leave-active,
-:global(html.rq-still) .option-drawer-handle :deep(.ic) {
-  transition: none;
 }
 
 @media (max-width: 540px) {

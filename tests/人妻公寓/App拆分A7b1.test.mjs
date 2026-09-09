@@ -188,7 +188,7 @@ test('专属 CSS 所有权：筹备规则迁入组件并引入 弹窗基础.css�
     assert.match(舞台源码, new RegExp(转义(选择器)), `舞台组件应持有 ${选择器}`);
     assert.doesNotMatch(App源码, new RegExp(转义(选择器)), `App 不应再持有 ${选择器}`);
   }
-  assert.match(舞台源码, /:global\(html\.rq-still\) \.mute-meeting-visual img/, '舞台组件应持有 rq-still visual 减动效');
+  assert.doesNotMatch(舞台源码, /rq-still/, '舞台组件不再消费已删除的手动减动效 class');
   assert.match(舞台源码, /@media \(max-width: 540px\)[\s\S]*?\.mute-meeting-track/, '舞台组件应持有 540px track 规则');
   // 互动组件持有互动幕/目标/模式/控制/结果/辅助/keyframe/mobile
   for (const 选择器 of [
@@ -208,7 +208,7 @@ test('专属 CSS 所有权：筹备规则迁入组件并引入 弹窗基础.css�
     assert.match(互动源码, new RegExp(转义(选择器)), `互动组件应持有 ${选择器}`);
     assert.doesNotMatch(App源码, new RegExp(转义(选择器)), `App 不应再持有 ${选择器}`);
   }
-  assert.match(互动源码, /:global\(html\.rq-still\) \.mute-target\.pulse/, '互动组件应持有 rq-still target 减动效');
+  assert.doesNotMatch(互动源码, /rq-still/, '互动组件不再消费已删除的手动减动效 class');
   assert.match(互动源码, /\.mute-control-button\.holding \.hold-progress/, '互动组件应持有 holding 进度动效');
   assert.match(互动源码, /@media \(max-width: 540px\)[\s\S]*?\.mute-interaction-panel/, '互动组件应持有 540px interaction 规则');
   // 锁定提示组件持有 lock-note + dark

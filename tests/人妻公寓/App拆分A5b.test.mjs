@@ -398,7 +398,7 @@ test('档案专属 CSS 已从 App 移到组件；基础 popup scoped 引入；av
   assert.match(App源码, /\.avatar-glyph \{\s*width: 40px;\s*height: 40px;/, 'App 移动端通用头像规则仍保留');
 });
 
-test('dark/mobile 档案规则完整迁移；rq-still 来自弹窗基础；App 无档案 dark/mobile 残留', () => {
+test('dark/mobile 档案规则完整迁移；手动 rq-still 链已删除；App 无档案 dark/mobile 残留', () => {
   for (const selector of [
     ':global(html.rq-dark) .hearts i {',
     ':global(html.rq-dark) .hearts i.on {',
@@ -419,8 +419,8 @@ test('dark/mobile 档案规则完整迁移；rq-still 来自弹窗基础；App �
   }
   assert.match(档案卡源码, /@media \(max-width: 540px\)/, '档案移动端组在组件');
   assert.doesNotMatch(App源码, /\.mask:has\(\.dossier\)/, 'App 无档案移动端残留');
-  assert.match(弹窗基础css, /:global\(html\.rq-still\)/, 'rq-still 来自弹窗基础');
-  assert.doesNotMatch(档案卡源码, /rq-still/, '档案组件不复制 rq-still');
+  assert.doesNotMatch(弹窗基础css, /rq-still/, '弹窗基础不再提供已删除的手动减动效 class');
+  assert.doesNotMatch(档案卡源码, /rq-still/, '档案组件也不复制已删除的手动减动效 class');
 });
 
 test('四份既有测试按所有权读取组件且不弱化；A1–A5a 组件边界未回退', () => {

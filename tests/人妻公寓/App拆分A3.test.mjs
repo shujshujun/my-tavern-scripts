@@ -8,6 +8,8 @@ import test from 'node:test';
 const 客户端目录 = new URL('../../src/人妻公寓/界面/客户端/', import.meta.url);
 const App源码 = readFileSync(new URL('./App.vue', 客户端目录), 'utf8');
 const 偏好源码 = readFileSync(new URL('./composables/useUIPrefs.ts', 客户端目录), 'utf8');
+const 迁移源码 = readFileSync(new URL('./旧界面偏好迁移.ts', 客户端目录), 'utf8');
+const 存储辅助源码 = readFileSync(new URL('../../界面偏好存储.ts', 客户端目录), 'utf8');
 const 设置源码 = readFileSync(new URL('./components/设置弹窗.vue', 客户端目录), 'utf8');
 const 准备源码 = readFileSync(new URL('./components/首次准备.vue', 客户端目录), 'utf8');
 const 标题源码 = readFileSync(new URL('./components/序章标题屏.vue', 客户端目录), 'utf8');
@@ -82,12 +84,17 @@ test('App 不再内联设置/首次准备大模板与专属状态/检测/解析�
   assert.match(App源码, /watch\(设置开, 开 => \{\s*if \(!开\) 重开确认\.value = false;/, '关闭设置仍撤销武装态');
 });
 
-test('useUIPrefs 单例状态/存储键/合并写/容错/CSS 变量与类/跟随/全屏 fallback/可卸载监听/导出进真全屏', () => {
+test('useUIPrefs 单例状态/共享存储键/合并写/容错/CSS 变量与主题类/跟随/全屏 fallback/可卸载监听/导出进真全屏', () => {
   assert.match(偏好源码, /if \(!单例\) 单例 = 创建UIPrefs\(options \?\? \{\}\)/, '模块级单例只创建一份共享状态');
   assert.match(偏好源码, /const 当前选项 = shallowRef\(options\)/, '跨 App 重挂载依赖以可替换 shallowRef 持有');
   assert.match(偏好源码, /else if \(options\) 单例\.更新选项\(options\)/, 'App 重挂载必须把依赖所有权交给新实例');
   assert.match(偏好源码, /'人妻公寓_夜间模式'/, '夜间模式存储键');
-  assert.match(偏好源码, /'人妻公寓_界面偏好'/, '界面偏好存储键');
+  assert.match(偏好源码, /取得界面偏好存储,/, '偏好模块复用父页优先的共享存储锚点');
+  assert.match(偏好源码, /界面偏好存储键 as 设置存储键,/, '偏好模块复用共享键');
+  assert.match(偏好源码, /移除已删除界面偏好字段,/, '偏好模块复用退场字段清理器');
+  assert.match(偏好源码, /from '\.\.\/\.\.\/\.\.\/界面偏好存储'/, '共享存储模块导入路径正确');
+  assert.match(存储辅助源码, /export const 界面偏好存储键 = '人妻公寓_界面偏好'/, '界面偏好共享键只定义一次');
+  assert.match(迁移源码, /export const 设置存储键 = 界面偏好存储键/, '启动迁移向既有调用方兼容导出共享键');
   assert.match(偏好源码, /'rqgy-mobile-fullscreen-guide-v1'/, '移动端引导存储键');
   assert.match(偏好源码, /JSON\.stringify\(\{\s*\.\.\.已存,/, '持久化必须合并已有对象');
   assert.match(偏好源码, /坏 JSON 当空处理/, '坏 JSON 静默回默认');
@@ -96,8 +103,7 @@ test('useUIPrefs 单例状态/存储键/合并写/容错/CSS 变量与类/跟随
   assert.match(偏好源码, /--entry-veil/, '--entry-veil 仍由 composable 写');
   assert.match(偏好源码, /--prose-ink/, '--prose-ink 仍由 composable 写');
   assert.match(偏好源码, /'rq-dark'/, 'rq-dark 主题类仍由 composable 应用');
-  assert.match(偏好源码, /'rq-lite'/, 'rq-lite 省流类仍由 composable 应用');
-  assert.match(偏好源码, /'rq-still'/, 'rq-still 减动效类仍由 composable 应用');
+  assert.doesNotMatch(偏好源码, /rq-lite|rq-still|省流|减动效/, '两个已删除偏好及手动 class 不得回到 composable');
   assert.match(偏好源码, /'rqgy-full'/, 'rqgy-full 全屏类仍由 composable 应用');
   assert.match(
     偏好源码,
@@ -128,13 +134,12 @@ test('useUIPrefs 单例状态/存储键/合并写/容错/CSS 变量与类/跟随
   assert.doesNotMatch(偏好源码, /s\.二次变量结算|s\.内置变量解析/, '恢复设置只读纯 UI 字段');
 });
 
-test('设置组件拥有全部可见设置文案、UI prefs 共享、游戏独立变量 API/官方 MVU 路径/1500ms 轮询与卸载、重开 emit', () => {
+test('设置组件保留安全外观设置与变量 API/MVU 路径，彻底移除省流和减少动效，并保留1500ms轮询与重开 emit', () => {
   assert.match(设置源码, /看着舒服最要紧/, '标题文案保持');
   assert.match(设置源码, /跟随时段/, '跟随时段文案保持');
   assert.match(设置源码, /正文字色/, '字色组保持');
   assert.match(设置源码, /立绘显示/, '立绘组保持');
-  assert.match(设置源码, /省流模式/, '省流组保持');
-  assert.match(设置源码, /减少动效/, '减动效组保持');
+  assert.doesNotMatch(设置源码, /省流|减动效/, '省流与减少动效的文案、状态和按钮全部退场');
   assert.match(设置源码, /useUIPrefs\(\)/, '组件直接共享 useUIPrefs 单例');
   assert.match(设置源码, /主题模式 = m/, 'UI refs 在组件内直接可写');
   assert.match(设置源码, /变量解析：独立模型（默认）/, '游戏独立变量解析说明保持');
@@ -308,8 +313,9 @@ test('两组件以 scoped src 用弹窗基础.css；专属 CSS 所有权正确�
   assert.match(App源码, /:global\(html\.rq-dark\) \.sheet \{/, 'App 通用 dark sheet 仍存在');
 });
 
-test('App 其他消费者仍获得 省流/立绘显示/移动端/暗色/全屏中/进真全屏；正文隐藏仍在 App；无中文首字符组件 tag', () => {
-  assert.match(地图源码, /const 用画布地图 = computed\(\(\) => !props\.lite && !立面失效\.value\)/, '省流被地图消费(A6a 迁入地图组件)');
+test('App 保留立绘/移动端/暗色/全屏消费者；地图仅按真实图片失败降级；正文隐藏仍在 App；无中文首字符组件 tag', () => {
+  assert.match(地图源码, /const 用画布地图 = computed\(\(\) => !立面失效\.value\)/, '完整地图默认启用，仅真实立面加载失败时降级');
+  assert.doesNotMatch(App源码, /:lite=|rq-lite|rq-still|省流|减动效/, 'App 不再消费已删除设置或 class');
   assert.match(App源码, /v-if="\s*立绘显示 &&\s*!显示成人CG/, '立绘显示被舞台消费');
   assert.match(App源码, /v-if="移动端 && 数据库运行文案"/, '移动端被数据库横幅消费');
   assert.match(App源码, /:title="暗色 \? '切回日间模式' : '切换夜间模式'" @click="切换主题"/, '暗色被主题钮消费');

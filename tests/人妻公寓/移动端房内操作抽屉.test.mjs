@@ -439,7 +439,7 @@ test('双端展开后两列，302只增加同层二选一；窄屏两列不横�
   assert.match(抽屉源码, /overflow-wrap: anywhere;/, '窄屏长文案换行不横溢');
 });
 
-test('过渡只动 transform/opacity；rq-still 与 prefers-reduced-motion 都禁用；dark 补齐', () => {
+test('过渡只动 transform/opacity；系统 prefers-reduced-motion 禁用；手动 rq-still 退场；dark 补齐', () => {
   assert.match(
     抽屉源码,
     /\.drawer-enter-active,[\s\S]{0,30}\.drawer-leave-active \{\s*transition:\s*transform 0\.2s ease,\s*opacity 0\.2s ease;/,
@@ -451,14 +451,14 @@ test('过渡只动 transform/opacity；rq-still 与 prefers-reduced-motion 都�
     /@media \(prefers-reduced-motion: reduce\)[\s\S]*?\.drawer-enter-active/,
     'prefers-reduced-motion 禁用过渡',
   );
-  assert.match(抽屉源码, /:global\(html\.rq-still \.drawer-enter-active\)/, 'html.rq-still 禁用过渡');
+  assert.doesNotMatch(抽屉源码, /rq-still/, '抽屉不得继续消费已删除的手动减动效 class');
   assert.match(抽屉源码, /:global\(html\.rq-dark \.tile\) \{/, 'dark 瓷砖补齐');
   assert.match(抽屉源码, /:global\(html\.rq-dark \.drawer-panel\) \{/, 'dark 面板补齐');
   assert.match(抽屉源码, /:global\(html\.rq-dark \.drawer-handle\) \{/, 'dark 把手补齐');
   assert.doesNotMatch(
     抽屉源码,
-    /:global\(html\.rq-(dark|still)\) \./,
-    '完整复合选择器整体放进 :global,不得拆成 `:global(html.rq-x) .sel`',
+    /:global\(html\.rq-dark\) \./,
+    '完整 dark 复合选择器整体放进 :global,不得拆成 `:global(html.rq-dark) .sel`',
   );
 });
 
@@ -513,18 +513,15 @@ test('抽屉组件 scoped 样式可编译；完整 :global 后代选择器保留
   assert.match(编译.code, /html\.rq-dark \.tile\s*\{/, 'dark .tile 编译后保留完整后代选择器');
   assert.match(编译.code, /html\.rq-dark \.drawer-panel\s*\{/, 'dark .drawer-panel 编译后保留完整后代选择器');
   assert.match(编译.code, /html\.rq-dark \.drawer-handle\s*\{/, 'dark .drawer-handle 编译后保留完整后代选择器');
-  assert.match(编译.code, /html\.rq-still \.drawer-enter-active/, 'rq-still 减动效保留完整后代选择器');
-  assert.match(编译.code, /html\.rq-still \.drawer-handle \.handle-arrow/, 'rq-still 箭头保留完整后代选择器');
+  assert.doesNotMatch(编译.code, /rq-still/, '编译产物不应再出现手动减动效 class');
 
   // 完整 :global 选择器整体编译后不得带组件 scoped 属性。
   assert.doesNotMatch(编译.code, /html\.rq-dark \.tile\[data-v-/, 'dark .tile 不得带 scoped 属性');
   assert.doesNotMatch(编译.code, /html\.rq-dark \.drawer-panel\[data-v-/, 'dark .drawer-panel 不得带 scoped 属性');
   assert.doesNotMatch(编译.code, /html\.rq-dark \.drawer-handle\[data-v-/, 'dark .drawer-handle 不得带 scoped 属性');
-  assert.doesNotMatch(编译.code, /html\.rq-still \.drawer-enter-active\[data-v-/, 'rq-still 减动效不得带 scoped 属性');
 
-  // 不得退化成只命中 html.rq-dark / html.rq-still 的裸规则(旧写法会吃掉后代选择器)。
+  // dark 规则不得退化成只命中 html.rq-dark 的裸规则(旧写法会吃掉后代选择器)。
   assert.doesNotMatch(编译.code, /html\.rq-dark\s*\{/, 'html.rq-dark 不得退化成裸选择器');
-  assert.doesNotMatch(编译.code, /html\.rq-still\s*\{/, 'html.rq-still 不得退化成裸选择器');
 
   // 普通 scoped 规则仍命中组件 scoped 属性。
   assert.match(编译.code, /\.drawer-handle\[data-v-[^\]]*\]/, '把手规则编译后命中 scoped 属性');

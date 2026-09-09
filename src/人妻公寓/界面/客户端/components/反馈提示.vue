@@ -137,12 +137,4 @@ const emit = defineEmits<{ dismissLoot: [] }>();
 :global(html.rq-dark) .toast {
   background: rgba(38, 40, 56, 0.97);
 }
-
-/* ── 减少动效:关掉全局过渡与动画(组件内部 DOM 同样服从 rq-still) ── */
-:global(html.rq-still) *,
-:global(html.rq-still) *::before,
-:global(html.rq-still) *::after {
-  animation-duration: 0.001s !important;
-  transition-duration: 0.001s !important;
-}
 </style>

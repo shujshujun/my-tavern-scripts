@@ -45,6 +45,27 @@ test('SNAP-25 正常睡眠和双击只结算一次，日志与撤销点一致', 
   assert.equal(Object.hasOwn(env.a.vars, recordKey), false);
 });
 
+test('SNAP-25/26 成功通知真实发生在 MVU 队列与时间写门释放之后', async () => {
+  const env = createTimeEnvironment();
+  const 终态事件 = () => env.eventStates.filter(state =>
+    state.event === '人妻公寓:时间推进结束' || state.event === '人妻公寓:回合完成');
+  const 核对 = label => {
+    const states = 终态事件();
+    assert.deepEqual(states.map(state => state.event), [
+      '人妻公寓:时间推进结束',
+      '人妻公寓:回合完成',
+    ], `${label}必须先结束时间事务，再以回合完成开放客户端和手机节拍`);
+    assert.ok(states.every(state => state.mvuBusy === false), `${label}广播时 MVU 队列必须已经退出`);
+    assert.ok(states.every(state => state.timeBlocked === false), `${label}广播时真实时间写门必须已经释放`);
+  };
+
+  await env.advance();
+  核对('推进');
+  env.eventStates.length = 0;
+  await env.undo();
+  核对('撤销');
+});
+
 test('SNAP-25 可选世界书失败不能回滚已经完整提交的时间', async () => {
   const env = createTimeEnvironment();
   env.setHook(onceAt('worldbook', 1, fail));

@@ -9,7 +9,6 @@ const props = defineProps<{
   celebration: 通关成绩 | null;
   saving: boolean;
   error: string;
-  reducedMotion?: boolean;
 }>();
 const emit = defineEmits<{ close: [] }>();
 const 根 = ref<HTMLElement | null>(null);
@@ -68,7 +67,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="settlement-backdrop" :class="{ 'reduced-motion': reducedMotion }">
+  <div class="settlement-backdrop">
     <section
       ref="根"
       class="settlement"
@@ -671,9 +670,6 @@ onUnmounted(() => {
 }
 .continue-button:hover:not(:disabled) {
   background: #ffe1a8;
-}
-.reduced-motion .rank-letter {
-  animation: none;
 }
 @media (prefers-reduced-motion: reduce) {
   .celebrating .rank-letter {

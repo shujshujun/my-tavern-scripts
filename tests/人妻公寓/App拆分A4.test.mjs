@@ -97,7 +97,7 @@ test('素材全部从 ../assets 的 素材基址 构造；KV/纹章/按钮底三
   assert.doesNotMatch(标题源码, /(?:png|webp)\?url/, '组件不得出现 ?url 位图导入');
 });
 
-test('标题专属 CSS 已从 App 删除并完整进入组件；组件含本地通用 btn/kicker/heartbeat 与 rq-still；App 仍保留通用规则', () => {
+test('标题专属 CSS 已从 App 删除并完整进入组件；组件含本地通用 btn/kicker/heartbeat；手动省流与减动效规则彻底退场', () => {
   for (const selector of [
     '.title-screen {',
     '.title-hero {',
@@ -117,8 +117,8 @@ test('标题专属 CSS 已从 App 删除并完整进入组件；组件含本地�
     assert.doesNotMatch(App源码, new RegExp(转义), `App 不应再持有 ${selector}`);
     assert.match(标题源码, new RegExp(转义), `组件应持有 ${selector}`);
   }
-  assert.doesNotMatch(App源码, /:global\(html\.rq-lite\) \.title-screen/, 'App 不应再持有 rq-lite title-screen 规则');
-  assert.match(标题源码, /:global\(html\.rq-lite\) \.title-screen \{/, '组件应持有 rq-lite title-screen 规则');
+  assert.doesNotMatch(App源码, /rq-lite|rq-still/, 'App 不应再持有手动省流/减动效规则');
+  assert.doesNotMatch(标题源码, /rq-lite|rq-still/, '标题组件不应继续消费已删除的手动 class');
 
   for (const selector of [
     '.ui-kicker {',
@@ -133,7 +133,6 @@ test('标题专属 CSS 已从 App 删除并完整进入组件；组件含本地�
     const 转义 = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     assert.match(标题源码, new RegExp(转义), `组件应复制通用 ${selector}`);
   }
-  assert.match(标题源码, /:global\(html\.rq-still\) \*/, '组件应自带 rq-still 减动效');
 
   assert.match(App源码, /^\.ui-kicker \{/m, 'App 通用 .ui-kicker 仍保留');
   assert.match(App源码, /\.ui-kicker\.light \{/, 'App .ui-kicker.light 仍保留(其他模板用)');
@@ -143,7 +142,7 @@ test('标题专属 CSS 已从 App 删除并完整进入组件；组件含本地�
   assert.match(App源码, /\.btn\.ghost \{/, 'App .btn.ghost 仍保留');
   assert.match(App源码, /\.heartbeat \{/, 'App .heartbeat 仍保留');
   assert.match(App源码, /\.heartbeat\.dead \{/, 'App .heartbeat.dead 仍保留');
-  assert.match(App源码, /:global\(html\.rq-still\) \*/, 'App 通用 rq-still 仍保留');
+  assert.match(App源码, /@media \(prefers-reduced-motion: reduce\)/, '浏览器系统级减少动效媒体查询仍保留');
 });
 
 test('无中文首字符组件 tag；不触碰 A1–A3 组件边界', () => {

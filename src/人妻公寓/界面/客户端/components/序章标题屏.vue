@@ -92,8 +92,7 @@ const 难度卡 = Object.values(难度表);
 /* ═══ 序章标题屏(gal タイトル:全屏立面KV + 纹章 + 竖排木牌菜单) ═══
    专属规则完整移动自 App.vue(A4)；开头 .ui-kicker/.btn/.heartbeat 为 scoped 边界
    复制的通用声明（顺序对齐 App 原 CSS：通用在前，标题专属在后，保证 .title-beat
-   的 margin-top:12px 覆盖 .heartbeat 的 margin-top:auto），App 仍保留原规则。
-   底部 rq-lite / rq-still 保证标题组件继续服从省流与减动效。 */
+   的 margin-top:12px 覆盖 .heartbeat 的 margin-top:auto），App 仍保留原规则。 */
 
 .ui-kicker {
   font-family: var(--font-mono);
@@ -366,18 +365,5 @@ const 难度卡 = Object.values(难度表);
   text-align: center;
   margin-top: 12px;
   color: rgba(255, 255, 255, 0.7);
-}
-
-/* ── 省流模式:标题屏关掉 KV 位图 ── */
-:global(html.rq-lite) .title-screen {
-  --kv-img: none !important;
-}
-
-/* ── 减少动效:关掉全局过渡与动画(标题组件内部 DOM 同样服从 rq-still) ── */
-:global(html.rq-still) *,
-:global(html.rq-still) *::before,
-:global(html.rq-still) *::after {
-  animation-duration: 0.001s !important;
-  transition-duration: 0.001s !important;
 }
 </style>

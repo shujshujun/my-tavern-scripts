@@ -318,7 +318,7 @@ test('CSS 所有权精确：专属规则从 App 删除并进入正确组件；�
     assert.match(舞台源码, new RegExp(转义(css)), `舞台组件应持有 ${css}`);
   }
   assert.match(舞台源码, /@keyframes mute-visual-turn/, '舞台组件持有 visual keyframe');
-  assert.match(舞台源码, /:global\(html\.rq-still\) \.mute-meeting-visual img/, '舞台组件持有 rq-still visual 减动效');
+  assert.doesNotMatch(舞台源码, /rq-still/, '舞台组件不再消费已删除的手动减动效 class');
   assert.match(舞台源码, /@media \(max-width: 540px\)[\s\S]*?\.mute-meeting-track \{/, '舞台组件持有 540px track');
   assert.match(舞台源码, /\.fade-enter-active,[\s\S]*?\.fade-leave-active[\s\S]*?\.fade-enter-from,[\s\S]*?\.fade-leave-to/, '舞台组件补同值 fade 过渡');
   for (const css of ['.special-interaction-stage {', '.special-interaction-stage img {', '.mute-meeting-interaction-stage {', '.mute-interaction-panel {', '.mute-target {', '.mute-control-button {', '.hold-progress {', '.mute-interaction-assist {']) {
@@ -326,7 +326,7 @@ test('CSS 所有权精确：专属规则从 App 删除并进入正确组件；�
   }
   assert.match(互动源码, /@keyframes mute-hold-progress/, '互动组件持有 hold keyframe');
   assert.match(互动源码, /@keyframes mute-target-pulse/, '互动组件持有 target keyframe');
-  assert.match(互动源码, /:global\(html\.rq-still\) \.mute-target\.pulse/, '互动组件持有 rq-still target 减动效');
+  assert.doesNotMatch(互动源码, /rq-still/, '互动组件不再消费已删除的手动减动效 class');
   assert.match(互动源码, /\.mute-control-button\.holding \.hold-progress/, '互动组件持有 holding 进度动效');
   assert.match(互动源码, /@media \(max-width: 540px\)[\s\S]*?\.mute-interaction-panel \{/, '互动组件持有 540px interaction');
   assert.match(互动源码, /\.btn \{[\s\S]*?\.btn\.rite \{/, '互动组件具备自身 .btn/.btn.rite 基线');
@@ -346,13 +346,13 @@ test('CSS 所有权精确：专属规则从 App 删除并进入正确组件；�
     '.dock.mute-meeting-dock {',
     '.dock-btn.meeting-live {',
     '.dock-btn.meeting-frozen {',
-    ':global(html.rq-still) .dock-btn.meeting-live {',
     '@keyframes mute-phone-breathe {',
   ]) {
     assert.match(App源码, new RegExp(转义(css)), `App 应保留跨布局例外 ${css}`);
   }
   assert.match(App源码, /\.fade-enter-active,[\s\S]*?\.fade-leave-active/, 'App 保留共享 fade');
-  // dark/still 分支没丢：各组件拥有对应 rq-dark / rq-still 覆盖
+  assert.doesNotMatch(App源码, /rq-still/, 'App 不再保留手动减动效跨布局例外');
+  // dark 分支没丢：各组件仍拥有对应 rq-dark 覆盖
   assert.match(锁定源码, /html\.rq-dark\) \.mute-meeting-lock-note/, '锁定组件 dark 覆盖');
   assert.match(会后源码, /html\.rq-dark\) \.mute-after-panel/, '会后组件 dark 覆盖');
 });

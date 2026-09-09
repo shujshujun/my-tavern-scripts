@@ -16,7 +16,6 @@ const props = defineProps<{
   day: number;
   weekday: string;
   period: '早上' | '中午' | '下午' | '傍晚' | '晚上' | '深夜';
-  lite: boolean;
   sending: boolean;
   hospitalVisible: boolean;
   avatarFailed: Record<string, boolean>;
@@ -256,8 +255,8 @@ function 房内首字(房间id: string): string {
 
 const 立面失效 = ref(false);
 
-/** 省流关位图/立面图挂了 → 退回玻璃楼体 */
-const 用画布地图 = computed(() => !props.lite && !立面失效.value);
+/** 立面图真实加载失败时退回玻璃楼体；正常路径始终使用完整地图。 */
+const 用画布地图 = computed(() => !立面失效.value);
 
 /** 时段调色档:同一张傍晚底图,白天提亮降饱和、夜里压暗上蓝 */
 const 时段色调 = computed(
@@ -370,7 +369,7 @@ const 地图点位 = computed(() =>
         </div>
       </div>
 
-      <!-- 兜底(省流模式/立面图挂了):原玻璃楼体 -->
+      <!-- 立面图真实加载失败时的原玻璃楼体兜底 -->
       <div v-else class="map-fallback">
         <div class="bldg">
           <div class="roofline">
@@ -1616,7 +1615,7 @@ const 地图点位 = computed(() =>
   border-color: var(--pink);
 }
 
-/* 兜底容器(省流/图挂):原玻璃楼体贴底呈现 */
+/* 立面图加载失败兜底容器：原玻璃楼体贴底呈现。 */
 .map-fallback {
   position: absolute;
   inset: 0;
@@ -1696,7 +1695,7 @@ const 地图点位 = computed(() =>
   background: rgba(255, 214, 231, 0.78);
 }
 
-/* ═══ 地图的夜间/省流/移动端覆盖(App 合写选择器按所有权拆分,其余对象仍留 App) ═══ */
+/* ═══ 地图的夜间/图片失败兜底/移动端覆盖(App 合写选择器按所有权拆分,其余对象仍留 App) ═══ */
 
 :global(html.rq-dark) .tile,
 :global(html.rq-dark) .room-choice-tile {
@@ -1724,38 +1723,38 @@ const 地图点位 = computed(() =>
   border-color: rgba(142, 177, 209, 0.34);
 }
 
-/* 省流会使用纯 CSS 楼体兜底；夜间必须同步换深卡，否则浅字落在浅玻璃上。 */
-:global(html.rq-dark.rq-lite) .map-fallback .bldg-body {
+/* 立面图失败会使用纯 CSS 楼体兜底；夜间必须同步换深卡，否则浅字落在浅玻璃上。 */
+:global(html.rq-dark) .map-fallback .bldg-body {
   background: rgba(24, 27, 42, 0.92);
   border-color: rgba(255, 255, 255, 0.14);
 }
 
-:global(html.rq-dark.rq-lite) .map-fallback .bfloor {
+:global(html.rq-dark) .map-fallback .bfloor {
   border-bottom-color: rgba(255, 255, 255, 0.1);
 }
 
-:global(html.rq-dark.rq-lite) .map-fallback .bunit,
-:global(html.rq-dark.rq-lite) .map-fallback .roof-card,
-:global(html.rq-dark.rq-lite) .map-fallback .gunit {
+:global(html.rq-dark) .map-fallback .bunit,
+:global(html.rq-dark) .map-fallback .roof-card,
+:global(html.rq-dark) .map-fallback .gunit {
   color: #f5f3fa;
   background: rgba(43, 46, 65, 0.9);
   border-color: rgba(255, 255, 255, 0.12);
 }
 
-:global(html.rq-dark.rq-lite) .map-fallback .bunit:hover,
-:global(html.rq-dark.rq-lite) .map-fallback .roof-card:hover,
-:global(html.rq-dark.rq-lite) .map-fallback .gunit:hover {
+:global(html.rq-dark) .map-fallback .bunit:hover,
+:global(html.rq-dark) .map-fallback .roof-card:hover,
+:global(html.rq-dark) .map-fallback .gunit:hover {
   background: rgba(60, 64, 88, 0.96);
 }
 
-:global(html.rq-dark.rq-lite) .map-fallback .bunit.here,
-:global(html.rq-dark.rq-lite) .map-fallback .roof-card.here,
-:global(html.rq-dark.rq-lite) .map-fallback .gunit.here {
+:global(html.rq-dark) .map-fallback .bunit.here,
+:global(html.rq-dark) .map-fallback .roof-card.here,
+:global(html.rq-dark) .map-fallback .gunit.here {
   color: #fff;
   background: rgba(142, 64, 105, 0.92);
 }
 
-:global(html.rq-dark.rq-lite) .map-fallback .bground {
+:global(html.rq-dark) .map-fallback .bground {
   background: rgba(20, 23, 36, 0.96);
   border-color: rgba(255, 255, 255, 0.14);
 }

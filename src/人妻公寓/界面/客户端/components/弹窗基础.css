@@ -248,12 +248,3 @@
   background: var(--field-bg);
   color: var(--ink);
 }
-
-/* ── 减少动效:关掉全局过渡与动画(组件内部 DOM 同样服从 rq-still) ── */
-
-:global(html.rq-still) *,
-:global(html.rq-still) *::before,
-:global(html.rq-still) *::after {
-  animation-duration: 0.001s !important;
-  transition-duration: 0.001s !important;
-}

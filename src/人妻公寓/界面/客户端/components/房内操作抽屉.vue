@@ -687,21 +687,6 @@ function 面板交互(): void {
   }
 }
 
-:global(html.rq-still .drawer-enter-active),
-:global(html.rq-still .drawer-leave-active),
-:global(html.rq-still .new-hint-enter-active),
-:global(html.rq-still .new-hint-leave-active),
-:global(html.rq-still .choice-panel-enter-active),
-:global(html.rq-still .choice-panel-leave-active),
-:global(html.rq-still .drawer-handle .handle-arrow) {
-  transition: none;
-}
-
-:global(html.rq-still .choice-tile.holding::after) {
-  animation: none;
-  transform: scaleX(1);
-}
-
 @media (max-width: 540px) {
   .scene-acts,
   .action-choice-grid {

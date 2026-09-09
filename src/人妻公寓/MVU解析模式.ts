@@ -185,13 +185,21 @@ function 偏好存储(): Storage | undefined {
 }
 
 const 界面偏好存储键 = '人妻公寓_界面偏好';
+const 已删除界面偏好字段 = ['省流', '减动效'] as const;
+
+/** 本模块需保持可被 Node/酒馆脚本独立加载，故在共享键写边界内就地清除退场字段。 */
+function 清理界面偏好退场字段(值: unknown): Record<string, unknown> {
+  const 偏好 = 值 && typeof 值 === 'object' && !Array.isArray(值) ? { ...(值 as Record<string, unknown>) } : {};
+  for (const 字段 of 已删除界面偏好字段) delete 偏好[字段];
+  return 偏好;
+}
 
 function 读界面偏好(): Record<string, unknown> {
   try {
     const raw = 偏好存储()?.getItem(界面偏好存储键);
     if (!raw) return {};
     const 值 = JSON.parse(raw) as unknown;
-    return 值 && typeof 值 === 'object' ? (值 as Record<string, unknown>) : {};
+    return 清理界面偏好退场字段(值);
   } catch {
     return {};
   }
@@ -204,7 +212,8 @@ function 写界面偏好(补丁: Record<string, unknown>): boolean {
       console.warn('[人妻公寓] 写界面偏好失败:拿不到可写 localStorage');
       return false;
     }
-    存储.setItem(界面偏好存储键, JSON.stringify({ ...读界面偏好(), ...补丁 }));
+    const 合并偏好 = 清理界面偏好退场字段({ ...读界面偏好(), ...补丁 });
+    存储.setItem(界面偏好存储键, JSON.stringify(合并偏好));
     return true;
   } catch (e) {
     console.warn('[人妻公寓] 写界面偏好失败:', e);

@@ -165,10 +165,6 @@ function 图片加载失败(event: Event): void {
   color: #f1f8fa;
 }
 
-:global(html.rq-still) .mute-meeting-visual img {
-  animation: none;
-}
-
 @keyframes mute-visual-turn {
   from {
     opacity: 0.28;

@@ -481,11 +481,6 @@ const emit = defineEmits<{
   margin-top: 9px;
 }
 
-:global(html.rq-still) .mute-target.pulse,
-:global(html.rq-still) .mute-control-button.holding .hold-progress {
-  animation: none;
-}
-
 @keyframes mute-hold-progress {
   to {
     transform: scaleX(1);

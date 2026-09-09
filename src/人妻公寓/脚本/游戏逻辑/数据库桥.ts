@@ -1062,10 +1062,15 @@ function 当前末楼(): number | null {
 const 时间线宿主键 = '__RQP_DATABASE_TIMELINE_FENCE_V2__';
 const 时间线会话键 = '__RQP_DATABASE_TIMELINE_FENCE_V2__';
 const 切聊回调保护毫秒 = 1000;
+const 同源时间线重复标记合并毫秒 = 250;
 const 无回调保守恢复毫秒 = 2500;
 
 interface 时间线宿主状态 {
   待重建: Record<string, unknown>;
+  /** 跨 iframe 记录最后一个确实完成并清栅栏的令牌；旧等待者只能认领自己的令牌。 */
+  已完成令牌: Record<string, string>;
+  /** 时间线清场／裁剪是破坏性 DELETE；任何 iframe 的迟到请求结算前，全宿主都不能开放新写。 */
+  时间线清场待结算: Record<string, Record<string, number>>;
   当前聊天标识: string;
   进入当前聊天时间: number;
 }
@@ -1074,12 +1079,26 @@ function 取时间线宿主状态(): 时间线宿主状态 {
   const host = 宿主窗口();
   const existing = host[时间线宿主键] as Partial<时间线宿主状态> | undefined;
   if (existing && existing.待重建 && typeof existing.待重建 === 'object') {
+    if (!existing.已完成令牌 || typeof existing.已完成令牌 !== 'object') {
+      existing.已完成令牌 = Object.create(null) as Record<string, string>;
+    }
+    if (!existing.时间线清场待结算 || typeof existing.时间线清场待结算 !== 'object') {
+      const 旧原型 = (existing as Partial<时间线宿主状态> & {
+        重开清场待结算?: Record<string, Record<string, number>>;
+      }).重开清场待结算;
+      existing.时间线清场待结算 =
+        旧原型 && typeof 旧原型 === 'object'
+          ? 旧原型
+          : (Object.create(null) as Record<string, Record<string, number>>);
+    }
     if (typeof existing.当前聊天标识 !== 'string') existing.当前聊天标识 = '';
     if (!Number.isFinite(existing.进入当前聊天时间)) existing.进入当前聊天时间 = Date.now();
     return existing as 时间线宿主状态;
   }
   const created: 时间线宿主状态 = {
     待重建: Object.create(null) as Record<string, unknown>,
+    已完成令牌: Object.create(null) as Record<string, string>,
+    时间线清场待结算: Object.create(null) as Record<string, Record<string, number>>,
     当前聊天标识: '',
     进入当前聊天时间: Date.now(),
   };
@@ -1093,7 +1112,7 @@ const 时间线栅栏 = new 数据库时间线栅栏();
 const 数据库异步写 = new 数据库异步写栅栏();
 /** 同聊天迟到 SQL 无法精确补偿时保持失败关闭；刷新脚本后仍会由持久时间线栅栏重新复验。 */
 const 数据库未补偿迟到写 = new Set<string>();
-const 时间线恢复任务 = new Map<string, { 令牌: string; promise: Promise<boolean> }>();
+const 时间线恢复任务 = new Map<string, { 令牌: string; 截止时间: number; promise: Promise<boolean> }>();
 const 时间线重试计时器 = new Map<string, ReturnType<typeof setTimeout>>();
 const 时间线重试间隔 = new Map<string, number>();
 const 时间线事件停止器: (() => void)[] = [];
@@ -1104,6 +1123,7 @@ function 数据库时间线允许新写(聊天标识: string): boolean {
   return (
     !!聊天标识 &&
     !数据库未补偿迟到写.has(聊天标识) &&
+    !数据库时间线清场仍有待结算写入(聊天标识) &&
     数据库异步写.可开始新写(聊天标识) &&
     !读取持久时间线状态(聊天标识) &&
     时间线栅栏.可读取(聊天标识)
@@ -1199,15 +1219,29 @@ function 持久化时间线状态(state: 数据库时间线持久状态): void {
 }
 
 function 清除持久时间线状态(聊天标识: string, 令牌: string): void {
+  let 确实完成本令牌 = false;
   const hostState = 时间线宿主.待重建[聊天标识] as { 令牌?: unknown } | undefined;
-  if (hostState?.令牌 === 令牌) delete 时间线宿主.待重建[聊天标识];
+  if (hostState?.令牌 === 令牌) {
+    delete 时间线宿主.待重建[聊天标识];
+    确实完成本令牌 = true;
+  }
   const records = 读取会话时间线集合();
   const sessionState = records[聊天标识] as { 令牌?: unknown } | undefined;
   if (sessionState?.令牌 === 令牌) {
     delete records[聊天标识];
     写会话时间线集合(records);
+    确实完成本令牌 = true;
   }
-  时间线栅栏.清除(聊天标识, 令牌);
+  if (时间线栅栏.清除(聊天标识, 令牌)) 确实完成本令牌 = true;
+  // 同一共享恢复可能由另一个 iframe 最先完成；记录精确令牌，使其他实例能区分
+  // “我的同一事务已完成”与“后来一代事务完成后恰好也没有 pending”的 ABA。
+  if (确实完成本令牌) {
+    时间线宿主.已完成令牌[聊天标识] = 令牌;
+    const 重开状态 = 数据库重开清场状态.get(聊天标识);
+    if (重开状态?.令牌 === 令牌) 数据库重开清场状态.delete(聊天标识);
+    const 裁剪状态 = 数据库脚本表裁剪状态.get(聊天标识);
+    if (裁剪状态?.令牌 === 令牌) 数据库脚本表裁剪状态.delete(聊天标识);
+  }
 }
 
 function 取消时间线重试(聊天标识: string): void {
@@ -1227,9 +1261,281 @@ function 安排时间线后台重试(聊天标识: string): void {
   时间线重试计时器.set(聊天标识, timer);
 }
 
-async function 执行数据库时间线恢复(聊天标识: string, 令牌: string, 最长等待毫秒: number): Promise<boolean> {
-  const 截止时间 = Date.now() + Math.max(0, 最长等待毫秒);
-  while (!时间线接线已清理 && Date.now() <= 截止时间) {
+const 数据库重开清场表 = [
+  'rq_events',
+  'rq_character_memory',
+  'rq_promises',
+  'rq_social_history',
+  'chronicle',
+] as const;
+const 数据库重开清场稳定毫秒 = 500;
+const 数据库重开清场状态 = new Map<string, { 令牌: string; 空表起始时间: number }>();
+
+function 数据库时间线清场仍有待结算写入(聊天标识: string): boolean {
+  const tokens = 时间线宿主.时间线清场待结算[聊天标识];
+  if (!tokens || typeof tokens !== 'object') return false;
+  return Object.values(tokens).some(count => Number.isInteger(count) && count > 0);
+}
+
+function 登记数据库时间线清场写入<T>(
+  聊天标识: string,
+  令牌: string,
+  启动: () => T | PromiseLike<T>,
+): Promise<T> {
+  let tokens = 时间线宿主.时间线清场待结算[聊天标识];
+  if (!tokens || typeof tokens !== 'object') {
+    tokens = Object.create(null) as Record<string, number>;
+    时间线宿主.时间线清场待结算[聊天标识] = tokens;
+  }
+  const 旧数量 = Number(tokens[令牌]);
+  tokens[令牌] = (Number.isInteger(旧数量) && 旧数量 > 0 ? 旧数量 : 0) + 1;
+  const 释放 = () => {
+    const 当前集合 = 时间线宿主.时间线清场待结算[聊天标识];
+    if (!当前集合 || typeof 当前集合 !== 'object') return;
+    const 当前数量 = Number(当前集合[令牌]);
+    if (Number.isInteger(当前数量) && 当前数量 > 1) 当前集合[令牌] = 当前数量 - 1;
+    else delete 当前集合[令牌];
+    if (Object.keys(当前集合).length === 0) delete 时间线宿主.时间线清场待结算[聊天标识];
+  };
+  let mutation: Promise<T>;
+  try {
+    mutation = Promise.resolve(启动());
+  } catch (error) {
+    释放();
+    return Promise.reject(error);
+  }
+  return mutation.finally(释放);
+}
+
+function 查询数据库重开残留行数(): number | null {
+  let 总数 = 0;
+  for (const 表名 of 数据库重开清场表) {
+    const result = 执行SQLite查询(`SELECT COUNT(*) AS count FROM ${表名}`, [], 1);
+    if (!result) return null;
+    const count = Number(SQL结果对象行(result)?.[0]?.count);
+    if (!Number.isInteger(count) || count < 0) return null;
+    总数 += count;
+  }
+  return 总数;
+}
+
+/**
+ * “重开一局”不是普通回档：0楼会被重写成全新出厂态，上一局的五张数据库记忆表也必须
+ * 同步回到模板空表。数据库删楼守卫会把被删楼层的 per-sheet checkpoint 前移到0楼，
+ * 因而仅等待消息回放会把上一局记忆重新灌回运行态，并让四表楼层校验永久失败。
+ *
+ * 这里只处理精确的“重开一局→0楼”；普通回档、重掷、删楼和 swipe 仍由数据库自己的
+ * checkpoint/operation-log 回放恢复历史版本，绝不对人物记忆、承诺或纪要做粗暴清空。
+ * 清场前先等数据库保守回放窗口结束，之后逐表单语句删除、逐表回读，并要求空表持续稳定
+ * 一小段时间；若数据库迟到回放重新灌入旧行，下一轮会再次发现并清理，栅栏不会提前开放。
+ */
+async function 收口数据库重开清场(
+  聊天标识: string,
+  令牌: string,
+  目标楼层: number | null,
+  原因: string,
+  标记时间: number,
+): Promise<boolean> {
+  if (目标楼层 !== 0 || 原因 !== '重开一局') {
+    数据库重开清场状态.delete(聊天标识);
+    return true;
+  }
+  if (Date.now() < 标记时间 + 无回调保守恢复毫秒) return false;
+  const api = 取数据库API();
+  if (!api || typeof api.executeSqlMutation !== 'function') return false;
+  // 任一 iframe 已经发出的清场 DELETE 即使超过本轮等待上限也可能稍后落库；它真正
+  // settle 前绝不重复发破坏性 SQL，也绝不开放新局写入，否则迟到 DELETE 会抹掉新记录。
+  if (数据库时间线清场仍有待结算写入(聊天标识)) return false;
+
+  let 状态 = 数据库重开清场状态.get(聊天标识);
+  if (!状态 || 状态.令牌 !== 令牌) {
+    状态 = { 令牌, 空表起始时间: -1 };
+    数据库重开清场状态.set(聊天标识, 状态);
+  }
+  const 仍属本次恢复 = (): boolean => {
+    if (时间线接线已清理 || !仍是同一聊天(聊天标识) || 取数据库API() !== api) return false;
+    const 当前 = 读取持久时间线状态(聊天标识);
+    return !当前 || 当前.令牌 === 令牌;
+  };
+
+  const 残留行数 = 查询数据库重开残留行数();
+  if (残留行数 === null) return false;
+  if (残留行数 === 0) {
+    if (状态.空表起始时间 < 0) 状态.空表起始时间 = Date.now();
+    if (Date.now() - 状态.空表起始时间 < 数据库重开清场稳定毫秒) return false;
+    if (数据库重开清场状态.get(聊天标识) === 状态) 数据库重开清场状态.delete(聊天标识);
+    return true;
+  }
+  状态.空表起始时间 = -1;
+
+  for (const 表名 of 数据库重开清场表) {
+    if (!仍属本次恢复()) return false;
+    const countResult = 执行SQLite查询(`SELECT COUNT(*) AS count FROM ${表名}`, [], 1);
+    const count = Number(countResult ? SQL结果对象行(countResult)?.[0]?.count : Number.NaN);
+    if (Number.isInteger(count) && count === 0) continue;
+    if (!Number.isInteger(count) || count < 0) return false;
+    try {
+      await 限时等待(
+        登记数据库时间线清场写入(聊天标识, 令牌, () =>
+          api.executeSqlMutation!(`DELETE FROM ${表名} WHERE row_id IS NOT NULL`, []),
+        ),
+        2500,
+        `数据库重开清场:${表名}`,
+      );
+    } catch {
+      // mutation 可能已在插件内部持久化后才抛错；下面仍以同步回读作为唯一成功判据。
+      // 若只是超时，宿主共享待结算计数仍为正，本轮会保持失败关闭直到真实 settle。
+    }
+    if (!仍属本次恢复() || 数据库时间线清场仍有待结算写入(聊天标识)) return false;
+    const remaining = 执行SQLite查询(`SELECT COUNT(*) AS count FROM ${表名}`, [], 1);
+    const remainingCount = Number(remaining ? SQL结果对象行(remaining)?.[0]?.count : Number.NaN);
+    if (!Number.isInteger(remainingCount) || remainingCount !== 0) return false;
+  }
+  状态.空表起始时间 = Date.now();
+  console.info('[人妻公寓·数据库] 重开一局已清空上一局的五张数据库记忆表，等待空表稳定复核。');
+  return false;
+}
+
+const 数据库脚本表裁剪定义 = [
+  { 表名: 'rq_events', 楼层列: 'floor_no' },
+  { 表名: 'rq_social_history', 楼层列: 'last_floor' },
+] as const;
+const 数据库脚本表裁剪稳定毫秒 = 500;
+const 数据库脚本表裁剪状态 = new Map<
+  string,
+  { 令牌: string; 规则签名: string; 空表起始时间: number }
+>();
+
+interface 数据库脚本表裁剪规则 {
+  目标楼层: number;
+  比较符: '>' | '>=';
+  规则签名: string;
+}
+
+/**
+ * 普通删楼的目标楼仍然存活，只裁掉它后面的脚本流水；同楼 swipe 会替换目标楼自己的
+ * 正文，因此旧分支绑定在该楼的剧情／社交行也必须裁掉。重开的五表归零由专用清场处理。
+ */
+function 解析数据库脚本表裁剪规则(
+  目标楼层: number | null,
+  原因: string,
+): 数据库脚本表裁剪规则 | null {
+  if (!Number.isInteger(目标楼层) || Number(目标楼层) < 0) return null;
+  if (目标楼层 === 0 && 原因 === '重开一局') return null;
+  const 比较符 = /切换消息分支|swipe/iu.test(原因) ? '>=' : '>';
+  return {
+    目标楼层: Number(目标楼层),
+    比较符,
+    规则签名: `${比较符}:${Number(目标楼层)}`,
+  };
+}
+
+function 查询数据库脚本表待裁行数(
+  定义: (typeof 数据库脚本表裁剪定义)[number],
+  规则: 数据库脚本表裁剪规则,
+): number | null {
+  const result = 执行SQLite查询(
+    `SELECT COUNT(*) AS count FROM ${定义.表名} WHERE ${定义.楼层列} ${规则.比较符} ?`,
+    [规则.目标楼层],
+    1,
+  );
+  if (!result) return null;
+  const count = Number(SQL结果对象行(result)?.[0]?.count);
+  return Number.isInteger(count) && count >= 0 ? count : null;
+}
+
+/**
+ * 通用表由数据库插件的 checkpoint／operation log 恢复；游戏只维护自己独占的两张流水表。
+ * 裁剪在共享时间线栅栏内完成并要求短暂稳定：插件若迟到回放旧分支，下一轮会再次看到越界
+ * 行并重删。任一 DELETE 的底层 Promise 尚未 settle 时，共享写门持续关闭且不会重复发 SQL。
+ */
+async function 收口数据库脚本表裁剪(
+  聊天标识: string,
+  令牌: string,
+  目标楼层: number | null,
+  原因: string,
+  标记时间: number,
+): Promise<boolean> {
+  const 规则 = 解析数据库脚本表裁剪规则(目标楼层, 原因);
+  if (!规则) {
+    数据库脚本表裁剪状态.delete(聊天标识);
+    return true;
+  }
+  // 至少越过数据库栅栏自己的最短重建窗口；更晚的 checkpoint 回放会被下面的稳定复核捕获。
+  if (Date.now() < 标记时间 + 500) return false;
+  const api = 取数据库API();
+  if (!api || typeof api.executeSqlMutation !== 'function') return false;
+  if (数据库时间线清场仍有待结算写入(聊天标识)) return false;
+
+  let 状态 = 数据库脚本表裁剪状态.get(聊天标识);
+  if (!状态 || 状态.令牌 !== 令牌 || 状态.规则签名 !== 规则.规则签名) {
+    状态 = { 令牌, 规则签名: 规则.规则签名, 空表起始时间: -1 };
+    数据库脚本表裁剪状态.set(聊天标识, 状态);
+  }
+  const 仍属本次恢复 = (): boolean => {
+    if (时间线接线已清理 || !仍是同一聊天(聊天标识) || 取数据库API() !== api) return false;
+    const 当前 = 读取持久时间线状态(聊天标识);
+    return !当前 || 当前.令牌 === 令牌;
+  };
+
+  let 待裁总数 = 0;
+  const 各表行数 = new Map<(typeof 数据库脚本表裁剪定义)[number], number>();
+  for (const 定义 of 数据库脚本表裁剪定义) {
+    const count = 查询数据库脚本表待裁行数(定义, 规则);
+    if (count === null) return false;
+    各表行数.set(定义, count);
+    待裁总数 += count;
+  }
+  if (待裁总数 === 0) {
+    if (状态.空表起始时间 < 0) {
+      // 若本实例先被旧 SQL／补偿阻塞了很久，插件重建窗口已经在等待期间经过；
+      // 首次零行回读仍从“标记后最短窗口”计时，不再额外叠加完整500ms。
+      状态.空表起始时间 = Math.min(Date.now(), 标记时间 + 500);
+    }
+    if (Date.now() - 状态.空表起始时间 < 数据库脚本表裁剪稳定毫秒) return false;
+    // 不在此处删除状态：外层数据库快照还需连续采样，同一令牌必须复用已经完成的
+    // 裁剪稳定窗，同时每次回读仍能发现 checkpoint 迟到重放的越界行。
+    return true;
+  }
+  状态.空表起始时间 = -1;
+
+  for (const 定义 of 数据库脚本表裁剪定义) {
+    if ((各表行数.get(定义) ?? 0) === 0) continue;
+    if (!仍属本次恢复()) return false;
+    try {
+      await 限时等待(
+        登记数据库时间线清场写入(聊天标识, 令牌, () =>
+          api.executeSqlMutation!(
+            `DELETE FROM ${定义.表名} WHERE ${定义.楼层列} ${规则.比较符} ?`,
+            [规则.目标楼层],
+          ),
+        ),
+        2500,
+        `数据库时间线裁剪:${定义.表名}`,
+      );
+    } catch {
+      // 可能已经持久化后才抛错；只认同步回读。超时请求仍在共享待结算表中，绝不提前开门。
+    }
+    if (!仍属本次恢复() || 数据库时间线清场仍有待结算写入(聊天标识)) return false;
+    const remaining = 查询数据库脚本表待裁行数(定义, 规则);
+    if (remaining !== 0) return false;
+  }
+  状态.空表起始时间 = Date.now();
+  console.info(
+    `[人妻公寓·数据库] 已按${规则.比较符 === '>=' ? '同楼切分支' : '删楼'}边界裁剪脚本剧情／社交流水，等待稳定复核。`,
+  );
+  return false;
+}
+
+async function 执行数据库时间线恢复(
+  聊天标识: string,
+  令牌: string,
+  初始目标楼层: number | null,
+  初始原因: string,
+  初始标记时间: number,
+  读取截止时间: () => number,
+): Promise<boolean> {
+  while (!时间线接线已清理 && Date.now() <= 读取截止时间()) {
     if (!仍是同一聊天(聊天标识)) return false;
     const persisted = 读取持久时间线状态(聊天标识);
     if (persisted && persisted.令牌 !== 令牌) return false;
@@ -1240,6 +1546,24 @@ async function 执行数据库时间线恢复(聊天标识: string, 令牌: stri
       await new Promise<void>(resolve => setTimeout(resolve, 160));
       continue;
     }
+    // 另一 iframe 可能已经完成并清除了同一共享令牌；本实例只需确认自己的旧 SQL／补偿
+    // 已全部结算。精确完成令牌不匹配时保持 false，防止更新一代事务完成后的 ABA 放行。
+    if (!persisted) {
+      return 时间线宿主.已完成令牌[聊天标识] === 令牌 && 数据库时间线允许新写(聊天标识);
+    }
+    const 恢复目标楼层 = persisted.目标楼层 ?? 初始目标楼层;
+    const 恢复原因 = persisted?.原因 ?? 初始原因;
+    const 恢复标记时间 = persisted?.标记时间 ?? 初始标记时间;
+    if (!(await 收口数据库重开清场(聊天标识, 令牌, 恢复目标楼层, 恢复原因, 恢复标记时间))) {
+      await new Promise<void>(resolve => setTimeout(resolve, 160));
+      continue;
+    }
+    if (!(await 收口数据库脚本表裁剪(聊天标识, 令牌, 恢复目标楼层, 恢复原因, 恢复标记时间))) {
+      await new Promise<void>(resolve => setTimeout(resolve, 160));
+      continue;
+    }
+    // 共享记录可能被另一窗口先清除；本实例仍要等自己的迟到 SQL 补偿与全部时间线清场完成，
+    // 才能把“共享状态已清”解释为本实例也已经可写。
     if (!persisted) return 数据库时间线允许新写(聊天标识);
     const state = 时间线栅栏.读取状态(聊天标识);
     if (!state?.待重建) {
@@ -1296,14 +1620,31 @@ function 启动数据库时间线恢复(聊天标识: string, 最长等待毫秒
   if (时间线接线已清理 || !仍是同一聊天(聊天标识)) return Promise.resolve(false);
   const persisted = 读取持久时间线状态(聊天标识);
   if (!persisted) return Promise.resolve(数据库时间线允许新写(聊天标识));
+  const 请求截止时间 = Date.now() + Math.max(0, 最长等待毫秒);
   const existing = 时间线恢复任务.get(聊天标识);
-  if (existing?.令牌 === persisted.令牌) return existing.promise;
+  if (existing?.令牌 === persisted.令牌) {
+    // MESSAGE_DELETED 监听常先以默认3.5秒启动；重开主事务随后会请求更长窗口。
+    // 同一令牌只运行一条恢复循环，但允许后到的强调用者延长截止时间，不能复用短任务假装等待8秒。
+    existing.截止时间 = Math.max(
+      Number.isFinite(existing.截止时间) ? existing.截止时间 : Date.now(),
+      请求截止时间,
+    );
+    return existing.promise;
+  }
   取消时间线重试(聊天标识);
   const entry = {
     令牌: persisted.令牌,
+    截止时间: 请求截止时间,
     promise: Promise.resolve(false),
   };
-  entry.promise = 执行数据库时间线恢复(聊天标识, persisted.令牌, 最长等待毫秒).then(
+  entry.promise = 执行数据库时间线恢复(
+    聊天标识,
+    persisted.令牌,
+    persisted.目标楼层,
+    persisted.原因,
+    persisted.标记时间,
+    () => entry.截止时间,
+  ).then(
     ready => {
       if (时间线恢复任务.get(聊天标识) === entry) {
         时间线恢复任务.delete(聊天标识);
@@ -1381,7 +1722,7 @@ export function 标记数据库时间线将变更(
   if (!数据库状态().已装游戏模板) return;
   const 聊天标识 = 更新当前聊天驻留();
   if (!聊天标识) return;
-  const 已有状态 = 选项.已有共享栅栏覆盖时不重标 ? 读取持久时间线状态(聊天标识) : null;
+  const 已有状态 = 读取持久时间线状态(聊天标识);
   // 必须在任何删楼 await 之前同步推进；已经起跑的脚本 SQL 从这一拍开始只允许结算后补偿。
   // 即使共享栅栏已经由另一个 iframe 建立，本实例自己的异步写世代仍必须单独作废。
   数据库异步写.作废(聊天标识);
@@ -1390,6 +1731,15 @@ export function 标记数据库时间线将变更(
   确保数据库时间线回调();
   取消时间线重试(聊天标识);
   时间线重试间隔.set(聊天标识, 1000);
+  // 同一个宿主事件会被游戏脚本、客户端和热挂载残留实例同时看见。短窗口内仍是同一目标、
+  // 同一原因的未完成恢复，就复用共享令牌；各实例上面的异步写世代已经分别作废，
+  // 无需再制造互相覆盖的同毫秒令牌。更晚的独立操作、目标更低或原因不同仍会新建事务。
+  if (
+    已有状态?.目标楼层 === 冻结楼层 &&
+    已有状态.原因 === 原因 &&
+    Date.now() - 已有状态.标记时间 >= 0 &&
+    Date.now() - 已有状态.标记时间 <= 同源时间线重复标记合并毫秒
+  ) return;
   if (
     选项.已有共享栅栏覆盖时不重标 &&
     已有状态 &&
@@ -1413,10 +1763,13 @@ export async function 等待数据库时间线就绪(最长等待毫秒 = 3500):
   if (!persisted) return 数据库时间线允许新写(聊天标识);
   const 等待租约 = 数据库异步写.捕获(聊天标识);
   确保数据库时间线回调();
-  const 恢复完成 = await 启动数据库时间线恢复(聊天标识, 最长等待毫秒);
+  await 启动数据库时间线恢复(聊天标识, 最长等待毫秒);
   if (!仍是同一聊天(聊天标识)) return false;
-  // await 期间可能卸载、开始下一次回档，或另一窗口先完成共享恢复；最终按本实例现状复核。
-  const 已就绪 = 恢复完成 && !时间线接线已清理 &&
+  // await 期间可能由另一个 iframe 先完成同一共享令牌；这时本实例的恢复 Promise 可以
+  // 保守返回 false，但只要共享完成令牌仍精确等于本次起点、且本实例旧 SQL 也已结算，
+  // 就应视为同一恢复完成。若期间出现并完成了更新令牌，令牌不匹配会阻止旧等待者 ABA 放行。
+  const 同一恢复令牌已完成 = 时间线宿主.已完成令牌[聊天标识] === persisted.令牌;
+  const 已就绪 = 同一恢复令牌已完成 && !时间线接线已清理 &&
     数据库异步写.可提交(等待租约) && 数据库时间线允许新写(聊天标识);
   if (!已就绪) {
     const state = 时间线栅栏.读取状态(聊天标识);
@@ -1433,8 +1786,12 @@ function 接入宿主时间线事件(): void {
       标记数据库时间线将变更(当前末楼(), '删除消息', { 已有共享栅栏覆盖时不重标: true });
       void 等待数据库时间线就绪();
     });
-    const 滑动监听 = eventOn(tavern_events.MESSAGE_SWIPED, () => {
-      标记数据库时间线将变更(当前末楼(), '切换消息分支');
+    const 滑动监听 = eventOn(tavern_events.MESSAGE_SWIPED, (消息楼层: number) => {
+      const 原始楼层 = Number(消息楼层);
+      const 切换楼层 = Number.isInteger(原始楼层) && 原始楼层 >= 0 ? 原始楼层 : 当前末楼();
+      // swipe 不会删除目标楼号，只替换该楼分支；必须把精确楼号带进栅栏，后续才能裁掉
+      // rq_events／rq_social_history 在“同一楼”的旧分支行，而不是只裁当前末楼之后。
+      标记数据库时间线将变更(切换楼层, '切换消息分支');
       void 等待数据库时间线就绪();
     });
     const 切聊监听 = eventOn(tavern_events.CHAT_CHANGED, () => {
@@ -1474,6 +1831,8 @@ function 清理数据库时间线接线(): void {
   }
   for (const timer of 时间线重试计时器.values()) clearTimeout(timer);
   时间线重试计时器.clear();
+  数据库重开清场状态.clear();
+  数据库脚本表裁剪状态.clear();
   释放时间线接线所有权();
   window.removeEventListener('pagehide', 清理数据库时间线接线);
 }

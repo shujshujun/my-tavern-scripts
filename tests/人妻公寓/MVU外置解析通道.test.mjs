@@ -432,7 +432,7 @@ test('游戏权威配置原子提交：宿主保存是成败判据，旧 localSt
   const 存储 = new Map([
     ['人妻公寓_界面偏好', JSON.stringify({ 变量解析通道: '自动', 省流: true })],
   ]);
-  let 拒绝偏好写入 = true;
+  const 拒绝偏好写入 = true;
   const localStorage = {
     getItem: key => (存储.has(key) ? 存储.get(key) : null),
     setItem: (key, value) => {
@@ -527,11 +527,11 @@ test('解析通道单独持久化必须等待宿主保存，拒绝时不假装�
   }
 });
 
-test('解析开关偏好统一走父页存储、合并保留其他 UI 字段，并报告真实写入失败', () => {
+test('解析开关偏好统一走父页存储、保留安全 UI 字段且不复活已删除字段，并报告真实写入失败', () => {
   const 原window存在 = Object.prototype.hasOwnProperty.call(globalThis, 'window');
   const 原window = globalThis.window;
   const 存储 = new Map([
-    ['人妻公寓_界面偏好', JSON.stringify({ 省流: true, 内置变量解析: false })],
+    ['人妻公寓_界面偏好', JSON.stringify({ 主题模式: '夜间', 省流: true, 减动效: false, 内置变量解析: false })],
   ]);
   let 拒绝写入 = false;
   const localStorage = {
@@ -546,7 +546,7 @@ test('解析开关偏好统一走父页存储、合并保留其他 UI 字段，�
     assert.deepEqual(读取变量解析偏好(), { 内置变量解析: false, 严格变量审计: false });
     assert.equal(写入变量解析偏好({ 内置变量解析: true, 严格变量审计: true }), true);
     assert.deepEqual(JSON.parse(存储.get('人妻公寓_界面偏好')), {
-      省流: true,
+      主题模式: '夜间',
       内置变量解析: true,
       严格变量审计: true,
     });

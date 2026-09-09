@@ -1,7 +1,7 @@
 /**
  * 界面偏好/全屏 共享单例（App A3 从 App.vue 等价外移）。
  *
- * 主题三档、字号、字色、垫板、立绘、省流、减动效、设置开关、移动端断点与沉浸全屏
+ * 主题三档、字号、字色、垫板、立绘、设置开关、移动端断点与沉浸全屏
  * 的状态与动作整体收敛在本 composable；App 与 设置弹窗.vue 调用 useUIPrefs() 拿到
  * 同一组 refs，不得各建一套互不同步的状态。
  *
@@ -9,8 +9,15 @@
  * 自定义 API 表单）留在 设置弹窗.vue，不进入本文件。
  */
 import { computed, ref, shallowRef, watchEffect, type Ref } from 'vue';
+import {
+  取得界面偏好存储,
+  界面偏好存储键 as 设置存储键,
+  移除已删除界面偏好字段,
+} from '../../../界面偏好存储';
 import { 同步画幅 as 默认同步画幅 } from '../viewport';
 import type { 移动端全屏选择, 全屏根, 全屏文档 } from '../types';
+
+export { 设置存储键 };
 
 export interface UIPrefs选项 {
   /** 游戏时段(时间信息.时段)；「跟随」主题按 晚上/深夜 判暗。 */
@@ -21,13 +28,13 @@ export interface UIPrefs选项 {
   reportFullscreenError?: (message: string) => void;
 }
 
-/** 界面偏好持久化键；设置弹窗复用 设置存储键 做解析字段的合并读写。 */
-export const 设置存储键 = '人妻公寓_界面偏好';
+/** 界面偏好共享键由纯存储模块统一定义；本模块只合并读写仍在使用的外观字段。 */
 const 主题存储键 = '人妻公寓_夜间模式';
 const 移动端全屏引导存储键 = 'rqgy-mobile-fullscreen-guide-v1';
 
 function 创建UIPrefs(options: UIPrefs选项) {
   // 单例会跨 Vue App 重挂载复用；依赖必须可替换，不能永久捕获第一次 App 的 refs/回调。
+  const 取共享存储 = () => 取得界面偏好存储();
   const 当前选项 = shallowRef(options);
   const 更新选项 = (新选项: UIPrefs选项): void => {
     当前选项.value = 新选项;
@@ -48,7 +55,7 @@ function 创建UIPrefs(options: UIPrefs选项) {
 
   const 读取移动端全屏选择 = (): boolean => {
     try {
-      const 选择 = localStorage.getItem(移动端全屏引导存储键);
+      const 选择 = 取共享存储()?.getItem(移动端全屏引导存储键);
       return 选择 === '全屏' || 选择 === '窗口';
     } catch {
       return false;
@@ -63,7 +70,7 @@ function 创建UIPrefs(options: UIPrefs选项) {
   const 记住移动端全屏选择 = (选择: 移动端全屏选择): void => {
     移动端全屏引导已处理.value = true;
     try {
-      localStorage.setItem(移动端全屏引导存储键, 选择);
+      取共享存储()?.setItem(移动端全屏引导存储键, 选择);
     } catch {
       /* 隐私模式拒绝持久化时，本次页面仍不再遮挡。 */
     }
@@ -130,7 +137,7 @@ function 创建UIPrefs(options: UIPrefs选项) {
     应用画幅(开);
   };
 
-  // ── 界面偏好设置(全走 localStorage,不碰游戏变量) ──
+  // ── 界面偏好设置(父页面共享 localStorage 优先,不碰游戏变量) ──
 
   /** 主题三档:日间 / 夜间 / 跟随游戏时段 */
   const 主题模式 = ref<'日间' | '夜间' | '跟随'>('日间');
@@ -142,38 +149,34 @@ function 创建UIPrefs(options: UIPrefs选项) {
   const 立绘显示 = ref(true);
   /** 正文垫板不透明度(0.2~1.0,越高字越清背景越淡) */
   const 垫板浓度 = ref(0.66);
-  /** 省流:关掉全部背景图/立绘/图标,回纯 CSS */
-  const 省流 = ref(false);
-  /** 减少动效 */
-  const 减动效 = ref(false);
 
   const 字号档表: Record<'小' | '中' | '大', string> = { 小: '0.82em', 中: '0.9em', 大: '1.02em' };
 
-  /** 把偏好写进根元素的 CSS 变量 + body class(省流/减动效) */
+  /** 把仍受支持的外观偏好写进根元素 CSS 变量。 */
   function 应用界面偏好() {
     const root = document.documentElement;
     root.style.setProperty('--prose-size', 字号档表[字号档.value]);
     root.style.setProperty('--entry-veil', String(垫板浓度.value));
     if (正文字色.value) root.style.setProperty('--prose-ink', 正文字色.value);
     else root.style.removeProperty('--prose-ink');
-    root.classList.toggle('rq-lite', 省流.value);
-    root.classList.toggle('rq-still', 减动效.value);
   }
 
   function 持久化设置() {
     try {
-      localStorage.setItem(主题存储键, 暗色.value ? '1' : '0'); // 兼容旧键
+      const 存储 = 取共享存储();
+      if (!存储) return;
+      存储.setItem(主题存储键, 暗色.value ? '1' : '0'); // 兼容旧键
       // 合并写:同一个键还承载脚本侧写入的 变量解析通道/MVU外置默认V080已初始化 与
       // 设置组件写入的内置变量解析、严格审计等解析字段，整体覆写会冲掉它们。
       let 已存: Record<string, unknown> = {};
       try {
-        const raw = localStorage.getItem(设置存储键);
+        const raw = 存储.getItem(设置存储键);
         const 值 = raw ? JSON.parse(raw) : null;
-        if (值 && typeof 值 === 'object') 已存 = 值;
+        已存 = 移除已删除界面偏好字段(值).偏好;
       } catch {
         /* 坏 JSON 当空处理 */
       }
-      localStorage.setItem(
+      存储.setItem(
         设置存储键,
         JSON.stringify({
           ...已存,
@@ -181,8 +184,6 @@ function 创建UIPrefs(options: UIPrefs选项) {
           字号档: 字号档.value,
           正文字色: 正文字色.value,
           垫板浓度: 垫板浓度.value,
-          省流: 省流.value,
-          减动效: 减动效.value,
           立绘显示: 立绘显示.value,
         }),
       );
@@ -197,21 +198,20 @@ function 创建UIPrefs(options: UIPrefs选项) {
     持久化设置();
   }
 
-  /** 恢复界面偏好(主题三档/字号/垫板/省流/减动效/立绘)；只读纯 UI 字段,解析字段由设置组件恢复。 */
+  /** 恢复界面偏好(主题三档/字号/垫板/立绘)；只读纯 UI 字段,解析字段由设置组件恢复。 */
   function 恢复设置() {
     // 每次挂载先回到合法默认，避免坏 JSON、缺字段或上一个 App 的内存值污染新实例。
     主题模式.value = '日间';
     字号档.value = '中';
     正文字色.value = '';
     垫板浓度.value = 0.66;
-    省流.value = false;
-    减动效.value = false;
     立绘显示.value = true;
 
     try {
-      const 旧主题 = localStorage.getItem(主题存储键) === '1' ? '夜间' : '日间';
+      const 存储 = 取共享存储();
+      const 旧主题 = 存储?.getItem(主题存储键) === '1' ? '夜间' : '日间';
       主题模式.value = 旧主题;
-      const raw = localStorage.getItem(设置存储键);
+      const raw = 存储?.getItem(设置存储键);
       if (raw) {
         const s = JSON.parse(raw) as Record<string, unknown>;
         if (s.主题模式 === '日间' || s.主题模式 === '夜间' || s.主题模式 === '跟随') {
@@ -224,8 +224,6 @@ function 创建UIPrefs(options: UIPrefs选项) {
         if (typeof s.垫板浓度 === 'number' && Number.isFinite(s.垫板浓度)) {
           垫板浓度.value = Math.min(1, Math.max(0.2, s.垫板浓度));
         }
-        if (typeof s.省流 === 'boolean') 省流.value = s.省流;
-        if (typeof s.减动效 === 'boolean') 减动效.value = s.减动效;
         if (typeof s.立绘显示 === 'boolean') 立绘显示.value = s.立绘显示;
       }
     } catch {
@@ -240,19 +238,17 @@ function 创建UIPrefs(options: UIPrefs选项) {
     字号档.value = '中';
     正文字色.value = '';
     垫板浓度.value = 0.66;
-    省流.value = false;
-    减动效.value = false;
     立绘显示.value = true;
     应用界面偏好();
     持久化设置();
     try {
-      localStorage.removeItem(主题存储键);
+      取共享存储()?.removeItem(主题存储键);
     } catch {
       /* ignore */
     }
   }
 
-  // ── 夜间模式(html.rq-dark 令牌覆盖;localStorage 记住偏好) ──
+  // ── 夜间模式(html.rq-dark 令牌覆盖;父页面共享 localStorage 记住偏好) ──
 
   const 暗色 = ref(false);
 
@@ -329,8 +325,6 @@ function 创建UIPrefs(options: UIPrefs选项) {
     正文字色,
     立绘显示,
     垫板浓度,
-    省流,
-    减动效,
     全屏中,
     真全屏中,
     移动端,

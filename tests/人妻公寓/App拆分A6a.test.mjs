@@ -96,12 +96,12 @@ test('props/emits 接线、ref 公开接口完整；显示结果严格守 open &
   const 模板段 = 提取模板(App源码);
   assert.match(
     模板段,
-    /<MapPopup\b[\s\S]*?:open="显示地图 && 就绪"[\s\S]*?:data="data"[\s\S]*?:current-room="当前房间"[\s\S]*?:day="天数"[\s\S]*?:weekday="星期"[\s\S]*?:period="时段"[\s\S]*?:lite="省流"[\s\S]*?:sending="发送中 \|\| 场景剧情移动锁 \|\| 前台硬决策中"[\s\S]*?:avatar-failed="头像失效"[\s\S]*?:avatar-image="头像图"[\s\S]*?:avatar-name="头像名"[\s\S]*?:room-people="房内的人"[\s\S]*?:window-lit="窗灯"[\s\S]*?:management-badge="管理任务角标"[\s\S]*?:rent-owed="欠租中"[\s\S]*?:room-actions="房间动作"[\s\S]*?@close="关地图"[\s\S]*?@outing="从地图外出"[\s\S]*?@avatar-error="头像失效\[\$event\] = true"[\s\S]*?\/>/,
+    /<MapPopup\b[\s\S]*?:open="显示地图 && 就绪"[\s\S]*?:data="data"[\s\S]*?:current-room="当前房间"[\s\S]*?:day="天数"[\s\S]*?:weekday="星期"[\s\S]*?:period="时段"[\s\S]*?:sending="发送中 \|\| 场景剧情移动锁 \|\| 前台硬决策中"[\s\S]*?:avatar-failed="头像失效"[\s\S]*?:avatar-image="头像图"[\s\S]*?:avatar-name="头像名"[\s\S]*?:room-people="房内的人"[\s\S]*?:window-lit="窗灯"[\s\S]*?:management-badge="管理任务角标"[\s\S]*?:rent-owed="欠租中"[\s\S]*?:room-actions="房间动作"[\s\S]*?@close="关地图"[\s\S]*?@outing="从地图外出"[\s\S]*?@avatar-error="头像失效\[\$event\] = true"[\s\S]*?\/>/,
     'MapPopup tag 全部 props/emits 接线',
   );
   assert.match(
     地图源码,
-    /defineProps<\{[\s\S]*?open: boolean[\s\S]*?data: SchemaType[\s\S]*?currentRoom: string \| null[\s\S]*?day: number[\s\S]*?weekday: string[\s\S]*?period: '早上' \| '中午' \| '下午' \| '傍晚' \| '晚上' \| '深夜'[\s\S]*?lite: boolean[\s\S]*?sending: boolean[\s\S]*?avatarFailed: Record<string, boolean>[\s\S]*?avatarImage: \(name: string\) => string[\s\S]*?avatarName: \(displayName: string\) => string[\s\S]*?roomPeople: \(roomId: string\) => string\[\][\s\S]*?windowLit: \(roomId: string\) => boolean[\s\S]*?managementBadge: \(roomId: string\) => '' \| '楼务' \| '逾期'[\s\S]*?rentOwed: \(roomId: string\) => boolean[\s\S]*?roomActions: \(roomId: string \| null\) => 卡动作\[\][\s\S]*?\}>/,
+    /defineProps<\{[\s\S]*?open: boolean[\s\S]*?data: SchemaType[\s\S]*?currentRoom: string \| null[\s\S]*?day: number[\s\S]*?weekday: string[\s\S]*?period: '早上' \| '中午' \| '下午' \| '傍晚' \| '晚上' \| '深夜'[\s\S]*?sending: boolean[\s\S]*?avatarFailed: Record<string, boolean>[\s\S]*?avatarImage: \(name: string\) => string[\s\S]*?avatarName: \(displayName: string\) => string[\s\S]*?roomPeople: \(roomId: string\) => string\[\][\s\S]*?windowLit: \(roomId: string\) => boolean[\s\S]*?managementBadge: \(roomId: string\) => '' \| '楼务' \| '逾期'[\s\S]*?rentOwed: \(roomId: string\) => boolean[\s\S]*?roomActions: \(roomId: string \| null\) => 卡动作\[\][\s\S]*?\}>/,
     '组件 props 强类型契约',
   );
   assert.match(
@@ -243,7 +243,8 @@ test('组件局部状态/派生完整；素材来自 ../assets，无 ?url；关�
   );
   assert.match(地图源码, /import \{ 户静态表, 查房间, type 门牌 \} from '\.\.\/\.\.\/\.\.\/stageConfig'/, '组件从 stageConfig 导入户静态表/查房间/门牌');
   assert.match(地图源码, /import Ic from '\.\/Icon\.vue'/, '组件导入 Icon');
-  assert.match(地图源码, /const 用画布地图 = computed\(\(\) => !props\.lite && !立面失效\.value\)/, '用画布地图 = !lite && !立面失效');
+  assert.match(地图源码, /const 用画布地图 = computed\(\(\) => !立面失效\.value\)/, '完整地图默认启用，仅真实立面失败时切换兜底');
+  assert.doesNotMatch(地图源码, /props\.lite|lite:\s*boolean|rq-lite/, '地图不再接收或消费省流设置');
   assert.match(地图源码, /const 时段色调 = computed/, '时段色调派生');
   assert.match(地图源码, /const 时段问候 = computed/, '时段问候派生');
   assert.match(地图源码, /const 楼层组 = computed/, '楼层组派生');
@@ -336,16 +337,17 @@ test('地图专属 CSS 已从 App 移除且在组件；组件引基础 CSS 并�
   assert.match(弹窗基础css, /\.mask \{/, '基础 .mask 来自弹窗基础');
 });
 
-test('dark/lite/mobile 地图规则迁移，App 无地图专属残留；A1–A5b 边界未回退', () => {
+test('dark/图片失败兜底/mobile 地图规则完整；手动 lite 链退场；App 无地图专属残留；A1–A5b 边界未回退', () => {
   for (const selector of [
     ':global(html.rq-dark) .spot {',
     ':global(html.rq-dark) .outing-launch {',
-    ':global(html.rq-dark.rq-lite) .map-fallback .bldg-body {',
+    ':global(html.rq-dark) .map-fallback .bldg-body {',
     ':global(html.rq-dark) .room-modal {',
   ]) {
     assert.match(地图源码, new RegExp(转义(selector)), `地图组件应持有 ${selector}`);
     assert.doesNotMatch(App源码, new RegExp(转义(selector)), `App 不应再持有 ${selector}`);
   }
+  assert.doesNotMatch(地图源码, /rq-lite/, '地图 CSS 不再依赖已删除的省流 class');
   // App 侧合写选择器按所有权拆分后仍保留其余对象
   assert.match(App源码, /:global\(html\.rq-dark\) \.peep-card,[\s\S]{0,40}\.loc-banner \{/, 'App 保留 dark peep-card/loc-banner');
   assert.match(App源码, /:global\(html\.rq-dark\) \.todo-bar,[\s\S]{0,40}\.clue-card \{/, 'App 保留 dark todo-bar/clue-card');
