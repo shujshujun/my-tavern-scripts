@@ -7,7 +7,10 @@ const require = createRequire(import.meta.url),
   ts = require('typescript');
 process.env.TS_NODE_COMPILER_OPTIONS = JSON.stringify({ module: 'CommonJS', moduleResolution: 'node' });
 require('ts-node/register/transpile-only');
-const { 标记未提交回合生成事件 } = require('../../src/人妻公寓/脚本/游戏逻辑/数据库辅助生成标记.ts');
+const {
+  标记未提交回合生成事件,
+  标记脚本辅助生成事件,
+} = require('../../src/人妻公寓/脚本/游戏逻辑/数据库辅助生成标记.ts');
 const { 临时楼标记键 } = require('../../src/人妻公寓/脚本/游戏逻辑/临时回合楼.ts');
 const temp = role => ({ is_user: role === 'user', mes: '候选文本', extra: { [临时楼标记键]: true } });
 
@@ -47,6 +50,20 @@ test('预览、非对象参数和不可写参数不抛错；已有自动标记�
   for (const options of [null, undefined, 'text', [], Object.freeze({ automatic_trigger: false })])
     assert.equal(标记未提交回合生成事件(chat, options), false);
   assert.equal(标记未提交回合生成事件(chat, Object.freeze({ automatic_trigger: true })), true);
+});
+
+test('脚本辅助生成只标记真实 normal 请求；dryRun、其他类型和不可写参数保持失败关闭', () => {
+  const options = { source: 'generateRaw' };
+  assert.equal(标记脚本辅助生成事件('normal', options, false), true);
+  assert.deepEqual(options, { source: 'generateRaw', automatic_trigger: true });
+
+  for (const [type, dryRun] of [['quiet', false], ['regenerate', false], ['normal', true]]) {
+    const untouched = {};
+    assert.equal(标记脚本辅助生成事件(type, untouched, dryRun), false);
+    assert.deepEqual(untouched, {});
+  }
+  assert.equal(标记脚本辅助生成事件('normal', Object.freeze({ automatic_trigger: false }), false), false);
+  assert.equal(标记脚本辅助生成事件('normal', Object.freeze({ automatic_trigger: true }), false), true);
 });
 
 test('生产注册先于数据库记录生成上下文，即使第三方预先绑定generateRaw也按临时生命周期跳过', async () => {

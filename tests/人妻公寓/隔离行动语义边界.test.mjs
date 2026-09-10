@@ -31,6 +31,27 @@ globalThis.getLastMessageId = () => 0;
 globalThis.getVariables = () => 当前聊天变量;
 let 当前聊天变量 = {};
 
+// TavernHelper.generateRaw 会在调用实现前广播 normal GENERATION_AFTER_COMMANDS。
+// 本测试宿主必须复现该事件及 makeFirst 顺序，否则无法验证隔离生成的数据库身份门。
+const 生成前监听 = [];
+globalThis.tavern_events = { GENERATION_AFTER_COMMANDS: 'generation_after_commands' };
+globalThis.eventMakeFirst = (_event, listener) => {
+  生成前监听.unshift(listener);
+  return {
+    stop: () => {
+      const index = 生成前监听.indexOf(listener);
+      if (index >= 0) 生成前监听.splice(index, 1);
+    },
+  };
+};
+function 模拟酒馆助手GenerateRaw(实现) {
+  return async (...args) => {
+    const options = {};
+    for (const listener of [...生成前监听]) await listener('normal', options, false);
+    return 实现(...args);
+  };
+}
+
 const { Schema, 当前MVU数据版本 } = require('../../src/人妻公寓/schema.ts');
 const {
   净化隔离事件正文,
@@ -235,10 +256,10 @@ test('监控/荣耀洞即使数据库可用也各只请求一次正文 API', asy
       数据库次数 += 1;
       throw new Error('隔离事件不应调用数据库 AI');
     };
-    globalThis.generateRaw = async () => {
+    globalThis.generateRaw = 模拟酒馆助手GenerateRaw(async () => {
       正文次数 += 1;
       return '<content>正文线路生成成功</content>';
-    };
+    });
     globalThis.eventEmit = () => undefined;
     globalThis.getPreset = () => ({ prompts: [] });
     globalThis.substitudeMacros = 文 => 文;
@@ -280,10 +301,10 @@ test('监控正文 API 返回空正文时失败关闭且不自动重试', async 
       数据库次数 += 1;
       return '<content>不应调用</content>';
     };
-    globalThis.generateRaw = async () => {
+    globalThis.generateRaw = 模拟酒馆助手GenerateRaw(async () => {
       正文次数 += 1;
       return '';
-    };
+    });
     globalThis.eventEmit = () => undefined;
     globalThis.getPreset = () => ({ prompts: [] });
     globalThis.substitudeMacros = 文 => 文;
@@ -328,7 +349,7 @@ test('正文 generateRaw 永久 pending 时，取消隔离事件必须立即结�
   };
   let 停止次数 = 0;
   try {
-    globalThis.generateRaw = () => 底层;
+    globalThis.generateRaw = 模拟酒馆助手GenerateRaw(() => 底层);
     globalThis.stopAllGeneration = () => {
       停止次数 += 1;
     };

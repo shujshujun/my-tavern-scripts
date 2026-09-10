@@ -19,14 +19,64 @@ const input = { 类型: '睡眠', 线程: 'play045', 房间: '管理员室', 行
 
 function host(name, macro = token => token === '{{user}}' ? name : token) {
   const vars = { _隔离事件: { 日志: [{ 线程: 'play045', 谁: '玩家', 文本: '历史原文{{user}}。' }] } };
-  const calls = [];
+  const calls = [], databaseObserved = [], listeners = new Map();
+  const generationAfterCommands = 'generation_after_commands';
+  listeners.set(generationAfterCommands, [(_type, options) => databaseObserved.push(options.automatic_trigger === true)]);
+  globalThis.tavern_events = { GENERATION_AFTER_COMMANDS: generationAfterCommands };
+  globalThis.eventMakeFirst = (event, listener) => {
+    const list = listeners.get(event) ?? [];
+    list.unshift(listener);
+    listeners.set(event, list);
+    return {
+      stop: () => {
+        const index = list.indexOf(listener);
+        if (index >= 0) list.splice(index, 1);
+      },
+    };
+  };
   globalThis.SillyTavern = { name1: name, getCurrentChatId: () => 'play045-chat', chat: [] };
   globalThis.getVariables = () => structuredClone(vars);
   globalThis.substitudeMacros = macro;
-  globalThis.generateRaw = async request => { calls.push(structuredClone(request)); return '检查已经结束。'; };
+  globalThis.generateRaw = async request => {
+    const options = {};
+    for (const listener of [...(listeners.get(generationAfterCommands) ?? [])]) {
+      await listener('normal', options, false);
+    }
+    calls.push(structuredClone(request));
+    return '检查已经结束。';
+  };
   globalThis.fetch = async () => { throw new Error('external request forbidden'); };
-  return { vars, calls };
+  return { vars, calls, databaseObserved };
 }
+
+test('睡眠与录像带隔离生成在数据库监听前声明为后台触发，并保留前台取消语义', async () => {
+  const h = host('林舟');
+  await engine.生成隔离事件草稿({
+    类型: '睡眠',
+    线程: 'play045-sleep',
+    房间: '管理员室',
+    行动: '睡到次日早晨。',
+    导演事件: '从入睡写到次日醒来。',
+  });
+  await engine.生成录像带V4隔离草稿({
+    场次标识: 'play045-vtr-background',
+    房间: '102',
+    画面键: 'VTR-V4-102-B01',
+    行动: '继续查看录像。',
+    系统契约: '只演绎当前录像带画面。',
+    入口胶囊: '播放器已经启动。',
+    当前卡: '继续当前画面。',
+    历史: [],
+    房间摘要: { 102: '', 202: '' },
+  });
+
+  assert.equal(h.calls.length, 2);
+  assert.deepEqual(h.databaseObserved, [true, true], '数据库的后续监听必须看到 automatic_trigger=true');
+  for (const request of h.calls) {
+    assert.notEqual(request.should_silence, true, '不能为规避填表而改成静默生成，酒馆停止按钮仍须可用');
+    assert.match(request.generation_id, /^rqgy-(?:isolated|vtr-v4)-/u);
+  }
+});
 
 for (const name of ['林舟', 'Alex Chen', '阿舟🌿', 'A$&B']) {
   test(`自定义system按字面展开本次Persona：${name}`, async () => {

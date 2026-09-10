@@ -125,7 +125,17 @@ test('五种隔离事件统一只走正文 API，预设破限段仍收到本拍�
   assert.match(生成段, /const 通道 = '正文' as const;/, '史册提示词快照必须如实标记正文通道');
   assert.match(生成段, /预设破限段\(参数\.行动\)/, '预设破限段必须收到本拍行动，阻断上一楼指令泄漏');
   assert.match(生成段, /当前正文模型是DeepSeek\(\)/, '所有隔离正文必须沿用当前正文模型的兼容判定');
-  assert.match(生成段, /generateRaw\(\{[\s\S]*?generation_id: 生成ID/, '隔离正文必须直接调用可取消的正文 API');
+  assert.match(
+    隔离事件源,
+    /function 注册隔离辅助生成事件标记[\s\S]*?eventMakeFirst\(tavern_events\.GENERATION_AFTER_COMMANDS[\s\S]*?标记脚本辅助生成事件/,
+    '隔离正文必须在数据库监听前修改 TavernHelper 实际广播的生成事件身份',
+  );
+  assert.match(
+    生成段,
+    /辅助生成事件监听 = 注册隔离辅助生成事件标记\(\)[\s\S]*?generateRaw\(\{[\s\S]*?generation_id: 生成ID/,
+    '隔离正文必须紧贴可取消的 generateRaw 请求注册单次辅助身份监听',
+  );
+  assert.match(生成段, /finally \{[\s\S]*?辅助生成事件监听\?\.stop\(\)/, '任何结束路径都必须卸载未消费的身份监听');
   assert.match(生成段, /受控生成超时错误前缀/);
   assert.match(生成段, /本拍与时间均未结算/);
 });

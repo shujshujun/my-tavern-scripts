@@ -1,6 +1,7 @@
 import { Schema, 当前MVU数据版本, type SchemaType } from '../../schema';
 import { 构造隔离事件完整提示词快照 } from '../../提示词快照';
 import { 全局数据库AI租约 } from './数据库AI租约';
+import { 标记脚本辅助生成事件 } from './数据库辅助生成标记';
 import { 前台生成租约持有中, 取得前台生成租约, 手机生成租约持有中 } from './生成通道互斥';
 import { 当前正文模型是DeepSeek } from './正文模型识别';
 import { 预设破限段 } from './预设桥';
@@ -101,6 +102,31 @@ function 停止隔离正文底层请求(生成ID: string): void {
   } catch {
     /* 本地等待仍会结束，底层迟到结果由单次 settle 门丢弃。 */
   }
+}
+
+/**
+ * TavernHelper.generateRaw 当前会在请求前广播 normal GENERATION_AFTER_COMMANDS，且把调用配置
+ * 转换为内部参数时不会透传自定义 automatic_trigger。必须在数据库监听之前修改本次事件对象，
+ * 才能让数据库跳过这次没有宿主正文楼的辅助演出。监听紧贴 generateRaw 注册并只认领一次；
+ * 前台生成租约与酒馆停止按钮已在同一调用中阻止玩家并发发起另一轮普通正文。
+ */
+function 注册隔离辅助生成事件标记(): { stop: () => void } {
+  let 句柄: { stop: () => void } | null = null;
+  let 已停止 = false;
+  const 停止 = () => {
+    if (已停止) return;
+    已停止 = true;
+    句柄?.stop();
+  };
+  句柄 = eventMakeFirst(tavern_events.GENERATION_AFTER_COMMANDS, (类型, 选项, dryRun) => {
+    if (已停止 || dryRun || 类型 !== 'normal') return;
+    if (!标记脚本辅助生成事件(类型, 选项, dryRun)) {
+      停止();
+      throw new Error('无法建立辅助生成身份；为避免数据库误填表，本次独立演出没有启动。');
+    }
+    停止();
+  });
+  return { stop: 停止 };
 }
 
 function 从变量读库(vars: unknown): 隔离事件库 {
@@ -246,6 +272,7 @@ export async function 生成隔离事件草稿(
   }
   // 生成中 置位与 生成开始 广播都放进 try：监听器抛错也不得泄漏共享前台租约，
   // 统一由 finally 释放（含成功/失败/取消全部路径）。
+  let 辅助生成事件监听: { stop: () => void } | null = null;
   try {
     生成中 = true;
     已取消 = false;
@@ -277,6 +304,9 @@ export async function 生成隔离事件草稿(
       ...(是DeepSeek ? [...后, 'user_input' as const] : ['user_input' as const, ...后]),
     ];
     const 生成ID = `rqgy-isolated-${Date.now()}-${++隔离正文请求序号}`;
+    // 先把下一次 generateRaw 的 GENERATION_AFTER_COMMANDS 放到数据库监听之前标成辅助请求。
+    // 保持 should_silence 缺省：玩家仍可用酒馆停止按钮或游戏内取消入口中断这次前台演出。
+    辅助生成事件监听 = 注册隔离辅助生成事件标记();
     const 等待 = 创建受控生成等待(
       generateRaw({ ordered_prompts, user_input: 本拍用户输入, should_stream: 是DeepSeek, generation_id: 生成ID }),
       {
@@ -312,6 +342,7 @@ export async function 生成隔离事件草稿(
     }
     throw error;
   } finally {
+    辅助生成事件监听?.stop();
     当前隔离正文等待 = null;
     生成中 = false;
     前台租约.释放();
@@ -331,6 +362,7 @@ export async function 生成录像带V4隔离草稿(参数: 录像带V4隔离事
     if (前台生成租约持有中()) throw new Error('正文或另一独立事件正在生成，请等待完成后重试。');
     throw new Error('生成通道刚被其他请求占用，请稍后重试。');
   }
+  let 辅助生成事件监听: { stop: () => void } | null = null;
   try {
     生成中 = true;
     已取消 = false;
@@ -353,6 +385,7 @@ export async function 生成录像带V4隔离草稿(参数: 录像带V4隔离事
     ];
     const 是DeepSeek = 当前正文模型是DeepSeek();
     const 生成ID = `rqgy-vtr-v4-${Date.now()}-${++隔离正文请求序号}`;
+    辅助生成事件监听 = 注册隔离辅助生成事件标记();
     const 等待 = 创建受控生成等待(
       generateRaw({
         ordered_prompts,
@@ -395,6 +428,7 @@ export async function 生成录像带V4隔离草稿(参数: 录像带V4隔离事
     }
     throw error;
   } finally {
+    辅助生成事件监听?.stop();
     当前隔离正文等待 = null;
     生成中 = false;
     前台租约.释放();
