@@ -388,7 +388,7 @@ test('useMuteMeeting 未改职责；App 仍只使用其既有 API，story-wrap/d
   assert.match(行动选项源码, /<template v-if="open">/, '行动选项组件根自持 v-if="open"');
   assert.match(App源码, /:open="可输入 && !偷窥决策中"/, '监控硬决策关闭普通输入');
   assert.match(回合输入源码, /v-if="open && decisionMode !== 'blocked'" class="quill"/, '游戏输入组件按决策类型自持门控');
-  assert.match(App源码, /:actions="普通房间动作"/, '普通房内动作经抽屉组件消费');
+  assert.match(App源码, /:actions="抽屉普通房间动作"/, '统一过滤后的普通房内动作经抽屉组件消费');
   assert.match(App源码, /:video-tape-active="录像带任一中"/, '两代录像带统一门控接线保持');
   assert.match(App源码, /:suppressed="房内操作抑制 \|\| 前台硬决策中"/, '统一抑制与硬决策接线保持');
   // A1–A7b2 关键组件仍在

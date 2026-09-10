@@ -147,7 +147,7 @@ for (const status of ['生成中', '待重试', '等待回应', '']) {
   });
 }
 
-test('PLAY-004 201续演保留自有活动票豁免，同时阻止队尾其他人的同地票', () => {
+test('PLAY-004 201自有活动票未收口时隐藏重复地点入口，并完整保留活动票与队尾票', () => {
   const entry = entries[0];
   for (const foreign of [false, true]) {
     const data = entry.fresh();
@@ -158,11 +158,11 @@ test('PLAY-004 201续演保留自有活动票豁免，同时阻止队尾其他�
     }).成功, true);
     waiting(data);
     if (foreign) waiting(data, '201');
-    check(entry, data, !foreign);
+    check(entry, data, false);
   }
 });
 
-test('PLAY-004 201自有等待票豁免逐项判定，不放过未知票或远处连续锁场票', () => {
+test('PLAY-004 201自有等待票未收口时隐藏重复地点入口，不吞远处、未知或连续锁场票', () => {
   const entry = entries[0];
   for (const kind of ['remote', 'unknown', 'continuous']) {
     const data = entry.fresh();
@@ -170,7 +170,7 @@ test('PLAY-004 201自有等待票豁免逐项判定，不放过未知票或远�
     waiting(data, '201', own.事件);
     if (kind === 'unknown') data.系统._待发送事件 += '|【上一动作·送礼回响】旧档缺少地点';
     else waiting(data, '101', kind === 'continuous' ? '【场景剧情连续锁场】待继续' : '【普通预约】稍后再来');
-    check(entry, data, kind === 'remote');
+    check(entry, data, false);
   }
 });
 

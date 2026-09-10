@@ -125,7 +125,10 @@ test('总钥匙唯一收束可穿过自有剧情锁，真实忙态与其他地�
 
 test('App给唯一钥匙动作传递明确许可，其他忙态不会被该许可覆盖', () => {
   const app = read('界面/客户端/App.vue');
-  assert.match(app, /发送中: 场景操作锁,\s*最终收束操作可用,/);
+  assert.match(
+    app,
+    /发送中: 场景操作锁,\s*允许不再留门动作穿锁: 不再留门动作允许穿锁,\s*最终收束操作可用,/,
+  );
   assert.match(app, /动作 === '归位总钥匙' && 最终收束操作可用\.value/);
   const declaration = app.match(/const 最终收束操作可用 = computed\(([\s\S]*?)\n\);/)[1].replace(/,\s*$/, '');
   const refs = {

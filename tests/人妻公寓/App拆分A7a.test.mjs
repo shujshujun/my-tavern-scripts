@@ -272,7 +272,7 @@ test('App 其他录像带门控原样；A1–A6 边界未回退；无中文首�
   assert.match(正文卷轴源码, /:class="\{ 'story-veiled': veiled \}"/, '组件根把 veiled 映射到 story-veiled');
   assert.match(App源码, /v-if="当前房间 && !录像带任一中"/, '离房钮对两代录像带统一关闭');
   // 普通房内动作瓷砖迁入 房内操作抽屉.vue：录像带门控等价保留在组件，App 接线动作数组与统一抑制
-  assert.match(App源码, /:actions="普通房间动作"/, 'App 把普通房间动作传给抽屉组件');
+  assert.match(App源码, /:actions="抽屉普通房间动作"/, 'App 把统一过滤后的普通房间动作传给抽屉组件');
   assert.match(App源码, /:video-tape-active="录像带任一中"/, 'App 接线两代录像带统一门控');
   assert.match(App源码, /:suppressed="房内操作抑制 \|\| 前台硬决策中"/, 'App 接线统一抑制与硬决策门');
   assert.match(
