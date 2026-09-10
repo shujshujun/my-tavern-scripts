@@ -1,5 +1,5 @@
 import type { SchemaType } from '../../schema';
-import { 有地点动作剧情冲突 } from './场景剧情事务';
+import { 有地点动作剧情冲突, 读取待发送事件队列 } from './场景剧情事务';
 import { 许曼君离婚场景ID, 许曼君离婚新锁芯ID, 许曼君离婚新钥匙ID } from '../../stageConfig';
 import { 当前时段, 每天时段数, 妻位置推算 } from './楼层时钟';
 import { 处于医院硬锁 } from './生产系统';
@@ -230,6 +230,15 @@ function 自有剧情票(text: string): boolean {
   return String(text ?? '').includes('【许曼君离婚提交:');
 }
 
+/** 提交端可以识别自己的票，但地点动作候选端不得在同一票未收口时重复起场。 */
+function 已有自有剧情票(data: SchemaType): boolean {
+  const active = data.系统._场景剧情事务;
+  return Boolean(
+    (active.id && 自有剧情票(active.内容)) ||
+      读取待发送事件队列(data.系统._待发送事件).some(自有剧情票),
+  );
+}
+
 function 普通强剧情冲突(data: SchemaType, location: string): boolean {
   return 有地点动作剧情冲突(data, location, 自有剧情票);
 }
@@ -318,6 +327,7 @@ function 结局后亲密可用(data: SchemaType, location: string): boolean {
 
 export function 许曼君离婚地点动作(data: SchemaType, location: string): 许曼君离婚地点动作视图[] {
   const state = 路线(data);
+  if (已有自有剧情票(data)) return [];
 
   if (结局后亲密可用(data, location)) {
     return [

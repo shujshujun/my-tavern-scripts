@@ -233,10 +233,30 @@ function 当前本线票(data: SchemaType): 不再留门剧情票 | null {
 }
 export const 读取不再留门当前剧情票 = 当前本线票;
 
-function 本线正在前台(data: SchemaType): boolean {
+function 当前前台本线票(data: SchemaType): 不再留门剧情票 | null {
   const active = data.系统._场景剧情事务;
   const 内容 = active.id ? active.内容 : (读取队首场景剧情(data.系统._待发送事件)?.内容 ?? '');
-  return 解析不再留门剧情事件(内容)?.实例 === data.系统._不再留门.实例;
+  const 票 = 解析不再留门剧情事件(内容);
+  return 票?.实例 === data.系统._不再留门.实例 ? 票 : null;
+}
+
+function 前台票匹配当前路线(data: SchemaType, 票: 不再留门剧情票): boolean {
+  const r = data.系统._不再留门;
+  return (
+    票.实例 === r.实例 &&
+    票.修订 === r.修订 &&
+    票.场景 === r.当前场景 &&
+    票.拍 === r.当前拍 &&
+    票.时段 === data.系统._绝对时段
+  );
+}
+
+function 不再留门票目标地点(票: 不再留门剧情票): string {
+  return 票.场景 === 'A2' ? '公寓外部' : '202';
+}
+
+function 本线正在前台(data: SchemaType): boolean {
+  return Boolean(当前前台本线票(data));
 }
 
 export function 不再留门明确回应(data: SchemaType): string {
@@ -438,6 +458,26 @@ export function 不再留门动作阻断(data: SchemaType, 动作: 不再留门�
   return '';
 }
 
+const 不再留门自解锁动作 = new Set<不再留门动作ID>(['确认当前决定', '暂缓', '撤回许可']);
+
+/**
+ * 客户端只能让当前《不再留门》前台票解除自己的场景锁。
+ * 旧票、队尾票、错地点、错拍、错修订及普通地点动作一律不能借此穿锁；
+ * 正文生成、MVU 保存、移动与其他特殊现场仍由 App 的共享事务门继续阻断。
+ */
+export function 不再留门控制动作可穿过自身剧情锁(
+  data: SchemaType,
+  动作: 不再留门动作ID,
+  原地点: string,
+): boolean {
+  if (!不再留门自解锁动作.has(动作)) return false;
+  const 票 = 当前前台本线票(data);
+  if (!票 || !前台票匹配当前路线(data, 票)) return false;
+  const 地点 = 地点规范(原地点);
+  if (地点 !== 不再留门票目标地点(票)) return false;
+  return !不再留门动作阻断(data, 动作, 地点);
+}
+
 /** 只列当前位置的下一步；等待理由与档案、背包共用同一判定。 */
 export function 不再留门地点动作(data: SchemaType, 原地点: string): 不再留门动作视图[] {
   const r = data.系统._不再留门;
@@ -447,9 +487,12 @@ export function 不再留门地点动作(data: SchemaType, 原地点: string): �
   const 动作 = 下一动作(data);
   const 目标 = r.阶段 === '待归档' ? '302' : ['待目击', '目击中', '可拍'].includes(r.阶段) ? '公寓外部' : '202';
   const ids: 不再留门动作ID[] = [];
-  if (动作 && 地点 === 目标 && !当前本线票(data)) ids.push(动作);
-  if (当前本线票(data) && 地点 === 目标 && 不再留门明确回应(data)) ids.push('确认当前决定');
-  if (当前本线票(data)) ids.push('暂缓');
+  const 任一本线票 = 当前本线票(data);
+  const 前台票 = 当前前台本线票(data);
+  const 当前控制票 = 前台票 && 前台票匹配当前路线(data, 前台票) ? 前台票 : null;
+  if (动作 && 地点 === 目标 && !任一本线票) ids.push(动作);
+  if (当前控制票 && 地点 === 不再留门票目标地点(当前控制票) && 不再留门明确回应(data)) ids.push('确认当前决定');
+  if (当前控制票 && 地点 === 不再留门票目标地点(当前控制票)) ids.push('暂缓');
   if (r.许可 === '同意本次' && r.阶段 !== '已完成' && 地点 === '202') ids.push('撤回许可');
   return ids.map(id => {
     const 原因 = 不再留门动作阻断(data, id, 地点);

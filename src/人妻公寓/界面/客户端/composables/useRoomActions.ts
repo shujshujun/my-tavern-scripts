@@ -100,6 +100,11 @@ export interface 房间动作选项 {
   绝对时段: Readonly<Ref<number>>;
   /** 文本事务锁；楼务瓷砖与到达确认复用。 */
   发送中: Ref<boolean>;
+  /**
+   * `发送中` 由 App 注入组合锁；只有当前《不再留门》前台控制动作可声明该锁仅来自自身剧情。
+   * 真实生成、保存、移动、其他剧情与旧票必须返回 false。
+   */
+  允许不再留门动作穿锁?: (动作: 不再留门动作ID) => boolean;
   /** 只允许最后钥匙动作完成自己的锁；真实生成、保存和其他剧情仍由 App 关闭此许可。 */
   最终收束操作可用?: Readonly<Ref<boolean>>;
   /** 撤销资格；晨跑/健身/302/管理员室亮撤销动作。 */
@@ -132,6 +137,7 @@ export function useRoomActions(options: 房间动作选项) {
     时段,
     绝对时段,
     发送中,
+    允许不再留门动作穿锁 = () => false,
     时间撤销可用,
     已破门进入,
     荣耀洞可用,
@@ -220,7 +226,8 @@ export function useRoomActions(options: 房间动作选项) {
     if (当前房间.value === id) {
       for (const a of 不再留门地点动作(data.value, id)) {
         动作.push({ kicker: a.kicker, icon: a.icon, 文案: a.文案, 禁用: !a.可执行, 提示: a.原因, 做: () => {
-          if (!发送中.value && 当前房间.value === id && a.可执行) 事件.不再留门动作(a.id);
+          const 可穿自身锁 = 允许不再留门动作穿锁(a.id);
+          if ((!发送中.value || 可穿自身锁) && 当前房间.value === id && a.可执行) 事件.不再留门动作(a.id);
         } });
       }
     }

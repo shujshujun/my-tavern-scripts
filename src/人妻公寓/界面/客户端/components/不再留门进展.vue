@@ -4,8 +4,8 @@ import { computed, ref, watch } from 'vue';
 import type { SchemaType } from '../../../schema';
 import {
   不再留门地点动作,
+  不再留门控制动作可穿过自身剧情锁,
   不再留门真实录制已绑定,
-  读取不再留门当前剧情票,
   读取不再留门档案提示,
   type 不再留门动作ID,
 } from '../../../脚本/游戏逻辑/不再留门系统';
@@ -25,7 +25,8 @@ const decisions = computed(() =>
   不再留门地点动作(props.data, props.room ?? '').filter(
     a =>
       ['暂缓', '确认当前决定'].includes(a.id) ||
-      (a.id === '撤回许可' && (读取不再留门当前剧情票(props.data) || r.value.阶段 === '录制中')),
+      (a.id === '撤回许可' &&
+        (不再留门控制动作可穿过自身剧情锁(props.data, a.id, props.room ?? '') || r.value.阶段 === '录制中')),
   ),
 );
 const photo = computed(() => (不再留门CG允许(props.data, 'ZXM-NMD-02') ? 不再留门图片('ZXM-NMD-02') : ''));

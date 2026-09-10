@@ -917,7 +917,7 @@
 
         <!-- 房内动作(输入门控收紧后的补位:站在垃圾房/空户里,翻袋撬门不用开地图)。
              电脑与手机由房内操作抽屉统一收起瓷砖，业务动作仍由原提供方执行。 -->
-        <NoMoreDoorProgress v-if="!录像带任一中 && !静音会议正式中 && !安若妍H7决策中" :data="data" :room="当前房间" :sending="发送中" @action="请求不再留门动作" />
+        <NoMoreDoorProgress v-if="!录像带任一中 && !静音会议正式中 && !安若妍H7决策中" :data="data" :room="当前房间" :sending="不再留门控制提交中" @action="请求不再留门动作" />
         <RoomActionsDrawer
         :desktop-cohabitation-fold="当前房间 === '302'"
         :mobile="移动端"
@@ -926,7 +926,7 @@
         :action-count="可见房内动作数"
         :suppressed="房内操作抑制 || 前台硬决策中"
         :forced-open="安若妍H7决策中 && !场景操作锁"
-        :actions="普通房间动作"
+        :actions="抽屉普通房间动作"
         :garbage-visible="垃圾入口可见"
         :video-tape-active="录像带任一中"
         @open-garbage="垃圾选择开 = true"
@@ -1436,7 +1436,7 @@ import { 怀孕已公开 } from '../../脚本/游戏逻辑/怀孕系统';
 import { 借种离线监控待确认 } from '../../脚本/游戏逻辑/借种结局系统';
 import { 借种101持久背景文件 } from '../../脚本/游戏逻辑/借种结局状态';
 import { 录像带V4录像带可购买, 录像带V4贞操锁可购买数量, 录像带V4已经使用, 录像带V4使用阻断 } from '../../脚本/游戏逻辑/录像带V4状态';
-import { 不再留门购买阻断, 不再留门套件可购买, 不再留门动作阻断, 不再留门真实录制已绑定, 不再留门录制现场错误, 读取不再留门档案提示, type 不再留门动作ID } from '../../脚本/游戏逻辑/不再留门系统';
+import { 不再留门购买阻断, 不再留门套件可购买, 不再留门动作阻断, 不再留门控制动作可穿过自身剧情锁, 不再留门真实录制已绑定, 不再留门录制现场错误, 读取不再留门档案提示, type 不再留门动作ID } from '../../脚本/游戏逻辑/不再留门系统';
 import { 不再留门图片, 不再留门CG标题, 不再留门CG允许, 不再留门背景文件 } from './不再留门资源';
 import { 母亲视频通话已接通, 母亲视频通话当前CG, 母亲视频通话待接听 } from '../../脚本/游戏逻辑/母亲视频通话系统';
 import { 处于医院硬锁, 医院已解锁, 房间生产背景键, type 生产地点动作ID } from '../../脚本/游戏逻辑/生产系统';
@@ -3396,6 +3396,24 @@ const 界面事务提交中 = ref(false);
 let 界面事务提交世代 = 0;
 let 界面事务观察timer: ReturnType<typeof setInterval> | undefined;
 const 场景操作锁 = computed(() => 发送中.value || 场景剧情锁定.value || 界面事务提交中.value);
+const 不再留门控制提交中 = computed(() => 发送中.value || 界面事务提交中.value);
+
+/** 仅当前《不再留门》前台票可解除自己的普通场景锁；其余忙态和专属硬锁继续关闭。 */
+function 不再留门动作允许穿锁(动作: 不再留门动作ID): boolean {
+  if (
+    发送中.value ||
+    界面事务提交中.value ||
+    场景移动中 ||
+    !普通场景剧情功能锁.value ||
+    录像带前置中.value ||
+    录像带V4活动.value ||
+    母亲视频终幕已接通.value ||
+    双重继承最终收束锁.value
+  )
+    return false;
+  return 不再留门控制动作可穿过自身剧情锁(data.value, 动作, 当前房间.value ?? '');
+}
+
 const 最终收束操作可用 = computed(
   () =>
     双重继承最终收束锁.value &&
@@ -3569,6 +3587,7 @@ const { 房间动作, 当前房间动作, 普通房间动作, 确认已到达动
   时段,
   绝对时段,
   发送中: 场景操作锁,
+  允许不再留门动作穿锁: 不再留门动作允许穿锁,
   最终收束操作可用,
   时间撤销可用,
   已破门进入,
@@ -3671,7 +3690,8 @@ function 使用录像带() {
 }
 
 function 请求不再留门动作(动作: 不再留门动作ID) {
-  if (提交界面事务(() => eventEmit('人妻公寓:不再留门动作', 动作))) 显示背包.value = false;
+  const 允许穿锁 = 不再留门动作允许穿锁(动作);
+  if (提交界面事务(() => eventEmit('人妻公寓:不再留门动作', 动作), 允许穿锁)) 显示背包.value = false;
 }
 
 const 运行阶段 = ref('');
@@ -5385,7 +5405,11 @@ const 前台决策输入模式 = computed<前台决策输入模式>(() =>
 // ── 房内操作抽屉可见性(App 只算可见动作数、垃圾入口与统一抑制,展开/自动收起在组件内状态机) ──
 // 普通动作只在任一录像带场景之外计入；垃圾入口本身保持原地点语义，但V4硬锁会统一抑制操作。
 const 垃圾入口可见 = computed(() => 当前房间.value === '垃圾房' && 垃圾袋列表.value.length > 0);
-const 普通动作可见数 = computed(() => (录像带任一中.value ? 0 : 普通房间动作.value.length));
+/** 普通强剧情期间抽屉不保留陈旧瓷砖；最终钥匙仍沿用既有精确穿锁例外。 */
+const 抽屉普通房间动作 = computed(() =>
+  场景剧情锁定.value && !双重继承最终收束锁.value ? [] : 普通房间动作.value,
+);
+const 普通动作可见数 = computed(() => (录像带任一中.value ? 0 : 抽屉普通房间动作.value.length));
 const 可见房内动作数 = computed(() =>
   双重继承最终收束锁.value
     ? 普通动作可见数.value
@@ -5399,7 +5423,13 @@ const 桌面302共居操作折叠 = computed(
 );
 // 发送中 / 静音会议在桌面与手机都抑制；键盘门只在手机生效——桌面输入框 focus 时 键盘打开
 // 不隐藏房内动作(桌面行为原样),与旧 keyboard-open CSS 仅在 max-width:540px 媒体内命中等价。
-const 房内操作抑制 = computed(() => 发送中.value || 静音会议正式中.value || (移动端.value && 键盘打开.value));
+const 房内操作抑制 = computed(
+  () =>
+    发送中.value ||
+    静音会议正式中.value ||
+    (移动端.value && 键盘打开.value) ||
+    (场景剧情锁定.value && !双重继承最终收束锁.value),
+);
 
 watch(安若妍H7决策中, 决策中 => {
   if (!决策中) return;

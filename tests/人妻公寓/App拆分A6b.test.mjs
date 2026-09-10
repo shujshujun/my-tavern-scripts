@@ -287,7 +287,7 @@ test('管理任务与地点线路的完整参数/门控/顺序；五个组合动
   );
 });
 
-test('当前动作两层过滤保持；App MapPopup 继续收房间动作函数且抽屉组件消费普通房间动作', () => {
+test('当前动作两层过滤保持；App MapPopup 继续收房间动作函数且抽屉消费场景锁过滤后的普通动作', () => {
   assert.match(
     合成源码,
     /const 当前房间动作 = computed<卡动作\[\]>\(\(\) =>[\s\S]{0,120}房间动作\(当前房间\.value\)\.filter\(a => !\['GO', 'VISIT', 'KNOCK', 'HOME'\]\.includes\(a\.kicker\)\)/,
@@ -300,9 +300,14 @@ test('当前动作两层过滤保持；App MapPopup 继续收房间动作函数�
   );
   const 模板段 = 提取模板(App源码);
   assert.match(模板段, /:room-actions="房间动作"/, 'MapPopup 继续接收房间动作函数');
-  // 正文舞台的普通动作瓷砖已迁入 房内操作抽屉.vue；App 仍接线动作数组与录像带门控。
+  // 正文舞台的普通动作瓷砖已迁入 房内操作抽屉.vue；App 先按场景锁统一过滤数组、数量与可见性。
   assert.match(模板段, /<RoomActionsDrawer\b/, 'App 挂载抽屉组件');
-  assert.match(模板段, /:actions="普通房间动作"/, 'App 继续把普通房间动作传给抽屉组件');
+  assert.match(模板段, /:actions="抽屉普通房间动作"/, 'App 把场景锁过滤后的普通动作传给抽屉组件');
+  assert.match(
+    App源码,
+    /const 抽屉普通房间动作 = computed\(\(\) =>[\s\S]{0,160}场景剧情锁定\.value && !双重继承最终收束锁\.value \? \[\] : 普通房间动作\.value/,
+    '普通场景锁清空陈旧动作；双重继承最终钥匙继续使用既有精确例外',
+  );
   assert.match(模板段, /:video-tape-active="录像带任一中"/, 'App 继续接线旧录像带与V4统一门控');
 });
 
