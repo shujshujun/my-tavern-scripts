@@ -1,0 +1,63 @@
+{
+  "version": "0.92",
+  "tag": "rq0.92",
+  "sourceCommit": "d4383aa42987e4968ca801288fa2f5c1a906de6e",
+  "files": {
+    "dist/人妻公寓/界面/客户端/index.html": {
+      "sha256": "7d66ca4f099af5c487687ed59600d98727c4a669862a0cc7d0e59b52aeb99b16",
+      "bytes": 2368503
+    },
+    "dist/人妻公寓/脚本/游戏逻辑/index.js": {
+      "sha256": "43772cd3fceaf020830aa0d3f139cbe6d5de97b5166bfb3e0f2879cbd7008066",
+      "bytes": 3015297
+    },
+    "dist/人妻公寓/人妻公寓.json": {
+      "sha256": "aff527a743219b2977b40bcf645f296bbc73a0ad803bddda1269c52e3dc65cad",
+      "bytes": 99177
+    },
+    "dist/人妻公寓/人妻公寓.png": {
+      "sha256": "6037c449491d76192b96dce3413d0c870c002e29a60467e3a8f922920e96c2ef",
+      "bytes": 2390335
+    }
+  },
+  "checks": {
+    "test": true,
+    "lint": true,
+    "typeCheck": true,
+    "vueTypeCheck": true,
+    "build": true,
+    "card": true,
+    "releaseGate": true,
+    "publishWorkflow": true
+  },
+  "testSummary": {
+    "tests": 6608,
+    "pass": 6608,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0
+  },
+  "evidenceRoots": {
+    "cg": "D:/SillyTavern/tavern_helper_template-consolidated",
+    "vtr": "D:/SillyTavern/tavern_helper_template-consolidated",
+    "testArtifacts": "D:/SillyTavern/tavern_helper_template-consolidated",
+    "wardrobe": "D:/SillyTavern/tavern_helper_template-consolidated-prompt-opt"
+  },
+  "buildSummary": {
+    "isolated": {
+      "success": true,
+      "gameLogicErrors": 0,
+      "gameLogicWarnings": 3,
+      "clientErrors": 0,
+      "clientWarnings": 2,
+      "sourceUnchanged": true,
+      "distUnchanged": true
+    },
+    "formal": {
+      "success": true,
+      "errors": 0,
+      "warnings": 39,
+      "rqgyRelevantWarnings": 0
+    }
+  }
+}
