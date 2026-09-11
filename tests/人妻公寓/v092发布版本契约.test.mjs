@@ -7,7 +7,7 @@ import { 校验发布版本一致, 校验客户端构建版本 } from '../../src
 
 const 读 = 路径 => readFileSync(new URL(`../../${路径}`, import.meta.url), 'utf8');
 
-test('0.92 游戏版本、组卡标签、入口、发布说明、工作流规划与数据版本保持一致', () => {
+test('0.92 游戏版本、组卡标签、正式入口、发布说明、工作流与数据版本保持一致', () => {
   const 依赖版本 = 读('src/人妻公寓/脚本/游戏逻辑/依赖版本.ts');
   const 组卡 = 读('src/人妻公寓/组卡.mjs');
   const 入口 = 读('src/人妻公寓/新窗口入口_精简.md');
@@ -19,14 +19,14 @@ test('0.92 游戏版本、组卡标签、入口、发布说明、工作流规划
   assert.match(组卡, /const TAG = 'rq0\.92'/);
   assert.match(组卡, /支持继承 v0\.80～v0\.91\.6 存档/);
   assert.match(组卡, /my-tavern-scripts@\$\{TAG\}/);
-  assert.match(入口, /v0\.92／规划标签 rq0\.92/);
+  assert.match(入口, /v0\.92／rq0\.92/);
   assert.match(入口, /发布说明_v0\.92_2026-09-12\.md/);
-  assert.match(入口, /未创建或推送 rq0\.92/);
-  assert.match(发布说明, /发布分支规划：`release\/rq092`/);
-  assert.match(发布说明, /发布标签规划：`rq0\.92`/);
+  assert.match(入口, /注解标签 rq0\.92、发布分支 release\/rq092、GitHub Actions、Release、三个附件与不可变标签 CDN 均已完成并验证/);
+  assert.match(发布说明, /发布分支：`release\/rq092`/);
+  assert.match(发布说明, /发布标签：`rq0\.92`/);
   assert.match(发布说明, /角色卡版本：`0\.92`/);
   assert.match(发布说明, /v0\.83～v0\.91\.6\(v9\) 可直接继续/);
-  assert.match(发布说明, /尚未创建或推送 `rq0\.92`/);
+  assert.match(发布说明, /已完成正式发布；注解标签、发布分支、GitHub Actions、Release、三个附件和不可变标签 CDN 均已验证/);
   assert.match(工作流, /name: publish-rq092/);
   assert.match(工作流, /- release\/rq092/);
   assert.match(工作流, /ref: rq0\.92/);
