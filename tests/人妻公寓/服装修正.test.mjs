@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 import lodash from 'lodash';
 
 globalThis._ = lodash;
@@ -22,6 +24,8 @@ const { 角色立绘候选, 孕态服装白名单, 孕态服装立绘图, 素材
 const catalog = JSON.parse(readFileSync(new URL('../../src/人妻公寓/衣柜服装重制清单.json', import.meta.url), 'utf8'));
 const fixed = JSON.parse(readFileSync(new URL('../../src/人妻公寓/衣柜造型清单.json', import.meta.url), 'utf8'));
 const product = new URL('../../src/人妻公寓/素材/衣柜/成品/', import.meta.url);
+const 项目根 = fileURLToPath(new URL('../..', import.meta.url));
+const 证据根 = process.env.RQGY_CG_EVIDENCE_ROOT ? path.resolve(process.env.RQGY_CG_EVIDENCE_ROOT) : 项目根;
 const hash = relative => createHash('sha256').update(readFileSync(new URL(relative, product))).digest('hex');
 
 test('24张修正版按角色和衣物精确读取，主图与同源预览均有可校验的真实文件', () => {
@@ -68,6 +72,8 @@ test('已发布时使用cg5素材，本地验收仍可使用明确注入的资�
 test('戒指商品图已改为素圈且只覆盖换戒这一商品', () => {
   assert.equal(decodeURI(resources.衣柜商品修正图('换戒')), 'http://wardrobe.test/approved/_道具/换戒.webp');
   assert.equal(resources.衣柜商品修正图('choker颈环'), '');
-  const provenance = JSON.parse(readFileSync(new URL('../../output/imagegen/wardrobe-visual-reset/inventory-corrections/manifest.json', import.meta.url), 'utf8'));
+  const provenance = JSON.parse(
+    readFileSync(path.join(证据根, 'output/imagegen/wardrobe-visual-reset/inventory-corrections/manifest.json'), 'utf8'),
+  );
   assert.equal(hash('_道具/换戒.webp'), provenance.sha256);
 });

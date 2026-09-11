@@ -7,6 +7,7 @@ import { 当前正文模型是DeepSeek } from './正文模型识别';
 import { 预设破限段 } from './预设桥';
 import { 应用酒馆最终显示正则, 转为正文舞台纯文本 } from './预设输出兼容';
 import { 提取外部预设正文原文 } from './正文输出边界';
+import { 是提供方拒答正文 } from './正文生成完整性';
 import { 严格清除协议残留 } from './正文协议安全';
 import { 创建受控生成等待, 受控生成超时错误前缀, type 受控生成等待句柄 } from './受控生成等待';
 import { 当前聊天ID } from './手机/运行时上下文';
@@ -324,6 +325,7 @@ export async function 生成隔离事件草稿(
     if (已取消) throw new Error('已取消——这一拍没有发生');
     const 正文 = 净化隔离事件正文(应用酒馆最终显示正则(String(原文 ?? '')));
     if (!正文) throw new Error('事件 AI 没有返回可显示的正文');
+    if (是提供方拒答正文(正文)) throw new Error('AI服务返回了拒答说明，本拍未发生；请重试或更换模型线路。');
 
     const 提示词 = 构造隔离事件完整提示词快照({
       通道,
@@ -409,6 +411,7 @@ export async function 生成录像带V4隔离草稿(参数: 录像带V4隔离事
     if (已取消) throw new Error('已取消——这一幕没有发生');
     const 正文 = 净化隔离事件正文(String(原文 ?? ''));
     if (!正文) throw new Error('录像带V4 AI没有返回可显示的正文');
+    if (是提供方拒答正文(正文)) throw new Error('AI服务返回了拒答说明，本幕未发生；请重试或更换模型线路。');
     return {
       参数: {
         类型: '录像带V4',

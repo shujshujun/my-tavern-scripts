@@ -45,6 +45,22 @@ test('原生变量回调冻结轮令牌、owner、世代、聊天与消息双身
   assert.match(回调, /finally[\s\S]*标记原生变量事务结束\(\)/);
 });
 
+test('原生提供方拒答只作用于当前租约的预期助手楼，并在业务提交前清正文、恢复基底与释放租约', () => {
+  const 回调 = 截源(index源, 'eventOn(Mvu.events.VARIABLE_UPDATE_ENDED', '// 原生酒馆生成被玩家停止时');
+  assert.match(回调, /const 拒答归属租约 = 静音会议基底 \? null : 读原生正文开始票\(\)/u);
+  assert.match(回调, /拒答归属租约\.序号 === 原生租约owner/u);
+  assert.match(回调, /拒答归属租约\.聊天ID === 原生聊天ID/u);
+  assert.match(回调, /拒答归属租约\.时间线世代 === 原生时间线世代/u);
+  assert.match(回调, /拒答归属租约\.预期助手楼层 === 末楼层/u);
+  const 门 = 回调.indexOf('&& 是提供方拒答正文(本轮有效正文)');
+  const 清正文 = 回调.indexOf("await 物理写回静音会议原生正文('',", 门);
+  const 恢复基底 = 回调.indexOf('const 失败基底 = 静音会议基底 ??', 清正文);
+  const 释放 = 回调.indexOf('释放正文租约(原生租约owner)', 恢复基底);
+  const 失败 = 回调.indexOf("eventEmit('人妻公寓:回合失败'", 释放);
+  assert.ok(门 >= 0 && 清正文 > 门 && 恢复基底 > 清正文 && 释放 > 恢复基底 && 失败 > 释放);
+  assert.ok(门 < 回调.indexOf('提交场景剧情成功'), '拒答门必须早于任何剧情票提交');
+});
+
 test('静音正文物理写回持有精确租约，自己的正文改写会同步刷新预期签名', () => {
   const 写回 = 截源(index源, 'async function 物理写回静音会议原生正文(', 'function 合并静音会议可信私聊摘要');
   assert.match(写回, /if \(!提交校验\(\)\) throw/);

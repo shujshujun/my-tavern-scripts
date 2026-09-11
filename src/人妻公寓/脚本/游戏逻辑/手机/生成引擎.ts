@@ -12,6 +12,7 @@ import { 全局数据库AI租约 } from '../数据库AI租约';
 import { 验收群聊隐私 } from '../手机输出安全';
 import type { 群聊隐私模式 } from '../手机输出安全';
 import { 手机回复封套未闭合, 手机回复封套状态 } from '../手机生成完整性';
+import { 是提供方拒答正文 } from '../正文生成完整性';
 import { 汉字数, 解析微信群消息 } from '../手机群聊格式';
 import { 攻略动态方向 } from './内容素材表';
 import { 取得手机生成租约, 手机生成租约持有中 } from '../生成通道互斥';
@@ -119,7 +120,8 @@ export function 净化消息(原: string): string {
     .replace(/<options>[\s\S]*$/i, '')
     .replace(/<变量更新>[\s\S]*$/i, '')
     .trim();
-  return 全清 || 闭合清;
+  const 结果 = 全清 || 闭合清;
+  return 是提供方拒答正文(结果) ? '' : 结果;
 }
 
 function 有单条超过汉字上限(文本: string, 上限: number, 忽略发言人前缀 = false): boolean {

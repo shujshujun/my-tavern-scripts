@@ -2,12 +2,17 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
+import { pathToFileURL } from 'node:url';
 
 const 项目根 = new URL('../../', import.meta.url);
+const 证据根 = process.env.RQGY_CG_EVIDENCE_ROOT
+  ? pathToFileURL(`${path.resolve(process.env.RQGY_CG_EVIDENCE_ROOT)}${path.sep}`)
+  : 项目根;
 const 包根 = new URL(
   'output/imagegen/rqgy-reset/adult-completion/double-inheritance-302-intimacy/',
-  项目根,
+  证据根,
 );
 const 产品根 = new URL('approved/', 包根);
 const manifest = JSON.parse(readFileSync(new URL('manifest.json', 包根), 'utf8'));
@@ -79,7 +84,7 @@ test('9对PNG／WebP全部可解析，尺寸与manifest SHA精确一致', () => 
 
 test('身份、房间、生产计划与四份原图审核证据均存在', () => {
   for (const path of [manifest.references.identity, manifest.references.identityContinuity, manifest.references.room]) {
-    assert.equal(existsSync(new URL(path, 项目根)), true, `参考缺失: ${path}`);
+    assert.equal(existsSync(new URL(path, 证据根)), true, `参考缺失: ${path}`);
   }
   assert.equal(existsSync(new URL('production-plan.json', 包根)), true);
   for (const item of manifest.assets.filter(entry => entry.kind === 'opening')) {

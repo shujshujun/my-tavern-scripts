@@ -183,7 +183,9 @@ async function fixed(pair, first, second, options = {}) {
     安若妍不必停票: null, 许曼君分居票: null, 许曼君离婚票: null, 许曼君离婚后日常票: null,
     双重继承票: null, 焦点妻门牌: null, 快照: '', 行动锚: '', 选项: {}, 本轮数据库已安装: false,
     回合前末楼: 30, 行动: '提交整理好的经营归档。', 正文模型覆盖: {}, 焦点妻们: [], 阶段表: {}, 尺度模式: '', 正戏免检: false,
+    拍摄尺度契约: null,
     console: { warn() {} }, eventEmit() {}, 应用酒馆最终显示正则: value => value, 提取可提交正文: value => value,
+    提取正文舞台文本: value => value, 是提供方拒答正文: () => false,
     输出稽查: () => ({ 状态: '通过' }),
     确认本轮事务有效: () => { counters.leaseChecks++; if (options.stale) throw new Error('TEST_STALE_LEASE'); },
     等待正文生成: async () => { counters.generations++; if (options.error) throw new Error(options.error); return second; },
@@ -195,7 +197,7 @@ async function fixed(pair, first, second, options = {}) {
     deps[name] = () => '';
   }
   const run = evaluate(`return (async () => {
-    let 原文 = first, 最终显示原文 = first, 本回合生成id = '', 稽查 = { 状态: '通过' };
+    let 原文 = first, 最终显示原文 = first, 本回合生成id = '', 失败残稿 = '', 使用无处罚拒绝兜底 = false, 稽查 = { 状态: '通过' };
     ${firstAndRewrite}
     let 回国提交结果;
     ${fixedCommit}

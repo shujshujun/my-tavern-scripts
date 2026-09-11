@@ -61,7 +61,7 @@ function watch(promise) {
   return result;
 }
 function world({ storageDenied = false, future = false } = {}) {
-  const time = clock(), storage = new Map(), callbacks = new Set(), calls = [], instances = [];
+  const time = clock(), storage = new Map(), callbacks = new Set(), calls = [], instances = [], warnings = [];
   const host = { sessionStorage: {
     getItem: key => { if (storageDenied) throw Error('storage denied'); return storage.get(key) ?? null; },
     setItem: (key, value) => { if (storageDenied) throw Error('storage denied'); storage.set(key, value); },
@@ -120,7 +120,8 @@ function world({ storageDenied = false, future = false } = {}) {
       '数据库脚本表裁剪状态', '解析数据库脚本表裁剪规则', '收口数据库脚本表裁剪',
       '同步数据库回合', '同步社交轨迹', '读取数据库记忆胶囊',
     ], {
-      ...deps, ...time, _: lodash, window, console: { info() {}, warn() {}, error() {} },
+      ...deps, ...time, _: lodash, window,
+      console: { info() {}, warn: (...args) => warnings.push(args.map(String).join(' ')), error() {} },
       宿主窗口: () => host, 当前聊天标识: () => chat, 仍是同一聊天: id => id === chat, 当前末楼: () => floor,
       取数据库API: () => api, 数据库状态: () => ({ 已装游戏模板: true, 社交结果说明可用: true }),
       探测数据库SQLite模式: async () => true,
@@ -173,7 +174,7 @@ function world({ storageDenied = false, future = false } = {}) {
       .run('AM0001', '旧时间', '旧局纪要', '上一局的剧情纪要。', null);
   };
   return {
-    time, calls, callbacks, instance, event, social, snapshot, seedResetRows, seedScriptRows,
+    time, calls, callbacks, warnings, instance, event, social, snapshot, seedResetRows, seedScriptRows,
     auto: value => { auto = value; }, setChat: value => { chat = value; }, setFloor: value => { floor = value; },
     eventRows: () => db.prepare('SELECT * FROM rq_events ORDER BY floor_no').all(),
     memoryRows: () => db.prepare('SELECT * FROM rq_character_memory ORDER BY row_id').all(),
@@ -513,6 +514,28 @@ test('Future snapshot and swipe without a trusted callback do not open either in
     } finally { await w.close(); }
   }
 });
+
+test('同一聊天同一恢复令牌由多个观察者等待时只打印一次超时；新令牌仍可提示一次', async () => {
+  const w = world({ future: true }), a = w.instance(), b = w.instance();
+  const 警告数 = () => w.warnings.filter(line => line.includes('数据库重建未在时限内完成')).length;
+  try {
+    a.标记数据库时间线将变更(10, '删除消息');
+    b.标记数据库时间线将变更(10, '删除消息');
+    const first = [watch(a.等待数据库时间线就绪(3500)), watch(b.等待数据库时间线就绪(3500))];
+    await w.time.advance(4000);
+    assert.ok(first.every(result => result.settled && result.value === false));
+    assert.equal(警告数(), 1, '同一共享恢复任务不得被两个iframe重复刷屏');
+
+    a.标记数据库时间线将变更(9, '重掷回合');
+    const second = watch(a.等待数据库时间线就绪(3500));
+    await w.time.advance(4000);
+    assert.equal(second.settled, true);
+    assert.equal(second.value, false);
+    assert.equal(警告数(), 2, '新的恢复令牌仍应保留一次可见诊断');
+    assert.equal(a.数据库时间线允许新写('dual-test'), false, '限频不能放宽数据库失败关闭栅栏');
+  } finally { await w.close(); }
+});
+
 for (const change of ['chat', 'unload', 'new-token', 'ABA', 'new-token-completed']) {
   test(`${change}: a late successful recovery promise cannot grant current readiness`, async () => {
     const w = world(), a = w.instance();

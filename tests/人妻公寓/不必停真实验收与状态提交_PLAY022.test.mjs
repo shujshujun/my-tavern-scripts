@@ -30,7 +30,8 @@ const declaration = name => select(node => ts.isVariableStatement(node) && node.
 const gate = [declaration('专属节拍错误'), declaration('首稿重写原因'),
   select(node => ts.isIfStatement(node) && node.expression.getText(tree).startsWith('首稿重写原因 &&'))].join('\n');
 const js = ts.transpileModule(`async function run() {
-  let 原文 = first, 最终显示原文 = first, 本回合生成id = '';
+  let 原文 = first, 最终显示原文 = first, 本回合生成id = '', 失败残稿 = '';
+  let 使用无处罚拒绝兜底 = false;
   let 稽查 = { 状态: '通过' };
   ${gate}
   return 原文;
@@ -46,7 +47,9 @@ async function review(event, first, second, state, options = {}) {
     许曼君离婚后日常票: null, 双重继承票: null, 焦点妻门牌: null,
     快照: '', 行动锚: '', 选项: {}, 本轮数据库已安装: false, 回合前末楼: 30,
     行动: '继续当前拍。', 正文模型覆盖: {}, 焦点妻们: [], 阶段表: {}, 尺度模式: '', 正戏免检: false,
+    拍摄尺度契约: null,
     console: { warn() {} }, eventEmit() {}, 应用酒馆最终显示正则: value => value, 提取可提交正文: value => value,
+    提取正文舞台文本: value => value, 是提供方拒答正文: () => false,
     输出稽查: () => ({ 状态: '通过' }),
     确认本轮事务有效: () => { state.leaseChecks++; if (options.stale) throw new Error('TEST_STALE_LEASE'); },
     等待正文生成: async () => { state.generations++; if (options.error) throw new Error(options.error); return second; },

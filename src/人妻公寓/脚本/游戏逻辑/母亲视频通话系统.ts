@@ -1,4 +1,5 @@
 import type { SchemaType } from '../../schema';
+import { 是提供方拒答正文 } from './正文生成完整性';
 import {
   母亲视频通话接通入场CG,
   母亲视频通话终幕CG,
@@ -286,6 +287,7 @@ export function 完成母亲视频通话现场正文(
   if (视频.状态 !== '正文生成中') return { 成功: false, 提示: '现场正文并非生成中。' };
   const 文 = 正文.trim();
   if (!文) return { 成功: false, 提示: '现场正文为空。' };
+  if (是提供方拒答正文(文)) return { 成功: false, 提示: 'AI服务返回了拒答说明，现场正文未完成。' };
   视频.上轮现场正文 = 文;
   const 已有位置 = 视频.现场正文记录.findIndex(条 => 条.序号 === 序号);
   const 记录 = { 序号, CG: 视频.当前CG, 文 };

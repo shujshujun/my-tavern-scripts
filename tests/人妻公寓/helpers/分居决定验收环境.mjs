@@ -110,14 +110,16 @@ export async function fixedReview(fixture, first, second = first, options = {}) 
     许曼君离婚后日常票: null, 回国票: null, 双重继承票: null, 焦点妻门牌: null,
     快照: '', 行动锚: '', 选项: {}, 本轮数据库已安装: false, 回合前末楼: fixture.floor - 2,
     行动: options.player ?? '我在听。', 正文模型覆盖: {}, 焦点妻们: ['201'], 阶段表: { 201: 5 }, 尺度模式: '', 正戏免检: false,
+    拍摄尺度契约: null,
     console: { warn() {} }, eventEmit() {}, 应用酒馆最终显示正则: text => text, 提取可提交正文: text => text,
+    提取正文舞台文本: text => text, 是提供方拒答正文: () => false,
     输出稽查: () => ({ 状态: '通过' }),
     确认本轮事务有效: () => { if (options.stale) throw new Error('isolated stale caller lease'); },
     等待正文生成: async () => { generations++; if (options.error) throw new Error(options.error); return second; },
   };
   for (const name of ['不再留门正文越拍原因', '第二机位正文越拍原因', '安若妍不必停正文越拍原因',
     '许曼君离婚正文越拍原因', '许曼君离婚后日常正文越界原因', '回国正文越拍原因', '双重继承正文越拍原因']) deps[name] = () => '';
-  const text = `async function review() { let 原文 = first, 最终显示原文 = first, 本回合生成id = ''; let 稽查 = { 状态: '通过' };\n` +
+  const text = `async function review() { let 原文 = first, 最终显示原文 = first, 本回合生成id = '', 失败残稿 = ''; let 使用无处罚拒绝兜底 = false; let 稽查 = { 状态: '通过' };\n` +
     declaration('专属节拍错误') + '\n' + declaration('首稿重写原因') + '\n' + blocks[0].getText(tree) + '\nreturn 原文; }';
   const body = await execute(text, deps, 'review()');
   return { body, generations };

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
@@ -18,23 +19,18 @@ const require = createRequire(import.meta.url);
 require('ts-node/register/transpile-only');
 
 const 仓库根 = fileURLToPath(new URL('../..', import.meta.url));
-const 视频产品根 = fileURLToPath(
-  new URL(
-    '../../output/imagegen/rqgy-reset/adult-completion/mother-video-call-sequence/product-v1/cg1/mother-video-call/',
-    import.meta.url,
-  ),
+const 证据根 = process.env.RQGY_CG_EVIDENCE_ROOT ? path.resolve(process.env.RQGY_CG_EVIDENCE_ROOT) : 仓库根;
+const 视频产品根 = path.join(
+  证据根,
+  'output/imagegen/rqgy-reset/adult-completion/mother-video-call-sequence/product-v1/cg1/mother-video-call',
 );
-const 视频清单路径 = fileURLToPath(
-  new URL(
-    '../../output/imagegen/rqgy-reset/adult-completion/mother-video-call-sequence/product-v1/mother-video-call.manifest.json',
-    import.meta.url,
-  ),
+const 视频清单路径 = path.join(
+  证据根,
+  'output/imagegen/rqgy-reset/adult-completion/mother-video-call-sequence/product-v1/mother-video-call.manifest.json',
 );
-const 视频源映射路径 = fileURLToPath(
-  new URL(
-    '../../output/imagegen/rqgy-reset/adult-completion/mother-video-call-sequence/product-v1/source-map.json',
-    import.meta.url,
-  ),
+const 视频源映射路径 = path.join(
+  证据根,
+  'output/imagegen/rqgy-reset/adult-completion/mother-video-call-sequence/product-v1/source-map.json',
 );
 const 静态清单路径 = fileURLToPath(new URL('../../src/人妻公寓/素材/特殊场景/母亲线剧情CG.manifest.json', import.meta.url));
 const 视频语义源码路径 = fileURLToPath(new URL('../../src/人妻公寓/脚本/游戏逻辑/母亲视频通话CG语义.ts', import.meta.url));
@@ -98,7 +94,7 @@ test('母亲视频54个运行ID、build-only源映射、产品WebP和manifest保
   assert.deepEqual(源映射.entries.map(条目 => 条目.id), 运行ID, '源映射必须保持运行拓扑顺序');
   assert.equal(new Set(源映射.entries.map(条目 => 条目.sourceFile)).size, 54, '每个运行ID必须拥有唯一物理源文件');
   for (const 条目 of 源映射.entries) {
-    assert.equal(existsSync(`${仓库根}/${条目.sourceFile}`), true, `${条目.id}的获批源文件不存在`);
+    assert.equal(existsSync(`${证据根}/${条目.sourceFile}`), true, `${条目.id}的获批源文件不存在`);
     assert.match(条目.sourceFile, /^output\/imagegen\/rqgy-reset\/adult-completion\//);
   }
 
@@ -117,7 +113,7 @@ test('母亲视频54个运行ID、build-only源映射、产品WebP和manifest保
   const 产品文件 = readdirSync(视频产品根).filter(文件 => 文件.endsWith('.webp'));
   assert.deepEqual(排序(产品文件), 排序(运行ID.map(id => `${id}.webp`)), '产品目录不得缺图或残留孤儿WebP');
   for (const 条目 of 清单.entries) {
-    const 路径 = `${仓库根}/${条目.productFile}`;
+    const 路径 = `${证据根}/${条目.productFile}`;
     assert.equal(existsSync(路径), true);
     assert.equal(statSync(路径).size, 条目.productBytes);
     assert.ok(条目.productBytes > 100_000, `${条目.id}不应是空占位`);
@@ -125,7 +121,7 @@ test('母亲视频54个运行ID、build-only源映射、产品WebP和manifest保
     assert.deepEqual(读取WebP尺寸(路径), { 宽: 1536, 高: 2304 });
     assert.equal(条目.productWidth, 1536);
     assert.equal(条目.productHeight, 2304);
-    const 源路径 = `${仓库根}/${条目.sourceFile}`;
+    const 源路径 = `${证据根}/${条目.sourceFile}`;
     assert.equal(statSync(源路径).size, 条目.sourceBytes);
     assert.equal(sha256(源路径), 条目.sourceSha256);
   }

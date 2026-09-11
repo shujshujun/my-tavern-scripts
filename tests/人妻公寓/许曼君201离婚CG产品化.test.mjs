@@ -6,7 +6,8 @@ import { join, resolve } from 'node:path';
 import test from 'node:test';
 
 const ROOT = resolve(new URL('../..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/u, '$1'));
-const SOURCE_ROOT = join(ROOT, 'output/imagegen/rqgy-reset/adult-completion/xumanjun-divorce-ending');
+const EVIDENCE_ROOT = process.env.RQGY_CG_EVIDENCE_ROOT ? resolve(process.env.RQGY_CG_EVIDENCE_ROOT) : ROOT;
+const SOURCE_ROOT = join(EVIDENCE_ROOT, 'output/imagegen/rqgy-reset/adult-completion/xumanjun-divorce-ending');
 const SOURCE_MANIFEST = join(SOURCE_ROOT, 'manifest-v2.json');
 const PRODUCT_ROOT = join(ROOT, 'src/人妻公寓/素材/特殊场景/许曼君离婚');
 const PRODUCT_MANIFEST = join(ROOT, 'src/人妻公寓/素材/特殊场景/许曼君离婚CG.manifest.json');

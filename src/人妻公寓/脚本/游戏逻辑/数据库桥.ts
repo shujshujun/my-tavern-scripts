@@ -1071,6 +1071,8 @@ interface 时间线宿主状态 {
   已完成令牌: Record<string, string>;
   /** 时间线清场／裁剪是破坏性 DELETE；任何 iframe 的迟到请求结算前，全宿主都不能开放新写。 */
   时间线清场待结算: Record<string, Record<string, number>>;
+  /** 同一聊天、同一恢复令牌的超时只由宿主打印一次，避免多个等待者放大同一任务。 */
+  恢复超时已提示: Record<string, string>;
   当前聊天标识: string;
   进入当前聊天时间: number;
 }
@@ -1091,6 +1093,9 @@ function 取时间线宿主状态(): 时间线宿主状态 {
           ? 旧原型
           : (Object.create(null) as Record<string, Record<string, number>>);
     }
+    if (!existing.恢复超时已提示 || typeof existing.恢复超时已提示 !== 'object') {
+      existing.恢复超时已提示 = Object.create(null) as Record<string, string>;
+    }
     if (typeof existing.当前聊天标识 !== 'string') existing.当前聊天标识 = '';
     if (!Number.isFinite(existing.进入当前聊天时间)) existing.进入当前聊天时间 = Date.now();
     return existing as 时间线宿主状态;
@@ -1099,6 +1104,7 @@ function 取时间线宿主状态(): 时间线宿主状态 {
     待重建: Object.create(null) as Record<string, unknown>,
     已完成令牌: Object.create(null) as Record<string, string>,
     时间线清场待结算: Object.create(null) as Record<string, Record<string, number>>,
+    恢复超时已提示: Object.create(null) as Record<string, string>,
     当前聊天标识: '',
     进入当前聊天时间: Date.now(),
   };
@@ -1756,6 +1762,15 @@ export function 标记数据库时间线将变更(
  * 等待 spv8.9.1 的消息级回放，并主动稳定复验公开快照。超时后游戏继续，
  * 栅栏保持关闭并以退避方式后台重试；绝不因超时直接放行未知分支。
  */
+function 提示数据库恢复超时一次(聊天标识: string, state: 数据库时间线持久状态): void {
+  const 提示键 = `${state.令牌}:${state.原因}`;
+  if (时间线宿主.恢复超时已提示[聊天标识] === 提示键) return;
+  时间线宿主.恢复超时已提示[聊天标识] = 提示键;
+  console.warn(
+    `[人妻公寓·数据库] ${state.原因 || '消息时间线变更'}后的数据库重建未在时限内完成；本轮不读取一般长期记忆。`,
+  );
+}
+
 export async function 等待数据库时间线就绪(最长等待毫秒 = 3500): Promise<boolean> {
   if (时间线接线已清理) return false;
   const 聊天标识 = 更新当前聊天驻留();
@@ -1772,10 +1787,9 @@ export async function 等待数据库时间线就绪(最长等待毫秒 = 3500):
   const 已就绪 = 同一恢复令牌已完成 && !时间线接线已清理 &&
     数据库异步写.可提交(等待租约) && 数据库时间线允许新写(聊天标识);
   if (!已就绪) {
-    const state = 时间线栅栏.读取状态(聊天标识);
-    console.warn(
-      `[人妻公寓·数据库] ${state?.原因 || '消息时间线变更'}后的数据库重建未在时限内完成；本轮不读取一般长期记忆。`,
-    );
+    // 多个脚本 iframe／回合观察者可能同时等待同一个共享恢复 Promise。恢复任务已经单飞，
+    // 日志也必须按聊天+令牌单飞；新一代令牌仍会重新提示，失败关闭语义不变。
+    提示数据库恢复超时一次(聊天标识, 时间线栅栏.读取状态(聊天标识) ?? persisted);
   }
   return 已就绪;
 }

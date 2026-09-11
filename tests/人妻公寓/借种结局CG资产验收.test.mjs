@@ -2,15 +2,15 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const 仓库根 = fileURLToPath(new URL('../..', import.meta.url));
-const 产品目录 = fileURLToPath(new URL('../../output/imagegen/borrow-seed-ending/final/', import.meta.url));
-const 成人项目目录 = fileURLToPath(
-  new URL('../../output/imagegen/rqgy-reset/adult-completion/borrow-seed-ending/', import.meta.url),
-);
-const 父级目录 = fileURLToPath(new URL('../../output/imagegen/rqgy-reset/adult-completion/', import.meta.url));
+const 证据根 = process.env.RQGY_CG_EVIDENCE_ROOT ? path.resolve(process.env.RQGY_CG_EVIDENCE_ROOT) : 仓库根;
+const 产品目录 = path.join(证据根, 'output/imagegen/borrow-seed-ending/final');
+const 成人项目目录 = path.join(证据根, 'output/imagegen/rqgy-reset/adult-completion/borrow-seed-ending');
+const 父级目录 = path.join(证据根, 'output/imagegen/rqgy-reset/adult-completion');
 
 const 非敏感 = [
   '借种_101三人赴约.webp',
@@ -69,12 +69,12 @@ test('借种结局14张产品WebP、编号总表、历史父级封板与当前�
     assert.deepEqual(webpSize(bytes), 非敏感.includes(文件) ? [1536, 1024] : [1536, 2304]);
   }
 
-  const 清单 = JSON.parse(readFileSync(`${仓库根}/output/imagegen/borrow-seed-ending/manifest.json`, 'utf8'));
+  const 清单 = JSON.parse(readFileSync(`${证据根}/output/imagegen/borrow-seed-ending/manifest.json`, 'utf8'));
   assert.equal(清单.nonSensitive.status, 'complete_reviewed_and_converted');
   assert.deepEqual([...清单.nonSensitive.approved].sort(), 非敏感);
   assert.deepEqual([...清单.adult.approved].sort(), 成人);
   const 非敏感总表 = JSON.parse(
-    readFileSync(`${仓库根}/output/imagegen/borrow-seed-ending/${清单.nonSensitive.taskLedger}`, 'utf8'),
+    readFileSync(`${证据根}/output/imagegen/borrow-seed-ending/${清单.nonSensitive.taskLedger}`, 'utf8'),
   );
   assert.equal(非敏感总表.status, 'complete_reviewed_and_converted_2026-08-21');
   assert.deepEqual(
@@ -96,7 +96,7 @@ test('借种结局14张产品WebP、编号总表、历史父级封板与当前�
     assert.equal(任务.artifacts.length, 1);
     const artifact = 任务.artifacts[0];
     assert.equal(sha256(`${成人项目目录}/${artifact.path}`), artifact.sha256);
-    assert.equal(sha256(`${仓库根}/${artifact.productPath}`), artifact.productSha256);
+    assert.equal(sha256(`${证据根}/${artifact.productPath}`), artifact.productSha256);
   }
 
   const 父级封板 = 总表.scope.parentSeal;

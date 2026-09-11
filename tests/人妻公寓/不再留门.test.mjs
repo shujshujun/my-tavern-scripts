@@ -119,6 +119,54 @@ function toRecord() {
   return d;
 }
 
+test('新票只删除未经授权尺度边界，不添加任何媒介或未发生事实说明', () => {
+  const d = fresh();
+  buy(d);
+  waitFor(d, '使用道具', '202');
+  const result = act(d, '使用道具');
+  assert.match(result.事件, /本轮仅演这一拍。AI不改变状态/u);
+  assert.doesNotMatch(result.事件, /新增演出保持非露骨|新增身体行为严格服从|拍摄尺度契约|既有摄像机|录制或母带只作为/u);
+});
+
+test('旧票热升级只精确删边界句，保留队列分隔、票号、拍次、事务与其他剧情', () => {
+  const d = fresh();
+  const 旧边界 = '本轮仅演这一拍，新增演出保持非露骨。';
+  const 错误替代 = '本轮仅演这一拍；新增身体行为严格服从当前拍事实，照片、相机、镜头、录制或母带只作为已成立的剧情环境，不得借设备语境提前演出后续普通场次。';
+  const 旧票A = `【不再留门提交:legacy-a:3:A7:1:12】【场景剧情连续锁场】【开录确认·1/2】${旧边界}AI不改变状态。`;
+  const 旧票B = `【不再留门提交:legacy-b:4:A9:2:18】【场景剧情连续锁场】【场景剧情需回应】【记录封存·2/2】${错误替代}AI不改变状态。`;
+  const 其他票 = `【其他剧情提交:test】${旧边界}原样保留|内文`;
+  d.系统._待发送事件 = `|${旧票A}|${其他票}|${旧票B}|`;
+  Object.assign(d.系统._场景剧情事务, {
+    id: 'persisted-nmd', 标题: '开录确认', 目标场景: '202', 行动: '继续', 内容: 旧票A,
+    触发绝对时段: 12, 触发楼层: 30, 请求世代: 7, 状态: '待重试',
+  });
+  d.系统._已注入事件 = { 楼层: 31, 内容: 旧票B };
+  Object.assign(d.系统._不再留门, { 实例: 'legacy-a', 修订: 3, 当前场景: 'A7', 当前拍: 1 });
+  const 路线前 = lodash.cloneDeep(d.系统._不再留门);
+  const 事务前 = lodash.cloneDeep(d.系统._场景剧情事务);
+
+  assert.equal(route.清理不再留门旧尺度边界提示(d), true);
+  const 本线路径 = [
+    ...d.系统._待发送事件.split('|').filter(项 => 项.includes('【不再留门提交:')),
+    d.系统._场景剧情事务.内容,
+    d.系统._已注入事件.内容,
+  ].join('\n');
+  assert.doesNotMatch(本线路径, /新增演出保持非露骨|新增身体行为严格服从/u);
+  assert.match(d.系统._待发送事件, /【其他剧情提交:test】本轮仅演这一拍，新增演出保持非露骨。原样保留/u);
+  assert.equal(d.系统._待发送事件.startsWith('|'), true);
+  assert.equal(d.系统._待发送事件.endsWith('|'), true);
+  assert.ok(d.系统._待发送事件.includes(其他票));
+  assert.match(d.系统._场景剧情事务.内容, /【不再留门提交:legacy-a:3:A7:1:12】/u);
+  assert.match(d.系统._已注入事件.内容, /【不再留门提交:legacy-b:4:A9:2:18】/u);
+  assert.deepEqual(d.系统._不再留门, 路线前);
+  assert.deepEqual(
+    { ...d.系统._场景剧情事务, 内容: 事务前.内容 },
+    事务前,
+    '除内容中的精确删句外，事务身份与请求世代不得变化',
+  );
+  assert.equal(route.清理不再留门旧尺度边界提示(d), false);
+});
+
 test('购买只扣一次入包，未使用不开放外部，旧完成字符串不冒充新线', () => {
   const d = fresh();
   d.系统._已完成特殊场景.push('不再留门');

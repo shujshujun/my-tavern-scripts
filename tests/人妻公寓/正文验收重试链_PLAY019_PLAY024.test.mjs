@@ -12,6 +12,7 @@ require('ts-node/register/transpile-only');
 globalThis._ = lodash;
 const door = require('../../src/人妻公寓/脚本/游戏逻辑/不再留门系统.ts');
 const home = require('../../src/人妻公寓/脚本/游戏逻辑/回国系统.ts');
+const { 是提供方拒答正文 } = require('../../src/人妻公寓/脚本/游戏逻辑/正文生成完整性.ts');
 const text = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/回合引擎.ts', import.meta.url), 'utf8');
 const tree = ts.createSourceFile('回合引擎.ts', text, ts.ScriptTarget.Latest, true);
 function select(predicate) {
@@ -37,15 +38,16 @@ async function review(event, first, second, state, options = {}) {
     许曼君离婚后日常票: null, 双重继承票: null, 焦点妻门牌: null,
     快照: '', 行动锚: '', 选项: {}, 本轮数据库已安装: false, 回合前末楼: 30,
     行动: '继续当前拍。', 正文模型覆盖: {}, 焦点妻们: [], 阶段表: {}, 尺度模式: '', 正戏免检: false,
-    console: { warn() {} }, eventEmit() {}, 应用酒馆最终显示正则: value => value, 提取可提交正文: value => value,
-    输出稽查: () => ({ 状态: '通过' }),
+    console: { warn() {} }, eventEmit() {}, 应用酒馆最终显示正则: value => value,
+    提取可提交正文: value => value, 提取正文舞台文本: value => value, 是提供方拒答正文,
+    输出稽查: () => ({ 状态: '通过' }), 拍摄尺度契约: null,
     确认本轮事务有效: () => { state.leaseChecks++; if (options.stale) throw new Error('TEST_STALE_LEASE'); },
     等待正文生成: async () => { state.generations++; if (options.error) throw new Error(options.error); return second; },
   };
   for (const name of ['第二机位正文越拍原因', '安若妍不必停正文越拍原因', '许曼君分居正文越拍原因',
     '许曼君离婚正文越拍原因', '许曼君离婚后日常正文越界原因', '双重继承正文越拍原因']) deps[name] = () => '';
   const js = ts.transpileModule(`async function run() {
-    let 原文 = first, 最终显示原文 = first, 本回合生成id = '';
+    let 原文 = first, 最终显示原文 = first, 本回合生成id = '', 失败残稿 = '';
     let 稽查 = { 状态: '通过' };
     ${actualGate}
     return 原文;
