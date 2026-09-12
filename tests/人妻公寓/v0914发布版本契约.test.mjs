@@ -7,7 +7,7 @@ import { 校验发布版本一致, 校验客户端构建版本 } from '../../src
 
 const 读 = 路径 => readFileSync(new URL(`../../${路径}`, import.meta.url), 'utf8');
 
-test('0.91.4 历史发布说明保持冻结，当前源码、组卡与入口前进到0.92.1', () => {
+test('0.91.4 历史发布说明保持冻结，当前源码、组卡与入口前进到0.92.2', () => {
   const 依赖版本 = 读('src/人妻公寓/脚本/游戏逻辑/依赖版本.ts');
   const 组卡 = 读('src/人妻公寓/组卡.mjs');
   const 入口 = 读('src/人妻公寓/新窗口入口_精简.md');
@@ -16,9 +16,9 @@ test('0.91.4 历史发布说明保持冻结，当前源码、组卡与入口前�
   assert.match(发布说明, /角色卡版本：`0\.91\.4`/);
   assert.match(发布说明, /releases\/download\/rq0\.91\.4\/rqgy-0\.91\.4\.png/);
   assert.doesNotMatch(发布说明, /rq0\.91\.5/);
-  assert.match(依赖版本, /当前游戏版本 = '0\.92\.1'/);
-  assert.match(组卡, /const 版本 = '0\.92\.1'/);
-  assert.match(组卡, /const TAG = 'rq0\.92\.1'/);
+  assert.match(依赖版本, /当前游戏版本 = '0\.92\.2'/);
+  assert.match(组卡, /const 版本 = '0\.92\.2'/);
+  assert.match(组卡, /const TAG = 'rq0\.92\.2'/);
   assert.match(组卡, /支持继承 v0\.80～v0\.92 存档，无需重开/);
   assert.match(入口, /当前正式入口：v0\.92\.1／rq0\.92\.1/);
   assert.match(读('src/人妻公寓/schema.ts'), /当前MVU数据版本 = 9/);
