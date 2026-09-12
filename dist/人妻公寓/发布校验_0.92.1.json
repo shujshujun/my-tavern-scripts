@@ -1,0 +1,54 @@
+{
+  "version": "0.92.1",
+  "tag": "rq0.92.1",
+  "sourceCommit": "4ec2433302d116f74f099d4ed99938eebfe11610",
+  "files": {
+    "dist/人妻公寓/界面/客户端/index.html": {
+      "bytes": 2368492,
+      "sha256": "9367a1ddebbe954184982f469538b767921757019bd388a1be8e947a2848bb82"
+    },
+    "dist/人妻公寓/脚本/游戏逻辑/index.js": {
+      "bytes": 3015501,
+      "sha256": "f2d8d5343a77cdb0bc02e4e58b09eb5b9ecb02ed0090cbb9109273ec4519b6f0"
+    },
+    "dist/人妻公寓/人妻公寓.json": {
+      "bytes": 100033,
+      "sha256": "2b13f0a374badc4d13b3f0befdec48d3b1094be166e76b6d5d31169f74c1fcb5"
+    },
+    "dist/人妻公寓/人妻公寓.png": {
+      "bytes": 2391479,
+      "sha256": "cf55196a45835099ff5e68544d2ea0ed7247aadd1929dd5ebda8dc2edf46c88b"
+    }
+  },
+  "checks": {
+    "test": true,
+    "lint": true,
+    "typeCheck": true,
+    "vueTypeCheck": true,
+    "build": true,
+    "card": true,
+    "releaseGate": true,
+    "publishWorkflow": true
+  },
+  "testSummary": {
+    "tests": 6613,
+    "pass": 6613,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0
+  },
+  "buildSummary": {
+    "isolated": {
+      "errors": 0,
+      "warnings": 5,
+      "distUnchanged": true,
+      "sourceUnchanged": true
+    },
+    "formal": {
+      "errors": 0,
+      "warnings": 5,
+      "isolatedBytesIdentical": true,
+      "preservedOtherDistFiles": 75
+    }
+  }
+}
