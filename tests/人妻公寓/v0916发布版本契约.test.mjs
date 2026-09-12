@@ -23,7 +23,7 @@ test('0.91.6 历史发布说明保持冻结，当前源码、组卡与入口前�
   assert.match(组卡, /const TAG = 'rq0\.92'/);
   assert.match(组卡, /支持继承 v0\.80～v0\.91\.6 存档/);
   assert.match(组卡, /my-tavern-scripts@\$\{TAG\}/);
-  assert.match(入口, /v0\.92／规划标签 rq0\.92/);
+  assert.match(入口, /当前正式入口：v0\.92／rq0\.92/);
   assert.match(入口, /发布说明_v0\.92_2026-09-12\.md/);
   assert.match(读('src/人妻公寓/schema.ts'), /当前MVU数据版本 = 9/);
 });
