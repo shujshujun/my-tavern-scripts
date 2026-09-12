@@ -298,12 +298,27 @@ export function 核验即时业务撤回记录(
   }
 }
 
-export function 即时业务锚仍是业务前状态(value: unknown, 当前锚数据原: SchemaType): boolean {
+function 读取即时业务前数据指纹(value: unknown): string {
   const record = 读取即时业务撤回记录(value);
-  if (!record) return false;
+  if (record) return record.业务前数据指纹;
+  // 捕获阶段尚未分配场景事务 ID，因此此处拿到的是准备票而不是完整撤回记录。
+  // 仍需重算快照指纹，避免把被改写的伪准备票当作真实业务前状态。
+  if (!是记录(value) || typeof value.业务前数据指纹 !== 'string' || !value.业务前数据指纹) return '';
+  try {
+    const 业务前数据 = Schema.parse(_.cloneDeep(value.业务前数据)) as SchemaType;
+    const 指纹 = 时间状态指纹(业务前数据);
+    return 指纹 === value.业务前数据指纹 ? 指纹 : '';
+  } catch {
+    return '';
+  }
+}
+
+export function 即时业务锚仍是业务前状态(value: unknown, 当前锚数据原: SchemaType): boolean {
+  const 业务前数据指纹 = 读取即时业务前数据指纹(value);
+  if (!业务前数据指纹) return false;
   try {
     const 当前锚数据 = Schema.parse(_.cloneDeep(当前锚数据原)) as SchemaType;
-    return 时间状态指纹(当前锚数据) === record.业务前数据指纹;
+    return 时间状态指纹(当前锚数据) === 业务前数据指纹;
   } catch {
     return false;
   }
