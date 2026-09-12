@@ -1,5 +1,31 @@
 import type { SchemaType } from '../../schema';
 
+/** 两处答复断点共享同一协议；只识别当前阶段，不能替玩家选择或推进路线。 */
+export function 读取许曼君分居重答(data: SchemaType): { 动作: string; 文案: string; 标记: string } | null {
+  const route = data.系统._许曼君分居;
+  if (!route) return null;
+  if (route.阶段 === '待初谈' && route.当前场景 === '第一幕初谈' && route.当前拍 === 2) {
+    return { 动作: '开始第一幕初谈', 文案: '说明你会怎样参与', 标记: '【许曼君分居提交:第一幕初谈:3】' };
+  }
+  if (route.阶段 === '待私下决定' && route.当前场景 === '第四幕私下决定' && route.当前拍 === 1) {
+    return { 动作: '开始第四幕私下决定', 文案: '说明你与她今后的关系', 标记: '【许曼君分居提交:第四幕私下决定:2】' };
+  }
+  return null;
+}
+
+/** 0.92/0.92.1 已落盘的重答按钮票。精确匹配原输入，真实玩家回应和其他角色不可改写。 */
+export function 许曼君分居旧票需要补答(data: SchemaType): boolean {
+  const reply = 读取许曼君分居重答(data);
+  const txn = data.系统._场景剧情事务;
+  if (!reply || !txn.id || txn.目标场景 !== '201') return false;
+  const tags = txn.内容.match(/【许曼君分居提交:[^】]+】/gu) ?? [];
+  return (
+    tags.length === 1 &&
+    tags[0] === reply.标记 &&
+    txn.行动 === `（在201执行《分居》的“${reply.文案}”，只推进眼前这一个人物决定或硬物件动作）`
+  );
+}
+
 /** 空字符串表示酒馆楼道；null 只用于“旧记录无法可靠确认原场景”。 */
 export type 场景剧情目标 = string | null;
 
@@ -656,13 +682,15 @@ export function 读取场景剧情状态(data: SchemaType): 场景剧情状态�
   if (!active && (data.系统._特殊场景.id || data.系统._荣耀洞拍 >= 0)) return null;
   if (active) {
     const head = 读取队首场景剧情(data.系统._待发送事件);
+    // 旧重答票已有持久事务但没有玩家答复，界面按等待输入呈现；底层活动锁、票号及撤回签名保留。
+    const 需要补答 = 许曼君分居旧票需要补答(data);
     return {
-      活动: true,
+      活动: !需要补答,
       id: active.id,
       标题: active.标题,
       目标场景: active.目标场景,
       状态: active.状态 || '待重试',
-      需要玩家回应: false,
+      需要玩家回应: 需要补答,
       连续锁场: 场景剧情连续锁场(active.内容),
       队列剩余数: Math.max(0, (head?.总项数 ?? 1) - (head?.项数 ?? 1)),
       可在当前场景开始: 当前场景 => 场景剧情目标匹配(active.目标场景, 当前场景),
