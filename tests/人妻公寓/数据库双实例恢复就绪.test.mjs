@@ -86,6 +86,7 @@ function world({ storageDenied = false, future = false } = {}) {
     d: { name: 'RQ_社交轨迹', content: [['最后楼层'], ...db.prepare('SELECT last_floor FROM rq_social_history ORDER BY row_id').all().map(r => [r.last_floor])] },
   });
   const api = {
+    synchronizeChatTimeline: async () => ({ success: true }),
     exportTableAsJson: snapshot,
     registerTableUpdateCallback: fn => callbacks.add(fn),
     unregisterTableUpdateCallback: fn => callbacks.delete(fn),
@@ -174,7 +175,7 @@ function world({ storageDenied = false, future = false } = {}) {
       .run('AM0001', '旧时间', '旧局纪要', '上一局的剧情纪要。', null);
   };
   return {
-    time, calls, callbacks, warnings, instance, event, social, snapshot, seedResetRows, seedScriptRows,
+    time, calls, callbacks, warnings, instance, event, social, snapshot, seedResetRows, seedScriptRows, api,
     auto: value => { auto = value; }, setChat: value => { chat = value; }, setFloor: value => { floor = value; },
     eventRows: () => db.prepare('SELECT * FROM rq_events ORDER BY floor_no').all(),
     memoryRows: () => db.prepare('SELECT * FROM rq_character_memory ORDER BY row_id').all(),
@@ -190,6 +191,79 @@ function world({ storageDenied = false, future = false } = {}) {
     },
   };
 }
+
+test('回放确认尚未完成时禁止抢先DELETE，完成后恢复读写并保留长期记忆', async () => {
+  const w = world();
+  let release;
+  const replay = new Promise(resolve => { release = resolve; });
+  w.api.synchronizeChatTimeline = () => replay;
+  w.seedScriptRows(12);
+  const b = w.instance();
+  try {
+    b.标记数据库时间线将变更(10, '回档至10楼');
+    const pending = watch(b.等待数据库时间线就绪(3500));
+    await w.time.advance(1500);
+    assert.equal(w.calls.length, 0, '1.2秒插件防抖经过也不意味着回放已经完成');
+    assert.equal(b.数据库时间线允许新写('dual-test'), false);
+    release({ success: true });
+    await w.time.advance(1800);
+    assert.equal(pending.value, true);
+    assert.ok(w.calls.some(call => call.sql.startsWith('DELETE')));
+    assert.equal(w.eventRows().length, 0);
+  } finally { await w.close(); }
+});
+
+test('旧插件没有回放接口时不发抢先清理SQL；已恢复快照可被动解锁', async () => {
+  const w = world(), b = w.instance();
+  delete w.api.synchronizeChatTimeline;
+  try {
+    w.seedScriptRows(12);
+    b.标记数据库时间线将变更(10, '删除消息');
+    const pending = watch(b.等待数据库时间线就绪(3500));
+    await w.time.advance(4000);
+    assert.equal(pending.value, false);
+    assert.equal(w.calls.length, 0);
+    assert.equal(w.eventRows().length, 1, '不能用强删未来记忆冒充恢复');
+  } finally { await w.close(); }
+  const clean = world(), c = clean.instance();
+  delete clean.api.synchronizeChatTimeline;
+  try {
+    c.标记数据库时间线将变更(10, '删除消息');
+    const pending = watch(c.等待数据库时间线就绪(3500));
+    await clean.time.advance(4000);
+    assert.equal(pending.value, true);
+    assert.equal(clean.calls.length, 0);
+  } finally { await clean.close(); }
+});
+
+test('物理删除之前不确认旧聊天；旧令牌迟到确认不能允许新令牌写入', async () => {
+  const w = world(), b = w.instance(), pending = [];
+  w.api.synchronizeChatTimeline = () => new Promise(resolve => pending.push(resolve));
+  try {
+    b.标记数据库时间线将变更(8, '回档至8楼');
+    void b.等待数据库时间线就绪(3500);
+    await w.time.advance(600);
+    assert.equal(pending.length, 0);
+    w.setFloor(8);
+    await w.time.advance(300);
+    assert.equal(pending.length, 1);
+    b.标记数据库时间线将变更(6, '回档至6楼');
+    w.setFloor(6);
+    const next = watch(b.等待数据库时间线就绪(3500));
+    await w.time.advance(300);
+    assert.equal(pending.length, 2);
+    pending[0]({ success: true });
+    await w.time.advance(600);
+    assert.equal(next.value, undefined);
+    assert.equal(b.数据库时间线允许新写('dual-test'), false);
+    assert.equal(w.calls.length, 0);
+    pending[1]({ success: true });
+    await flush();
+    w.notify(); // 插件回放完成的表格通知；后续仍需连续稳定采样。
+    await w.time.advance(1800);
+    assert.equal(next.value, true);
+  } finally { await w.close(); }
+});
 
 test('跨窗口内部删楼已由操作级栅栏覆盖时，不得重标成玩家删除消息', async () => {
   const w = world(), game = w.instance(), client = w.instance();
@@ -322,6 +396,7 @@ test('普通回档裁剪DELETE超时后，底层Promise真实settle前跨窗口�
     w.auto(false);
     game.标记数据库时间线将变更(4, '回档至4楼');
     client.标记数据库时间线将变更(4, '回档至4楼');
+    w.setFloor(4); // 真实删除完成后才进入插件回放与脚本流水裁剪。
     const results = [watch(game.等待数据库时间线就绪(8000)), watch(client.等待数据库时间线就绪(8000))];
 
     // 第一张脚本表的裁剪已超过单次2.5秒等待，但底层DELETE仍未真正结算。
@@ -551,7 +626,7 @@ for (const change of ['chat', 'unload', 'new-token', 'ABA', 'new-token-completed
       if (change === 'new-token') a.标记数据库时间线将变更(4, '删除消息');
       if (change === 'ABA') { w.setChat('B'); a.emit('changed'); w.setChat('dual-test'); a.标记数据库时间线将变更(4, '切换消息分支'); }
       if (change === 'new-token-completed') {
-        a.标记数据库时间线将变更(4, '删除消息'); const b = w.instance();
+        a.标记数据库时间线将变更(4, '删除消息'); w.setFloor(4); const b = w.instance();
         const newer = watch(b.等待数据库时间线就绪(3500)); await w.time.advance(3000);
         assert.equal(newer.value, true); assert.equal(a.数据库时间线允许新写('dual-test'), true);
       }

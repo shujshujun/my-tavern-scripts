@@ -62,6 +62,7 @@ type SQL查询方法 = (
 ) => SQL查询结果 | null;
 
 interface 数据库API {
+  synchronizeChatTimeline?: (options: { reason: 'deleted' | 'swiped' }) => Promise<{ success: boolean }>;
   callAI?: (messages: 数据库消息[], options?: { presetName?: string; max_tokens?: number }) => Promise<string | null>;
   getUpdateConfigParams?: () => unknown;
   setUpdateConfigParams?: (params: { autoUpdateTokenThreshold?: number }) => boolean | Promise<boolean>;
@@ -1122,6 +1123,9 @@ const 时间线恢复任务 = new Map<string, { 令牌: string; 截止时间: nu
 const 时间线重试计时器 = new Map<string, ReturnType<typeof setTimeout>>();
 const 时间线重试间隔 = new Map<string, number>();
 const 时间线事件停止器: (() => void)[] = [];
+const 数据库回放确认 = new Map<string, {
+  令牌: string; api: 数据库API; 完成: boolean; 成功: boolean; 重试时间: number;
+}>();
 let 时间线回调API: 数据库API | null = null;
 let 时间线接线已清理 = false;
 
@@ -1560,11 +1564,18 @@ async function 执行数据库时间线恢复(
     const 恢复目标楼层 = persisted.目标楼层 ?? 初始目标楼层;
     const 恢复原因 = persisted?.原因 ?? 初始原因;
     const 恢复标记时间 = persisted?.标记时间 ?? 初始标记时间;
-    if (!(await 收口数据库重开清场(聊天标识, 令牌, 恢复目标楼层, 恢复原因, 恢复标记时间))) {
+    // 必须先由插件恢复检查点并完成冷回放，再允许游戏发出清场 SQL。
+    // 老插件没有确认接口时只做被动快照复验，不能在其防抖窗口中保存并覆盖恢复副本。
+    const 回放已确认 = 确认数据库回放(聊天标识, 令牌, 恢复原因, 恢复目标楼层);
+    if (回放已确认 === false || (回放已确认 === null && 恢复原因 === '重开一局')) {
       await new Promise<void>(resolve => setTimeout(resolve, 160));
       continue;
     }
-    if (!(await 收口数据库脚本表裁剪(聊天标识, 令牌, 恢复目标楼层, 恢复原因, 恢复标记时间))) {
+    if (回放已确认 && !(await 收口数据库重开清场(聊天标识, 令牌, 恢复目标楼层, 恢复原因, 恢复标记时间))) {
+      await new Promise<void>(resolve => setTimeout(resolve, 160));
+      continue;
+    }
+    if (回放已确认 && !(await 收口数据库脚本表裁剪(聊天标识, 令牌, 恢复目标楼层, 恢复原因, 恢复标记时间))) {
       await new Promise<void>(resolve => setTimeout(resolve, 160));
       continue;
     }
@@ -1619,6 +1630,38 @@ async function 执行数据库时间线恢复(
     }
     await new Promise<void>(resolve => setTimeout(resolve, 140));
   }
+  return false;
+}
+
+/** null 表示旧插件仅能被动恢复；任何超时、失败和迟到确认都不授予写权限。 */
+function 确认数据库回放(聊天标识: string, 令牌: string, 原因: string, 目标楼层: number | null): boolean | null {
+  const api = 取数据库API();
+  if (!api) return false;
+  if (typeof api.synchronizeChatTimeline !== 'function') return null;
+  let entry = 数据库回放确认.get(聊天标识);
+  if (entry?.令牌 === 令牌 && entry.api === api) {
+    if (entry.成功) return true;
+    if (!entry.完成 || Date.now() < entry.重试时间) return false;
+  }
+  // 标记发生在物理删楼之前；首次同步必须看到目标前缀已存活，不能先确认旧的完整聊天。
+  if (entry?.令牌 !== 令牌 && !/切换消息分支|swipe/iu.test(原因) &&
+      目标楼层 !== null && Number(当前末楼()) > 目标楼层) return false;
+  entry = { 令牌, api, 完成: false, 成功: false, 重试时间: 0 };
+  数据库回放确认.set(聊天标识, entry);
+  const current = entry;
+  void Promise.resolve().then(() => {
+    if (时间线接线已清理 || !仍是同一聊天(聊天标识) || 取数据库API() !== api ||
+        读取持久时间线状态(聊天标识)?.令牌 !== 令牌) return { success: false };
+    return api.synchronizeChatTimeline!({
+      reason: /切换消息分支|swipe/iu.test(原因) ? 'swiped' : 'deleted',
+    });
+  }).then(result => {
+    current.成功 = result?.success === true && !时间线接线已清理 && 仍是同一聊天(聊天标识) &&
+      取数据库API() === api && 读取持久时间线状态(聊天标识)?.令牌 === 令牌;
+  }, () => { current.成功 = false; }).finally(() => {
+    current.完成 = true;
+    current.重试时间 = Date.now() + 1000;
+  });
   return false;
 }
 
@@ -1769,6 +1812,9 @@ function 提示数据库恢复超时一次(聊天标识: string, state: 数据�
   console.warn(
     `[人妻公寓·数据库] ${state.原因 || '消息时间线变更'}后的数据库重建未在时限内完成；本轮不读取一般长期记忆。`,
   );
+  if (typeof 取数据库API()?.synchronizeChatTimeline !== 'function') {
+    console.warn('[人妻公寓·数据库] 当前插件缺少回档同步确认接口；请使用配套数据库修复版。恢复期间仅复验快照，不抢先写入数据库。');
+  }
 }
 
 export async function 等待数据库时间线就绪(最长等待毫秒 = 3500): Promise<boolean> {
@@ -1830,6 +1876,7 @@ function 接入宿主时间线事件(): void {
 function 清理数据库时间线接线(): void {
   if (时间线接线已清理) return;
   时间线接线已清理 = true;
+  数据库回放确认.clear();
   try {
     时间线回调API?.unregisterTableUpdateCallback?.(数据库刷新完成回调);
   } catch {
