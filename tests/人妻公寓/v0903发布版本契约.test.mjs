@@ -19,12 +19,12 @@ function 载入TypeScript(路径) {
   return module.exports;
 }
 
-test('v0.90.3 已成为历史正式版，当前源码与组卡入口统一前进到 0.92', () => {
+test('v0.90.3 已成为历史正式版，当前源码与组卡入口统一前进到 0.92.1', () => {
   const 依赖版本源 = 读('src/人妻公寓/脚本/游戏逻辑/依赖版本.ts');
   const 组卡源 = 读('src/人妻公寓/组卡.mjs');
-  assert.match(依赖版本源, /当前游戏版本 = '0\.92'/);
-  assert.match(组卡源, /const 版本 = '0\.92'/);
-  assert.match(组卡源, /const TAG = 'rq0\.92'/);
+  assert.match(依赖版本源, /当前游戏版本 = '0\.92\.1'/);
+  assert.match(组卡源, /const 版本 = '0\.92\.1'/);
+  assert.match(组卡源, /const TAG = 'rq0\.92\.1'/);
 });
 
 test('0.90.3 玩家能检测到 0.90.4；本地与官方同为 0.90.4 时不重复提示', () => {

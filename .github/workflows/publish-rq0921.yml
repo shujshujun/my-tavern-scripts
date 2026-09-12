@@ -1,0 +1,64 @@
+name: publish-rq0921
+
+on:
+  push:
+    branches:
+      - release/rq0921
+    paths:
+      - .github/workflows/publish-rq0921.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-rq0921
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out immutable release tag
+        uses: actions/checkout@v4
+        with:
+          ref: rq0.92.1
+
+      - name: Prepare release assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-assets
+          cp 'dist/人妻公寓/人妻公寓.png' 'release-assets/rqgy-0.92.1.png'
+          cp 'dist/人妻公寓/人妻公寓.json' 'release-assets/rqgy-0.92.1.json'
+          cp 'dist/人妻公寓/发布校验_0.92.1.json' 'release-assets/rqgy-0.92.1-checksums.json'
+
+      - name: Create or update GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if gh release view rq0.92.1 >/dev/null 2>&1; then
+            gh release edit rq0.92.1 \
+              --title '《人妻公寓》v0.92.1' \
+              --notes-file 'src/人妻公寓/发布说明_v0.92.1_2026-09-12.md' \
+              --latest
+          else
+            gh release create rq0.92.1 \
+              --verify-tag \
+              --title '《人妻公寓》v0.92.1' \
+              --notes-file 'src/人妻公寓/发布说明_v0.92.1_2026-09-12.md' \
+              --latest
+          fi
+          gh release upload rq0.92.1 release-assets/* --clobber
+
+      - name: Verify published assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh release view rq0.92.1 --json tagName,isDraft,isPrerelease,url,assets \
+            --jq '{tagName,isDraft,isPrerelease,url,assets:[.assets[]|{name,size,state}]}'

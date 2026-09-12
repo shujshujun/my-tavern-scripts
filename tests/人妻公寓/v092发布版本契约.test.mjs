@@ -7,21 +7,21 @@ import { 校验发布版本一致, 校验客户端构建版本 } from '../../src
 
 const 读 = 路径 => readFileSync(new URL(`../../${路径}`, import.meta.url), 'utf8');
 
-test('0.92 游戏版本、组卡标签、正式入口、发布说明、工作流与数据版本保持一致', () => {
+test('0.92 历史发布说明与工作流保持冻结，当前源码、组卡与入口前进到0.92.1', () => {
   const 依赖版本 = 读('src/人妻公寓/脚本/游戏逻辑/依赖版本.ts');
   const 组卡 = 读('src/人妻公寓/组卡.mjs');
   const 入口 = 读('src/人妻公寓/新窗口入口_精简.md');
   const 发布说明 = 读('src/人妻公寓/发布说明_v0.92_2026-09-12.md');
   const 工作流 = 读('.github/workflows/publish-rq092.yml');
 
-  assert.match(依赖版本, /当前游戏版本 = '0\.92'/);
-  assert.match(组卡, /const 版本 = '0\.92'/);
-  assert.match(组卡, /const TAG = 'rq0\.92'/);
-  assert.match(组卡, /支持继承 v0\.80～v0\.91\.6 存档/);
+  assert.match(依赖版本, /当前游戏版本 = '0\.92\.1'/);
+  assert.match(组卡, /const 版本 = '0\.92\.1'/);
+  assert.match(组卡, /const TAG = 'rq0\.92\.1'/);
+  assert.match(组卡, /支持继承 v0\.80～v0\.92 存档，无需重开/);
   assert.match(组卡, /my-tavern-scripts@\$\{TAG\}/);
-  assert.match(入口, /v0\.92／rq0\.92/);
-  assert.match(入口, /发布说明_v0\.92_2026-09-12\.md/);
-  assert.match(入口, /注解标签 rq0\.92、发布分支 release\/rq092、GitHub Actions、Release、三个附件与不可变标签 CDN 均已完成并验证/);
+  assert.match(入口, /当前正式入口：v0\.92\.1／rq0\.92\.1/);
+  assert.match(入口, /发布说明_v0\.92\.1_2026-09-12\.md/);
+  assert.match(入口, /v0\.92 的七组功能与修复、`rq0\.92` 标签和正式发布闭环保持冻结/);
   assert.match(发布说明, /发布分支：`release\/rq092`/);
   assert.match(发布说明, /发布标签：`rq0\.92`/);
   assert.match(发布说明, /角色卡版本：`0\.92`/);
