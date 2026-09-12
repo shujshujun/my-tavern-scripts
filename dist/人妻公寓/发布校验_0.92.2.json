@@ -1,0 +1,68 @@
+{
+  "version": "0.92.2",
+  "tag": "rq0.92.2",
+  "sourceCommit": "d3436429f4eb1cb9f8c47d68e09a50a59bea01f2",
+  "files": {
+    "dist/人妻公寓/界面/客户端/index.html": {
+      "bytes": 2370410,
+      "sha256": "b03ced0f1c22fd97039c90fb460ea472669c3e16a4da56da001af4d50b543051"
+    },
+    "dist/人妻公寓/脚本/游戏逻辑/index.js": {
+      "bytes": 3017723,
+      "sha256": "94286ae38dcbf5e10a494a00f486e03292209993d92aec5e8478bba56f3a3c09"
+    },
+    "dist/人妻公寓/人妻公寓.json": {
+      "bytes": 100991,
+      "sha256": "1d09b5bdc644092804e3532a0b5361f5fd81ccf4fa2b5cb229c1dc3bd53c7f52"
+    },
+    "dist/人妻公寓/人妻公寓.png": {
+      "bytes": 2392755,
+      "sha256": "cf057aba9c972dc9e74ba669d00627129ddfbf043bd0074e766eca32186bc438"
+    },
+    "dist/人妻公寓/database-rq0922.json": {
+      "bytes": 10911075,
+      "sha256": "e0fef2a2845405e1af4775c084737330d02a1a384ea34449505712f7f8f9fc6a"
+    },
+    "dist/人妻公寓/database-rq0922-source.zip": {
+      "bytes": 4038721,
+      "sha256": "d3be3bb19be7f591a9e1138fe3f6b51f820619aa9f3393789540f878101b07ab"
+    }
+  },
+  "testSummary": {
+    "tests": 6640,
+    "pass": 6640,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0
+  },
+  "database": {
+    "upstream": "AlbusKen/shujuku",
+    "base": "c99fa5c",
+    "patchCommit": "a6dc956",
+    "tests": 97
+  },
+  "checks": {
+    "typeCheck": true,
+    "vueTypeCheck": true,
+    "lint": true,
+    "card": true,
+    "build": true
+  },
+  "buildSummary": {
+    "errors": 0,
+    "warnings": 5,
+    "isolatedBytesIdentical": true,
+    "preservedOtherDistFiles": 76
+  },
+  "card": {
+    "spec": "chara_card_v3",
+    "specVersion": "3.0",
+    "version": "0.92.2",
+    "charaChunks": 1,
+    "pngJsonIdentical": true,
+    "urls": [
+      "https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.92.2/dist/人妻公寓/界面/客户端/index.html",
+      "https://testingcf.jsdelivr.net/gh/shujshujun/my-tavern-scripts@rq0.92.2/dist/人妻公寓/脚本/游戏逻辑/index.js"
+    ]
+  }
+}
