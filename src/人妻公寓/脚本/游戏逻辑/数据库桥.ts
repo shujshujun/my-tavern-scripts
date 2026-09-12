@@ -1,6 +1,23 @@
+import {
+  数据库恢复点键,
+  保存数据库恢复点记录,
+  选择数据库恢复点,
+  是数据库完整导出,
+  数据库恢复指纹,
+  数据库表内容指纹,
+  清空游戏数据库导出,
+  type 数据库恢复记录,
+} from './数据库恢复点';
+import { 计算微信刷新分支指纹 } from './手机/刷新恢复镜像';
+import { 取得数据库恢复交互锁 } from './数据库恢复交互锁';
 import 数据库模板文本 from '../../人妻公寓数据库模板.json?raw';
 import { 提取数据库脚本版本 } from './数据库版本';
-import { 数据库异步写栅栏, 数据库时间线栅栏, type 数据库时间线持久状态 } from './数据库时间线栅栏';
+import {
+  数据库快照未越过楼层,
+  数据库异步写栅栏,
+  数据库时间线栅栏,
+  type 数据库时间线持久状态,
+} from './数据库时间线栅栏';
 import { 接管数据库时间线接线 } from './数据库时间线接线所有权';
 import { 全局数据库AI租约 } from './数据库AI租约';
 import { 胶囊预算选择 } from './胶囊预算';
@@ -62,7 +79,6 @@ type SQL查询方法 = (
 ) => SQL查询结果 | null;
 
 interface 数据库API {
-  synchronizeChatTimeline?: (options: { reason: 'deleted' | 'swiped' }) => Promise<{ success: boolean }>;
   callAI?: (messages: 数据库消息[], options?: { presetName?: string; max_tokens?: number }) => Promise<string | null>;
   getUpdateConfigParams?: () => unknown;
   setUpdateConfigParams?: (params: { autoUpdateTokenThreshold?: number }) => boolean | Promise<boolean>;
@@ -78,7 +94,7 @@ interface 数据库API {
     params?: unknown[],
     options?: Record<string, unknown>,
   ) => Promise<SQL写入结果 | null>;
-  registerTableUpdateCallback?: (callback: (data: unknown) => void) => void;
+  registerTableUpdateCallback?: (callback: (data: unknown, meta?: { persisted?: boolean }) => void) => void;
   unregisterTableUpdateCallback?: (callback: (data: unknown) => void) => void;
   registerTableFillStartCallback?: (callback: () => void) => void;
   getManualSelectedTables?: () => { selectedTables?: unknown; hasManualSelection?: unknown };
@@ -200,7 +216,9 @@ export function 数据库事件摘要待整理(value: unknown): boolean {
 }
 
 function 截断字符(text: string, 上限: number): string {
-  return Array.from(String(text ?? '')).slice(0, 上限).join('');
+  return Array.from(String(text ?? ''))
+    .slice(0, 上限)
+    .join('');
 }
 
 /**
@@ -222,7 +240,10 @@ export function 摘要按句收口(压缩文本: string): string {
     // 句末标点后可能紧跟收尾引号/括号，一并带上，避免留下不成对的半个引号。
     let 末尾 = index;
     while (末尾 + 1 < 候选.length && /[」』”’"'）)\]】》〕〉]/.test(候选[末尾 + 1])) 末尾 += 1;
-    return 候选.slice(0, 末尾 + 1).join('').trim();
+    return 候选
+      .slice(0, 末尾 + 1)
+      .join('')
+      .trim();
   }
   return '';
 }
@@ -280,7 +301,9 @@ function 判断结果摘要为正文(结果: string): boolean {
  * 绝不再生成可被未来通用填表批次认领的“待整理”占位；合规摘要保持原样，写长了的按句末收口。
  */
 export function 规范事件摘要(摘要: string, 行动: string): string {
-  const 压缩 = String(摘要 ?? '').replace(/\s+/g, ' ').trim();
+  const 压缩 = String(摘要 ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (!压缩) return 脚本保守回合摘要(行动);
   if (判断结果摘要为正文(String(摘要 ?? ''))) return 脚本保守回合摘要(行动);
   return 摘要按句收口(压缩) || 脚本保守回合摘要(行动);
@@ -409,7 +432,9 @@ export function 迁移游戏记忆表时间列(旧表: 数据表, 新表: 数据
 
 /** 旧 RQ 事件只有半截时段时保留已知部分并明确标记天数未知，绝不按消息楼猜世界日期。 */
 export function 规范旧数据库时间文本(value: unknown): string {
-  const 旧时间 = String(value ?? '').replace(/\s+/g, ' ').trim();
+  const 旧时间 = String(value ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
   return /^(?:早上|中午|下午|傍晚|晚上|深夜)$/.test(旧时间) ? `旧记录（第几天未知）·${旧时间}` : 旧时间;
 }
 
@@ -746,7 +771,13 @@ export async function 确保RQ剧情事件SQLite结构(): Promise<void> {
         4000,
         `RQ剧情事件补字段:${字段.name}`,
       );
-      if (!result || result.errors?.length || result.ok === false || result.success === false || result.saved === false) {
+      if (
+        !result ||
+        result.errors?.length ||
+        result.ok === false ||
+        result.success === false ||
+        result.saved === false
+      ) {
         throw new Error(`补字段 ${字段.name} 失败: ${result?.errors?.map(String).join('；') || '数据库未确认写入'}`);
       }
       已有字段 = await 读取结构();
@@ -877,7 +908,8 @@ function 构造SQLite唯一行失效补偿(参数: {
       return 参数.恢复列.every(column => {
         const expected = 旧行[column];
         const actual = 当前[column];
-        if (expected === null || expected === undefined || actual === null || actual === undefined) return expected == actual;
+        if (expected === null || expected === undefined || actual === null || actual === undefined)
+          return expected == actual;
         return typeof expected === 'number' ? Number(actual) === expected : String(actual) === String(expected);
       });
     },
@@ -909,8 +941,7 @@ async function 执行SQLite写入(
   const 写租约 = 数据库异步写.捕获(预期聊天标识);
   // 独立于栅栏本身的身份校验，供未结算任务检查取消；不能反向递归查询栅栏。
   const 请求仍有效 = () => 仍是同一聊天(预期聊天标识) && 取数据库API() === api && 额外提交校验();
-  const 提交仍有效 = () =>
-    请求仍有效() && 数据库异步写.可提交(写租约) && 数据库时间线允许新写(预期聊天标识);
+  const 提交仍有效 = () => 请求仍有效() && 数据库异步写.可提交(写租约) && 数据库时间线允许新写(预期聊天标识);
   if (!预期聊天标识 || !提交仍有效()) return '已取消';
   if (typeof api?.executeSqlMutation !== 'function' || !(await 探测数据库SQLite模式())) return '未调用';
   // SQLite 能力探测包含异步等待；真正提交 mutation 前必须重新核对聊天与 API 实例。
@@ -1086,13 +1117,13 @@ function 取时间线宿主状态(): 时间线宿主状态 {
       existing.已完成令牌 = Object.create(null) as Record<string, string>;
     }
     if (!existing.时间线清场待结算 || typeof existing.时间线清场待结算 !== 'object') {
-      const 旧原型 = (existing as Partial<时间线宿主状态> & {
-        重开清场待结算?: Record<string, Record<string, number>>;
-      }).重开清场待结算;
+      const 旧原型 = (
+        existing as Partial<时间线宿主状态> & {
+          重开清场待结算?: Record<string, Record<string, number>>;
+        }
+      ).重开清场待结算;
       existing.时间线清场待结算 =
-        旧原型 && typeof 旧原型 === 'object'
-          ? 旧原型
-          : (Object.create(null) as Record<string, Record<string, number>>);
+        旧原型 && typeof 旧原型 === 'object' ? 旧原型 : (Object.create(null) as Record<string, Record<string, number>>);
     }
     if (!existing.恢复超时已提示 || typeof existing.恢复超时已提示 !== 'object') {
       existing.恢复超时已提示 = Object.create(null) as Record<string, string>;
@@ -1123,21 +1154,353 @@ const 时间线恢复任务 = new Map<string, { 令牌: string; 截止时间: nu
 const 时间线重试计时器 = new Map<string, ReturnType<typeof setTimeout>>();
 const 时间线重试间隔 = new Map<string, number>();
 const 时间线事件停止器: (() => void)[] = [];
-const 数据库回放确认 = new Map<string, {
-  令牌: string; api: 数据库API; 完成: boolean; 成功: boolean; 重试时间: number;
-}>();
+interface 数据库恢复任务 {
+  聊天: string;
+  令牌: string;
+  api: 数据库API;
+  分支: string;
+  楼层: number;
+  数据: unknown;
+  保留记录: 数据库恢复记录 | null;
+  进行中: boolean;
+  成功: boolean;
+  重试时间: number;
+  次数: number;
+}
+function 数据库恢复任务表(): Record<string, 数据库恢复任务> {
+  const host = 宿主窗口();
+  const key = '__RQP_DATABASE_RESTORE_TASKS_V1__';
+  if (!host[key]) host[key] = Object.create(null);
+  return host[key] as Record<string, 数据库恢复任务>;
+}
+function 数据库恢复写入中(): boolean {
+  return Object.values(数据库恢复任务表()).some(task => task.进行中);
+}
 let 时间线回调API: 数据库API | null = null;
+let 当前数据库回调: ((raw: unknown, meta?: { persisted?: boolean }) => void) | null = null;
 let 时间线接线已清理 = false;
 
 function 数据库时间线允许新写(聊天标识: string): boolean {
   return (
     !!聊天标识 &&
+    !数据库恢复写入中() &&
     !数据库未补偿迟到写.has(聊天标识) &&
     !数据库时间线清场仍有待结算写入(聊天标识) &&
     数据库异步写.可开始新写(聊天标识) &&
     !读取持久时间线状态(聊天标识) &&
     时间线栅栏.可读取(聊天标识)
   );
+}
+
+function 数据库恢复分支(楼层: number): string {
+  const messages = SillyTavern.chat ?? [];
+  if (楼层 < 0 || 楼层 >= messages.length) return '';
+  // 旧楼没有稳定游戏令牌时，补上正文与宿主消息身份，防止同号重建被误认作旧分支。
+  const legacy = messages.slice(0, 楼层 + 1).map(message => {
+    const extra = (message as unknown as { extra?: Record<string, unknown> }).extra ?? {};
+    if (Object.keys(extra).some(k => k.startsWith('_rqgy') && k.includes('令牌'))) return null;
+    const m = message as unknown as Record<string, unknown>;
+    return [m.is_user ?? false, m.swipe_id ?? 0, m.name ?? '', m.send_date ?? '', m.mes ?? ''];
+  });
+  return `${计算微信刷新分支指纹(messages, 楼层)}:${数据库恢复指纹(legacy)}`;
+}
+
+function 数据库持久来源(floor: number): string {
+  return 数据库恢复指纹(
+    (SillyTavern.chat ?? [])
+      .slice(0, floor + 1)
+      .map(m => (m as unknown as { TavernDB_ACU_IsolatedData?: unknown }).TavernDB_ACU_IsolatedData ?? null),
+  );
+}
+
+async function 请求保存数据库恢复点(): Promise<void> {
+  type SaveContext = { saveMetadata?: () => unknown; saveChat?: () => unknown; getContext?: () => SaveContext };
+  const st = SillyTavern as unknown as SaveContext;
+  const context = st.getContext?.() ?? st;
+  const save = context.saveMetadata ?? context.saveChat;
+  if (typeof save === 'function') await 限时等待(Promise.resolve(save.call(context)), 2500, '数据库恢复点保存');
+  // 没有显式保存接口的旧宿主仍由 updateVariablesWith 的聊天元数据防抖保存负责。
+}
+
+/** 官方表回调及下一回合开始前建立恢复点；不把首次接入时的当前数据写到历史楼层。 */
+export async function 保存当前数据库恢复点(raw?: unknown): Promise<boolean> {
+  const chat = 更新当前聊天驻留(),
+    floor = 当前末楼(),
+    api = 取数据库API();
+  if (!chat || floor === null || !api?.exportTableAsJson || !数据库状态().已装游戏模板 || !数据库时间线允许新写(chat))
+    return false;
+  if (
+    Date.now() - 时间线宿主.进入当前聊天时间 < 切聊回调保护毫秒 ||
+    (typeof api.executeSqlQuery !== 'function' && typeof api.querySql !== 'function')
+  )
+    return false;
+  const source = 数据库持久来源(floor),
+    branch = 数据库恢复分支(floor);
+  let supplied: unknown;
+  try {
+    if (raw !== undefined) supplied = _.cloneDeep(解析数据库数据(raw));
+  } catch {
+    return false;
+  }
+  try {
+    await 限时等待(数据库异步写.等待已登记写入(chat), 2500, '数据库写入收尾');
+  } catch {
+    return false;
+  }
+  if (
+    !仍是同一聊天(chat) ||
+    !数据库时间线允许新写(chat) ||
+    当前末楼() !== floor ||
+    数据库恢复分支(floor) !== branch ||
+    (raw !== undefined && 数据库持久来源(floor) !== source)
+  )
+    return false;
+  const message = SillyTavern.chat?.[floor] as unknown as { extra?: Record<string, unknown> };
+  if (message?.extra?._rqgy回合临时 === true) return false;
+  let snapshot: unknown;
+  try {
+    snapshot = supplied ?? _.cloneDeep(解析数据库数据(api.exportTableAsJson()));
+  } catch {
+    return false;
+  }
+  if (!是数据库完整导出(snapshot) || !数据库快照可用于恢复点(snapshot, floor)) return false;
+  const sampledSource = 数据库持久来源(floor),
+    lease = 数据库异步写.捕获(chat);
+  const valid = () =>
+    !时间线接线已清理 &&
+    仍是同一聊天(chat) &&
+    取数据库API() === api &&
+    数据库异步写.可提交(lease) &&
+    数据库时间线允许新写(chat) &&
+    数据库恢复分支(floor) === branch &&
+    数据库持久来源(floor) === sampledSource;
+  const host = 宿主窗口();
+  const queuesKey = '__RQP_DATABASE_CHECKPOINT_QUEUE_V1__';
+  if (!host[queuesKey]) host[queuesKey] = Object.create(null);
+  const queues = host[queuesKey] as Record<string, Promise<boolean>>;
+  const dirtyKey = '__RQP_DATABASE_CHECKPOINT_DIRTY_V1__';
+  if (!host[dirtyKey]) host[dirtyKey] = Object.create(null);
+  const dirty = host[dirtyKey] as Record<string, boolean>;
+  const task = Promise.resolve(queues[chat])
+    .catch(() => false)
+    .then(async () => {
+      if (!valid()) return false;
+      const existing = getVariables({ type: 'chat' })[数据库恢复点键] as 数据库恢复记录 | undefined;
+      const last = existing?.聊天 === chat ? existing.点.at(-1) : null;
+      if (
+        !dirty[chat] &&
+        last?.楼层 === floor &&
+        last.分支 === branch &&
+        last.来源 === sampledSource &&
+        last.结果指纹 === 数据库恢复指纹(snapshot) &&
+        getVariables({ type: 'chat' })._rqgy数据库恢复锚 === last.完整性
+      )
+        return true;
+      await Promise.resolve(
+        updateVariablesWith(
+          vars => {
+            if (!valid()) return vars;
+            const old = vars[数据库恢复点键] as { 聊天?: string } | undefined;
+            // 复制聊天时从当前官方数据建立新聊天的首点；不把另一聊天的历史作为恢复来源。
+            vars[数据库恢复点键] = 保存数据库恢复点记录(
+              old?.聊天 && old.聊天 !== chat ? null : old,
+              { 聊天: chat, 楼层: floor, 分支: branch, 来源: sampledSource },
+              snapshot,
+            );
+            vars._rqgy数据库恢复锚 = (vars[数据库恢复点键] as 数据库恢复记录).点.at(-1)?.完整性 ?? null;
+            return vars;
+          },
+          { type: 'chat' },
+        ),
+      );
+      if (!valid()) return false;
+      dirty[chat] = true;
+      await 请求保存数据库恢复点();
+      if (valid()) delete dirty[chat];
+      return valid();
+    })
+    .catch(error => {
+      console.warn('[人妻公寓·数据库] 本次恢复点未保存，现有游戏状态未改变：', error);
+      return false;
+    });
+  queues[chat] = task;
+  void task.then(() => {
+    if (queues[chat] === task) delete queues[chat];
+  });
+  return task;
+}
+
+function 数据库快照可用于恢复点(data: unknown, floor: number): boolean {
+  // 复用回档的四表楼层门；未来数据和未形成完整表头的暂态不得成为恢复点。
+  return 数据库快照未越过楼层(data, floor);
+}
+
+function 数据库历史帧存在(message: unknown): boolean {
+  return Boolean((message as { TavernDB_ACU_IsolatedData?: unknown } | null)?.TavernDB_ACU_IsolatedData);
+}
+
+/** 旧档只读取无后继编辑的完整官方快照；增量日志由官方自己的回放器处理。 */
+function 读取官方历史数据库快照(limit: number): unknown | null {
+  const messages = SillyTavern.chat ?? [];
+  for (let i = Math.min(limit, messages.length - 1); i >= 0; i--) {
+    const container = (messages[i] as unknown as { TavernDB_ACU_IsolatedData?: Record<string, unknown> })
+      ?.TavernDB_ACU_IsolatedData;
+    if (!container || typeof container !== 'object') continue;
+    if (Object.keys(container).length !== 1) return null;
+    const candidates = Object.values(container)
+      .map(tag => {
+        const frame = (
+          tag as {
+            storageFrame?: { version?: number; checkpoint?: { kind?: string; data?: unknown }; logEntries?: unknown[] };
+          }
+        )?.storageFrame;
+        return frame?.version === 2 &&
+          frame.checkpoint?.kind === 'full' &&
+          !frame.logEntries?.length &&
+          是数据库完整导出(frame.checkpoint.data)
+          ? frame.checkpoint.data
+          : null;
+      })
+      .filter(Boolean);
+    // 遇到日志、多个隔离作用域或不完整帧，不能跳过它们拿更早状态冒充目标状态。
+    return candidates.length === 1 && 数据库快照可用于恢复点(candidates[0], limit) ? candidates[0] : null;
+  }
+  return null;
+}
+
+async function 尝试恢复数据库记录(
+  chat: string,
+  token: string,
+  floor: number | null,
+  reason: string,
+  reference?: string,
+): Promise<'等待' | '完成' | '官方回放'> {
+  if (floor === null || !仍是同一聊天(chat)) return '等待';
+  const api = 取数据库API();
+  if (!api?.exportTableAsJson) return '等待';
+  const tasks = 数据库恢复任务表();
+  const old = tasks[chat];
+  if (Object.values(tasks).some(task => task.进行中)) return '等待';
+  const branch = 数据库恢复分支(floor);
+  if (!branch) return '等待';
+  let entry = old?.令牌 === token && old.api === api && old.分支 === branch ? old : undefined;
+  if (!entry) {
+    const limit = /切换消息分支|swipe/iu.test(reason) ? floor - 1 : floor;
+    let snapshot: unknown = null,
+      kept: 数据库恢复记录 | null = null;
+    try {
+      const selected = 选择数据库恢复点(
+        getVariables({ type: 'chat' })[数据库恢复点键],
+        chat,
+        limit,
+        数据库恢复分支,
+        reference,
+      );
+      kept = selected?.保留记录 ?? null;
+      if (selected && !(SillyTavern.chat ?? []).slice(selected.楼层 + 1, limit + 1).some(数据库历史帧存在)) {
+        snapshot = selected.数据;
+        kept = selected.保留记录;
+      }
+    } catch (error) {
+      console.warn('[人妻公寓·数据库] 恢复记录无法核实，保留原数据并等待官方回放：', error);
+    }
+    if (reason === '重开一局') {
+      snapshot = 清空游戏数据库导出(解析数据库数据(api.exportTableAsJson()));
+      kept = { 版本: 1, 聊天: chat, 点: [] };
+    } else if (!snapshot && !reference) snapshot = 读取官方历史数据库快照(limit);
+
+    // 显式回档在删楼前已标记；没有看到目标尾部前，不调用持久导入。
+    if (!/切换消息分支|swipe/iu.test(reason) && Number(当前末楼()) > floor) return '等待';
+    entry = {
+      聊天: chat,
+      令牌: token,
+      api,
+      分支: branch,
+      楼层: floor,
+      数据: _.cloneDeep(snapshot),
+      保留记录: kept,
+      进行中: false,
+      成功: false,
+      重试时间: 0,
+      次数: 0,
+    };
+    tasks[chat] = entry;
+  }
+  if (!entry.数据) return reason === '重开一局' ? '等待' : '官方回放';
+  const expected = 数据库表内容指纹(entry.数据);
+  if (entry.成功 && 数据库表内容指纹(解析数据库数据(api.exportTableAsJson())) === expected) return '完成';
+  if (entry.次数 >= 3 || Date.now() < entry.重试时间 || typeof api.importTableAsJson !== 'function') return '等待';
+  const current = entry;
+  const valid = () =>
+    !时间线接线已清理 &&
+    仍是同一聊天(chat) &&
+    取数据库API() === api &&
+    读取持久时间线状态(chat)?.令牌 === token &&
+    数据库恢复分支(floor) === current.分支;
+  current.次数 += 1;
+  current.进行中 = true;
+  void Promise.resolve()
+    .then(async () => {
+      if (!valid()) return;
+      const release = 取得数据库恢复交互锁(宿主窗口().document);
+      try {
+        if (!valid()) return;
+        const restored = await 登记数据库时间线清场写入(chat, token, () =>
+          api.importTableAsJson!(JSON.stringify(current.数据), { persist: true }),
+        );
+        current.成功 =
+          restored === true && valid() && 数据库表内容指纹(解析数据库数据(api.exportTableAsJson!())) === expected;
+      } finally {
+        release();
+      }
+    })
+    .catch(error => {
+      current.成功 = false;
+      console.warn('[人妻公寓·数据库] 数据库恢复未提交，恢复点保留，可稍后重试：', error);
+    })
+    .finally(() => {
+      current.进行中 = false;
+      current.重试时间 = Date.now() + 1000;
+    });
+  return '等待';
+}
+
+async function 完成数据库恢复记录(chat: string, token: string): Promise<void> {
+  if (!仍是同一聊天(chat)) return;
+  const tasks = 数据库恢复任务表(),
+    task = tasks[chat];
+  if (task?.令牌 === token && !task.进行中) {
+    const kept = task.保留记录 ?? { 版本: 1 as const, 聊天: chat, 点: [] };
+    await Promise.resolve(
+      updateVariablesWith(
+        vars => {
+          if (
+            仍是同一聊天(chat) &&
+            !读取持久时间线状态(chat) &&
+            时间线宿主.已完成令牌[chat] === token &&
+            数据库恢复分支(task.楼层) === task.分支
+          ) {
+            vars[数据库恢复点键] = kept;
+            vars._rqgy数据库恢复锚 = kept.点.at(-1)?.完整性 ?? null;
+          }
+          return vars;
+        },
+        { type: 'chat' },
+      ),
+    );
+    if (仍是同一聊天(chat)) {
+      try {
+        await 请求保存数据库恢复点();
+      } catch (error) {
+        const host = 宿主窗口(),
+          key = '__RQP_DATABASE_CHECKPOINT_DIRTY_V1__';
+        if (!host[key]) host[key] = Object.create(null);
+        (host[key] as Record<string, boolean>)[chat] = true;
+        console.warn('[人妻公寓·数据库] 恢复已经完成，聊天恢复记录待补存：', error);
+      }
+    }
+    delete tasks[chat];
+  }
 }
 
 function 更新当前聊天驻留(): string {
@@ -1247,10 +1610,6 @@ function 清除持久时间线状态(聊天标识: string, 令牌: string): void
   // “我的同一事务已完成”与“后来一代事务完成后恰好也没有 pending”的 ABA。
   if (确实完成本令牌) {
     时间线宿主.已完成令牌[聊天标识] = 令牌;
-    const 重开状态 = 数据库重开清场状态.get(聊天标识);
-    if (重开状态?.令牌 === 令牌) 数据库重开清场状态.delete(聊天标识);
-    const 裁剪状态 = 数据库脚本表裁剪状态.get(聊天标识);
-    if (裁剪状态?.令牌 === 令牌) 数据库脚本表裁剪状态.delete(聊天标识);
   }
 }
 
@@ -1271,27 +1630,13 @@ function 安排时间线后台重试(聊天标识: string): void {
   时间线重试计时器.set(聊天标识, timer);
 }
 
-const 数据库重开清场表 = [
-  'rq_events',
-  'rq_character_memory',
-  'rq_promises',
-  'rq_social_history',
-  'chronicle',
-] as const;
-const 数据库重开清场稳定毫秒 = 500;
-const 数据库重开清场状态 = new Map<string, { 令牌: string; 空表起始时间: number }>();
-
 function 数据库时间线清场仍有待结算写入(聊天标识: string): boolean {
   const tokens = 时间线宿主.时间线清场待结算[聊天标识];
   if (!tokens || typeof tokens !== 'object') return false;
   return Object.values(tokens).some(count => Number.isInteger(count) && count > 0);
 }
 
-function 登记数据库时间线清场写入<T>(
-  聊天标识: string,
-  令牌: string,
-  启动: () => T | PromiseLike<T>,
-): Promise<T> {
+function 登记数据库时间线清场写入<T>(聊天标识: string, 令牌: string, 启动: () => T | PromiseLike<T>): Promise<T> {
   let tokens = 时间线宿主.时间线清场待结算[聊天标识];
   if (!tokens || typeof tokens !== 'object') {
     tokens = Object.create(null) as Record<string, number>;
@@ -1315,226 +1660,6 @@ function 登记数据库时间线清场写入<T>(
     return Promise.reject(error);
   }
   return mutation.finally(释放);
-}
-
-function 查询数据库重开残留行数(): number | null {
-  let 总数 = 0;
-  for (const 表名 of 数据库重开清场表) {
-    const result = 执行SQLite查询(`SELECT COUNT(*) AS count FROM ${表名}`, [], 1);
-    if (!result) return null;
-    const count = Number(SQL结果对象行(result)?.[0]?.count);
-    if (!Number.isInteger(count) || count < 0) return null;
-    总数 += count;
-  }
-  return 总数;
-}
-
-/**
- * “重开一局”不是普通回档：0楼会被重写成全新出厂态，上一局的五张数据库记忆表也必须
- * 同步回到模板空表。数据库删楼守卫会把被删楼层的 per-sheet checkpoint 前移到0楼，
- * 因而仅等待消息回放会把上一局记忆重新灌回运行态，并让四表楼层校验永久失败。
- *
- * 这里只处理精确的“重开一局→0楼”；普通回档、重掷、删楼和 swipe 仍由数据库自己的
- * checkpoint/operation-log 回放恢复历史版本，绝不对人物记忆、承诺或纪要做粗暴清空。
- * 清场前先等数据库保守回放窗口结束，之后逐表单语句删除、逐表回读，并要求空表持续稳定
- * 一小段时间；若数据库迟到回放重新灌入旧行，下一轮会再次发现并清理，栅栏不会提前开放。
- */
-async function 收口数据库重开清场(
-  聊天标识: string,
-  令牌: string,
-  目标楼层: number | null,
-  原因: string,
-  标记时间: number,
-): Promise<boolean> {
-  if (目标楼层 !== 0 || 原因 !== '重开一局') {
-    数据库重开清场状态.delete(聊天标识);
-    return true;
-  }
-  if (Date.now() < 标记时间 + 无回调保守恢复毫秒) return false;
-  const api = 取数据库API();
-  if (!api || typeof api.executeSqlMutation !== 'function') return false;
-  // 任一 iframe 已经发出的清场 DELETE 即使超过本轮等待上限也可能稍后落库；它真正
-  // settle 前绝不重复发破坏性 SQL，也绝不开放新局写入，否则迟到 DELETE 会抹掉新记录。
-  if (数据库时间线清场仍有待结算写入(聊天标识)) return false;
-
-  let 状态 = 数据库重开清场状态.get(聊天标识);
-  if (!状态 || 状态.令牌 !== 令牌) {
-    状态 = { 令牌, 空表起始时间: -1 };
-    数据库重开清场状态.set(聊天标识, 状态);
-  }
-  const 仍属本次恢复 = (): boolean => {
-    if (时间线接线已清理 || !仍是同一聊天(聊天标识) || 取数据库API() !== api) return false;
-    const 当前 = 读取持久时间线状态(聊天标识);
-    return !当前 || 当前.令牌 === 令牌;
-  };
-
-  const 残留行数 = 查询数据库重开残留行数();
-  if (残留行数 === null) return false;
-  if (残留行数 === 0) {
-    if (状态.空表起始时间 < 0) 状态.空表起始时间 = Date.now();
-    if (Date.now() - 状态.空表起始时间 < 数据库重开清场稳定毫秒) return false;
-    if (数据库重开清场状态.get(聊天标识) === 状态) 数据库重开清场状态.delete(聊天标识);
-    return true;
-  }
-  状态.空表起始时间 = -1;
-
-  for (const 表名 of 数据库重开清场表) {
-    if (!仍属本次恢复()) return false;
-    const countResult = 执行SQLite查询(`SELECT COUNT(*) AS count FROM ${表名}`, [], 1);
-    const count = Number(countResult ? SQL结果对象行(countResult)?.[0]?.count : Number.NaN);
-    if (Number.isInteger(count) && count === 0) continue;
-    if (!Number.isInteger(count) || count < 0) return false;
-    try {
-      await 限时等待(
-        登记数据库时间线清场写入(聊天标识, 令牌, () =>
-          api.executeSqlMutation!(`DELETE FROM ${表名} WHERE row_id IS NOT NULL`, []),
-        ),
-        2500,
-        `数据库重开清场:${表名}`,
-      );
-    } catch {
-      // mutation 可能已在插件内部持久化后才抛错；下面仍以同步回读作为唯一成功判据。
-      // 若只是超时，宿主共享待结算计数仍为正，本轮会保持失败关闭直到真实 settle。
-    }
-    if (!仍属本次恢复() || 数据库时间线清场仍有待结算写入(聊天标识)) return false;
-    const remaining = 执行SQLite查询(`SELECT COUNT(*) AS count FROM ${表名}`, [], 1);
-    const remainingCount = Number(remaining ? SQL结果对象行(remaining)?.[0]?.count : Number.NaN);
-    if (!Number.isInteger(remainingCount) || remainingCount !== 0) return false;
-  }
-  状态.空表起始时间 = Date.now();
-  console.info('[人妻公寓·数据库] 重开一局已清空上一局的五张数据库记忆表，等待空表稳定复核。');
-  return false;
-}
-
-const 数据库脚本表裁剪定义 = [
-  { 表名: 'rq_events', 楼层列: 'floor_no' },
-  { 表名: 'rq_social_history', 楼层列: 'last_floor' },
-] as const;
-const 数据库脚本表裁剪稳定毫秒 = 500;
-const 数据库脚本表裁剪状态 = new Map<
-  string,
-  { 令牌: string; 规则签名: string; 空表起始时间: number }
->();
-
-interface 数据库脚本表裁剪规则 {
-  目标楼层: number;
-  比较符: '>' | '>=';
-  规则签名: string;
-}
-
-/**
- * 普通删楼的目标楼仍然存活，只裁掉它后面的脚本流水；同楼 swipe 会替换目标楼自己的
- * 正文，因此旧分支绑定在该楼的剧情／社交行也必须裁掉。重开的五表归零由专用清场处理。
- */
-function 解析数据库脚本表裁剪规则(
-  目标楼层: number | null,
-  原因: string,
-): 数据库脚本表裁剪规则 | null {
-  if (!Number.isInteger(目标楼层) || Number(目标楼层) < 0) return null;
-  if (目标楼层 === 0 && 原因 === '重开一局') return null;
-  const 比较符 = /切换消息分支|swipe/iu.test(原因) ? '>=' : '>';
-  return {
-    目标楼层: Number(目标楼层),
-    比较符,
-    规则签名: `${比较符}:${Number(目标楼层)}`,
-  };
-}
-
-function 查询数据库脚本表待裁行数(
-  定义: (typeof 数据库脚本表裁剪定义)[number],
-  规则: 数据库脚本表裁剪规则,
-): number | null {
-  const result = 执行SQLite查询(
-    `SELECT COUNT(*) AS count FROM ${定义.表名} WHERE ${定义.楼层列} ${规则.比较符} ?`,
-    [规则.目标楼层],
-    1,
-  );
-  if (!result) return null;
-  const count = Number(SQL结果对象行(result)?.[0]?.count);
-  return Number.isInteger(count) && count >= 0 ? count : null;
-}
-
-/**
- * 通用表由数据库插件的 checkpoint／operation log 恢复；游戏只维护自己独占的两张流水表。
- * 裁剪在共享时间线栅栏内完成并要求短暂稳定：插件若迟到回放旧分支，下一轮会再次看到越界
- * 行并重删。任一 DELETE 的底层 Promise 尚未 settle 时，共享写门持续关闭且不会重复发 SQL。
- */
-async function 收口数据库脚本表裁剪(
-  聊天标识: string,
-  令牌: string,
-  目标楼层: number | null,
-  原因: string,
-  标记时间: number,
-): Promise<boolean> {
-  const 规则 = 解析数据库脚本表裁剪规则(目标楼层, 原因);
-  if (!规则) {
-    数据库脚本表裁剪状态.delete(聊天标识);
-    return true;
-  }
-  // 至少越过数据库栅栏自己的最短重建窗口；更晚的 checkpoint 回放会被下面的稳定复核捕获。
-  if (Date.now() < 标记时间 + 500) return false;
-  const api = 取数据库API();
-  if (!api || typeof api.executeSqlMutation !== 'function') return false;
-  if (数据库时间线清场仍有待结算写入(聊天标识)) return false;
-
-  let 状态 = 数据库脚本表裁剪状态.get(聊天标识);
-  if (!状态 || 状态.令牌 !== 令牌 || 状态.规则签名 !== 规则.规则签名) {
-    状态 = { 令牌, 规则签名: 规则.规则签名, 空表起始时间: -1 };
-    数据库脚本表裁剪状态.set(聊天标识, 状态);
-  }
-  const 仍属本次恢复 = (): boolean => {
-    if (时间线接线已清理 || !仍是同一聊天(聊天标识) || 取数据库API() !== api) return false;
-    const 当前 = 读取持久时间线状态(聊天标识);
-    return !当前 || 当前.令牌 === 令牌;
-  };
-
-  let 待裁总数 = 0;
-  const 各表行数 = new Map<(typeof 数据库脚本表裁剪定义)[number], number>();
-  for (const 定义 of 数据库脚本表裁剪定义) {
-    const count = 查询数据库脚本表待裁行数(定义, 规则);
-    if (count === null) return false;
-    各表行数.set(定义, count);
-    待裁总数 += count;
-  }
-  if (待裁总数 === 0) {
-    if (状态.空表起始时间 < 0) {
-      // 若本实例先被旧 SQL／补偿阻塞了很久，插件重建窗口已经在等待期间经过；
-      // 首次零行回读仍从“标记后最短窗口”计时，不再额外叠加完整500ms。
-      状态.空表起始时间 = Math.min(Date.now(), 标记时间 + 500);
-    }
-    if (Date.now() - 状态.空表起始时间 < 数据库脚本表裁剪稳定毫秒) return false;
-    // 不在此处删除状态：外层数据库快照还需连续采样，同一令牌必须复用已经完成的
-    // 裁剪稳定窗，同时每次回读仍能发现 checkpoint 迟到重放的越界行。
-    return true;
-  }
-  状态.空表起始时间 = -1;
-
-  for (const 定义 of 数据库脚本表裁剪定义) {
-    if ((各表行数.get(定义) ?? 0) === 0) continue;
-    if (!仍属本次恢复()) return false;
-    try {
-      await 限时等待(
-        登记数据库时间线清场写入(聊天标识, 令牌, () =>
-          api.executeSqlMutation!(
-            `DELETE FROM ${定义.表名} WHERE ${定义.楼层列} ${规则.比较符} ?`,
-            [规则.目标楼层],
-          ),
-        ),
-        2500,
-        `数据库时间线裁剪:${定义.表名}`,
-      );
-    } catch {
-      // 可能已经持久化后才抛错；只认同步回读。超时请求仍在共享待结算表中，绝不提前开门。
-    }
-    if (!仍属本次恢复() || 数据库时间线清场仍有待结算写入(聊天标识)) return false;
-    const remaining = 查询数据库脚本表待裁行数(定义, 规则);
-    if (remaining !== 0) return false;
-  }
-  状态.空表起始时间 = Date.now();
-  console.info(
-    `[人妻公寓·数据库] 已按${规则.比较符 === '>=' ? '同楼切分支' : '删楼'}边界裁剪脚本剧情／社交流水，等待稳定复核。`,
-  );
-  return false;
 }
 
 async function 执行数据库时间线恢复(
@@ -1563,19 +1688,9 @@ async function 执行数据库时间线恢复(
     }
     const 恢复目标楼层 = persisted.目标楼层 ?? 初始目标楼层;
     const 恢复原因 = persisted?.原因 ?? 初始原因;
-    const 恢复标记时间 = persisted?.标记时间 ?? 初始标记时间;
-    // 必须先由插件恢复检查点并完成冷回放，再允许游戏发出清场 SQL。
-    // 老插件没有确认接口时只做被动快照复验，不能在其防抖窗口中保存并覆盖恢复副本。
-    const 回放已确认 = 确认数据库回放(聊天标识, 令牌, 恢复原因, 恢复目标楼层);
-    if (回放已确认 === false || (回放已确认 === null && 恢复原因 === '重开一局')) {
-      await new Promise<void>(resolve => setTimeout(resolve, 160));
-      continue;
-    }
-    if (回放已确认 && !(await 收口数据库重开清场(聊天标识, 令牌, 恢复目标楼层, 恢复原因, 恢复标记时间))) {
-      await new Promise<void>(resolve => setTimeout(resolve, 160));
-      continue;
-    }
-    if (回放已确认 && !(await 收口数据库脚本表裁剪(聊天标识, 令牌, 恢复目标楼层, 恢复原因, 恢复标记时间))) {
+    void 初始标记时间;
+    const 恢复 = await 尝试恢复数据库记录(聊天标识, 令牌, 恢复目标楼层, 恢复原因, persisted.恢复点);
+    if (恢复 === '等待') {
       await new Promise<void>(resolve => setTimeout(resolve, 160));
       continue;
     }
@@ -1625,43 +1740,14 @@ async function 执行数据库时间线恢复(
     if (时间线栅栏.提交主动快照(聊天标识, data, 校验前楼层, now, { 允许无回调恢复 })) {
       清除持久时间线状态(聊天标识, 令牌);
       时间线重试间隔.delete(聊天标识);
+      await 完成数据库恢复记录(聊天标识, 令牌);
+      void 保存当前数据库恢复点();
+      eventEmit('人妻公寓:数据库表格已更新');
       console.info('[人妻公寓·数据库] 消息时间线快照已稳定，长期记忆恢复读取。');
       return 数据库时间线允许新写(聊天标识);
     }
     await new Promise<void>(resolve => setTimeout(resolve, 140));
   }
-  return false;
-}
-
-/** null 表示旧插件仅能被动恢复；任何超时、失败和迟到确认都不授予写权限。 */
-function 确认数据库回放(聊天标识: string, 令牌: string, 原因: string, 目标楼层: number | null): boolean | null {
-  const api = 取数据库API();
-  if (!api) return false;
-  if (typeof api.synchronizeChatTimeline !== 'function') return null;
-  let entry = 数据库回放确认.get(聊天标识);
-  if (entry?.令牌 === 令牌 && entry.api === api) {
-    if (entry.成功) return true;
-    if (!entry.完成 || Date.now() < entry.重试时间) return false;
-  }
-  // 标记发生在物理删楼之前；首次同步必须看到目标前缀已存活，不能先确认旧的完整聊天。
-  if (entry?.令牌 !== 令牌 && !/切换消息分支|swipe/iu.test(原因) &&
-      目标楼层 !== null && Number(当前末楼()) > 目标楼层) return false;
-  entry = { 令牌, api, 完成: false, 成功: false, 重试时间: 0 };
-  数据库回放确认.set(聊天标识, entry);
-  const current = entry;
-  void Promise.resolve().then(() => {
-    if (时间线接线已清理 || !仍是同一聊天(聊天标识) || 取数据库API() !== api ||
-        读取持久时间线状态(聊天标识)?.令牌 !== 令牌) return { success: false };
-    return api.synchronizeChatTimeline!({
-      reason: /切换消息分支|swipe/iu.test(原因) ? 'swiped' : 'deleted',
-    });
-  }).then(result => {
-    current.成功 = result?.success === true && !时间线接线已清理 && 仍是同一聊天(聊天标识) &&
-      取数据库API() === api && 读取持久时间线状态(聊天标识)?.令牌 === 令牌;
-  }, () => { current.成功 = false; }).finally(() => {
-    current.完成 = true;
-    current.重试时间 = Date.now() + 1000;
-  });
   return false;
 }
 
@@ -1674,10 +1760,7 @@ function 启动数据库时间线恢复(聊天标识: string, 最长等待毫秒
   if (existing?.令牌 === persisted.令牌) {
     // MESSAGE_DELETED 监听常先以默认3.5秒启动；重开主事务随后会请求更长窗口。
     // 同一令牌只运行一条恢复循环，但允许后到的强调用者延长截止时间，不能复用短任务假装等待8秒。
-    existing.截止时间 = Math.max(
-      Number.isFinite(existing.截止时间) ? existing.截止时间 : Date.now(),
-      请求截止时间,
-    );
+    existing.截止时间 = Math.max(Number.isFinite(existing.截止时间) ? existing.截止时间 : Date.now(), 请求截止时间);
     return existing.promise;
   }
   取消时间线重试(聊天标识);
@@ -1714,25 +1797,45 @@ function 启动数据库时间线恢复(聊天标识: string, 最长等待毫秒
   return entry.promise;
 }
 
-const 数据库刷新完成回调 = (raw: unknown): void => {
+const 数据库刷新完成回调 = (raw: unknown, meta?: { persisted?: boolean }): void => {
   if (时间线接线已清理) return;
   确保数据库手动填表选择安全(raw);
-  // 公开 table-update 回调发生在数据库完成一次表格持久化后。这里只广播无载荷信号：
-  // RQ 骨架队列收到后先按 floor_no + event_code 精确回读，缺行才允许单次幂等补写。
+  const chat = 更新当前聊天驻留(),
+    floor = 当前末楼();
+  const data = 解析数据库数据(raw);
+  let persisted = 读取持久时间线状态(chat);
+  if (!persisted && floor !== null && floor > 0 && 是数据库完整导出(data) && !数据库快照可用于恢复点(data, floor)) {
+    标记数据库时间线将变更(floor, '数据库刷新越过当前楼层');
+    persisted = 读取持久时间线状态(chat);
+  }
+  if (!persisted && floor !== null && floor > 0 && meta?.persisted !== false && !数据库恢复写入中()) {
+    const journal = getVariables({ type: 'chat' })[数据库恢复点键] as 数据库恢复记录 | undefined;
+    const last = journal?.聊天 === chat ? journal.点.at(-1) : null;
+    if (
+      last?.楼层 === floor &&
+      last.分支 === 数据库恢复分支(floor) &&
+      last.来源 &&
+      last.来源 === 数据库持久来源(floor) &&
+      是数据库完整导出(data) &&
+      last.内容指纹 !== 数据库表内容指纹(data)
+    ) {
+      // 没有对应持久编辑的运行态倒退不能覆盖已记录历史；合法手动编辑会改变官方存储来源。
+      标记数据库时间线将变更(floor, '数据库回放内容复验', { 恢复点: last.完整性 });
+      persisted = 读取持久时间线状态(chat);
+    }
+  }
   try {
     eventEmit('人妻公寓:数据库表格已更新');
   } catch {
-    /* 游戏逻辑监听尚未挂载时无需处理；下一回合仍会按保守回读路径补齐。 */
+    /* 下次成功回合补写骨架。 */
   }
-  const 聊天标识 = 更新当前聊天驻留();
-  const persisted = 读取持久时间线状态(聊天标识);
-  if (!persisted) return;
+  if (!persisted) {
+    if (meta?.persisted !== false) void 保存当前数据库恢复点(raw);
+    return;
+  }
   const now = Date.now();
-  const 聊天上下文稳定 = now - 时间线宿主.进入当前聊天时间 >= 切聊回调保护毫秒;
-  const data = 解析数据库数据(raw);
-  if (时间线栅栏.通知刷新提示(聊天标识, data, 当前末楼(), now, 聊天上下文稳定)) {
-    void 启动数据库时间线恢复(聊天标识, 3500);
-  }
+  const stable = now - 时间线宿主.进入当前聊天时间 >= 切聊回调保护毫秒;
+  if (时间线栅栏.通知刷新提示(chat, data, floor, now, stable)) void 启动数据库时间线恢复(chat, 3500);
 };
 
 function 确保数据库时间线回调(): void {
@@ -1740,14 +1843,18 @@ function 确保数据库时间线回调(): void {
   const api = 取数据库API();
   if (api === 时间线回调API) return;
   try {
-    时间线回调API?.unregisterTableUpdateCallback?.(数据库刷新完成回调);
+    if (当前数据库回调) 时间线回调API?.unregisterTableUpdateCallback?.(当前数据库回调);
   } catch {
     /* 旧实例已销毁时无需处理。 */
   }
   时间线回调API = null;
   if (typeof api?.registerTableUpdateCallback !== 'function') return;
   try {
-    api.registerTableUpdateCallback(数据库刷新完成回调);
+    const callback = (raw: unknown, meta?: { persisted?: boolean }) => {
+      if (取数据库API() === api) 数据库刷新完成回调(raw, meta);
+    };
+    当前数据库回调 = callback;
+    api.registerTableUpdateCallback(callback);
     时间线回调API = api;
   } catch {
     /* 无公开回调时仍可在稳定驻留窗口后做三次主动复验。 */
@@ -1755,6 +1862,7 @@ function 确保数据库时间线回调(): void {
 }
 
 interface 数据库时间线标记选项 {
+  恢复点?: unknown;
   /**
    * 卡内删楼已经在调用 deleteChatMessages 前创建共享栅栏；其他 iframe 收到同一删除事件时，
    * 仍须作废自己的迟到 SQL，但不得用泛化的“删除消息”覆盖更严格的原操作原因和令牌。
@@ -1763,11 +1871,7 @@ interface 数据库时间线标记选项 {
 }
 
 /** 删除/滑动消息前先关闭一般数据库记忆读取；数据库仍只是可丢弃派生记忆。 */
-export function 标记数据库时间线将变更(
-  目标楼层: number | null,
-  原因: string,
-  选项: 数据库时间线标记选项 = {},
-): void {
+export function 标记数据库时间线将变更(目标楼层: number | null, 原因: string, 选项: 数据库时间线标记选项 = {}): void {
   if (!数据库状态().已装游戏模板) return;
   const 聊天标识 = 更新当前聊天驻留();
   if (!聊天标识) return;
@@ -1788,16 +1892,19 @@ export function 标记数据库时间线将变更(
     已有状态.原因 === 原因 &&
     Date.now() - 已有状态.标记时间 >= 0 &&
     Date.now() - 已有状态.标记时间 <= 同源时间线重复标记合并毫秒
-  ) return;
-  if (
-    选项.已有共享栅栏覆盖时不重标 &&
-    已有状态 &&
-    已有状态.目标楼层 !== null &&
-    已有状态.目标楼层 <= 冻结楼层
-  ) {
+  )
+    return;
+  if (选项.已有共享栅栏覆盖时不重标 && 已有状态 && 已有状态.目标楼层 !== null && 已有状态.目标楼层 <= 冻结楼层) {
     return;
   }
-  const state = 时间线栅栏.标记(聊天标识, 冻结楼层, 原因);
+  const state = 时间线栅栏.标记(
+    聊天标识,
+    冻结楼层,
+    原因,
+    Date.now(),
+    undefined,
+    typeof 选项.恢复点 === 'string' ? 选项.恢复点 : undefined,
+  );
   if (state) 持久化时间线状态(state);
 }
 
@@ -1812,9 +1919,6 @@ function 提示数据库恢复超时一次(聊天标识: string, state: 数据�
   console.warn(
     `[人妻公寓·数据库] ${state.原因 || '消息时间线变更'}后的数据库重建未在时限内完成；本轮不读取一般长期记忆。`,
   );
-  if (typeof 取数据库API()?.synchronizeChatTimeline !== 'function') {
-    console.warn('[人妻公寓·数据库] 当前插件缺少回档同步确认接口；请使用配套数据库修复版。恢复期间仅复验快照，不抢先写入数据库。');
-  }
 }
 
 export async function 等待数据库时间线就绪(最长等待毫秒 = 3500): Promise<boolean> {
@@ -1830,8 +1934,8 @@ export async function 等待数据库时间线就绪(最长等待毫秒 = 3500):
   // 保守返回 false，但只要共享完成令牌仍精确等于本次起点、且本实例旧 SQL 也已结算，
   // 就应视为同一恢复完成。若期间出现并完成了更新令牌，令牌不匹配会阻止旧等待者 ABA 放行。
   const 同一恢复令牌已完成 = 时间线宿主.已完成令牌[聊天标识] === persisted.令牌;
-  const 已就绪 = 同一恢复令牌已完成 && !时间线接线已清理 &&
-    数据库异步写.可提交(等待租约) && 数据库时间线允许新写(聊天标识);
+  const 已就绪 =
+    同一恢复令牌已完成 && !时间线接线已清理 && 数据库异步写.可提交(等待租约) && 数据库时间线允许新写(聊天标识);
   if (!已就绪) {
     // 多个脚本 iframe／回合观察者可能同时等待同一个共享恢复 Promise。恢复任务已经单飞，
     // 日志也必须按聊天+令牌单飞；新一代令牌仍会重新提示，失败关闭语义不变。
@@ -1858,8 +1962,8 @@ function 接入宿主时间线事件(): void {
       const 聊天标识 = 更新当前聊天驻留();
       读取持久时间线状态(聊天标识);
       setTimeout(() => {
-        if (!时间线接线已清理 && 仍是同一聊天(聊天标识) && 读取持久时间线状态(聊天标识)) {
-          void 启动数据库时间线恢复(聊天标识, 3500);
+        if (!时间线接线已清理 && 仍是同一聊天(聊天标识)) {
+          更新时间线驻留与恢复();
         }
       }, 1250);
     });
@@ -1876,9 +1980,8 @@ function 接入宿主时间线事件(): void {
 function 清理数据库时间线接线(): void {
   if (时间线接线已清理) return;
   时间线接线已清理 = true;
-  数据库回放确认.clear();
   try {
-    时间线回调API?.unregisterTableUpdateCallback?.(数据库刷新完成回调);
+    if (当前数据库回调) 时间线回调API?.unregisterTableUpdateCallback?.(当前数据库回调);
   } catch {
     /* 页面卸载时插件实例可能已先销毁。 */
   }
@@ -1892,8 +1995,6 @@ function 清理数据库时间线接线(): void {
   }
   for (const timer of 时间线重试计时器.values()) clearTimeout(timer);
   时间线重试计时器.clear();
-  数据库重开清场状态.clear();
-  数据库脚本表裁剪状态.clear();
   释放时间线接线所有权();
   window.removeEventListener('pagehide', 清理数据库时间线接线);
 }
@@ -1907,9 +2008,23 @@ window.addEventListener('pagehide', 清理数据库时间线接线, { once: true
 
 function 更新时间线驻留与恢复(): void {
   const 聊天标识 = 更新当前聊天驻留();
+  确保数据库时间线回调();
+  try {
+    const journal = getVariables({ type: 'chat' })[数据库恢复点键] as 数据库恢复记录 | undefined;
+    const last = journal?.聊天 === 聊天标识 ? journal.点.at(-1) : null;
+    if (!读取持久时间线状态(聊天标识) && last && 数据库恢复分支(last.楼层) !== last.分支) {
+      标记数据库时间线将变更(当前末楼(), '恢复消息时间线');
+    }
+  } catch {
+    /* 旧档没有恢复记录时走官方历史回放。 */
+  }
   if (读取持久时间线状态(聊天标识)) {
     确保数据库时间线回调();
     void 启动数据库时间线恢复(聊天标识, 3500);
+  } else {
+    setTimeout(() => {
+      if (!时间线接线已清理 && 仍是同一聊天(聊天标识)) void 保存当前数据库恢复点();
+    }, 1250);
   }
 }
 
@@ -2128,7 +2243,8 @@ function 当前数据库表数据(api: 数据库API, raw?: unknown): unknown {
  */
 export function 确保数据库手动填表选择安全(raw?: unknown): boolean {
   const api = 取数据库API();
-  if (typeof api?.getManualSelectedTables !== 'function' || typeof api.setManualSelectedTables !== 'function') return false;
+  if (typeof api?.getManualSelectedTables !== 'function' || typeof api.setManualSelectedTables !== 'function')
+    return false;
   try {
     const data = 当前数据库表数据(api, raw);
     if (!data) return false;
@@ -2519,9 +2635,7 @@ function 安装数据库手动填表保护(): void {
     if (运行态.已清理) return;
     const api = 取数据库API() as (数据库API & 数据库V2API) | null;
     const 当前数据 = api ? 当前数据库表数据(api) : null;
-    const 当前有脚本所有权表 = 当前数据
-      ? 计算数据库手动填表安全选择(当前数据, [], false).受保护表键.length > 0
-      : false;
+    const 当前有脚本所有权表 = 当前数据 ? 计算数据库手动填表安全选择(当前数据, [], false).受保护表键.length > 0 : false;
     if (api && 当前有脚本所有权表) {
       安装数据库手动填表API保护(api, 运行态);
       确保数据库手动填表选择安全(当前数据);
@@ -2554,7 +2668,8 @@ function 安装数据库手动填表保护(): void {
           }
           const button = control.closest('button');
           if (!button) return;
-          const 是新版全选 = Boolean(button.closest('#form-fill-manual-panel')) && button.textContent?.trim() === '全选';
+          const 是新版全选 =
+            Boolean(button.closest('#form-fill-manual-panel')) && button.textContent?.trim() === '全选';
           const 是旧版全选 = button.id.endsWith('-manual-table-select-all');
           if (是新版全选 || 是旧版全选) {
             event.preventDefault();
@@ -2814,9 +2929,7 @@ const 安装互斥 = new Map<string, boolean>();
 
 /** 纪要概览与事件至少共享 2 个连续汉字二元组，才认为内容匹配；单个常见汉字不构成证据。 */
 function 概览与事件相似度足够(概览: string, row: unknown[], 楼层列: number): boolean {
-  const 事件文本 = row
-    .map((value, index) => (index === 楼层列 ? '' : String(value ?? '')))
-    .join('');
+  const 事件文本 = row.map((value, index) => (index === 楼层列 ? '' : String(value ?? ''))).join('');
   const 转汉字二元组 = (text: string): Set<string> => {
     const 汉字 = [...text].filter(字符 => /\p{Script=Han}/u.test(字符));
     return new Set(汉字.slice(0, -1).map((字符, index) => 字符 + 汉字[index + 1]));
@@ -2859,11 +2972,12 @@ function 迁移旧RQ事件数据(rq事件表: 数据表, 纪要表: 数据表 | 
       row[结果摘要列] = 摘要按句收口(结果.replace(/\s+/g, ' ').trim()) || 脚本保守回合摘要(行动);
       continue;
     }
-    const 候选 = 可按序匹配纪要 ? String(纪要行[index][纪要概览列] ?? '').replace(/\s+/g, ' ').trim() : '';
-    const 概览 =
-      候选 && Array.from(候选).length <= 结果摘要上限 && 概览与事件相似度足够(候选, row, 楼层列)
-        ? 候选
-        : '';
+    const 候选 = 可按序匹配纪要
+      ? String(纪要行[index][纪要概览列] ?? '')
+          .replace(/\s+/g, ' ')
+          .trim()
+      : '';
+    const 概览 = 候选 && Array.from(候选).length <= 结果摘要上限 && 概览与事件相似度足够(候选, row, 楼层列) ? 候选 : '';
     row[结果摘要列] = 概览 || 脚本保守回合摘要(行动);
   }
 }
@@ -3265,11 +3379,14 @@ export function 读取数据库剧情事件已记录楼层(
   return new Set(
     rows
       .filter(row => !数据库事件摘要待整理(row.result_summary))
-      .filter(row => !(
-        数据库事件摘要为脚本兜底(row.result_summary) &&
-        row.event_code === `RQ-${Number(row.floor_no)}` &&
-        同楼有可靠摘要(Number(row.floor_no))
-      ))
+      .filter(
+        row =>
+          !(
+            数据库事件摘要为脚本兜底(row.result_summary) &&
+            row.event_code === `RQ-${Number(row.floor_no)}` &&
+            同楼有可靠摘要(Number(row.floor_no))
+          ),
+      )
       .map(row => Number(row.floor_no))
       .filter(楼层 => Number.isInteger(楼层) && 楼层 >= 0),
   );
@@ -3740,6 +3857,7 @@ export function 读取数据库记忆胶囊(focusNames: readonly string[], 当�
   确保数据库时间线回调();
   if (
     pending ||
+    数据库恢复写入中() ||
     !时间线栅栏.可读取(聊天标识) ||
     !数据库异步写.可开始新写(聊天标识) ||
     数据库未补偿迟到写.has(聊天标识)

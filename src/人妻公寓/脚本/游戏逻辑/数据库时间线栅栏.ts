@@ -58,6 +58,10 @@ export class 数据库异步写栅栏 {
     return tracked;
   }
 
+  async 等待已登记写入(聊天标识: string): Promise<void> {
+    await Promise.allSettled([...this.任务].filter(task => task.租约.聊天标识 === 聊天标识).map(task => task.任务));
+  }
+
   有已作废写入(聊天标识: string): boolean {
     if (!聊天标识) return false;
     const current = this.当前世代(聊天标识);
@@ -86,6 +90,7 @@ export interface 数据库时间线持久状态 {
   标记时间: number;
   最早校验时间: number;
   原因: string;
+  恢复点?: string;
 }
 
 interface 时间线状态 extends 数据库时间线持久状态 {
@@ -187,6 +192,7 @@ export function 解析数据库时间线持久状态(value: unknown, 预期聊�
     标记时间,
     最早校验时间,
     原因: raw.原因,
+    ...(typeof raw.恢复点 === 'string' && raw.恢复点.length <= 160 ? { 恢复点: raw.恢复点 } : {}),
   };
 }
 
@@ -214,6 +220,7 @@ export class 数据库时间线栅栏 {
     原因: string,
     现在 = Date.now(),
     指定令牌?: string,
+    恢复点?: string,
   ): 数据库时间线持久状态 | null {
     if (!聊天标识) return null;
     const 序号 = ++this.版本序号;
@@ -235,6 +242,7 @@ export class 数据库时间线栅栏 {
       标记时间: 现在,
       最早校验时间: 现在 + this.最短重建毫秒,
       原因: String(原因).slice(0, 120),
+      ...(恢复点 ? { 恢复点 } : {}),
     };
     this.状态.set(聊天标识, this.创建内存状态(persistent));
     return { ...persistent };
@@ -259,6 +267,7 @@ export class 数据库时间线栅栏 {
         : Math.min(current.目标楼层, restored.目标楼层);
     const 最晚校验时间 = Math.max(current.最早校验时间, restored.最早校验时间);
     if (current.标记时间 === restored.标记时间) {
+      if (current.令牌 === restored.令牌 && !current.恢复点 && restored.恢复点) current.恢复点 = restored.恢复点;
       const 约束变化 = current.目标楼层 !== 收窄目标 || current.最早校验时间 !== 最晚校验时间;
       current.目标楼层 = 收窄目标;
       current.最早校验时间 = 最晚校验时间;
@@ -382,6 +391,7 @@ export class 数据库时间线栅栏 {
       标记时间: state.标记时间,
       最早校验时间: state.最早校验时间,
       原因: state.原因,
+      ...(state.恢复点 ? { 恢复点: state.恢复点 } : {}),
     };
   }
 

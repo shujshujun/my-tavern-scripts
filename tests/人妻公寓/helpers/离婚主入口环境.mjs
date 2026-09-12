@@ -141,7 +141,7 @@ export function host(options = {}) {
     if (e.provider) return e.provider(request, e.requests.length);
     return options.body ?? goodBody(choice);
   };
-  const absentDB = new Proxy({ 数据库状态: () => ({ 已装游戏模板: false }), 读取数据库记忆胶囊: () => '', 读取微信进展胶囊: () => '',
+  const absentDB = new Proxy({ 数据库状态: () => ({ 已装游戏模板: false }), 保存当前数据库恢复点: async () => false, 读取数据库记忆胶囊: () => '', 读取微信进展胶囊: () => '',
     等待数据库时间线就绪: async () => false, 标记数据库时间线将变更: () => e.trace.push({ op: 'absent-db-invalidation' }) },
   { get: (object, key) => key in object ? object[key] : noCall(`absent-db:${String(key)}`) });
   const inactivePhone = { 当前聊天ID: () => e.id, 手机AI生成中: () => false, 手机节拍进行中: () => false,

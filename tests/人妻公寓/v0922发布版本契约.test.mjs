@@ -10,7 +10,7 @@ test('0.92.2源码、角色卡、发布工作流和入口使用同一版本，�
   const card = read('src/人妻公寓/组卡.mjs');
   assert.match(card, /const 版本 = '0\.92\.2'/);
   assert.match(card, /const TAG = 'rq0\.92\.2'/);
-  assert.match(card, /本发布附件的数据库兼容修复脚本/);
+  assert.match(card, /数据库继续按官方渠道更新/);
   assert.match(read('src/人妻公寓/新窗口入口_精简.md').slice(0, 180), /当前正式入口：v0\.92\.2／rq0\.92\.2/);
   const workflow = read('.github/workflows/publish-rq0922.yml');
   assert.match(workflow, /ref: rq0\.92\.2/);

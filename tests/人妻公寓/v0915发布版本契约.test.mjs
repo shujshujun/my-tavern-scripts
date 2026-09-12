@@ -64,19 +64,19 @@ test('0.91.5 启动前从父页与 iframe 逐字段清理旧偏好，不覆盖�
   assert.doesNotMatch(设置, /省流模式|减少动效/);
 });
 
-test('0.91.5 数据库重开清五表，删楼和 swipe 同步裁剪剧情事件与社交轨迹', () => {
+test('数据库重开仍清五表，删楼和 swipe 通过官方持久导入恢复历史', () => {
   const 数据库桥 = 读('src/人妻公寓/脚本/游戏逻辑/数据库桥.ts');
   assert.match(
     数据库桥,
     /游戏表名 = \['RQ_剧情事件', 'RQ_人物长期记忆', 'RQ_承诺与伏笔', 'RQ_社交轨迹', '纪要表'\]/,
   );
   assert.match(数据库桥, /数据库脚本所有权表名 = \['RQ_剧情事件', 'RQ_社交轨迹'\]/);
-  assert.match(数据库桥, /目标楼层 !== 0 \|\| 原因 !== '重开一局'/);
-  assert.match(数据库桥, /DELETE FROM \$\{表名\} WHERE row_id IS NOT NULL/);
-  assert.match(数据库桥, /\{ 表名: 'rq_events', 楼层列: 'floor_no' \}/);
-  assert.match(数据库桥, /\{ 表名: 'rq_social_history', 楼层列: 'last_floor' \}/);
+  assert.match(数据库桥, /reason === '重开一局'/);
+  assert.match(数据库桥, /snapshot = 清空游戏数据库导出/);
+  assert.match(数据库桥, /选择数据库恢复点\(/);
+  assert.match(数据库桥, /importTableAsJson!\(JSON\.stringify\(current\.数据\), \{ persist: true \}\)/);
   assert.match(数据库桥, /MESSAGE_SWIPED/);
-  assert.match(数据库桥, /const 比较符 = \/切换消息分支\|swipe\/iu\.test\(原因\) \? '>=' : '>'/);
+  assert.match(数据库桥, /const limit = \/切换消息分支\|swipe\/iu\.test\(reason\) \? floor - 1 : floor/);
 });
 
 test('0.91.5 完成信号位于事务和共享租约释放之后，数据库 SQL 留在下一任务拍', () => {
