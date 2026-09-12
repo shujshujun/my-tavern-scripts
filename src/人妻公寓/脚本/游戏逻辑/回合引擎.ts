@@ -457,8 +457,8 @@ const 回合变量键 = [
 
 function 读取即时业务锚数据(锚楼: number): SchemaType | null {
   try {
-    const raw = Mvu.getMvuData({ type: 'message', message_id: 锚楼 });
-    const stat = _.get(raw, 'stat_data');
+    // 与业务入口使用相同的完整性校验和向前回退规则；不能把不完整末楼补成默认新局。
+    const stat = 读最近有效stat(锚楼);
     if (!stat) return null;
     return Schema.parse(_.cloneDeep(stat)) as SchemaType;
   } catch {
@@ -4532,7 +4532,8 @@ function 准备恢复即时业务撤回(
   选项: { 允许业务前锚?: boolean } = {},
 ): 即时业务撤回记录 | null {
   const 原记录 = 上次回合.chat快照?.[即时业务撤回键];
-  if (原记录 === undefined) return null;
+  // 普通失败恢复和历史回档将缺失聊天键写为 null，与 undefined 同为没有即时业务。
+  if (原记录 == null) return null;
   const record = 读取即时业务撤回记录(原记录);
   if (!record) throw new Error('本回合的即时业务撤回记录损坏，已在删楼前停止，避免错误退款。');
   if (上次回合.回合前末楼 !== 目标楼层 || record.锚楼 !== 目标楼层) {

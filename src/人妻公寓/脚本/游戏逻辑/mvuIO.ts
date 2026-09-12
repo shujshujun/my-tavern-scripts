@@ -451,8 +451,10 @@ export async function 同步整表视图(
  * 上一楼(含全部 UI 写入)就是真值,回退拿它:快照恒新鲜。
  * 找不到(全新对话等)返回 undefined,由调用方跳过——绝不 parse({}) 造默认值。
  */
-export function 读最近有效stat(): unknown {
-  const last = (SillyTavern.chat?.length ?? 0) - 1;
+export function 读最近有效stat(锚楼 = (SillyTavern.chat?.length ?? 0) - 1): unknown {
+  const 末楼 = (SillyTavern.chat?.length ?? 0) - 1;
+  if (!Number.isInteger(锚楼) || 锚楼 < 0 || 锚楼 > 末楼) return undefined;
+  const last = 锚楼;
   let 最近损坏: { 楼层: number; 错误: unknown } | null = null;
   for (let id = last; id >= 0 && id > last - 10; id--) {
     let raw: unknown;
