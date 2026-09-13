@@ -30,6 +30,8 @@ export interface 即时业务撤回记录 extends 即时业务撤回准备 {
   状态: '准备中' | '已提交';
   /** 忽略同一场景票的请求世代与生成状态，其他任何差异仍会令票据失效。 */
   业务后数据指纹: string;
+  /** 本线暂停/撤回许可写核心前登记；只有精确落成该状态才可消费原业务票。 */
+  场景控制后指纹?: string;
   完整性指纹: string;
 }
 
@@ -120,6 +122,7 @@ function 记录完整性载荷(record: Omit<即时业务撤回记录, '完整性
     业务前数据指纹: record.业务前数据指纹,
     业务前聊天指纹: record.业务前聊天指纹,
     业务后数据指纹: record.业务后数据指纹,
+    ...(record.场景控制后指纹 ? { 场景控制后指纹: record.场景控制后指纹 } : {}),
   };
 }
 
@@ -181,6 +184,7 @@ export function 创建即时业务撤回记录(
 
 export function 读取即时业务撤回记录(value: unknown): 即时业务撤回记录 | null {
   if (!是记录(value)) return null;
+  if (value.场景控制后指纹 !== undefined && (typeof value.场景控制后指纹 !== 'string' || !value.场景控制后指纹)) return null;
   if (
     value.版本 !== 即时业务撤回版本 ||
     typeof value.聊天ID !== 'string' ||
@@ -232,6 +236,7 @@ export function 读取即时业务撤回记录(value: unknown): 即时业务撤�
       场景事务ID: value.场景事务ID,
       状态: value.状态 as 即时业务撤回记录['状态'],
       业务后数据指纹: value.业务后数据指纹,
+      ...(typeof value.场景控制后指纹 === 'string' ? { 场景控制后指纹: value.场景控制后指纹 } : {}),
     } satisfies Omit<即时业务撤回记录, '完整性指纹'>;
     if (时间状态指纹(记录完整性载荷(无签名)) !== value.完整性指纹) return null;
     return { ...无签名, 完整性指纹: value.完整性指纹 };
@@ -247,6 +252,16 @@ export function 完成即时业务撤回记录(value: unknown, 业务后数据�
   const 业务后数据指纹 = 即时业务后数据指纹(业务后数据, record.场景事务ID);
   if (!业务后数据指纹) throw new Error('即时业务撤回记录与当前场景事务不一致');
   return 重签即时业务撤回记录({ ...record, 状态: '已提交', 业务后数据指纹 });
+}
+
+export function 登记即时业务场景控制(record: 即时业务撤回记录, data: SchemaType): 即时业务撤回记录 {
+  const 安全记录 = 读取即时业务撤回记录(record);
+  if (!安全记录) throw new Error('场景控制前的即时业务撤回票损坏');
+  return 重签即时业务撤回记录({ ...安全记录, 场景控制后指纹: 时间状态指纹(Schema.parse(_.cloneDeep(data))) });
+}
+
+export function 即时业务场景控制已写入(record: 即时业务撤回记录, data: SchemaType): boolean {
+  return Boolean(record.场景控制后指纹 && record.场景控制后指纹 === 时间状态指纹(Schema.parse(_.cloneDeep(data))));
 }
 
 export function 核验即时业务撤回记录(

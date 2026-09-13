@@ -263,6 +263,8 @@ import {
   核验即时业务撤回记录,
   读取即时业务撤回记录,
   恢复即时业务撤回聊天变量,
+  登记即时业务场景控制,
+  即时业务场景控制已写入,
   type 即时业务撤回准备,
   type 即时业务撤回记录,
 } from './即时业务撤回';
@@ -1047,11 +1049,61 @@ async function 清即时业务撤回顶层记录(预期完整性指纹: string):
   }
 }
 
+/** 控制结束同一业务场景：预写精确后态，保证核心写成而清票中断时仍可恢复。 */
+export async function 提交即时业务场景控制(
+  操作前: SchemaType,
+  操作后: SchemaType,
+  提交: () => Promise<boolean>,
+): Promise<boolean> {
+  const 原票 = getVariables({ type: 'chat' })[即时业务撤回键];
+  if (原票 == null) return 提交();
+  const record = 读取即时业务撤回记录(原票);
+  if (!record || !即时业务撤回身份仍有效(record)) throw new Error('场景控制与即时业务撤回锚点不一致');
+  const 锚数据 = 读取即时业务锚数据(record.锚楼);
+  if (!锚数据) throw new Error('场景控制无法读取业务锚点');
+  const 判定 = 核验即时业务撤回记录(record, {
+    当前聊天ID: 当前聊天ID(), 当前锚楼: record.锚楼,
+    当前锚消息: SillyTavern.chat?.[record.锚楼], 当前锚分支指纹: 当前即时业务锚分支指纹(record.锚楼),
+    当前锚数据: 锚数据, 预期场景事务ID: 操作前.系统._场景剧情事务.id,
+  });
+  if (!判定.有效 || record.场景事务ID !== 操作前.系统._场景剧情事务.id) {
+    throw new Error('场景控制不能消费另一业务或已变化的撤回票');
+  }
+  const 控制票 = 登记即时业务场景控制(判定.记录, 操作后);
+  try {
+    await updateVariablesWith(vars => {
+      if (!即时业务撤回身份仍有效(record) || 读取即时业务撤回记录(vars[即时业务撤回键])?.完整性指纹 !== record.完整性指纹) {
+        throw new Error('场景控制登记期间时间线或撤回票变化');
+      }
+      vars[即时业务撤回键] = _.cloneDeep(控制票);
+      return vars;
+    }, { type: 'chat' });
+  } catch (error) {
+    if (!即时业务撤回身份仍有效(record) || 读取即时业务撤回记录(getVariables({ type: 'chat' })[即时业务撤回键])?.完整性指纹 !== 控制票.完整性指纹) throw error;
+  }
+  if (!即时业务撤回身份仍有效(record)) throw new Error('__RQGY_TIMELINE_CHANGED__');
+  let 结果 = false;
+  let 提交错误: unknown;
+  try { 结果 = await 提交(); } catch (error) { 提交错误 = error; }
+  // 落地会排队写保护镜像；先等同一聊天的写队列收口，避免旧聊天副本带回已消费的票。
+  await 等待晋阶镜像写入();
+  if (即时业务撤回身份仍有效(record)) {
+    const 已写 = 读取即时业务锚数据(record.锚楼);
+    if (已写 && 即时业务场景控制已写入(控制票, 已写)) {
+      await 清即时业务撤回顶层记录(控制票.完整性指纹);
+      return true;
+    }
+  }
+  if (提交错误) throw 提交错误;
+  return 结果;
+}
+
 /**
  * 刷新／崩溃可能杀死“准备票已写、核心锚楼待写／已写、正文尚未完成”的旧调用栈。
- * 启动时只接受四种可证明状态：锚楼仍是业务前（删准备票）、锚楼持有同一事务
+ * 启动时只接受可证明状态：锚楼仍是业务前（删准备票）、锚楼持有同一事务
  * （把准备票收敛为已提交）、成功回合已搬运同一票（删顶层副本），以及正文楼已删且
- * 核心退款已写成但聊天／派生收口中断（从业务前锚继续完成）。其余一律失败关闭。
+ * 核心退款已写成但聊天／派生收口中断（从业务前锚继续完成）、场景控制已精确写成
+ * （消费原业务票）。其余一律失败关闭。
  */
 export async function 恢复即时业务撤回登记(): Promise<boolean> {
   const vars = getVariables({ type: 'chat' });
@@ -1098,6 +1150,10 @@ export async function 恢复即时业务撤回登记(): Promise<boolean> {
 
   const 锚数据 = 读取即时业务锚数据(record.锚楼);
   if (!锚数据) throw new Error('即时业务撤回记录存在，但启动时无法读取原锚楼变量。');
+  if (当前末楼 === record.锚楼 && 即时业务场景控制已写入(record, 锚数据)) {
+    await 清即时业务撤回顶层记录(record.完整性指纹);
+    return true;
+  }
   if (即时业务锚仍是业务前状态(record, 锚数据)) {
     await 清即时业务撤回顶层记录(record.完整性指纹);
     console.info('[人妻公寓] 即时业务核心尚未写入，已清理中断的准备票。');

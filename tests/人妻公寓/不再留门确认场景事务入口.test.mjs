@@ -159,3 +159,23 @@ test('旧修订确认事件到达后端时失败关闭，不激活旧票或请�
   assert.match(hints, /剧情票已经变化|重新查看线路进展/u);
   assertReleased(e);
 });
+
+test('A5确认后撤回许可直接落地，重复点击不会请求模型或重复结算', async () => {
+  const { e, scene } = 挂载确认环境();
+  await 点击确认并等待(e);
+  断言A5已确认(e, scene);
+  const before = e.read();
+  await e.ctx.eventEmit('人妻公寓:不再留门动作', '撤回许可');
+  await ticks(12);
+  const saved = e.read();
+  assert.equal(saved.系统._不再留门.许可, '已撤回', e.warnings.join('\n'));
+  assert.equal(saved.系统._不再留门.阶段, '决定中');
+  assert.equal(saved.现金, before.现金);
+  assert.deepEqual(Array.from(saved.背包), Array.from(before.背包));
+  assert.equal(e.vars._即时业务撤回, undefined);
+  await e.ctx.eventEmit('人妻公寓:不再留门动作', '撤回许可');
+  await ticks(12);
+  assert.deepEqual(e.read(), saved);
+  assert.equal(e.requests.length, 1);
+  assertReleased(e);
+});
