@@ -1,6 +1,7 @@
 import { Schema, type SchemaType } from '../../schema';
 import { 手机锚消息签名, 手机锚消息签名匹配 } from './手机时间线租约';
 import { 恢复精确聊天快照, 时间状态指纹, type 精确聊天快照 } from './时间撤销系统';
+import { 同步已打开裂缝 } from './裂缝揭晓状态';
 
 export const 即时业务撤回键 = '_即时业务撤回';
 export const 即时业务撤回版本 = 1 as const;
@@ -275,7 +276,7 @@ export function 核验即时业务撤回记录(
   if (
     上下文.允许业务前锚 &&
     record.状态 === '已提交' &&
-    时间状态指纹(当前锚数据) === record.业务前数据指纹
+    即时业务锚仍是业务前状态(record, 当前锚数据)
   ) {
     return { 有效: true, 记录: record, 锚状态: '业务前已恢复' };
   }
@@ -318,7 +319,13 @@ export function 即时业务锚仍是业务前状态(value: unknown, 当前锚�
   if (!业务前数据指纹) return false;
   try {
     const 当前锚数据 = Schema.parse(_.cloneDeep(当前锚数据原)) as SchemaType;
-    return 时间状态指纹(当前锚数据) === 业务前数据指纹;
+    if (时间状态指纹(当前锚数据) === 业务前数据指纹) return true;
+    // 旧撤回票保持原签名；中断重入只接受“原业务前数据 + 本局已打开裂缝”的准确结果。
+    const record = 读取即时业务撤回记录(value);
+    if (!record) return false;
+    const 业务前 = _.cloneDeep(record.业务前数据);
+    同步已打开裂缝(业务前);
+    return 时间状态指纹(当前锚数据) === 时间状态指纹(业务前);
   } catch {
     return false;
   }

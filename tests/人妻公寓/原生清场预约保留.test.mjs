@@ -59,6 +59,7 @@ function fixture(initial = plan()) {
     // Refresh mirror and unrelated actor/worldbook I/O are explicit boundaries, not claimed by this test.
     选择微信刷新恢复值: value => ({ 值: value }),
     清保护快照: () => {}, 捕获保护快照: () => {},
+    同步已打开裂缝: () => false,
     恢复安若妍不必停失效亲密检查点: () => false, 恢复安若妍换掉失效亲密检查点: () => false,
     同步安若妍换掉当前剧情票: () => false, 清理不再留门旧尺度边界提示: () => false,
     清理线路失效待演打断: () => false,

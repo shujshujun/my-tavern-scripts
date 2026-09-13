@@ -1376,13 +1376,19 @@ async function 尝试恢复数据库记录(
   reference?: string,
 ): Promise<'等待' | '完成' | '官方回放'> {
   if (floor === null || !仍是同一聊天(chat)) return '等待';
+  const branch = 数据库恢复分支(floor);
+  if (!branch) return '等待';
+  const state = 读取持久时间线状态(chat);
+  // 先记录确实到过 0 楼，再等待官方 API。8 秒后新序章可能已经生成，刷新也要能继续清场。
+  if (reason === '重开一局' && floor === 0 && 当前末楼() === 0 && state?.令牌 === token) {
+    state.重开落位分支 = branch;
+    持久化时间线状态(state);
+  }
   const api = 取数据库API();
   if (!api?.exportTableAsJson) return '等待';
   const tasks = 数据库恢复任务表();
   const old = tasks[chat];
   if (Object.values(tasks).some(task => task.进行中)) return '等待';
-  const branch = 数据库恢复分支(floor);
-  if (!branch) return '等待';
   let entry = old?.令牌 === token && old.api === api && old.分支 === branch ? old : undefined;
   if (!entry) {
     const limit = /切换消息分支|swipe/iu.test(reason) ? floor - 1 : floor;
@@ -1410,7 +1416,8 @@ async function 尝试恢复数据库记录(
     } else if (!snapshot && !reference) snapshot = 读取官方历史数据库快照(limit);
 
     // 显式回档在删楼前已标记；没有看到目标尾部前，不调用持久导入。
-    if (!/切换消息分支|swipe/iu.test(reason) && Number(当前末楼()) > floor) return '等待';
+    if (!/切换消息分支|swipe/iu.test(reason) && Number(当前末楼()) > floor &&
+      !(reason === '重开一局' && state?.重开落位分支 === branch)) return '等待';
     entry = {
       聊天: chat,
       令牌: token,

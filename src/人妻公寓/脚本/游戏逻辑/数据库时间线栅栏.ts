@@ -91,6 +91,7 @@ export interface 数据库时间线持久状态 {
   最早校验时间: number;
   原因: string;
   恢复点?: string;
+  重开落位分支?: string;
 }
 
 interface 时间线状态 extends 数据库时间线持久状态 {
@@ -193,6 +194,7 @@ export function 解析数据库时间线持久状态(value: unknown, 预期聊�
     最早校验时间,
     原因: raw.原因,
     ...(typeof raw.恢复点 === 'string' && raw.恢复点.length <= 160 ? { 恢复点: raw.恢复点 } : {}),
+    ...(typeof raw.重开落位分支 === 'string' && raw.重开落位分支.length <= 160 ? { 重开落位分支: raw.重开落位分支 } : {}),
   };
 }
 
@@ -268,6 +270,7 @@ export class 数据库时间线栅栏 {
     const 最晚校验时间 = Math.max(current.最早校验时间, restored.最早校验时间);
     if (current.标记时间 === restored.标记时间) {
       if (current.令牌 === restored.令牌 && !current.恢复点 && restored.恢复点) current.恢复点 = restored.恢复点;
+      if (current.令牌 === restored.令牌 && restored.重开落位分支) current.重开落位分支 = restored.重开落位分支;
       const 约束变化 = current.目标楼层 !== 收窄目标 || current.最早校验时间 !== 最晚校验时间;
       current.目标楼层 = 收窄目标;
       current.最早校验时间 = 最晚校验时间;
@@ -392,6 +395,7 @@ export class 数据库时间线栅栏 {
       最早校验时间: state.最早校验时间,
       原因: state.原因,
       ...(state.恢复点 ? { 恢复点: state.恢复点 } : {}),
+      ...(state.重开落位分支 ? { 重开落位分支: state.重开落位分支 } : {}),
     };
   }
 

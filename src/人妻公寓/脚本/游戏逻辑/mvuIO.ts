@@ -8,6 +8,7 @@ import { 规范AI表现文本 } from './AI表现文本安全';
 import { 清理线路失效待演打断 } from './线路待演打断';
 import { 确认时间事务允许写入, 时间事务阻止普通写入, 当前时间事务写入版本, 时间事务当前聊天ID, type 时间事务写入校验 } from './时间事务写入门';
 import { 同步通关进度 } from './通关结算';
+import { 同步已打开裂缝 } from './裂缝揭晓状态';
 
 /**
  * 脚本侧 MVU 读写共享模块
@@ -195,6 +196,7 @@ export async function 脚本写入(raw: object, data?: SchemaType, 选项: 脚�
   确认MVU提交仍有效();
   确认时间事务允许写入(选项.时间事务校验);
   if (data) {
+    同步已打开裂缝(data);
     清理线路失效待演打断(data);
     const 旧raw = _.get(raw, 'stat_data');
     if (选项.记录成长 !== false && 旧raw && !_.isEmpty(旧raw)) {

@@ -1,5 +1,5 @@
 import { Schema, 当前MVU数据版本, type SchemaType } from '../../schema';
-import { PROMOTE_MIRROR_KEY } from './守护系统';
+import { PROMOTE_MIRROR_KEY, 保留已打开裂缝镜像 } from './守护系统';
 import { 到次日早晨间隔 } from './楼层时钟';
 import { 孕期时段数 } from './生产系统';
 import type { 时间推进地点, 时间推进方式 } from './时间推进系统';
@@ -269,8 +269,10 @@ export function 恢复精确聊天快照(
   for (const key of keys) {
     const 记录 = 快照[key];
     if (!记录) throw new Error(`聊天快照缺少 ${key}`);
+    const 原镜像 = key === PROMOTE_MIRROR_KEY ? vars[key] : null;
     if (记录.存在) vars[key] = 记录.值未定义 ? undefined : _.cloneDeep(记录.值);
     else delete vars[key];
+    if (原镜像) 保留已打开裂缝镜像(vars, 原镜像);
   }
 }
 

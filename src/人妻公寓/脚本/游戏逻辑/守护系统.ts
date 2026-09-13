@@ -1,6 +1,7 @@
+import { PROMOTE_MIRROR_KEY, 同步已打开裂缝 } from './裂缝揭晓状态';
 import type { SchemaType, 户节点Type } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
-import { 好感封顶表 } from '../../stageConfig';
+import { 好感封顶表, 户静态表 } from '../../stageConfig';
 import { 应冻结堕落 } from './阶段线路系统';
 import { 当前天数 } from './楼层时钟';
 import { 计算阶段堕落底线 } from './冷落成长核心';
@@ -15,7 +16,7 @@ import { 规范AI表现文本 } from './AI表现文本安全';
  * - delta cap:堕落值超 ±3 整项回滚；其他 AI 可写数值按既有规则裁剪
  * - 脚本权限:情报显示直接从可信裂缝确认状态派生，不再保存第二份布尔副本(防护4)
  * - chat 级镜像取大(防护9):玩家手点的单调状态(阶段/裂缝确认/入住时段)
- *   入镜像,重roll/毒快照路径盖不回;回档作废由 回合引擎.回档至 显式清镜像宣告
+ *   入镜像,重roll/毒快照路径盖不回；普通回档重置阶段等镜像，但保留已打开裂缝。
  *   (2026-07-26 审计 H2/M12:楼层比较无法区分重掷与回档,不再自行推断)
  */
 
@@ -66,7 +67,7 @@ export function 清保护快照(): void {
 // chat 级镜像(防护9:单调状态取大；回档时由入口显式作废)
 // ============================================
 
-export const PROMOTE_MIRROR_KEY = '人妻公寓_晋阶镜像';
+export { PROMOTE_MIRROR_KEY, 同步已打开裂缝 } from './裂缝揭晓状态';
 
 interface 户镜像 {
   阶段: number;
@@ -133,20 +134,36 @@ function 排队合并晋阶镜像(抬升表: Record<string, Partial<户镜像>>)
   });
 }
 
-/** 回档、原生删楼和重开统一调用；返回时旧世代迟到写与清场都已经落定。 */
-export function 作废晋阶镜像时间线(): Promise<void> {
+/** 回档与原生删楼保留已打开裂缝；重开传 true 全清。返回时旧世代迟到写与清场均已落定。 */
+export function 作废晋阶镜像时间线(重开 = false): Promise<void> {
   _镜像时间线世代 += 1;
   const 世代 = _镜像时间线世代;
   return 排队晋阶镜像任务(async () => {
     if (世代 !== _镜像时间线世代) return;
     await updateVariablesWith(
       vars => {
-        if (世代 === _镜像时间线世代) _.set(vars, PROMOTE_MIRROR_KEY, null);
+        if (世代 === _镜像时间线世代) {
+          const 原镜像 = vars[PROMOTE_MIRROR_KEY];
+          _.set(vars, PROMOTE_MIRROR_KEY, null);
+          if (!重开) 保留已打开裂缝镜像(vars, 原镜像);
+        }
         return vars;
       },
       { type: 'chat' },
     );
   });
+}
+
+/** 普通回退只保留已完成的裂缝揭晓，不保留未完成碎片、阶段或入住进度。 */
+export function 保留已打开裂缝镜像(vars: Record<string, unknown>, 原镜像: unknown): void {
+  const 户表 = _.get(原镜像, '户', {}) as Record<string, Partial<户镜像>>;
+  for (const [门牌号, 户] of Object.entries(户表 ?? {})) {
+    if (户?.裂缝确认 !== true || !户静态表[门牌号 as 门牌]) continue;
+    const 当前 = (vars[PROMOTE_MIRROR_KEY] as 镜像结构 | undefined) ?? { 户: {} };
+    当前.户 ??= {};
+    当前.户[门牌号] = 合并户镜像(当前.户[门牌号], { 裂缝确认: true, 碎片: 4 });
+    vars[PROMOTE_MIRROR_KEY] = 当前;
+  }
 }
 
 /** 测试与事务收口使用；业务入口不应靠任意延时猜测镜像是否已经写完。 */
@@ -167,6 +184,7 @@ export async function 等待晋阶镜像写入(): Promise<void> {
 function 同步镜像(写入 = true): void {
   if (!_protSnapshot) return;
   try {
+    同步已打开裂缝(_protSnapshot);
     const mirror = _.get(getVariables({ type: 'chat' }), PROMOTE_MIRROR_KEY) as 镜像结构 | undefined;
     if (mirror) {
       for (const [门牌号, m] of Object.entries(mirror.户 ?? {})) {

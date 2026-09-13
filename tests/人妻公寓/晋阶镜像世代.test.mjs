@@ -104,3 +104,18 @@ test('时间撤销也在恢复旧聊天镜像前作废写世代，失败补偿�
   assert.match(body, /准备补偿: 撤销写口\.准备补偿/);
   assert.match(body, /恢复推进前聊天:[\s\S]*撤销写口\.校验\(getVariables[\s\S]*恢复时间聊天备份\(\s*推进后聊天备份, 读取时间事务恢复键\(当前撤销事务\)/);
 });
+
+test('普通镜像清场只保留已打开裂缝，时间快照恢复不关闭它，重开完整清空', async () => {
+  镜像直写('101', { 阶段: 3, 碎片: 4, 裂缝确认: true, 入住时段: 10 });
+  镜像直写('201', { 阶段: 1, 碎片: 3 });
+  await 等待晋阶镜像写入();
+  await 作废晋阶镜像时间线();
+  assert.deepEqual(聊天变量[PROMOTE_MIRROR_KEY].户, {
+    101: { 阶段: 0, 碎片: 4, 裂缝确认: true, 入住时段: 0 },
+  });
+  const { 恢复精确聊天快照 } = require('../../src/人妻公寓/脚本/游戏逻辑/时间撤销系统.ts');
+  恢复精确聊天快照(聊天变量, { [PROMOTE_MIRROR_KEY]: { 存在: false, 值: null } });
+  assert.equal(聊天变量[PROMOTE_MIRROR_KEY].户[101].裂缝确认, true);
+  await 作废晋阶镜像时间线(true);
+  assert.equal(聊天变量[PROMOTE_MIRROR_KEY], null);
+});

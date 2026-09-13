@@ -8,6 +8,7 @@ import lodash from 'lodash';
 globalThis._ = lodash;
 globalThis.SillyTavern = { chat: [{}] };
 globalThis.getLastMessageId = () => 0;
+globalThis.getVariables = () => ({});
 globalThis.updateVariablesWith = updater => updater({});
 globalThis.Mvu = {
   replaceMvuData: async () => undefined,

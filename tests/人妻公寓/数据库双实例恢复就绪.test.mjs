@@ -924,6 +924,56 @@ test('重开到0会清空上一局五张数据库记忆表，再恢复剧情与�
   }
 });
 
+for (const mode of ['延迟导入', '延迟API并刷新', '连续仅0楼重开', '落位前不得清表']) {
+  test(`重开完整清场边界：${mode}`, async () => {
+    const w = world();
+    let b = w.instance();
+    try {
+      w.seedResetRows(9);
+      b.标记数据库时间线将变更(0, '重开一局');
+      if (mode === '落位前不得清表') {
+        watch(b.等待数据库时间线就绪(8000));
+        await w.time.advance(9000);
+        assert.equal(w.calls.length, 0);
+        assert.equal(w.eventRows().length, 1);
+        return;
+      }
+      w.setFloor(0);
+      const exporter = w.api.exportTableAsJson;
+      if (mode === '延迟API并刷新') w.api.exportTableAsJson = undefined;
+      if (mode === '延迟导入') w.auto(false);
+      const first = watch(b.等待数据库时间线就绪(8000));
+      await w.time.advance(8500);
+      if (mode !== '连续仅0楼重开') {
+        assert.equal(first.value, false);
+        w.setFloor(2); // 新局核心与序章已经继续；数据库仍等待原清场。
+        if (mode === '延迟导入') {
+          assert.equal(w.calls.filter(c => c.kind === 'import').length || w.calls.length, 1);
+          w.calls[0].finish();
+          w.auto(true);
+        } else {
+          b.清理数据库时间线接线();
+          w.api.exportTableAsJson = exporter;
+          b = w.instance();
+        }
+        const resumed = watch(b.等待数据库时间线就绪(8000));
+        await w.time.advance(9000);
+        assert.equal(resumed.value, true, w.warnings.join('\n'));
+      } else {
+        assert.equal(first.value, true);
+        w.seedResetRows(8);
+        b.标记数据库时间线将变更(0, '重开一局');
+        const again = watch(b.等待数据库时间线就绪(8000));
+        await w.time.advance(9000);
+        assert.equal(again.value, true);
+      }
+      for (const rows of [w.eventRows(), w.memoryRows(), w.promiseRows(), w.socialRows(), w.chronicleRows()]) assert.deepEqual(rows, []);
+      assert.equal(await w.event(b, 2), '已确认');
+      assert.equal(await w.social(b, '重开后恢复写入', 2), '已确认');
+    } finally { await w.close(); }
+  });
+}
+
 for (const stage of ['first', 'retry']) {
   for (const reason of ['删除消息', '切换消息分支']) {
     test(`${stage}/${reason}: shared recovery completion does not release an instance with old SQL`, async () => {
