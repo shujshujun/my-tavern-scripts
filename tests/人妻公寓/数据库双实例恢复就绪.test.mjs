@@ -666,6 +666,37 @@ test('导入失败保留恢复点与原库，下一次成功重试不会重复�
   }
 });
 
+test('三次导入失败后同一令牌仍可退避续办，新实例不能绕过退避或重复导入', async () => {
+  const w = world(), b = w.instance();
+  try {
+    w.setFloor(4); w.seedResetRows(4); await b.保存当前数据库恢复点();
+    w.setFloor(8); w.seedScriptRows(8); w.auto(false);
+    b.标记数据库时间线将变更(4, '回档至4楼'); w.setFloor(4);
+    const first = watch(b.等待数据库时间线就绪(6000));
+    for (const delay of [300, 1400, 2400]) {
+      await w.time.advance(delay);
+      const call = w.calls.filter(c => c.kind === 'import' && !c.settled).at(-1);
+      assert.ok(call); call.finish('reject'); await flush();
+    }
+    await w.time.advance(2000);
+    assert.equal(first.value, false);
+    assert.equal(b.数据库时间线允许新写('dual-test'), false);
+    assert.equal(w.calls.length, 3);
+    w.auto(true);
+    const second = w.instance();
+    const retry = watch(b.等待数据库时间线就绪(6000));
+    const shared = watch(second.等待数据库时间线就绪(6000));
+    await w.time.advance(500);
+    assert.equal(w.calls.length, 3, '退避尚未结束，不因新等待或新实例重复发起');
+    await w.time.advance(5500);
+    assert.equal(retry.value, true, w.warnings.join('\n'));
+    assert.equal(shared.value, true);
+    assert.equal(w.calls.length, 4);
+    assert.deepEqual(w.eventRows().map(r => r.floor_no), [4]);
+    assert.equal(w.locks(), 0);
+  } finally { await w.close(); }
+});
+
 test('恢复成功后官方迟到回放再次带入未来楼层时，用保留恢复点重新对齐', async () => {
   const w = world(),
     b = w.instance();

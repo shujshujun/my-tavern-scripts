@@ -1436,7 +1436,7 @@ async function 尝试恢复数据库记录(
   if (!entry.数据) return reason === '重开一局' ? '等待' : '官方回放';
   const expected = 数据库表内容指纹(entry.数据);
   if (entry.成功 && 数据库表内容指纹(解析数据库数据(api.exportTableAsJson())) === expected) return '完成';
-  if (entry.次数 >= 3 || Date.now() < entry.重试时间 || typeof api.importTableAsJson !== 'function') return '等待';
+  if (Date.now() < entry.重试时间 || typeof api.importTableAsJson !== 'function') return '等待';
   const current = entry;
   const valid = () =>
     !时间线接线已清理 &&
@@ -1467,7 +1467,8 @@ async function 尝试恢复数据库记录(
     })
     .finally(() => {
       current.进行中 = false;
-      current.重试时间 = Date.now() + 1000;
+      // 等待调用仍有自己的截止时间；失败仅退避，不永久耗尽同一恢复令牌的续办机会。
+      current.重试时间 = Date.now() + Math.min(30_000, 1000 * 2 ** Math.min(current.次数 - 1, 5));
     });
   return '等待';
 }
