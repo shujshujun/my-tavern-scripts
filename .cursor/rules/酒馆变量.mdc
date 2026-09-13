@@ -1,5 +1,6 @@
 ---
-alwaysApply: true
+description: 修改酒馆持久变量的作用域、读取或写入时参考。
+alwaysApply: false
 ---
 # 酒馆变量
 

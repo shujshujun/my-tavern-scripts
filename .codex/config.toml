@@ -1,6 +1,29 @@
+# 本机《人妻公寓》后期维护配置；仅作用于本目录及其子目录。
+# 恢复某项：移除相应 enabled = false 覆盖，重新打开项目任务。
+# 保留全局模型、权限、浏览器与上下文预算设置。
+
+[plugins."sites@openai-bundled"]
+enabled = false
+
+[plugins."visualize@openai-bundled"]
+enabled = false
+
+[plugins."documents@openai-primary-runtime"]
+enabled = false
+
+[plugins."pdf@openai-primary-runtime"]
+enabled = false
+
+[plugins."spreadsheets@openai-primary-runtime"]
+enabled = false
+
+[plugins."presentations@openai-primary-runtime"]
+enabled = false
+
+[plugins."template-creator@openai-primary-runtime"]
+enabled = false
+
 [mcp_servers.chrome-devtools]
+enabled = false
 command = "pnpx"
-args = [
-    "chrome-devtools-mcp@latest",
-    "--autoConnect",
-]
+args = ["chrome-devtools-mcp@latest", "--autoConnect"]

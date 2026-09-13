@@ -1,5 +1,6 @@
 ---
-alwaysApply: true
+description: 修改酒馆助手宿主接入、接口使用或项目结构时参考。
+alwaysApply: false
 ---
 # 项目基本概念
 
