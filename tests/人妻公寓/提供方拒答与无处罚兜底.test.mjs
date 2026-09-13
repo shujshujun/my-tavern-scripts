@@ -64,12 +64,30 @@ test('提供方拒答识别只认元层服务语义，不吞掉角色自己的�
     '我不能答应你的要求，但愿意留下来谈。',
     '她摇头说自己不愿继续，随后把门关上。',
     '许曼君拒绝了这次亲密请求，把账本收回包里。',
+    '她翻开杂志，指着采访中的一句话念道：“作为人工智能公司的产品经理，我更关心使用体验。”随后她问起你的看法。',
+    '作为人工智能公司的产品经理，我更关心使用体验。',
+    '她说：“AI无法代替我们做决定。”',
   ]) assert.equal(是提供方拒答正文(text), false, text);
 
   assert.deepEqual(
     判定正文提交('抱歉，我无法继续这项请求。', value => value, value => value),
     { 显示正文: '抱歉，我无法继续这项请求。', 成功正文: '', 失败残稿: '抱歉，我无法继续这项请求。', 可提交: false },
   );
+});
+
+test('普通回合中的人工智能话题可正常提交，故事引文不冒充提供方拒答', async () => {
+  const e = host();
+  const schema = e.load('src/人妻公寓/schema.ts');
+  const data = schema.Schema.parse({ 户: { 101: schema.创建户节点(0) }, 现金: 12000 });
+  data.系统._序章完成 = true;
+  data.户[101].妻.当前阶段 = 1;
+  e.vars = { _场景: { 房间id: '101' } };
+  e.st.chat.at(-1).variables = [{ stat_data: clone(data) }];
+  e.provider = () => '她翻开杂志，指着采访中的一句话念道：“作为人工智能公司的产品经理，我更关心使用体验。”随后她问起你的看法。';
+  assert.equal(await e.main.执行回合('我和她聊聊杂志上的采访。'), true, e.warnings.join('\n'));
+  assert.equal(e.requests.length, 1);
+  assert.equal(e.trace.some(item => item.name === '人妻公寓:回合失败'), false);
+  assertReleased(e);
 });
 
 test('普通主回合收到提供方拒答只请求一次，不建楼、不结算、不改亲密检查点', async () => {
