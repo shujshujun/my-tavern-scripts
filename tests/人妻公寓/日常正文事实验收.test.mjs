@@ -140,23 +140,26 @@ for (const relation of ['继续关系', '暂不承诺', '退出关系']) {
         });
       }
     }
-    test(`PLAY-002 真实listener跨楼→坏稿待重试→刷新后原票成功：${relation}/${theme}`, async () => {
+    test(`PLAY-002 真实listener跨楼→观察待续保留正文→刷新后原票成功：${relation}/${theme}`, async () => {
       const input = clone(bodies);
       input.D1[theme] = samples[index].D1yes[0]; input.D2[theme] = samples[index].D2no[0];
       const e = harness(input).lifecycleHost(); e.state = h.fresh(relation, index);
+      const successObservation = e.observer;
+      e.observer = req => ({ ...successObservation(req), 状态: req.消息.at(-1).文本 === samples[index].D2no[0] ? '待续' : '完成' });
       await e.click(relation === '退出关系' ? '只处理201房务' : '把决定留给她');
       assert.deepEqual(e.outcome, [true], e.errors.map(String).join('\n'));
       const checkpoint = clone(e.state.系统._许曼君离婚后日常);
       await e.click('把今天这件事做完');
-      assert.deepEqual(e.outcome, [true, false]);
+      assert.deepEqual(e.outcome, [true, true]);
       assert.deepEqual(e.state.系统._许曼君离婚后日常, checkpoint);
       const id = e.state.系统._场景剧情事务.id;
-      assert.equal(e.state.系统._场景剧情事务.状态, '待重试');
+      assert.equal(e.state.系统._场景剧情事务.状态, '待续');
+      assert.equal(e.chat.at(-1).mes, samples[index].D2no[0]);
       e.state = Schema.parse(JSON.parse(JSON.stringify(e.state)));
       input.D2[theme] = samples[index].D2yes[0];
       assert.equal(await e.retry(), true, e.errors.map(String).join('\n'));
       assert.ok(id); assert.equal(e.state.系统._许曼君离婚后日常.累计次数, index + 1);
-      assert.equal(e.state.系统._许曼君离婚后日常.最近事件楼层, 84);
+      assert.equal(e.state.系统._许曼君离婚后日常.最近事件楼层, 86);
       assert.equal(e.state.系统._许曼君离婚后日常.事件记录.length, 1);
       assert.equal(e.state.系统._许曼君离婚后日常.待反馈事件.length, 1);
     });

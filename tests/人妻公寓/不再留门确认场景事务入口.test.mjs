@@ -1,5 +1,6 @@
 /* eslint-disable import-x/no-nodejs-modules -- Full listener/scene transaction regression. */
 import assert from 'node:assert/strict';
+import { 观察返回 } from './helpers/自然观察模型夹具.mjs';
 import test from 'node:test';
 
 import { host, clone, assertReleased, ticks } from './helpers/离婚主入口环境.mjs';
@@ -86,6 +87,7 @@ function 挂载确认环境({ 活动行动 = '', 改写数据 = () => undefined 
   e.id = 'play-nmd-confirm';
   e.vars = { ...e.vars, _场景: { 房间id: '202' } };
   e.st.chat.at(-1).variables = [{ stat_data: clone(data) }];
+  e.observe = req => 观察返回(req, { choices: { 本步玩家许可: '确认' } });
   e.provider = () =>
     '周小满听完你明确同意后，和你谈清这次录制只供约定的人观看、不公开传播，并约在之后安全独处时再开始。设备仍未启动。';
   e.load(`${game}手机系统.ts`).刷新红点 = () => undefined;

@@ -1,4 +1,5 @@
 import type { SchemaType } from '../../schema';
+import { 自然事件已识别 } from './自然对话接入';
 import { 门牌列表 } from '../../stageConfig';
 import { 当前时段, 妻位置推算 } from './楼层时钟';
 import { 处于医院硬锁 } from './生产系统';
@@ -581,7 +582,7 @@ export function 提交许曼君离婚后日常事件(
   if (!ticket) return { 成功: false, 变动: false, 提示: '201离婚后日常票已经失效。' };
   const actorError = 许曼君离婚后日常演员错误(event, wives, husbands);
   if (actorError) return { 成功: false, 变动: false, 提示: actorError };
-  const bodyError = 许曼君离婚后日常正文越界原因(event, text);
+  const bodyError = 自然事件已识别(data, event) ? '' : 许曼君离婚后日常正文越界原因(event, text);
   if (bodyError) return { 成功: false, 变动: false, 提示: bodyError };
   const blocked = 硬阻断原因(data, location, false);
   if (blocked) return { 成功: false, 变动: false, 提示: blocked };

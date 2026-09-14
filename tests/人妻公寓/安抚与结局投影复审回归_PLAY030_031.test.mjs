@@ -61,8 +61,10 @@ function actualConsumer(file, target) {
   walk(ast); assert.equal(blocks.length, 1);
   const js = ts.transpileModule(blocks[0].getText(ast), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   return (data, text) => {
+    // 本组模型观察未确认玩家安抚，生产消费者必须保持账本；具体模型理解不在本测试范围内。
+    const 自然观察 = null, 原生自然观察 = null;
     const deps = { ...cold, ...policy, newStat: data, newData: data, 本轮余波目标: '101', _本轮余波目标: '101', 生成楼层: 100, 楼层: 100, 当前绝对时段: 96, 现钟: 96, 可提交正文: '她听到了这次答复。', 本轮有效正文: '她听到了这次答复。', 妻在场: ['101'], _本轮妻在场: ['101'], 行动: text, _本轮玩家文本: text };
-    Function('deps', `const {${Object.keys(deps).join(',')}} = deps; ${js}`)(deps);
+    Function('deps', '自然观察', '原生自然观察', `const {${Object.keys(deps).join(',')}} = deps; ${js}`)(deps, 自然观察, 原生自然观察);
   };
 }
 for (const [file, target] of [['回合引擎.ts', '本轮余波目标'], ['index.ts', '_本轮余波目标']]) {

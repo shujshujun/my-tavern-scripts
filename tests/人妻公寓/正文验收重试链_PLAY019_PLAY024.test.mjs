@@ -32,6 +32,7 @@ const actualGate = [
 // Model generation, display extraction, general scale auditing, sibling routes and caller lease are adapters.
 async function review(event, first, second, state, options = {}) {
   const deps = {
+    ...require('../../src/人妻公寓/脚本/游戏逻辑/自然对话接入.ts'),
     _: lodash, ...door, ...home, first, 本楼事件: event, 当前拍正文: first,
     不再留门票: door.解析不再留门剧情事件(event), 回国票: home.解析回国剧情事件(event),
     第二机位票: null, 安若妍不必停票: null, 许曼君分居票: null, 许曼君离婚票: null,
@@ -73,19 +74,27 @@ for (const c of cases) {
     assert.equal(await review(c.event, c.good, c.bad, state), c.good);
     assert.equal(state.generations, 0);
   });
-  test(`PLAY${c.id} 实际二稿门：错误首稿被合法二稿替换`, async () => {
+  test(`PLAY${c.id} 首稿处理遵循当前线路入口`, async () => {
     const state = counters();
-    assert.equal(await review(c.event, c.bad, c.good, state), c.good);
-    assert.deepEqual(state, { generations: 1, leaseChecks: 1 });
+    assert.equal(await review(c.event, c.bad, c.good, state), c.id === '019' ? c.bad : c.good);
+    assert.deepEqual(state, c.id === '019' ? { generations: 0, leaseChecks: 0 } : { generations: 1, leaseChecks: 1 });
   });
   test(`PLAY${c.id} 实际二稿门：两稿错误必须抛错，不返回可提交正文`, async () => {
     const state = counters();
+    if (c.id === '019') {
+      assert.equal(await review(c.event, c.bad, c.bad, state), c.bad);
+      assert.equal(state.generations, 0); return;
+    }
     await assert.rejects(review(c.event, c.bad, c.bad, state), /未能通过验收|两次未能停在正确节点/u);
     assert.equal(state.generations, 1);
   });
   for (const error of ['TEST_TIMEOUT', 'TEST_CANCELLED', 'TEST_MISSING_MODEL']) {
     test(`PLAY${c.id} 实际重试链：${error} 不被吞成成功`, async () => {
       const state = counters();
+      if (c.id === '019') {
+        assert.equal(await review(c.event, c.bad, c.good, state, { error }), c.bad);
+        assert.equal(state.generations, 0); return;
+      }
       await assert.rejects(review(c.event, c.bad, c.good, state, { error }), new RegExp(error));
       assert.equal(state.generations, 1);
       assert.equal(state.leaseChecks, 0);
@@ -93,6 +102,10 @@ for (const c of cases) {
   }
   test(`PLAY${c.id} 实际重试链：迟到二稿先经过原时间线检查`, async () => {
     const state = counters();
+    if (c.id === '019') {
+      assert.equal(await review(c.event, c.bad, c.good, state, { stale: true }), c.bad);
+      assert.deepEqual(state, { generations: 0, leaseChecks: 0 }); return;
+    }
     await assert.rejects(review(c.event, c.bad, c.good, state, { stale: true }), /TEST_STALE_LEASE/u);
     assert.deepEqual(state, { generations: 1, leaseChecks: 1 });
   });

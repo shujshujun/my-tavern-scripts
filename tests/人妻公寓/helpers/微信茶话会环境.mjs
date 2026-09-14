@@ -2,9 +2,15 @@
 import assert from 'node:assert/strict';
 import { createHost, clone, productionFunction } from './微信事务恢复环境.mjs';
 import { consumerKit } from './微信余波消费环境.mjs';
+import { 安装观察模型 } from './自然观察模型夹具.mjs';
 
-export function fixture(lines, task = '回应回国', playerName = '林舟') {
+export function fixture(lines, task = '回应回国', playerName = '林舟', observer) {
   const e = createHost();
+  if (observer) {
+    安装观察模型(e.globals, observer);
+    e.adapt('手机/配置.ts', { 读配置: () => ({ ai来源: '正文' }) });
+    e.adapt('数据库桥.ts', { 数据库状态: () => ({ 可调用AI: false }) });
+  }
   e.st.name1 = playerName;
   const data = e.st.chat.at(-1).stat_data;
   data.户['302'] = clone(data.户['101']);
@@ -54,10 +60,12 @@ export function fixture(lines, task = '回应回国', playerName = '林舟') {
   const validation = e.load('手机/回国茶话会验收.ts');
   e.restore = productionFunction('手机/回国茶话会恢复.ts', '恢复回国茶话会主状态', {
     ...e.globals, ...timeline, ...validation, ...e.load('回国系统.ts'),
+    ...e.load('手机/群聊进度补取.ts'),
     当前聊天ID: () => e.id, 读库: e.api.读库,
     排队MVU操作: async fn => { await e.onQueue?.(); return fn(); },
     读取: () => ({ raw: {}, data: clone(e.st.chat.at(-1).stat_data) }),
     脚本写入: async (_, next) => { if (e.failMvu) throw new Error('controlled MVU failure'); Object.assign(data, next); },
+    登记MVU提交校验: check => { assert.equal(check(), true); return () => {}; },
     捕获保护快照: () => {},
   });
   let batch = 0;

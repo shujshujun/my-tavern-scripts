@@ -35,6 +35,7 @@ export function functionText(tree, name) {
   assert.equal(nodes.length, 1, name); return nodes[0].getText(tree);
 }
 export function execute(text, deps, expression) {
+  deps = { ...require('../../../src/人妻公寓/脚本/游戏逻辑/自然对话接入.ts'), ...deps };
   const js = ts.transpileModule(`${text}\nmodule.exports = ${expression};`, {
     compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
   }).outputText;

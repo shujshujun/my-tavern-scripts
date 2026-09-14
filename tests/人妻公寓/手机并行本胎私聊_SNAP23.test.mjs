@@ -3,9 +3,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { clone } from './helpers/微信事务恢复环境.mjs';
 import { createPhoneHost, pregnancyKit } from './helpers/手机并行第二组环境.mjs';
+import { 安装观察模型 } from './helpers/自然观察模型夹具.mjs';
 
 function fixture(family = true) {
   const e = createPhoneHost();
+  安装观察模型(e.globals);
+  e.adapt('手机/配置.ts', { 读配置: () => ({ ai来源: '正文' }) });
+  e.adapt('数据库桥.ts', { 数据库状态: () => ({ 可调用AI: false }) });
   const data = e.st.chat.at(-1).stat_data;
   data.户['201'] = clone(data.户['101']);
   for (const node of Object.values(data.户)) {

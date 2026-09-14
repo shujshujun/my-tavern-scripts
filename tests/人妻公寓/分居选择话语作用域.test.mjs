@@ -139,7 +139,7 @@ for (const [player, expected] of [
   const f = finalDecision();
   const modelBody = '许曼君听完这句话，把它说成了玩家退出关系。';
   const review = await fixedReview(f, '赵国强同意办理。', modelBody, { player });
-  assert.equal(review.generations, 1); assert.equal(review.body, modelBody);
+  assert.equal(review.generations, 0); assert.equal(review.body, '赵国强同意办理。');
   const fixed = clone(f);
   assert.equal(productionSubmit(fixed, player).成功, true);
   assert.equal(fixed.data.系统._许曼君分居.玩家最终关系选择, expected);

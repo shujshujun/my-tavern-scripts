@@ -1,5 +1,6 @@
 import { 剧情线使用阻断 } from './剧情线使用门';
 import type { SchemaType } from '../../schema';
+import { 自然事件已识别 } from './自然对话接入';
 import type { 门牌 } from '../../stageConfig';
 import {
   不再留门已完成,
@@ -713,7 +714,7 @@ export function 提交不再留门剧情事件(
     return 失败('本线现场或时间线已经变化，旧剧情票不再提交。');
   const 外部 = p.场景 === 'A2';
   if (地点 !== (外部 ? '公寓外部' : '202')) return 失败('当前地点已经变化。');
-  const 错误 = 互斥错误(data, 地点, true) || 人物错误(data, 地点, 外部) || 不再留门回应错误(事件, 行动);
+  const 错误 = 互斥错误(data, 地点, true) || 人物错误(data, 地点, 外部) || (自然事件已识别(data, 事件) ? '' : 不再留门回应错误(事件, 行动));
   if (错误) return 失败(错误);
   if (!data.背包.includes(不再留门任务ID)) return 失败('占用中的剧情道具缺失。');
   if (p.场景 === 'A1' && (data.户['202'].妻.当前阶段 < 5 || data.户['202'].妻.阶段性癖 !== '独占印记'))

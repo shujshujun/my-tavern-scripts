@@ -1,6 +1,7 @@
 /* eslint-disable import-x/no-nodejs-modules -- PLAY-014 real first/rewrite/native consumers. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createRequire } from 'node:module';
 import { Schema, route, clone, handoffProposal, productionSubmit, nativeCandidate, fixedReview } from './helpers/分居决定验收环境.mjs';
 
 const proposals = [
@@ -58,17 +59,19 @@ for (const body of proposals) test(`PLAY-014 实际首稿不误重写且原生�
   assert.equal(f.data.系统._许曼君分居.阶段, '待管理员室交接');
   assert.ok(native.后续剧情?.事件);
 });
-for (const body of early) test(`PLAY-014 真实二稿错误与原生错误不提交：${body}`, async () => {
+for (const body of early) test(`PLAY-014 首稿保留；无观察记录的旧直接提交仍校验：${body}`, async () => {
   const f = handoffProposal(), before = clone(f.data);
-  await assert.rejects(() => fixedReview(f, body, body), /两次未能停在正确节点/u);
-  assert.throws(() => nativeCandidate(f, body), /未通过验收/u);
+  const observed = await fixedReview(f, body, body);
+  assert.equal(observed.body, body); assert.equal(observed.generations, 0);
+  const natural = createRequire(import.meta.url)('../../src/人妻公寓/脚本/游戏逻辑/自然对话接入.ts');
+  assert.equal(natural.本轮自然事件可提交(f.data, f.event), false, '外围提交门等待观察，不进入内部提交分支');
   assert.deepEqual(f.data, before);
 });
 
-test('PLAY-014 真正提前稿更正为提议后只提交第一拍，第二拍才签办理同意', async () => {
+test('PLAY-014 初稿不自动重写；旧直接提交仍按第一拍和第二拍分别记账', async () => {
   const f = handoffProposal();
   const reviewed = await fixedReview(f, early[0], proposals[0]);
-  assert.equal(reviewed.generations, 1); assert.equal(reviewed.body, proposals[0]);
+  assert.equal(reviewed.generations, 0); assert.equal(reviewed.body, early[0]);
   const first = productionSubmit(f, '我在听。');
   assert.equal(first.成功, true); assert.equal(f.data.系统._许曼君分居.双方同意进入办理, false);
   f.data = Schema.parse(clone(f.data)); f.event = first.后续剧情.事件; f.floor++;
@@ -81,15 +84,15 @@ test('PLAY-014 真正提前稿更正为提议后只提交第一拍，第二拍�
   const saved = clone(f.data); assert.equal(productionSubmit(f, '我在听。').成功, false);
   assert.deepEqual(f.data, saved);
 });
-for (const error of ['提供方失败', '取消', '超时']) test(`PLAY-014 实际重写等待${error}不提交`, async () => {
+for (const error of ['提供方失败', '取消', '超时']) test(`PLAY-014 不再启动旧句式重写：${error}`, async () => {
   const f = handoffProposal(), before = clone(f.data);
-  await assert.rejects(() => fixedReview(f, early[0], proposals[0], { error }), new RegExp(error, 'u'));
+  assert.equal((await fixedReview(f, early[0], proposals[0], { error })).body, early[0]);
   assert.deepEqual(f.data, before);
-  assert.equal((await fixedReview(f, early[0], proposals[0])).generations, 1);
+  assert.equal((await fixedReview(f, early[0], proposals[0])).generations, 0);
 });
-test('PLAY-014 既有重写后事务复核保留；迟到文本不认领当前候选', async () => {
+test('PLAY-014 单独首稿门不产生迟到二稿或修改候选', async () => {
   const f = handoffProposal(), before = clone(f.data);
-  await assert.rejects(() => fixedReview(f, early[0], proposals[0], { stale: true }), /stale caller lease/u);
+  assert.equal((await fixedReview(f, early[0], proposals[0], { stale: true })).generations, 0);
   assert.deepEqual(f.data, before);
 });
 test('PLAY-014 实际原生演员门与地点门没有放宽', () => {

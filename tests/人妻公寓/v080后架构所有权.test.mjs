@@ -54,11 +54,12 @@ test('手机拆分模块不反向 import 内核或旧门面，避免副作用重
   }
 });
 
-test('游戏逻辑中的自定义 raw 生成只存在于三个受控所有者', () => {
+test('游戏逻辑中的 raw 生成只存在于既有生成所有者和只读观察模块', () => {
   const 命中 = 调用文件('generateRaw').filter(文件 => 文件.startsWith('脚本/游戏逻辑/'));
   assert.deepEqual(命中, [
     '脚本/游戏逻辑/回合引擎.ts',
     '脚本/游戏逻辑/手机/生成引擎.ts',
+    '脚本/游戏逻辑/自然对话接入.ts',
     '脚本/游戏逻辑/隔离事件引擎.ts',
   ]);
   const 回合 = 读(path.join(根, '脚本/游戏逻辑/回合引擎.ts'));
@@ -67,6 +68,9 @@ test('游戏逻辑中的自定义 raw 生成只存在于三个受控所有者', 
   assert.match(回合, /取得前台生成租约/);
   assert.match(手机, /取得手机生成租约/);
   assert.match(隔离, /取得前台生成租约/);
+  const 观察 = 读(path.join(根, '脚本/游戏逻辑/自然对话接入.ts'));
+  assert.match(观察, /should_silence: true/);
+  assert.match(观察, /stopGenerationById/);
 });
 
 test('变量解析的现代候选全部进入统一协议规范器，提示词不再宣称外层单标签足够', () => {

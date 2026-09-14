@@ -1,6 +1,7 @@
 /* eslint-disable import-x/no-nodejs-modules -- Real host listeners, scene transactions and engine; isolated storage/model ports. */
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { 观察返回 } from './helpers/自然观察模型夹具.mjs';
 import { firstDecision, finalDecision } from './helpers/分居决定验收环境.mjs';
 import { host, clone, ticks, assertReleased, deferred, waitRequests } from './helpers/离婚主入口环境.mjs';
 import { mountActualHostListeners } from './helpers/完整回合补验环境_PLAY002_022.mjs';
@@ -13,6 +14,7 @@ const cases = [
 
 async function setup(fixture, label, legacy = false) {
   const e = host();
+  e.observe = req => 观察返回(req, { choices: label.includes('参与') ? { 初谈参与方式: '当面在场' } : { 最终关系选择: '继续关系' } });
   const f = fixture();
   const route = e.load(`${game}许曼君分居系统.ts`);
   const result = route.提交许曼君分居剧情事件(f.data, f.event, '201', 32, '我听见了。');

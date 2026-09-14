@@ -800,6 +800,12 @@
         </section>
         <MuteMeetingLockNote :open="静音会议正式中" />
         </AuxPanel>
+        <section v-if="自然进度待识别" class="scene-story-lock waiting" role="status" aria-live="polite">
+          <p>对话已保存，事件进度尚未确认。</p>
+          <button type="button" class="scene-story-start" :disabled="发送中 || 自然识别中" @click="重新识别自然对话">
+            {{ 自然识别中 ? '正在识别…' : '重新识别已保存对话' }}
+          </button>
+        </section>
         <AuxPanel v-if="场景剧情状态 || 录像带前置中" label="剧情待处理" :hint="场景剧情状态?.标题 ?? 录像带前置标题 ?? '当前剧情'" :default-open="true" :reset-key="场景剧情状态?.id ?? 录像带前置标题 ?? ''">
         <section
           v-if="场景剧情状态"
@@ -1407,6 +1413,7 @@ import { 安若妍换掉图片, 安若妍换掉背景文件, 安若妍换掉CG�
 import { 安若妍换掉等待硬操作 } from '../../脚本/游戏逻辑/安若妍换掉系统';
 import { 剧情商品货架可见 } from '../../脚本/游戏逻辑/商店剧情货架';
 import { 场景剧情楼道, 读取场景剧情状态, 读取队首场景剧情 } from '../../脚本/游戏逻辑/场景剧情事务';
+import { 读取自然对话记录 } from '../../脚本/游戏逻辑/自然对话接入';
 import { 是入住登场事件 } from '../../脚本/游戏逻辑/入住触发门';
 import type { SchemaType } from '../../schema';
 import {
@@ -3326,6 +3333,21 @@ const 录像带V4活动 = computed(
   () => data.value.系统._特殊场景.id === '录像带V4' && data.value.系统._录像带V4.场景.状态 === '观看中',
 );
 const 场景剧情状态 = computed(() => (data.value?.系统 ? 读取场景剧情状态(data.value) : null));
+const 自然识别中 = ref(false);
+const 自然进度待识别 = computed(() => {
+  const 记录 = data.value?.系统 ? 读取自然对话记录(data.value) : null;
+  const ctx = 记录?.提交上下文;
+  if (!ctx || 记录.技术状态 === '已识别' || ctx.时段 !== data.value.系统._绝对时段) return false;
+  try { if (ctx.楼层 !== getLastMessageId()) return false; } catch { return false; }
+  return 记录.请求.类别 === '冷落安抚' ||
+    (data.value.系统._场景剧情事务.id === ctx.事务ID && data.value.系统._场景剧情事务.状态 === '待续');
+});
+async function 重新识别自然对话() {
+  if (自然识别中.value || 发送中.value) return;
+  自然识别中.value = true;
+  try { await eventEmit('人妻公寓:重新识别已保存对话'); }
+  finally { 自然识别中.value = false; }
+}
 /**
  * 业务已经在脚本候选中建立场景票、但 MVU 尚未完成持久写回的极短窗口。
  * 这层锁不充当第二份真值，只负责在持久活动票可见前阻止快速换房；写回成功后由活动票接管。

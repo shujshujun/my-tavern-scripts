@@ -3,9 +3,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createHost, clone, productionFunction, makePlan, delta } from './helpers/微信事务恢复环境.mjs';
 import { createPhone } from './helpers/手机发送草稿环境.mjs';
+import { 安装观察模型, 观察返回 } from './helpers/自然观察模型夹具.mjs';
 
-function fixture(text, verdict = '接受', more = {}) {
+function fixture(text, verdict = '接受', more = {}, confirmed = true) {
   const e = createHost();
+  安装观察模型(e.globals, req => 观察返回(req, { status: confirmed ? '完成' : '待续' }));
+  e.adapt('手机/配置.ts', { 读配置: () => ({ ai来源: '正文' }) });
+  e.adapt('数据库桥.ts', { 数据库状态: () => ({ 可调用AI: false }) });
   const config = e.load('../../stageConfig.ts');
   const hard = e.load('手机/叙事硬事实.ts');
   e.planInput = { ...makePlan(), ...more };
@@ -14,7 +18,7 @@ function fixture(text, verdict = '接受', more = {}) {
     ...e.globals, ...e.api,
   });
   const generate = productionFunction('手机/交互/邀约与发消息.ts', '生成邀约裁定回复', {
-    ...e.globals, ...config, ...hard, ...e.load('楼层时钟.ts'),
+    ...e.globals, ...config, ...hard, ...e.load('楼层时钟.ts'), ...e.load('手机/自然通知.ts'),
     读取私聊记忆上下文: () => ({ 可知记忆: '', 最近聊天: '' }), 读库: e.api.读库,
     玩家名: () => '林舟', 小生成: async () => { e.calls++; return text; }, 微信短文本: short,
     手机可见单条硬上限: e.api.手机可见单条硬上限,
@@ -29,14 +33,14 @@ for (const text of accepted) test(`SNAP12 明确接受 ${text}`, async () => {
   const e = fixture(text); assert.equal(await e.generate(), text); assert.equal(e.calls, 1);
 });
 for (const text of rejected) test(`SNAP12 拒收未承诺或另约 ${text}`, async () => {
-  const e = fixture(text); assert.equal(await e.generate(), ''); assert.equal(e.calls, 1);
+  const e = fixture(text, '接受', {}, false); assert.match(await e.generate(), /［事件通知］.*天台/su); assert.equal(e.calls, 1);
 });
 for (const verdict of ['拒绝', '改口拒绝']) {
   for (const text of ['抱歉，我去不了。', '今天不方便，改天吧。', '原先答应了，但现在不能赴约。']) test(`SNAP12 ${verdict} ${text}`, async () => {
     assert.equal(await fixture(text, verdict).generate(), text);
   });
   for (const text of ['抱歉。', '天气很好。', '家里有事，但我会去。', '好，到时见。']) test(`SNAP12 ${verdict}不能误认 ${text}`, async () => {
-    assert.equal(await fixture(text, verdict).generate(), '');
+    assert.match(await fixture(text, verdict, {}, false).generate(), /［事件通知］/u);
   });
 }
 test('SNAP12 共同邀约实际回复与冻结计划同次写入，失败与重试保持CAS', async () => {
@@ -56,7 +60,7 @@ test('SNAP12 共同邀约实际回复与冻结计划同次写入，失败与重�
 });
 
 for (const text of ['好，明天下午。', '可以，周五晚上。']) test(`SNAP12 复审：省略见面动词的另约也不能覆盖冻结时间 ${text}`, async () => {
-  assert.equal(await fixture(text).generate(), '');
+  assert.match(await fixture(text, '接受', {}, false).generate(), /［事件通知］.*天台/su);
 });
 
 for (const [text, valid] of [
@@ -67,16 +71,18 @@ for (const [text, valid] of [
   ['好，今晚。', true], ['可以，明晚。', false],
   ['好，我会去大堂。', false], ['没问题，我会去天台。', true],
 ]) test(`SNAP12 约定与生活理由：${text}`, async () => {
-  assert.equal(await fixture(text).generate(), valid ? text : '');
+  const result = await fixture(text, '接受', {}, valid).generate();
+  if (valid) assert.equal(result, text); else assert.match(result, /［事件通知］.*天台/su);
 });
 
-function entryFixture(reply) {
-  const e = createPhone({ registerBusiness: false });
+function entryFixture(reply, confirmed) {
+  const e = createPhone({ registerBusiness: false, skipRenderer: true });
+  安装观察模型(e.globals, req => 观察返回(req, { status: confirmed ? '完成' : '待续' }));
   const wife = e.st.chat.at(-1).stat_data.户['101'].妻;
   Object.assign(wife, { 当前阶段: 5, 好感值: 90 });
   wife.裂缝.已确认 = true;
   e.adapt('snapshotSystem.ts', { 妻状态包: () => '' });
-  e.adapt('数据库桥.ts', { 同步社交轨迹: async () => '已确认' });
+  e.adapt('数据库桥.ts', { 同步社交轨迹: async () => '已确认', 数据库状态: () => ({ 可调用AI: false }) });
   e.adapt('手机/摘要系统.ts', { 排队刷新微信进展摘要() {}, 排队刷新群聊进展摘要() {} });
   e.adapt('手机/微信记忆上下文.ts', { 读取私聊记忆上下文: () => ({ 可知记忆: '', 最近聊天: '' }) });
   e.adapt('手机/生成引擎.ts', {
@@ -84,7 +90,7 @@ function entryFixture(reply) {
     微信短文本: productionFunction('手机/生成引擎.ts', '微信短文本', { ...e.globals, ...e.api }),
     家庭事实: () => '', 称呼纪律: () => '', 口吻纪律: '',
   });
-  e.adapt('手机/配置.ts', { 人设段: async () => '' });
+  e.adapt('手机/配置.ts', { 人设段: async () => '', 读配置: () => ({ ai来源: '正文' }) });
   e.load('手机/交互/邀约与发消息.ts');
   e.invite = () => e.portModule.取渲染业务端口().约多人出来(['101'], {
     创建楼: 4, 创建绝对时段: 20, 目标绝对时段: 22, 地点: '天台',
@@ -93,12 +99,13 @@ function entryFixture(reply) {
 }
 for (const [reply, accepted] of [['好，明天下午。', false], ['好的，今晚天台见。', true]]) {
   test(`SNAP12 完整注册邀约入口：${reply}`, async () => {
-    const e = entryFixture(reply);
+    const e = entryFixture(reply, accepted);
     await e.invite();
     const plan = e.api.读手机邀约计划();
-    assert.equal(Boolean(plan), accepted, JSON.stringify(e.warnings));
+    assert.ok(plan, JSON.stringify(e.warnings));
     assert.equal(e.api.读库().消息.some(m => m.发 === '对方' && m.文 === reply), accepted);
-    if (accepted) {
+    if (!accepted) assert.ok(e.api.读库().消息.some(m => m.文.startsWith('［事件通知］')));
+    {
       assert.equal(plan.目标绝对时段, 22);
       assert.equal(plan.地点, '天台');
     }

@@ -17,9 +17,9 @@ test('0.91.5 历史发布说明保持冻结，当前源码、组卡与入口前�
   assert.match(发布说明, /角色卡版本：`0\.91\.5`/);
   assert.match(发布说明, /v0\.83～v0\.91\.4\(v9\) 可直接继续/);
   assert.doesNotMatch(发布说明, /rq0\.91\.6/);
-  assert.match(依赖版本, /当前游戏版本 = '0\.92\.5'/);
-  assert.match(组卡, /const 版本 = '0\.92\.5'/);
-  assert.match(组卡, /const TAG = 'rq0\.92\.5'/);
+  assert.match(依赖版本, /当前游戏版本 = '0\.92\.6'/);
+  assert.match(组卡, /const 版本 = '0\.92\.6'/);
+  assert.match(组卡, /const TAG = 'rq0\.92\.6'/);
   assert.match(组卡, /支持继承 v0\.80～v0\.92 存档，无需重开/);
   assert.match(入口, /当前正式入口：v0\.92\.1／rq0\.92\.1/);
   assert.match(读('src/人妻公寓/schema.ts'), /当前MVU数据版本 = 9/);

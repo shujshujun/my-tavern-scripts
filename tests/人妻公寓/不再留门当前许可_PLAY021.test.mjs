@@ -47,7 +47,8 @@ function visit(node) {
 }
 visit(ast);
 assert.equal(preflight.length, 1);
-const engineGate = new Function('不再留门回应错误', '本楼事件', '行动', preflight[0]).bind(null, route.不再留门回应错误);
+const { 自然场景类别 } = require('../../src/人妻公寓/脚本/游戏逻辑/自然对话接入.ts');
+const engineGate = new Function('自然场景类别', '不再留门回应错误', '本楼事件', '行动', preflight[0]).bind(null, 自然场景类别, route.不再留门回应错误);
 
 let floor = 1;
 function act(d, action, place = '202') {
@@ -158,12 +159,11 @@ for (const [stage, prepare, next] of [['A5', atDecision, '待准备'], ['A7', at
   const base = prepare();
   assert.equal(route.解析不再留门剧情事件(base.event).场景, stage);
   for (const [label, reply, yes] of cases) {
-    test(`${stage} ${label}：真实前置回应与正式提交`, () => {
+    test(`${stage} ${label}：旧票直接提交兼容；新回合先接收自由输入`, () => {
       const d = lodash.cloneDeep(base.d);
       const result = route.提交不再留门剧情事件(d, base.event, '202', floor++, reply);
       assert.equal(result?.成功, yes, result?.提示);
-      if (yes) assert.doesNotThrow(() => engineGate(base.event, reply));
-      else assert.throws(() => engineGate(base.event, reply));
+      assert.doesNotThrow(() => engineGate(base.event, reply), '当前回合入口不再按措辞拒绝输入，提交另由语义观察决定');
       if (yes) {
         assert.equal(d.系统._不再留门.阶段, next);
         const after = lodash.cloneDeep(d);

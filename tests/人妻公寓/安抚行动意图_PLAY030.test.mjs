@@ -190,8 +190,17 @@ function consumer(file, target) {
   const js = ts.transpileModule(blocks[0].getText(ast), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
-  return (data, text, { present = true, body = true, targetPresent = true } = {}) => {
+  return (data, text, { present = true, body = true, targetPresent = true, completed = true } = {}) => {
+    const natural = require('../../src/人妻公寓/脚本/游戏逻辑/自然对话接入.ts');
+    const protocol = require('../../src/人妻公寓/脚本/游戏逻辑/自然对话观察.ts');
+    const req = natural.构造安抚观察请求(data, '101', text, '她听到了本次答复。', 'fixture', 'fixture:100');
+    const record = req ? protocol.新建对话观察记录(req, {
+      版本: 1, 事件: req.事件, 阶段: req.阶段, 分支: req.分支, 批次: req.批次,
+      状态: completed ? '完成' : '待续', 意向: '未明确',
+      依据: [{ 消息: req.消息[0].id, 原文: text }], 意向依据: [], 选择: {}, 已谈主题: [],
+    }) : null;
     const deps = {
+      ...protocol, 自然观察: record, 原生自然观察: record,
       ...cold, ...policy, newStat: data, newData: data,
       本轮余波目标: targetPresent ? '101' : '', _本轮余波目标: targetPresent ? '101' : '',
       生成楼层: 100, 楼层: 100, 当前绝对时段: 96, 现钟: 96,
@@ -205,7 +214,7 @@ function consumer(file, target) {
 for (const [file, target] of [['回合引擎.ts', '本轮余波目标'], ['index.ts', '_本轮余波目标']]) {
   const run = consumer(file, target);
   for (const [label, text, settings, takeover] of [
-    ['否定行动', '我一点也不关心你。', {}, false],
+    ['否定行动', '我一点也不关心你。', { completed: false }, false],
     ['无正文/失败', '对不起。', { body: false }, false],
     ['非当面/远程', '对不起。', { present: false }, false],
     ['本轮未注入目标', '对不起。', { targetPresent: false }, false],

@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import * as ts from 'typescript';
 import lodash from 'lodash';
 import { witness, clone } from './离婚事实验收环境.mjs';
+import { 观察返回 } from './自然观察模型夹具.mjs';
 
 const require = createRequire(import.meta.url);
 const root = fileURLToPath(new URL('../../../', import.meta.url));
@@ -88,7 +89,13 @@ export function host(options = {}) {
     },
     tavern_events: { MESSAGE_DELETED: 'message_deleted', GENERATION_STARTED: 'generation_started', GENERATION_ENDED: 'generation_ended' },
     iframe_events: { STREAM_TOKEN_RECEIVED_FULLY: 'stream-full' },
-    fetch: noCall('network'), generateRaw: noCall('unconfigured-variable-model'),
+    fetch: noCall('network'), crypto,
+    generateRaw: options => {
+      if (!String(options.generation_id).startsWith('rqgy-observe-')) return noCall('unconfigured-variable-model')();
+      const request = JSON.parse(options.ordered_prompts[1].content);
+      // 成功场景的明确模型夹具；测试可通过 e.observe 单独注入待续、格式失败、选择和迟到回执。
+      return e.observe ? e.observe(request, options) : 观察返回(request);
+    },
     stopGenerationById: id => { e.trace.push({ op: 'provider-stop', id }); return true; }, stopAllGeneration: noCall('global-provider-stop'),
   });
   e.ctx = ctx;

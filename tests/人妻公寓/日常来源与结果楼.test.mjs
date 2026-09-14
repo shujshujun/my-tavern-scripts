@@ -6,6 +6,7 @@ import test from 'node:test';
 import { 装配真实时间事务门 } from './helpers/时间事务门装配.mjs';
 import * as ts from 'typescript';
 import lodash from 'lodash';
+import { 观察结果 } from './helpers/自然观察模型夹具.mjs';
 
 const require = createRequire(import.meta.url);
 process.env.TS_NODE_COMPILER_OPTIONS = JSON.stringify({ module: 'CommonJS', moduleResolution: 'node' });
@@ -49,7 +50,8 @@ function declarationText(ast, name) {
   assert.equal(nodes.length, 1, name); return nodes[0].getText(ast);
 }
 function callText(ast, name) {
-  const nodes = select(ast, n => ts.isCallExpression(n) && n.expression.getText(ast) === name);
+  const nodes = select(ast, n => ts.isCallExpression(n) && n.expression.getText(ast) === name &&
+    (name !== '回合结算' || n.arguments[0]?.getText(ast) === 'newStat'));
   assert.equal(nodes.length, 1, name); return nodes[0].getText(ast);
 }
 
@@ -237,10 +239,12 @@ function settlementApi() {
 }
 
 function lifecycleHost() {
+  const natural = require('../../src/人妻公寓/脚本/游戏逻辑/自然对话接入.ts');
+  const observation = require('../../src/人妻公寓/脚本/游戏逻辑/自然对话观察.ts');
   const e = { state: fresh(), chatID: 'daily-chat', epoch: 0, room: '201', busy: false, held: false,
     chat: Array.from({ length: 81 }, (_, floor) => ({ is_user: floor % 2 === 1, mes: `历史${floor}` })),
     writes: 0, generations: 0, completionWrites: 0, outcome: [], events: [], errors: [], validators: new Set(),
-    mode: '', beforeResultWrite: null, beforeGeneration: null,
+    mode: '', beforeResultWrite: null, beforeGeneration: null, observer: req => 观察结果(req),
   };
   const settlement = settlementApi();
   const { 选择本轮事件 } = require('../../src/人妻公寓/脚本/游戏逻辑/入住触发门.ts');
@@ -296,6 +300,8 @@ function lifecycleHost() {
         e.chat.push({ is_user: false, mes: text });
         assert.equal(e.chat.length - 1, slots.生成楼层);
         const candidate = clone(data);
+        const request = natural.构造自然场景请求(candidate, event, action, text, origin.id, `daily:${slots.生成楼层}`);
+        natural.保存自然对话记录(candidate, observation.新建对话观察记录(request, e.observer(request)));
         const result = execute('', { 回合结算: settlement, newStat: candidate, 本轮结算基准: data,
           焦点: [], 妻在场: ['201'], 夫在场: [], ...slots, 本轮事件冻结: frozen, 可提交正文: text,
           回合起始场景: '201', 行动: action, 变量重生成派生票据: null,

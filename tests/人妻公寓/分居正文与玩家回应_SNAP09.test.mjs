@@ -56,16 +56,16 @@ test('SNAP09 原生验收与提交整块接受玩家问题，仍拒绝真实越�
   const f = second();
   assert.equal(nativeCandidate(f, safe, question, ['201'], [])?.成功, true);
   const bad = second(), before = clone(bad.data);
-  assert.throws(() => nativeCandidate(bad, unsafe, question, ['201'], []), /未通过验收/);
+  assert.throws(() => nativeCandidate(bad, unsafe, question, ['201'], []), /不能提前归还工资卡/);
   assert.deepEqual(bad.data, before);
 });
-test('SNAP09 固定首稿否定事实不重写，真实越拍仍走重写并保留当前拍', async () => {
+test('SNAP09 固定首稿原样保留，进度交给语义观察', async () => {
   const f = second();
   const normal = '这不代表工资卡已经归还，她只是想先谈谈自己的打算。';
   assert.equal((await fixedReview(f, normal, safe)).generations, 0);
   const retried = await fixedReview(f, unsafe, safe);
-  assert.equal(retried.generations, 1);
-  assert.equal(retried.body, safe);
+  assert.equal(retried.generations, 0);
+  assert.equal(retried.body, unsafe);
 });
 
 function 使用承接剧情票(...args) { return require('../../src/人妻公寓/脚本/游戏逻辑/承接剧情票使用.ts').使用承接剧情票(...args); }

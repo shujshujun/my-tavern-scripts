@@ -1,5 +1,6 @@
 /* eslint-disable import-x/no-nodejs-modules -- Complete production engine and local file-backed host I/O. */
 import assert from 'node:assert/strict';
+import { 观察返回 } from './helpers/自然观察模型夹具.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import test from 'node:test';
@@ -87,12 +88,19 @@ const targets = [
     good: dailyBodies[0][1], bad: '等这件上衣缝好以后，她再试穿；现在她只把粉笔和针线摆在桌上。' },
 ];
 for (const target of targets) {
-  test(`${target.name}完整首稿失败后同轮重写，最终只提交一次`, async () => {
+  test(`${target.name}观察待续保留首稿；原回复补取完成后只提交一次`, async () => {
     const e = await target.create(); storage(e, 'rewrite');
     e.provider = (_request, n) => n === 1 ? target.bad : target.good;
+    e.observe = req => 观察返回(req, { status: '待续' });
     assert.equal(await e.run(), true, e.warnings.join('\n')); assertReleased(e);
+    assert.equal(e.requests.length, 1); assert.equal(e.commits, 0);
+    assert.equal(e.st.chat.at(-1).mes.includes(target.bad), true);
+    assert.equal(e.read().系统._场景剧情事务.状态, '待续');
+    // 后续玩家对话由原事件继续；模型观察 fixture 明确改为完成。
+    e.observe = undefined;
+    assert.equal(await e.retry(), true, e.warnings.join('\n'));
     assert.equal(e.requests.length, 2); assert.equal(e.commits, 1);
-    assert.ok(e.validations.some(v => v.error));
+    assert.equal(e.validations.length, 0, '语义路径不调用旧句式验收器');
     assert.equal(e.reloadFile().系统[target.field][target.flag], target.expected);
   });
 
@@ -103,16 +111,17 @@ for (const target of targets) {
     const generate = e.ctx.generate;
     if (failure === '缺模型') e.ctx.generate = undefined;
     e.options.saveFail = failure === '保存抛错'; e.options.mvuFail = failure === 'MVU写入失败';
+    if (failure === '两稿无效') e.observe = req => 观察返回(req, { status: '待续' });
     e.provider = () => {
       if (failure === '模型异常') throw new Error('controlled provider error');
       if (failure === '取消') e.main.取消本回合();
       return failure === '两稿无效' ? target.bad : target.good;
     };
-    assert.equal(await e.run(), false, e.warnings.join('\n')); assertReleased(e);
-    assert.deepEqual(e.read().系统[target.field], before);
-    assert.equal(e.st.chat.length, startRows);
+    assert.equal(await e.run(), failure === '两稿无效', e.warnings.join('\n')); assertReleased(e);
+    assert.deepEqual(JSON.parse(JSON.stringify(e.read().系统[target.field])), JSON.parse(JSON.stringify(before)));
+    assert.equal(e.st.chat.length, startRows + (failure === '两稿无效' ? 2 : 0));
     assert.equal(e.trace.some(t => t.name?.endsWith('CG')), false);
-    e.options.saveFail = false; e.options.mvuFail = false; e.provider = () => target.good; e.ctx.generate = generate;
+    e.options.saveFail = false; e.options.mvuFail = false; e.provider = () => target.good; e.ctx.generate = generate; e.observe = undefined;
     assert.equal(await e.retry(), true, e.warnings.join('\n')); assertReleased(e);
     assert.equal(e.reloadFile().系统[target.field][target.flag], target.expected);
   });

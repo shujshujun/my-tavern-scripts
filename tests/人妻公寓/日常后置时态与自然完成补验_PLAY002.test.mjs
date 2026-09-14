@@ -82,10 +82,10 @@ function resultView(data) {
     relation: a.最近关系,
   };
 }
-function expectedDone(index, relation, clock = 4) {
+function expectedDone(index, relation, clock = 4, floor = 84) {
   return {
-    phase: '空闲', currentID: '', count: index + 1, resultFloor: 84, cooldown: clock + 6,
-    reward: true, rewardMatchesEvent: true, records: 1, recordFloor: 84,
+    phase: '空闲', currentID: '', count: index + 1, resultFloor: floor, cooldown: clock + 6,
+    reward: true, rewardMatchesEvent: true, records: 1, recordFloor: floor,
     feedback: 1, feedbackTime: clock + 1, relation,
   };
 }
@@ -155,6 +155,8 @@ for (const relation of relations) {
         const modelBodies = clone(bodies);
         modelBodies.D2[sample.theme] = body;
         const e = harness(modelBodies).lifecycleHost();
+        const successObservation = e.observer;
+        e.observer = req => ({ ...successObservation(req), 状态: req.消息.at(-1).文本 === body ? '待续' : '完成' });
         e.state = h.fresh(relation, index);
         await e.click(actionFor(relation));
         assert.deepEqual(e.outcome, [true], '[FIXTURE] original D1 listener must succeed');
@@ -168,7 +170,7 @@ for (const relation of relations) {
           retryRun: false,
         };
         // Never manufacture a retry checkpoint after an incorrectly accepted D2.
-        if (e.outcome.at(-1) === false && txn.状态 === '待重试' && observed.checkpointUnchanged) {
+        if (e.outcome.at(-1) === true && txn.状态 === '待续' && observed.checkpointUnchanged) {
           e.state = Schema.parse(JSON.parse(JSON.stringify(e.state)));
           assert.equal(e.state.系统._场景剧情事务.id, txn.id, '[FIXTURE] reload preserves original transaction');
           modelBodies.D2[sample.theme] = bodies.D2[sample.theme];
@@ -181,9 +183,9 @@ for (const relation of relations) {
             e.completionWrites === writes && e.generations === generations;
         }
         assert.deepEqual(observed, {
-          finalDraftOutcome: [true, false], checkpointUnchanged: true, checkpointChangedPaths: [],
-          transactionStatus: '待重试', completionWrites: 1, retryRun: true, retrySucceeded: true,
-          afterRetry: expectedDone(index, relation, 3), repeatActionNoSettlement: true,
+          finalDraftOutcome: [true, true], checkpointUnchanged: true, checkpointChangedPaths: [],
+          transactionStatus: '待续', completionWrites: 2, retryRun: true, retrySucceeded: true,
+          afterRetry: expectedDone(index, relation, 3, 86), repeatActionNoSettlement: true,
         }, JSON.stringify({ kind, body, errors: e.errors.map(String), accountAfter: resultView(e.state),
           unexecuted: observed.retryRun ? [] : ['reload-then-legal-retry', 'duplicate-after-retry'] }));
       });

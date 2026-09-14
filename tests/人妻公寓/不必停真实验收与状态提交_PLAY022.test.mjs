@@ -41,6 +41,7 @@ const js = ts.transpileModule(`async function run() {
 // Model, general scale check, sibling routes, display extraction and caller lease are explicit adapters.
 async function review(event, first, second, state, options = {}) {
   const deps = {
+    ...require('../../src/人妻公寓/脚本/游戏逻辑/自然对话接入.ts'),
     _: lodash, ...route, first, 本楼事件: event, 当前拍正文: first,
     安若妍不必停票: route.解析安若妍不必停剧情事件(event),
     不再留门票: null, 回国票: null, 第二机位票: null, 许曼君分居票: null, 许曼君离婚票: null,
@@ -81,30 +82,30 @@ for (const c of cases) {
     assert.equal(await review(event, c.good, c.bad, state), c.good);
     assert.deepEqual(state, { generations: 0, leaseChecks: 0 });
   });
-  test(`PLAY-022 ${c.name}真实二稿：合法重写替换条件或提议`, async () => {
+  test(`PLAY-022 ${c.name}条件或提议先保留，交给后续观察`, async () => {
     const state = counters();
-    assert.equal(await review(event, c.bad, c.good, state), c.good);
-    assert.deepEqual(state, { generations: 1, leaseChecks: 1 });
+    assert.equal(await review(event, c.bad, c.good, state), c.bad);
+    assert.deepEqual(state, { generations: 0, leaseChecks: 0 });
   });
-  test(`PLAY-022 ${c.name}真实二稿：两次不成立必须抛错而非普通兜底`, async () => {
-    await assert.rejects(review(event, c.bad, c.bad, counters()), /《不必停》.*两次未能停在正确节点/u);
+  test(`PLAY-022 ${c.name}未确认的正文不因旧句式检查而丢弃`, async () => {
+    assert.equal(await review(event, c.bad, c.bad, counters()), c.bad);
   });
   for (const error of ['TEST_TIMEOUT', 'TEST_CANCELLED', 'TEST_MISSING_MODEL']) {
-    test(`PLAY-022 ${c.name}真实重写：${error}不转为成功`, async () => {
+    test(`PLAY-022 ${c.name}旧自动重写没有被调用：${error}`, async () => {
       const state = counters();
-      await assert.rejects(review(event, c.bad, c.good, state, { error }), new RegExp(error));
-      assert.deepEqual(state, { generations: 1, leaseChecks: 0 });
+      assert.equal(await review(event, c.bad, c.good, state, { error }), c.bad);
+      assert.deepEqual(state, { generations: 0, leaseChecks: 0 });
     });
   }
-  test(`PLAY-022 ${c.name}真实重写：迟到二稿先验证原事务`, async () => {
+  test(`PLAY-022 ${c.name}首稿门不产生可迟到的二稿`, async () => {
     const state = counters();
-    await assert.rejects(review(event, c.bad, c.good, state, { stale: true }), /TEST_STALE_LEASE/u);
-    assert.deepEqual(state, { generations: 1, leaseChecks: 1 });
+    assert.equal(await review(event, c.bad, c.good, state, { stale: true }), c.bad);
+    assert.deepEqual(state, { generations: 0, leaseChecks: 0 });
   });
   // The following uses the real state owner in an explicit test orchestration, not the full host transaction.
   test(`PLAY-022 ${c.name}真实状态所有者：合法正文后只提交当前检查点且重复不重做`, async () => {
     const data = fixture(c);
-    const body = await review(event, c.bad, c.good, counters());
+    const body = await review(event, c.good, c.good, counters());
     assert.equal(route.安若妍不必停正文越拍原因(event, body), '');
     const result = route.提交安若妍不必停剧情事件(data, event, '301', 32);
     assert.equal(result?.成功, true);
@@ -127,7 +128,7 @@ for (const c of cases) {
   test(`PLAY-022 ${c.name}隔离回档：纯判定不落状态，恢复后可重新完成`, async () => {
     const data = fixture(c);
     const before = lodash.cloneDeep(data);
-    await assert.rejects(review(event, c.bad, c.bad, counters()));
+    assert.equal(await review(event, c.bad, c.bad, counters()), c.bad);
     assert.deepEqual(data, before);
     const restored = Schema.parse(JSON.parse(JSON.stringify(before)));
     assert.equal(route.安若妍不必停正文越拍原因(event, c.good), '');

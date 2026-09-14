@@ -1,6 +1,8 @@
 /* eslint-disable import-x/no-nodejs-modules -- Bind the production time gate to each isolated AST fixture. */
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import * as ts from 'typescript';
+const require = createRequire(import.meta.url);
 
 const source = readFileSync(new URL('../../../src/人妻公寓/脚本/游戏逻辑/时间事务写入门.ts', import.meta.url), 'utf8');
 const compiled = ts.transpileModule(source, {
@@ -28,5 +30,7 @@ export function 装配真实时间事务门(dependencies) {
   Function('module', 'exports', ...Object.keys(globals), compiled)(
     module, module.exports, ...Object.values(globals),
   );
-  return { ...module.exports, ...dependencies };
+  // 回合函数新增的生产依赖一并注入；不替换语义判断或生成观察结果。
+  const natural = require('../../../src/人妻公寓/脚本/游戏逻辑/自然对话接入.ts');
+  return { ...module.exports, ...natural, ...dependencies };
 }

@@ -4,9 +4,9 @@ import test from 'node:test';
 import { 校验发布版本一致, 校验客户端构建版本 } from '../../src/人妻公寓/发布版本门禁.mjs';
 const read=p=>readFileSync(new URL(`../../${p}`,import.meta.url),'utf8');
 test('0.92.5源码、组卡、工作流与更新说明一致，历史工作流冻结',()=>{
- assert.match(read('src/人妻公寓/脚本/游戏逻辑/依赖版本.ts'),/当前游戏版本 = '0\.92\.5'/);
+ assert.match(read('src/人妻公寓/脚本/游戏逻辑/依赖版本.ts'),/当前游戏版本 = '0\.92\.6'/);
  const pack=read('src/人妻公寓/组卡.mjs');
- assert.match(pack,/const 版本 = '0\.92\.5'/);assert.match(pack,/const TAG = 'rq0\.92\.5'/);
+ assert.match(pack,/const 版本 = '0\.92\.6'/);assert.match(pack,/const TAG = 'rq0\.92\.6'/);
  const workflow=read('.github/workflows/publish-rq0925.yml');
  assert.match(workflow,/ref: rq0\.92\.5/);
  for(const n of ['rqgy-0.92.5.png','rqgy-0.92.5.json','rqgy-0.92.5-checksums.json'])assert.ok(workflow.includes(n));

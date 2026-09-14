@@ -29,5 +29,5 @@ test('PLAY-013 完整固定回合：当前持证和所选见证成功落在34楼
   assertSuccess(e);
   assert.equal(e.commits, 1);
   assert.equal(e.requests.length, 1);
-  assert.equal(e.validations.length >= 1, true);
+  assert.equal(e.validations.length, 0, '观察已确认时不再调用旧关键词验收器');
 });

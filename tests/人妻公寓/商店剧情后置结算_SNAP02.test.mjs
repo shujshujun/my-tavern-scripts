@@ -94,6 +94,7 @@ const nativeRiskSource = only(find(indexAST, n => ts.isForOfStatement(n) &&
 
 function deps() {
   const env = { _: lodash, Schema, ...scenes, ...gate, ...deferred, ...daily,
+    ...require('../../src/人妻公寓/脚本/游戏逻辑/自然对话接入.ts'),
     eventEmit() {}, 读场景: () => ({ 房间id: '201' }),
     静音会议正式运行中: () => false, 前台角色线路无关强剧情已冻结: () => true,
     提交入住登场: () => null, 提交母亲两幕事件: () => [], 提交阶段线路剧情: () => [],

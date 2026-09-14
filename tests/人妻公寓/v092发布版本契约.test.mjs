@@ -14,9 +14,9 @@ test('0.92 历史发布说明与工作流保持冻结，当前源码、组卡与
   const 发布说明 = 读('src/人妻公寓/发布说明_v0.92_2026-09-12.md');
   const 工作流 = 读('.github/workflows/publish-rq092.yml');
 
-  assert.match(依赖版本, /当前游戏版本 = '0\.92\.5'/);
-  assert.match(组卡, /const 版本 = '0\.92\.5'/);
-  assert.match(组卡, /const TAG = 'rq0\.92\.5'/);
+  assert.match(依赖版本, /当前游戏版本 = '0\.92\.6'/);
+  assert.match(组卡, /const 版本 = '0\.92\.6'/);
+  assert.match(组卡, /const TAG = 'rq0\.92\.6'/);
   assert.match(组卡, /支持继承 v0\.80～v0\.92 存档，无需重开/);
   assert.match(组卡, /my-tavern-scripts@\$\{TAG\}/);
   assert.match(入口, /当前正式入口：v0\.92\.1／rq0\.92\.1/);

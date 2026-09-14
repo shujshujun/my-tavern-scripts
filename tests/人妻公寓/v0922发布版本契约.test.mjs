@@ -6,10 +6,10 @@ import { 校验发布版本一致, 校验客户端构建版本 } from '../../src
 const read = file => readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8');
 
 test('0.92.2历史工作流冻结，当前源码和角色卡前进到0.92.3', () => {
-  assert.match(read('src/人妻公寓/脚本/游戏逻辑/依赖版本.ts'), /当前游戏版本 = '0\.92\.5'/);
+  assert.match(read('src/人妻公寓/脚本/游戏逻辑/依赖版本.ts'), /当前游戏版本 = '0\.92\.6'/);
   const card = read('src/人妻公寓/组卡.mjs');
-  assert.match(card, /const 版本 = '0\.92\.5'/);
-  assert.match(card, /const TAG = 'rq0\.92\.5'/);
+  assert.match(card, /const 版本 = '0\.92\.6'/);
+  assert.match(card, /const TAG = 'rq0\.92\.6'/);
   assert.match(card, /数据库继续按官方渠道更新/);
   assert.match(read('src/人妻公寓/归档/新窗口入口_2026-09-14.md').slice(0, 180), /当前正式入口：v0\.92\.3／rq0\.92\.3/);
   const workflow = read('.github/workflows/publish-rq0922.yml');

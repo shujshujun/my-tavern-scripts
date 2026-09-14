@@ -178,6 +178,7 @@ test('SNAP07 重复及交错判定不泄漏期待或历史状态', () => {
 async function fixed(pair, first, second, options = {}) {
   const counters = { generations: 0, leaseChecks: 0 };
   const deps = {
+    ...require('../../src/人妻公寓/脚本/游戏逻辑/自然对话接入.ts'),
     ...home, _: lodash, first, 本楼事件: pair.second, 当前拍正文: first,
     回国票: home.解析回国剧情事件(pair.second), 不再留门票: null, 第二机位票: null,
     安若妍不必停票: null, 许曼君分居票: null, 许曼君离婚票: null, 许曼君离婚后日常票: null,

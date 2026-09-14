@@ -676,6 +676,10 @@
           "default": 0,
           "type": "number"
         },
+        "_自然对话记录": {
+          "default": "",
+          "type": "string"
+        },
         "_场景剧情事务": {
           "default": {},
           "type": "object",

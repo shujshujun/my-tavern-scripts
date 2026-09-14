@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 import * as ts from 'typescript';
 import lodash from 'lodash';
 import { 装配真实时间事务门 } from './时间事务门装配.mjs';
+import { 观察结果 } from './自然观察模型夹具.mjs';
 
 const require = createRequire(import.meta.url);
 process.env.TS_NODE_COMPILER_OPTIONS = JSON.stringify({ module: 'CommonJS', moduleResolution: 'node' });
@@ -62,7 +63,7 @@ const definitions = names.map(name => functionText(prior, name)).join('\n');
 export function harness(modelBodies = bodies) {
   return execute(definitions, {
     assert, ts, lodash, require: createRequire(new URL('../日常来源与结果楼.test.mjs', import.meta.url)),
-    Schema, 创建户节点, daily, divorce, scenes, clone, 装配真实时间事务门,
+    Schema, 创建户节点, daily, divorce, scenes, clone, 装配真实时间事务门, 观察结果,
     hostAst: ast(readSource('index')), engineAst: ast(readSource('回合引擎')), bodies: modelBodies,
   }, '({ fresh, prepare, capture, submitFromProduction, lifecycleHost })');
 }

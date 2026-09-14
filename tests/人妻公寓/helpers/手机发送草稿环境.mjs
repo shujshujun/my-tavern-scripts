@@ -133,6 +133,8 @@ export function createPhone(options = {}) {
       return promise;
     };
   }
+  // 业务专项先配置模型端口，再加载业务依赖；不提前通过渲染器捕获旧端口。
+  if (options.skipRenderer) return e;
   const renderer = e.load('手机/壳/渲染/chat.ts');
   e.page = { 名: 'chat', 会话: '101' };
   e.key = () => e.transient.当前会话批次键(e.page.会话);

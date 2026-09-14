@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { clone } from './helpers/微信事务恢复环境.mjs';
 import { createPhoneHost, extract, pregnancyKit } from './helpers/手机并行第二组环境.mjs';
+import { 安装观察模型, 观察返回 } from './helpers/自然观察模型夹具.mjs';
 
 const hard = createPhoneHost().load('手机/叙事硬事实.ts');
 const cases = [
@@ -44,6 +45,9 @@ for (const [kind, text, args, expected] of cases) test(`SNAP13 ${kind}：${text}
 
 function birthFixture() {
   const e = createPhoneHost(); const data = e.st.chat.at(-1).stat_data;
+  安装观察模型(e.globals, req => 观察返回(req, { status: e.observationStatus ?? '完成' }));
+  e.adapt('手机/配置.ts', { 读配置: () => ({ ai来源: '正文' }) });
+  e.adapt('数据库桥.ts', { 数据库状态: () => ({ 可调用AI: false }) });
   data.户['201'] = clone(data.户['101']);
   for (const node of Object.values(data.户)) Object.assign(node.妻, { 当前阶段: 4, 好感值: 60, 堕落值: 40, 上次互动楼层: 4 });
   data.户['101'].妻.当前阶段 = 3;
@@ -56,6 +60,7 @@ function birthFixture() {
 for (const topic of ['生产', '恢复', '近况', '出院']) for (const variant of ['正确', '矛盾', '过短', '缺本人']) {
   test(`SNAP13 真实专题群 ${topic}/${variant}`, async () => {
     const e = birthFixture();
+    e.observationStatus = variant === '矛盾' ? '待续' : '完成';
     if (topic === '出院') { e.data.系统._绝对时段 = 100; e.load('生产系统.ts').推进生产时钟(e.data); }
     const normal = topic === '生产' ? '孩子已经顺利出生，我还在医院休息。' : topic === '出院' ? '我已经出院回家了，接下来慢慢恢复。' : '我还在医院休养，这次检查结束了。';
     const bad = topic === '生产' ? '孩子还没出生，生产没有开始。' : topic === '出院' ? '我仍住在医院，还没有出院。' : '我已经离开医院，回家忙工作了。';
@@ -64,21 +69,24 @@ for (const topic of ['生产', '恢复', '近况', '出院']) for (const variant
     if (variant === '缺本人') response = '沈静仪:知道了。\n许曼君:消息我看到了。\n沈静仪:之后再说。\n许曼君:慢慢休息。\n沈静仪:有事再联系。';
     const kit = pregnancyKit(e, async () => response); const db = e.api.读库();
     const result = await kit.姐妹群一拍(e.data, db, 4, '本胎住院通知。', {}, { 生产凭据: e.receipt, ...(topic === '生产' ? {} : { 住院群节点: topic }) });
-    assert.equal(result, variant === '正确');
-    assert.equal(db.消息.length, variant === '正确' ? 5 : 0);
+    assert.equal(result, ['正确', '矛盾'].includes(variant));
+    assert.equal(db.消息.length, variant === '正确' ? 5 : variant === '矛盾' ? 4 : 0);
+    if (variant === '矛盾') assert.ok(db.消息.some(m => m.文.includes('［事件通知］')));
   });
 }
 test('SNAP13 真实私聊构造器不接收未完成生产的文案', async () => {
   const e = birthFixture();
+  e.observationStatus = '待续';
   const file = '手机/孕情AI通知.ts';
   const overrides = { 小生成: async () => '生产还没开始，医生说是个女孩。', 微信短文本: extract(e, '手机/生成引擎.ts', '微信短文本') };
   for (const name of ['最近本人私聊', '孕产硬事实', '生成孕产私聊']) overrides[name] = extract(e, file, name, overrides);
-  const text = await overrides.生成孕产私聊(e.data, e.receipt, '生产完成并让玩家获知', [], value => hard.验收生产硬事实(value, '女', 1));
-  assert.equal(text, '');
+  const text = await overrides.生成孕产私聊(e.data, e.receipt, '生产完成并让玩家获知', []);
+  assert.match(text, /［事件通知］.*生产完成/su);
 });
 
 for (const outcome of ['未完成', '取消', '超时', '已完成']) test(`SNAP13 实际通知同步与写入门：${outcome}`, async () => {
   const e = birthFixture();
+  e.observationStatus = outcome === '未完成' ? '待续' : '完成';
   const child = e.load('生产系统.ts').读取生产事件快照(e.data, e.receipt).孩子;
   const sex = child.性别 === '女' ? '女儿' : '儿子';
   const file = '手机/孕情AI通知.ts';
@@ -90,12 +98,13 @@ for (const outcome of ['未完成', '取消', '超时', '已完成']) test(`SNAP
     },
     微信短文本: extract(e, '手机/生成引擎.ts', '微信短文本'),
   };
-  for (const name of ['验收借种阳性邀约', '最近本人私聊', '孕产硬事实', '生成孕产私聊', '生成家庭计划邀请', '同步孕产与家庭计划AI微信']) {
+  for (const name of ['最近本人私聊', '孕产硬事实', '生成孕产私聊', '生成家庭计划邀请', '同步孕产与家庭计划AI微信']) {
     overrides[name] = extract(e, file, name, overrides);
   }
   if (outcome === '超时') await assert.rejects(overrides.同步孕产与家庭计划AI微信(e.data), /controlled timeout/);
-  else assert.equal(await overrides.同步孕产与家庭计划AI微信(e.data), outcome === '已完成');
+  else assert.equal(await overrides.同步孕产与家庭计划AI微信(e.data), ['已完成', '未完成'].includes(outcome));
   const stored = e.api.读库().消息;
   if (outcome === '已完成') assert.ok(stored.length > 0 && stored.every(m => m.文.includes('已经平安出生')));
+  else if (outcome === '未完成') assert.ok(stored.length > 0 && stored.every(m => m.文.startsWith('［事件通知］')));
   else assert.equal(stored.length, 0);
 });

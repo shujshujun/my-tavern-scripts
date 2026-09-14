@@ -44,6 +44,7 @@ import { 请求刷新手机红点 } from '../../UI刷新';
 import { 取渲染业务端口 } from './业务端口';
 import { 渲染头, type 渲染上下文 } from './共享';
 import { 取聊天显示页, 手机聊天每页条数 } from './分页';
+import { 恢复回国茶话会主状态 } from '../../回国茶话会恢复';
 
 /** 单聊/群聊页：时间线过滤、气泡左右/撤回墓碑、长按撤回、图片/通话类型、
  *  草稿与焦点恢复、绿黄红灯、取消/立即发送、输入状态 interval/渲染世代护栏、邀约 + 菜单与会议硬门。 */
@@ -208,6 +209,21 @@ export function 渲染chat(上下文: 渲染上下文): void {
   }
   体.appendChild(泡区);
   屏.appendChild(体);
+  const 最新群进度 = 会话 === '姐妹群' ? 库.消息.filter(项 => 项.会话 === 会话 && 项.类 !== '撤回').at(-1)?.事件进度 : null;
+  if (最新群进度?.状态 === '未知' && 最新群进度.观察要求) {
+    const 提示条 = el('div', 'rqp-input-wrap');
+    const 按钮 = el('button', 'rqp-send', '重新识别已保存对话') as HTMLButtonElement;
+    const 提示 = el('span', '', 最新群进度.识别错误 || '回复已保存，事件进度尚未确认。');
+    按钮.addEventListener('click', async () => {
+      按钮.disabled = true;
+      按钮.textContent = '正在识别…';
+      try { await 恢复回国茶话会主状态(true); }
+      catch { 提示.textContent = '识别未完成，回复仍保留，可稍后重试。'; }
+      finally { 按钮.disabled = false; 按钮.textContent = '重新识别已保存对话'; 上下文.重绘(); }
+    });
+    提示条.append(提示, 按钮);
+    屏.appendChild(提示条);
+  }
   if (会话 === '姐妹群' && data && 回国母亲可邀请入群(data)) {
     const 邀请条 = el('div', 'rqp-input-wrap');
     const 邀请 = el('button', 'rqp-send', '邀请母亲加入群聊') as HTMLButtonElement;

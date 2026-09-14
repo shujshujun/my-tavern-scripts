@@ -683,7 +683,7 @@ export function 读取场景剧情状态(data: SchemaType): 场景剧情状态�
   if (active) {
     const head = 读取队首场景剧情(data.系统._待发送事件);
     // 旧重答票已有持久事务但没有玩家答复，界面按等待输入呈现；底层活动锁、票号及撤回签名保留。
-    const 需要补答 = 许曼君分居旧票需要补答(data);
+    const 需要补答 = active.状态 === '待续' || 许曼君分居旧票需要补答(data);
     return {
       活动: !需要补答,
       id: active.id,
