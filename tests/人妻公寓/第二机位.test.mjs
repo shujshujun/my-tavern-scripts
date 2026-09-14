@@ -1060,7 +1060,9 @@ test('旧录像带存档保持历史隔离：未完成旧票可续，已完成�
   新母带.系统._已完成特殊场景.push('第二机位');
   assert.equal(货架ID(新母带).includes('男用贞操带'), false);
   assert.equal(货架ID(新母带).includes('录像带'), false);
-  assert.ok(商店源码.includes("key === '录像带:102' || key === '录像带:202'"));
+  assert.ok(商店源码.includes('return 录像带沿用旧流程(data);'));
+  assert.ok(readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/录像带V4状态.ts', import.meta.url), 'utf8')
+    .includes("key === '录像带:102' || key === '录像带:202'"));
   assert.ok(特殊场景源码.includes("_已完成特殊场景.includes('录像带')"));
 });
 

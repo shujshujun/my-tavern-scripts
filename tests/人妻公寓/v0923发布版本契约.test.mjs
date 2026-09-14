@@ -6,12 +6,12 @@ import { 校验发布版本一致, 校验客户端构建版本 } from '../../src
 const read = file => readFileSync(new URL(`../../${file}`, import.meta.url), 'utf8');
 
 test('0.92.3版本、双代码入口、发布工作流一致，历史0.92.2冻结', () => {
-  assert.match(read('src/人妻公寓/脚本/游戏逻辑/依赖版本.ts'), /当前游戏版本 = '0\.92\.3'/);
+  assert.match(read('src/人妻公寓/脚本/游戏逻辑/依赖版本.ts'), /当前游戏版本 = '0\.92\.4'/);
   const card = read('src/人妻公寓/组卡.mjs');
-  assert.match(card, /const 版本 = '0\.92\.3'/);
-  assert.match(card, /const TAG = 'rq0\.92\.3'/);
+  assert.match(card, /const 版本 = '0\.92\.4'/);
+  assert.match(card, /const TAG = 'rq0\.92\.4'/);
   assert.match(card, /my-tavern-scripts@\$\{TAG\}/);
-  assert.match(read('src/人妻公寓/新窗口入口_精简.md').slice(0, 180), /当前正式入口：v0\.92\.3／rq0\.92\.3/);
+  assert.match(read('src/人妻公寓/归档/新窗口入口_2026-09-14.md').slice(0, 180), /当前正式入口：v0\.92\.3／rq0\.92\.3/);
   const workflow = read('.github/workflows/publish-rq0923.yml');
   assert.match(workflow, /ref: rq0\.92\.3/);
   for (const name of ['rqgy-0.92.3.png', 'rqgy-0.92.3.json', 'rqgy-0.92.3-checksums.json']) assert.ok(workflow.includes(name), name);
