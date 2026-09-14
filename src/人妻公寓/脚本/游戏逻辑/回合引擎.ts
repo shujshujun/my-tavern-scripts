@@ -214,6 +214,7 @@ import { 行动资源门槛, 亲密场景许可阶段, 现场楼身体增长依�
 import { 不再留门回应错误, 不再留门剧情演员错误, 不再留门正文越拍原因, 不再留门事件要求真实开录, 不再留门真实录制已绑定, 排入不再留门后续剧情, 提交不再留门剧情事件, 解析不再留门剧情事件, 清理不再留门旧尺度边界提示, type 不再留门结果 } from './不再留门系统';
 import { 应用酒馆最终显示正则 } from './预设输出兼容';
 import { 当前预设流式边界 } from './预设桥';
+import { 创建生成提示词记录器, 生成提示词记录键, type 生成提示词记录 } from '../../生成提示词记录';
 import { 提取正文舞台文本, 提取可提交正文, type 外部正文标签 } from './正文输出边界';
 import { 提取末尾裸JSON补丁 } from './正文协议安全';
 import { 规范变量协议候选, 标准变量块需要本地应用 } from './变量块协议';
@@ -1264,6 +1265,7 @@ function 确认回合未取消(): void {
  * 90 秒降级门，正文看门狗不把规划时间算进去。迟到结果只会结束底层 Promise，不会落楼。
  */
 type 正文生成参数 = Parameters<typeof generate>[0] & { automatic_trigger?: boolean };
+let 本回合提示词记录: 生成提示词记录 | undefined;
 
 interface 正文生成等待选项 {
   启用数据库规划: boolean;
@@ -1276,6 +1278,20 @@ interface 正文生成等待选项 {
 }
 
 async function 等待正文生成(参数: 正文生成参数, 选项?: 正文生成等待选项): Promise<string> {
+  本回合提示词记录 = undefined;
+  let 提示词记录器: ReturnType<typeof 创建生成提示词记录器> | undefined;
+  const 记录聊天ID = 当前聊天ID();
+  const 调用并记录正文 = (正文参数: 正文生成参数) => {
+    提示词记录器?.停止();
+    提示词记录器 = 创建生成提示词记录器({
+      生成id: String(正文参数.generation_id ?? ''),
+      用户输入: 正文参数.user_input ?? '',
+      注入文本: (正文参数.injects ?? []).map(项 => 项.content),
+      监听: (事件, 回调) => eventOn(事件, 回调),
+      预设名: () => getLoadedPresetName() || 'in_use',
+    });
+    return generate(正文参数);
+  };
   const 中止门 = new Promise<never>((_resolve, reject) => {
     解除生成等待 = () => reject(new Error('__RQGY_CANCELLED__'));
   });
@@ -1326,14 +1342,18 @@ async function 等待正文生成(参数: 正文生成参数, 选项?: 正文生
           选项.正文开始?.(已规划);
         },
         继续前确认: 选项.继续前确认,
-        调用正文: 正文参数 => generate(正文参数),
+        调用正文: 调用并记录正文,
       });
     } else {
       标记正文开始();
-      生成任务 = generate(参数);
+      生成任务 = 调用并记录正文(参数);
     }
     return String(await Promise.race([生成任务, 中止门, 超时门]));
   } finally {
+    if (参数.generation_id === 本回合生成id && 当前聊天ID() === 记录聊天ID) {
+      本回合提示词记录 = 提示词记录器?.读取();
+    }
+    提示词记录器?.停止();
     if (看门狗timer !== undefined) clearInterval(看门狗timer);
     if (正文生成进展回调 === 标记正文进展) 正文生成进展回调 = null;
     解除生成等待 = null;
@@ -3710,6 +3730,7 @@ export async function 执行回合(
               message: 可重处理楼层正文,
               data: _.cloneDeep(解析基准),
               extra: {
+                ...(本回合提示词记录 ? { [生成提示词记录键]: 本回合提示词记录 } : {}),
                 [回合令牌键]: 本回合消息令牌,
                 [回合角色键]: 'assistant',
                 [临时楼标记键]: true,

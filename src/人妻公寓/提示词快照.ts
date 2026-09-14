@@ -9,6 +9,9 @@ export interface 提示词快照项 {
   role: string;
   content: unknown;
   name?: unknown;
+  tool_calls?: unknown;
+  tool_call_id?: unknown;
+  function_call?: unknown;
 }
 
 function 是记录(值: unknown): 值 is Record<string, unknown> {
@@ -61,7 +64,13 @@ export function 格式化完整提示词快照(参数: {
   const 正文 = 参数.消息.map((项, 索引) => {
     const 角色 = String(项.role || 'unknown').toUpperCase();
     const 名称 = typeof 项.name === 'string' && 项.name.trim() ? ` · ${项.name.trim()}` : '';
-    return `===== ${String(索引 + 1).padStart(2, '0')} · ${角色} · ${项.来源}${名称} =====\n${提示词内容转文本(项.content)}`;
+    const 工具字段 = Object.fromEntries(
+      (['tool_calls', 'tool_call_id', 'function_call'] as const)
+        .filter(键 => 项[键] !== undefined)
+        .map(键 => [键, 项[键]]),
+    );
+    const 工具文本 = Object.keys(工具字段).length ? `\n${JSON.stringify(工具字段, null, 2)}` : '';
+    return `===== ${String(索引 + 1).padStart(2, '0')} · ${角色} · ${项.来源}${名称} =====\n${提示词内容转文本(项.content)}${工具文本}`;
   });
   return [...头, '', ...正文].join('\n\n');
 }
@@ -76,6 +85,9 @@ export function 从酒馆原始提示词构造快照(rawPrompt: unknown, presetN
               role: typeof 项.role === 'string' ? 项.role : 'unknown',
               content: 项.content,
               name: 项.name,
+              tool_calls: 项.tool_calls,
+              tool_call_id: 项.tool_call_id,
+              function_call: 项.function_call,
             }
           : { 来源: '酒馆最终请求', role: 'unknown', content: 项 },
       )

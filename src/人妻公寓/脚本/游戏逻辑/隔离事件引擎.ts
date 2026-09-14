@@ -1,5 +1,6 @@
 import { Schema, 当前MVU数据版本, type SchemaType } from '../../schema';
 import { 构造隔离事件完整提示词快照 } from '../../提示词快照';
+import { 创建生成提示词记录器 } from '../../生成提示词记录';
 import { 全局数据库AI租约 } from './数据库AI租约';
 import { 标记脚本辅助生成事件 } from './数据库辅助生成标记';
 import { 前台生成租约持有中, 取得前台生成租约, 手机生成租约持有中 } from './生成通道互斥';
@@ -308,18 +309,29 @@ export async function 生成隔离事件草稿(
     // 先把下一次 generateRaw 的 GENERATION_AFTER_COMMANDS 放到数据库监听之前标成辅助请求。
     // 保持 should_silence 缺省：玩家仍可用酒馆停止按钮或游戏内取消入口中断这次前台演出。
     辅助生成事件监听 = 注册隔离辅助生成事件标记();
-    const 等待 = 创建受控生成等待(
-      generateRaw({ ordered_prompts, user_input: 本拍用户输入, should_stream: 是DeepSeek, generation_id: 生成ID }),
-      {
-        超时毫秒: 隔离正文生成等待上限毫秒,
-        超时说明: '独立事件正文超过十分钟未返回',
-        请求停止: () => 停止隔离正文底层请求(生成ID),
-      },
-    );
-    当前隔离正文等待 = 等待;
+    const 提示词记录器 = 创建生成提示词记录器({
+      生成id: 生成ID,
+      用户输入: 本拍用户输入,
+      注入文本: [system],
+      监听: (事件, 回调) => eventOn(事件, 回调),
+      预设名: 当前预设名称,
+    });
+    let 实际提示词: string | undefined;
+    let 等待: 受控生成等待句柄<unknown> | undefined;
     try {
+      等待 = 创建受控生成等待(
+        generateRaw({ ordered_prompts, user_input: 本拍用户输入, should_stream: 是DeepSeek, generation_id: 生成ID }),
+        {
+          超时毫秒: 隔离正文生成等待上限毫秒,
+          超时说明: '独立事件正文超过十分钟未返回',
+          请求停止: () => 停止隔离正文底层请求(生成ID),
+        },
+      );
+      当前隔离正文等待 = 等待;
       原文 = await 等待.结果;
     } finally {
+      实际提示词 = 提示词记录器.读取()?.文本;
+      提示词记录器.停止();
       if (当前隔离正文等待 === 等待) 当前隔离正文等待 = null;
     }
     if (已取消) throw new Error('已取消——这一拍没有发生');
@@ -327,7 +339,7 @@ export async function 生成隔离事件草稿(
     if (!正文) throw new Error('事件 AI 没有返回可显示的正文');
     if (是提供方拒答正文(正文)) throw new Error('AI服务返回了拒答说明，本拍未发生；请重试或更换模型线路。');
 
-    const 提示词 = 构造隔离事件完整提示词快照({
+    const 提示词 = 实际提示词 ?? 构造隔离事件完整提示词快照({
       通道,
       预设名: 当前预设名称(),
       前,
@@ -335,7 +347,7 @@ export async function 生成隔离事件草稿(
       用户输入: 本拍用户输入,
       后,
       用户输入置后,
-    });
+    }).replace('【完整提示词快照】', '【组装提示词快照】');
     return { 参数: { ...参数 }, 正文, 提示词 };
   } catch (error) {
     if (error instanceof Error && error.message.startsWith(受控生成超时错误前缀)) {

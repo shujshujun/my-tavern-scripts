@@ -5,6 +5,7 @@ import { computed } from 'vue';
 const props = defineProps<{ text: string }>();
 const emit = defineEmits<{ close: [] }>();
 const 是完整快照 = computed(() => props.text.startsWith('【完整提示词快照】'));
+const 是组装快照 = computed(() => props.text.startsWith('【组装提示词快照】'));
 </script>
 
 <template>
@@ -16,6 +17,8 @@ const 是完整快照 = computed(() => props.text.startsWith('【完整提示词
         {{
           是完整快照
             ? '按生成时的实际请求顺序展示；预设、角色、世界书、历史与注入内容只在当时实际发送时出现。'
+            : 是组装快照
+              ? '这是生成前组装的提示词，含当时采用的预设；未取得最终请求记录，不能确认后续扩展的修改。'
             : '这是旧记录：当时只保存了事件核心，缺失的预设内容无法事后还原。'
         }}
       </p>

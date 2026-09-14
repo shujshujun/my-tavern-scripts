@@ -1432,6 +1432,8 @@ import {
 } from '../../stageConfig';
 import { 解析绝对时段 } from '../../周作息';
 import { 从酒馆原始提示词构造快照 } from '../../提示词快照';
+import { 读取消息提示词记录 } from '../../生成提示词记录';
+import { 读取酒馆提示词记录 } from '../../酒馆提示词读取';
 import { 丈夫在楼, 妻位置推算 } from '../../脚本/游戏逻辑/楼层时钟';
 import { 余波有冻结效力 } from '../../脚本/游戏逻辑/冷落系统';
 import { 怀孕已公开 } from '../../脚本/游戏逻辑/怀孕系统';
@@ -5105,6 +5107,19 @@ function 等待酒馆显示原始提示词按钮(弹窗文档: Document): Promis
 }
 
 async function 打开楼层提示词(楼: number) {
+  const 读取身份 = { 聊天ID: 当前聊天ID(), 世代: 当前时间线切换世代() };
+  const 仍在原聊天 = () => 读取身份.聊天ID === 当前聊天ID() && 读取身份.世代 === 当前时间线切换世代();
+  try {
+    const 消息 = (await getChatMessages(楼))[0];
+    if (!仍在原聊天()) return;
+    const 已保存 = 读取消息提示词记录(消息?.extra);
+    if (已保存) {
+      事件提示词文本.value = 已保存;
+      return;
+    }
+  } catch (e) {
+    console.warn('[人妻公寓客户端] 读取正文提示词快照失败，尝试宿主历史记录:', e);
+  }
   const 同源窗口们: Window[] = [];
   try {
     let 窗: Window = window;
@@ -5137,17 +5152,33 @@ async function 打开楼层提示词(楼: number) {
 
   // 宿主窗口来自同源窗口列表(已过 document 同源检查)或 window，同源必有 eval；只在此做一次局部结构断言。
   const 原生模块 = await 读取酒馆原生提示词模块(宿主窗口 as 宿主窗口接口);
+  if (!仍在原聊天()) return;
   if (原生模块) {
-    const 提示词记录 = 原生模块.itemizedPrompts.find(item => Number(item?.mesId) === 楼号);
-    if (!提示词记录) {
-      弹提示('这一回合没有保存可查看的提示词。', 4000);
+    let 提示词记录;
+    try {
+      提示词记录 = await 读取酒馆提示词记录({
+        楼: 楼号,
+        聊天ID: String((宿主窗口 as unknown as { SillyTavern?: { getContext: () => { getCurrentChatId: () => string } } }).SillyTavern?.getContext().getCurrentChatId() ?? ''),
+        索引: 原生模块.itemizedPrompts,
+        存储: async () => {
+          const lib = await (宿主窗口 as 宿主窗口接口).eval('import("/lib.js")') as {
+            localforage?: { createInstance: (选项: { name: string }) => { getItem: (键: string) => Promise<unknown> } };
+          };
+          return lib.localforage?.createInstance({ name: 'SillyTavern_Prompts' });
+        },
+      });
+    } catch (e) {
+      console.warn('[人妻公寓客户端] 读取宿主提示词历史失败，尝试原生窗口:', e);
+    }
+    if (!仍在原聊天()) return;
+    // rawPrompt 保留宿主组装的消息；后装 fetch 扩展可能再追加内容，不能冒充发送边界快照。
+    if (提示词记录?.rawPrompt !== undefined && 提示词记录.rawPrompt !== null) {
+      const 完整提示词 = 从酒馆原始提示词构造快照(提示词记录.rawPrompt, 提示词记录.presetName);
+      事件提示词文本.value = 完整提示词.replace('【完整提示词快照】', '【组装提示词快照】');
       return;
     }
-    // rawPrompt 是 SillyTavern 在真正发请求前保存的最终数据：包含当时预设、世界书、角色卡、
-    // 聊天历史与全部扩展注入。优先在游戏内统一查看，保留 role/name，不再只看拆分统计。
-    if (提示词记录.rawPrompt !== undefined && 提示词记录.rawPrompt !== null) {
-      const 完整提示词 = 从酒馆原始提示词构造快照(提示词记录.rawPrompt, 提示词记录.presetName);
-      事件提示词文本.value = 完整提示词;
+    if (!原生模块.itemizedPrompts.some(item => Number(item?.mesId) === 楼号)) {
+      弹提示('没有找到本回合生成时保存的完整提示词，无法用当前预设还原过去的请求。', 5500);
       return;
     }
   } else {
