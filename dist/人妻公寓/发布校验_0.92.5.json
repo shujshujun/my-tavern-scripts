@@ -1,0 +1,88 @@
+{
+  "version": "0.92.5",
+  "tag": "rq0.92.5",
+  "sourceCommit": "82c7d52eb1390488142d02cb7bc81cfd25d198d7",
+  "files": {
+    "dist/人妻公寓/界面/客户端/index.html": {
+      "bytes": 2386080,
+      "sha256": "f931287870e84ba04060b1e277657ccaa351976358a9cd20bcc79ea6af657b0a"
+    },
+    "dist/人妻公寓/脚本/游戏逻辑/index.js": {
+      "bytes": 3042713,
+      "sha256": "feb226875e3e69efd8d4c9f976a823b5b2ce9bab73c79927d240cf150653df40"
+    },
+    "dist/人妻公寓/人妻公寓.json": {
+      "bytes": 103197,
+      "sha256": "5c1364a2f1e0cb7e7e4371368c56316292d12c749edfe3d52f0c016dde811280"
+    },
+    "dist/人妻公寓/人妻公寓.png": {
+      "bytes": 2395695,
+      "sha256": "58705882ec507c3c052ef291a248948aed702c12405a572ab5acf1968e268aea"
+    }
+  },
+  "checks": {
+    "test": true,
+    "lint": true,
+    "typeCheck": true,
+    "vueTypeCheck": true,
+    "build": true,
+    "card": true,
+    "releaseGate": true,
+    "publishWorkflow": true
+  },
+  "testSummary": {
+    "tests": 6780,
+    "pass": 6780,
+    "fail": 0,
+    "cancelled": 0,
+    "skipped": 0,
+    "todo": 0,
+    "method": "完整运行后复测唯一失败组；15项复测与全量重叠，不重复计数。源代码无变更，仅修正既有素材根环境变量。",
+    "fullRun": {
+      "tests": 6780,
+      "pass": 6779,
+      "fail": 1,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "correctedGroup": {
+      "file": "初始外装物品图_PLAY044.test.mjs",
+      "tests": 15,
+      "pass": 15,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0,
+      "evidenceRoot": "tavern_helper_template-consolidated-prompt-opt"
+    },
+    "phoneRecheck": {
+      "tests": 67,
+      "pass": 67,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "logs": [
+      "tests-rerun.log",
+      "wardrobe-recheck.log",
+      "phone-recheck.log"
+    ],
+    "limitation": "不等同于玩家原存档全剧情或九类自然对话方案的真实宿主验收。"
+  },
+  "buildSummary": {
+    "isolated": {
+      "errors": 0,
+      "warnings": 5,
+      "distUnchanged": true,
+      "sourceUnchanged": true
+    },
+    "formal": {
+      "errors": 0,
+      "warnings": 5,
+      "isolatedBytesIdentical": true,
+      "preservedOtherDistFiles": 81
+    }
+  }
+}
