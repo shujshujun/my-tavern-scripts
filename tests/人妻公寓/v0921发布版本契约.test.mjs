@@ -14,9 +14,9 @@ test('0.92.1历史发布说明和工作流保留，当前源码版本前进到0.
   const 发布说明 = 读('src/人妻公寓/发布说明_v0.92.1_2026-09-12.md');
   const 工作流 = 读('.github/workflows/publish-rq0921.yml');
 
-  assert.match(依赖版本, /当前游戏版本 = '0\.92\.4'/);
-  assert.match(组卡, /const 版本 = '0\.92\.4'/);
-  assert.match(组卡, /const TAG = 'rq0\.92\.4'/);
+  assert.match(依赖版本, /当前游戏版本 = '0\.92\.5'/);
+  assert.match(组卡, /const 版本 = '0\.92\.5'/);
+  assert.match(组卡, /const TAG = 'rq0\.92\.5'/);
   assert.match(组卡, /支持继承 v0\.80～v0\.92 存档，无需重开/);
   assert.match(组卡, /v0\.92 把即时业务捕获阶段尚未登记场景事务的准备票误当成完整撤回记录/);
   assert.match(组卡, /my-tavern-scripts@\$\{TAG\}/);
