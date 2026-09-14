@@ -1,0 +1,75 @@
+{
+  "version": "0.92.6",
+  "tag": "rq0.92.6",
+  "sourceCommit": "4421d7763f2bbb19b4dfec601e9851c5f7ae67d9",
+  "files": {
+    "dist/人妻公寓/界面/客户端/index.html": {
+      "bytes": 2390497,
+      "sha256": "765e396d644cfdf05319ee7cc40d175e8a7d5f81641a5bec875ffec03c2c4546"
+    },
+    "dist/人妻公寓/脚本/游戏逻辑/index.js": {
+      "bytes": 3056498,
+      "sha256": "e810cb0d87b326a1471dd2f317be525a718ef4921e6d7f6b365483bf66de0d50"
+    },
+    "dist/人妻公寓/人妻公寓.json": {
+      "bytes": 103816,
+      "sha256": "cfdaa9e982d16f44ad4ac247c545c5862b316ff4b67d3bd260ee5df420872b44"
+    },
+    "dist/人妻公寓/人妻公寓.png": {
+      "bytes": 2396523,
+      "sha256": "e3e98c16963b61e80ec020a86e9a95ceb39d22f4876aa9d14bea803f7850e628"
+    }
+  },
+  "checks": {
+    "test": true,
+    "lint": true,
+    "typeCheck": true,
+    "vueTypeCheck": true,
+    "build": true,
+    "card": true,
+    "releaseGate": true,
+    "publishWorkflow": true
+  },
+  "testSummary": {
+    "tests": 6843,
+    "passedAfterTargetedRerun": 6843,
+    "full": {
+      "tests": 6843,
+      "pass": 6841,
+      "fail": 2,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "rerun": {
+      "tests": 128,
+      "pass": 128,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "last": {
+      "tests": 47,
+      "pass": 47,
+      "fail": 0,
+      "cancelled": 0,
+      "skipped": 0
+    },
+    "resolution": "全量6841通过；两项旧版号断言更新后发布契约与全部自然对话专项128/128通过。最后工具封套调整对应47/47通过。",
+    "modelAndHostIO": "explicit fixtures; production business modules",
+    "tauriTavern": "waived by user; no new live run"
+  },
+  "buildSummary": {
+    "isolated": {
+      "errors": 0,
+      "warnings": 5,
+      "distUnchanged": true,
+      "sourceUnchanged": true
+    },
+    "formal": {
+      "errors": 0,
+      "warnings": 5,
+      "isolatedBytesIdentical": true,
+      "preservedOtherDistFiles": 82
+    }
+  }
+}
