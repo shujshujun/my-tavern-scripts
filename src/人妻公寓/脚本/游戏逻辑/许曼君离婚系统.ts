@@ -1,3 +1,4 @@
+import { 剧情线使用阻断 } from './剧情线使用门';
 import type { SchemaType } from '../../schema';
 import { 有地点动作剧情冲突, 读取待发送事件队列 } from './场景剧情事务';
 import { 许曼君离婚场景ID, 许曼君离婚新锁芯ID, 许曼君离婚新钥匙ID } from '../../stageConfig';
@@ -749,6 +750,8 @@ export function 执行许曼君离婚地点动作(
   location: string,
   _floor = -1,
 ): 许曼君离婚结果 {
+  const 线路阻断 = action === '使用红色封存盒' && 剧情线使用阻断(data, '离婚');
+  if (线路阻断) return { 成功: false, 提示: 线路阻断 };
   const state = 路线(data);
   const candidates = 许曼君离婚地点动作(data, location);
   const selectable = candidates.some(item => item.id === action || item.选项?.some(option => option.id === action));

@@ -86,6 +86,7 @@ test('上架、购买与重复购买由后端硬门负责', () => {
 
   const 前现金 = data.现金;
   const 首买 = 购买(data, '家庭计划套件');
+  assert.equal(使用承接剧情票(data, '家庭计划套件').成功, true);
   assert.equal(首买.成功, true);
   assert.equal(data.现金, 前现金 - 道具表.家庭计划套件.价格);
   assert.equal(data.系统._家庭计划.阶段, '待安装');
@@ -143,6 +144,7 @@ test('五日流程逐日推进，监控只准备票据、有效提交才改变�
   chatVars = {};
   const data = 建夏乔完成数据();
   assert.equal(购买(data, '家庭计划套件').成功, true);
+  assert.equal(使用承接剧情票(data, '家庭计划套件').成功, true);
 
   // D1：夏乔早上在家；安装后背景切到初始计划板。
   let D1成功 = false;
@@ -378,3 +380,5 @@ test('接线契约覆盖监控原子提交、真实微信已读、赴约成功�
   assert.match(通知源码, /return !手机记录晚于已读\(消息, 已读楼, 已读锚\);/);
   assert.match(客户端源码, /eventEmit\('人妻公寓:同步家庭计划微信已读'\)/);
 });
+
+function 使用承接剧情票(...args) { return require('../../src/人妻公寓/脚本/游戏逻辑/承接剧情票使用.ts').使用承接剧情票(...args); }

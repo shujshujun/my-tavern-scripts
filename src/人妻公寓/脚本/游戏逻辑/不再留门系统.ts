@@ -1,3 +1,4 @@
+import { 剧情线使用阻断 } from './剧情线使用门';
 import type { SchemaType } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
 import {
@@ -438,6 +439,8 @@ function 下一动作(data: SchemaType): 不再留门动作ID | null {
 }
 
 export function 不再留门动作阻断(data: SchemaType, 动作: 不再留门动作ID, 原地点: string): string {
+  const 线路阻断 = 动作 === '使用道具' && 剧情线使用阻断(data, '不再留门');
+  if (线路阻断) return 线路阻断;
   const 地点 = 地点规范(原地点);
   const r = data.系统._不再留门;
   if (动作 === '暂缓' || 动作 === '撤回许可') {

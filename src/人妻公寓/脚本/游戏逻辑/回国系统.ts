@@ -1,3 +1,4 @@
+import { 剧情线使用阻断 } from './剧情线使用门';
 import type { SchemaType } from '../../schema';
 import { 户静态表, 难度表, 门牌列表, type 门牌 } from '../../stageConfig';
 import { 处于医院硬锁 } from './生产系统';
@@ -773,6 +774,8 @@ export function 排入回国后续剧情(data: SchemaType, 结果: 回国结果 
 }
 
 export function 使用回国经营归档册(data: SchemaType, 当前地点: string): 回国结果 {
+  const 线路阻断 = 剧情线使用阻断(data, '回国');
+  if (线路阻断) return { 成功: false, 提示: 线路阻断 };
   if (当前地点 !== '管理员室' || 路线(data).阶段 !== '待使用经营归档册')
     return { 成功: false, 提示: '请在管理员室使用公寓经营归档册。' };
   if (!data.背包.includes(回国经营归档册ID)) return { 成功: false, 提示: '公寓经营归档册不在背包里。' };

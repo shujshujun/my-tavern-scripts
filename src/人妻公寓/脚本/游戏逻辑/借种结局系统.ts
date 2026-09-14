@@ -1,3 +1,4 @@
+import { 剧情线使用阻断 } from './剧情线使用门';
 import type { SchemaType } from '../../schema';
 import { 当前星期, 当前时段, 当前周数 } from './楼层时钟';
 import { 保证夏乔借种受孕, type 受孕判定结果 } from './怀孕系统';
@@ -134,6 +135,8 @@ export function 拆除借种摄像头(
   通过撬门进入: boolean,
   目标房无人: boolean,
 ): 借种操作结果 {
+  const 线路阻断 = 剧情线使用阻断(data, '借种');
+  if (线路阻断) return { 成功: false, 提示: 线路阻断 };
   if (借种结局已完成(data)) return { 成功: false, 提示: '借种结局已经完成，摄像头可以按普通流程处理。' };
   if (data.系统._家庭计划.阶段 !== '已完成') return { 成功: false, 提示: '家庭计划还没有走到拆除观察点这一步。' };
   if (!借种票在背包(data)) return { 成功: false, 提示: '先在特殊场景货架买下「借种」。' };
@@ -430,6 +433,8 @@ export function 拍摄借种产后家庭合照(
 }
 
 export function 借种启动条件提示(data: SchemaType, 当前地点: string): string {
+  const 线路阻断 = 剧情线使用阻断(data, '借种');
+  if (线路阻断) return 线路阻断;
   const 妻 = data.户['101']?.妻;
   const 亲密阻断 = 特殊场景启动亲密门(data);
   if (亲密阻断) return 亲密阻断;

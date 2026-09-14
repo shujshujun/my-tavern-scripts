@@ -47,11 +47,12 @@ export function 家庭计划已上架(data: SchemaType): boolean {
   return !!夏乔 && 夏乔.当前阶段 >= 5 && 阶段性癖已完成(data, '101');
 }
 
-export function 家庭计划卡状态(data: SchemaType): '可购买' | '筹备中' | '待赴约' | '已完成' | '未解锁' {
+export function 家庭计划卡状态(data: SchemaType): '可购买' | '待使用' | '筹备中' | '待赴约' | '已完成' | '未解锁' {
   const 状态 = data.系统._家庭计划.阶段;
   if (状态 === '已完成') return '已完成';
   if (状态 === '待赴约') return '待赴约';
   if (状态 !== '未开始') return '筹备中';
+  if (data.背包.includes(家庭计划套件ID)) return '待使用';
   return 家庭计划已上架(data) ? '可购买' : '未解锁';
 }
 
@@ -60,6 +61,7 @@ export function 家庭计划档案提示(data: SchemaType): 家庭计划档案�
   if (!data.户['101']) return null;
   const 路线 = data.系统._家庭计划;
   if (路线.阶段 === '未开始') {
+    if (data.背包.includes(家庭计划套件ID)) return { 状态: '剧情道具已购买', 下一步: '从背包使用家庭计划套件，开启后前往101安装。' };
     return 家庭计划已上架(data) ? { 状态: '承接事件已开放', 下一步: '去商店“特殊场景”页购买“家庭计划套件”。' } : null;
   }
   if (路线.阶段 === '已完成') {
@@ -93,21 +95,17 @@ export function 家庭计划档案提示(data: SchemaType): 家庭计划档案�
 
 export function 购买家庭计划套件(data: SchemaType, 价格: number): 家庭计划结果 {
   if (!家庭计划已上架(data)) return { 成功: false, 提示: '夏乔的家庭计划还没有准备好。' };
+  if (data.背包.includes(家庭计划套件ID)) return { 成功: false, 提示: '家庭计划套件已在背包中。' };
   if (data.系统._家庭计划.阶段 !== '未开始') {
     return { 成功: false, 提示: `家庭计划已经处于「${家庭计划卡状态(data)}」。` };
   }
   if (!Number.isFinite(价格) || 价格 <= 0) return { 成功: false, 提示: '家庭计划套件的价格配置无效。' };
   if (data.现金 < 价格) return { 成功: false, 提示: '钱不够。' };
   data.现金 -= 价格;
-  data.系统._家庭计划 = {
-    阶段: '待安装',
-    最早继续日: 玩家当前日(data),
-    完成楼层: -1,
-  };
   if (!data.背包.includes(家庭计划套件ID)) data.背包.push(家庭计划套件ID);
   return {
     成功: true,
-    提示: '「家庭计划套件」已经送到管理员室。先把计划板带去101安装。',
+    提示: '家庭计划套件已放入背包，使用后开启。',
     变动: true,
   };
 }

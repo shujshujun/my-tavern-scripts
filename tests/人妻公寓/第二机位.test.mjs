@@ -223,6 +223,7 @@ test('完整流程按准备票与有效正文分离提交，重复点击幂等�
   const data = 建数据();
   const 初始现金 = data.现金;
   const 首买 = 购买(data, '第二机位');
+  assert.equal(使用承接剧情票(data, '第二机位').成功, true);
   assert.equal(首买.成功, true);
   assert.equal(data.现金, 初始现金 - 道具表.第二机位.价格);
   assert.equal(data.系统._第二机位.阶段, '待门缝');
@@ -916,6 +917,7 @@ test('第二机位套件、母带及其他特殊场景票据不能被普通送�
 test('弱模型越拍正文会被精确识别，当前拍合法内容与否定句不会误伤', () => {
   const data = 建数据();
   assert.equal(购买(data, '第二机位').成功, true);
+  assert.equal(使用承接剧情票(data, '第二机位').成功, true);
   查动作时段(data, '门缝那一眼', 0, 42);
   const 门缝一 = 执行第二机位地点动作(data, '门缝那一眼', '102').事件;
   assert.equal(第二机位正文越拍原因(门缝一, '沈静仪开门，让玩家坐下。几句寻常话以后，她主动把人留在里间。'), '');
@@ -956,6 +958,7 @@ test('弱模型越拍正文会被精确识别，当前拍合法内容与否定�
 test('多回合票在每拍成功后持久排队，后续必须由玩家回应且刷新、重复排队都不丢不叠', () => {
   const data = 建数据();
   assert.equal(购买(data, '第二机位').成功, true);
+  assert.equal(使用承接剧情票(data, '第二机位').成功, true);
   查动作时段(data, '门缝那一眼', 0, 42);
   const 第一拍 = 执行第二机位地点动作(data, '门缝那一眼', '102');
   const 第一拍提交 = 提交剧情(data, 第一拍, '102', 9);
@@ -1125,3 +1128,5 @@ test('第二机位九张正式WebP进入源素材，运行时路由不再依赖o
   assert.doesNotMatch(资源路由, /output\/imagegen\/second-camera/);
   assert.match(资源路由, /第二机位图片/);
 });
+
+function 使用承接剧情票(...args) { return require('../../src/人妻公寓/脚本/游戏逻辑/承接剧情票使用.ts').使用承接剧情票(...args); }

@@ -1,3 +1,4 @@
+import { 剧情线使用阻断 } from './剧情线使用门';
 import type { SchemaType } from '../../schema';
 import { 双重继承场景ID, 经济配置 } from '../../stageConfig';
 import { 列出地点管理任务 } from './管理任务系统';
@@ -232,6 +233,8 @@ function 剧情提交错误(data: SchemaType, 当前事件: string): string {
 
 export function 使用双重继承场景票(data: SchemaType, 当前地点: string, 当前楼层 = -1): 双重继承结果 {
   const 当前路线 = 路线(data);
+  const 线路阻断 = 剧情线使用阻断(data, '双重继承');
+  if (线路阻断) return { 成功: false, 提示: 线路阻断 };
   if (当前路线.阶段 !== '待使用双重继承' || !data.背包.includes(双重继承场景票ID)) {
     return { 成功: false, 提示: '背包里没有当前可用的《双重继承》交接材料。' };
   }

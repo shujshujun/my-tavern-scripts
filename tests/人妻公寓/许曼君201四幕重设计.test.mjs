@@ -78,6 +78,7 @@ function 下一拍(data, result, 地点, 楼层, text = '我在听。') {
 function 推进至外住登记() {
   const data = 建数据();
   assert.equal(购买(data, 许曼君分居任务ID).成功, true);
+  assert.equal(使用承接剧情票(data, '许曼君分居').成功, true);
   assert.equal(data.系统._许曼君分居.阶段, '待初谈');
   找动作时段(data, '201', '开始第一幕初谈');
   const start = 做动作(data, '201', '开始第一幕初谈');
@@ -396,3 +397,5 @@ test('同一硬动作重复点击只成功一次，不会生成第二枚封条�
   assert.equal(completed.系统._许曼君分居.完成楼层, 88);
   assert.equal(completed.系统._已完成特殊场景.filter(id => id === '分居').length, 1);
 });
+
+function 使用承接剧情票(...args) { return require('../../src/人妻公寓/脚本/游戏逻辑/承接剧情票使用.ts').使用承接剧情票(...args); }

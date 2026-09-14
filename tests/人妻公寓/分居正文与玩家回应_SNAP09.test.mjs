@@ -8,6 +8,7 @@ const { 购买 } = require('../../src/人妻公寓/脚本/游戏逻辑/商店系
 function second() {
   const data = journey.建数据();
   assert.equal(购买(data, route.许曼君分居任务ID).成功, true);
+  assert.equal(使用承接剧情票(data, '许曼君分居').成功, true);
   journey.找动作时段(data, '201', '开始第一幕初谈');
   const first = journey.做动作(data, '201', '开始第一幕初谈');
   const result = journey.交一拍(data, first.事件, '201', 1);
@@ -66,3 +67,5 @@ test('SNAP09 固定首稿否定事实不重写，真实越拍仍走重写并保�
   assert.equal(retried.generations, 1);
   assert.equal(retried.body, safe);
 });
+
+function 使用承接剧情票(...args) { return require('../../src/人妻公寓/脚本/游戏逻辑/承接剧情票使用.ts').使用承接剧情票(...args); }

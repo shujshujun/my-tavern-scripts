@@ -28,6 +28,8 @@ interface 背包展示项 {
   可读信: boolean;
   信门牌?: 门牌 | null;
   可布设: boolean;
+  可使用承接票?: boolean;
+  线路使用原因?: string;
   可使用录像带: boolean;
   录像带使用文案?: string;
   录像带使用原因?: string;
@@ -68,6 +70,7 @@ const emit = defineEmits<{
   useNoMoreDoor: [];
   prepareMeeting: [];
   useReturnFile: [];
+  useStoryTicket: [itemId: string];
   useDoubleInheritance: [];
   useXumanjunDivorce: [];
   gift: [itemId: string, door: 门牌];
@@ -98,6 +101,7 @@ const emit = defineEmits<{
               >{{ 项.名称 }} <em class="ware-kind-label">{{ 项.视觉.标 }}</em></b
             >
             <span class="ware-desc">{{ 项.描述 }}</span>
+            <span v-if="项.线路使用原因" class="ware-desc">{{ 项.线路使用原因 }}</span>
             <span v-if="项.路线说明" class="ware-desc">{{ 项.路线说明 }}</span>
             <span v-if="项.录像带使用原因" class="ware-desc">{{ 项.录像带使用原因 }}</span>
             <span v-if="项.可使用不再留门 && 项.不再留门使用原因" class="ware-desc">{{ 项.不再留门使用原因 }}</span>
@@ -122,23 +126,24 @@ const emit = defineEmits<{
             >
               {{ 项.全局线路候选 ? `用于${户静态表[项.全局线路候选.门牌].妻名}的线索` : '使用' }}
             </button>
-            <button v-if="项.可使用不再留门" class="btn mini rite" :disabled="sending || !!项.不再留门使用原因" @click="emit('useNoMoreDoor')">在202使用</button>
-            <button v-if="项.可使用录像带" class="btn mini rite" :disabled="sending || !!项.录像带使用原因" @click="emit('playTape')">
+            <button v-if="项.可使用承接票" class="btn mini rite" :disabled="sending || !!项.线路使用原因" @click="emit('useStoryTicket', 项.id)">使用并开启剧情</button>
+            <button v-if="项.可使用不再留门" class="btn mini rite" :disabled="sending || !!项.不再留门使用原因 || !!项.线路使用原因" @click="emit('useNoMoreDoor')">在202使用</button>
+            <button v-if="项.可使用录像带" class="btn mini rite" :disabled="sending || !!项.录像带使用原因 || !!项.线路使用原因" @click="emit('playTape')">
               {{ 项.录像带使用文案 || '在管理员室播放' }}
             </button>
-            <button v-if="项.可筹备静音会议" class="btn mini rite" :disabled="sending" @click="emit('prepareMeeting')">
+            <button v-if="项.可筹备静音会议" class="btn mini rite" :disabled="sending || !!项.线路使用原因" @click="emit('prepareMeeting')">
               筹备会议
             </button>
-            <button v-if="项.可使用回国归档册" class="btn mini rite" :disabled="sending" @click="emit('useReturnFile')">
+            <button v-if="项.可使用回国归档册" class="btn mini rite" :disabled="sending || !!项.线路使用原因" @click="emit('useReturnFile')">
               在管理员室归档
             </button>
-            <button v-if="项.可使用双重继承" class="btn mini rite" :disabled="sending" @click="emit('useDoubleInheritance')">
+            <button v-if="项.可使用双重继承" class="btn mini rite" :disabled="sending || !!项.线路使用原因" @click="emit('useDoubleInheritance')">
               在管理员室准备交接
             </button>
             <button
               v-if="项.可使用许曼君离婚"
               class="btn mini rite"
-              :disabled="sending || !!项.许曼君离婚使用原因"
+              :disabled="sending || !!项.许曼君离婚使用原因 || !!项.线路使用原因"
               @click="emit('useXumanjunDivorce')"
             >
               在201使用

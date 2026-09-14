@@ -175,7 +175,7 @@ export function 第二机位已完成(data: SchemaType): boolean {
   return 路线(data).阶段 === '已完成' || data.系统._已完成特殊场景.includes(第二机位完成ID);
 }
 
-export function 第二机位任务已上架(data: SchemaType): boolean {
+export function 第二机位可开启(data: SchemaType): boolean {
   const 户 = data.户['102'];
   return Boolean(
     户 &&
@@ -187,6 +187,10 @@ export function 第二机位任务已上架(data: SchemaType): boolean {
   );
 }
 
+export function 第二机位任务已上架(data: SchemaType): boolean {
+  return 第二机位可开启(data) && !data.背包.includes(第二机位任务ID);
+}
+
 export function 第二机位套件已上架(data: SchemaType): boolean {
   return 路线(data).阶段 === '待购套件' && !data.背包.includes(第二机位套件ID);
 }
@@ -195,13 +199,11 @@ export function 购买第二机位任务(data: SchemaType, 价格: number): 第�
   if (!第二机位任务已上架(data)) {
     return { 成功: false, 提示: '先让沈静仪达到最终阶段、完成视奸主题，并在102保留可用监控。' };
   }
-  const 错误 = 互斥错误(data);
-  if (错误) return { 成功: false, 提示: 错误 };
+  if (data.背包.includes(第二机位任务ID)) return { 成功: false, 提示: '《第二机位》已在背包中。' };
   if (data.现金 < 价格) return { 成功: false, 提示: '钱不够。' };
   data.现金 -= 价格;
-  路线(data).阶段 = '待门缝';
-  路线(data).最早继续日 = 今日(data);
-  return { 成功: true, 提示: '《第二机位》已经开始。等顾国栋外出、沈静仪独自在102时赴约。', 变动: true };
+  data.背包.push(第二机位任务ID);
+  return { 成功: true, 提示: '《第二机位》已放入背包，使用后开启。', 变动: true };
 }
 
 export function 购买第二机位套件(data: SchemaType, 价格: number): 第二机位结果 {
@@ -528,6 +530,7 @@ export function 读取第二机位档案提示(data: SchemaType): 第二机位�
   const 等待到 = Math.max(0, 当前路线.最早继续日) * 每天时段数;
 
   if (阶段 === '未开始') {
+    if (data.背包.includes(第二机位任务ID)) return { 状态: '剧情道具已购买', 下一步: '从背包使用《第二机位》，开启后按提示前往102。' };
     return 第二机位任务已上架(data)
       ? {
           状态: '承接事件已开放',

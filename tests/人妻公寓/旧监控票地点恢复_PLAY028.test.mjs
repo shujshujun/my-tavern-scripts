@@ -41,6 +41,7 @@ function buildSources() {
   data.户['101'].妻.当前阶段 = 5;
   data.户['101'].妻.阶段性癖 = 户静态表['101'].招牌性癖;
   assert.equal(family.购买家庭计划套件(data, 道具表.家庭计划套件.价格).成功, true);
+  assert.equal(使用承接剧情票(data, '家庭计划套件').成功, true);
   let installed = false;
   for (let t = 0; t < 6 && !installed; t++) {
     data.系统._绝对时段 = t;
@@ -212,3 +213,5 @@ test('PLAY-028 回档到未激活状态仍从原文字恢复；其他已知旧�
     ['没有明确位置的普通旧事件。', null],
   ]) assert.equal(scene.推断旧场景剧情目标(event), expected);
 });
+
+function 使用承接剧情票(...args) { return require('../../src/人妻公寓/脚本/游戏逻辑/承接剧情票使用.ts').使用承接剧情票(...args); }

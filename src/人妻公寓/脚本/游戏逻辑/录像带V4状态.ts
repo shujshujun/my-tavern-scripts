@@ -1,3 +1,4 @@
+import { 剧情线使用阻断 } from './剧情线使用门';
 import type { SchemaType } from '../../schema';
 import { 第二机位已完成, 第二机位母带封存键 } from './第二机位系统';
 import { 不再留门已完成 } from '../../不再留门契约';
@@ -152,6 +153,8 @@ export function 录像带V4已经使用(data: SchemaType): boolean {
 }
 
 export function 录像带V4使用阻断(data: SchemaType): string {
+  const 线路阻断 = 剧情线使用阻断(data, '录像带');
+  if (线路阻断) return 线路阻断;
   if (录像带V4已经使用(data)) return '录像带已使用，请从当前筹备或观看进度继续。';
   if (录像带V4不可新开(data)) return '现有结局或现场不能重新开启。';
   if (!data.背包.includes('录像带')) return '背包里没有录像带。';

@@ -1249,6 +1249,7 @@
         @use-no-more-door="请求不再留门动作('使用道具')"
         @prepare-meeting="打开静音会议筹备"
         @use-return-file="使用回国经营归档册"
+        @use-story-ticket="使用承接剧情票"
         @use-double-inheritance="使用双重继承场景票"
         @use-xumanjun-divorce="使用许曼君离婚封存盒"
         @gift="送出"
@@ -1401,6 +1402,7 @@
 </template>
 
 <script setup lang="ts">
+import { 承接票线路, 剧情道具线路, 剧情线使用阻断 } from '../../脚本/游戏逻辑/剧情线使用门';
 import { 安若妍换掉图片, 安若妍换掉背景文件, 安若妍换掉CG覆盖普通场次, 安若妍换掉CG占位图 } from '../../脚本/游戏逻辑/安若妍换掉资源';
 import { 安若妍换掉等待硬操作 } from '../../脚本/游戏逻辑/安若妍换掉系统';
 import { 剧情商品货架可见 } from '../../脚本/游戏逻辑/商店剧情货架';
@@ -4263,6 +4265,8 @@ function 道具视觉信息(配?: 道具配置, 可读信 = false): { 类: 道�
 const 背包列表 = computed(() =>
   (data.value?.背包 ?? []).map(id => {
     const 配 = 查道具(id);
+    const 剧情线路 = 剧情道具线路(id);
+    const 线路使用原因 = 剧情线路 ? 剧情线使用阻断(data.value, 剧情线路) : '';
     const 信门牌 = 信物门牌(id);
     const 房 = 当前房间.value ? 查房间(当前房间.value) : undefined;
     const 在户内 = !!房 && 房.类型 === '户' && 房.id !== '302' && Boolean(data.value.户[房.id]);
@@ -4303,6 +4307,8 @@ const 背包列表 = computed(() =>
       可读信: !!信门牌 && !data.value.户[信门牌]?.妻.裂缝.已确认,
       信门牌,
       // 摄像头:须在已入住户的房内且屋里没人
+      可使用承接票: !!承接票线路(id) && (id !== '家庭计划套件' || data.value.系统._家庭计划.阶段 === '未开始'),
+      线路使用原因,
       可布设: id === '针孔摄像头' && 在户内 && !房内有人在(当前房间.value!),
       可使用录像带:
         id === '录像带' &&
@@ -4339,6 +4345,7 @@ const 背包列表 = computed(() =>
         id === '安眠药'
           ? 安眠药圆场对象
           : !配?.常驻 &&
+              !承接票线路(id) &&
               id !== '录像带' &&
               id !== '静音会议' &&
               id !== 第二机位套件ID &&
@@ -4388,6 +4395,10 @@ function 用运作(道具id: string, 门牌号?: 门牌, 候选?: 阶段线路�
 
 function 用资源道具(道具id: string) {
   if (提交界面事务(() => eventEmit('人妻公寓:使用资源道具', 道具id))) 显示背包.value = false;
+}
+
+function 使用承接剧情票(id: string) {
+  if (提交界面事务(() => eventEmit('人妻公寓:使用承接剧情票', id))) 显示背包.value = false;
 }
 
 function 使用回国经营归档册() {

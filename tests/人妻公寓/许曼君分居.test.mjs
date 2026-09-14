@@ -80,11 +80,12 @@ test('Schema、schema.json与initvar共用四幕版本2默认值，不保留旧3
   assert.equal(routeJson.properties.封存袋位置, undefined);
 });
 
-test('L5、交易快感与肉偿账本后零元上架；购买只进入待初谈且不生成旧路线物件', () => {
+test('L5、交易快感与肉偿账本后零元上架；购买入包后主动使用进入待初谈且不生成旧路线物件', () => {
   const data = fresh();
   assert.equal(许曼君分居已上架(data), true);
   assert.ok(取货架(data).flatMap(page => page.商品.map(item => item.id)).includes(许曼君分居任务ID));
   assert.equal(购买(data, 许曼君分居任务ID).成功, true);
+  assert.equal(使用承接剧情票(data, '许曼君分居').成功, true);
   assert.equal(data.系统._许曼君分居.阶段, '待初谈');
   assert.equal(data.背包.includes(许曼君会面通知ID), false);
   assert.equal(data.背包.includes(许曼君钥匙封存袋ID), false);
@@ -94,6 +95,7 @@ test('L5、交易快感与肉偿账本后零元上架；购买只进入待初谈
 test('第一幕只能在201且丈夫真实外出时出现；医院和错场失败不改写当前检查点', () => {
   const data = fresh();
   购买(data, 许曼君分居任务ID);
+  assert.equal(使用承接剧情票(data, '许曼君分居').成功, true);
   findInitialWindow(data);
   assert.equal(许曼君分居地点动作(data, '管理员室').some(item => item.id === '开始第一幕初谈'), false);
   const opening = 执行许曼君分居地点动作(data, '开始第一幕初谈', '201');
@@ -110,6 +112,7 @@ test('第一幕只能在201且丈夫真实外出时出现；医院和错场失�
 test('剧情票逐拍排队且旧A1/A3/A5/A6票不能认领四幕状态', () => {
   const data = fresh();
   购买(data, 许曼君分居任务ID);
+  assert.equal(使用承接剧情票(data, '许曼君分居').成功, true);
   findInitialWindow(data);
   const opening = 执行许曼君分居地点动作(data, '开始第一幕初谈', '201');
   const first = 提交许曼君分居剧情事件(data, opening.事件, '201', 1, '我在听。');
@@ -159,3 +162,5 @@ test('越拍检查区分四幕边界，取物当天不能直接替妻子或丈�
   assert.match(许曼君分居正文越拍原因('【许曼君分居提交:第四幕私下决定:2】', '丈夫已经同意办理，钥匙改成待离婚交接。'), /管理员室/);
   assert.equal(许曼君分居正文越拍原因('【许曼君分居提交:第四幕取物提案:2】', '他提出减少长途和固定参与生活。'), '');
 });
+
+function 使用承接剧情票(...args) { return require('../../src/人妻公寓/脚本/游戏逻辑/承接剧情票使用.ts').使用承接剧情票(...args); }

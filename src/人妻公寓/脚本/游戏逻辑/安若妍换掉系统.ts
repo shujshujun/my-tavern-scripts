@@ -1,3 +1,4 @@
+import { 剧情线使用阻断 } from './剧情线使用门';
 import type { SchemaType } from '../../schema';
 import { 当前时段, 取绝对时段, 妻位置推算, 读取世界时间 } from './楼层时钟';
 import { 阶段性癖已完成 } from './阶段性癖状态';
@@ -323,6 +324,8 @@ export function 同步安若妍换掉时间节点(data: SchemaType): void {
 }
 
 function 动作阻断(data: SchemaType, id: 安若妍换掉动作ID): string {
+  const 线路阻断 = id === '使用换掉' && 剧情线使用阻断(data, '换掉');
+  if (线路阻断) return 线路阻断;
   const 路线 = data.系统._安若妍换掉;
   const 配置 = 动作配置[id];
   const 当前 = 取绝对时段(data);

@@ -148,17 +148,20 @@ for (const [name, lock] of [
   const e = host(d);
   await e.use();
   assert.equal(e.legacyCalls, 0);
-  assert.match(e.messages.at(-1).提示, /当前现场或电话/);
+  assert.match(e.messages.at(-1).提示, name === '特殊现场' ? /《静音会议》/ : /当前现场或电话/);
   assert.equal(e.writes, 0);
   assert.deepEqual(e.saved, d);
 });
 
-test('其他线路等待微信而无活动现场，不阻止新版录像带开始筹备', async () => {
+test('其他线路等待微信而无活动现场，仍阻止新版录像带开始筹备', async () => {
   const d = fresh(); d.背包.push('录像带');
+  d.系统._回国.阶段 = '姐妹茶话会进行中';
   d.系统._回国.茶话会状态 = '交代正事';
   const e = host(d); await e.use();
-  assert.equal(e.saved.系统._录像带V4.录像带已使用, true);
-  assert.deepEqual(e.saved.系统._回国, d.系统._回国);
+  assert.equal(e.saved.系统._录像带V4.录像带已使用, false);
+  assert.match(e.messages.at(-1).提示, /《回国》/);
+  assert.equal(e.writes, 0);
+  assert.deepEqual(e.saved, d);
 });
 
 test('新版硬凭据未完成时不迁移旧路线，不凭背包或旧完成字符串补造前置', async () => {

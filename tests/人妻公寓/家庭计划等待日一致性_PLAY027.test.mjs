@@ -40,6 +40,7 @@ function advertisedDay(data) {
 function install() {
   const data = fresh();
   assert.equal(route.购买家庭计划套件(data, 道具表.家庭计划套件.价格).成功, true);
+  assert.equal(使用承接剧情票(data, '家庭计划套件').成功, true);
   for (let period = 0; period < 6; period++) {
     data.系统._绝对时段 = period;
     const result = route.执行家庭计划地点动作(data, '安装计划板', '101');
@@ -181,3 +182,5 @@ test('PLAY-027 缺户/未解锁/已完成和旧无等待哨兵不出现虚构等
   assert.doesNotMatch(route.家庭计划档案提示(completed).下一步, /至少等到/u);
   assert.deepEqual(completed, before);
 });
+
+function 使用承接剧情票(...args) { return require('../../src/人妻公寓/脚本/游戏逻辑/承接剧情票使用.ts').使用承接剧情票(...args); }

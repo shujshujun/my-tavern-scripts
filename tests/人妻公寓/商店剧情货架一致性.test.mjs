@@ -142,8 +142,8 @@ for (let kind = 0; kind < 4; kind++) {
         const cash = d.现金, backpack = clone(d.背包);
         assert.equal(shop.购买(d, ids[kind]).成功, true);
         if (kind === 0) {
-          assert.equal(d.现金, cash); assert.deepEqual(d.背包, backpack);
-          assert.equal(d.系统._许曼君分居.阶段, '待初谈');
+          assert.equal(d.现金, cash); assert.deepEqual(d.背包, [...backpack, ids[kind]]);
+          assert.equal(d.系统._许曼君分居.阶段, '未开始');
         } else {
           assert.equal(d.现金, cash - config.道具表[ids[kind]].价格);
           assert.equal(d.背包.filter(id => id === ids[kind]).length, 1);
@@ -289,8 +289,8 @@ for (let kind = 0; kind < 4; kind++) {
       view.sending.value = false; await view.next(); view.click(buyButton());
       assert.deepEqual(ui.events, [['人妻公寓:购买', ids[kind]]]);
       const current = reload(ui.data.value); assert.equal(shop.购买(current, ids[kind]).成功, true);
-      ui.data.value = current; await view.next(); assert.equal(card(), undefined);
-      ui.data.value = fresh(); await view.next(); assert.equal(card(), undefined);
+      ui.data.value = current; await view.next(); assert.equal(Boolean(card()), false, '购票后移出货架');
+      ui.data.value = fresh(); await view.next(); assert.equal(Boolean(card()), false, '不合格时移出货架');
       ui.data.value = ready(kind); await view.next(); assert.ok(card(), '回档重载的合格状态重新显示');
     } finally { view.unmount(); }
   });

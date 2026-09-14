@@ -1,3 +1,4 @@
+import { 剧情线使用阻断 } from './剧情线使用门';
 import type { SchemaType } from '../../schema';
 import type { 门牌 } from '../../stageConfig';
 import { 户静态表 } from '../../stageConfig';
@@ -289,6 +290,8 @@ export interface 特殊场景操作结果 {
 }
 
 export function 打开静音会议筹备(data: SchemaType, 当前地点: string): 特殊场景操作结果 {
+  const 线路阻断 = 剧情线使用阻断(data, '静音会议');
+  if (线路阻断) return { 成功: false, 提示: 线路阻断 };
   const 亲密阻断 = 特殊场景启动亲密门(data);
   if (亲密阻断) return { 成功: false, 提示: 亲密阻断 };
   if (!特殊场景空闲(data)) return { 成功: false, 提示: '眼下已有一场特殊事件正在进行。' };
@@ -500,6 +503,8 @@ export function 请求结束静音会议(data: SchemaType): 特殊场景操作�
 }
 
 export function 开始录像带首送(data: SchemaType, 门牌号: '102' | '202', 楼层: number): { 成功: boolean; 提示: string } {
+  const 线路阻断 = 剧情线使用阻断(data, '录像带');
+  if (线路阻断) return { 成功: false, 提示: 线路阻断 };
   const 键 = 录像带前置键(门牌号);
   const 亲密阻断 = 特殊场景启动亲密门(data);
   if (亲密阻断) return { 成功: false, 提示: 亲密阻断 };
@@ -530,6 +535,8 @@ export function 开始录像带首送(data: SchemaType, 门牌号: '102' | '202'
 }
 
 export function 启动录像带(data: SchemaType, 楼层: number): { 成功: boolean; 提示: string } {
+  const 线路阻断 = 剧情线使用阻断(data, '录像带');
+  if (线路阻断) return { 成功: false, 提示: 线路阻断 };
   const 亲密阻断 = 特殊场景启动亲密门(data);
   if (亲密阻断) return { 成功: false, 提示: 亲密阻断 };
   const 住院妻 = (['102', '202'] as const).find(门牌号 => !读取医院内容策略(data, 门牌号).允许成人特殊场景);

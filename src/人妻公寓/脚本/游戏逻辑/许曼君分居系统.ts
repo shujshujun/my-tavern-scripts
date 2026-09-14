@@ -469,7 +469,7 @@ export function 许曼君分居已完成(data: SchemaType): boolean {
   return 路线(data).阶段 === '已完成' || data.系统._已完成特殊场景.includes(许曼君分居完成ID);
 }
 
-export function 许曼君分居已上架(data: SchemaType): boolean {
+export function 许曼君分居可开启(data: SchemaType): boolean {
   const 节点 = 户(data);
   return Boolean(
     节点 &&
@@ -482,24 +482,23 @@ export function 许曼君分居已上架(data: SchemaType): boolean {
   );
 }
 
+export function 许曼君分居已上架(data: SchemaType): boolean {
+  return 许曼君分居可开启(data) && !data.背包.includes(许曼君分居任务ID);
+}
+
 export function 购买许曼君分居(data: SchemaType, 价格 = 0): 许曼君分居结果 {
   if (data.系统._坏结局) return { 成功: false, 提示: '这一局已经结束，不能再领取《分居》。' };
   if (!许曼君分居已上架(data)) {
     return { 成功: false, 提示: '先让许曼君达到最终阶段，完成交易快感、《肉偿账本》和“没有债也会来”。' };
   }
-  const 错误 = 硬互斥错误(data);
-  if (错误) return { 成功: false, 提示: 错误 };
+  if (data.背包.includes(许曼君分居任务ID)) return { 成功: false, 提示: '《分居》已在背包中。' };
   if (价格 > 0 && data.现金 < 价格) return { 成功: false, 提示: '钱不够。' };
   if (价格 > 0) data.现金 -= 价格;
-  const 当前路线 = 路线(data);
-  当前路线.阶段 = '待初谈';
-  当前路线.最早继续时段 = data.系统._绝对时段;
-  当前路线.初谈参与方式 = '未决定';
-  清理旧路线物件(data);
+  data.背包.push(许曼君分居任务ID);
   return {
     成功: true,
     变动: true,
-    提示: '《分居》已经开启。等赵国强按真实作息外出、许曼君独自在201时，和她谈那张一直挂着的出车表。',
+    提示: '《分居》已放入背包，使用后开启。',
   };
 }
 
@@ -1202,7 +1201,8 @@ export function 许曼君201留宿背景文件(阶段: '夜' | '晨'): string {
 
 export function 读取许曼君分居档案提示(data: SchemaType): 许曼君分居档案提示 | null {
   const 当前路线 = 路线(data);
-  if (当前路线.阶段 === '未开始') return null;
+  if (当前路线.阶段 === '未开始') return data.背包.includes(许曼君分居任务ID)
+    ? { 状态: '剧情道具已购买', 下一步: '从背包使用《分居》，开启后按提示前往201。' } : null;
   if (许曼君分居已完成(data)) {
     return {
       状态: '《分居》已完成',

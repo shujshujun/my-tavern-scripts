@@ -50,12 +50,13 @@ const prior = ast(readFileSync(new URL('../许曼君201四幕重设计.test.mjs'
 const names = ['建数据', '找动作时段', '做动作', '交一拍', '下一拍', '推进至外住登记',
   '推进至第三幕完成', '推进至私下决定', '推进至最终钥匙'];
 export const journey = execute(names.map(name => functionText(prior, name)).join('\n'), {
-  assert, Schema, 创建户节点, lodash, ...route, ...clock, ...stage, ...shop,
+  assert, Schema, 创建户节点, lodash, ...route, ...clock, ...stage, ...shop, 使用承接剧情票,
 }, `({ ${names.join(', ')} })`);
 
 export function firstDecision() {
   const data = journey.建数据();
   assert.equal(shop.购买(data, route.许曼君分居任务ID).成功, true);
+  assert.equal(使用承接剧情票(data, '许曼君分居').成功, true);
   journey.找动作时段(data, '201', '开始第一幕初谈');
   const start = journey.做动作(data, '201', '开始第一幕初谈');
   const p1 = journey.交一拍(data, start.事件, '201', 1);
@@ -135,3 +136,5 @@ export function productionSubmit(fixture, player, channel = 'fixed', body = '') 
     读场景: () => ({ 房间id: fixture.room }),
   }, calls[0].getText(tree));
 }
+
+function 使用承接剧情票(...args) { return require('../../../src/人妻公寓/脚本/游戏逻辑/承接剧情票使用.ts').使用承接剧情票(...args); }

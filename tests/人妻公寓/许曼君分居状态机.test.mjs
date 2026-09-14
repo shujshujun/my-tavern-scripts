@@ -88,6 +88,7 @@ test('钥匙柜只展示同一枚封存钥匙及其用途，不表达拆封再�
 test('兼容地图适配器只转发当前权威动作，旧信箱、大堂和公寓外部动作归零', () => {
   const data = fresh();
   main.购买许曼君分居(data);
+  assert.equal(使用承接剧情票(data, '许曼君分居').成功, true);
   for (let abs = 0; abs < 252; abs += 1) {
     data.系统._绝对时段 = abs;
     if (main.许曼君分居地点动作(data, '201').length) break;
@@ -99,3 +100,5 @@ test('兼容地图适配器只转发当前权威动作，旧信箱、大堂和�
   assert.deepEqual(adapter.读取许曼君分居地图动作(data, { ...context, 地点: '大堂' }), []);
   assert.deepEqual(adapter.读取许曼君分居地图动作(data, { ...context, 地点: '公寓外部' }), []);
 });
+
+function 使用承接剧情票(...args) { return require('../../src/人妻公寓/脚本/游戏逻辑/承接剧情票使用.ts').使用承接剧情票(...args); }

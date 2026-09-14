@@ -1,3 +1,4 @@
+import { 剧情线使用阻断 } from './剧情线使用门';
 import type { SchemaType } from '../../schema';
 import { 安若妍不必停场景ID } from '../../stageConfig';
 import {
@@ -926,6 +927,8 @@ export function 执行安若妍不必停地点动作(
   楼层: number,
   来源时间线 = '',
 ): 安若妍不必停结果 {
+  const 线路阻断 = action === '使用不必停' && 剧情线使用阻断(data, '不必停');
+  if (线路阻断) return { 成功: false, 提示: 线路阻断 };
   同步安若妍不必停时间节点(data);
   if (action === '将301丈夫到访改为提前通知' && 安若妍不必停已完成(data)) {
     return 完成安若妍不必停最终登记(data, 楼层);
