@@ -49,6 +49,7 @@ import { 事件角色标记 } from './snapshotSystem';
 import { 开始录像带首送, 录像带前置键 } from './特殊场景系统';
 import {
   登记购买录像带V4,
+  录像带沿用旧流程,
   录像带V4录像带可购买,
   录像带V4贞操锁可购买数量,
   赠送录像带V4贞操锁,
@@ -143,13 +144,7 @@ export function 全楼最高阶段(data: SchemaType): number {
 }
 
 function 旧录像带遗留路线可见(data: SchemaType): boolean {
-  if (data.系统._已完成特殊场景.some(id => id === '录像带' || id === '录像带结局')) return false;
-  // V4沿用旧道具ID兼容背包，但一旦V4购买账成立，背包里的录像带/锁不能反向把它误判成旧路线。
-  if (data.系统._录像带V4.录像带已购买 || data.系统._录像带V4.阶段 !== '未开始') return false;
-  return Boolean(
-    data.系统._特殊场景前置.some(key => key === '录像带:102' || key === '录像带:202') ||
-      ['录像带前置', '录像带', '录像带双承接'].includes(data.系统._特殊场景.id),
-  );
+  return 录像带沿用旧流程(data);
 }
 
 /** 同一道具ID兼容旧档，但新档严格按V4“先录像带、后两把锁”逐件上架。 */

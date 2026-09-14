@@ -107,6 +107,15 @@ export function 录像带V4承接条件已完成(data: SchemaType): boolean {
   return 沈静仪承接完成 && 周小满承接完成;
 }
 
+/** 购买、背包与使用共用分流；已归档的新承接优先于旧档残留前置，运行中的旧场次保持原路线。 */
+export function 录像带沿用旧流程(data: SchemaType): boolean {
+  if (旧录像带已完成(data) || V4已完成(data)) return false;
+  if (旧录像带正在运行(data)) return true;
+  const v = data.系统._录像带V4;
+  if (v.录像带已购买 || v.阶段 !== '未开始' || 录像带V4承接条件已完成(data)) return false;
+  return data.系统._特殊场景前置.some(key => key === '录像带:102' || key === '录像带:202');
+}
+
 export function 录像带V4录像带可购买(data: SchemaType): boolean {
   if (录像带V4不可新开(data) || !录像带V4承接条件已完成(data)) return false;
   return !data.系统._录像带V4.录像带已购买 && !data.背包.includes('录像带');
@@ -192,6 +201,9 @@ export function 读取录像带V4档案提示(data: SchemaType, 房间: 录像�
   if (旧录像带正在运行(data)) return null;
   if (v.阶段 === '未开始' || v.阶段 === '待购录像带') {
     if (!录像带V4承接条件已完成(data) || data.系统._坏结局) return null;
+    // 旧购买分支可能只把实物放进背包；只读展示已有物品，使用成功时再由写口登记V4。
+    if (data.背包.includes('录像带'))
+      return { 状态: '《录像带》已购买', 下一步: '打开背包主动使用《录像带》，启动两户共享筹备。' };
     return { 状态: '共享结局已开放', 下一步: '去商店“特殊场景”页购买《录像带》。' };
   }
   if (v.阶段 === '待使用录像带') {
