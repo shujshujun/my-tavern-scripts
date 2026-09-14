@@ -33,6 +33,24 @@ function loadFunction(file, name, dependencies = {}) {
 function fresh() {
   return Schema.parse({ 户: Object.fromEntries(门牌列表.map(m => [m, 创建户节点(0)])) });
 }
+
+test('母亲称呼独立于阶段与工作身份，所有手机渠道均保留母子称呼', () => {
+  const rules = require('../../src/人妻公寓/脚本/游戏逻辑/手机/母亲称呼规则.ts');
+  const general = loadFunction('手机/生成引擎.ts', '称呼纪律', { ...rules, 玩家名: () => '林舟' });
+  assert.match(general(), /林舟/);
+  assert.ok(general().includes(rules.母亲称呼纪律));
+  for (const stage of [0, 3, 5]) {
+    const data = fresh();
+    data.户['302'].妻.当前阶段 = stage;
+    for (const channel of ['私聊', '姐妹群', '公开朋友圈']) {
+      const text = 结局期称呼纪律(data, '302', channel);
+      assert.ok(text.includes(rules.母亲称呼纪律));
+      assert.match(text, /儿子/);
+      assert.match(text, /不称呼玩家为“管理员”/);
+    }
+    assert.ok(结局期称呼纪律(data, '101', '姐妹群').includes(rules.母亲称呼纪律));
+  }
+});
 const sourceFacts = require('../../src/人妻公寓/脚本/游戏逻辑/结局后生活社交语义.ts');
 const family = loadFunction('手机/生成引擎.ts', '家庭事实', { 户静态表, ...sourceFacts });
 const validateFeed = loadFunction('手机/节拍引擎.ts', '校验朋友圈文案', {

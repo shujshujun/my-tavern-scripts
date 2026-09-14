@@ -46,6 +46,52 @@ const { 读取近期微信胶囊 } = require('../../src/人妻公寓/脚本/游�
 const { 读取私聊记忆上下文, 读取群聊记忆上下文 } = require('../../src/人妻公寓/脚本/游戏逻辑/手机/微信记忆上下文.ts');
 
 const msg = (文, rest = {}) => ({ 楼: 5, 时: 20, 会话: '姐妹群', 发: '对方', 文, ...rest });
+
+test('母亲入列及姐妹群各阶段均不授予楼务群资格，私聊和朋友圈照常接收', () => {
+  const { data } = environment();
+  data.系统._母亲入列 = true;
+  for (const state of ['未开始', '逐人调侃', '交代正事', '已完成']) {
+    data.系统._回国.茶话会状态 = state;
+    assert.equal(当前社交接收门牌(data, '群').includes('302'), false);
+    assert.deepEqual(当前社交接收门牌(data, '302'), ['302']);
+    assert.equal(当前社交接收门牌(data, '朋友圈').includes('302'), true);
+  }
+  assert.equal(当前社交接收门牌(data, '姐妹群').includes('302'), true);
+});
+
+test('旧档误收与本人误发均不赋予母亲楼务群记忆，其他成员引用也不能复活误发原文', () => {
+  const rows = [
+    msg('母亲:管理员，楼道灯坏了。', { 会话: '群', 序: 1, 接收门牌: ['101', '302'] }),
+    msg('夏乔:收到。', { 会话: '群', 序: 2, 接收门牌: ['101', '302'], 引用: { 序: 1 } }),
+    msg('母亲:儿子，记得吃饭。', { 序: 3, 接收门牌: ['101', '302'] }),
+  ];
+  assert.deepEqual(角色可知群消息(rows, '302', 5, 20).map(x => x.序), [3]);
+  assert.deepEqual(角色可知群消息(rows, '101', 5, 20).map(x => x.序), [2, 3]);
+});
+
+test('实存拒绝母亲楼务发言；旧档投影隐藏误发，正常增量保留原始记录和其他会话', async () => {
+  const env = environment();
+  env.data.系统._母亲入列 = true;
+  env.data.系统._回国.茶话会状态 = '已完成';
+  await 写库增量({ 新消息: [
+    msg('母亲:管理员，楼道灯坏了。', { 会话: '群' }),
+    msg('夏乔:楼道灯已登记。', { 会话: '群' }),
+    msg('母亲:儿子，记得吃饭。'),
+    msg('儿子，晚饭留好了。', { 会话: '302' }),
+    msg('我去看望母亲。', { 会话: '群', 发: '我' }),
+  ], 新圈: [], 节拍改: {} });
+  assert.equal(env.vars._微信.消息.length, 4);
+  assert.equal(读库().消息.length, 4);
+  assert.ok(读库().消息.filter(x => x.会话 === '群').every(x => !x.接收门牌.includes('302')));
+  const old = { ...structuredClone(env.vars._微信.消息[0]), 文: '母亲:管理员，灯坏了。', 序: 100 };
+  env.vars._微信.消息.push(old);
+  assert.equal(读库().消息.length, 4);
+  await 写库增量({ 新消息: [msg('夏乔:谢谢。', { 会话: '群' })], 新圈: [], 节拍改: {} });
+  assert.equal(读库().消息.length, 5);
+  assert.ok(env.vars._微信.消息.some(x => x.文 === old.文), '原始记录保留');
+  assert.doesNotMatch(读取群聊记忆上下文('群', 读库(), 5, ['101']).最近聊天, /母亲:管理员/);
+  assert.match(读取群聊记忆上下文('群', 读库(), 5, ['101']).群内记忆, /母亲不在楼务群/);
+});
 const post = (谁, 文, rest = {}) => ({ 楼: 5, 时: 20, 谁, 文, 评: [], ...rest });
 const capsule = (库, m = '101', options = {}) =>
   编译角色跨渠道见闻(库, [{ 门牌: m, 人物: 户静态表[m].妻名 }], 5, 20, new Set(), options);

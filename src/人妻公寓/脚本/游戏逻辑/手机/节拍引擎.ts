@@ -1,4 +1,5 @@
 import { 验收回国茶话会文本 } from './回国茶话会验收';
+import { 楼务群成员门牌 } from '../微信好友规则';
 import { Schema, type SchemaType } from '../../../schema';
 import { 不再留门手机只读原因 } from '../../../不再留门契约';
 import { 安若妍换照姐妹群一拍 } from './安若妍换照姐妹群';
@@ -234,11 +235,14 @@ function 选私聊候选图(
   const 最近 = new Set(最近图片);
   const 已发 = new Set(已发送ID);
   const 全部 = 私聊图库清单.filter(项 => 项.门牌 === m && 项.最低阶段 <= 阶段);
+  // 单图池不能靠不断重置轮次反复发送；历史消息也兼容尚未重建缓存的旧档。
+  if (全部.length === 1 && (已发.has(全部[0].id) || 最近.has(`@adult/${全部[0].path}`))) return undefined;
   const 未看 = 全部.filter(项 => !已发.has(项.id));
   const 新一轮 = 全部.length > 0 && 未看.length === 0;
   const 本轮 = 未看.length ? 未看 : 全部;
   const 未近期 = 本轮.filter(项 => !最近.has(`@adult/${项.path}`));
-  const 候选 = 未近期.length ? 未近期 : 本轮;
+  const 非上一张 = 本轮.filter(项 => `@adult/${项.path}` !== 最近图片.at(-1));
+  const 候选 = 未近期.length ? 未近期 : 非上一张;
   if (!候选.length) return undefined;
   const 序 = Math.floor(seededRandom(钟, m, '私聊候选图序') * 候选.length);
   const 项 = 候选[序];
@@ -775,7 +779,10 @@ async function 楼务群自动消息(上下文: 节拍上下文): Promise<入口
   const 波2 = 读余波(楼);
   const 探针到点 = !!波2 && !波2.私密 && !波2.探针 && 楼 - 波2.起楼 >= 余波缓冲楼;
   if (钟 - 上次 < 间隔 || !(探针到点 || seededRandom(钟, '群聊') < (data.风闻 >= 50 ? 0.6 : 0.25))) return '无新';
-  const 在群 = 微信好友(data).filter(f => f.类 === '妻' && 读取医院内容策略(data, f.id as 门牌).允许普通自动内容);
+  const 在群 = 楼务群成员门牌(data)
+    .filter(m => 读取医院内容策略(data, m).允许普通自动内容)
+    .map(m => ({ id: m, 名: 户静态表[m].妻名 }));
+  if (!在群.length) return '无新';
   const 群记忆 = 读取群聊记忆上下文(
     '群',
     库,
@@ -1471,6 +1478,7 @@ async function 回国茶话会一拍(
   const 名单 = 全成员.map(m => ({
     门牌: m,
     姓名: 户静态表[m].妻名,
+    ...(m === '302' ? { 基础身份: `群成员已知：她是管理员${玩家名()}的母亲，两人是母子；此次是新加入群聊。` } : {}),
     当前阶段: data.户[m].妻.当前阶段,
     好感值: data.户[m].妻.好感值,
     堕落值: data.户[m].妻.堕落值,

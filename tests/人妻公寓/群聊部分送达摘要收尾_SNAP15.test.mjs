@@ -104,6 +104,7 @@ function fixture(options = {}) {
       ...groupFormat, ...e.load('手机输出安全.ts'), console: e.globals.console,
     });
     realProducer = productionFunction(source, '楼务群一拍', {
+      ...e.load('微信好友规则.ts'),
       ...e.globals, ...config, ...groupFormat, ...quotes, ...e.load('微信正文承接.ts'),
       微信群文本: parser,
       手机可见单条硬上限: e.api.手机可见单条硬上限,

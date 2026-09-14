@@ -56,7 +56,7 @@ function fixture(options = {}) {
   });
   e.adapt('手机/生成引擎.ts', {
     小生成: generate, 微信短文本: finalText,
-    称呼纪律: productionFunction(source, '称呼纪律', { 玩家名: e.api.玩家名 }),
+    称呼纪律: productionFunction(source, '称呼纪律', { 玩家名: e.api.玩家名, ...e.load('手机/母亲称呼规则.ts') }),
   });
   e.caller = e.load('手机/回国手机.ts');
   e.run = () => e.caller.同步回国茶话会后私聊(e.state());

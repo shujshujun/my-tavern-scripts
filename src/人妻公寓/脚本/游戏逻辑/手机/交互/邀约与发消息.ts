@@ -7,6 +7,7 @@
  */
 
 import type { SchemaType } from '../../../../schema';
+import { 楼务群成员门牌 } from '../../微信好友规则';
 import { 不再留门手机只读原因 } from '../../../../不再留门契约';
 import type { 门牌 } from '../../../../stageConfig';
 import { 查房间, 户静态表, 门牌列表 } from '../../../../stageConfig';
@@ -173,12 +174,7 @@ function 限幅01(值: number): number {
 }
 
 function 群聊成员门牌(data: SchemaType, 会话: '群' | '姐妹群'): 门牌[] {
-  return 会话 === '姐妹群'
-    ? 姐妹群成员(data)
-    : 门牌列表.filter(m => {
-        const 配 = 户静态表[m];
-        return Boolean(data.户[m]) && (!配.隐身 || data.系统._母亲入列);
-      });
+  return 会话 === '姐妹群' ? 姐妹群成员(data) : 楼务群成员门牌(data);
 }
 
 function 群聊跟聊画像(data: SchemaType, m: 门牌): string {
@@ -751,10 +747,7 @@ async function 楼务群一拍(
   控制?: 手机小生成控制,
   引用约束?: 群聊引用响应约束,
 ): Promise<boolean> {
-  const 成员 = 门牌列表.filter(m => {
-    const 配 = 户静态表[m];
-    return Boolean(data.户[m]) && (!配.隐身 || data.系统._母亲入列);
-  });
+  const 成员 = 楼务群成员门牌(data);
   if (!成员.length) return false;
   const 时 = 取绝对时段(data);
   const 名单 = 成员.map(m => `${户静态表[m].妻名}(${m}室住户)`).join('、');

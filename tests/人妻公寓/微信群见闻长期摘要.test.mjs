@@ -100,6 +100,7 @@ function environment() {
   let generation = 0;
   let compressions = 0;
   const dependencies = {
+    ...require('../../src/人妻公寓/脚本/游戏逻辑/微信好友规则.ts'),
     ...stage,
     ...knowledge,
     ...sourceAPI,
@@ -184,6 +185,31 @@ function environment() {
     },
   };
 }
+
+test('旧母亲发言不再进入摘要，楼务群、姐妹群及成员原有摘要签名保持兼容', async () => {
+  const e = environment();
+  e.data.系统._母亲入列 = true;
+  e.data.系统._回国.茶话会状态 = '已完成';
+  await dataAPI.写库增量({ 新消息: [
+    { 楼: 5, 时: 20, 会话: '群', 发: '对方', 文: '夏乔:楼道灯修好了。' },
+    { 楼: 5, 时: 20, 会话: '姐妹群', 发: '对方', 文: '母亲:儿子，晚饭留好了。' },
+  ], 新圈: [], 节拍改: {} });
+  e.vars._微信.消息.push({ ...structuredClone(e.vars._微信.消息[0]), 序: 100, 文: '母亲:管理员，灯坏了。' });
+  for (const room of ['群', '姐妹群']) for (const recipient of [undefined, '101']) {
+    const snapshot = e.api.取群聊摘要快照(room, 5, recipient);
+    assert.equal(snapshot.消息.length, 1);
+    const item = snapshot.消息[0];
+    const token = JSON.stringify(['summary-test', room, ...(recipient ? [recipient] : []), e.api.微信摘要签名消息(item)]);
+    const hashA = e.api.推进摘要哈希(2166136261, token);
+    const hashB = e.api.推进摘要哈希(2246822507, `${token.length}:${token}`);
+    const oldKey = `RQP-微信进展-${room}${recipient ? `:接收:${recipient}` : ''}-${item.楼}-${item.序}-${hashA.toString(36)}${hashB.toString(36)}`;
+    assert.equal(snapshot.点[0].事件键, oldKey);
+  }
+  assert.equal(e.api.取群聊摘要快照('群', 5, '302').消息.length, 0);
+  const context = e.api.读取角色群聊见闻胶囊(['101'], 5, 2000, '群');
+  assert.match(context, /楼道灯修好了/);
+  assert.match(context, /母亲不在楼务群/);
+});
 
 test('超过400条后的承诺仍能供实际接收者回忆，新入群者不继承此前的约定', async () => {
   const env = environment();

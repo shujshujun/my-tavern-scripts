@@ -1,7 +1,7 @@
 import type { SchemaType } from '../../schema';
 import { 户静态表, 门牌列表, type 门牌 } from '../../stageConfig';
 import { 姐妹群成员 } from './雌竞系统';
-import { 已入住微信妻友门牌 } from './微信好友规则';
+import { 已入住微信妻友门牌, 楼务群成员门牌, 楼务群消息成员有效 } from './微信好友规则';
 import { 定位微信消息, 微信消息发送者, 微信消息提示行 } from './微信消息引用';
 import type { 微信消息记录 } from './微信消息撤回';
 import { 净化微信只读文本 } from './微信可知正文';
@@ -21,7 +21,8 @@ export function 当前社交接收门牌(data: SchemaType | null, 会话: string
   if (!data) return [];
   const 好友 = 已入住微信妻友门牌(data);
   if (会话 === '姐妹群') return 姐妹群成员(data);
-  if (会话 === '群' || 会话 === '朋友圈') return 好友;
+  if (会话 === '群') return 楼务群成员门牌(data);
+  if (会话 === '朋友圈') return 好友;
   return 好友.filter(m => m === 会话);
 }
 
@@ -47,6 +48,8 @@ export function 角色可知群消息(
   const 存活 = 消息们.filter(
     项 =>
       (项.会话 === '群' || 项.会话 === '姐妹群') &&
+      !(m === '302' && 项.会话 === '群') &&
+      楼务群消息成员有效(项) &&
       项.类 !== '撤回' &&
       项.发 !== '系统' &&
       在截止点内(项, 截止楼, 截止时) &&

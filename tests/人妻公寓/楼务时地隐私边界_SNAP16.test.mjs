@@ -14,6 +14,7 @@ globalThis.getVariables = () => ({});
 const ts = require('typescript');
 const { Schema, 创建户节点 } = require('../../src/人妻公寓/schema.ts');
 const { 门牌列表, 户静态表 } = require('../../src/人妻公寓/stageConfig.ts');
+const { 楼务群成员门牌 } = require('../../src/人妻公寓/脚本/游戏逻辑/微信好友规则.ts');
 const { 验收群聊隐私 } = require('../../src/人妻公寓/脚本/游戏逻辑/手机输出安全.ts');
 const { 汉字数, 解析微信群消息 } = require('../../src/人妻公寓/脚本/游戏逻辑/手机群聊格式.ts');
 const { 微信消息提示行, 解析微信AI引用前缀, 确保群聊指定角色发言 } = require('../../src/人妻公寓/脚本/游戏逻辑/微信消息引用.ts');
@@ -43,12 +44,54 @@ const modes = ['楼务', '姐妹', '姐妹孕情', '朋友圈孕情'];
 const names = new Set(['夏乔', '沈静仪']);
 const report = '昨晚家里水管漏了，麻烦登记维修。';
 const fresh = () => Schema.parse({ 户: { 101: 创建户节点(0), 102: 创建户节点(0) } });
+
+test('母亲正式加入姐妹群后，手动与自动楼务生产者仍只接受普通住户', async () => {
+  for (const build of [groupFixture, automaticFixture]) {
+    const e = build('母亲:楼道灯坏了。\n夏乔:水管报修已登记。');
+    e.data.户['302'] = 创建户节点(0);
+    e.data.系统._母亲入列 = true;
+    e.data.系统._回国.茶话会状态 = '已完成';
+    assert.equal(await e.run(), build === groupFixture ? true : '有新');
+    assert.deepEqual(e.库.消息.map(x => x.文), ['夏乔:水管报修已登记。']);
+    assert.doesNotMatch(e.calls[0].user, /母亲/);
+  }
+});
+
+test('旧母亲消息不能触发楼务群必答角色，姐妹群引用仍可指定母亲', () => {
+  const { 姐妹群成员 } = require('../../src/人妻公寓/脚本/游戏逻辑/雌竞系统.ts');
+  const 成员 = loadFunction('手机/交互/邀约与发消息.ts', '群聊成员门牌', { 姐妹群成员, 楼务群成员门牌 });
+  const quotes = require('../../src/人妻公寓/脚本/游戏逻辑/微信消息引用.ts');
+  const profile = loadFunction('手机/交互/邀约与发消息.ts', '群聊跟聊画像', { 户静态表 });
+  const constraint = loadFunction('手机/交互/邀约与发消息.ts', '创建群聊引用响应约束', {
+    ...quotes, 户静态表, 群聊成员门牌: 成员, 群聊跟聊画像: profile, 玩家名: () => '林舟',
+  });
+  const data = fresh();
+  data.户['302'] = 创建户节点(0);
+  data.系统._母亲入列 = true;
+  data.系统._回国.茶话会状态 = '已完成';
+  for (const room of ['群', '姐妹群']) {
+    const history = [{ 楼: 12, 时: 20, 会话: room, 发: '对方', 文: '母亲:儿子，记得吃饭。', 序: 1 },
+      { 楼: 12, 时: 20, 会话: room, 发: '对方', 文: '夏乔:收到。', 序: 2, 键: `引用跟聊:${room}:cooldown` }];
+    const reply = { 楼: 12, 时: 20, 会话: room, 发: '我', 文: '知道了。', 序: 3, 引用: { 序: 1 } };
+    const result = constraint(data, room, { 消息: history }, [reply], 12, 20);
+    if (room === '群') assert.equal(result, undefined);
+    else assert.equal(result.必答角色, '母亲');
+  }
+});
+
+test('没有普通住户时楼务自动拍不调用模型，母亲不能填补空名单', async () => {
+  const e = automaticFixture('母亲:楼道灯坏了。');
+  e.data.户 = { 302: 创建户节点(0) };
+  e.data.系统._母亲入列 = true;
+  assert.equal(await e.run(), '无新');
+  assert.equal(e.calls.length, 0);
+});
 function groupFixture(raw, history = []) {
   const data = fresh(), 库 = { 消息: _.cloneDeep(history) }, calls = [];
   // External model, memory repository, player profile and clock are adapters. The actual roster,
   // request producer, parser/privacy gate, real-quote resolver, required-speaker gate and array writes run unchanged.
   const producer = loadFunction('手机/交互/邀约与发消息.ts', '楼务群一拍', {
-    门牌列表, 户静态表, 微信群文本, 微信消息提示行, 解析微信AI引用前缀, 确保群聊指定角色发言,
+    门牌列表, 户静态表, 楼务群成员门牌, 微信群文本, 微信消息提示行, 解析微信AI引用前缀, 确保群聊指定角色发言,
     手机可见单条硬上限, 楼务微信消息仍有效,
     取绝对时段: stat => stat.系统._绝对时段,
     玩家名: () => '管理员甲',
@@ -166,7 +209,7 @@ function automaticFixture(raw) {
   // wardrobe aftermath) are controlled adjacent-module adapters. The complete current automatic
   // consumer, real group parser/privacy gate, late validity check, array write and watermark update run.
   const producer = loadFunction('手机/节拍引擎.ts', '楼务群自动消息', {
-    门牌列表, 户静态表, 微信群文本, 手机可见单条硬上限,
+    门牌列表, 户静态表, 楼务群成员门牌, 微信群文本, 手机可见单条硬上限,
     楼务群节拍键: e.key,
     旧钟楼跨度转时段: span => span,
     读余波: () => null,

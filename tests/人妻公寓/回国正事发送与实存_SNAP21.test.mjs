@@ -6,8 +6,9 @@ import * as ts from 'typescript';
 import { createHost, clone, productionFunction } from './helpers/微信事务恢复环境.mjs';
 import { consumerKit } from './helpers/微信余波消费环境.mjs';
 
-function fixture(lines, task = '回应回国') {
+function fixture(lines, task = '回应回国', playerName = '林舟') {
   const e = createHost();
+  e.st.name1 = playerName;
   const data = e.st.chat.at(-1).stat_data;
   data.户['302'] = clone(data.户['101']);
   Object.assign(data.系统._回国, {
@@ -15,7 +16,10 @@ function fixture(lines, task = '回应回国') {
     群名反应已完成: true, 母亲已坦白: true, 正事已说明: true,
     已点评成员: ['101', '102'], 已回应点评成员: ['101', '102'], 已回应回国成员: [],
   });
-  if (task === '坦白') data.系统._回国.母亲已坦白 = false;
+  if (task === '坦白') Object.assign(data.系统._回国, {
+    茶话会状态: '逐人调侃', 母亲已坦白: false, 正事已说明: false,
+    已点评成员: [], 已回应点评成员: [],
+  });
   if (task === '点评') Object.assign(data.系统._回国, { 茶话会状态: '逐人调侃', 已点评成员: [] });
   if (task === '转正事') Object.assign(data.系统._回国, { 茶话会状态: '逐人调侃', 正事已说明: false });
   if (task === '收束') data.系统._回国.已回应回国成员 = ['101', '102'];
@@ -23,7 +27,8 @@ function fixture(lines, task = '回应回国') {
   const kit = consumerKit(e, async (system, prompt) => {
     e.calls++; e.prompt = prompt;
     if (e.onGenerate) await e.onGenerate();
-    return e.lines.join('\n');
+    const raw = e.raw ?? e.lines.join('\n');
+    return e.normalize ? e.normalize(raw) : raw;
   });
   const timeline = e.load('手机时间线租约.ts');
   const proof = e.load('手机/回国提交凭据.ts');
@@ -55,7 +60,7 @@ function fixture(lines, task = '回应回国') {
     const [event, payload, receipt] = e.events[0];
     assert.equal(event, '人妻公寓:回国茶话会批次完成');
     assert.equal(proof.回国提交凭据有效(receipt, { 聊天ID: e.id, 世代: timeline.读取当前手机时间线租约世代(), 绝对时段: e.clock(), 聊天消息: e.st.chat, 微信消息: e.api.读库().消息 }), true);
-    const result = e.load('回国系统.ts').提交回国茶话会批次(data, payload, receipt.消息);
+    const result = e.load('回国系统.ts').提交回国茶话会批次(data, payload, receipt.消息, e.st.name1);
     return { result, payload, data };
   };
   e.data = data;
@@ -64,6 +69,55 @@ function fixture(lines, task = '回应回国') {
 
 const good = ['母亲:你爸大约一周后回国。他在楼里时，公共区域大家还是按普通住户和管理员的关系相处。', '夏乔:我知道了，到时候照常打招呼。'];
 const bad = ['母亲:茶还热，大家慢慢喝。', '夏乔:好，今天这茶真香。'];
+
+// 0.92.3 玩家截图原句节选：测试输入来自故障证据，不由测试替身生成剧情。
+const screenshotLine = '母亲:苏不仅叫我妈，现在也是我的男人。';
+test('0.92.3 截图原句经过封套、真实解析、落库及提交后推进同一节点', async () => {
+  const lines = [screenshotLine, '夏乔:哎哟我的天！', '许曼君:呵呵。'];
+  const e = fixture(lines, '坦白', '苏');
+  e.data.户['201'] = clone(e.data.户['101']);
+  e.data.系统._回国.茶话会成员快照 = ['101', '201'];
+  e.normalize = productionFunction('手机/生成引擎.ts', '净化消息', {
+    ...e.globals,
+    ...e.load('手机生成完整性.ts'),
+    ...e.load('正文生成完整性.ts'),
+    ...e.load('预设输出兼容.ts'),
+  });
+  e.raw = `封套外文本\n<回复>\n${lines.join('\n')}\n</回复>`;
+  assert.deepEqual(e.normalize(e.raw).split('\n'), lines);
+  assert.equal(await e.send(), true);
+  assert.deepEqual(e.messages().map(m => m.文), lines);
+  const { result, data } = e.commit();
+  assert.equal(result.成功, true);
+  assert.equal(data.系统._回国.母亲已坦白, true);
+  assert.equal(data.系统._回国.茶话会状态, '逐人调侃');
+  assert.match(e.prompt, /基础身份.*管理员苏的母亲，两人是母子/);
+});
+
+test('0.92.3 截图表述的否定、假设、疑问及其他对象不签发完成', () => {
+  const e = fixture([], '坦白', '苏');
+  const check = e.load('手机/回国茶话会验收.ts').验收回国茶话会文本;
+  for (const line of [
+    screenshotLine.replace('也是', '也不是'),
+    screenshotLine.replace('母亲:', '母亲:如果'),
+    screenshotLine.replace('。', '？'),
+    screenshotLine.replace('苏', '另一个人'),
+    screenshotLine.replace('母亲:', '夏乔:'),
+  ]) assert.equal(check([line], { 任务: '坦白' }, '苏'), false);
+  assert.equal(check(['母亲:苏是个男人。'], { 任务: '坦白' }, '苏'), false);
+});
+
+test('0.92.3 入群改名首拍提供基础身份且仍按演员顺序提交', async () => {
+  const e = fixture(['夏乔:这个新群名真有趣。', '沈静仪:我也看见了。', '母亲:看来大家都看见我取的新名字了。']);
+  e.data.系统._回国.群名反应已完成 = false;
+  const route = e.load('回国系统.ts');
+  await e.api.写库增量({ 新圈: [], 新消息: [{ 楼: 4, 时: 20, 会话: '姐妹群', 发: '系统',
+    文: route.回国姐妹群改名系统文案(route.生成回国姐妹群昵称('林舟')), 键: route.回国姐妹群改名消息键 }], 节拍改: {} });
+  assert.equal(await e.send(), true);
+  assert.match(e.prompt, /基础身份.*管理员林舟的母亲，两人是母子/);
+  assert.equal(e.commit().result.成功, true);
+});
+
 for (const [label, lines, expected] of [['正常', good, true], ['无关茶水', bad, false],
   ['只说回国', ['母亲:你爸大约一周后回国。', '夏乔:好，知道了。'], false],
   ['疑问', ['母亲:你爸一周后回国吗？公共区域大家按普通住户和管理员相处。', '夏乔:我也不知道。'], false],
