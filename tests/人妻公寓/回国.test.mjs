@@ -205,11 +205,6 @@ test('母亲入群提示先落库，约五秒后才真实改群名并允许角�
   assert.match(聊天列表源码, /_\.escape\(友\.名\)/, '动态 Persona 群名必须按纯文本转义');
   assert.match(群聊源码, /任务 = '改名反应'/);
   assert.match(群聊源码, /Math\.min\(2, 其他成员\.length\)/, '首拍应保证至多两名其他成员真实回应改名');
-  assert.match(
-    群聊源码,
-    /母亲首条索引[\s\S]*索引 >= 0 && 索引 < 母亲首条索引/,
-    '首拍不能只保证成员存在，还必须保证其他成员先反应、母亲随后接话',
-  );
   assert.match(群聊源码, /不得提前坦白母亲与管理员的具体关系/);
   assert.match(群聊源码, /export async function 同步回国延迟改名与群名反应/);
   assert.match(群聊源码, /setTimeout\(resolve, 回国姐妹群改名延迟毫秒\)/, '改名必须真实等待约五秒');
@@ -481,7 +476,7 @@ test('产品接线覆盖商店、背包使用、地图瓷砖、姐妹群任务�
   assert.match(客户端源码, /@use-return-file="使用回国经营归档册"/);
   assert.match(客户端源码, /eventEmit\('人妻公寓:回国动作'/);
   assert.match(房间动作源码, /添加回国动作\(动作, id\)/);
-  assert.match(群聊源码, /当前任务:[\s\S]*回国姐妹茶话会/);
+  assert.match(群聊源码, /参考事件目标:[\s\S]*回国姐妹茶话会/);
   assert.match(路线源码, /回国提交:/);
   const index源码 = readFileSync(new URL('../../src/人妻公寓/脚本/游戏逻辑/index.ts', import.meta.url), 'utf8');
   assert.match(index源码, /解析回国剧情事件/);

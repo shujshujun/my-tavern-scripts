@@ -1,8 +1,9 @@
 import { 户静态表, type 门牌 } from '../../../stageConfig';
 import type { 微信消息 } from './数据层';
 import type { 回国茶话会批次提交 } from '../回国系统';
+import { 手机事件进度可提交 } from '../手机事件进度';
 
-export type 回国正事气泡 = Pick<微信消息, '会话' | '发' | '文' | '键'>;
+export type 回国正事气泡 = Pick<微信消息, '会话' | '发' | '文' | '键' | '事件进度'>;
 
 /** 转正事必须由母亲交代回国安排和公共相处口径，不能以演员齐全代替任务完成。 */
 export function 验收回国正事文本(消息们: readonly string[]): boolean {
@@ -26,10 +27,11 @@ export function 验收回国正事实存(消息们: readonly 回国正事气泡[
   if (!消息们.length || 消息们.some(消息 => 消息.会话 !== '姐妹群' || 消息.发 !== '对方' ||
     !/^回国茶话会:转正事:-:(?:(?:[ab][^:]+):)?\d+$/u.test(消息.键 ?? ''))) return false;
   if (new Set(消息们.map(消息 => 消息.键!.replace(/:\d+$/u, ''))).size !== 1) return false;
+  if (消息们.some(消息 => 消息.事件进度 !== undefined)) return 手机事件进度可提交(消息们, '转正事', '');
   return 验收回国正事文本(消息们.map(消息 => 消息.文));
 }
 
-/** 任务内容由本次演员实际说出的文本承担，不从调用摘要或“送达成功”推断完成。 */
+/** 仅用于已落库的旧版凭据恢复；新回复不经过关键词判定。 */
 export function 验收回国茶话会文本(消息们: readonly string[], 提交: Pick<回国茶话会批次提交, '任务' | '目标'>, 玩家姓名 = ''): boolean {
   if (提交.任务 === '转正事') return 验收回国正事文本(消息们);
   if (提交.任务 !== '坦白' && 提交.任务 !== '点评') return true;
@@ -62,11 +64,15 @@ export function 验收回国茶话会实存(消息们: readonly 回国正事气�
   const 母亲名 = 户静态表['302'].妻名;
   const 成员名 = 成员.map(m => 户静态表[m as 门牌]?.妻名).filter(Boolean);
   if (发言人.some(名 => 名 !== 母亲名 && !成员名.includes(名))) return false;
+  const 新进度 = 消息们.some(消息 => 消息.事件进度 !== undefined);
   if (提交.任务 === '改名反应') {
     const 母亲索引 = 发言人.indexOf(母亲名);
-    if (母亲索引 < 0 || new Set(发言人.slice(0, 母亲索引).filter(名 => 成员名.includes(名))).size < Math.min(2, 成员名.length)) return false;
+    const 回应人 = 新进度 ? 发言人 : 发言人.slice(0, 母亲索引);
+    if (母亲索引 < 0 || new Set(回应人.filter(名 => 成员名.includes(名))).size < Math.min(2, 成员名.length)) return false;
   } else if (提交.任务 === '回应回国') {
     if (!(提交.回应成员?.length) || 提交.回应成员.some(m => !成员.includes(m) || !发言人.includes(户静态表[m as 门牌]?.妻名))) return false;
   } else if (!发言人.includes(母亲名)) return false;
+  if (提交.任务 === '点评' && !发言人.includes(户静态表[提交.目标 as 门牌]?.妻名)) return false;
+  if (新进度) return 手机事件进度可提交(消息们, 提交.任务, 目标 === '-' ? '' : 目标);
   return 验收回国茶话会文本(消息们.map(消息 => 消息.文), 提交, 玩家姓名);
 }

@@ -73,6 +73,7 @@ export function createTickHost(options = {}) {
     ...e.api, ...e.ui,
     ...e.load('手机/姐妹群跨容器事务.ts'),
     ...e.load('手机/母亲共居跨容器事务.ts'),
+    ...e.load('手机/回国茶话会恢复.ts'),
     门牌列表: e.load('../../stageConfig.ts').门牌列表,
     // 新局中不活动的专题通知与外部摘要排队不是本项被测入口；不代替接受/写入判定。
     同步管理任务微信: inert, 同步回国父亲微信: inert, 同步回国茶话会后私聊: inert,

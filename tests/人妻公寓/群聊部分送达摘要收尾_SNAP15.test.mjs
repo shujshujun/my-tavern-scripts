@@ -145,6 +145,9 @@ function fixture(options = {}) {
   e.run = productionFunction(source, '手动群接话', {
     ...e.globals,
     Schema: schema.Schema,
+    ...e.load('手机/回国茶话会验收.ts'),
+    玩家名: () => e.st.name1,
+    恢复回国茶话会主状态: async () => false,
     手机发送租约仍有效: hardValid,
     手机小生成仍有效: softValid,
     恢复双重继承群聊余波主状态: async () => {},
@@ -376,7 +379,7 @@ test('SNAP15 reload from the actual mirror preserves delivered keyed messages wi
 
 for (const partial of [false, true]) {
   test(`SNAP15 keyed special batch ${partial ? 'partial' : 'complete'} retains exact completion gate`, async () => {
-    const e = fixture({ session: '姐妹群', keys: '回国茶话会:收束:-:aSNAP15:', failures: partial ? { 2: 'false' } : {} });
+    const e = fixture({ session: '姐妹群', keys: '回国茶话会:收束:-:aSNAP15:', candidates: ['母亲:这件事已经交代清楚了。', '母亲:大家接着聊吧。'], failures: partial ? { 2: 'false' } : {} });
     assert.equal(await e.invoke(), true);
     await e.settle();
     assert.deepEqual(e.queueCalls, ['姐妹群']);
@@ -449,7 +452,7 @@ test('SNAP15 dedicated atomic receipt duplicate does not queue another visible-m
 });
 
 test('SNAP15 optional summary queue exception does not suppress an otherwise complete keyed batch', async () => {
-  const e = fixture({ session: '姐妹群', keys: '回国茶话会:收束:-:aSNAP15:' });
+  const e = fixture({ session: '姐妹群', keys: '回国茶话会:收束:-:aSNAP15:', candidates: ['母亲:这件事已经交代清楚了。', '母亲:大家接着聊吧。'] });
   e.queueFailure = true;
   assert.equal(await e.invoke(), true);
   assert.equal(e.events.length, 1);
