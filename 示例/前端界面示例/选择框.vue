@@ -44,7 +44,10 @@ async function handleClick(item: RoleplayOption) {
 }
 </script>
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> bca3799e3ab288f5d52b3e2777478f654fc5e816
 <style lang="scss" scoped>
 .roleplay_options {
   &_back {
